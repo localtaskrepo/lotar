@@ -60,6 +60,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 
 ### Custom Fields
 - `--field <KEY>=<VALUE>` - Arbitrary properties (can be used multiple times)
+- `--field=sprint=N` stores a custom field named `sprint`; it does not assign the task to a sprint. Use `lotar sprint add --sprint N TASK_ID` for actual membership (see [Sprints](./sprints.md)).
 
 ### Global Options
 - `--format <FORMAT>` - Output format: text, table, json, markdown
@@ -108,6 +109,8 @@ All task properties are validated against project configuration:
 - **Status**: Defaults to first state in `issue_states`
 - **Tags**: Validated against `tags` config
 - **Custom Fields**: Validated for format and allowed values
+
+Task creation and any auto-populated project members are committed together through the coordinated task transaction. A failed task write does not leave a member/configuration update behind. `--dry-run` performs validation without writing either the task or project configuration.
 
 Configure validation rules with:
 ```bash
@@ -203,8 +206,11 @@ lotar add "Refactor authentication module" --type=chore --effort=3d
 # Epic planning
 lotar add "User Management System" --epic --field=story_points=21 --field=quarter=Q3
 
-# Sprint tasks
+# Custom sprint label (not sprint membership)
 lotar add "Design user profile page" --field=sprint=15 --field=team=frontend
+
+# Assign the returned task ID to an actual sprint
+lotar sprint add --sprint 15 TASK_ID
 ```
 
 ### Personal Productivity

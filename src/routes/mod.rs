@@ -547,6 +547,45 @@ pub(super) fn not_found(msg: String) -> HttpResponse {
     ok_json(404, json!({"error": {"code": "NOT_FOUND", "message": msg}}))
 }
 
+/// Map a typed service error onto the canonical REST error envelope
+/// (DEV-58). Classification is exhaustive over [`LoTaRError`] and never
+/// inspects message text: validation and identifier-syntax faults are
+/// 400 INVALID_ARGUMENT; missing task/sprint/project resources are
+/// 404 NOT_FOUND; serialization, index, and genuine IO faults are
+/// 500 INTERNAL. Two IO-shaped conditions stay client errors because
+/// they are coordination states the caller can resolve and retry: lock
+/// contention (io `WouldBlock`) and a pending transaction journal
+/// (typed marker, see [`crate::storage::safety`]); both keep their
+/// exact diagnostics.
+pub(super) fn map_lotar_error(err: LoTaRError) -> HttpResponse {
+    match err {
+        // Validation diagnostics read best without the enum prefix; the
+        // InvalidTaskId display keeps its "Invalid task ID: " qualifier.
+        LoTaRError::ValidationError(msg) => bad_request(msg),
+        err @ LoTaRError::InvalidTaskId(_) => bad_request(err.to_string()),
+        err @ (LoTaRError::TaskNotFound(_)
+        | LoTaRError::SprintNotFound(_)
+        | LoTaRError::ProjectNotFound(_)) => not_found(err.to_string()),
+        err @ (LoTaRError::SerializationError(_) | LoTaRError::IndexError(_)) => {
+            internal(json!({"error": {"code": "INTERNAL", "message": err.to_string()}}))
+        }
+        LoTaRError::IoError(io_err) => {
+            let coordination_refusal = io_err.kind() == std::io::ErrorKind::WouldBlock
+                || io_err.get_ref().is_some_and(|inner| {
+                    inner
+                        .downcast_ref::<crate::storage::safety::PendingJournalRefusal>()
+                        .is_some()
+                });
+            let message = format!("IO error: {io_err}");
+            if coordination_refusal {
+                bad_request(message)
+            } else {
+                internal(json!({"error": {"code": "INTERNAL", "message": message}}))
+            }
+        }
+    }
+}
+
 #[allow(clippy::needless_pass_by_value)]
 pub(super) fn json_response(
     status: u16,
@@ -584,4 +623,98 @@ pub fn initialize(api_server: &mut ApiServer) {
     sync::register(api_server);
     projects::register(api_server);
     activity::register(api_server);
+}
+
+#[cfg(test)]
+mod dev58_error_mapping_cases {
+    use super::*;
+
+    fn assert_envelope(resp: &HttpResponse, status: u16, code: &str, message: &str) {
+        assert_eq!(resp.status, status, "status for {message:?}");
+        let body: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
+        assert_eq!(body["error"]["code"].as_str(), Some(code), "{body}");
+        let actual = body["error"]["message"].as_str().unwrap_or_default();
+        assert!(
+            actual.contains(message),
+            "message {actual:?} must contain {message:?}"
+        );
+    }
+
+    /// Exhaustive mapper coverage: every `LoTaRError` variant plus the two
+    /// IO-shaped coordination refusals pins its HTTP status, error code,
+    /// and message contract.
+    #[test]
+    fn map_lotar_error_is_exhaustive_and_typed() {
+        assert_envelope(
+            &map_lotar_error(LoTaRError::ValidationError("bad enum".into())),
+            400,
+            "INVALID_ARGUMENT",
+            "bad enum",
+        );
+        assert_envelope(
+            &map_lotar_error(LoTaRError::InvalidTaskId("TP-x: nope".into())),
+            400,
+            "INVALID_ARGUMENT",
+            "Invalid task ID: TP-x: nope",
+        );
+        assert_envelope(
+            &map_lotar_error(LoTaRError::TaskNotFound("TP-9".into())),
+            404,
+            "NOT_FOUND",
+            "Task not found: TP-9",
+        );
+        assert_envelope(
+            &map_lotar_error(LoTaRError::SprintNotFound(42)),
+            404,
+            "NOT_FOUND",
+            "Sprint not found: 42",
+        );
+        assert_envelope(
+            &map_lotar_error(LoTaRError::ProjectNotFound("ORPH".into())),
+            404,
+            "NOT_FOUND",
+            "Project not found: ORPH",
+        );
+        assert_envelope(
+            &map_lotar_error(LoTaRError::SerializationError("bad yaml".into())),
+            500,
+            "INTERNAL",
+            "Serialization error: bad yaml",
+        );
+        assert_envelope(
+            &map_lotar_error(LoTaRError::IndexError("stale".into())),
+            500,
+            "INTERNAL",
+            "Index error: stale",
+        );
+        assert_envelope(
+            &map_lotar_error(LoTaRError::IoError(std::io::Error::other("disk on fire"))),
+            500,
+            "INTERNAL",
+            "IO error: disk on fire",
+        );
+        // Lock contention (io WouldBlock) stays a client-side retryable
+        // refusal with its production diagnostics preserved.
+        assert_envelope(
+            &map_lotar_error(LoTaRError::IoError(std::io::Error::new(
+                std::io::ErrorKind::WouldBlock,
+                "Storage lock /w/TP/.task.lock is still busy after 2 seconds; retry after the other writer finishes; mutation was not run",
+            ))),
+            400,
+            "INVALID_ARGUMENT",
+            "still busy after 2 seconds",
+        );
+        // Pending-journal refusal carries the typed marker and stays 400.
+        assert_envelope(
+            &map_lotar_error(LoTaRError::IoError(std::io::Error::other(
+                crate::storage::safety::PendingJournalRefusal(
+                    "A pending task/sprint transaction journal exists at /w/.txn-pending.json"
+                        .into(),
+                ),
+            ))),
+            400,
+            "INVALID_ARGUMENT",
+            "pending task/sprint transaction journal",
+        );
+    }
 }

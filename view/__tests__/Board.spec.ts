@@ -13,7 +13,13 @@ const projectsStore = {
 
 const taskMap = shallowRef(new Map<string, TaskDTO>())
 const taskVersion = shallowRef(0)
-function createBoardHandle(key: string, status = shallowRef('idle' as string), error = shallowRef(null as string | null), hasSnapshot = shallowRef(false)) {
+function createBoardHandle(
+    key: string,
+    status = shallowRef('idle' as string),
+    error = shallowRef(null as string | null),
+    hasSnapshot = shallowRef(false),
+    memberIds: Set<string> | null = null,
+) {
     return {
         key,
         hasSnapshot,
@@ -23,7 +29,13 @@ function createBoardHandle(key: string, status = shallowRef('idle' as string), e
         status,
         error,
         lastSyncAt: shallowRef(0),
-        tasks: computed(() => { void taskVersion.value; return Array.from(taskMap.value.values()) }),
+        tasks: computed(() => {
+            void taskVersion.value
+            const all = Array.from(taskMap.value.values())
+            // Optional per-query membership: when set, the handle serves only
+            // its member rows, mirroring the server-scoped query contract.
+            return memberIds ? all.filter((t) => memberIds.has(t.id)) : all
+        }),
         refresh: vi.fn(async () => { status.value = 'ready'; hasSnapshot.value = true }),
         retain: vi.fn(),
         release: vi.fn(),
@@ -40,11 +52,11 @@ function boardKeyOf(filter: Record<string, unknown> = {}): string {
 }
 
 const boardQueryHandles = new Map<string, ReturnType<typeof createBoardHandle>>()
-function boardHandleFor(filter: Record<string, unknown> = {}) {
+function boardHandleFor(filter: Record<string, unknown> = {}, memberIds?: Set<string>) {
     const key = boardKeyOf(filter)
     let handle = boardQueryHandles.get(key)
     if (!handle) {
-        handle = createBoardHandle(key)
+        handle = createBoardHandle(key, undefined, undefined, undefined, memberIds ?? null)
         boardQueryHandles.set(key, handle)
     }
     return handle
@@ -99,10 +111,11 @@ vi.mock('vue-router', () => ({
 }))
 
 const showConfigMock = vi.fn(async (_project?: string) => ({}))
+const setStatusMock = vi.fn(async (_id: string, _status: string) => { })
 
 vi.mock('../api/client', () => ({
     api: {
-        setStatus: vi.fn(async () => { }),
+        setStatus: (id: string, status: string) => setStatusMock(id, status),
         showConfig: (project?: string) => showConfigMock(project),
     },
 }))
@@ -1078,5 +1091,270 @@ describe('Board overdue suppression for done tasks', () => {
         expect(wrapper2.find('.board.grid').exists()).toBe(true)
         expect(wrapper2.findAll('article.card.task').length).toBe(1)
         wrapper2.unmount()
+    })
+})
+
+describe('Board unknown-status Other column (DEV-68)', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+        routeState.query = { project: 'ACME' }
+        taskMap.value = new Map()
+        taskVersion.value = 0
+        boardQueryHandles.clear()
+        tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
+        configStore.statuses.value = ['Todo', 'Doing', 'Done']
+        showConfigMock.mockReset()
+        showConfigMock.mockImplementation(async () => ({}))
+        setStatusMock.mockClear()
+        invalidateCompletionPolicies()
+        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+            localStorage.clear()
+        }
+    })
+    afterEach(() => { vi.useRealTimers() })
+
+    it('renders unknown-status tasks in a synthetic Other column, sorted like configured columns', async () => {
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Todo', modified: '2026-01-02T10:00:00Z' }),
+            baseTask({ id: 'ACME-9', status: 'Blocked', modified: '2026-01-04T10:00:00Z' }),
+            baseTask({ id: 'ACME-2', status: 'Blocked', modified: '2026-01-04T10:00:00Z' }),
+            baseTask({ id: 'ACME-3', status: 'Blocked', modified: '2026-01-03T10:00:00Z' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        // Synthetic column is addressable by kind; its data-status keeps the
+        // reserved sentinel.
+        const otherCol = wrapper.find('.board.grid > .col.column[data-column-kind="other"]')
+        expect(otherCol.exists()).toBe(true)
+        expect(otherCol.attributes('data-status')).toBe('__other__')
+
+        // Header count and title.
+        expect(otherCol.find('.col-header strong').text()).toBe('Other')
+        expect(otherCol.find('.col-header .muted').text()).toContain('3')
+
+        // Same deterministic order as configured columns: modified desc with
+        // id-asc tie-breaks.
+        const ids = otherCol.findAll('article.card.task').map(c => c.find('.id').text())
+        expect(ids).toEqual(['ACME-2', 'ACME-9', 'ACME-3'])
+
+        // Every project task renders; grid tracks equal rendered columns.
+        expect(wrapper.findAll('article.card.task').length).toBe(4)
+        expect(wrapper.findAll('.board.grid > .col.column').length).toBe(4)
+        expect(wrapper.find('.board.grid').attributes('style')).toContain('repeat(4')
+        wrapper.unmount()
+    })
+
+    it('includes the synthetic column in grouped swimlanes, group counts, and grid tracks', async () => {
+        const tasks = [
+            baseTask({ id: 'ACME-1', assignee: 'alice', status: 'Todo' }),
+            baseTask({ id: 'ACME-2', assignee: 'bob', status: 'Blocked' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const select = wrapper.find('[data-testid="board-groupby"]')
+        await select.setValue('assignee')
+        await flushPromises()
+
+        // A group whose only task has an unknown status counts and renders.
+        const headers = wrapper.findAll('.swimlane-header')
+        const bobHeader = headers.find(h => h.text().includes('bob'))
+        expect(bobHeader).toBeTruthy()
+        expect(bobHeader!.find('.swimlane-count').text()).toBe('1')
+
+        // Cells exist per group per column, including the synthetic one.
+        expect(wrapper.findAll('.column-group-cell').length).toBe(8) // 2 groups x 4 columns
+        expect(wrapper.findAll('.column-group-cell[data-column-kind="other"]').length).toBe(2)
+        expect(wrapper.findAll('article.card.task').length).toBe(2)
+        expect(wrapper.findAll('.board-col-header').length).toBe(4)
+        expect(wrapper.find('.board.grid').attributes('style')).toContain('repeat(4')
+        wrapper.unmount()
+    })
+
+    it('keeps a configured literal __other__ status writable and distinct from the synthetic column', async () => {
+        configStore.statuses.value = ['Todo', 'Doing', 'Done', '__other__']
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: '__other__' }),
+            baseTask({ id: 'ACME-2', status: 'Mystery' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        // Configured literal __other__ stays a real status column; the
+        // synthetic fallback is distinguished by kind, not by renaming.
+        const configured = wrapper.find('.board.grid > .col.column[data-column-kind="status"][data-status="__other__"]')
+        expect(configured.exists()).toBe(true)
+        expect(configured.find('.col-header strong').text()).toBe('__other__')
+        expect(configured.find('article.card.task').text()).toContain('ACME-1')
+
+        const synthetic = wrapper.find('.board.grid > .col.column[data-column-kind="other"]')
+        expect(synthetic.exists()).toBe(true)
+        expect(synthetic.find('article.card.task').text()).toContain('ACME-2')
+
+        // Five distinct columns: 4 configured + 1 synthetic.
+        expect(wrapper.findAll('.board.grid > .col.column').length).toBe(5)
+
+        // Dropping on the configured literal writes the real status value.
+        const mysteryCard = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-2'))!
+        await mysteryCard.trigger('dragstart')
+        await configured.trigger('drop')
+        await flushPromises()
+        expect(setStatusMock).toHaveBeenCalledWith('ACME-2', '__other__')
+        wrapper.unmount()
+    })
+
+    it('never writes a status for drops on the synthetic Other column', async () => {
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Todo' }),
+            baseTask({ id: 'ACME-2', status: 'Mystery' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const synthetic = wrapper.find('.board.grid > .col.column[data-column-kind="other"]')
+        expect(synthetic.exists()).toBe(true)
+
+        const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-2'))!
+        await card.trigger('dragstart')
+        await synthetic.trigger('drop')
+        await synthetic.trigger('keydown', { key: 'Enter' })
+        await wrapper.find('.column[data-column-kind="status"][data-status="Todo"]').trigger('keydown', { key: 'Enter' })
+        await flushPromises()
+
+        expect(setStatusMock).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
+
+    it('keeps a configured Other status selectable in done filters while the synthetic column is not', async () => {
+        configStore.statuses.value = ['Todo', 'Doing', 'Done', 'Other']
+        showConfigMock.mockImplementation(async () => policyConfig({
+            issue_states: ['Todo', 'Doing', 'Done', 'Other'],
+            effective_done_states: ['Done'],
+        }))
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Other' }),
+            baseTask({ id: 'ACME-2', status: 'Blocked' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        // Configured "Other" is a real column; the synthetic fallback coexists.
+        const configuredOther = wrapper.find('.board.grid > .col.column[data-column-kind="status"][data-status="Other"]')
+        expect(configuredOther.exists()).toBe(true)
+        expect(configuredOther.find('article.card.task').text()).toContain('ACME-1')
+        expect(wrapper.find('.board.grid > .col.column[data-column-kind="other"]').exists()).toBe(true)
+
+        // Done-column checkboxes list configured labels only — exactly once
+        // each, never the synthetic fallback.
+        const labels = wrapper.findAll('.done-filter input[type="checkbox"]')
+            .map(input => input.element.closest('label')?.textContent?.trim())
+        expect(labels).toEqual(['Todo', 'Doing', 'Done', 'Other'])
+
+        // Seeding and persistence stay untouched by unknown-status tasks.
+        const doingToggle = wrapper.findAll('.done-filter input[type="checkbox"]')
+            .find(input => input.element.closest('label')?.textContent?.includes('Doing'))
+        await doingToggle!.setValue(true)
+        expect(JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')?.statuses).toEqual(['Done', 'Doing'])
+        wrapper.unmount()
+    })
+
+    it('paginates the synthetic Other column like normal columns', async () => {
+        const tasks: TaskDTO[] = []
+        for (let i = 1; i <= 32; i++) {
+            tasks.push(baseTask({ id: `ACME-${i}`, status: 'Blocked', modified: `2026-01-02T${String(i % 24).padStart(2, '0')}:00:00Z` }))
+        }
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const otherCol = wrapper.find('.board.grid > .col.column[data-column-kind="other"]')
+        expect(otherCol.findAll('article.card.task').length).toBe(30)
+        const showMoreBtn = otherCol.find('.show-more-btn')
+        expect(showMoreBtn.exists()).toBe(true)
+        expect(showMoreBtn.text()).toContain('Show 2 more')
+
+        await showMoreBtn.trigger('click')
+        await flushPromises()
+        expect(wrapper.find('.board.grid > .col.column[data-column-kind="other"]').findAll('article.card.task').length).toBe(32)
+        expect(wrapper.find('.board.grid > .col.column[data-column-kind="other"]').find('.show-more-btn').exists()).toBe(false)
+        wrapper.unmount()
+    })
+
+    it('excludes foreign-project unknown-status tasks from the project-scoped board', async () => {
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Todo' }),
+            baseTask({ id: 'ACME-2', status: 'Blocked' }),
+            baseTask({ id: 'BETA-1', status: 'Blocked' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        expect(wrapper.findAll('article.card.task').length).toBe(2)
+        expect(wrapper.text()).not.toContain('BETA-1')
+        const otherCol = wrapper.find('.board.grid > .col.column[data-column-kind="other"]')
+        expect(otherCol.find('.col-header .muted').text()).toContain('1')
+        wrapper.unmount()
+
+        routeState.query = { project: 'BETA' }
+        const wrapper2 = mount(Board)
+        await flushPromises()
+        const betaOther = wrapper2.find('.board.grid > .col.column[data-column-kind="other"]')
+        expect(betaOther.exists()).toBe(true)
+        expect(betaOther.find('article.card.task').text()).toContain('BETA-1')
+        wrapper2.unmount()
+        routeState.query = { project: 'ACME' }
+    })
+
+    it('renders only the active query membership, not every cached insertion', async () => {
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Todo' }),
+            baseTask({ id: 'ACME-2', status: 'Todo' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        // Server-scoped query membership: the base ACME query contains only
+        // ACME-1 even though the shared cache also holds ACME-2.
+        boardHandleFor({ project: 'ACME' }, new Set(['ACME-1']))
+        boardHandleFor({ project: 'ACME', due: 'overdue' }, new Set(['ACME-2']))
+
+        const wrapper = mount(Board)
+        await flushPromises()
+        expect(wrapper.text()).toContain('ACME-1')
+        expect(wrapper.text()).not.toContain('ACME-2')
+
+        // Switching filters adopts the new query and its membership only.
+        const filters = wrapper.findComponent({ name: 'FilterBar' })
+        filters.vm.$emit('update:value', { due: 'overdue' })
+        await vi.advanceTimersByTimeAsync(150)
+        await flushPromises()
+
+        expect(wrapper.text()).not.toContain('ACME-1')
+        expect(wrapper.text()).toContain('ACME-2')
+        wrapper.unmount()
     })
 })

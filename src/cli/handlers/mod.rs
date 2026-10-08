@@ -380,8 +380,12 @@ impl CommandHandler for AddHandler {
                 .unwrap_or(config);
         }
 
+        // Pending members are computed with the CLI rules, merged in memory
+        // for validation, and staged inside the coordinated creation
+        // transaction (DEV-89) so a validation or publish failure can never
+        // leave a mutated project config behind.
+        let mut pending: Vec<String> = Vec::new();
         if autop_members_enabled {
-            let mut pending: Vec<String> = Vec::new();
             let mut seen: HashSet<String> = HashSet::new();
 
             let mut consider = |value: Option<&String>| {
@@ -406,40 +410,20 @@ impl CommandHandler for AddHandler {
 
             consider(task.reporter.as_ref());
             consider(task.assignee.as_ref());
-
-            if !pending.is_empty() {
-                if args.dry_run || project_for_storage.trim().is_empty() {
-                    let mut merged = config.members.clone();
-                    for candidate in pending.iter() {
-                        if !merged
-                            .iter()
-                            .any(|existing| existing.eq_ignore_ascii_case(candidate))
-                        {
-                            merged.push(candidate.clone());
-                        }
-                    }
-                    merged.sort_by_key(|a| a.to_ascii_lowercase());
-                    config.members = merged;
-                } else {
-                    match crate::config::operations::auto_populate_project_members(
-                        resolver.path.as_path(),
-                        &project_for_storage,
-                        &config.members,
-                        &pending,
-                    ) {
-                        Ok(Some(updated)) => {
-                            config.members = updated;
-                        }
-                        Ok(None) => {}
-                        Err(err) => {
-                            return Err(format!(
-                                "Failed to auto-populate project members: {}",
-                                err
-                            ));
-                        }
-                    }
+        }
+        let base_members = config.members.clone();
+        if !pending.is_empty() {
+            let mut merged = config.members.clone();
+            for candidate in pending.iter() {
+                if !merged
+                    .iter()
+                    .any(|existing| existing.eq_ignore_ascii_case(candidate))
+                {
+                    merged.push(candidate.clone());
                 }
             }
+            merged.sort_by_key(|a| a.to_ascii_lowercase());
+            config.members = merged;
         }
 
         let validator = CliValidator::new(&config);
@@ -543,13 +527,18 @@ impl CommandHandler for AddHandler {
                 project_for_storage, original_project_name
             );
         }
-        let task_id = storage
-            .add(
-                &task,
-                &project_for_storage,
-                original_project_name.as_deref(),
-            )
-            .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
+        let task_id = crate::services::task_service::TaskService::commit_prepared_create(
+            &storage,
+            crate::services::task_service::PreparedTaskCreate {
+                task: &task,
+                project: &project_for_storage,
+                original_project_name: original_project_name.as_deref(),
+                validation_config: &config,
+                base_members: &base_members,
+                pending_members: &pending,
+            },
+        )
+        .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
         renderer.log_info(format_args!("add: created id={}", task_id));
 
         // Fire automation rules for the `created` event.

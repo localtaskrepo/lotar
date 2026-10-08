@@ -1,7 +1,37 @@
 title: Sync page errors when a scope has no sync reports
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-02T18:15:52.389031+00:00
+modified: 2026-10-06T18:29:06.196403+00:00
+comments:
+- date: 2026-10-06T18:07:01.695135+00:00
+  text: 'Plan: thirdapprovedtask after89/58Done. Keep reports requiredarray inREST/TS/OpenAPI; remove serde empty-Vec omission onSyncReportListResponse, declare/document alwaysarray, no optionalshapeorlegacyfallback UI. Add serialization/publicRESTemptyarray regression and actualSyncHubbrowserempty-state/noerror across fresh andexplicitprojectscope. Preserve validreport refresh/error isolation. Targetedthenfinal lint/fullRust/UI/freshsmoke. NoGit/index/commits/push/worktrees, nofakeDEVscenariofixtures; actualtempworkspaces.'
+- date: 2026-10-06T18:29:06.169478+00:00
+  text: 'Outcome: removed empty-Vec serialization omission/default from SyncReportListResponse.reports, preserving existing required-array TS/OpenAPI contract. Empty global/project scopes now return reports:[] and SyncHub renders No reports yet without undefined.map. Rust/UIcomments/OpenAPI fielddescription synchronized; no optionalfallback/clientshim or persistedreportmigration. Evidence: 3 new serialization/publicroute/OpenAPI tests pin alwaysarray and requiredfield; actualbackend/browser smoke validatesglobal+projectemptyresponses andscope-switch emptyUI/noerror. Final lint types/alltargetsClippy-Dwarnings/fmtpassed,1284Rustpassed/45actualGitless exclusions,558UIpassed,fresh216smokepassed/25actualGitskips/55files. Logs target/sequence-20261006/dev94/. Initialtestcompile scaffold import/resolver mismatch corrected toexisting ApiServer/commonEnvVarGuard; no productioncoverage weakening. Remaining:no blocker; Git/Windows/unpublishedCI not claimed. NoRepositoryGit/index/commit/push/worktrees. Guidance:no durableinstruction correction. Closebefore68.'
 description: 'Found while capturing README screenshots (DEV-17). GET /api/sync/reports/list omits the reports field when the list is empty (src/api_types.rs SyncReportListResponse has skip_serializing_if = Vec::is_empty), but view/api/types.ts declares reports: SyncReportMeta[] as required and view/pages/SyncHub.vue loadReports() calls payload.reports.map(...). Result: a fresh workspace with remotes but no reports shows ''Cannot read properties of undefined (reading map)'' in the Sync reports card. Repro: node scripts/generate-test-tasks.mjs --demo, lotar serve, open /sync. Acceptance: decide the contract (always serialize an empty array, or make it optional in TS/OpenAPI and default in the UI), keep src/api_types.rs, view/api/types.ts and docs/openapi.json in agreement, add a regression test; the empty state renders ''No reports yet.'' without an error.'
+history:
+- at: 2026-10-06T18:07:01.662375+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-06T18:07:01.695135+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T18:29:06.169478+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T18:29:06.196403+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

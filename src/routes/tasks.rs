@@ -23,13 +23,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 crate::api_events::emit_task_created(&task, actor.as_deref());
                 ok_json(201, json!({"data": task}))
             }
-            Err(e) => match e {
-                LoTaRError::ValidationError(msg) => bad_request(msg),
-                LoTaRError::SprintNotFound(id) => bad_request(format!("Sprint not found: {}", id)),
-                other => {
-                    internal(json!({"error": {"code":"INTERNAL", "message": other.to_string()}}))
-                }
-            },
+            Err(e) => map_lotar_error(e),
         }
     });
 
@@ -194,10 +188,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         match outcome {
             Ok(task) => ok_json(200, json!({"data": task})),
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     });
 
@@ -230,7 +221,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
     let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
         Ok(c) => c,
-        Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+        // Configuration failures are server-side (DEV-58): 500 INTERNAL.
+        Err(e) => {
+            return internal(
+                json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
+            )
+        }
     };
 
     // Apply per-project overrides using the canonical ID prefix (final
@@ -286,8 +282,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
     let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config)
     {
+        // Store-root resolution failures are server-side (DEV-58).
         Ok(p) => p,
-        Err(e) => return bad_request(e.to_string()),
+        Err(e) => return map_lotar_error(e),
     };
 
     // Identity and mutation access resolve BEFORE any file bytes are written:
@@ -300,25 +297,25 @@ pub(super) fn register(api_server: &mut ApiServer) {
     }
     {
         let storage = crate::storage::manager::Storage::new(&resolver.path);
+        // Typed precheck classification (DEV-58): a missing target is a
+        // 404; malformed or ambiguous identifiers and cross-root targets
+        // stay client errors, without message-string matching.
         let refusal = match storage.resolve_task_location(task_id) {
-            Ok(location) if !location.is_in_root(&resolver.path) => Some(format!(
+            Ok(location) if !location.is_in_root(&resolver.path) => Some(bad_request(format!(
                 "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
                 location.full_id(),
                 location.root.display(),
                 resolver.path.display()
-            )),
+            ))),
             Ok(_) => None,
             Err(crate::storage::identity::TaskLookupError::NotFound(_)) => {
-                Some(format!("Task '{}' not found", task_id))
+                Some(not_found(format!("Task '{}' not found", task_id)))
             }
-            Err(err) => Some(err.to_string()),
+            Err(err) => Some(bad_request(err.to_string())),
         };
         drop(storage);
-        if let Some(message) = refusal {
-            if message.contains("not found") {
-                return not_found(message);
-            }
-            return bad_request(message);
+        if let Some(response) = refusal {
+            return response;
         }
     }
 
@@ -332,7 +329,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         // LAST blob operation and before any post-commit hook runs.
         let _store_guard = match AttachmentService::lock_store(&root) {
             Ok(guard) => guard,
-            Err(e) => return bad_request(e.to_string()),
+            Err(e) => return map_lotar_error(e),
         };
 
         let (stored, created) =
@@ -390,10 +387,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached: outcome.changed, task: outcome.task }}),
             )
         }
-        Err(e) => match e {
-            LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-            _ => bad_request(e.to_string()),
-        },
+        Err(e) => map_lotar_error(e),
     }
 });
 
@@ -424,7 +418,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
             Ok(c) => c,
-            Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+            // Configuration failures are server-side (DEV-58): 500 INTERNAL.
+            Err(e) => {
+                return internal(
+                    json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
+                )
+            }
         };
 
         let config = match crate::storage::TaskId::parse(payload.id.trim()) {
@@ -437,8 +436,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(_) => base_config,
         };
         let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
+            // Store-root resolution failures are server-side (DEV-58).
             Ok(p) => p,
-            Err(e) => return bad_request(e.to_string()),
+            Err(e) => return map_lotar_error(e),
         };
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
@@ -452,7 +452,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             // before any post-commit hook runs.
             let _store_guard = match AttachmentService::lock_store(&root) {
                 Ok(guard) => guard,
-                Err(e) => return bad_request(e.to_string()),
+                Err(e) => return map_lotar_error(e),
             };
 
             match AttachmentService::detach_managed_reference(
@@ -508,10 +508,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     json!({"data": crate::api_types::AttachmentRemoveResponse { task: outcome.task, deleted, still_referenced }}),
                 )
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     },
 );
@@ -555,10 +552,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                         json!({"data": crate::api_types::LinkReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
                     )
                 }
-                Err(e) => match e {
-                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                    _ => bad_request(e.to_string()),
-                },
+                Err(e) => map_lotar_error(e),
             }
         },
     );
@@ -601,10 +595,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     json!({"data": crate::api_types::LinkReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
                 )
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     },
 );
@@ -655,10 +646,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                         json!({"data": crate::api_types::CodeReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
                     )
                 }
-                Err(e) => match e {
-                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                    _ => bad_request(e.to_string()),
-                },
+                Err(e) => map_lotar_error(e),
             }
         },
     );
@@ -701,10 +689,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     json!({"data": crate::api_types::CodeReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
                 )
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     },
 );
@@ -755,10 +740,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                         json!({"data": crate::api_types::FileReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
                     )
                 }
-                Err(e) => match e {
-                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                    _ => bad_request(e.to_string()),
-                },
+                Err(e) => map_lotar_error(e),
             }
         },
     );
@@ -809,10 +791,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     json!({"data": crate::api_types::FileReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
                 )
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     },
 );
@@ -864,10 +843,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     json!({"data": crate::api_types::GenericReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
                 )
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     });
 
@@ -921,10 +897,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     json!({"data": crate::api_types::GenericReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
                 )
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     },
 );
@@ -983,10 +956,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 crate::api_events::emit_task_updated(&task, actor.as_deref());
                 ok_json(200, json!({"data": task}))
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                other => bad_request(other.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     });
 
@@ -1019,10 +989,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 crate::api_events::emit_task_updated(&task, actor.as_deref());
                 ok_json(200, json!({"data": task}))
             }
-            Err(e) => match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                other => bad_request(other.to_string()),
-            },
+            Err(e) => map_lotar_error(e),
         }
     });
 
@@ -1045,13 +1012,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         let dto = match TaskService::add_comment(&mut storage, &id, &text) {
             Ok(dto) => dto,
-            Err(err) => match err {
-                LoTaRError::TaskNotFound(_) => {
-                    return not_found(format!("Task '{}' not found", id));
-                }
-                // Malformed IDs (canonical parse failures) fail closed as 400.
-                _ => return bad_request(err.to_string()),
-            },
+            // Typed classification (DEV-58): malformed IDs and tombstone
+            // refusals stay 400s; storage/serialization faults are 500s.
+            Err(err) => return map_lotar_error(err),
         };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
         crate::api_events::emit_task_updated(&dto, actor.as_deref());
@@ -1085,13 +1048,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
         let dto = match TaskService::update_comment(&mut storage, &id, index, trimmed) {
             Ok(dto) => dto,
-            Err(err) => match err {
-                LoTaRError::TaskNotFound(_) => {
-                    return not_found(format!("Task '{}' not found", id));
-                }
-                // Malformed IDs (canonical parse failures) fail closed as 400.
-                _ => return bad_request(err.to_string()),
-            },
+            // Typed classification (DEV-58): malformed IDs, bad indices,
+            // and tombstone refusals stay 400s; storage faults are 500s.
+            Err(err) => return map_lotar_error(err),
         };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
         crate::api_events::emit_task_updated(&dto, actor.as_deref());
@@ -1122,12 +1081,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
         ) {
             Ok(value) => value,
             Err(err) => {
-                // Invalid IDs, project mismatches, ambiguity, and cross-root
-                // refusals are client errors, not internal failures.
-                return match err {
-                    LoTaRError::TaskNotFound(_) => not_found(err.to_string()),
-                    _ => bad_request(err.to_string()),
-                };
+                // Typed classification (DEV-58): invalid IDs, project
+                // mismatches, ambiguity, and cross-root refusals are
+                // client errors; storage faults are internal failures.
+                return map_lotar_error(err);
             }
         };
         if outcome.deleted {
@@ -1167,10 +1124,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 crate::api_events::emit_task_updated(&dto, actor.as_deref());
                 ok_json(200, json!({"data": dto}))
             }
-            Err(err) => match err {
-                LoTaRError::TaskNotFound(_) => not_found(err.to_string()),
-                _ => bad_request(err.to_string()),
-            },
+            Err(err) => map_lotar_error(err),
         }
     });
 

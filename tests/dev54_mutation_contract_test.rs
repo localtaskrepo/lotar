@@ -388,14 +388,15 @@ fn rest_invalid_create_leaves_no_task_files() {
     assert_eq!(resp.status, 400);
     assert_eq!(count_task_files(&fx.tasks_dir, "ORPH"), 0);
 
-    // Invalid sprint reference is rejected before the task file is written.
+    // Invalid sprint reference is rejected before the task file is written
+    // (typed NOT_FOUND since DEV-58).
     let resp = api.handle_request(&mk_req(
         "POST",
         "/api/tasks/add",
         &[],
         json!({"title": "bad sprint", "project": "ORPH", "sprints": [424242]}),
     ));
-    assert_eq!(resp.status, 400);
+    assert_eq!(resp.status, 404);
     assert_eq!(count_task_files(&fx.tasks_dir, "ORPH"), 0);
 }
 

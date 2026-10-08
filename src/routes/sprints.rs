@@ -103,14 +103,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let outcome = match SprintService::create(&mut storage, sprint, defaults) {
             Ok(outcome) => outcome,
-            Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to create sprint: {}", err)
-                    }
-                }));
-            }
+            // Typed classification (DEV-58): storage faults are 500s.
+            Err(err) => return map_lotar_error(err),
         };
 
         let response = SprintCreateResponse {
@@ -324,30 +318,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let sprint_id = body.sprint;
         let existing = match SprintService::get(&storage, sprint_id) {
             Ok(record) => record,
-            Err(LoTaRError::SprintNotFound(_)) => {
-                return not_found(format!("Sprint #{} not found", sprint_id));
-            }
-            Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to load sprint: {}", err)
-                    }
-                }));
-            }
+            // Typed classification (DEV-58): unknown sprints are 404s;
+            // storage faults are 500s.
+            Err(err) => return map_lotar_error(err),
         };
 
         match SprintService::delete(&mut storage, sprint_id) {
             Ok(true) => {}
-            Ok(false) => return not_found(format!("Sprint #{} not found", sprint_id)),
-            Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to delete sprint: {}", err)
-                    }
-                }));
-            }
+            Ok(false) => return not_found(format!("Sprint not found: {sprint_id}")),
+            Err(err) => return map_lotar_error(err),
         }
 
         let mut records = match SprintService::list(&storage) {
@@ -592,19 +571,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let record = match SprintService::get(&storage, sprint_id) {
             Ok(record) => record,
-            Err(err) => {
-                return match err {
-                    LoTaRError::SprintNotFound(_) => {
-                        bad_request(format!("Sprint {} not found", sprint_id))
-                    }
-                    other => internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to load sprint: {}", other),
-                        }
-                    })),
-                };
-            }
+            // Typed classification (DEV-58): unknown sprints are 404s;
+            // storage faults are 500s.
+            Err(err) => return map_lotar_error(err),
         };
 
         let resolved_config =
@@ -656,19 +625,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let record = match SprintService::get(&storage, sprint_id) {
             Ok(record) => record,
-            Err(err) => {
-                return match err {
-                    LoTaRError::SprintNotFound(_) => {
-                        bad_request(format!("Sprint {} not found", sprint_id))
-                    }
-                    other => internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to load sprint: {}", other),
-                        }
-                    })),
-                };
-            }
+            // Typed classification (DEV-58): unknown sprints are 404s;
+            // storage faults are 500s.
+            Err(err) => return map_lotar_error(err),
         };
 
         let resolved_config =
@@ -714,19 +673,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let existing = match SprintService::get(&storage, body.sprint) {
             Ok(record) => record,
-            Err(err) => {
-                return match err {
-                    LoTaRError::SprintNotFound(_) => {
-                        bad_request(format!("Sprint {} not found", body.sprint))
-                    }
-                    other => internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to load sprint: {}", other)
-                        }
-                    })),
-                };
-            }
+            // Typed classification (DEV-58): unknown sprints are 404s;
+            // storage faults are 500s.
+            Err(err) => return map_lotar_error(err),
         };
 
         let mut sprint = existing.sprint.clone();
@@ -734,14 +683,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let outcome = match SprintService::update(&mut storage, body.sprint, sprint) {
             Ok(outcome) => outcome,
-            Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to update sprint: {}", err)
-                    }
-                }));
-            }
+            Err(err) => return map_lotar_error(err),
         };
 
         let payload = SprintUpdateResponse {

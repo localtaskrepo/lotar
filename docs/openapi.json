@@ -3,7 +3,7 @@
   "info": {
     "title": "LoTaR API",
     "version": "1.0.0",
-    "description": "REST API for LoTaR task management. Includes task CRUD, projects, config, and realtime events via SSE."
+    "description": "REST API for LoTaR task management. Includes task CRUD, projects, config, and realtime events via SSE. Task/sprint domain failures use the existing error envelope: invalid input/identity/safety refusals return 400 INVALID_ARGUMENT, missing resources return 404 NOT_FOUND, and I/O/serialization/index failures return 500 INTERNAL."
   },
   "servers": [
     {
@@ -100,6 +100,9 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -1931,7 +1934,7 @@
     "/api/sprints/summary": {
       "get": {
         "summary": "Get sprint summary analytics",
-        "description": "Returns lifecycle, completion, and timeline metrics for the selected sprint.",
+        "description": "Returns lifecycle, completion, and timeline metrics for the selected sprint. Invalid identifiers return 400; an unknown positive sprint id returns 404.",
         "parameters": [
           {
             "name": "sprint",
@@ -1958,6 +1961,9 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "500": {
             "$ref": "#/components/responses/InternalError"
           }
@@ -1967,7 +1973,7 @@
     "/api/sprints/burndown": {
       "get": {
         "summary": "Get sprint burndown series",
-        "description": "Returns burndown totals and remaining work series for tasks, points, and hours.",
+        "description": "Returns burndown totals and remaining work series for tasks, points, and hours. Invalid identifiers return 400; an unknown positive sprint id returns 404.",
         "parameters": [
           {
             "name": "sprint",
@@ -1993,6 +1999,9 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -3035,7 +3044,7 @@
     "/api/sprints/update": {
       "post": {
         "summary": "Update sprint fields",
-        "description": "Updates the sprint identified by the required sprint id. Omitted fields are unchanged; null clears the nullable capacity/actual-timestamp fields. Returns 400 for an unknown sprint id, sprint 0, or an invalid body.",
+        "description": "Updates the sprint identified by the required sprint id. Omitted fields are unchanged; null clears the nullable capacity/actual-timestamp fields. Returns 404 for an unknown sprint id; sprint 0 or an invalid body returns 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3095,6 +3104,9 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -6732,6 +6744,7 @@
           },
           "reports": {
             "type": "array",
+            "description": "Always present; an empty scope returns [] rather than omitting this field.",
             "items": {
               "$ref": "#/components/schemas/SyncReportMeta"
             }

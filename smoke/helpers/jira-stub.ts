@@ -1,6 +1,5 @@
 import http from 'node:http';
 import { AddressInfo } from 'node:net';
-import getPort from 'get-port';
 
 /** A single request recorded by the stub, with the exact query the backend sent. */
 export interface StubRequest {
@@ -39,12 +38,12 @@ const BARRIER_AUTO_RELEASE_MS = 30_000;
  */
 export class JiraStub {
     static async start(options: JiraStubOptions): Promise<JiraStub> {
-        const port = await getPort({ host: HOST });
-        const stub = new JiraStub(port, options);
+        const stub = new JiraStub(options);
         await new Promise<void>((resolve, reject) => {
             stub.server.once('error', reject);
-            stub.server.listen(port, HOST, () => resolve());
+            stub.server.listen(0, HOST, () => resolve());
         });
+        stub.port = (stub.server.address() as AddressInfo).port;
         return stub;
     }
 
@@ -54,15 +53,15 @@ export class JiraStub {
     private readonly server: http.Server;
     private readonly projectKey: string;
     /** Base URL the seeded auth profiles point at. */
-    readonly url: string;
+    get url(): string { return `http://${HOST}:${this.port}`; }
+    private port = 0;
     private nextCreatedId = 4000;
     private gate: Promise<void> | null = null;
     private gateRelease: (() => void) | null = null;
 
-    private constructor(private readonly port: number, options: JiraStubOptions) {
+    private constructor(options: JiraStubOptions) {
         this.projectKey = options.projectKey;
         this.issues = [...(options.issues ?? [])];
-        this.url = `http://${HOST}:${port}`;
         this.server = http.createServer((req, res) => {
             void this.handle(req, res);
         });

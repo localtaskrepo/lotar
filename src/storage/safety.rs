@@ -127,13 +127,29 @@ fn refuse_under_pending_transaction(target_dir: &Path) -> std::io::Result<()> {
     };
     let journal = root.join(crate::storage::transaction::JOURNAL_FILE_NAME);
     if journal.is_file() {
-        return Err(std::io::Error::other(format!(
+        return Err(std::io::Error::other(PendingJournalRefusal(format!(
             "A pending task/sprint transaction journal exists at {}; a crashed multi-file mutation is waiting to be rolled back. Run any task create/update, sprint assignment, or sprint cleanup operation to trigger recovery, then retry this change",
             journal.display()
-        )));
+        ))));
     }
     Ok(())
 }
+
+/// Typed marker wrapping the pending-transaction refusal message (DEV-58):
+/// REST error classification recognizes this client-correctable
+/// coordination state by downcasting the `io::Error` payload instead of
+/// matching on message text. Display is exactly the refusal message, so
+/// existing diagnostics are unchanged.
+#[derive(Debug)]
+pub(crate) struct PendingJournalRefusal(pub(crate) String);
+
+impl std::fmt::Display for PendingJournalRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for PendingJournalRefusal {}
 
 /// Sync the new file before atomically publishing it. Callers requiring durable
 /// directory entries must also sync the parent directory after this succeeds.

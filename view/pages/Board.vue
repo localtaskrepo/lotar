@@ -167,14 +167,15 @@
           </div>
           <!-- Per-column tasks for this group -->
           <template v-if="!collapsedGroups.has(group)">
-            <div v-for="st in columns" :key="`${group}::${st}`" class="col column-group-cell"
-                 :data-status="st"
-                 :class="{ 'over-limit': overLimit(st) }"
+            <div v-for="col in boardColumns" :key="`${group}::${col.key}`" class="col column-group-cell"
+                 :data-status="col.synthetic ? OTHER_COLUMN_KEY : col.label"
+                 :data-column-kind="col.synthetic ? 'other' : 'status'"
+                 :class="{ 'over-limit': overLimit(col) }"
                  @dragover.prevent="onDragOver"
-                 @drop.prevent="onDrop(st)"
+                 @drop.prevent="onDrop(col)"
             >
               <TransitionGroup name="task-list" tag="div" class="col-cards">
-                <article v-for="task in groupedColumnTasks(st, group)" :key="task.id"
+                <article v-for="task in groupedColumnTasks(col, group)" :key="task.id"
                          class="card task"
                          :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
                          draggable="true"
@@ -195,68 +196,70 @@
                       <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                     </template>
                   </header>
-                                    <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
+                  <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
                 </article>
-                <div v-if="!groupedColumnTasks(st, group).length" key="__group-empty__" class="muted" style="padding: 4px 0; font-size: var(--text-xs, 0.75rem);">—</div>
+                <div v-if="!groupedColumnTasks(col, group).length" key="__group-empty__" class="muted" style="padding: 4px 0; font-size: var(--text-xs, 0.75rem);">—</div>
               </TransitionGroup>
             </div>
           </template>
         </template>
         <!-- Column headers at the very top (rendered first via CSS order) -->
-        <div v-for="st in columns" :key="`hdr-${st}`" class="col-header row board-col-header"
-             :data-status="st"
-             style="justify-content: space-between; align-items:center; gap:8px;">
-          <strong>{{ st }}</strong>
+        <div v-for="col in boardColumns" :key="`hdr-${col.key}`" class="col-header row board-col-header"
+              :data-status="col.synthetic ? OTHER_COLUMN_KEY : col.label"
+              :data-column-kind="col.synthetic ? 'other' : 'status'"
+              style="justify-content: space-between; align-items:center; gap:8px;">
+          <strong>{{ col.label }}</strong>
           <span class="row" style="gap:6px; align-items:center;">
             <UiButton
               icon-only
               variant="ghost"
               class="board-col-add"
               type="button"
-              :aria-label="`Add task in ${st}`"
-              :title="`Add task in ${st}`"
-              @click="openCreateInStatus(st)"
+              :aria-label="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
+              :title="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
+              @click="col.synthetic ? openCreateInBoard() : openCreateInStatus(col.label)"
             >
               <IconGlyph name="plus" />
             </UiButton>
-            <span class="muted" :class="{ warn: overLimit(st) }">
-              <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
-              <template v-else>{{ countOf(st) }}</template>
+            <span class="muted" :class="{ warn: overLimit(col) }">
+              <template v-if="limitOf(col) > 0">{{ countOf(col) }} / {{ limitOf(col) }}</template>
+              <template v-else>{{ countOf(col) }}</template>
             </span>
           </span>
         </div>
       </template>
       <template v-else>
-        <div v-for="st in columns" :key="st" class="col column"
-             :data-status="st"
-             :class="{ 'over-limit': overLimit(st) }"
+        <div v-for="col in boardColumns" :key="col.key" class="col column"
+             :data-status="col.synthetic ? OTHER_COLUMN_KEY : col.label"
+             :data-column-kind="col.synthetic ? 'other' : 'status'"
+             :class="{ 'over-limit': overLimit(col) }"
              tabindex="0"
              @dragover.prevent="onDragOver"
-             @drop.prevent="onDrop(st)"
-             @keydown.enter.prevent="onDrop(st)"
+             @drop.prevent="onDrop(col)"
+             @keydown.enter.prevent="onDrop(col)"
         >
           <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
-            <strong>{{ st }}</strong>
+            <strong>{{ col.label }}</strong>
             <span class="row" style="gap:6px; align-items:center;">
               <UiButton
                 icon-only
                 variant="ghost"
                 class="board-col-add"
                 type="button"
-                :aria-label="`Add task in ${st}`"
-                :title="`Add task in ${st}`"
-                @click="openCreateInStatus(st)"
+                :aria-label="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
+                :title="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
+                @click="col.synthetic ? openCreateInBoard() : openCreateInStatus(col.label)"
               >
                 <IconGlyph name="plus" />
               </UiButton>
-              <span class="muted" :class="{ warn: overLimit(st) }">
-                <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
-                <template v-else>{{ countOf(st) }}</template>
+              <span class="muted" :class="{ warn: overLimit(col) }">
+                <template v-if="limitOf(col) > 0">{{ countOf(col) }} / {{ limitOf(col) }}</template>
+                <template v-else>{{ countOf(col) }}</template>
               </span>
             </span>
           </div>
           <TransitionGroup name="task-list" tag="div" class="col-cards">
-            <article v-for="task in visibleFlatTasks(st)" :key="task.id"
+            <article v-for="task in visibleFlatTasks(col)" :key="task.id"
                      class="card task"
                      :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
                      draggable="true"
@@ -277,56 +280,13 @@
                   <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                 </template>
               </header>
-                            <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
+              <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
             </article>
-            <div v-if="!grouped[st]?.length" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
+            <div v-if="!columnTasks(col).length" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
           </TransitionGroup>
-          <button v-if="hiddenFlatCount(st) > 0" type="button" class="show-more-btn" @click="showMore(st)">
-            Show {{ hiddenFlatCount(st) }} more…
+          <button v-if="hiddenFlatCount(col) > 0" type="button" class="show-more-btn" @click="showMore(col.key)">
+            Show {{ hiddenFlatCount(col) }} more…
           </button>
-        </div>
-        <div v-if="other.length" class="col column" data-status="__other__">
-          <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
-            <strong>Other</strong>
-            <span class="row" style="gap:6px; align-items:center;">
-              <UiButton
-                icon-only
-                variant="ghost"
-                class="board-col-add"
-                type="button"
-                aria-label="Add task"
-                title="Add task"
-                @click="openCreateInBoard()"
-              >
-                <IconGlyph name="plus" />
-              </UiButton>
-              <span class="muted">{{ other.length }}</span>
-            </span>
-          </div>
-          <TransitionGroup name="task-list" tag="div" class="col-cards">
-            <article v-for="task in other" :key="task.id"
-                     class="card task"
-                     :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
-                     draggable="true"
-                     @dragstart="onDragStart(task)"
-                     @dblclick="openTask(task.id)"
-                     @click.exact="selectTask(task.id)"
-                     tabindex="0">
-              <header v-if="hasTaskHeader(task)" class="row task-header">
-                <template v-if="hasTaskIdentity(task)">
-                  <div class="row task-header__left">
-                    <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                    <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
-                  </div>
-                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                </template>
-                <template v-else>
-                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                </template>
-              </header>
-                            <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
-            </article>
-          </TransitionGroup>
         </div>
       </template>
     </div>
@@ -617,26 +577,32 @@ const columnLookup = computed(() => {
   return map
 })
 
-const rawGrouped = computed<Record<string, TaskDTO[]>>(() => {
-  const g: Record<string, TaskDTO[]> = {}
+// DEV-68 shared ordered base: ONE deterministic pass (project-prefix guard +
+// server-basis display sort) partitions tasks into configured columns plus a
+// synthetic fallback bucket for unknown custom statuses. Flat and grouped
+// renders derive from the same buckets, so ordering, counts, and membership
+// cannot diverge. Filter semantics stay server-authoritative — this pass only
+// orders and buckets the query's own rows.
+const partitionedBoardTasks = computed<{ configured: Record<string, TaskDTO[]>; other: TaskDTO[] }>(() => {
   const lookup = columnLookup.value
   const activeProject = project.value
-  for (const { label } of columnsData.value) g[label] = []
   // Smart filters (due/recent/needs/assignee) are applied server-side by the
   // hydrate; only the deterministic display order is applied here.
   const { normalized } = buildServerFilter(filter.value, activeProject)
-  const filtered = sortTasks(items.value || [], 'modified', normalized.order === 'asc' ? 'asc' : 'desc')
-  for (const t of filtered) {
+  const sorted = sortTasks(items.value || [], 'modified', normalized.order === 'asc' ? 'asc' : 'desc')
+  const configured: Record<string, TaskDTO[]> = {}
+  for (const { label } of columnsData.value) configured[label] = []
+  const other: TaskDTO[] = []
+  for (const t of sorted) {
     if (!activeProject || !t.id.startsWith(`${activeProject}-`)) continue
     const key = lookup.get(normalizeStatusKey(t.status))
-    if (key) {
-      (g[key] ??= []).push(t)
-    }
+    if (key) (configured[key] ??= []).push(t)
+    else other.push(t)
   }
-  return g
+  return { configured, other }
 })
 
-const grouped = computed<Record<string, TaskDTO[]>>(() => applyDoneFilters(rawGrouped.value))
+const grouped = computed<Record<string, TaskDTO[]>>(() => applyDoneFilters(partitionedBoardTasks.value.configured))
 
 function applyDoneFilters(groups: Record<string, TaskDTO[]>) {
   const targetStatuses = doneFilters.value.statuses.filter((label) => label && groups[label])
@@ -673,16 +639,34 @@ function applyDoneFilters(groups: Record<string, TaskDTO[]>) {
   return result
 }
 
-const other = computed(() => {
-  const lookup = columnLookup.value
-  const activeProject = project.value
-  return (items.value || []).filter((t) => {
-    if (!activeProject || !t.id.startsWith(`${activeProject}-`)) return false
-    return !lookup.get(normalizeStatusKey(t.status))
-  })
+// Column descriptors drive every render branch (flat + grouped). `key` is the
+// normalized status for configured columns and a reserved sentinel for the
+// synthetic fallback; normalizeStatusKey strips underscores, so no configured
+// status can ever collide with the sentinel key — a user workflow status
+// literally named "Other" or "__other__" stays a real configured column.
+// The synthetic bucket is presentation-only: it is never a completion
+// status, never a done-filter target, and never a status-write target.
+const OTHER_COLUMN_KEY = '__other__'
+type BoardColumnDescriptor = {
+  key: string
+  label: string
+  norm: string
+  synthetic: boolean
+}
+
+const boardColumns = computed<BoardColumnDescriptor[]>(() => {
+  const cols: BoardColumnDescriptor[] = columnsData.value.map(({ label, norm }) => ({ key: norm, label, norm, synthetic: false }))
+  if (partitionedBoardTasks.value.other.length) {
+    cols.push({ key: OTHER_COLUMN_KEY, label: 'Other', norm: OTHER_COLUMN_KEY, synthetic: true })
+  }
+  return cols
 })
 
-// -- Aligned swimlane computeds -------------------------------------------
+function columnTasks(col: BoardColumnDescriptor): TaskDTO[] {
+  return col.synthetic ? partitionedBoardTasks.value.other : (grouped.value[col.label] || [])
+}
+
+// -- Aligned swimlane group-by ---------------------------------------------
 function groupKeyFor(task: TaskDTO): string {
   if (groupBy.value === 'assignee') return (task.assignee || '').trim() || '(none)'
   if (groupBy.value === 'priority') return (task.priority || '').trim() || '(none)'
@@ -693,10 +677,9 @@ function groupKeyFor(task: TaskDTO): string {
 const allGroupLabels = computed<string[]>(() => {
   if (groupBy.value === 'none') return []
   const labels = new Set<string>()
-  for (const tasks of Object.values(grouped.value)) {
-    for (const t of tasks) labels.add(groupKeyFor(t))
+  for (const col of boardColumns.value) {
+    for (const t of columnTasks(col)) labels.add(groupKeyFor(t))
   }
-  for (const t of other.value) labels.add(groupKeyFor(t))
   const arr = Array.from(labels).sort((a, b) => {
     if (a === '(none)') return 1
     if (b === '(none)') return -1
@@ -705,34 +688,34 @@ const allGroupLabels = computed<string[]>(() => {
   return arr
 })
 
-function groupedColumnTasks(st: string, group: string): TaskDTO[] {
-  return (grouped.value[st] || []).filter(t => groupKeyFor(t) === group)
+function groupedColumnTasks(col: BoardColumnDescriptor, group: string): TaskDTO[] {
+  return columnTasks(col).filter(t => groupKeyFor(t) === group)
 }
 
 function groupTotalCount(group: string): number {
   let count = 0
-  for (const tasks of Object.values(grouped.value)) {
-    count += tasks.filter(t => groupKeyFor(t) === group).length
+  for (const col of boardColumns.value) {
+    count += columnTasks(col).filter(t => groupKeyFor(t) === group).length
   }
   return count
 }
 
 // -- Flat (ungrouped) column helpers --------------------------------------
-function visibleFlatTasks(st: string): TaskDTO[] {
-  const all = grouped.value[st] || []
-  const limit = visibleLimit(st)
+function visibleFlatTasks(col: BoardColumnDescriptor): TaskDTO[] {
+  const all = columnTasks(col)
+  const limit = visibleLimit(col.key)
   return all.length <= limit ? all : all.slice(0, limit)
 }
 
-function hiddenFlatCount(st: string): number {
-  const all = grouped.value[st] || []
-  const limit = visibleLimit(st)
+function hiddenFlatCount(col: BoardColumnDescriptor): number {
+  const all = columnTasks(col)
+  const limit = visibleLimit(col.key)
   return all.length <= limit ? 0 : all.length - limit
 }
 
 const gridStyle = computed(() => ({
   display: 'grid',
-  gridTemplateColumns: `repeat(${columns.value.length + (other.value.length ? 1 : 0)}, minmax(260px, 1fr))`,
+  gridTemplateColumns: `repeat(${boardColumns.value.length}, minmax(260px, 1fr))`,
   gap: '12px',
 }))
 
@@ -744,9 +727,9 @@ function loadWip(){
   wipLimits.value = (obj && typeof obj === 'object') ? obj : {}
 }
 function saveWip(){ storageSetJson(wipKey(), wipLimits.value || {}) }
-function limitOf(st: string): number { const v = (wipLimits.value || {})[st]; return (typeof v === 'number' && v > 0) ? v : 0 }
-function countOf(st: string): number { return (grouped.value[st]?.length || 0) }
-function overLimit(st: string): boolean { const lim = limitOf(st); return lim > 0 && countOf(st) > lim }
+function limitOf(col: BoardColumnDescriptor): number { if (col.synthetic) return 0; const v = (wipLimits.value || {})[col.label]; return (typeof v === 'number' && v > 0) ? v : 0 }
+function countOf(col: BoardColumnDescriptor): number { return columnTasks(col).length }
+function overLimit(col: BoardColumnDescriptor): boolean { const lim = limitOf(col); return lim > 0 && countOf(col) > lim }
 function onWipInput(st: string, ev: Event){
   const val = parseInt((ev.target as HTMLInputElement).value, 10)
   if (!isFinite(val) || val <= 0) { delete (wipLimits.value as any)[st] } else { (wipLimits.value as any)[st] = val }
@@ -874,10 +857,16 @@ function onDragStart(t: any) {
   draggingId.value = t.id
 }
 function onDragOver(ev: DragEvent) { ev.preventDefault() }
-async function onDrop(targetStatus: string) {
+async function onDrop(target: BoardColumnDescriptor) {
   const id = draggingId.value
-  if (!id || !targetStatus || targetStatus === '__other__') return
+  if (!id) return
   draggingId.value = ''
+  // The synthetic fallback column is presentation-only: a drop there must
+  // never write a status. Configured columns carry real workflow statuses —
+  // including a legitimate configured literal "__other__", which must keep
+  // writing its real status value.
+  if (target.synthetic) return
+  const targetStatus = target.label
   try {
     // Optimistic move via store (resolved against this board's query)
     const existing = items.value.find(t => t.id === id)

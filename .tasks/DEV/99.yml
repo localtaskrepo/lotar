@@ -1,0 +1,7 @@
+title: Coordinate CLI edit member auto-population with the task update transaction
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-06T16:46:06.152442+00:00
+description: Found during DEV-89 implementation review; separate from approved creation scope. src/cli/handlers/task/edit.rs:159 calls apply_auto_populate_members before TaskService::update at line168, so failed task writes can leave a project member/config change despite the service already planning members transactionally. Route member planning through the coordinated update path, preserve validation/CLI output/defaults, and add failed-write/dry-run no-side-effect regressions. No work performed for this follow-up; do not broaden DEV89 or the current DEV89->58->94->68 sequence.

@@ -1019,18 +1019,18 @@ fn actual_sprint_crud_responses_match_declared_contracts() {
     ));
     assert_eq!(resp.status, 400, "sprint 0 update must be 400");
 
-    // Update unknown sprint: 400 (not 404).
+    // Update unknown sprint: 404 (typed NOT_FOUND, DEV-58).
     let resp = api.handle_request(&req(
         "POST",
         "/api/sprints/update",
         json!({"sprint": 9999, "label": "Ghost"}),
     ));
-    assert_eq!(resp.status, 400, "unknown sprint update must be 400");
+    assert_eq!(resp.status, 404, "unknown sprint update must be 404");
     assert_valid(
         &spec,
         spec.component("ApiError"),
         &body_of(&resp),
-        "update 400 body",
+        "update 404 body",
     );
 
     // Delete with the legacy {id, confirm} body: 400, no side effects.

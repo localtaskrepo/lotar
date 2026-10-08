@@ -18,7 +18,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
             Ok(c) => c,
-            Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+            // Configuration failures are server-side (DEV-58): 500 INTERNAL.
+            Err(e) => {
+                return internal(
+                    json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
+                )
+            }
         };
         let config = if let Some(project) = req.query.get("project").map(|s| s.as_str()) {
             resolution::get_project_config(&base_config, project, resolver.path.as_path())
@@ -28,14 +33,25 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         let root =
             match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
+                // Store-root resolution failures are server-side (DEV-58).
                 Ok(p) => p,
-                Err(e) => return bad_request(e.to_string()),
+                Err(e) => return map_lotar_error(e),
             };
 
-        let resolved = match AttachmentService::resolve_attachment_path(&root, &rel) {
+        // Typed classification (DEV-58): unsafe paths stay 400s, a missing
+        // blob is a 404, and root-resolution failures are 500s — no
+        // message-string matching.
+        let resolved = match AttachmentService::resolve_attachment_path_typed(&root, &rel) {
             Ok(p) => p,
-            Err(msg) if msg.contains("not found") => return not_found(msg),
-            Err(msg) => return bad_request(msg),
+            Err(crate::services::attachment_service::AttachmentPathError::Invalid(msg)) => {
+                return bad_request(msg.to_string())
+            }
+            Err(crate::services::attachment_service::AttachmentPathError::Missing) => {
+                return not_found("Attachment not found".into())
+            }
+            Err(crate::services::attachment_service::AttachmentPathError::RootUnavailable(msg)) => {
+                return internal(json!({"error": {"code": "INTERNAL", "message": msg}}))
+            }
         };
 
         let bytes = match std::fs::read(&resolved) {
@@ -115,7 +131,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             let base_config =
                 match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
                     Ok(c) => c,
-                    Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+                    // Configuration failures are server-side (DEV-58).
+                    Err(e) => {
+                        return internal(
+                            json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
+                        )
+                    }
                 };
             let config = if let Some(project) = req.query.get("project").map(|s| s.as_str()) {
                 resolution::get_project_config(&base_config, project, resolver.path.as_path())
@@ -126,8 +147,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             let root =
                 match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config)
                 {
+                    // Store-root resolution failures are server-side (DEV-58).
                     Ok(p) => p,
-                    Err(e) => return bad_request(e.to_string()),
+                    Err(e) => return map_lotar_error(e),
                 };
 
             let resolved = match AttachmentService::find_attachment_by_hash(&root, hash_tag) {

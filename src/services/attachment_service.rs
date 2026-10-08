@@ -482,25 +482,61 @@ impl AttachmentService {
     }
 
     pub fn resolve_attachment_path(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
+        Self::resolve_attachment_path_typed(root, rel_path).map_err(|e| e.to_string())
+    }
+
+    /// Typed variant of [`Self::resolve_attachment_path`] (DEV-58): REST
+    /// routes classify the failure by variant instead of matching on
+    /// message text. `Invalid` keeps the path-safety validation guards a
+    /// client error, `Missing` means no stored blob exists under the root,
+    /// and `RootUnavailable` is a server-side store-resolution failure.
+    /// The string-returning wrapper above stays for CLI/MCP callers and
+    /// produces identical messages.
+    pub fn resolve_attachment_path_typed(
+        root: &Path,
+        rel_path: &str,
+    ) -> Result<PathBuf, AttachmentPathError> {
         let rel = Path::new(rel_path);
         if rel_path.trim().is_empty() {
-            return Err("Missing path".to_string());
+            return Err(AttachmentPathError::Invalid("Missing path"));
         }
         if rel.is_absolute() {
-            return Err("Invalid attachment path".to_string());
+            return Err(AttachmentPathError::Invalid("Invalid attachment path"));
         }
         if rel.components().any(|c| matches!(c, Component::ParentDir)) {
-            return Err("Invalid attachment path".to_string());
+            return Err(AttachmentPathError::Invalid("Invalid attachment path"));
         }
 
-        let root_canon = fs::canonicalize(root).map_err(|e| e.to_string())?;
+        let root_canon = fs::canonicalize(root)
+            .map_err(|e| AttachmentPathError::RootUnavailable(e.to_string()))?;
         let joined = root.join(rel);
-        let joined_canon =
-            fs::canonicalize(&joined).map_err(|_| "Attachment not found".to_string())?;
+        let joined_canon = fs::canonicalize(&joined).map_err(|_| AttachmentPathError::Missing)?;
         if !joined_canon.starts_with(&root_canon) {
-            return Err("Invalid attachment path".to_string());
+            return Err(AttachmentPathError::Invalid("Invalid attachment path"));
         }
         Ok(joined_canon)
+    }
+}
+
+/// Typed resolution failure for a stored attachment path (DEV-58). Display
+/// strings match the legacy string errors exactly.
+#[derive(Debug)]
+pub enum AttachmentPathError {
+    /// Path-syntax or safety-guard rejection (client fault).
+    Invalid(&'static str),
+    /// No stored blob exists under the attachments root.
+    Missing,
+    /// The attachments root itself could not be resolved (server fault).
+    RootUnavailable(String),
+}
+
+impl std::fmt::Display for AttachmentPathError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttachmentPathError::Invalid(msg) => f.write_str(msg),
+            AttachmentPathError::Missing => f.write_str("Attachment not found"),
+            AttachmentPathError::RootUnavailable(msg) => f.write_str(msg),
+        }
     }
 }
 

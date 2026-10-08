@@ -1,12 +1,22 @@
 title: Centralize REST domain-error to HTTP response mapping
-status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-63]
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.496121+00:00
+modified: 2026-10-06T18:06:32.022909+00:00
+relationships:
+  blocks:
+  - DEV-63
+  parent: DEV-53
+comments:
+- date: 2026-10-06T16:47:31.480197+00:00
+  text: 'Plan: Second approved sequence task; DEV89 verifiedDone. Exhaustive shared LoTaRError -> existing JSON errorenvelope classification across sibling task/sprint/reference routes: Validation/InvalidTaskId400 INVALID_ARGUMENT, recognized missingTask/Sprint/Project404 NOT_FOUND, Io/Serialization/Index500 INTERNAL. Unknown addressed sprints update/summary/burndown become404 consistentdelete; invalid referenced sprint on taskcreate also404 typedMissingResource (zero/invalidid remains400). Preserve identity/crossroot/path/journal safetyvalidation400 and inputparseerrors400, no message-sniffing for typederrors. Add tabledriven publicroute regressions including storage/lockfailures and safetycases; synchronize Rust/UI errorcontract comments/OpenAPI/help. Remove existingupload TaskLookupError stringclassification in favor typedvariants. Keep untyped assignment/workflow domainstrings400 rather than broadservice overhaul unless needed foracceptance. Parent docs/smoke, worker routes/tests. Run final lint/fullnativeRust/UI/freshsmoke, no Git/index/commits/push/worktrees; no downstreamMCPwork.'
+- date: 2026-10-06T16:58:29.683405+00:00
+  text: 'Progress: Readonly audit found sibling SprintNotFound mapped404delete but400update/summary/burndown, and repeated typedtask IO/serialization/index errors blanket400. Docs/OpenAPI/UIerrorcomment updated to shared400/404/500 envelope; inputparse and safetyguard400 remain. Added actualHTTP table across16badinput/missingresource cases plus corruptpersistedsprint500/no mutation. Baseline smoke againstDEV89binary reproduced unknownsprintsummary400 instead404 (1expectedred/1passed), evidence target/sequence-20261006/dev58/smoke-red.log. Backendworker implementing exhaustive typedmapper and uploadtypedidentityprecheck; no downstreamMCPchanges. Remaining: sourceintegration, targeted/fullgates and closebefore94.'
+- date: 2026-10-06T18:06:31.995395+00:00
+  text: 'Outcome: exhaustive sharedtypedmap_lotar_error adopted acrosssibling task/sprint CRUD/status/comment/reference/attachment routes. Typedvalidation/invalididentity/safety400 INVALID_ARGUMENT, recognizedmissingTask/Sprint/Project404 NOT_FOUND, genuineIO/serialization/index500 INTERNAL; typedWouldBlock/pending-journal coordinationrefusals retain400/messages/guardorder. Uploadidentity message-sniff removed; typedattachmentpath resultclassifiesinvalid400/missing404/unavailable500 withexistingStringadapterforrealCLI/MCPcallers. Unknown addressed/referencedSprint404 consistent; invalid0/body400. ExistingString workflow/assignment400 unchanged, no broadMCP/CLIoverhaul. RustAPIerrorcomment/UIcomment/OpenAPI/help synchronized. Evidence: independent source reviewSIGNOFF preservesjournalpath/order/typedmarker andpath containment; docs reviewfound/fixed developerscopy400typo andconfirmedexact404schemarefs/no duplicatekeys. New28-case publicroute table/exhaustiveunitmapper plus actualHTTP16case+corruptsprint smoke. Final lint/typesClippy-Dwarnings/fmt clean;1281Rustpassed/45actualGitless skips,558UIpassed, fresh215smokepassed/25actualGitskips/54files. Logs target/sequence-20261006/dev58/ inclbaseline400vs404red. Jira fixture independentreview unusedimport cleaned (test-only) and fullsmokepassed. Remaining:noDEV58blocker, noGit-capable/Windows/unpublishedCI claim; preexistinglock_store mapslock-openvalidation400 andrawString workflows400 documentedreviewlimits, not silenced/new failures. NoRepositoryGit/index/stage/commit/push/worktrees. Guidance:no durableinstruction correction, no safety-policy weakening. VerifiedDonebeforecommit.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: S14.
@@ -17,3 +27,30 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-06T16:47:31.448233+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-06T16:47:31.480197+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T16:58:29.683405+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T18:06:31.995395+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T18:06:32.022909+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

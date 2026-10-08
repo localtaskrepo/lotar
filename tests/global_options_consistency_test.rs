@@ -620,10 +620,19 @@ mod global_options_integration {
             .filter_map(|entry| entry.ok())
             .collect();
 
-        // Look for project subdirectories (tasks are organized by project)
+        // Look for project subdirectories (tasks are organized by project).
+        // Internal reserved folders (e.g. @sprints, created by the
+        // coordinated creation transaction) are not project directories.
         let project_dirs: Vec<_> = all_files
             .iter()
             .filter(|entry| entry.path().is_dir())
+            .filter(|entry| {
+                entry
+                    .path()
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| !name.starts_with('@') && !name.starts_with('.'))
+            })
             .collect();
 
         if !project_dirs.is_empty() {

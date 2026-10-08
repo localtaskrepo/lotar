@@ -710,6 +710,8 @@ export interface ProjectStatsDTO {
   tags_top: string[]
 }
 
+// Task/sprint domain errors: invalid input/identity/safety = 400 INVALID_ARGUMENT,
+// missing resource = 404 NOT_FOUND, storage/serialization/index = 500 INTERNAL.
 export interface ApiEnvelope<T> { data: T; meta?: any; error?: { code: string; message: string } }
 
 export type ConfigSource = 'project' | 'global' | 'built_in'
@@ -1025,7 +1027,7 @@ export interface SyncReportListResponse {
   total: number
   limit: number
   offset: number
-  reports: SyncReportMeta[]
+  reports: SyncReportMeta[] // Always present, including [] for an empty scope.
 }
 
 export interface SyncResponse {
@@ -1169,4 +1171,3 @@ export interface AutomationSimulateResponse {
   task_before: TaskDTO
   task_after: TaskDTO | null
 }
-

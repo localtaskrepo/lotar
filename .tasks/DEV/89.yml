@@ -1,16 +1,43 @@
 title: Route CLI task add through the coordinated task mutation transaction
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-11T06:03:56.641092+00:00
-modified: 2026-09-11T06:04:13.326112+00:00
+modified: 2026-10-06T16:46:28.564131+00:00
 comments:
 - date: 2026-09-11T06:04:13.326112+00:00
   text: 'Filed during DEV-55 verification: e2e CLI probing showed ''lotar add --field=sprint=1'' lands a custom field (no sprint-file write) and the AddHandler persists via StorageOperations with config auto-populate before the task write. Not a DEV-55 regression: that path never wrote sprint files. Follow-up scope as in description.'
+- date: 2026-10-06T16:08:56.350350+00:00
+  text: 'Plan: First of approved sequence DEV89 -> DEV58 -> DEV94 -> DEV68. Coordinate CLI add/task add task creation and auto-populated project configuration in the existing MultiFileTransaction, preferably sharing TaskService creation commit without changing CLI defaults/project resolution/validation/output. Preserve branch inference, named/adopted roots, raw custom sprint field semantics, actor defaults, history and highest-file+1 allocation including tombstones. Add failure-injection/validation/dry-run and CLI creation parity regressions; clarify --field=sprint=N as custom data rather than membership. Run targeted native nextest then final warning-free lint/full Rust-UI/fresh smoke before closing and starting DEV58. No repository Git/index commands, staging/commits/pushes/worktree changes; isolated automated Git probes/fixtures only. Coordinator alone updates tickets and preserves existing approved/staged content.'
+- date: 2026-10-06T16:46:28.542065+00:00
+  text: 'Outcome: CLI add/task add uses locked coordinated prepared-create transaction, staging project creation/name and auto-members together with the new task, rechecking membership and allocating max-file-ID+1 under locks. Existing CLI validation/defaults/actors/branch inference/projectprefix/adoptedroot/output and single postcommit automation preserved. REST/MCP create untouched; dryrun returns before txn/no dirs/config/task writes; --field=sprint=N remainscustomdata and docs pointreal sprint add. Evidence: independent readonly source review SIGNOFF nointroducedfindings; doc/examples/link review passed. Native regression9 CLI+3 faultcases; adjacent228passed; final lint types/all-target/all-featureClippy-Dwarnings/fmtpassed. Full1275Rustpassed/45actualGitless exclusions,558UIpassed; final freshsmoke213passed/25actualGitskips/53files. First smoke failed with JiraStub get-port probe-and-bind EADDRINUSE; fixed live fixture to bind0 once and reportactualaddress, added8concurrent-owned-fixtures regression; no sleeps/retry/concurrency/budget changes and fullsmoke-green passed. Logs target/sequence-20261006/dev89/. Six directory-picker fixtures updated to ignore internal @sprints namespace (CLI now same txn layout asservice creation). Remaining: noDEV89 blocker, no Git/Windows/unpublishedCI claim. Separate existingCLI edit prerelease-member-write gap filedDEV99Todo, not implemented or foldedintospecifiedsequence. Guidance: no durableinstruction correction; existing port0 policy applied tofixture. No repository Git/indexcommands/commit/push/worktree; no integrationauthorized. Completewithoutwaitingcommit.'
 description: 'DEV-55 follow-up. The ''lotar add'' / ''lotar task add'' handler builds the Task and persists it via StorageOperations directly instead of TaskService::create, so it does not participate in the DEV-55 coordinated transaction. It never writes sprint files (no cross-file partial state), but its auto-populated project config write still precedes the task write and is not rollback-protected if the task write fails. Scope: src/cli/handlers/mod.rs AddHandler; consider converging on TaskService::create or staging its config write in MultiFileTransaction. Also verify whether documenting ''--field=sprint=N'' as the sprint example for ''task add'' is intentional (it stores a custom field, not sprint membership).'
 history:
 - at: 2026-09-11T06:04:13.326112+00:00
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-06T16:08:56.310175+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-06T16:08:56.350350+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T16:46:28.542065+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T16:46:28.564131+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

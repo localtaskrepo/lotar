@@ -1,13 +1,23 @@
 title: Render Board Other-status tasks consistently across filters and grouping
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-57, DEV-65]
-  related: [DEV-21]
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.663433+00:00
+modified: 2026-10-07T23:19:29.008028+00:00
+relationships:
+  depends_on:
+  - DEV-57
+  - DEV-65
+  related:
+  - DEV-21
+  parent: DEV-53
+comments:
+- date: 2026-10-06T18:35:31.268686+00:00
+  text: 'Plan: fourth/finalapprovedtask after89/58/94verifiedDone. Board has intentionalproject-required chooser (DEV97), no mergedallproject rendering now; oldauditallprojectwording predatescurrentdesign. FixallSUPPORTED flat/grouped modes/projectswitches withoutaddingmergedBoard. Buildone server-filtered/projectguarded/sortedbase andpartitionconfiguredstatus+syntheticOther; group totals/headers/cells/order/pagination aligned. Preservecompletionsemantictruth(actualRootDTO), savedDonevisibility prefs/configuredWIP, deletionquerymembership. Neverrename/skip userconfiguredOther/__other__ statuses: use distinct descriptor keys/kind andexplicitdropguard(no syntheticstatuswrite). BackendAPIshapesunchanged. Addunit/browsertests unknownstatussortedflat/groups/all3groupings/onlyOther group/counts/pagination/collisions/filterquery/excludedforeignproject/dropguard; preservechooser. Visualdesktop/mobileactualbrowser screenshot+targeted/full lint/nativeRust/UI/freshsmoke. NoGit/index/commits/push/worktrees, coordinatoronlyticketwrites.'
+- date: 2026-10-07T23:19:28.980012+00:00
+  text: 'Outcome: Board now uses one project-guarded/server-query-membership/sorted partition and column descriptors for configured statuses plus presentation-only Other across flat and assignee/priority/type swimlanes. Other participates in headers/grid/group totals and flat pagination; unknown cards no longer disappear or leave ghost tracks. Configured Other/__other__ statuses remain real columns and writable real statuses, synthetic Other never writes status or enters WIP/done-policy preferences. Existing project chooser/semantic completion/saved settings preserved; no merged-allproject feature added (old audit wording predates current project-required design). Source review found stale draggingId after ignored synthetic drop: fixed clear-before-guard and pinned ignoreddrop -> configured-column Enter no API write; reviewer rechecked SIGNOFF. Evidence: Board35/35 focused tests, final types/Clippy-Dwarnings/fmt lint clean; full1284Rustpassed/45actualGitless exclusions,566UIpassed/66files. New3 actualbackend/browser smoke cases verify descending modified order,30-card pagination/showmore,32unknown cards/all3groups/34total counts, configuredliteral collision, project switches, smartNoAssignee membership andno synthetic status POST/byteidentical task pluslegitimateconfigured __other__ POST. Fresh fullsmoke rerun219passed/25actualGit-dependent skips/56files; first fullsmoke had1existingDEV92external-file-watcher timing failure (218pass) atunchangedpoll assertion, no Boardcase failure; unchangeddefault-concurrency/fullfresh rerunpassed, originalfailure retained. No sleeps/retry/concurrency/budget weakening. Screenshots inspected desktop/mobile target/smoke-artifacts/board-other/ with syntheticfixturepeople; explicit viewport supports horizontal Board scrolling. Help serve.md documentsOther/projectscope. Logs target/sequence-20261006/dev68/. Remaining:no scopedimplementation blocker; intermittentexternalwatcher timing noted, not hidden; Git-capable/Windows/unpublishedCI not claimed. No repositoryGit/index/stage/commit/push/worktrees. Guidance:no durableinstruction correction or safety-policy changes. Approvedsequence89/58/94/68 nowselfverifiedcomplete; DEV99 separateTodo only.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: U7.
@@ -19,3 +29,26 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-06T18:35:31.235638+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-06T18:35:31.268686+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-07T23:19:28.980012+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-07T23:19:29.008028+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

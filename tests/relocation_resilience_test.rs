@@ -19,6 +19,9 @@ fn project_and_task_paths(root: &std::path::Path) -> (String, std::path::PathBuf
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         .map(|e| e.file_name().to_string_lossy().to_string())
+        // Internal reserved folders (@sprints, created by the coordinated
+        // creation transaction) are not project directories.
+        .filter(|name| !name.starts_with('@') && !name.starts_with('.'))
         .collect::<Vec<_>>();
     projects.sort();
     assert!(

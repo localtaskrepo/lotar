@@ -1168,7 +1168,7 @@ pub struct SyncReportListResponse {
     pub total: usize,
     pub limit: usize,
     pub offset: usize,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    /// Always present, including `[]` for scopes without reports.
     pub reports: Vec<SyncReportMeta>,
 }
 

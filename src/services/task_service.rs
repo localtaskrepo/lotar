@@ -97,6 +97,37 @@ impl CommentContext {
 #[path = "../../tests/common/dev55_transaction_cases.rs"]
 mod dev55_transaction_cases;
 
+#[cfg(test)]
+#[path = "../../tests/common/dev89_prepared_create_cases.rs"]
+mod dev89_prepared_create_cases;
+
+/// A CLI-validated task creation ready for transactional commit (DEV-89).
+///
+/// The CLI builds and validates the [`Task`] itself (smart defaults,
+/// branch inference, member rules, project-name vs prefix resolution),
+/// so this carries the already-prepared artifacts instead of a
+/// [`TaskCreate`] request, which would re-infer defaults or override
+/// explicit fields.
+pub struct PreparedTaskCreate<'a> {
+    /// Fully validated task, exactly as the CLI built it.
+    pub task: &'a Task,
+    /// Storage project prefix the task is written under.
+    pub project: &'a str,
+    /// Human-readable project name the config write should record when
+    /// the project config is created or still carries the prefix as its
+    /// name (the legacy `StorageOperations::add` naming rule).
+    pub original_project_name: Option<&'a str>,
+    /// Effective config with pending members already merged; used for the
+    /// membership recheck exactly like the CLI validated.
+    pub validation_config: &'a ResolvedConfig,
+    /// Effective members before the pending merge; the fallback list the
+    /// config plan starts from when the project config sets no members.
+    pub base_members: &'a [String],
+    /// Members the task introduces that are missing from the project
+    /// config, computed with the CLI member rules.
+    pub pending_members: &'a [String],
+}
+
 impl TaskService {
     pub fn create(storage: &mut Storage, req: TaskCreate) -> LoTaRResult<TaskDTO> {
         let TaskCreate {
@@ -366,6 +397,167 @@ impl TaskService {
         let file_string = serde_yaml_ng::to_string(t)?;
         txn.stage(&file_path, file_string)?;
         Ok((id, config, config_populated))
+    }
+
+    /// Commit a prepared CLI task creation through the coordinated
+    /// transaction (DEV-89): the auto-populated project config (including the
+    /// project-name creation/update rule) and the task file are validated in
+    /// full and published together under the project lock. Any failure before
+    /// or during publication leaves every affected file unchanged. Returns
+    /// the allocated task ID; automation and events stay with the caller so
+    /// the CLI keeps firing them exactly once after the commit.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn commit_prepared_create(
+        storage: &Storage,
+        prepared: PreparedTaskCreate<'_>,
+    ) -> LoTaRResult<String> {
+        let PreparedTaskCreate {
+            task,
+            project,
+            original_project_name,
+            validation_config,
+            base_members,
+            pending_members,
+        } = prepared;
+
+        crate::storage::safety::validate_project_prefix(project)
+            .map_err(LoTaRError::ValidationError)?;
+        let project_path = storage.root_path.join(project);
+        let config_path = crate::utils::paths::project_config_path(&storage.root_path, project);
+
+        let mut txn = MultiFileTransaction::begin(
+            &storage.root_path,
+            std::slice::from_ref(&project.to_string()),
+        )?;
+
+        let (config_yaml, planned_members) = Self::plan_prepared_project_config(
+            &storage.root_path,
+            project,
+            original_project_name,
+            base_members,
+            pending_members,
+        )?;
+        let config_staged = config_yaml.is_some();
+
+        // Full-candidate membership recheck under the coordinated locks,
+        // against the member list the staged config would persist.
+        let mut enforcement_config = validation_config.clone();
+        if let Some(members) = planned_members {
+            enforcement_config.members = members;
+        }
+        Self::enforce_membership(task, &enforcement_config, project)?;
+
+        // ID allocation rechecked under the lock, tombstones included.
+        let next_numeric_id = StorageOperations::get_current_id(&project_path) + 1;
+        let id = format!("{}-{}", project, next_numeric_id);
+
+        if let Some(yaml) = config_yaml {
+            txn.stage(&config_path, yaml)?;
+        }
+
+        let file_path =
+            StorageOperations::get_file_path(project, next_numeric_id, &storage.root_path);
+        if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
+            eprintln!("[lotar][debug] writing task file {}", file_path.display());
+        }
+        let file_string = serde_yaml_ng::to_string(task)?;
+        txn.stage(&file_path, file_string)?;
+        txn.commit()?;
+        if config_staged {
+            Self::invalidate_config_caches(storage.root_path.as_path());
+        }
+        Ok(id)
+    }
+
+    /// Plan the project config a prepared CLI creation would write, without
+    /// writing it: the legacy naming rule from `StorageOperations::add`
+    /// (record the original project name when the config is created or still
+    /// holds the prefix) unified with the auto-populated member merge from
+    /// [`crate::config::operations::plan_auto_populated_project_config`].
+    /// Returns the canonical YAML to stage plus the effective member list
+    /// when members were merged.
+    fn plan_prepared_project_config(
+        tasks_root: &Path,
+        project: &str,
+        original_project_name: Option<&str>,
+        base_members: &[String],
+        pending_members: &[String],
+    ) -> LoTaRResult<(Option<String>, Option<Vec<String>>)> {
+        let needs_name = original_project_name
+            .map(str::trim)
+            .is_some_and(|name| !name.is_empty());
+        if !needs_name && pending_members.is_empty() {
+            return Ok((None, None));
+        }
+
+        let mut project_config = crate::config::persistence::load_project_config_from_dir(
+            project, tasks_root,
+        )
+        .map_err(|err| {
+            LoTaRError::ValidationError(format!(
+                "Failed to load project config for project '{}': {}",
+                project, err
+            ))
+        })?;
+        let mut changed = false;
+
+        if let Some(original_name) = original_project_name
+            .map(str::trim)
+            .filter(|n| !n.is_empty())
+        {
+            // Legacy `StorageOperations::add` rule: record the human-readable
+            // name whenever the config is created, or still carries the
+            // prefix (or nothing) as its name.
+            let config_exists =
+                crate::utils::paths::project_config_path(tasks_root, project).is_file();
+            let current = project_config.project_name.trim();
+            if !config_exists || current.is_empty() || current.eq_ignore_ascii_case(project) {
+                if current != original_name {
+                    project_config.project_name = original_name.to_string();
+                }
+                changed = true;
+            }
+        }
+
+        let mut planned_members = None;
+        if !pending_members.is_empty() {
+            let mut effective = match project_config.members.clone() {
+                Some(existing) => existing,
+                None => base_members
+                    .iter()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+                    .collect(),
+            };
+            let mut members_changed = false;
+            for candidate in pending_members {
+                let trimmed = candidate.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                let already_present = effective
+                    .iter()
+                    .any(|existing| existing.eq_ignore_ascii_case(trimmed));
+                if !already_present {
+                    effective.push(trimmed.to_string());
+                    members_changed = true;
+                }
+            }
+            if members_changed {
+                effective.sort_by_key(|a| a.to_ascii_lowercase());
+                project_config.members = Some(effective.clone());
+                planned_members = Some(effective);
+                changed = true;
+            } else {
+                planned_members = Some(effective);
+            }
+        }
+
+        if !changed {
+            return Ok((None, planned_members));
+        }
+        let yaml = crate::config::normalization::to_canonical_project_yaml(&project_config);
+        Ok((Some(yaml), planned_members))
     }
 
     fn invalidate_config_caches(tasks_root: &Path) {

@@ -538,7 +538,7 @@ mod api_boundary {
                 "sprints": [31337],
             }),
         ));
-        assert_eq!(resp.status, 400, "invalid sprint must be rejected");
+        assert_eq!(resp.status, 404, "invalid sprint must be rejected");
         let body: Value = serde_json::from_slice(&resp.body).unwrap();
         assert!(
             body["error"]["message"]

@@ -12,7 +12,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/tasks/delete ({ id, hard?: bool }[?project=PREFIX]) -> { data: { deleted: bool, hard: bool, warnings: string[] } }; soft by default; hard deletion retains attachments and warns about retained attachment references and incoming task relationships
 - POST /api/tasks/restore ({ id }[?project=PREFIX]) -> { data: TaskDTO }; restores without changing `modified`
 - POST /api/sprints/create (SprintCreateRequest) -> { data: SprintCreateResponse }; configured sprint defaults apply unless `skip_defaults: true` (see `applied_defaults`, omitted when empty)
-- POST /api/sprints/update (SprintUpdateRequest) -> { data: SprintUpdateResponse }; sprint must be >= 1 (0 -> 400); omitted fields are unchanged, `null` clears `capacity_points`/`capacity_hours`/`actual_started_at`/`actual_closed_at` while `null` on single-value fields is treated as omitted; 400 for unknown sprint ids
+- POST /api/sprints/update (SprintUpdateRequest) -> { data: SprintUpdateResponse }; sprint must be >= 1 (0 -> 400); omitted fields are unchanged, `null` clears `capacity_points`/`capacity_hours`/`actual_started_at`/`actual_closed_at` while `null` on single-value fields is treated as omitted; 404 for unknown sprint ids
 - POST /api/sprints/delete ({ sprint, cleanup_missing? }) -> { data: SprintDeleteResponse }; sprint must be >= 1; 404 for unknown sprint ids; tasks keep their data
 - POST /api/tasks/attachments/upload ({ id, filename, content_base64 }) -> { data: { stored_path, attached, task } }; uploads attach typed `attachment` references
 - POST /api/tasks/attachments/remove ({ id, stored_path }) -> { data: { task, deleted, still_referenced } }; 400 when the task lacks the managed `attachment` reference (blob untouched)
@@ -25,7 +25,8 @@ Notes
 - List/export support `deletion=active|deleted|all`, default `active`. Ordinary mutations reject deleted tasks until restored. Lifecycle operations preserve `modified` and append their own timestamped history.
 - People fields accept `@me`.
 - /api/tasks/list accepts additional query keys beyond the documented ones: declared custom field names can be used directly (e.g., `?sprint=W35`). Values support CSV and fuzzy matching (case/sep-insensitive).
-- /api/tasks/update ignores `status` (status changes via CLI); other fields are updated.
+- /api/tasks/update validates `status`, `priority`, and `type` against the task's project configuration.
 - Validation errors return 400 with INVALID_ARGUMENT.
+- Task/sprint domain errors preserve `{ error: { code, message } }`: invalid arguments/identity/safety refusals map to `400 INVALID_ARGUMENT`, missing resources to `404 NOT_FOUND`, and I/O/serialization/index failures to `500 INTERNAL`. Unknown positive sprint IDs, including task-create membership references, return 404; zero/invalid IDs return 400.
 
 See also: [Identity & Users](./identity.md), [Task Model](./task-model.md), and [SSE Events](./sse.md).
