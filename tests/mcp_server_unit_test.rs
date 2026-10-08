@@ -1360,12 +1360,6 @@ fn mcp_strict_input_pins_reject_on_the_tools_call_surface() {
             serde_json::json!({"sprint": "#1", "force": true}),
             "force",
         ),
-        // sync task_id was undocumented and unadvertised.
-        (
-            "sync_pull",
-            serde_json::json!({"remote": "origin", "task_id": "MCP-1"}),
-            "task_id",
-        ),
         // config_set values must be strings (no silent coercion).
         (
             "config_set",

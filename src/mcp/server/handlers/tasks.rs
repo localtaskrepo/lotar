@@ -154,8 +154,11 @@ fn parse_task_update_patch(
         patch.priority = Some(s.to_string());
     }
 
+    // `type` is canonical and `task_type` its alias; an explicit null means
+    // omitted, so it falls through to the alias instead of shadowing it.
     if let Some(s) = patch_val
         .get("type")
+        .filter(|v| !v.is_null())
         .or_else(|| patch_val.get("task_type"))
         .and_then(|v| v.as_str())
     {
@@ -385,14 +388,20 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         .get("project")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let enum_hints = enum_hints_for_project(resolver.path.as_path(), project.as_deref());
+    let project = TaskService::resolve_create_project(&resolver.path, project);
     let project_cfg =
-        crate::config::resolution::config_for_project(resolver.path.as_path(), project.as_deref())
-            .unwrap_or_else(|_| {
-                crate::config::types::ResolvedConfig::from_global(
-                    crate::config::types::GlobalConfig::default(),
-                )
-            });
+        match crate::config::resolution::config_for_project(&resolver.path, Some(&project)) {
+            Ok(config) => config,
+            Err(error) => {
+                return err(
+                    req.id,
+                    -32000,
+                    "Failed to resolve configuration",
+                    Some(json!({"message": error.to_string()})),
+                );
+            }
+        };
+    let enum_hints = EnumHints::from_resolved_config(&project_cfg, std::slice::from_ref(&project));
     // Pre-validate enums with the target project's config so failures carry
     // structured suggestions; the service re-validates authoritatively.
     if let Some(raw) = req.params.get("status").and_then(|v| v.as_str())
@@ -421,9 +430,13 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
             data,
         );
     }
+    // `type` is canonical; `task_type` is its alias and only applies when
+    // `type` is absent or explicitly null (null means omitted, so it falls
+    // through to the alias instead of shadowing it).
     let type_param = req
         .params
         .get("type")
+        .filter(|v| !v.is_null())
         .or_else(|| req.params.get("task_type"))
         .and_then(|v| v.as_str());
     if let Some(raw) = type_param
@@ -470,6 +483,9 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     };
 
     let relationships = match req.params.get("relationships") {
+        // Explicit null matches the shared TaskCreate DTO's Option semantics
+        // (serde maps null to None): no relationships, not an error.
+        None | Some(Value::Null) => None,
         Some(value) => match serde_json::from_value::<TaskRelationships>(value.clone()) {
             Ok(rel) => {
                 if rel.is_empty() {
@@ -487,7 +503,6 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
                 );
             }
         },
-        None => None,
     };
 
     fn opt_string(params: &Value, key: &str) -> Option<String> {
@@ -499,11 +514,13 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let dto = TaskCreate {
         title,
-        project,
+        project: Some(project),
         // Enum strings are validated project-aware inside TaskService::create.
+        // `type` wins over the task_type alias (single resolution shared with
+        // the pre-validation above, so both see the same value).
         status: opt_string(&req.params, "status"),
         priority: opt_string(&req.params, "priority"),
-        task_type: opt_string(&req.params, "task_type").or_else(|| opt_string(&req.params, "type")),
+        task_type: type_param.map(|s| s.to_string()),
         reporter: opt_string(&req.params, "reporter"),
         assignee: opt_string(&req.params, "assignee"),
         due_date: opt_string(&req.params, "due_date"),
@@ -1781,6 +1798,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         &req.id,
         req.params
             .get("type")
+            .filter(|v| !v.is_null())
             .or_else(|| req.params.get("task_type")),
         "type",
         enum_hints.as_ref(),
@@ -2029,9 +2047,12 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         }
         Err(msg) => return err(req.id, -32602, msg, None),
     };
+    // `cursor` is canonical and `offset` its alias; an explicit null means
+    // "first page", so it falls through to the alias instead of shadowing it.
     let cursor_value = req
         .params
         .get("cursor")
+        .filter(|v| !v.is_null())
         .or_else(|| req.params.get("offset"));
     let cursor = match parse_cursor_value(cursor_value) {
         Ok(value) => value,

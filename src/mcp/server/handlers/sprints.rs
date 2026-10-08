@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 
-use super::super::hints::{EnumHints, enum_hints_to_value};
+use super::super::hints::{EnumHints, enum_hints_to_value, make_enum_error_data};
 use super::super::{
     JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_BACKLOG_LIMIT, MCP_DEFAULT_SPRINT_LIST_LIMIT,
     MCP_MAX_BACKLOG_LIMIT, MCP_MAX_CURSOR, MCP_MAX_SPRINT_LIST_LIMIT, domain_service_error, err,
@@ -11,7 +11,6 @@ use crate::api_types::{
     SprintCreateRequest, SprintCreateResponse, SprintListItem, SprintUpdateRequest,
     SprintUpdateResponse,
 };
-use crate::config::manager::ConfigManager;
 use crate::config::resolution;
 use crate::services::sprint_assignment::{self, SprintBacklogOptions};
 use crate::services::sprint_integrity;
@@ -316,6 +315,7 @@ pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let cursor_value = req
         .params
         .get("cursor")
+        .filter(|value| !value.is_null())
         .or_else(|| req.params.get("offset"));
     let cursor = match parse_cursor_value(cursor_value) {
         Ok(value) if value <= MCP_MAX_CURSOR => value,
@@ -948,8 +948,8 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
     let force_single = req
         .params
         .get("force_single")
-        .or_else(|| req.params.get("force"))
         .and_then(|v| v.as_bool())
+        .or_else(|| req.params.get("force").and_then(|v| v.as_bool()))
         .unwrap_or(false);
 
     let outcome = match sprint_assignment::assign_tasks(
@@ -1450,35 +1450,6 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
         .get("project")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let project_scope: Vec<String> = project.iter().cloned().collect();
-    let enum_hints = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-        .ok()
-        .and_then(|mgr| {
-            let cfg = mgr.get_resolved_config();
-            EnumHints::from_resolved_config(cfg, &project_scope)
-        });
-
-    let mut storage = match Storage::try_open(&resolver.path.clone()) {
-        Some(storage) => storage,
-        None => {
-            let mut payload = serde_json::Map::new();
-            payload.insert("status".to_string(), Value::String("ok".to_string()));
-            payload.insert("count".to_string(), Value::from(0u64));
-            payload.insert("truncated".to_string(), Value::Bool(false));
-            payload.insert("tasks".to_string(), Value::Array(Vec::new()));
-            if let Some(hints) = enum_hints.as_ref() {
-                payload.insert("enumHints".to_string(), enum_hints_to_value(hints));
-            }
-            let payload = Value::Object(payload);
-            return ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            );
-        }
-    };
-
     let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_BACKLOG_LIMIT) {
         Ok(value) if (1..=MCP_MAX_BACKLOG_LIMIT).contains(&value) => value,
         Ok(_) => {
@@ -1494,6 +1465,7 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
     let cursor_value = req
         .params
         .get("cursor")
+        .filter(|value| !value.is_null())
         .or_else(|| req.params.get("offset"));
     let cursor = match parse_cursor_value(cursor_value) {
         Ok(value) if value <= MCP_MAX_CURSOR => value,
@@ -1534,10 +1506,36 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 
     let status_tokens = parse_string_vec(req.params.get("status"));
-    let statuses: Vec<TaskStatus> = status_tokens
-        .iter()
-        .map(|token| TaskStatus::from(token.as_str()))
-        .collect();
+    let config = match resolution::config_for_project(&resolver.path, project.as_deref()) {
+        Ok(config) => config,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Failed to resolve configuration",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+    let project_scope: Vec<String> = project.iter().cloned().collect();
+    let enum_hints = EnumHints::from_resolved_config(&config, &project_scope);
+    let mut statuses = Vec::new();
+    for token in &status_tokens {
+        match TaskStatus::parse_with_config(token, &config) {
+            Ok(status) => statuses.push(status),
+            Err(error) => {
+                let data = enum_hints
+                    .as_ref()
+                    .and_then(|hints| make_enum_error_data("status", token, &hints.statuses));
+                return err(
+                    req.id,
+                    -32602,
+                    &format!("Status validation failed: {error}"),
+                    data,
+                );
+            }
+        }
+    }
 
     let tags = parse_string_vec(req.params.get("tag"));
 
@@ -1551,6 +1549,24 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string()),
         limit: 0,
+    };
+
+    let mut storage = match Storage::try_open(&resolver.path.clone()) {
+        Some(storage) => storage,
+        None => {
+            let mut payload = json!({
+                "status": "ok", "count": 0, "total": 0, "cursor": 0,
+                "limit": limit, "hasMore": false, "nextCursor": null,
+                "truncated": false, "tasks": [], "missing_sprints": []
+            });
+            if let Some(hints) = enum_hints.as_ref() {
+                payload["enumHints"] = enum_hints_to_value(hints);
+            }
+            return ok(
+                req.id,
+                json!({"content": [{"type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into())}]}),
+            );
+        }
     };
 
     let mut records = match SprintService::list(&storage) {
@@ -1604,6 +1620,7 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert("status".to_string(), Value::String("ok".to_string()));
     payload.insert("count".to_string(), Value::from(page_entries.len() as u64));
     payload.insert("total".to_string(), Value::from(total_entries as u64));
+    payload.insert("limit".to_string(), Value::from(limit as u64));
     payload.insert("truncated".to_string(), Value::Bool(has_more));
     payload.insert("hasMore".to_string(), Value::Bool(has_more));
     payload.insert("cursor".to_string(), Value::from(start as u64));

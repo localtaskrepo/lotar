@@ -1,12 +1,26 @@
 title: Synchronize MCP parameter schemas pagination and sprint hints with handlers
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-54, DEV-57, DEV-63]
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.596456+00:00
+modified: 2026-10-08T16:48:59.506122+00:00
+relationships:
+  depends_on:
+  - DEV-54
+  - DEV-57
+  - DEV-63
+  parent: DEV-53
+comments:
+- date: 2026-10-08T16:11:54.172376+00:00
+  text: 'Plan: reconcile current MCP catalog with handlers/shared DTOs, preserving completed DEV-54/57/63 foundations rather than reimplementing them. Confirmed gaps: targeted sync task_id omitted/rejected, sprint_backlog resolves global rather than project hints and its empty-storage branch bypasses pagination metadata/validation. Audit remaining nullable/alias/sprint-assignment fields and empty-page paths; add regressions for every advertised tool schema and nullable contract plus actual stdio dispatch. Keep create-status atomic, soft-delete/hard semantics and strict DEV-63 unknown-field/error classification. Either implement reliable sprint hints/change detection or remove any unsupported promise after checking present code/docs. Run targeted native nextest then warning-free lint, full Rust/UI and build-first smoke. No repository Git/index operations, commits, pushes or worktrees; serialize DEV64 tracking only.'
+- date: 2026-10-08T16:33:23.758915+00:00
+  text: 'Outcome/progress: parent fixes backlog limit/empty-page metadata, pagination validation before empty branch, project-scoped canonical status validation/suggestions and config-fingerprint hint refresh. Nullable cursor now permits offset in sprint/project/backlog handlers; nullable force_single permits force and real reassignment. Evidence: parent backlog baseline3run1pass2fail->3green; nullable aliases2 genuine failures; parent scopedgreen4/4 (combined task_list alias awaits owned worker). New actualstdio smoke3cases:2pass, targeted-sync red correctly reports unknown task_id; first draft assertion wrongly used report.entries instead of typed SyncResponse.report_entries and was corrected (test error, not production failure). Independent readonly parent-surface SIGNOFF. Decision: current EnumHints never includes sprint IDs; explicitly document configuration-only hints and require sprint_list for IDs/labels rather than add unreliable sprint hint promises/fingerprints. Established multi-project toolhint suppression retained. Remaining: schema/task/sync adapter worker and full catalog/nullable tests, build-first wire verification, final lint/Rust/UI/fullsmoke and complete source review. No REST/UI shape change or repository Git/index operations. Guidance:no durable finding.'
+- date: 2026-10-08T16:45:54.692345+00:00
+  text: 'Outcome: schema/task/sync adapters complete; advertised task_id now forwarded for both sync directions, nullable relationships and type/task_type aliases match handler behavior, integer sprint/comment/capacity and limit contracts align, cursor-null aliases work across all listings. Parent found/reproduced three final gaps (3/3 red): skip_defaults advertised null despite bool DTO, velocity invalid explicit window silently defaulted, and create preflight/global hints disagreed with actual repository-derived service project. Narrowed bool/window schemas and extracted unchanged service project-resolution helper used by service+MCP preflight; no default-project behavior change or REST shape change. Correction to investigation hypothesis: TaskService create fallback is repository-derived, not configured default.project; tests pin that established behavior. Evidence: whole38-tool catalog/nullable schema sweep plus behavioral DTO/alias/sprintclear/delete tests,18 new Rust cases total; focused100/100 MCP tests; new3 actualstdio smoke green (real loopbackJira pull + targetedpush, sibling exactbytes). Final first-run lint clean (types/Clippy alltargets-allfeatures -Dwarnings/fmt),1311 Rust passed/45actualGit-dependent exclusions,566 UI passed,222 fresh-build smoke passed/25Git-dependent skips,51passed6skippedfiles. Logs target/dev64-20261008/. Remaining: final fullsource readonly review result then native closure/readback; no Windows/remoteCI claim or repositoryGit/index operations. Guidance:no durableinstructionfinding.'
+- date: 2026-10-08T16:48:59.483715+00:00
+  text: 'Outcome: DEV-64 complete, full readonly final review SIGNOFF plus earlier parent-surface SIGNOFF. Verified unchanged service project fallback extraction, no advertised unsupported nullable shared-DTO fields, schema/domain classifications, nullalias precedence, strict unknownfield rejection beforewrites and actual targetedSync scoping. Evidence:18 newRust cases including38tool catalog+nullable-schema sweep and behavioral publicdispatch tests; focused100pass/newactualstdio3pass; final lintclean,1311Rustpass45actualGit-dependent exclusions,566UIpass,222build-first smokepass25Git-dependent skips. All final gates first-run green. Remaining: no blocking scoped work. Known LOW optional polish: schemas do not state u32::MAX on sprint IDs; oversized positive IDs pass shape validation then fail closed at semantic conversion with imprecise positive-integer wording (no write/silent drop); not an accepted oversized-ID behavior. Preexisting sync invalid-ID vs wrong-project error-class asymmetry retained; project_list string nextCursor retained/documented. No Windows/remoteCI claim, repositoryGit/index commands, commits/pushes/worktrees. Guidance:no durableinstructionfinding or policy changes. Logs target/dev64-20261008/.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: M6 M7 M8 M10 M11 M14 M15.
@@ -18,3 +32,34 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-08T16:11:54.134712+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-08T16:11:54.172376+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T16:33:23.758915+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T16:45:54.692345+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T16:48:59.483715+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T16:48:59.506122+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

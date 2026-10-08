@@ -1900,3 +1900,191 @@ fn tools_call_task_create_membership_error_keeps_operation_envelope() {
 
     clear_tasks_dir_env();
 }
+
+#[test]
+fn dev64_backlog_empty_pages_keep_pagination_contract() {
+    let _guard = test_env::lock_tasks_dir();
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    set_tasks_dir_env(&tasks_dir);
+
+    for (name, rows) in [
+        ("sprint_backlog", "tasks"),
+        ("task_list", "tasks"),
+        ("sprint_list", "sprints"),
+        ("project_list", "projects"),
+    ] {
+        let response = dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: json!({"name": name, "arguments": {"limit": 3, "cursor": 7}}),
+        });
+        assert!(response.error.is_none(), "{name}: {:?}", response.error);
+        let payload = parse_tool_payload(&response);
+        assert_eq!(payload[rows], json!([]), "{name}: {payload}");
+        assert_eq!(payload["count"], 0, "{name}: {payload}");
+        assert_eq!(payload["total"], 0, "{name}: {payload}");
+        assert_eq!(payload["limit"], 3, "{name}: {payload}");
+        assert_eq!(payload["cursor"], 0, "{name}: {payload}");
+        assert_eq!(payload["hasMore"], false, "{name}: {payload}");
+        assert_eq!(
+            payload.get("nextCursor"),
+            Some(&Value::Null),
+            "{name}: {payload}"
+        );
+    }
+}
+
+#[test]
+fn dev64_backlog_empty_storage_still_validates_pagination() {
+    let _guard = test_env::lock_tasks_dir();
+    let tmp = tempfile::tempdir().unwrap();
+    set_tasks_dir_env(&tmp.path().join(".tasks"));
+    for arguments in [json!({"limit": 0}), json!({"cursor": "invalid"})] {
+        let response = dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: json!({"name": "sprint_backlog", "arguments": arguments}),
+        });
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code),
+            Some(-32602)
+        );
+    }
+}
+
+#[test]
+fn dev64_backlog_project_validation_and_hints_refresh_together() {
+    let _guard = test_env::lock_tasks_dir();
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    seed_single_project_config(&tasks_dir);
+    std::fs::create_dir_all(tasks_dir.join("MCP")).unwrap();
+    let config_path = tasks_dir.join("MCP/config.yml");
+    std::fs::write(
+        &config_path,
+        "issue.states: [Ready, Closed]\nissue.priorities: [Urgent]\n",
+    )
+    .unwrap();
+    std::fs::write(tasks_dir.join("MCP/1.yml"), "title: Project task\nstatus: Ready\npriority: Urgent\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").unwrap();
+    set_tasks_dir_env(&tasks_dir);
+
+    let call = |arguments| {
+        dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: json!({"name": "sprint_backlog", "arguments": arguments}),
+        })
+    };
+    let response = call(json!({"project": "MCP", "status": "ready", "limit": 1}));
+    assert!(response.error.is_none(), "{:?}", response.error);
+    let payload = parse_tool_payload(&response);
+    assert_eq!(payload["count"], 1);
+    assert_eq!(payload["limit"], 1);
+    assert_eq!(payload["tasks"][0]["id"], "MCP-1");
+    assert_eq!(payload["enumHints"]["statuses"], json!(["Ready", "Closed"]));
+    assert_eq!(payload["enumHints"]["priorities"], json!(["Urgent"]));
+
+    let invalid = call(json!({"project": "MCP", "status": "Bogus"}));
+    let error = invalid.error.as_ref().expect("invalid status must fail");
+    assert_eq!(error.code, -32602);
+    assert_eq!(
+        error.data.as_ref().unwrap()["suggestions"],
+        json!(["Ready", "Closed"])
+    );
+
+    std::fs::write(
+        &config_path,
+        "issue.states: [Ready, Reviewing, Closed]\nissue.priorities: [Immediate]\n",
+    )
+    .unwrap();
+    let refreshed = call(json!({"project": "MCP"}));
+    let payload = parse_tool_payload(&refreshed);
+    assert_eq!(
+        payload["enumHints"]["statuses"],
+        json!(["Ready", "Reviewing", "Closed"])
+    );
+    assert_eq!(payload["enumHints"]["priorities"], json!(["Immediate"]));
+}
+
+#[test]
+fn dev64_nullable_cursor_does_not_mask_offset_alias() {
+    let _guard = test_env::lock_tasks_dir();
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    seed_single_project_config(&tasks_dir);
+    for prefix in ["MCP", "OTHER"] {
+        std::fs::create_dir_all(tasks_dir.join(prefix)).unwrap();
+        std::fs::write(tasks_dir.join(prefix).join("1.yml"), "title: Task\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").unwrap();
+    }
+    std::fs::create_dir_all(tasks_dir.join("@sprints")).unwrap();
+    for id in [1, 2] {
+        std::fs::write(
+            tasks_dir.join("@sprints").join(format!("{id}.yml")),
+            "created: 2026-01-01T00:00:00Z\n",
+        )
+        .unwrap();
+    }
+    set_tasks_dir_env(&tasks_dir);
+    for name in ["sprint_backlog", "sprint_list", "project_list", "task_list"] {
+        let response = dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: json!({"name": name, "arguments": {"limit": 1, "cursor": null, "offset": 1}}),
+        });
+        assert!(response.error.is_none(), "{name}: {:?}", response.error);
+        let payload = parse_tool_payload(&response);
+        assert_eq!(payload["cursor"], 1, "{name}: {payload}");
+        assert_eq!(payload["count"], 1, "{name}: {payload}");
+        assert_eq!(payload["hasMore"], false, "{name}: {payload}");
+    }
+}
+
+#[test]
+fn dev64_nullable_force_single_does_not_mask_force_alias() {
+    let _guard = test_env::lock_tasks_dir();
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    seed_single_project_config(&tasks_dir);
+    std::fs::create_dir_all(tasks_dir.join("MCP")).unwrap();
+    std::fs::write(tasks_dir.join("MCP/1.yml"), "title: Task\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").unwrap();
+    std::fs::create_dir_all(tasks_dir.join("@sprints")).unwrap();
+    std::fs::write(
+        tasks_dir.join("@sprints/1.yml"),
+        "created: 2026-01-01T00:00:00Z\ntasks:\n  - id: MCP-1\n",
+    )
+    .unwrap();
+    std::fs::write(
+        tasks_dir.join("@sprints/2.yml"),
+        "created: 2026-01-01T00:00:00Z\n",
+    )
+    .unwrap();
+    set_tasks_dir_env(&tasks_dir);
+    let response = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(1)),
+        method: "tools/call".into(),
+        params: json!({"name": "sprint_add", "arguments": {"tasks": "MCP-1", "sprint_id": 2, "force_single": null, "force": true}}),
+    });
+    assert!(response.error.is_none(), "{:?}", response.error);
+    assert_ne!(response.result.as_ref().unwrap()["isError"], json!(true));
+    let storage = crate::storage::manager::Storage::try_open(&tasks_dir).unwrap();
+    let records = crate::services::sprint_service::SprintService::list(&storage).unwrap();
+    assert!(
+        records
+            .iter()
+            .find(|r| r.id == 1)
+            .unwrap()
+            .sprint
+            .tasks
+            .is_empty()
+    );
+    assert_eq!(
+        records.iter().find(|r| r.id == 2).unwrap().sprint.tasks[0].id,
+        "MCP-1"
+    );
+}

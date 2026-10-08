@@ -129,6 +129,19 @@ pub struct PreparedTaskCreate<'a> {
 }
 
 impl TaskService {
+    pub(crate) fn resolve_create_project(tasks_root: &Path, project: Option<String>) -> String {
+        project.unwrap_or_else(|| {
+            let repo_name = tasks_root
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+                .or_else(crate::project::get_project_name)
+                .unwrap_or_else(|| "default".to_string());
+            generate_project_prefix(&repo_name)
+        })
+    }
+
     pub fn create(storage: &mut Storage, req: TaskCreate) -> LoTaRResult<TaskDTO> {
         let TaskCreate {
             title,
@@ -155,19 +168,7 @@ impl TaskService {
         let normalized_sprints = Self::normalize_sprint_ids(&sprints);
 
         // Prefer explicit project if provided; otherwise, derive from repo folder name
-        let project = project.unwrap_or_else(|| {
-            // If tasks dir looks like /path/to/repo/.tasks, use repo folder name
-            let repo_name = storage
-                .root_path
-                .parent()
-                .and_then(|p| p.file_name())
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_string())
-                // Fallback to detected project name
-                .or_else(crate::project::get_project_name)
-                .unwrap_or_else(|| "default".to_string());
-            generate_project_prefix(&repo_name)
-        });
+        let project = Self::resolve_create_project(&storage.root_path, project);
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
 

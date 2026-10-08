@@ -14,6 +14,9 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - `tools/call` results additionally embed a `functionResponse` compatibility wrapper (successes and `isError` conversions alike); direct method calls omit it.
 - `@me` is accepted anywhere a reporter/assignee is expected and resolves using the same identity chain as the CLI.
 - Many responses include `enumHints` so hosts can surface the project’s allowed values.
+- Hints are advisory, not schema constraints. Tool-list hints describe configuration only when the workspace has at most one project; multi-project workspaces omit them rather than advertise another project's values. Request-scoped validation and response hints use the operation's resolved project configuration. Configuration changes refresh these values.
+- Sprint IDs are not included in `enumHints` or tool-list field hints. Discover current sprint IDs and labels with `sprint_list`; sprint integrity diagnostics are separate from enum hints.
+- For paginated tools, `cursor: null` behaves as omitted and permits the `offset` alias. A non-null `cursor` takes precedence over `offset`.
 
 ## Task Tools
 
@@ -26,6 +29,8 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Params:** `title` (required), optional `description`, `project`, `priority`, `type` (alias `task_type`), `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `acceptance_criteria[]`, `relationships`, `custom_fields` map, and `sprints[]` (positive integers).
 - **Behavior:** validates `status`/`priority`/`type` against the target project's configuration (project-only enum values are accepted; failures carry `error.data.suggestions` from that project); an explicit `status` is persisted atomically with creation; auto-fills missing defaults (priority/type/status/reporter/assignee/tags) per project config; `@me` supported for people fields.
 - **Response:** JSON blob containing the saved `task` plus `metadata.appliedDefaults` (fields the server filled) and `metadata.enumHints` when available.
+- **Project:** An explicit `project` selects that project. When omitted, MCP uses the shared task service's repository-derived project prefix for both enum validation and creation; it does not pre-validate against unrelated global values.
+- **Type Alias:** A non-null `type` takes precedence over `task_type`; `type: null` permits the alias. This precedence is consistent in create, patch, and list filters.
 
 ### `task_get`
 - **Params:** `id` (required), optional `project` override to disambiguate numeric IDs, and `include_deleted` (bool, default false).
@@ -104,7 +109,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `status` and a single `sprint` entry.
 
 ### `sprint_create`
-- **Params:** `label`, `goal`, `plan_length`, `starts_at`, `ends_at`, `capacity_points`, `capacity_hours`, `overdue_after`, `notes`, `skip_defaults`.
+- **Params:** `label`, `goal`, `plan_length`, `starts_at`, `ends_at`, `capacity_points`, `capacity_hours`, `overdue_after`, `notes`, `skip_defaults` (boolean, default `false`; explicit `null` is rejected). Capacity values are non-negative integers, not fractions.
 - **Response:** JSON with `status`, created `sprint`, plus any warnings/defaults applied.
 
 ### `sprint_update`
@@ -120,11 +125,12 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Same payload as the CLI sprint burndown report (`series[]` etc.).
 
 ### `sprint_velocity`
-- **Params:** `limit` (default 6), `include_active` (default false), `metric` (`tasks|points|hours`).
+- **Params:** `limit` (positive integer, default 6), `include_active` (default false), `metric` (`tasks|points|hours`). Invalid explicit windows are rejected rather than silently defaulted.
 - **Response:** Same payload as the CLI sprint velocity report.
 
 ### `sprint_add`
 - **Params:** `tasks` (string or array, required), optional `sprint` (reference like `#1`, numeric id, or keyword), optional `sprint_id` (numeric id), `allow_closed` (default `false`), `force_single`/`force` (advertised aliases — force reassignments), and `cleanup_missing` (remove dangling references first).
+- **Aliases:** `force_single: null` permits the `force` alias; a boolean `force_single` takes precedence, including explicit `false`.
 - **Response:** JSON with `status`, `action` (`created|updated|moved`), `sprint_id`, `sprint_label`, lists of `modified`, `unchanged`, `replaced`, `missing_sprints`, and optional `integrity` metrics. If reassignments occur, an additional text content item lists the human-readable warnings.
 
 ### `sprint_remove`
@@ -139,7 +145,8 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 ### `sprint_backlog`
 - **Params:** `project`, `status` list (defaults come from config), `tag` filter, `assignee`, `limit` (default 20, max 100), `cursor` (<= 5000), and `cleanup_missing`.
 - **Validation:** `sort_by`, `order`, `due`, `recent`, and `needs` are not supported here. They were previously advertised but ignored; they now return `-32602` rather than silently returning an unfiltered backlog. Use `task_list` for those filters.
-- **Response:** Paginated backlog with `status`, `count`, `total`, `cursor`, `nextCursor` (number or null), `tasks[]`, `missing_sprints`, `enumHints`, and a `truncated`/`hasMore` flag.
+- **Validation:** Explicit status values are canonicalized and validated against the selected project's configuration; invalid values return `-32602` with that project's suggestions. Validation also runs for empty results.
+- **Response:** Paginated backlog with `status`, `count`, `total`, `cursor`, `limit`, `nextCursor` (number or null), `tasks[]`, `missing_sprints`, optional project-scoped `enumHints`, and `truncated`/`hasMore` flags. Empty pages retain the same pagination fields; cursors beyond the result set are clamped to its length.
 
 ## Project Tools
 
@@ -165,13 +172,13 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 ## Sync Tools
 
 ### `sync_pull`
-- **Params:** `remote` (required), optional `project`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
-- **Behavior:** `task_id` is not an accepted parameter (it was never advertised) and is rejected as an unknown property — scope runs with `project` instead.
+- **Params:** `remote` (required), optional `project`, `task_id`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
+- **Behavior:** `task_id` targets one local task using a fully qualified ID. The shared sync service resolves its project and remote linkage and rejects project/ID mismatches. Omit it or pass `null` to sync the selected project's scope. `dry_run` previews changes but pull still needs remote authentication and reads.
 - **Response:** JSON summary plus report metadata; `include_report` returns per-item entries.
 
 ### `sync_push`
-- **Params:** `remote` (required), optional `project`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
-- **Behavior:** `task_id` is rejected as an unknown property, exactly as with `sync_pull`.
+- **Params:** `remote` (required), optional `project`, `task_id`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
+- **Behavior:** `task_id` targets one local task with the same project/ID validation as `sync_pull`; omit it or pass `null` for the selected project's scope. Unknown fields such as `dryrun` remain errors and never trigger a live sync.
 - **Response:** JSON summary plus report metadata; `include_report` returns per-item entries.
 
 ## Agent Tools

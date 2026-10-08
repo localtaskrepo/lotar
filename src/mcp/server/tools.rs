@@ -164,7 +164,7 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
         "task_type".into(),
         json!({
             "type": ["string", "null"],
-            "description": "Alias for 'type'."
+            "description": "Alias for 'type'; 'type' wins when both are provided."
         }),
     );
     properties.insert("reporter".into(), json!({"type": ["string", "null"]}));
@@ -195,7 +195,7 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
         "sprints".into(),
         json!({
             "type": ["array", "null"],
-            "items": {"type": "number"},
+            "items": {"type": "integer", "minimum": 1},
             "description": "Initial sprint memberships; entries must be positive integers."
         }),
     );
@@ -346,7 +346,7 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         "task_type".into(),
         json!({
             "type": ["string", "null"],
-            "description": "Alias for 'type'; null is treated as omitted."
+            "description": "Alias for 'type'; 'type' wins when both are provided and null means omitted."
         }),
     );
     patch_properties.insert(
@@ -396,7 +396,7 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         "sprints".into(),
         json!({
             "type": ["array", "null"],
-            "items": {"type": "number"},
+            "items": {"type": "integer", "minimum": 1},
             "description": "Replaces sprint memberships; null or [] clears them."
         }),
     );
@@ -577,8 +577,11 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
     properties.insert(
         "sprints".into(),
         json!({
-            "type": ["array", "string", "number", "null"],
-            "items": {"type": ["number", "string"]},
+            // Flexible filter grammar (single value or array), but every
+            // numeric form must still be a positive integer.
+            "type": ["array", "string", "integer", "null"],
+            "minimum": 1,
+            "items": {"type": ["integer", "string"], "minimum": 1},
             "description": "Filter by sprint ids. Accepts a single number/string, or an array. Strings may be '#<id>' or '<id>'."
         }),
     );
@@ -586,6 +589,8 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         "limit".into(),
         json!({
             "type": ["number", "null"],
+            "minimum": 1,
+            "maximum": 200,
             "description": "Maximum number of tasks to return per page (1-200). Defaults to 50."
         }),
     );
@@ -764,7 +769,7 @@ fn make_task_comment_update_tool(_enum_hints: Option<&EnumHints>) -> Value {
             "type": "object",
             "properties": {
                 "id": {"type": "string"},
-                "index": {"type": "number", "description": "0-based comment index."},
+                "index": {"type": "integer", "minimum": 0, "description": "0-based comment index."},
                 "text": {"type": "string"}
             },
             "required": ["id", "index", "text"],
@@ -831,11 +836,11 @@ fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
     );
     patch_properties.insert(
         "sprints".into(),
-        json!({"type": ["array", "null"], "items": {"type": "number"}}),
+        json!({"type": ["array", "null"], "items": {"type": "integer", "minimum": 1}}),
     );
     patch_properties.insert(
         "task_type".into(),
-        json!({"type": ["string", "null"], "description": "Alias for 'type'."}),
+        json!({"type": ["string", "null"], "description": "Alias for 'type'; 'type' wins when both are provided."}),
     );
 
     let mut tool = json!({
@@ -989,7 +994,7 @@ fn make_sprint_list_tool() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "limit": {"type": ["number", "null"], "description": "Max sprints per page."},
+                "limit": {"type": ["number", "null"], "minimum": 1, "maximum": 200, "description": "Max sprints per page (1-200). Defaults to 50."},
                 "cursor": {"type": ["string", "number", "null"], "description": "Opaque cursor returned via nextCursor."},
                 "offset": {"type": ["number", "null"], "description": "Alias for cursor (0-based)."},
                 "include_integrity": {"type": ["boolean", "null"], "description": "When true (default), include missing_sprints/integrity diagnostics."}
@@ -1006,8 +1011,8 @@ fn make_sprint_get_tool() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or a numeric id."},
-                "sprint_id": {"type": ["number", "null"], "description": "Numeric sprint identifier."}
+                "sprint": {"type": ["string", "integer", "null"], "description": "Sprint reference like '#1' or a numeric id."},
+                "sprint_id": {"type": ["integer", "null"], "minimum": 1, "description": "Numeric sprint identifier."}
             },
             "additionalProperties": false
         }
@@ -1026,11 +1031,11 @@ fn make_sprint_create_tool() -> Value {
                 "plan_length": {"type": ["string", "null"]},
                 "ends_at": {"type": ["string", "null"]},
                 "starts_at": {"type": ["string", "null"]},
-                "capacity_points": {"type": ["number", "null"]},
-                "capacity_hours": {"type": ["number", "null"]},
+                "capacity_points": {"type": ["integer", "null"], "minimum": 0},
+                "capacity_hours": {"type": ["integer", "null"], "minimum": 0},
                 "overdue_after": {"type": ["string", "null"]},
                 "notes": {"type": ["string", "null"]},
-                "skip_defaults": {"type": ["boolean", "null"]}
+                "skip_defaults": {"type": "boolean", "description": "Omit for false; null is not supported by the shared request DTO."}
             },
             "additionalProperties": false
         }
@@ -1044,15 +1049,15 @@ fn make_sprint_update_tool() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or numeric id."},
-                "sprint_id": {"type": ["number", "null"], "description": "Numeric sprint id (preferred)."},
+                "sprint": {"type": ["string", "integer", "null"], "description": "Sprint reference like '#1' or numeric id."},
+                "sprint_id": {"type": ["integer", "null"], "minimum": 1, "description": "Numeric sprint id (preferred)."},
                 "label": {"type": ["string", "null"]},
                 "goal": {"type": ["string", "null"]},
                 "plan_length": {"type": ["string", "null"]},
                 "ends_at": {"type": ["string", "null"]},
                 "starts_at": {"type": ["string", "null"]},
-                "capacity_points": {"type": ["number", "null"], "description": "Number sets; null clears; omit leaves unchanged."},
-                "capacity_hours": {"type": ["number", "null"], "description": "Number sets; null clears; omit leaves unchanged."},
+                "capacity_points": {"type": ["integer", "null"], "minimum": 0, "description": "Integer sets; null clears; omit leaves unchanged."},
+                "capacity_hours": {"type": ["integer", "null"], "minimum": 0, "description": "Integer sets; null clears; omit leaves unchanged."},
                 "overdue_after": {"type": ["string", "null"]},
                 "notes": {"type": ["string", "null"]},
                 "actual_started_at": {"type": ["string", "null"], "description": "RFC3339 timestamp, null clears."},
@@ -1070,8 +1075,8 @@ fn make_sprint_summary_tool() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or numeric id."},
-                "sprint_id": {"type": ["number", "null"]}
+                "sprint": {"type": ["string", "integer", "null"], "description": "Sprint reference like '#1' or numeric id."},
+                "sprint_id": {"type": ["integer", "null"], "minimum": 1}
             },
             "additionalProperties": false
         }
@@ -1085,8 +1090,8 @@ fn make_sprint_burndown_tool() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or numeric id."},
-                "sprint_id": {"type": ["number", "null"]}
+                "sprint": {"type": ["string", "integer", "null"], "description": "Sprint reference like '#1' or numeric id."},
+                "sprint_id": {"type": ["integer", "null"], "minimum": 1}
             },
             "additionalProperties": false
         }
@@ -1101,7 +1106,7 @@ fn make_sprint_velocity_tool() -> Value {
             "type": "object",
             "properties": {
                 "include_active": {"type": ["boolean", "null"]},
-                "limit": {"type": ["number", "null"], "description": "Window size (default 6)."},
+                "limit": {"type": ["integer", "null"], "minimum": 1, "description": "Positive window size (default 6)."},
                 "metric": {"type": ["string", "null"], "description": "tasks | points | hours"}
             },
             "additionalProperties": false
@@ -1117,11 +1122,12 @@ fn make_sprint_add_tool() -> Value {
             "type": "object",
             "properties": {
                 "sprint": {
-                    "type": ["string", "number", "null"],
+                    "type": ["string", "integer", "null"],
                     "description": "Sprint reference like '#1', a numeric id, or keyword (next/previous/active)."
                 },
                 "sprint_id": {
-                    "type": ["number", "null"],
+                    "type": ["integer", "null"],
+                    "minimum": 1,
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
                 "tasks": {
@@ -1155,11 +1161,12 @@ fn make_sprint_remove_tool() -> Value {
             "type": "object",
             "properties": {
                 "sprint": {
-                    "type": ["string", "number", "null"],
+                    "type": ["string", "integer", "null"],
                     "description": "Sprint reference like '#1', a numeric id, or keyword (next/previous/active)."
                 },
                 "sprint_id": {
-                    "type": ["number", "null"],
+                    "type": ["integer", "null"],
+                    "minimum": 1,
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
                 "tasks": {
@@ -1188,7 +1195,8 @@ fn make_sprint_delete_tool() -> Value {
                     "description": "Sprint reference like '#1'."
                 },
                 "sprint_id": {
-                    "type": ["number", "null"],
+                    "type": ["integer", "null"],
+                    "minimum": 1,
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
                 "cleanup_missing": {"type": ["boolean", "null"]}
@@ -1206,7 +1214,10 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
     properties.insert("status".into(), multi_value_string_schema());
     properties.insert("tag".into(), multi_value_string_schema());
     properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
-    properties.insert("limit".into(), json!({"type": ["number", "null"]}));
+    properties.insert(
+        "limit".into(),
+        json!({"type": ["number", "null"], "minimum": 1, "maximum": 100}),
+    );
     properties.insert(
         "cleanup_missing".into(),
         json!({"type": ["boolean", "null"]}),
@@ -1284,6 +1295,8 @@ fn make_project_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         "limit".into(),
         json!({
             "type": ["number", "null"],
+            "minimum": 1,
+            "maximum": 200,
             "description": "Maximum number of projects to return per page (1-200). Defaults to 50."
         }),
     );
@@ -1412,12 +1425,16 @@ fn make_config_set_tool(enum_hints: Option<&EnumHints>) -> Value {
 fn make_sync_pull_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "sync_pull",
-        "description": "Pull tasks from a configured sync remote. Returns a summary of planned changes.",
+        "description": "Pull tasks from a configured sync remote. Pass task_id to sync a single task; its project prefix scopes the run when project is omitted. Returns a summary of planned changes.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "remote": {"type": "string"},
                 "project": {"type": ["string", "null"]},
+                "task_id": {
+                    "type": ["string", "null"],
+                    "description": "Sync only this task id (e.g., ABC-123); null/omit syncs the whole scope."
+                },
                 "auth_profile": {"type": ["string", "null"]},
                 "dry_run": {"type": ["boolean", "null"]},
                 "include_report": {"type": ["boolean", "null"]},
@@ -1443,12 +1460,16 @@ fn make_sync_pull_tool(enum_hints: Option<&EnumHints>) -> Value {
 fn make_sync_push_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "sync_push",
-        "description": "Push tasks to a configured sync remote. Returns a summary of planned changes.",
+        "description": "Push tasks to a configured sync remote. Pass task_id to sync a single task; its project prefix scopes the run when project is omitted. Returns a summary of planned changes.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "remote": {"type": "string"},
                 "project": {"type": ["string", "null"]},
+                "task_id": {
+                    "type": ["string", "null"],
+                    "description": "Sync only this task id (e.g., ABC-123); null/omit syncs the whole scope."
+                },
                 "auth_profile": {"type": ["string", "null"]},
                 "dry_run": {"type": ["boolean", "null"]},
                 "include_report": {"type": ["boolean", "null"]},

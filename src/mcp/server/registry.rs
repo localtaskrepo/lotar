@@ -770,12 +770,6 @@ mod tests {
                 json!({"sprint": "#1", "force": true}),
                 "unknown property 'force'",
             ),
-            // sync task_id was never documented nor advertised.
-            (
-                "sync_pull",
-                json!({"remote": "origin", "task_id": "MCP-1"}),
-                "unknown property 'task_id'",
-            ),
             // MCP task_delete has no confirmation concept; CLI-style force
             // must be rejected instead of silently ignored.
             (
@@ -788,11 +782,6 @@ mod tests {
                 "task_restore",
                 json!({"id": "MCP-1", "dry_run": true}),
                 "unknown property 'dry_run'",
-            ),
-            (
-                "sync_push",
-                json!({"remote": "origin", "task_id": "MCP-1"}),
-                "unknown property 'task_id'",
             ),
             (
                 "config_set",

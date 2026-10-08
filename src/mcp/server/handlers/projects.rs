@@ -39,6 +39,7 @@ pub(crate) fn handle_project_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let cursor_value = req
         .params
         .get("cursor")
+        .filter(|value| !value.is_null())
         .or_else(|| req.params.get("offset"));
     let cursor = match parse_cursor_value(cursor_value) {
         Ok(value) if value <= MCP_MAX_CURSOR => value,
