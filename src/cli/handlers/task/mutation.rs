@@ -126,45 +126,25 @@ pub fn load_task(
     })
 }
 
-pub fn apply_auto_populate_members(
-    ctx: &mut TaskCommandContext,
-    project_prefix: &str,
-    task: &Task,
-    dry_run: bool,
-) -> Result<(), String> {
+/// Plan membership validation without writing; TaskService re-plans and stages
+/// the project config under its coordinated update transaction.
+pub fn plan_auto_populate_members(ctx: &mut TaskCommandContext, task: &Task) {
     let missing = TaskService::missing_members_for_task(task, &ctx.config);
     if missing.is_empty() {
-        return Ok(());
+        return;
     }
 
-    if dry_run || project_prefix.trim().is_empty() {
-        let mut merged = ctx.config.members.clone();
-        for candidate in missing.iter() {
-            if !merged
-                .iter()
-                .any(|existing| existing.eq_ignore_ascii_case(candidate))
-            {
-                merged.push(candidate.clone());
-            }
+    let mut merged = ctx.config.members.clone();
+    for candidate in missing.iter() {
+        if !merged
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(candidate))
+        {
+            merged.push(candidate.clone());
         }
-        merged.sort_by_key(|value| value.to_ascii_lowercase());
-        ctx.config.members = merged;
-        return Ok(());
     }
-
-    match crate::config::operations::auto_populate_project_members(
-        ctx.storage_root(),
-        project_prefix,
-        &ctx.config.members,
-        &missing,
-    ) {
-        Ok(Some(updated)) => {
-            ctx.config.members = updated;
-            Ok(())
-        }
-        Ok(None) => Ok(()),
-        Err(err) => Err(format!("Failed to auto-populate project members: {}", err)),
-    }
+    merged.sort_by_key(|value| value.to_ascii_lowercase());
+    ctx.config.members = merged;
 }
 
 pub fn ensure_membership(

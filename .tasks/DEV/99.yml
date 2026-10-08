@@ -1,7 +1,43 @@
 title: Coordinate CLI edit member auto-population with the task update transaction
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-06T16:46:06.152442+00:00
+modified: 2026-10-08T01:22:40.640412+00:00
+comments:
+- date: 2026-10-08T01:02:00.486383+00:00
+  text: 'Plan: remove CLI edit member/config pre-write and reuse TaskService coordinated update member planning; preserve CLI validation, identity/default behavior, output and side-effect-free dry-run. Add real-binary failed-write, pending-journal, dry-run and successful member/task regressions; verify targeted nextest then warning-free lint, full native Rust/UI and build-first smoke gates. Scope limited to DEV-99; no repository Git/index commands, commits, pushes or worktrees. Outcome/Evidence/Remaining/Guidance will be recorded at closure.'
+- date: 2026-10-08T01:22:23.228649+00:00
+  text: 'Outcome: CLI edit now plans missing members only in memory before membership validation/preview; the unchanged TaskService update path re-plans and stages configuration plus task/history under coordinated locks. No new transaction abstraction or API/UI shape change. Evidence: parent legacy baseline 9 run/5 pass/4 fail reproduced validation, symlink stage, corrupt-journal config side effects and bypassed mid-publish fault; post-fix 9/9 pass including strengthened strict-members success/text+JSON dry-run cases. Final lint clean (types, all-target/all-feature Clippy -D warnings, fmt); Rust nextest 1293 passed/45 actual Git-dependent exclusions; UI566 passed/66files; fresh build-first smoke219 passed/25 Git-dependent skips,50 passed/6 skipped files. Logs target/sequence-20261006/dev99/{red-root,green-strict,lint,test,smoke}.log. All final gates passed first run, default concurrency/zero Rust retries, no budget or exclusion changes. Remaining: bounded final readonly review result and native Done readback; no repository Git/index commands, commit/push/integration or Windows/remote CI verification. Guidance: no durable instruction finding.'
+- date: 2026-10-08T01:22:40.606508+00:00
+  text: 'Outcome: DEV-99 complete. Independent final readonly review SIGNOFF confirms minimal CLI-only preflight change, unchanged service transaction/cache/event/automation paths and real byte-exact rollback/public CLI assertions with isolated fixtures. Evidence: all nine new regression cases pass after four legacy failures; final lint,1293 Rust tests,566 UI tests and219 build-first smoke tests pass as recorded above. Remaining: no scoped implementation or verification work;45 Rust Git-dependent exclusions and25 smoke Git skips remain explicit, no Windows/remote CI claim. Changes remain uncommitted; no repository Git/index/staging/commit/push/worktree operations. Guidance: no durable finding or policy change.'
 description: Found during DEV-89 implementation review; separate from approved creation scope. src/cli/handlers/task/edit.rs:159 calls apply_auto_populate_members before TaskService::update at line168, so failed task writes can leave a project member/config change despite the service already planning members transactionally. Route member planning through the coordinated update path, preserve validation/CLI output/defaults, and add failed-write/dry-run no-side-effect regressions. No work performed for this follow-up; do not broaden DEV89 or the current DEV89->58->94->68 sequence.
+history:
+- at: 2026-10-08T01:02:00.454768+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-08T01:02:00.486383+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T01:22:23.228649+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T01:22:40.606508+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T01:22:40.640412+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

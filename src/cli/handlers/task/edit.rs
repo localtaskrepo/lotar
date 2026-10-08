@@ -2,7 +2,7 @@ use crate::cli::TaskEditArgs;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::{
-    LoadedTask, apply_auto_populate_members, ensure_membership, load_task, render_edit_preview,
+    LoadedTask, ensure_membership, load_task, plan_auto_populate_members, render_edit_preview,
 };
 use crate::cli::validation::CliValidator;
 use crate::types::custom_value_string;
@@ -156,7 +156,7 @@ impl CommandHandler for EditHandler {
         #[allow(clippy::drop_non_drop)]
         drop(validator);
 
-        apply_auto_populate_members(&mut ctx, &project_prefix, &task, dry_run)?;
+        plan_auto_populate_members(&mut ctx, &task);
         ensure_membership(&ctx, &task, &project_prefix)?;
 
         if dry_run {
@@ -171,3 +171,7 @@ impl CommandHandler for EditHandler {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/common/dev99_cli_edit_cases.rs"]
+mod dev99_cli_edit_cases;

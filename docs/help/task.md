@@ -64,8 +64,10 @@ lotar task list [QUERY] [--assignee|-a <VALUE>] [--mine|-m] [--status|-s <VALUE>
 lotar task edit <TASK_ID> [--title|-T] [--type|-t] [--priority|-P] [--reporter|-R] [--assignee|-a] [--effort|-E] [--due|-d] [--description|-D] [--tag|-i ...] [--field|-F key=value ...] [--dry-run|-n]
 ```
 
-- Invokes the same mutation pipeline as `lotar add`, so validation, normalization, and `@me` handling match the top-level commands.
+- Validates and normalizes edits in the task's project context, including `@me` handling, before updating through the shared task service.
+- When `auto.populate_members` is enabled, new reporter/assignee members and the task edit are saved in one coordinated transaction. Validation or write failures do not leave member configuration changes behind; a pending transaction that cannot be safely recovered blocks the edit.
 - `--dry-run` works with both text and JSON output (`--format=json` emits the preview envelope described in `docs/help/effort.md`).
+- Dry runs validate membership against an in-memory member list without writing task or configuration files.
 
 ### status
 
