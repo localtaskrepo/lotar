@@ -1358,3 +1358,131 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         wrapper.unmount()
     })
 })
+
+describe('Board semantic swimlane order (DEV-87)', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+        routeState.query = { project: 'ACME' }
+        taskMap.value = new Map()
+        taskVersion.value = 0
+        boardQueryHandles.clear()
+        configStore.statuses.value = ['Todo', 'Doing', 'Done']
+        configStore.priorities.value = ['low', 'med', 'high']
+        configStore.types.value = ['task']
+        configStore.refresh.mockReset().mockResolvedValue(undefined)
+        showConfigMock.mockReset().mockResolvedValue({})
+        invalidateCompletionPolicies()
+        localStorage.clear()
+    })
+    afterEach(() => {
+        configStore.priorities.value = ['low', 'med', 'high']
+        configStore.types.value = ['task']
+        vi.useRealTimers()
+    })
+
+    it.each(['priority', 'type'] as const)('uses configured %s order, then unknown values and missing last, including Other', async mode => {
+        const configured = mode === 'priority' ? ['Later', 'Normal', 'Urgent'] : ['Feature', 'Bug', 'Chore']
+        const expected = mode === 'priority' ? [...configured].reverse() : configured
+        const source = mode === 'priority' ? configStore.priorities : configStore.types
+        source.value = ['Unused', ...configured]
+        const field = mode === 'priority' ? 'priority' : 'task_type'
+        const tasks = [...configured, 'Zulu', 'Alpha', ''].map((label, index) => baseTask({
+            id: `ACME-${index + 1}`, [field]: label, status: index === 1 ? 'Legacy' : 'Todo',
+        }))
+        tasks.push(baseTask({ id: 'BETA-1', [field]: 'Foreign' }))
+        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            await wrapper.find('[data-testid="board-groupby"]').setValue(mode)
+            const labels = () => wrapper.findAll('.swimlane-label').map(label => label.text())
+            expect(labels()).toEqual([...expected, 'Alpha', 'Zulu', '(none)'])
+            expect(wrapper.findAll('.swimlane-count').map(count => count.text())).toEqual(Array(6).fill('1'))
+            expect(wrapper.findAll('article.task')).toHaveLength(6)
+            expect(wrapper.findAll('[data-column-kind="other"] article.task')).toHaveLength(1)
+
+            await wrapper.findAll('.swimlane-header')[0]!.trigger('click')
+            source.value = [...configured].reverse()
+            await nextTick()
+            const reordered = mode === 'priority' ? configured : [...configured].reverse()
+            expect(labels()).toEqual(reordered.concat(['Alpha', 'Zulu', '(none)']))
+            expect(wrapper.find('.swimlane-header.collapsed .swimlane-label').text()).toBe(expected[0])
+            expect(wrapper.findAll('article.task')).toHaveLength(5)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('keeps assignees alphabetical and missing values last', async () => {
+        const tasks = ['zoe', 'amy', '', 'ben'].map((assignee, index) => baseTask({ id: `ACME-${index + 1}`, assignee }))
+        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            await wrapper.find('[data-testid="board-groupby"]').setValue('assignee')
+            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['amy', 'ben', 'zoe', '(none)'])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('matches backend ASCII case/separators without merging distinct Unicode labels', async () => {
+        configStore.priorities.value = ['\u00e4', 'Very High', 'Zed', '\u00c4', 'Low', 'very-high']
+        const tasks = ['VERY_HIGH', 'low', '\u00c4', '\u00e4', 'Zed'].map((priority, index) => baseTask({ id: `ACME-${index + 1}`, priority }))
+        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
+            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['low', '\u00c4', 'Zed', 'VERY_HIGH', '\u00e4'])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('falls back to alphabetical order when the configuration has no values', async () => {
+        configStore.priorities.value = []
+        const tasks = ['Medium', '', 'High', 'Low'].map((priority, index) => baseTask({ id: `ACME-${index + 1}`, priority }))
+        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
+            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['High', 'Low', 'Medium', '(none)'])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('puts default Critical and High lanes above Medium and Low', async () => {
+        configStore.priorities.value = ['Low', 'Medium', 'High', 'Critical']
+        const tasks = ['Low', 'High', 'Critical', 'Medium'].map((priority, index) => baseTask({ id: `ACME-${index + 1}`, priority }))
+        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
+            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['Critical', 'High', 'Medium', 'Low'])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('orders only the active query members, not unrelated cached groups', async () => {
+        configStore.priorities.value = ['High', 'Medium', 'Low']
+        const tasks = [baseTask({ id: 'ACME-1', priority: 'High' }), baseTask({ id: 'ACME-2', priority: 'Medium', status: 'Legacy' })]
+        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        boardHandleFor({ project: 'ACME' }, new Set(['ACME-2']))
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
+            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['Medium'])
+            expect(wrapper.find('.swimlane-count').text()).toBe('1')
+            expect(wrapper.findAll('article.task')).toHaveLength(1)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})

@@ -680,9 +680,21 @@ const allGroupLabels = computed<string[]>(() => {
   for (const col of boardColumns.value) {
     for (const t of columnTasks(col)) labels.add(groupKeyFor(t))
   }
+  const source = groupBy.value === 'priority' ? priorities.value : groupBy.value === 'type' ? types.value : []
+  // Match the server's enum keys without folding distinct non-ASCII labels.
+  const keyFor = (label: string) => label.trim().replace(/[A-Z]/g, char => char.toLowerCase()).replace(/[ _-]/g, '')
+  const ranks = new Map<string, number>()
+  source.forEach((label, index) => {
+    const key = keyFor(label)
+    if (key && !ranks.has(key)) ranks.set(key, groupBy.value === 'priority' ? -index : index)
+  })
   const arr = Array.from(labels).sort((a, b) => {
+    if (a === b) return 0
     if (a === '(none)') return 1
     if (b === '(none)') return -1
+    const aRank = ranks.get(keyFor(a)) ?? Infinity
+    const bRank = ranks.get(keyFor(b)) ?? Infinity
+    if (aRank !== bRank) return aRank - bRank
     return a.localeCompare(b)
   })
   return arr
