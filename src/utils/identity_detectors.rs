@@ -85,7 +85,8 @@ impl GitConfigDetector {
             .and_then(|root| root.parent().map(|p| p.to_path_buf()))
             .or_else(|| std::env::current_dir().ok())?;
         let repo_root = crate::utils::git::find_repo_root(&start)?;
-        let config = repo_root.join(".git").join("config");
+        let (_, common_dir) = crate::utils::git::metadata_dirs(&repo_root.join(".git"))?;
+        let config = common_dir.join("config");
         Some((repo_root, config))
     }
 }

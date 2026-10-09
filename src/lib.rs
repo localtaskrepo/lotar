@@ -44,6 +44,10 @@ pub use workspace::TasksDirectoryResolver;
 /// integration-test `common` module performs the same redirect for its
 /// binaries; keep the two in sync. Never compiled into non-test builds.
 #[cfg(test)]
+#[path = "../tests/common/env_mutex.rs"]
+pub(crate) mod test_env;
+
+#[cfg(test)]
 mod test_environment {
     use std::sync::OnceLock;
 

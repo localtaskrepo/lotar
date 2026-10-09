@@ -32,25 +32,36 @@ fn cache_key(tasks_root: Option<&Path>) -> String {
     let start = tasks_root
         .and_then(|r| r.parent().map(|p| p.to_path_buf()))
         .or_else(|| std::env::current_dir().ok());
-    let (git_cfg_mtime, head_mtime) = if let Some(start) = start
+    let git_stamp = if let Some(start) = start
         && let Some(repo_root) = crate::utils::git::find_repo_root(&start)
     {
-        let mtime_of = |rel: &str| {
-            std::fs::metadata(repo_root.join(".git").join(rel))
-                .and_then(|m| m.modified())
-                .ok()
-                .and_then(|t| t.elapsed().ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0)
-        };
-        (mtime_of("config"), mtime_of("HEAD"))
+        git_cache_fingerprint(&repo_root.join(".git"))
     } else {
-        (0, 0)
+        String::new()
     };
 
     format!(
-        "{}|DEF_REP={}|GCFG_M={}|HEAD_M={}",
-        root_str, env_def_reporter, git_cfg_mtime, head_mtime
+        "{}|DEF_REP={}|GIT={}",
+        root_str, env_def_reporter, git_stamp
+    )
+}
+
+pub(crate) fn git_cache_fingerprint(git_entry: &Path) -> String {
+    let Some((git_dir, common_dir)) = super::git::metadata_dirs(git_entry) else {
+        return String::new();
+    };
+    let mtime_of = |path: &Path| {
+        std::fs::metadata(path)
+            .and_then(|metadata| metadata.modified())
+            .ok()
+    };
+    let config_modified = mtime_of(&common_dir.join("config"));
+    let head_modified = mtime_of(&git_dir.join("HEAD"));
+    // Include target paths as well as stable timestamps: routing can change
+    // without a timestamp change, and file age must not churn cache keys.
+    format!(
+        "{:?}",
+        (git_dir, common_dir, config_modified, head_modified)
     )
 }
 

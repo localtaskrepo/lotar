@@ -1,11 +1,11 @@
 title: Fix group sorting on Boards view
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-09-08T20:06:56.146448+00:00
-modified: 2026-10-09T00:14:22.225354+00:00
+modified: 2026-10-09T00:22:02.544775+00:00
 comments:
 - date: 2026-10-08T22:13:09.562404+00:00
   text: 'Plan: change only Board swimlane label comparator. Priorities/types follow activeproject resolved configuration sequence (not alphabetical/hardcoded severity/reversed order); present configured groups first, unknown groups alphabetical next, missing (none) last. Assignees remain alphabetical with missing last. Match canonical enum spelling with backend ASCII-case/space/underscore/hyphen normalization, preserving raw displaylabels and distinct nonASCII values. Keep group membership/counts, per-card sort, server filters/cache, Othercolumn, collapses, done policy, WIP and flatpagination unchanged. Pin configured order/reactive reorder, normalization/Unicode distinction, unknown/missing/assignee behavior and Other/querymembership regressions; actualdesktop/mobile browser + scopedproject switch and count checks, relevanthelp update; required lint/nativeRust+UI/build-first smoke beforeDone. No repositoryGit/index/status/diff/log/version/commit/push/worktrees, no unrelatedticketchanges.'
@@ -13,6 +13,8 @@ comments:
   text: 'Outcome: Board priority/type swimlanes follow activeproject configured enum sequence; unknown values alphabetically afterward, missing sentinel last; assignees retain alphabetical/unassigned-last. Comparator uses backend-equivalent ASCII case/space/underscore/hyphen keys and first configured rank; raw displaylabels and distinct nonASCII values preserved. No group membership/percard sort/Other/pagination/count/collapse/done/WIP/cache/query changes or new ordering preferences. Evidence:6new unitcases; legacy3fail38pass->41Boardgreen, covering bothdimensions/reactive reversal/preservedcollapsedlabel/unknown-missing/assignee/Unicode+separator/emptycfg/querymembers.2new actualdesktop-mobile browsercases with realproject configs+reorderedfile/Refresh, scopedproject switch, unknown/unassigned groups, counts/deleted-row exclusion/NoAssignee membership and0HTTPwrites; targetedwith3DEV68compatibilitycases5/5green. Initialbrowserfixture expected emptypriority/type toremainempty, but service intentionallyhydratesdefaults; corrected fixture toexplicitvalid duplicatevalues/counts rather than alteringproductionsemantics. Missingenum groups pinned in unitDTOcase; browsermissingassignee verified. Desktop/mobile screenshots inspected target/smoke-artifacts/board-groups/. Finalfirst-run lintclean(types/alltargets-allfeaturesClippy-Dwarnings/fmt),1311Rustpassed45actualGit-dependent exclusions,621UIpassed69files,229freshbuild smokepassed25Git-dependent skips54passed6skippedfiles. Scopedself-review confirms onlylabelcomparatorchanged; docs/help/serve.md matchescontract. Logs target/dev87-20261008/. Remaining:no scoped blocker; Gitcapable/Windows/remoteCI/otherbrowsers notclaimed. No repositoryGit/index/staging/commit/push/worktrees or RESTshapechanges. Guidance:no durableinstructionfinding.'
 - date: 2026-10-09T00:14:22.225354+00:00
   text: 'User correction: priority lanes should be highest-first, not low-to-high. Reverse the configured priority rank direction (default Low/Medium/High/Critical displays Critical/High/Medium/Low), preserving customlevel relative severity as declaredlow-to-high, firstnormalized configuredrank, unknown-afterconfigured/missing-last and ascending type/assignee contracts. Add explicithighestfirst/default/custom regressions andupdateactualbrowser fixtures/docs. PauseDEV73audituntilcorrectionselfverified, fullgates andexactDone readback; DEV73stillTodo/no sourceedits yet. No repositoryGit/index operations.'
+- date: 2026-10-09T00:22:02.491896+00:00
+  text: 'Correction complete: user-requested highest-first priority order now reverses configured low-to-high priority ranks. Defaults Critical/High/Medium/Low; customlevel ordinal ranks reverse without modifying configuration or rawlabels; type/assignee and unknown/missing suffix unchanged. One-lineproduction rank-sign change, explicithighest-first regression plusupdatedcustom/Unicode/browserfixtures/docs. Legacycorrective baseline3fail39pass->42Boardgreen; actualdesktop/mobile+DEV68compatible5/5pass; updatedscreenshotsread includingresetinnerhorizontal-scroll framing. Finalfirst-run lintclean,1311Rustpass45actualGit exclusions,622UIpass69files,229freshbuild smokepass25actualGit skips54passed6skippedfiles. Logs target/dev87-priority-20261009/. No source/config/API/membership/count/pagination/WIP/Donepolicy mutation or repositoryGit/index operations. No durableguidancefinding. DEV73 audit resumes separately.'
 description: 'Currently the grouping is not sorted. For example grouping by priority sorts High -> Low -> Medium, alphabetically, not logically. '
 history:
 - at: 2026-10-08T22:13:09.529662+00:00
@@ -47,3 +49,13 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-09T00:22:02.491896+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T00:22:02.544775+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

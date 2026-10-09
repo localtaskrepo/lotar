@@ -1,11 +1,20 @@
 title: Read branch and remote metadata correctly in linked Git worktrees
-status: Todo
-relationships:
-  parent: DEV-53
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.746239+00:00
+modified: 2026-10-09T00:59:10.968656+00:00
+relationships:
+  parent: DEV-53
+comments:
+- date: 2026-10-09T00:23:59.775995+00:00
+  text: 'Plan: add minimal read-only filesystem resolver for normal .git directories and gitdir marker files, canonicalize per-worktree administration and optional common-directory paths with correct relative bases, read branch from worktree HEAD and remotes/local identity config from shared config. Missing/malformed/unreadable routing metadata and detached/non-head/empty HEAD fail safely without env/parent fallback. Preserve existing publichelper signatures/remote parsing and sanitized command/verified ownership boundaries; no new Git processes for metadata reads or worktree operations. Add ungated isolated filesystem layouts and real CLI inference tests for aliases/toggles/explicitfields, relative/absolute paths/spaces/CRLF/siblingheads, malformed/dangling metadata and identity details. Reproduce legacy red, then targeted nextest/full lint/Rust/UI/build-first smoke and relevant docs; markDone onlyselfverified. DEV95 symlinkhistory outside scope, no repoGit/index/commit/push/worktrees or actualglobalcwd changes.'
+- date: 2026-10-09T00:50:09.083194+00:00
+  text: 'Progress: normal/linked read-onlymetadata resolver+identitysharedconfig implemented. Sandbox denies ANY .gitmarker creation atfixture setup (15attempts failedEPERM beforeasserts, not semanticred); initialbinaryfiltermatched0, notpassed. Deletedunsupportednewintegrationfile, didnotexclude/gateanything; privateentry-path readers sharedby unchanged public root/.gitwrappers allow ordinarynamed filesystemfixtures toexecuteidentical productionparsers without protectedGitdata/commands. Genuinepermitted baseline13cases5pass8fail->13green. Review SIGNOFF staticallytraced CLI branch/type/status/priority aliases+flagprecedence and common identitywiring; actualGit/CLIworktree runtime remainsnotverified. Reviewfoundadjacentlinkedidentitycache fixed too: cache fingerprint usesresolvedadmin/common paths+stablemodifiedSystemTimes not.elapsed fileage, preservingtarget-change sensitivity.2newfingerprint red->green withouttimers; trailing-spacefilesystemcase Unix-only properportability.15metadata/cache cases nowinlib, targeted37relatedcasespass (filter-skip countsnotreportedascapabilitypasses). No new skippedtests/defaultfilters/timeout/concurrency/retry changes. Remaining finalreadonlycache review and requiredfullgates; no APIshape/source-userdata/write-path/Gitownership verification changes. Guidance:no durablefinding.'
+- date: 2026-10-09T00:59:10.940981+00:00
+  text: 'Outcome: DEV73 complete/selfverified read-only metadata resolution; normaldirectories/gitdir markerfiles resolvecanonicaladmin/common paths withcorrectrelativebases; worktreeHEAD used forbranch, commonconfig forremotes/localidentity. Detached/nonhead/empty/control/whitespace/multilineHEAD andmalformed/unreadable/danglingmetadata failclosed, no env/ancestor fallback. PublicAPI signatures and unchangedCLIbranchalias/flagprecedence/staticwiring preserved. Identity cache nowobservessamecommonconfig/localHEAD paths+stableabsoluteSystemTime andpathidentity, correctinglinked-stale andfileage keychurn withoutwrite/securitypolicychanges. ExistingGitcommand sanitization/ownershipverification unchanged. Evidence:15 ungated ordinaryfilename FS/cache cases in productionreaderunitpath, baseline13 5pass8semanticfail->13green and2cache red->green; targeted37relatedpass; independentreadonly2passSIGNOFF. Clippy duplicate_mod failure corrected by single#[cfgtest]crate test_env module reusingexistingEnvVarGuard for73+DEV56fixture (no lint suppression/logicchange); timestamp test usesfuture10/20/30seconds toavoidcoarseFS assumptions withoutsleep, trailing-space/symlinkcases Unix-scoped. Final lint-green clean(types/alltargets-allfeaturesClippy-Dwarnings/fmt),1326Rustpassed45existingactualGit-dependent exclusions,622UIpassed69files,229freshbuild-smokepassed25Git-dependent skips54passed6skippedfiles. Logs target/dev73-20261009/. Remaining/limits: actual.gitmarker fixturecreation is sandboxEPERM, so realGit/CLI-linked-worktree runtime notclaimed; ordinaryentry-path tests runidenticalproductionreaders+staticcallertrace, no addedexcludedtests/gates and no bypass. Existing45Rust/25smokeGit cases remainunverifiedhere; Windows/remoteCI notclaimed. Localconfig parsing remains existingbest-effort(no global/includes/worktreeoverride expansion/fullrefnamevalidation); metadatareads notatomic snapshots, same-timestamp file rewrites remainexistingmtimecachebound. No repositoryGit/index/commit/push/worktrees or user-owned task/configdata/schema changes; onlyDEV73tracking. Guidance:no durableinstructionfinding.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: C14.
@@ -16,3 +25,30 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-09T00:23:59.735080+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-09T00:23:59.775995+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T00:50:09.083194+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T00:59:10.940981+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T00:59:10.968656+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

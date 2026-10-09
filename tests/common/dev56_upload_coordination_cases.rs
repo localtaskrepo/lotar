@@ -8,9 +8,7 @@ use super::*;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
-#[path = "env_mutex.rs"]
-mod env_mutex;
-use env_mutex::EnvVarGuard;
+use crate::test_env::EnvVarGuard;
 
 struct UploadFixture {
     _tmp: tempfile::TempDir,

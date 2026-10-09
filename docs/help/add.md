@@ -136,6 +136,8 @@ Tasks are created in the appropriate project:
 
 Auto-detection walks upward but stops at the repository root (supports `.git` directory or file for worktrees/submodules).
 
+Branch inference reads the current checkout's `HEAD`, including linked worktrees whose `.git` file points to an administration directory. Relative `gitdir` paths are resolved from the checkout, and relative `commondir` paths from that administration directory. A detached, missing, or malformed `HEAD` does not provide a branch inference value; configured defaults and explicit task options still apply. These metadata reads do not invoke Git commands or change repository files.
+
 ### Auto Tags from Monorepo Paths
 
 When you don't pass any `--tag` and your config has no `default.tags`, LoTaR will try to derive a single tag from common monorepo structures:
