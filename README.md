@@ -1,4 +1,9 @@
-<h1 align="center">LoTaR</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="view/assets/branding/lotar-logo-dark.svg">
+    <img src="view/assets/branding/lotar-logo.svg" width="320" alt="LoTaR">
+  </picture>
+</h1>
 
 <p align="center"><b>A git-native issue tracker that lives in your repo, and can run your coding agents for you.</b></p>
 

@@ -281,17 +281,48 @@ const hasCancelableJobs = computed(() => jobs.value.some(job => job.status === '
 let sse: ReturnType<typeof useSse> | null = null
 const sseUnsubscribers: Array<() => void> = []
 
+// Events can arrive while a list request is still in flight (and events
+// delivered before the stream opens are lost entirely). Each applied event
+// bumps the sequence and records its derived job so a late response can be
+// detected and merged instead of overwriting newer live state.
+let eventSeq = 0
+const recentEventJobs = new Map<string, { job: AgentJob; seq: number }>()
+// Concurrent list requests can complete out of order (separate connections);
+// only the most recently issued refresh may apply its snapshot.
+let refreshSeq = 0
+
 async function refresh() {
+  const myRefresh = ++refreshSeq
+  console.debug('[dev101] refresh-start', myRefresh)
   loading.value = true
   error.value = ''
+  const seqAtRequest = eventSeq
   try {
     const jobsResponse = await api.listAgentJobs()
-    jobs.value = sortJobs(jobsResponse.jobs)
+    if (myRefresh !== refreshSeq) {
+      console.debug('[dev101] refresh-skip', myRefresh)
+      return
+    }
+    console.debug('[dev101] refresh-apply', myRefresh, jobsResponse.jobs.length)
+    // The response is a snapshot from before any event that arrived during
+    // the flight; those events win and are merged back over the list.
+    const byId = new Map(jobsResponse.jobs.map((existing) => [existing.id, existing]))
+    for (const { job: next, seq } of recentEventJobs.values()) {
+      if (seq <= seqAtRequest) continue
+      const existing = byId.get(next.id)
+      byId.set(next.id, existing ? mergeJobFields(existing, next) : next)
+    }
+    jobs.value = sortJobs([...byId.values()])
     queueStats.value = jobsResponse.queue_stats || null
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    console.debug('[dev101] refresh-error', myRefresh, String(err))
+    if (myRefresh === refreshSeq) {
+      error.value = err instanceof Error ? err.message : String(err)
+    }
   } finally {
-    loading.value = false
+    if (myRefresh === refreshSeq) {
+      loading.value = false
+    }
   }
 }
 
@@ -314,6 +345,7 @@ function updateFromEvent(payload: any, kind: string) {
     worktree_branch: payload.worktree_branch || null,
   }
   mergeJob(next)
+  recentEventJobs.set(next.id, { job: next, seq: ++eventSeq })
   if (kind.startsWith('agent_job_')) {
     appendLog(next.id, {
       kind,
@@ -335,7 +367,14 @@ function mergeJob(next: AgentJob) {
   }
   const existing = jobs.value[idx]
   if (!existing) return
-  const merged: AgentJob = {
+  const updated = [...jobs.value]
+  updated[idx] = mergeJobFields(existing, next)
+  jobs.value = sortJobs(updated)
+}
+
+/** Field-level merge of an event-derived job over known state; event wins. */
+function mergeJobFields(existing: AgentJob, next: AgentJob): AgentJob {
+  return {
     ...existing,
     ...next,
     agent: next.agent ?? existing.agent ?? null,
@@ -343,9 +382,6 @@ function mergeJob(next: AgentJob) {
     summary: next.summary || existing.summary,
     session_id: next.session_id || existing.session_id,
   }
-  const updated = [...jobs.value]
-  updated[idx] = merged
-  jobs.value = sortJobs(updated)
 }
 
 function sortJobs(list: AgentJob[]): AgentJob[] {
@@ -597,6 +633,13 @@ function setupSse() {
     }
     sse?.on(kind, wrapped)
     sseUnsubscribers.push(() => sse?.off(kind, wrapped))
+  })
+
+  // Reconcile whenever the stream (re)opens: events delivered before the
+  // first open are lost, and events during a disconnect gap are missed, so
+  // the pre-open snapshot cannot be trusted once the stream is live.
+  sse?.es.addEventListener('open', () => {
+    void refresh()
   })
 }
 

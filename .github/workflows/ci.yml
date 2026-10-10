@@ -468,6 +468,7 @@ jobs:
     # failure and when a filter selects no test files, so an empty or
     # failing selection is red by construction (no pass-count floor).
     - name: Run portable agent + automation smoke selection (browser-free)
+      id: portable_agent_smoke
       shell: pwsh
       env:
         LOTAR_BINARY_PATH: ${{ github.workspace }}/target/ci/lotar.exe
@@ -485,13 +486,12 @@ jobs:
           "--outputFile.junit=$env:GITHUB_WORKSPACE/target/smoke-report/portable-agent-smoke.junit.xml"
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    # Real Windows results are recorded as JUnit and uploaded unconditionally
-    # (if: always), so a red run still leaves evidence. if-no-files-found:
-    # error turns a missing report (startup crash before the reporter wrote)
-    # into a failure instead of a silent empty upload; on such runs the smoke
-    # step itself already failed, so the erroring upload cannot mask a green.
+    # Attempted Windows smoke runs must leave a JUnit report, even on failure.
+    # A missing report after startup/test failure remains an error; an earlier
+    # failed gate that prevented smoke from running must not invent a second
+    # missing-artifact failure for a selection that was never attempted.
     - name: Upload Windows portable smoke report
-      if: always()
+      if: always() && steps.portable_agent_smoke.outcome != 'skipped' && steps.portable_agent_smoke.outcome != ''
       uses: actions/upload-artifact@v5
       with:
         name: windows-portable-smoke-report

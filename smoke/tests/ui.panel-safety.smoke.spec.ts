@@ -19,7 +19,7 @@ describe('UI panel scope safety', () => {
             });
             try {
                 await withPage(`${server.url}/?project=PANA`, async page => {
-                    await page.getByRole('button', { name: 'Add task', exact: true }).click();
+                    await page.getByTestId('global-new-task').click();
                     const panel = page.locator('.task-panel');
                     const create = panel.getByRole('button', { name: 'Create task', exact: true });
                     await expect.poll(() => create.isEnabled(), { timeout: 10_000 }).toBe(true);

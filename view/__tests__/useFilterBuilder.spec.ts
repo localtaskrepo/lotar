@@ -56,6 +56,20 @@ describe('useProjectFilterSync', () => {
 })
 
 describe('buildServerFilter', () => {
+    it('preserves prototype-named extras through project sync and server filter construction', () => {
+        const payload = Object.fromEntries([['__proto__', 'fixture'], ['field:constructor', 'value']])
+        const project = ref('AS')
+        const filter = ref<Record<string, string>>({})
+        const { onFilterUpdate } = useProjectFilterSync(project, filter)
+        onFilterUpdate(payload)
+        const { serverFilter, extras } = buildServerFilter(filter.value, project.value)
+        expect(Object.prototype.hasOwnProperty.call(extras, '__proto__')).toBe(true)
+        expect(Object.prototype.hasOwnProperty.call(serverFilter, '__proto__')).toBe(true)
+        expect(serverFilter['__proto__']).toBe('fixture')
+        expect(serverFilter['field:constructor']).toBe('value')
+        expect(serverFilter.project).toBe('AS')
+    })
+
     it('forwards smart filters, order, and a valid sort_by to the server', () => {
         const { serverFilter, normalized } = buildServerFilter(
             {

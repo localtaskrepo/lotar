@@ -52,6 +52,7 @@ type IconName =
   | 'eye'
   | 'eye-off'
   | 'download'
+  | 'filter'
 
 type IconDef = {
   paths: string[]
@@ -62,6 +63,9 @@ type IconDef = {
 }
 
 const ICONS: Record<IconName, IconDef> = {
+  filter: {
+    paths: ['M4 5h16l-6 7v6l-4 2v-8L4 5z'],
+  },
   plus: {
     paths: ['M12 4v16', 'M4 12h16'],
   },

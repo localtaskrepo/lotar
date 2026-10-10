@@ -6,6 +6,7 @@ import AgentJobs from '../pages/AgentJobs.vue'
 const sseCalls: Array<{
     params: Record<string, string>
     handlers: Map<string, Set<(ev: { data: string }) => void>>
+    lifecycle: Map<string, Set<() => void>>
     opts: { onReconnect?: () => void }
     close: ReturnType<typeof vi.fn>
 }> = []
@@ -23,10 +24,19 @@ vi.mock('../api/client', () => ({
 vi.mock('../composables/useSse', () => ({
     useSse: (_path: string, params: Record<string, string>, opts: { onReconnect?: () => void } = {}) => {
         const handlers = new Map<string, Set<(ev: { data: string }) => void>>()
+        const lifecycle = new Map<string, Set<() => void>>()
         const close = vi.fn()
-        sseCalls.push({ params, handlers, opts, close })
+        sseCalls.push({ params, handlers, lifecycle, opts, close })
         return {
-            es: {} as EventSource,
+            es: {
+                addEventListener: vi.fn((event: string, handler: () => void) => {
+                    if (!lifecycle.has(event)) lifecycle.set(event, new Set())
+                    lifecycle.get(event)!.add(handler)
+                }),
+                removeEventListener: vi.fn((event: string, handler: () => void) => {
+                    lifecycle.get(event)?.delete(handler)
+                }),
+            } as unknown as EventSource,
             on: vi.fn((event: string, handler: (ev: { data: string }) => void) => {
                 if (!handlers.has(event)) handlers.set(event, new Set())
                 handlers.get(event)!.add(handler)
@@ -104,6 +114,11 @@ function currentSse() {
 function emitSse(kind: string, payload: unknown) {
     const ev = { data: JSON.stringify(payload) }
     currentSse().handlers.get(kind)?.forEach((handler) => handler(ev))
+}
+
+/** Simulate the EventSource transition to OPEN (first open or reconnect). */
+function openSse() {
+    currentSse().lifecycle.get('open')?.forEach((handler) => handler())
 }
 
 async function mountAgentJobs() {
@@ -337,6 +352,61 @@ describe('AgentJobs stop-all confirmation', () => {
         expect(api.cancelAgentJob).toHaveBeenCalledWith('job-running')
         expect(dialog(wrapper).exists()).toBe(false)
         expect(api.cancelAllAgentJobs).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
+})
+
+describe('AgentJobs live synchronization', () => {
+    it('a stale list response cannot drop a job added by a live event', async () => {
+        // Reproduces the CI failure shape: a list request is slow, the job
+        // starts and is delivered over SSE during the flight, and only
+        // afterwards does the (older, pre-job) server snapshot resolve.
+        // The event is newer than the snapshot, so the job must survive.
+        const wrapper = await mountAgentJobs()
+        const list = deferred<{ jobs: AgentJob[]; queue_stats: unknown }>()
+        ;(api.listAgentJobs as any).mockReturnValue(list.promise)
+
+        const reload = wrapper.findAll('button').find((candidate) => candidate.text() === 'Reload')!
+        await reload.trigger('click')
+        await flushPromises()
+
+        emitSse('agent_job_started', {
+            id: 'job-live',
+            ticket_id: 'DEV-1',
+            agent: 'live-marker',
+            status: 'running',
+        })
+        await flushPromises()
+
+        // The snapshot predates the job entirely.
+        list.resolve({ jobs: [], queue_stats: null })
+        await flushPromises()
+
+        expect(wrapper.findAll('.job-card').length).toBe(1)
+        expect(wrapper.text()).toContain('live-marker')
+        wrapper.unmount()
+    })
+
+    it('reconciles with a fresh list when the stream opens after events were missed', async () => {
+        // Reproduces the CI failure shape where agent_job_started fired
+        // before the EventSource finished connecting and was lost: the page
+        // must not trust its pre-open snapshot once the stream is open.
+        const lateJob = job('job-late', {
+            agent: 'late-marker',
+            created_at: '2026-10-08T10:09:00.000Z',
+        })
+        ;(api.listAgentJobs as any)
+            .mockResolvedValueOnce({ jobs: [], queue_stats: null })
+            .mockResolvedValueOnce({ jobs: [lateJob], queue_stats: { running: 1, queued: 0, max_parallel: 2 } })
+        const wrapper = await mountAgentJobs()
+        expect(wrapper.findAll('.job-card').length).toBe(0)
+
+        openSse()
+        await flushPromises()
+
+        expect(api.listAgentJobs).toHaveBeenCalledTimes(2)
+        expect(wrapper.findAll('.job-card').length).toBe(1)
+        expect(wrapper.text()).toContain('late-marker')
         wrapper.unmount()
     })
 })

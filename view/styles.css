@@ -361,7 +361,20 @@ p {
 }
 
 .btn.icon-only .icon-glyph {
-	font-size: 1.1rem;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 640px) {
+	.btn.responsive-action {
+		min-width: 36px;
+		height: 36px;
+		padding: 0 8px;
+		gap: 0;
+	}
+
+	.responsive-action__label {
+		display: none;
+	}
 }
 
 .btn.icon-only.small,

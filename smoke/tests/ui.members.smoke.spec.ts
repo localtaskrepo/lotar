@@ -56,7 +56,7 @@ describe('UI strict member smoke scenarios', () => {
                     await page.waitForSelector('text=LoTaR', { timeout: 15_000 });
                     await page.waitForSelector('text=Tasks', { timeout: 15_000 });
 
-                    const addButton = page.getByRole('button', { name: 'Add' });
+                    const addButton = page.getByTestId('global-new-task');
                     await addButton.waitFor({ state: 'visible' });
                     await addButton.click();
 
@@ -170,7 +170,7 @@ describe('UI strict member smoke scenarios', () => {
                     await page.waitForSelector('text=LoTaR', { timeout: 15_000 });
                     await page.waitForSelector('text=Tasks', { timeout: 15_000 });
 
-                    const addButton = page.getByRole('button', { name: 'Add' });
+                    const addButton = page.getByTestId('global-new-task');
                     await addButton.waitFor({ state: 'visible', timeout: 15_000 });
                     await addButton.click();
 

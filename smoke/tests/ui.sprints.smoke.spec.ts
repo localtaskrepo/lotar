@@ -389,7 +389,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     }
 
                     await page.click('a[href="/"]');
-                    await page.getByRole('button', { name: 'Add task', exact: true }).click();
+                    await page.getByTestId('global-new-task').click();
 
                     const panel = page.locator('.task-panel');
                     await panel.waitFor({ timeout: 10_000 });

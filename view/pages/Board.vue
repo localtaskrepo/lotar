@@ -100,9 +100,9 @@
             @reset="boardFields.resetColumns"
           >
             <template #trigger="{ open, toggle }">
-              <UiButton type="button" title="Choose which fields appear on cards" :aria-expanded="open" @click="toggle">
+              <UiButton class="responsive-action" type="button" aria-label="Configure card fields" title="Choose which fields appear on cards" :aria-expanded="open" @click="toggle">
                 <IconGlyph name="columns" aria-hidden="true" />
-                <span>Fields</span>
+                <span class="responsive-action__label">Fields</span>
               </UiButton>
             </template>
           </ColumnsMenu>

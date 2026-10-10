@@ -52,7 +52,7 @@ describe('UI project creation refresh', () => {
                     await page.waitForSelector('text=DEV25 seed task', { timeout: 20_000 });
 
                     // Warm the always-mounted task panel's project snapshot.
-                    await page.getByRole('button', { name: 'Add task' }).click();
+                    await page.getByTestId('global-new-task').click();
                     const panel = page.locator('.task-panel');
                     await panel.waitFor({ state: 'visible', timeout: 10_000 });
                     const projectSelect = panel.locator('select').first();
@@ -82,7 +82,7 @@ describe('UI project creation refresh', () => {
 
                     // Reopen the task panel without reloading the page.
                     await page.locator('nav a.nav__link', { hasText: 'Tasks' }).click();
-                    await page.getByRole('button', { name: 'Add task' }).click();
+                    await page.getByTestId('global-new-task').click();
                     await panel.waitFor({ state: 'visible', timeout: 10_000 });
 
                     const reopenedSelect = panel.locator('select').first();

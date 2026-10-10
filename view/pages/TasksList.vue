@@ -41,11 +41,28 @@
         @update:value="onFilterUpdate"
       >
         <template #actions>
-          <label class="tasks-quick-row__checkbox">
-            <input type="checkbox" :checked="bulk" @change="onToggleBulkFromToolbar($event)" />
-            Bulk select
-          </label>
-          <span v-if="bulk" class="muted tasks-quick-row__selected" title="Selection is preserved across pages, and cleared when filters change.">Selected: {{ selectedIds.length }} / {{ totalCount }}</span>
+          <UiButton
+            type="button"
+            class="tasks-toolbar-btn"
+            :class="{ 'tasks-toolbar-btn--active': bulk }"
+            aria-label="Bulk select"
+            title="Bulk select"
+            :aria-pressed="bulk"
+            @click="toggleBulkMode"
+          >
+            <IconGlyph name="check" aria-hidden="true" />
+            <span class="tasks-toolbar-btn__label">Bulk select</span>
+          </UiButton>
+          <span
+            v-if="bulk"
+            class="muted tasks-toolbar-selected"
+            role="status"
+            :aria-label="`Selected ${selectedIds.length} of ${totalCount}`"
+            title="Selection is preserved across pages, and cleared when filters change."
+          >
+            <span class="tasks-toolbar-selected__label">Selected:</span>
+            {{ selectedIds.length }} / {{ totalCount }}
+          </span>
           <div v-if="bulk" class="bulk-menu-wrapper">
             <UiButton
               icon-only
@@ -89,13 +106,14 @@
           </div>
           <UiButton
             type="button"
+            class="tasks-toolbar-btn"
             title="Export the current filtered view as CSV"
             aria-label="Export CSV"
             :disabled="exportDisabled"
             @click="exportCsv"
           >
             <IconGlyph name="download" aria-hidden="true" />
-            <span>Export</span>
+            <span class="tasks-toolbar-btn__label">Export</span>
           </UiButton>
           <ColumnsMenu
             :open="columnsMenuOpen"
@@ -107,16 +125,19 @@
             @reset="resetColumns"
           >
             <template #trigger="{ open, toggle }">
-              <UiButton type="button" title="Configure columns" :aria-expanded="open" @click="toggle">
+              <UiButton
+                type="button"
+                class="tasks-toolbar-btn"
+                title="Configure columns"
+                aria-label="Configure columns"
+                :aria-expanded="open"
+                @click="toggle"
+              >
                 <IconGlyph name="columns" aria-hidden="true" />
-                <span>Columns</span>
+                <span class="tasks-toolbar-btn__label">Columns</span>
               </UiButton>
             </template>
           </ColumnsMenu>
-          <UiButton type="button" aria-label="Add task" title="Add task" @click="openCreate">
-            <IconGlyph name="plus" aria-hidden="true" />
-            <span>Task</span>
-          </UiButton>
         </template>
       </FilterBar>
     </div>
@@ -899,13 +920,8 @@ const scopedSelection = computed(() => {
 const disableBulkActions = computed(() => !scopedSelection.value.length)
 const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoading.value || !hasSprints.value)
 
-function onToggleBulkFromToolbar(event: Event) {
-  const checked = (event.target as HTMLInputElement | null)?.checked ?? false
-  bulk.value = checked
-  if (!checked) {
-    selectedIds.value = []
-    showBulkMenu.value = false
-  }
+function toggleBulkMode() {
+  bulk.value = !bulk.value
 }
 
 function toggleBulkMenu() {
@@ -1633,23 +1649,51 @@ const handleTaskUpdated = (task: TaskDTO) => {
   color: var(--color-danger-strong, var(--color-danger, #c62828));
 }
 
-.tasks-quick-row__checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 2.25rem;
-  line-height: 2.25rem;
+.tasks-toolbar-btn .tasks-toolbar-btn__label {
+  white-space: nowrap;
 }
 
-.tasks-quick-row__selected {
-  display: inline-flex;
-  align-items: center;
-  height: 2.25rem;
-  line-height: 2.25rem;
+.tasks-toolbar-btn--active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
-.tasks-quick-row__checkbox input {
-  margin: 0;
+.tasks-toolbar-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 2.25rem;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs, 0.75rem);
+  white-space: nowrap;
+}
+
+.tasks-toolbar-selected__label {
+  margin-right: 2px;
+}
+
+@media (max-width: 640px) {
+  .tasks-toolbar-btn {
+    padding: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: auto;
+    gap: 0;
+  }
+
+  .tasks-toolbar-btn .icon-glyph {
+    font-size: 1.1rem;
+  }
+
+  .tasks-toolbar-btn .tasks-toolbar-btn__label {
+    display: none;
+  }
+
+  .tasks-toolbar-selected__label {
+    display: none;
+  }
 }
 
 .bulk-menu-wrapper {

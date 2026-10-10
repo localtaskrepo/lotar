@@ -14,7 +14,7 @@ export function listFromCsv(value: string): string[] {
 
 export function normalizeFilter(raw: Record<string, string>) {
   const normalized: Record<string, string> = {}
-  const extras: Record<string, string> = {}
+  const extras: Record<string, string> = Object.create(null)
   const source = raw || {}
   for (const [key, value] of Object.entries(source)) {
     if (!value || key === 'order') continue
@@ -78,8 +78,7 @@ export function buildServerFilter(
     // Forwarded verbatim — including invalid values — so explicit errors
     // surface server-side instead of silently defaulting.
     serverFilter.order = normalized.order as TaskListFilter['order']
-    Object.assign(serverFilter, extras)
-    return { serverFilter, normalized, extras }
+    return { serverFilter: { ...serverFilter, ...extras }, normalized, extras }
 }
 
 export function useProjectFilterSync(
@@ -110,7 +109,7 @@ export function useProjectFilterSync(
   }
 
   function sanitizeFilterInput(payload: Record<string, string>) {
-    const next: Record<string, string> = {}
+    const next: Record<string, string> = Object.create(null)
     const hasProjectKey = payload && Object.prototype.hasOwnProperty.call(payload, 'project')
     if (hasProjectKey) {
       const nextProject = resolveProjectSelection(payload.project)

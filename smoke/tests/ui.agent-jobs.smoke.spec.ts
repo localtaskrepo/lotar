@@ -424,8 +424,31 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     expect(await waitForCompletedJobCountViaApi(server.url, task.id, 2)).toBeGreaterThanOrEqual(2);
 
                     await withPage(`${server.url}/agents`, async (page) => {
-                        expect(await (await waitForTicketChip(page, task.id)).count()).toBe(1);
-                        expect(await page.locator('.job-card').count()).toBe(2);
+                        const consoleLog: string[] = [];
+                        page.on('console', (msg) => consoleLog.push(msg.text()));
+                        try {
+                            expect(await (await waitForTicketChip(page, task.id)).count()).toBe(1);
+                            expect(await page.locator('.job-card').count()).toBe(2);
+                        } catch (error) {
+                            // DEV-101 diagnostics: distinguish server list
+                            // availability from client rendering at failure.
+                            const cardCount = await page.locator('.job-card').count().catch(() => -1);
+                            const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 600) ?? '');
+                            const browserFetch = await page.evaluate(async (url) => {
+                                try {
+                                    const r = await fetch(`/api/jobs?ticket_id=${url}`);
+                                    const t = await r.text();
+                                    return `status=${r.status} body=${t.slice(0, 300)}`;
+                                } catch (e) {
+                                    return `fetch-error ${String(e)}`;
+                                }
+                            }, task.id).catch((e) => `eval-error ${String(e)}`);
+                            console.warn(
+                                '[dev101-diag]',
+                                JSON.stringify({ cardCount, bodyText, browserFetch, consoleLog }),
+                            );
+                            throw error;
+                        }
                     });
                 } finally {
                     await server.stop();

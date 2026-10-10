@@ -41,7 +41,7 @@ describe('UI task panel persistence contract', () => {
                         }
                     });
 
-                    await page.getByRole('button', { name: 'Add task' }).click();
+                    await page.getByTestId('global-new-task').click();
                     const panel = page.locator('.task-panel');
                     const create = panel.getByRole('button', { name: 'Create task', exact: true });
                     await expect.poll(() => create.isEnabled(), { timeout: 10_000 }).toBe(true);

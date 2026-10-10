@@ -1,5 +1,5 @@
-import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 
 const projectState = vi.hoisted(() => ({
@@ -28,6 +28,18 @@ function openPanel(wrapper: any) {
   return toggle.trigger('click')
 }
 
+async function submitSearch(wrapper: any, text: string) {
+  const search = wrapper.find('[data-testid="filter-search"]')
+  await search.setValue(text)
+  await search.trigger('keydown', { key: 'Enter' })
+  await nextTick()
+}
+
+function lastValue(wrapper: any): Record<string, string> {
+  const events = wrapper.emitted('update:value') || []
+  return events[events.length - 1]?.[0] || {}
+}
+
 describe('FilterBar', () => {
   beforeEach(() => {
     // Default to multi-project so the project control renders as a select in most tests.
@@ -48,20 +60,14 @@ describe('FilterBar', () => {
     expect(last?.q).toBe('roadmap')
   })
 
-  it('shows helper text in tooltip when custom filters are invalid', async () => {
+  it('shows an inline search error without a duplicate custom input', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
     await openPanel(wrapper)
-    const custom = findByPlaceholder(wrapper, 'Custom filters')
-    expect(custom).toBeTruthy()
-    await custom!.setValue('field:iteration')
-    await nextTick()
-    const hint = wrapper.find('[data-testid="custom-filter-hint"]')
-    expect(hint.attributes('title')).toContain('missing "="')
-    await hint.trigger('mouseenter')
-    await nextTick()
-    const popover = wrapper.find('[data-testid="custom-filter-hint-popover"]')
-    expect(popover.exists()).toBe(true)
-    expect(popover.text()).toContain('missing "="')
+    expect(findByPlaceholder(wrapper, 'Custom filters')).toBeUndefined()
+    await submitSearch(wrapper, 'field:iteration=')
+    expect(wrapper.find('[role="alert"]').text()).toContain('value')
+    expect(wrapper.find('[data-testid="filter-search"]').attributes('aria-invalid')).toBe('true')
+    wrapper.unmount()
   })
 
   it('appendCustomFilter exposes shortcut for presets', async () => {
@@ -70,16 +76,14 @@ describe('FilterBar', () => {
     const vm: any = wrapper.vm
     vm.appendCustomFilter('field:iteration=')
     await nextTick()
-    const custom = findByPlaceholder(wrapper, 'Custom filters')
-    expect((custom!.element as HTMLInputElement).value).toContain('field:iteration=')
+    expect((wrapper.find('[data-testid="filter-search"]').element as HTMLInputElement).value).toContain('field:iteration=')
+    wrapper.unmount()
   })
 
   it('maps field:priority to the native priority filter', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
     await openPanel(wrapper)
-    const custom = findByPlaceholder(wrapper, 'Custom filters')
-    await custom!.setValue('field:priority=Medium')
-    await nextTick()
+    await submitSearch(wrapper, 'field:priority=Medium')
     const events = wrapper.emitted('update:value') || []
     const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
     expect(last?.priority).toBe('Medium')
@@ -88,9 +92,7 @@ describe('FilterBar', () => {
   it('maps field:task_type to the native type filter', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
     await openPanel(wrapper)
-    const custom = findByPlaceholder(wrapper, 'Custom filters')
-    await custom!.setValue('field:task_type=Bug')
-    await nextTick()
+    await submitSearch(wrapper, 'field:task_type=Bug')
     const events = wrapper.emitted('update:value') || []
     const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
     expect(last?.type).toBe('Bug')
@@ -99,21 +101,16 @@ describe('FilterBar', () => {
   it('maps field:state to the native status filter', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
     await openPanel(wrapper)
-    const custom = findByPlaceholder(wrapper, 'Custom filters')
-    await custom!.setValue('field:STATE=Backlog')
-    await nextTick()
+    await submitSearch(wrapper, 'field:STATE=Backlog')
     const events = wrapper.emitted('update:value') || []
     const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
     expect(last?.status).toBe('Backlog')
   })
 
-  it('emits custom filters when provided via input', async () => {
+  it('emits custom fields and bare assignments through the main search', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
     await openPanel(wrapper)
-    const custom = findByPlaceholder(wrapper, 'Custom filters')
-    expect(custom).toBeTruthy()
-    await custom!.setValue('field:iteration=beta, owner=ops')
-    await nextTick()
+    await submitSearch(wrapper, 'field:iteration=beta owner=ops')
     const events = wrapper.emitted('update:value') || []
     const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
     expect(last?.['field:iteration']).toBe('beta')
@@ -159,21 +156,20 @@ describe('FilterBar', () => {
       const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
       expect(last?.deletion).toBe('all')
 
-      // The dedicated control owns the key; it must not appear in the
-      // custom-filter box.
-      const custom = findByPlaceholder(wrapper, 'Custom filters')
-      expect((custom!.element as HTMLInputElement).value).not.toContain('deletion')
+      expect(wrapper.findAll('.filter-bar__chip').filter(chip => chip.text().includes('All tasks'))).toHaveLength(1)
+      expect(findByPlaceholder(wrapper, 'Custom filters')).toBeUndefined()
     })
   })
 
-  it('hydrates custom filters from incoming value', async () => {
+  it('renders incoming custom filters as removable chips', async () => {
     const wrapper = mount(FilterBar, {
       props: { value: { q: 'abc', 'field:iteration': 'beta', scope: 'edge' } },
     })
     await openPanel(wrapper)
-    const custom = findByPlaceholder(wrapper, 'Custom filters')
-    expect(custom?.element.value).toContain('field:iteration=beta')
-    expect(custom?.element.value).toContain('scope=edge')
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain('iteration')
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain('beta')
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain('scope')
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain('edge')
   })
 
   it('hides the status select when showStatus is false', () => {
@@ -343,5 +339,205 @@ describe('FilterBar sort snapshot ownership (DEV-57)', () => {
     expect(last?.order).toBe('asc')
     expect(last?.status).toBe('todo')
     wrapper.unmount()
+  })
+})
+
+describe('FilterBar unified search and panel cleanup (DEV-98)', () => {
+  const wrappers: ReturnType<typeof mount>[] = []
+  beforeEach(() => {
+    localStorage.clear()
+    projectState.projectsRef!.value = [
+      { name: 'api-service', prefix: 'AS' }, { name: 'frontend-app', prefix: 'FA' },
+    ]
+  })
+  afterEach(() => {
+    for (const wrapper of wrappers.splice(0)) wrapper.unmount()
+    document.body.replaceChildren()
+  })
+  function render(props: Record<string, unknown> = {}, attached = false) {
+    const wrapper = mount(FilterBar, { props: { value: {}, ...props }, ...(attached ? { attachTo: document.body } : {}) })
+    wrappers.push(wrapper)
+    return wrapper
+  }
+
+  it('replaces equality assignments while colon selection stays additive', async () => {
+    const wrapper = render({ value: { priority: 'High', status: 'Todo', type: 'Feature' } })
+    await submitSearch(wrapper, 'field:priority=Medium field:STATE=Done field:task_type=Bug')
+    expect(lastValue(wrapper)).toMatchObject({ priority: 'Medium', status: 'Done', type: 'Bug' })
+    await submitSearch(wrapper, 'status:Todo')
+    expect(lastValue(wrapper).status).toBe('Done,Todo')
+  })
+
+  it('retains committed filters and results while a custom draft is incomplete or invalid', async () => {
+    const wrapper = render({ value: { q: 'roadmap', status: 'Todo', 'field:iteration': 'beta' } })
+    await flushPromises()
+    const count = (wrapper.emitted('update:value') || []).length
+    await submitSearch(wrapper, 'status:Done field:iteration=')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    expect((wrapper.emitted('update:value') || []).length).toBe(count)
+    expect(wrapper.props('value')).toMatchObject({ q: 'roadmap', status: 'Todo', 'field:iteration': 'beta' })
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain('Todo')
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain('beta')
+    await submitSearch(wrapper, 'roadmap field:iteration=gamma')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(lastValue(wrapper)).toMatchObject({ q: 'roadmap', status: 'Todo', 'field:iteration': 'gamma' })
+  })
+
+  it('does not search operator-prefix characters as free text while a field expression is typed', async () => {
+    const wrapper = render({ value: { q: 'roadmap', 'field:iteration': 'beta' } })
+    await flushPromises()
+    const count = (wrapper.emitted('update:value') || []).length
+    const search = wrapper.find('[data-testid="filter-search"]')
+    for (const text of ['f', 'fi', 'fie', 'fiel', 'field', 'field:', 'field:iteration=']) await search.setValue(text)
+    expect((wrapper.emitted('update:value') || []).length).toBe(count)
+    await submitSearch(wrapper, 'field:iteration=gamma')
+    expect(lastValue(wrapper)['field:iteration']).toBe('gamma')
+    expect(lastValue(wrapper).q).toBeUndefined()
+  })
+
+  it('restores legacy object snapshots without losing commas, quotes, spaces or equals', async () => {
+    const value = 'beta, "release" = ready'
+    localStorage.setItem('lotar.tasks.filter', JSON.stringify({ q: 'release', 'field:iteration': value, scope: 'edge', sort_by: 'status', order: 'asc' }))
+    const wrapper = render()
+    await flushPromises()
+    expect(lastValue(wrapper)).toMatchObject({ q: 'release', 'field:iteration': value, scope: 'edge', order: 'desc' })
+    expect(lastValue(wrapper).sort_by).toBeUndefined()
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain(value)
+    const remove = wrapper.findAll('button').find(button => button.attributes('aria-label')?.startsWith('Remove filter iteration '))!
+    await remove.trigger('click')
+    expect(lastValue(wrapper)['field:iteration']).toBeUndefined()
+    expect(lastValue(wrapper).scope).toBe('edge')
+    expect(JSON.parse(localStorage.getItem('lotar.tasks.filter') || '{}').scope).toBe('edge')
+  })
+
+  it('queues and focuses an editable quoted-name preset without applying a partial filter', async () => {
+    const wrapper = render({ value: { q: 'roadmap' }, customPresets: [{ label: 'Release Stage', expression: 'field:Release Stage=' }] }, true)
+    await flushPromises()
+    const count = (wrapper.emitted('update:value') || []).length
+    ; (wrapper.vm as any).appendCustomFilter('field:Release Stage=')
+    await nextTick()
+    const search = wrapper.find('[data-testid="filter-search"]')
+    expect((search.element as HTMLInputElement).value).toBe('roadmap field:"Release Stage"=')
+    expect(document.activeElement).toBe(search.element)
+    expect((wrapper.emitted('update:value') || []).length).toBe(count)
+    await submitSearch(wrapper, 'roadmap field:"Release Stage"="beta team"')
+    expect(lastValue(wrapper)).toMatchObject({ q: 'roadmap', 'field:release stage': 'beta team' })
+  })
+
+  it('exposes labelled fields and closes the region with focus restored to Filters', async () => {
+    const wrapper = render({ statuses: ['Todo'], priorities: ['High'], types: ['Bug'], sprintOptions: [{ id: 1, label: 'Sprint one' }] }, true)
+    await openPanel(wrapper)
+    expect(wrapper.find('[data-testid="filter-panel"]').attributes('role')).toBe('region')
+    expect(wrapper.find('[data-testid="filter-panel"]').text()).toContain('Quick picks')
+    expect(wrapper.find('[data-testid="filter-panel"]').text()).toContain('Filter fields')
+    expect(wrapper.find('[aria-label="Custom filters"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="filter-status"]').trigger('click')
+    const checkbox = wrapper.find('input[type="checkbox"]')
+    ; (checkbox.element as HTMLInputElement).focus()
+    await checkbox.trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('.filter-bar__menu-popover').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.find('[data-testid="filter-status"]').element)
+    await wrapper.find('[data-testid="filter-status"]').trigger('keydown', { key: 'Escape' })
+    await nextTick()
+    expect(wrapper.find('[data-testid="filter-panel"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.find('[data-testid="filter-toggle"]').element)
+  })
+
+  it('clears conditions but preserves the current project and live sort owner', async () => {
+    const wrapper = render({ value: { project: 'AS', q: 'roadmap', status: 'Todo', tags: 'ui', deletion: 'all', 'field:iteration': 'beta', sort_by: 'priority', order: 'asc' } })
+    await openPanel(wrapper)
+    const clear = wrapper.findAll('button').find(button => button.text() === 'Clear conditions')!
+    await clear.trigger('click')
+    expect(lastValue(wrapper)).toEqual({ project: 'AS', sort_by: 'priority', order: 'asc' })
+    const snapshot = JSON.parse(localStorage.getItem('lotar.tasks.filter') || '{}')
+    expect(snapshot.sort_by).toBeUndefined()
+    expect(snapshot.order).toBeUndefined()
+    expect(snapshot['field:iteration']).toBeUndefined()
+  })
+
+  it('shows tags and deletion visibility as removable applied chips', async () => {
+    const wrapper = render({ value: { tags: 'ui,api', deletion: 'deleted' } })
+    await nextTick()
+    expect(wrapper.find('[data-testid="filter-chips"]').text()).toContain('Deleted tasks')
+    expect(wrapper.findAll('.filter-bar__chip')).toHaveLength(3)
+    const remove = wrapper.findAll('button').find(button => button.attributes('aria-label')?.startsWith('Remove filter Visibility'))!
+    await remove.trigger('click')
+    expect(lastValue(wrapper).deletion).toBeUndefined()
+    expect(lastValue(wrapper).tags).toBe('ui,api')
+  })
+
+  it('commits a manually typed filter on Enter after trailing whitespace', async () => {
+    const wrapper = render({ statuses: ['Todo', 'Done'] })
+    await submitSearch(wrapper, 'status:Todo ')
+    expect(lastValue(wrapper).status).toBe('Todo')
+    expect((wrapper.find('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe('')
+  })
+
+  it('queues a literal custom-field preset even when its name is a builtin alias', async () => {
+    const wrapper = render({ customPresets: [{ label: 'sprint', expression: 'field:sprint=' }] })
+    ; (wrapper.vm as any).appendCustomFilter('field:sprint=')
+    await nextTick()
+    expect((wrapper.find('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe('field:"sprint"=')
+    await submitSearch(wrapper, 'field:"sprint"=inc-2')
+    expect(lastValue(wrapper)['field:sprint']).toBe('inc-2')
+    expect(lastValue(wrapper).sprints).toBeUndefined()
+  })
+
+  it('round-trips prototype-named custom fields as ordinary own string properties', async () => {
+    const wrapper = render()
+    await submitSearch(wrapper, '__proto__=fixture field:constructor=value')
+    const payload = lastValue(wrapper)
+    expect(Object.prototype.hasOwnProperty.call(payload, '__proto__')).toBe(true)
+    expect(payload['__proto__']).toBe('fixture')
+    expect(payload['field:constructor']).toBe('value')
+    const snapshot = JSON.parse(localStorage.getItem('lotar.tasks.filter') || '{}')
+    expect(snapshot['__proto__']).toBe('fixture')
+  })
+
+  it('uses search and chips instead of separate Tags or Custom filters text inputs', async () => {
+    const wrapper = render({ value: { tags: 'ui,api' } })
+    await openPanel(wrapper)
+    expect(wrapper.find('input[placeholder="Tags"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Custom filters"]').exists()).toBe(false)
+    expect(wrapper.findAll('.filter-bar__chip-value').map(chip => chip.text())).toEqual(expect.arrayContaining(['ui', 'api']))
+    await submitSearch(wrapper, 'tags=backend')
+    expect(lastValue(wrapper).tags).toBe('backend')
+  })
+
+  it('shows the end-of-input clear button only for written search content', async () => {
+    const wrapper = render({ value: { project: 'AS', status: 'Todo' } }, true)
+    expect(wrapper.find('[data-testid="filter-search-clear"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="filter-search"]').setValue('roadmap')
+    const clear = wrapper.find('[data-testid="filter-search-clear"]')
+    expect(clear.attributes('aria-label')).toBe('Clear search')
+    await clear.trigger('click')
+    await nextTick()
+    expect((wrapper.find('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe('')
+    expect(wrapper.find('[data-testid="filter-search-clear"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.find('[data-testid="filter-search"]').element)
+    expect(lastValue(wrapper).q).toBeUndefined()
+    expect(lastValue(wrapper)).toMatchObject({ project: 'AS', status: 'Todo' })
+  })
+
+  it('clears an invalid draft and its errors without removing applied filters or sort', async () => {
+    const wrapper = render({ value: { q: 'roadmap', tags: 'ui', 'field:iteration': 'beta', order: 'asc', sort_by: 'priority' } }, true)
+    await submitSearch(wrapper, 'field:iteration=')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    await wrapper.find('[data-testid="filter-search-clear"]').trigger('click')
+    await nextTick()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="filter-search"]').attributes('aria-invalid')).toBe('false')
+    expect(lastValue(wrapper)).toMatchObject({ tags: 'ui', 'field:iteration': 'beta', order: 'asc', sort_by: 'priority' })
+    expect(lastValue(wrapper).q).toBeUndefined()
+    expect(document.activeElement).toBe(wrapper.find('[data-testid="filter-search"]').element)
+  })
+
+  it('expresses every panel/smart condition through the top search', async () => {
+    const wrapper = render()
+    await submitSearch(wrapper, 'project:AS status:Todo priority:High type:Bug sprints:1 tags:ui assignee:alice due:soon recent:7d needs:effort deletion=all sort_by=priority order=asc')
+    expect(lastValue(wrapper)).toMatchObject({
+      project: 'AS', status: 'Todo', priority: 'High', type: 'Bug', sprints: '1', tags: 'ui',
+      assignee: 'alice', due: 'soon', recent: '7d', needs: 'effort', deletion: 'all', sort_by: 'priority', order: 'asc',
+    })
   })
 })

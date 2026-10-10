@@ -206,9 +206,9 @@
             @reset="resetColumns"
           >
             <template #trigger="{ open, toggle }">
-              <UiButton type="button" title="Configure columns" :aria-expanded="open" @click="toggle">
+              <UiButton class="responsive-action" type="button" aria-label="Configure columns" title="Configure columns" :aria-expanded="open" @click="toggle">
                 <IconGlyph name="columns" aria-hidden="true" />
-                <span>Columns</span>
+                <span class="responsive-action__label">Columns</span>
               </UiButton>
             </template>
           </ColumnsMenu>

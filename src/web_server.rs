@@ -7,9 +7,10 @@ use notify::{Config as NotifyConfig, PollWatcher, RecursiveMode, Watcher, recomm
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::{LazyLock, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::time::Duration;
 
 static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web-embed");
@@ -19,10 +20,28 @@ static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
 const MAX_REQUEST_BODY_BYTES: usize = 16 * 1024 * 1024;
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(30);
 
-fn reject_oversized_body(stream: &mut TcpStream) {
+/// Upper bound on simultaneously serviced connections.
+///
+/// Each accepted connection is handled on its own thread so a slow or idle
+/// client (for example a browser's speculative preconnect sockets, which
+/// connect and then send nothing) cannot starve other requests. The bound
+/// keeps that thread-per-connection model finite: beyond it, additional
+/// connections are closed immediately rather than queued or served.
+const MAX_CONCURRENT_CONNECTIONS: usize = 64;
+
+/// The peer registry is pruned to live sockets once it grows past this many
+/// entries, bounding memory independently of the connection bound.
+const MAX_TRACKED_PEERS: usize = 4 * MAX_CONCURRENT_CONNECTIONS;
+
+/// How often the accept loop wakes to re-check the test-stop flag while no
+/// connection is pending. Only delays accepts of connections that arrive
+/// while the loop is sleeping, never an already-accepted request.
+const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+fn reject_oversized_body(mut stream: &TcpStream) {
     let body = "{\"error\":{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds the 16 MiB limit\"}}";
     let response = format!(
-        "HTTP/1.1 413 Content Too Large\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+        "HTTP/1.1 413 Content Too Large\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         body.len(),
         body
     );
@@ -104,225 +123,307 @@ pub fn serve_listener(
     // Best-effort: start a filesystem watcher thread to emit SSE events on changes under .tasks
     start_tasks_watcher();
 
-    for stream in listener.incoming() {
-        // Check for test-initiated shutdown before handling the next connection
-        if STOP_FLAGS
-            .lock()
-            .ok()
-            .and_then(|m| m.get(&port).copied())
-            .unwrap_or(false)
-        {
-            break;
-        }
+    // Every accepted connection is serviced on its own thread. A browser
+    // routinely opens speculative sockets that stay silent until their read
+    // timeout; servicing connections serially on the accept thread let a
+    // single idle preconnect starve every later request for up to
+    // SOCKET_TIMEOUT, which is what stalled `page.reload` and SSE setup in
+    // CI. Scoped threads borrow `api_server`/`config` (both Sync) without
+    // changing the public serve API.
+    let active = Arc::new(AtomicUsize::new(0));
+    let peers: Arc<Mutex<Vec<Weak<TcpStream>>>> = Arc::new(Mutex::new(Vec::new()));
 
-        match stream {
-            Ok(mut stream) => {
-                let _ = stream.set_read_timeout(Some(SOCKET_TIMEOUT));
-                let _ = stream.set_write_timeout(Some(SOCKET_TIMEOUT));
-                // Read a single HTTP request (headers + body)
-                let (method, path, query, headers, body) = {
-                    let mut head_buf: Vec<u8> = Vec::new();
-                    let mut buf = [0u8; 1024];
-                    loop {
-                        let n: usize = stream.read(&mut buf).unwrap_or_default();
-                        if n == 0 {
-                            break;
-                        }
-                        head_buf.extend_from_slice(&buf[..n]);
-                        if head_buf.windows(4).any(|w| w == b"\r\n\r\n") {
-                            break;
-                        }
-                        if head_buf.len() > 32 * 1024 {
-                            break;
-                        }
-                    }
-                    let header_end = head_buf
-                        .windows(4)
-                        .position(|w| w == b"\r\n\r\n")
-                        .map(|i| i + 4)
-                        .unwrap_or(head_buf.len());
-                    let (head_part, body_bytes) = head_buf.split_at(header_end);
-                    let request_head = String::from_utf8_lossy(head_part);
-                    let request_line = match request_head.lines().next() {
-                        Some(line) => line,
-                        None => {
-                            continue;
-                        }
-                    };
-                    let parts: Vec<&str> = request_line.split(' ').collect();
-                    let method = parts.first().copied().unwrap_or("GET").to_string();
-                    let path_full = parts.get(1).copied().unwrap_or("/");
-                    let (path, query) = parse_path_and_query(path_full);
-                    // Header names are case-insensitive; normalize once here.
-                    let mut headers = HashMap::new();
-                    for line in request_head.lines().skip(1) {
-                        if line.trim().is_empty() {
-                            break;
-                        }
-                        if let Some((k, v)) = line.split_once(":") {
-                            headers.insert(k.trim().to_lowercase(), v.trim().to_string());
-                        }
-                    }
-                    let mut body: Vec<u8> = body_bytes.to_vec();
-                    let declared_length: Option<usize> = headers
-                        .get("content-length")
-                        .and_then(|v| v.parse::<usize>().ok());
-                    if declared_length.is_some_and(|cl| cl > MAX_REQUEST_BODY_BYTES)
-                        || body.len() > MAX_REQUEST_BODY_BYTES
-                    {
-                        reject_oversized_body(&mut stream);
-                        continue;
-                    }
-                    if let Some(cl) = declared_length {
-                        while body.len() < cl {
-                            let n: usize = stream.read(&mut buf).unwrap_or_default();
-                            if n == 0 {
-                                break;
-                            }
-                            body.extend_from_slice(&buf[..n]);
-                            if body.len() > MAX_REQUEST_BODY_BYTES {
-                                break;
-                            }
-                        }
-                        body.truncate(cl.min(MAX_REQUEST_BODY_BYTES));
-                    }
-                    if body.len() > MAX_REQUEST_BODY_BYTES {
-                        reject_oversized_body(&mut stream);
-                        continue;
-                    }
-                    (method, path, query, headers, body)
-                };
+    // Poll the listener instead of blocking in accept() so the stop flag is
+    // observed promptly even when no further connection arrives.
+    let _ = listener.set_nonblocking(true);
 
-                // SSE endpoints
-                if path == "/api/events" || path == "/api/tasks/stream" {
-                    handle_sse_connection(stream, &query);
-                    continue;
-                } else if path == "/__test/stop"
-                    && std::env::var("LOTAR_ALLOW_TEST_STOP").as_deref() == Ok("1")
-                {
-                    if let Ok(mut map) = STOP_FLAGS.lock() {
-                        map.insert(port, true);
-                    }
-                    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 8\r\n\r\nstopping";
-                    let _ = stream.write_all(response.as_bytes());
-                    let _ = stream.flush();
-                    continue;
-                } else if path.starts_with("/api") {
-                    if path == "/api/openapi.json" {
-                        let spec = include_str!("../docs/openapi.json");
-                        let response = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-                            spec.len(),
-                            spec
-                        );
-                        let _ = stream.write_all(response.as_bytes());
-                        let _ = stream.flush();
-                        continue;
-                    }
-                    if method.eq_ignore_ascii_case("OPTIONS") {
-                        let preflight = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: 0\r\n\r\n";
-                        let _ = stream.write_all(preflight.as_bytes());
-                        let _ = stream.flush();
-                        continue;
-                    }
-                    if is_mutating_method(&method)
-                        && let Err(rejection) = validate_request_origin(&headers)
-                    {
-                        let body = rejection;
-                        let response = format!(
-                            "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-                            body.len(),
-                            body
-                        );
-                        let _ = stream.write_all(response.as_bytes());
-                        let _ = stream.flush();
-                        continue;
-                    }
+    std::thread::scope(|scope| {
+        loop {
+            // Check for test-initiated shutdown before handling the next connection
+            if STOP_FLAGS
+                .lock()
+                .ok()
+                .and_then(|m| m.get(&port).copied())
+                .unwrap_or(false)
+            {
+                break;
+            }
 
-                    let req = HttpRequest {
-                        method,
-                        path: path.clone(),
-                        query,
-                        headers,
-                        body,
-                    };
-                    let mut resp = api_server.handle_request(&req);
-                    resp.headers.push((
-                        "Access-Control-Allow-Methods".into(),
-                        "GET,POST,OPTIONS".into(),
-                    ));
-                    resp.headers
-                        .push(("Access-Control-Allow-Headers".into(), "Content-Type".into()));
-                    if !resp
-                        .headers
-                        .iter()
-                        .any(|(k, _)| k.eq_ignore_ascii_case("Content-Type"))
-                    {
-                        resp.headers
-                            .push(("Content-Type".into(), "application/json".into()));
+            match listener.accept() {
+                Ok((stream, _addr)) => {
+                    // Accepted sockets are blocking per POSIX, but reset the
+                    // flag explicitly so the non-blocking listener state can
+                    // never leak into request handling.
+                    let _ = stream.set_nonblocking(false);
+                    if active.load(Ordering::Acquire) >= MAX_CONCURRENT_CONNECTIONS {
+                        // Fail closed: refuse the overload instead of
+                        // queuing it behind unbounded work.
+                        continue;
                     }
-                    let headers_str = resp
-                        .headers
-                        .iter()
-                        .map(|(k, v)| format!("{}: {}\r\n", k, v))
-                        .collect::<String>();
-                    let status_line = match resp.status {
-                        200 => "200 OK",
-                        201 => "201 Created",
-                        204 => "204 No Content",
-                        400 => "400 Bad Request",
-                        403 => "403 Forbidden",
-                        404 => "404 Not Found",
-                        413 => "413 Content Too Large",
-                        500 => "500 Internal Server Error",
-                        _ => "500 Internal Server Error",
-                    };
-                    let response = format!(
-                        "HTTP/1.1 {}\r\n{}Content-Length: {}\r\n\r\n",
-                        status_line,
-                        headers_str,
-                        resp.body.len()
-                    );
-                    let _ = stream.write_all(response.as_bytes());
-                    let _ = stream.write_all(&resp.body);
-                    let _ = stream.flush();
-                } else {
-                    let request_path = if path == "/" { "/index.html" } else { &path };
-                    let rel_path = request_path.trim_start_matches('/');
-                    let external_path = config.effective_web_ui_path();
-                    let accepts_gzip = headers
-                        .get("accept-encoding")
-                        .map(|value| {
-                            value
-                                .split(',')
-                                .any(|part| part.trim().eq_ignore_ascii_case("gzip"))
-                        })
-                        .unwrap_or(false);
-                    let mut served =
-                        try_serve_static(rel_path, &mut stream, external_path, accepts_gzip);
-                    if !served && should_fallback_to_index(&path) {
-                        served = try_serve_static(
-                            "index.html",
-                            &mut stream,
-                            external_path,
-                            accepts_gzip,
-                        );
+                    let stream = Arc::new(stream);
+                    if let Ok(mut tracked) = peers.lock() {
+                        if tracked.len() >= MAX_TRACKED_PEERS {
+                            tracked.retain(|weak| weak.strong_count() > 0);
+                        }
+                        tracked.push(Arc::downgrade(&stream));
                     }
-                    if !served {
-                        let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.";
-                        let _ = stream.write_all(response.as_bytes());
-                        let _ = stream.flush();
-                    }
+                    active.fetch_add(1, Ordering::AcqRel);
+                    let active = Arc::clone(&active);
+                    let peers = Arc::clone(&peers);
+                    scope.spawn(move || {
+                        handle_connection(api_server, &stream, config, port, &peers);
+                        active.fetch_sub(1, Ordering::Release);
+                    });
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(ACCEPT_POLL_INTERVAL);
+                }
+                Err(e) => {
+                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                        .log_warn(format_args!("Connection error: {}", e));
                 }
             }
-            Err(e) => {
-                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                    .log_warn(format_args!("Connection error: {}", e));
-            }
         }
-    }
+        // Final sweep: a peer accepted in the last iteration before the stop
+        // flag was observed missed the stop handler's own sweep and would
+        // otherwise delay the scoped-thread join until its socket timeout.
+        shutdown_peer_connections(&peers, None);
+    });
 
     let _ = STOP_FLAGS.lock().map(|mut m| m.remove(&port));
+}
+
+/// Service exactly one HTTP request on an accepted connection, then return
+/// (the socket closes; one-shot responses advertise `Connection: close`).
+fn handle_connection(
+    api_server: &api_server::ApiServer,
+    mut stream: &TcpStream,
+    config: &WebServerConfig,
+    port: u16,
+    peers: &Arc<Mutex<Vec<Weak<TcpStream>>>>,
+) {
+    let _ = stream.set_read_timeout(Some(SOCKET_TIMEOUT));
+    let _ = stream.set_write_timeout(Some(SOCKET_TIMEOUT));
+    // Read a single HTTP request (headers + body)
+    let (method, path, query, headers, body) = {
+        let mut head_buf: Vec<u8> = Vec::new();
+        let mut buf = [0u8; 1024];
+        loop {
+            let n: usize = stream.read(&mut buf).unwrap_or_default();
+            if n == 0 {
+                break;
+            }
+            head_buf.extend_from_slice(&buf[..n]);
+            if head_buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                break;
+            }
+            if head_buf.len() > 32 * 1024 {
+                break;
+            }
+        }
+        let header_end = head_buf
+            .windows(4)
+            .position(|w| w == b"\r\n\r\n")
+            .map(|i| i + 4)
+            .unwrap_or(head_buf.len());
+        let (head_part, body_bytes) = head_buf.split_at(header_end);
+        let request_head = String::from_utf8_lossy(head_part);
+        let request_line = match request_head.lines().next() {
+            Some(line) => line,
+            None => {
+                return;
+            }
+        };
+        let parts: Vec<&str> = request_line.split(' ').collect();
+        let method = parts.first().copied().unwrap_or("GET").to_string();
+        let path_full = parts.get(1).copied().unwrap_or("/");
+        let (path, query) = parse_path_and_query(path_full);
+        // Header names are case-insensitive; normalize once here.
+        let mut headers = HashMap::new();
+        for line in request_head.lines().skip(1) {
+            if line.trim().is_empty() {
+                break;
+            }
+            if let Some((k, v)) = line.split_once(":") {
+                headers.insert(k.trim().to_lowercase(), v.trim().to_string());
+            }
+        }
+        let mut body: Vec<u8> = body_bytes.to_vec();
+        let declared_length: Option<usize> = headers
+            .get("content-length")
+            .and_then(|v| v.parse::<usize>().ok());
+        if declared_length.is_some_and(|cl| cl > MAX_REQUEST_BODY_BYTES)
+            || body.len() > MAX_REQUEST_BODY_BYTES
+        {
+            reject_oversized_body(stream);
+            return;
+        }
+        if let Some(cl) = declared_length {
+            while body.len() < cl {
+                let n: usize = stream.read(&mut buf).unwrap_or_default();
+                if n == 0 {
+                    break;
+                }
+                body.extend_from_slice(&buf[..n]);
+                if body.len() > MAX_REQUEST_BODY_BYTES {
+                    break;
+                }
+            }
+            body.truncate(cl.min(MAX_REQUEST_BODY_BYTES));
+        }
+        if body.len() > MAX_REQUEST_BODY_BYTES {
+            reject_oversized_body(stream);
+            return;
+        }
+        (method, path, query, headers, body)
+    };
+
+    // SSE endpoints
+    if path == "/api/events" || path == "/api/tasks/stream" {
+        handle_sse_connection(stream, &query);
+    } else if path == "/__test/stop" && std::env::var("LOTAR_ALLOW_TEST_STOP").as_deref() == Ok("1")
+    {
+        if let Ok(mut map) = STOP_FLAGS.lock() {
+            map.insert(port, true);
+        }
+        // The server owns prompt teardown of its open connections: shutdown
+        // every OTHER live peer so blocked readers and SSE forwarders exit
+        // instead of delaying the accept loop's scoped-thread join.
+        shutdown_peer_connections(peers, Some(stream));
+        let response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 8\r\nConnection: close\r\n\r\nstopping";
+        let _ = stream.write_all(response.as_bytes());
+        let _ = stream.flush();
+    } else if path.starts_with("/api") {
+        if path == "/api/openapi.json" {
+            let spec = include_str!("../docs/openapi.json");
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                spec.len(),
+                spec
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+            return;
+        }
+        if method.eq_ignore_ascii_case("OPTIONS") {
+            let preflight = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let _ = stream.write_all(preflight.as_bytes());
+            let _ = stream.flush();
+            return;
+        }
+        if is_mutating_method(&method)
+            && let Err(rejection) = validate_request_origin(&headers)
+        {
+            let body = rejection;
+            let response = format!(
+                "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+            return;
+        }
+
+        let req = HttpRequest {
+            method,
+            path: path.clone(),
+            query,
+            headers,
+            body,
+        };
+        let mut resp = api_server.handle_request(&req);
+        resp.headers.push((
+            "Access-Control-Allow-Methods".into(),
+            "GET,POST,OPTIONS".into(),
+        ));
+        resp.headers
+            .push(("Access-Control-Allow-Headers".into(), "Content-Type".into()));
+        if !resp
+            .headers
+            .iter()
+            .any(|(k, _)| k.eq_ignore_ascii_case("Content-Type"))
+        {
+            resp.headers
+                .push(("Content-Type".into(), "application/json".into()));
+        }
+        // The socket serves exactly one request and then closes; say so.
+        if !resp
+            .headers
+            .iter()
+            .any(|(k, _)| k.eq_ignore_ascii_case("Connection"))
+        {
+            resp.headers.push(("Connection".into(), "close".into()));
+        }
+        let headers_str = resp
+            .headers
+            .iter()
+            .map(|(k, v)| format!("{}: {}\r\n", k, v))
+            .collect::<String>();
+        let status_line = match resp.status {
+            200 => "200 OK",
+            201 => "201 Created",
+            204 => "204 No Content",
+            400 => "400 Bad Request",
+            403 => "403 Forbidden",
+            404 => "404 Not Found",
+            413 => "413 Content Too Large",
+            500 => "500 Internal Server Error",
+            _ => "500 Internal Server Error",
+        };
+        let response = format!(
+            "HTTP/1.1 {}\r\n{}Content-Length: {}\r\n\r\n",
+            status_line,
+            headers_str,
+            resp.body.len()
+        );
+        let _ = stream.write_all(response.as_bytes());
+        let _ = stream.write_all(&resp.body);
+        let _ = stream.flush();
+    } else {
+        let request_path = if path == "/" { "/index.html" } else { &path };
+        let rel_path = request_path.trim_start_matches('/');
+        let external_path = config.effective_web_ui_path();
+        let accepts_gzip = headers
+            .get("accept-encoding")
+            .map(|value| {
+                value
+                    .split(',')
+                    .any(|part| part.trim().eq_ignore_ascii_case("gzip"))
+            })
+            .unwrap_or(false);
+        let mut served = try_serve_static(rel_path, stream, external_path, accepts_gzip);
+        if !served && should_fallback_to_index(&path) {
+            served = try_serve_static("index.html", stream, external_path, accepts_gzip);
+        }
+        if !served {
+            let body = "404 - Page not found.";
+            let response = format!(
+                "HTTP/1.1 404 NOT FOUND\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+        }
+    }
+}
+
+/// Shut down every tracked live peer connection, except the excluded socket.
+fn shutdown_peer_connections(peers: &Arc<Mutex<Vec<Weak<TcpStream>>>>, except: Option<&TcpStream>) {
+    if let Ok(tracked) = peers.lock() {
+        for weak in tracked.iter() {
+            let Some(peer) = weak.upgrade() else {
+                continue;
+            };
+            if let Some(keep) = except
+                && std::ptr::eq(Arc::as_ptr(&peer), keep)
+            {
+                continue;
+            }
+            let _ = peer.shutdown(Shutdown::Both);
+        }
+    }
 }
 
 pub fn serve(api_server: &api_server::ApiServer, port: u16) {
@@ -333,11 +434,12 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
 ///
 /// Resolution order:
 /// 1. If `external_path` is Some, try to serve from that directory first
-/// 2. Try embedded assets (bundled at compile time)
-/// 3. Fallback to `target/web` on the filesystem (for development)
+/// 2. Try embedded pre-compressed assets (`<path>.gz`, bundled at compile time)
+/// 3. Try raw embedded assets (non-text binaries are embedded byte-exact)
+/// 4. Fallback to `target/web` on the filesystem (for development)
 fn try_serve_static(
     rel_path: &str,
-    stream: &mut TcpStream,
+    stream: &TcpStream,
     external_path: Option<&Path>,
     accepts_gzip: bool,
 ) -> bool {
@@ -370,7 +472,13 @@ fn try_serve_static(
             return serve_bytes(rel_path, &decompressed, stream, false);
         }
     }
-    // 3. Fallback to target/web filesystem (development convenience)
+    // 3. Raw embedded assets: non-compressible binaries (ICO/PNG/JPG/WEBP,
+    //    fonts, ...) are embedded byte-exact by scripts/compress-web.mjs;
+    //    serve the exact bytes with no Content-Encoding.
+    if let Some(file) = STATIC_FILES.get_file(rel_path) {
+        return serve_bytes(rel_path, file.contents(), stream, false);
+    }
+    // 4. Fallback to target/web filesystem (development convenience)
     // Skip this if we already tried an external path to avoid confusion
     if external_path.is_none() {
         let fs_path = Path::new("target/web").join(rel_path);
@@ -383,7 +491,7 @@ fn try_serve_static(
 }
 
 /// Write HTTP 200 response with the given bytes
-fn serve_bytes(rel_path: &str, bytes: &[u8], stream: &mut TcpStream, gzipped: bool) -> bool {
+fn serve_bytes(rel_path: &str, bytes: &[u8], mut stream: &TcpStream, gzipped: bool) -> bool {
     let content_type = content_type_for(rel_path);
     // Vite emits content-hashed filenames under assets/, so those can be
     // cached immutably; the HTML entry points must always revalidate.
@@ -393,9 +501,10 @@ fn serve_bytes(rel_path: &str, bytes: &[u8], stream: &mut TcpStream, gzipped: bo
         "no-cache"
     };
     // The extra trailing \r\n below terminates the header block; the encoding
-    // lines are formatted with their own line endings.
+    // lines are formatted with their own line endings. The socket closes
+    // after this single response, so the connection is advertised as closed.
     let header = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: {}\r\n{}\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: {}\r\nConnection: close\r\n{}\r\n",
         content_type,
         bytes.len(),
         cache_control,
@@ -429,8 +538,10 @@ fn content_type_for(path: &str) -> &'static str {
         .unwrap_or("")
     {
         "html" => "text/html",
+        "ico" => "image/x-icon",
         "jpg" | "jpeg" => "image/jpeg",
         "png" => "image/png",
+        "webp" => "image/webp",
         "css" => "text/css",
         "js" => "application/javascript",
         "svg" => "image/svg+xml",
@@ -438,7 +549,7 @@ fn content_type_for(path: &str) -> &'static str {
     }
 }
 
-fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>) {
+fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>) {
     use std::time::{Duration, Instant};
 
     let debounce_ms = query
@@ -895,4 +1006,67 @@ fn start_tasks_watcher() {
 
         drop(poll_watcher);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::content_type_for;
+
+    #[test]
+    fn text_assets_keep_their_documented_mime_types() {
+        assert_eq!(content_type_for("index.html"), "text/html");
+        assert_eq!(content_type_for("assets/index-sGbZQYYd.css"), "text/css");
+        assert_eq!(
+            content_type_for("assets/index-BtHy0XNw.js"),
+            "application/javascript"
+        );
+        assert_eq!(
+            content_type_for("assets/favicon-C8vPI8o9.svg"),
+            "image/svg+xml"
+        );
+    }
+
+    #[test]
+    fn embedded_branding_binaries_have_concrete_mime_types() {
+        assert_eq!(
+            content_type_for("assets/favicon-B3xkQ9.ico"),
+            "image/x-icon"
+        );
+        assert_eq!(content_type_for("assets/lotar-logo.webp"), "image/webp");
+        assert_eq!(
+            content_type_for("assets/branding/favicon.ico"),
+            "image/x-icon"
+        );
+    }
+
+    #[test]
+    fn raster_images_map_to_image_mime_types() {
+        assert_eq!(
+            content_type_for("assets/lotar-logo-2296x608.png"),
+            "image/png"
+        );
+        assert_eq!(
+            content_type_for("assets/lotar-logo-white-1148x304.jpg"),
+            "image/jpeg"
+        );
+        assert_eq!(content_type_for("assets/photo.jpeg"), "image/jpeg");
+    }
+
+    #[test]
+    fn unknown_extensions_fall_back_to_octet_stream() {
+        assert_eq!(
+            content_type_for("assets/inter-variable.woff2"),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            content_type_for("assets/manifest"),
+            "application/octet-stream"
+        );
+        // Extension matching is case-sensitive, matching Vite's lowercase
+        // output; anything else must not claim a type it cannot prove.
+        assert_eq!(
+            content_type_for("assets/UPPER.SVG"),
+            "application/octet-stream"
+        );
+    }
 }

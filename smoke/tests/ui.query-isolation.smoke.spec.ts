@@ -119,7 +119,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
         await page.click('[data-testid="filter-toggle"]');
         const panel = page.locator('[data-testid="filter-panel"]');
         await panel.waitFor({ state: 'visible', timeout: 10_000 });
-        return panel.locator('input[placeholder="Tags"]');
+        return page.getByTestId('filter-search');
     }
 
     function localDateKey(date = new Date()): string {
@@ -352,7 +352,8 @@ describe('UI DEV-65 query isolation and live convergence', () => {
 
                     // Tag filter: only tagged rows are members.
                     const tagsInput = await openFilterPanel(page);
-                    await tagsInput.fill('flux');
+                    await tagsInput.fill('tags=flux');
+                    await tagsInput.press('Enter');
                     await expect
                         .poll(() => lists.countWith('tags', 'flux'), { timeout: 10_000 })
                         .toBeGreaterThan(0);
@@ -477,7 +478,8 @@ describe('UI DEV-65 query isolation and live convergence', () => {
 
                     // Tag filter: membership is decided by the server query.
                     const tagsInput = await openFilterPanel(page);
-                    await tagsInput.fill('boardset');
+                    await tagsInput.fill('tags=boardset');
+                    await tagsInput.press('Enter');
                     await expect
                         .poll(() => lists.countWith('tags', 'boardset'), { timeout: 10_000 })
                         .toBeGreaterThan(0);
@@ -563,7 +565,8 @@ describe('UI DEV-65 query isolation and live convergence', () => {
 
                     // Filter to one tag set; the other task must not render.
                     const tagsInput = await openFilterPanel(page);
-                    await tagsInput.fill('calalpha');
+                    await tagsInput.fill('tags=calalpha');
+                    await tagsInput.press('Enter');
                     await expect
                         .poll(() => lists.countWith('tags', 'calalpha'), { timeout: 10_000 })
                         .toBeGreaterThan(0);
@@ -582,7 +585,8 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                         }
                         await route.continue();
                     });
-                    await tagsInput.fill('calbeta');
+                    await tagsInput.fill('tags=calbeta');
+                    await tagsInput.press('Enter');
                     // Failed NEW query: a refresh failure leaves membership
                     // untouched — empty for the fresh calbeta key — so the
                     // banner surfaces while the grid stays mounted as a

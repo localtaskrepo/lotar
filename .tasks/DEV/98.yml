@@ -1,7 +1,67 @@
 title: Remove duplicate "Custom filters" input
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-06T02:15:15.915372+00:00
+modified: 2026-10-09T22:05:23.250794+00:00
+comments:
+- date: 2026-10-09T19:01:10.325190+00:00
+  text: 'Plan: remove duplicateCustom filtersUI onlyafterunifiedsearch supports explicitfield:key=value/key=value expressions and builtinaliases; preserveunknowncolon terms asfreetext, quotes and storedstructuredfilterobject/key/query shape. Replace extra string reparse/hinttextboxwithstructuredextra record/search errors and removableactivechips; routecustomfieldpresets to mainsearch with focus/no partialcommit, preserveprops/storage/project/querycache/sort-single-owner/deletion contracts. Clean existinginline filters panel (notnewmodal): labelledcompactresponsive controls, quickpicks/viewoptions sections, sharedsearchsyntax guidance+errors, clear/close affordances andkeyboard/autocomplete semantics. Scope sharedFilterBar Tasks/Board/Calendar/Sprints users, noRESTDTOchanges or mutationAPI. Regressionstestparser/UI legacycustomsnapshots/props/chipremoval/clear/preset/draftinvalid preservation; actualbackenddesktop/mobile visual+keyboard+crossview customfield filter membership. Requiredlint/Rust/UI/freshsmoke beforeDone, no repositoryGit/index/commit/push/worktrees; preserveearlierhighestfirstBoard logic.'
+- date: 2026-10-09T20:38:57.466029+00:00
+  text: 'Outcome: duplicateCustom filtersinput/parser/hintUI removed. One search supports legacyfield:key=value/barekey=value plusbuiltincolon aliases, quotednames/values/escapedpunctuation andunknowncolon/literaltext preservation. Appliedcustomfilterstate nowstructuredrecord preservinglegacyJSONsnapshots withoutCSVroundtrip loss; presetsfocusmaineditableprefix, incomplete/malformeddrafts cannotreplaceappliedfilter. Equalityassignmentsreplacewhilecolonselectionsmerge; trailing-spaceEntercommitsinsteadstraykey. Quotedcustomnames addressliteralreservedfields (field:"sprint"=inc-2); serializer/presets/autocomplete quotecollisions, unquotedbuiltin aliasesretaincompat. Null-prototype lookup/records andspreadcreation preserveconstructor/__proto__ stringkeys (3genuinegrammarredcases fixed; no pollutionclaim). Cleanedinline(notmodal)panel Quickpicks/Viewoptions/labelledfields; desktopone-row andmobile2-columnProject-fullwidth controls, containedcheckboxpopovers, comboboxARIA, Escape/focusrestore, appliedcustom/tag/visibilityremovablechips, Clearconditionspreservesscope+livesort. Publicclearfullreset/props/project/querymembership/deletion/sort-single-owner/storagekeys unchanged. Evidence:79newUIregressions (622->701),132targetedParser/Bar/Buildergreen;2actualdesktop/mobilebackendcases exerciseTasks/Boards/Calendar/Sprints advancedcustommembership, preset/literalcustomsprint+no nativeSprint misroute, trailing-spacecommit, invaliddraftstablequery, scopedforeign/deleted exclusions, remove/reload/clear/keyboard/mobilepopup bounds/no mutationHTTP andbyte-identicaltask; screenshotsinspectedtarget/smoke-artifacts/filters/. Independentreadonlyreviewinitialtwofollowupfindingsfixed+finalSIGNOFF. Browserdraft failuresfixedfixtureRootroute /, canonicalcustom_fieldskey, Calendarhover-vsrealrowlocator andconsistenttask/sprint refs; fastreloadtracewasexisting150msURLdebounce, notlate-responsebug: owneralreadygenerationguarded, testwaitsobservedURLcommit(notfixedsleep/budgetweakening), TasksList.vueuntouched. Final lint-finalclean(types/Clippyalltargetsallfeatures-Dwarnings/fmt),1326Rustpass45actualGit exclusions,701UIpass69files,231freshsmokepass25Git skips55passed6skippedfiles. Logs target/dev98-20261009/. Remaining:no scopedblocker; preservedexplicitq= override/freetext andserver-authoritativeunknownproject errors, exactkey-autocomplete andunknowncoloncompat documented; Chromiumnotphysicalreader/otherbrowser/Windows/remoteCI verification. No repoGit/index/staging/commit/push/worktrees, RESTshape/user-ownedtaskconfigchanges. Guidance:no durableinstructionfinding.'
+- date: 2026-10-09T20:56:43.710154+00:00
+  text: 'User followup: removeTags textinput aswell (alltags/custom editing viaMainsearch), addend-of-searchxbuttonvisiblewhenwritten toclearfree text/draft/errors/refocuswithoutclearingappliedchips/project/sort. InitialsourceCustominputalreadyremoved; foundtwo liveUIservers via staticassetonlyprobes:8080/currentdisk index-BlwHF05J newpanel/unifiedhint/noOldCustomplaceholder,8888/index-DhJuR8tS oldCustomplaceholder/notnewpanel. Freshbuilddoesnotreplaceembeddedassets inalreadyrunningprocess/browserapp; no serverstopped/restarted or usertaskdataread. targetcleanedbyuserfreshbuild (ci/logs/browsercachegone), trackingusingfreshreleasebinary. Build.rs currentlytracksrawweb thoughinclude_dir embedsweb-embed, inspectonly/fix ifprovenbuildinvalidationscope needed. Addclearbutton/Tagsabsence/all-search regressions+actualnewrelease smoke/staticverification, finalqualitygates; preserve storage/schema/query/draft contracts, no repoGit/index/commits/worktrees.'
+- date: 2026-10-09T21:28:58.647519+00:00
+  text: 'Additionaluser scope: compactmobileExport/Columns/Bulkselect/relatedactions asicon-onlywithaccessiblelabels/titles/pressedstates, moveNewtaskfromTasksfilterrowtoappheadernextbrand availableallviews/contextproject. Parent ownsFilterBar/funnel toggle+sharedresponsiveutility/BoardCalendarSprintsfieldactions/smoke/docs; childApp+unit andchildTasksListtoolbar+relatedselector migrations isolatedownership. Searchclear+Tagsremoved+visiblehintnowSR-only/topalignment verified136targetedcases and2actualdesktopmobile fourviewcases; staleCustominputs userconfirmedfixedbybrowserreloadon8080. Existingfullsmoke3 failureswereoldTagsinput locators inDEV65query-isolation tests; migrated tosame tags=...+Enter withreplacementandallmembership/error/retryassertions/budgets unchanged. No processesstopped/restarted;8080 probeafterreleasebuildfoundlistenergone(user-ownedstateleftalone),8888 oldserveruntouched. Oldhelperruntime artifacts rebuilt afteruserclean; noGit/index/commit/worktrees.'
+- date: 2026-10-09T22:05:23.227202+00:00
+  text: 'Userfollowupscomplete: Tagsplaintextinputremovedtoo (tagsstate/search/chips/snapshotretained), end-of-inputxvisibleforwrittencontent clearsfreeq/draft/errors/autocomplete/refocus WITHOUT otherappliedcriteria/scope/sort. VisibleduplicatedhintSR-only, baralignedtop; mobileFiltersfunnelicon/countbadge andatomiccompactactions. Export/Columns/Bulkpressedbutton mobileicon-only36pxtargets+compactselectionstatus(accessiblename), desktoplabels; sharedresponsivefieldsactionsBoardCalendarSprints. GlobalNewtasknextLoTaRbrand outsideoverflowNav availableallroutes, knownquery/taskprefixcontext|null(nofirstprojectguess), disabledopenTaskPanel/no draftreset; existingHostupsert/SSErefresh unchanged, no duplicatecreationcallback/API. LocalTaskstoolbarAddremoved; empty/keyboardcontextualnew handlersretained. SourceRole/API data semantics unchanged. Evidence:3followupunitred34pass->37green;4newFilterBar+7App+4toolbarcases (701->716fullUI);50focusedApp/toolbar/Bargreen.2newactualdesktop/mobileglobalactioncases keyboardEnteropen/cancel5routes+knownACTproject/guard/oneactualACTcreate+Boardmembership; enhanced2filtercases Tagsabsence/MaintagsUI/searchx/ARIAerrors/focus/menu/alignment/hiddenhint;3DEV65membership/outofband/queryerrorcases migratedoldTags locator tosame tags=...Enter, no budgets weakened. ExistingglobalNew selectorsmigratedincludingstrictmembershipcases; initialfullsmokeoldTags/Add locatorsfailcorrected, transientnew-queryBeta assertionnowpollspositive loadedrow rather thannegative-empty intermediate. Full warningfree lint-actions clean,1326Rustpass45existingGit exclusions,716UIpass70files,233freshsmoke-actions-green25Git skips56passed6skippedfiles; finalaria-selection-status sourceonlyfollowup types/50UI+4freshactualbrowsercasespass, no behavior edits afterfullgates. Screenshots6synthetic desktop/mobile inspected target/smoke-artifacts/{filters,actions}; finalreleasebuildwarningfree target/release/lotar. Liveuserrestarted8080verifiedstaticindex-BtHy0XNw exactlymatcheslatestdisk, clear/global/compactmarkersTRUE, oldCustomplaceholderFALSE; no usertaskdata or secretsread/mutations and no processesstopped/restartedbyagent (8888untouched). UserconfirmedfreshreloadoldCustomgone; initialsourceTagsleftacknowledgedcorrected. Docsclarifybuild/restart/browserreload+actions. Independentreadonlyreview SIGNOFF lowselectionlabeladdressed; no repoGit/index/stage/commit/push/worktree/RESTshapechanges. Logs target/dev98-search-20261009/. Remaining:no scopedblocker; Git-capable/Windows/remoteCI/physicalscreenreader/otherbrowser notclaimed. Guidance:no agentpolicycorrection; helpusage clarified.'
 description: The Tasks (and probably other) filters panel has a field for "custom filters" which should already be covered by the normal search bar, so this one can probably be removed.
+history:
+- at: 2026-10-09T19:01:10.287853+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-09T19:01:10.325190+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T20:38:57.466029+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T20:38:57.489555+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-09T20:56:43.675233+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-09T20:56:43.710154+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T21:28:58.647519+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T22:05:23.227202+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T22:05:23.250794+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

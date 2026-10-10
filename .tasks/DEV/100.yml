@@ -1,0 +1,36 @@
+title: Integrate LoTaR branding in the app, favicon, and README
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-09T22:59:09.833741+00:00
+modified: 2026-10-09T23:28:04.870878+00:00
+comments:
+- date: 2026-10-09T23:00:26.913093+00:00
+  text: 'Plan: use current userSVGmaster (latestwordmarkalignmentpreserved) in theme-aware appheader nextglobalNewTask, derive light-inkdark variant without altering originals, linkSVGappiconfavicon+providedICO fallback, putmatchinglight/darklogo inREADMEintro retainingbadges/tagline/content. No PWA/manifest/extra generatedraster beyondsuppliedfiles. Fixpackaging: nontextICO/binary assets currentlyomittedbycompress-web andwebserver onlyembeddedgzlookup; preservebinaryexactbytes+embedraw serving/MIME, trackactualembedinput inbuildscript, preservetextcompression/isolation/servingprecedence/Gitcapabilityprobes. Addunit/App+assetpacking andactualembeddedHTTP/faviconbyte/header lightdark/mobile/system/override screenshot regressions, no task/form/query/backendDTOshape changes. Targetedchecks andalllint/nativeRust/UI/freshsmoke/release beforeDone. No repoGit/index/status/diff/log/version/commit/push/worktree ops, userprocessesleftuntouched; only DEV100 tracking.'
+- date: 2026-10-09T23:10:42.399922+00:00
+  text: 'Progress: themedheader/masterlight+derivedlight-inkdarkSVG, SVG+ICOlinkVitehashes, READMEpictureintro wired(originalassetcurrent114.5 alignment preserved). App11tests/typecheckgreen. Assetchild packAssets preservesrawbinary+gztext, rawembedHTTPpath/MIME, actualembedwatch/coldmkdir addedkeepingGitcap probes; nodepacking8/8/web MIME4/4/clippylib clean. Workflowviolationdisclosed: childreportsone git status incheckchainagainstcheckout despiteNoGit instruction; no staging/commit/Git-writecommandsreported. Statusmayrefreshindexmetadata, notindependentlyinspected; no furtherGit commandsauthorizedorusedbycoordinator. RecordnotblanketNoGitcomplianceclaim. Remaining actualembeddedHTTP exactfaviconbytes/gzip andlight-dark/mobile/themeoverride screenshots/fullgates/release/source-review. No sourcecontract/API/Taskeditor/query changes.'
+- date: 2026-10-09T23:28:04.844472+00:00
+  text: 'Outcome: suppliedlogo integratedasaccessiblehomebrandbesideunchangedglobalNewTask; primarymasterunalteredlatest114.5alignment, derivedlight-inkdarkSVGgeometrypreserved, CSSsystem+explicitoverride picksonevisibleimage. MatchingREADMEintro<h1><picture> light/darkSVGs width320/altLoTaR keepsbadges/tagline/content. Providedgreen-whiteappSVGfavicon+ICOcompatibilitylinks hashed/no-inline, oldunreferencedgenericview/favicon.svg retired. BinaryICOandotherVitebinaryfiles nowembedraw exact whiletextgzip once, rawlookup+ICO/WEBPMIME, raw/embed/packscript rebuildtracking/coldmkdir, Gitcapabilityprobes/cache/pathprecedence unchanged. Evidence:App2newcases11green; MIME4newRust tests;3newactualsmoke identity/gzip exactSVG/ICO bytes noFSfallback and2viewport4OS/override modes/logo-naturalWidth/NewTaskContext/no writes/home navigation;nodepacking8pass (3new) tempinclstale/gzdecoys/nestedUnicode/rawbytes. Browserfirst2themefailurescaughtpartial:global selector compiledtohtml display; fullglobalSelector fixed->5targetbrand/globalgreen and4headerscreenshotsinspected. Full lintclean alltargetsfeaturesClippy-Dwarnings/types/fmt;1330Rustpass45existingGit-dependent exclusions;718UIpass70files;236freshsmokegreen25Git skips57passed6skippedfiles. Initialfullsmoke1existingDEV98Alpha readinessinstant-countfailure correctedtoobservedpositivepoll samebudget, no sourcequery/concurrency/exclusion weakening. Releasewarningfree built;finalunreferencedfavicon deletionverifiedfrontbuild+SVGxml valid. Logs target/dev100-branding-20261009/, screenshots target/smoke-artifacts/branding/. Independentreadonlyreview SIGNOFFlowdeadassetaddressed. Remaining:no scopedblocker; Windows/remoteCI/physicalreader/otherbrowser notclaimed, PWA/appleiconsoutofscope. Existingembeddedserversmustrestartandbrowserreloadtonewrelease; nouserprocessoperated. Workflowviolationretained/disclosed: assetworkerreportsone git status despiteNoGitrestriction; no staging/commit/Git-writecommandsreported, optionalindexrefreshnotinspected; coordinator/reviewerusednoGitcommands, no blanketcomplianceclaim. No sourceuserdata/API/taskeditor/querycontracts altered. Guidance:no agentpolicy/instructionfinding.'
+history:
+- at: 2026-10-09T23:00:26.913093+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T23:10:42.399922+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T23:28:04.844472+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-09T23:28:04.870878+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    new: mallox

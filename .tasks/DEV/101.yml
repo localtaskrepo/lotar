@@ -1,0 +1,21 @@
+title: Repair QA timezone, Windows locking, and smoke concurrency failures
+status: InProgress
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-09T23:47:49.776890+00:00
+modified: 2026-10-10T00:08:47.454980+00:00
+comments:
+- date: 2026-10-09T23:49:18.154597+00:00
+  text: 'Plan: readyfixesforusernextcommit only(no stage/commit/push/checkout). Preserve45already-stagedbranding/filter files andindex; addonlyCIrelevantworktreehunks. ConfirmedmainQA37864256299@5ddf077: timezonewrongassert(query_predicates...X1duetomorrowcorrecttodayonUTCrollover), WinOS33lockcontentionclassifiedUncategorizednotWouldBlock(no retry), 2smoke timeouts reloadtwosessions/livejobcard. Fixwithouttimeout increases/retries/skips/coverage-gate weakening. Reproduce UTCtest+platformneutralfs2contention, inspectactualnetworkidle/preconnect andSSEstartup/snapshot race withdeterministicpublic-boundarytests; preservelock->journal->callback/force safety andtaskAPIcontracts. Windowsmissingportable-artifact secondaryskip guardcorrectonlyifteststepnotattempted, missingafterattemptmuststillfail. Targetednextest/node/UI/browser &fulllint/Rust/UI/freshsmoke, runtimeGit exclusions explicit, Windowsactualrunnotclaimed. Allread-onlyGitinspection alloweduserclarification; no Gitstatechangingopsoruserprocesschanges.'
+- date: 2026-10-10T00:08:47.454980+00:00
+  text: 'Progress: UTCfailure reproduced1red(date rollover X1) thenexpectedDatebucketcorrectedTESTONLY, UTC/LA/Tokyo allgreen; no runtimequery change. Win33contentionclassifierredonhost withexplicitfs2NativeMarker then17storage/dategreen,2sec/10ms/journal/callback/temp ordering intact. Parentreadonlyreview verifiedfs2Windowserror33native source/Unixalias andUTCmath/reportguard; foundwrongserde_yaml crate innewworkflowtest, fixedserde_yaml_ng beforefullgates. Windows portable report stepid+always/attempted-only guard andstrictmissing-after-attempt contracttest added(no qualitygate weakening). Its first compileoverlappednetworkchild transientE0596 webserver helper/newimports; no testpassclaim, parentwillrerunafterchildcomplete. Existing45stagedfiles retainedindexunchanged; newfixesunstaged/usernextcommitno stage/commit/push. Remainingnetworkidle/preconnect/SSEsnapshot smoke rootcause/repairownedchild then source review/fullgates, actualWindows/Gitcapability/remoteCI limits explicit.'
+history:
+- at: 2026-10-09T23:49:18.154597+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T00:08:47.454980+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

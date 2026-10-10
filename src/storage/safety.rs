@@ -55,6 +55,11 @@ pub fn sprint_lock_name() -> &'static str {
     SPRINT_LOCK_NAME
 }
 
+fn is_lock_contention(error: &std::io::Error, native_code: Option<i32>) -> bool {
+    error.kind() == std::io::ErrorKind::WouldBlock
+        || native_code.is_some_and(|code| error.raw_os_error() == Some(code))
+}
+
 /// Acquire an exclusive advisory directory lock, retrying contention for up
 /// to two seconds. The returned file owns the lock; dropping it releases the
 /// lock on success, error, or panic. The lock file itself must not be removed.
@@ -68,10 +73,11 @@ pub fn acquire_storage_lock(target_dir: &Path, lock_name: &str) -> std::io::Resu
             lock_path.display()
         )))?;
     let start = Instant::now();
+    let contention_code = fs2::lock_contended_error().raw_os_error();
     loop {
         match file.try_lock_exclusive() {
             Ok(()) => return Ok(file),
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(e) if is_lock_contention(&e, contention_code) => {
                 if start.elapsed() >= Duration::from_secs(2) {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::WouldBlock,
@@ -321,6 +327,32 @@ mod tests {
         drop(held);
         with_storage_lock(dir.path(), "task", || Ok::<_, std::io::Error>(())).unwrap();
         assert!(orphan.exists());
+    }
+
+    #[test]
+    fn native_windows_lock_code_is_contention_even_without_would_block_kind() {
+        // fs2 uses ERROR_LOCK_VIOLATION (33), whose ErrorKind is not WouldBlock.
+        let error = std::io::Error::from_raw_os_error(33);
+        assert!(is_lock_contention(&error, Some(33)));
+    }
+
+    #[test]
+    fn contention_matches_only_would_block_or_the_platform_native_code() {
+        let platform = fs2::lock_contended_error();
+        assert!(is_lock_contention(&platform, platform.raw_os_error()));
+        assert!(is_lock_contention(
+            &std::io::Error::new(std::io::ErrorKind::WouldBlock, "busy"),
+            None,
+        ));
+        assert!(!is_lock_contention(
+            &std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"),
+            Some(33),
+        ));
+        assert!(!is_lock_contention(&std::io::Error::other("unknown"), None));
+        assert!(!is_lock_contention(
+            &std::io::Error::from_raw_os_error(5),
+            Some(33)
+        ));
     }
 
     #[test]

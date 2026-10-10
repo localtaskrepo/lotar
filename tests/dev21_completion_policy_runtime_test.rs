@@ -616,8 +616,8 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
     // The stale `later` snapshot did not leak into the predicate.
     assert_eq!(ids, vec!["X-1"]);
 
-    // Same dues, later clock: tomorrow's instant is still soon, today's
-    // date-only value is no longer today when the local date rolled over.
+    // Same dues, later clock: on rollover the previous tomorrow is today,
+    // while the previous date-only today must no longer match.
     let later = now + Duration::hours(12);
     let mut tasks = vec![
         ("X-1".to_string(), dto(Some(due_tomorrow.clone()))),
@@ -634,7 +634,11 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
     let today_later = task_query::today_local(later);
     let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
     if today_later != today {
-        assert!(ids.is_empty(), "date rollover must re-bucket: {ids:?}");
+        assert_eq!(
+            ids,
+            vec!["X-1"],
+            "date rollover must re-bucket tomorrow into today"
+        );
     } else {
         assert_eq!(ids, vec!["X-2"]);
     }
