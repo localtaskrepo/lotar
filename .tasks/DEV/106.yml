@@ -1,0 +1,31 @@
+title: Refresh README screenshots for current branding and filter UI
+status: InProgress
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-10T21:22:12.028252+00:00
+modified: 2026-10-10T21:58:18.687713+00:00
+comments:
+- date: 2026-10-10T21:57:40.587288+00:00
+  text: 'Outcome: Partial refresh delivered:20 current-UI WebP shots (10 views light/dark) plus1280x640 social preview, using isolated synthetic Atlas data/current branding/global Add task/search-help toolbar. README keeps existing image paths and documents explicit --no-git partial mode. Capture tooling now owns unique canonical temp roots (no shared /tmp wipe), selects demo project explicitly, reuses one context/page for theme capture/encoding/social, resets per-navigation storage, waits finished/failed finite requests excluding live EventSource, and isolates inherited GIT_*/LOTAR_* state in seeding/server/terminal. Default Git-backed demo semantics preserved; no fake commits/worktrees/model calls. Evidence: node --check both runtime scripts;10 Node tests pass (2 durable demo-environment regressions+8 packer cases); actual npm run screenshots -- --no-git succeeded, final node capture after safeguards succeeded in one run;20 images decoded/inspected and ffprobe verified2880x1800, social1280x640;18 localREADME refs exist;mtime provenance confirms finalruntime edits precede light pass and whole dark pass follows light; readonly git diff confirms agents2/hero1/task-commits2/terminal1 unchanged. Logs target/dev106-20261010/capture{,-documented,-final}.log and early failure evidence retained; independent capture review and safeguard follow-up no blockers, fullGit path static-only. Remaining: defaultfull capture failed at git init (.git Operation not permitted). Agent2, hero1 and commit-history2 images are NOT refreshed; terminalGIF also intentionally preserved. Exact next step in Git-capable environment: npm run screenshots, inspect these outputs and reconcile DEV-106. Keep task open/Blocked until full media accepted; no nativeWindows/remoteCI/fullGit capture claim. Application source unchanged; docs/capture-only relevant behavior checks performed instead of rerunning full app gates. No repository Git mutations/user-server restarts; all changes uncommitted. Guidance: no durable instruction finding.'
+- date: 2026-10-10T21:58:18.687713+00:00
+  text: 'Status reconciliation: Blocked is not enabled in current DEV workflow (Todo/InProgress/NeedsReview/Done); attempted transition was rejected without mutation. Keep DEV-106 InProgress with the exact Git-capable capture step above, not Done or NeedsReview. The blocker is environmental, not pending human code review.'
+description: Regenerate README-referenced UI assets in light/dark themes and agent hero recording from isolated synthetic demo data; inspect output and preserve honest git-history/worktree demonstrations. Reuse existing capture tooling, update stale selectors/project routes or unsafe temp assumptions only as needed. Verify README asset references, image dimensions/content, and capture behavior; keep repository Git state and user servers untouched.
+history:
+- at: 2026-10-10T21:22:18.493101+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-10T21:57:40.587288+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T21:58:18.687713+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

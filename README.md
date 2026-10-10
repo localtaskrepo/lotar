@@ -211,7 +211,9 @@ history:
 
 ## Contributing
 
-Bug reports and pull requests are welcome in [issues](https://github.com/localtaskrepo/lotar/issues); report security problems through a [private advisory](https://github.com/localtaskrepo/lotar/security/advisories/new). Development setup, test commands, and conventions are in [AGENTS.md](AGENTS.md) and [docs/developers/](docs/developers/README.md). After UI changes, `npm run screenshots` regenerates every image in this README.
+Bug reports and pull requests are welcome in [issues](https://github.com/localtaskrepo/lotar/issues); report security problems through a [private advisory](https://github.com/localtaskrepo/lotar/security/advisories/new). Development setup, test commands, and conventions are in [AGENTS.md](AGENTS.md) and [docs/developers/](docs/developers/README.md). After UI changes, `npm run screenshots` regenerates every image in this README using an isolated demo workspace.
+
+Full regeneration needs a Git-capable environment. `npm run screenshots -- --no-git` refreshes the non-Git UI screenshots while preserving the existing agent, hero, commit-history and terminal media.
 
 ## License
 

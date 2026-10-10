@@ -20,6 +20,20 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const STUB_AGENT_SCRIPT = path.join(HERE, 'stub-agent.mjs');
 export const DEMO_PROJECT = 'ATLS';
 
+export function demoEnvironment(dir, inherited = process.env) {
+    const env = { ...inherited };
+    for (const key of Object.keys(env)) {
+        if (key.startsWith('GIT_') || key.startsWith('LOTAR_')) delete env[key];
+    }
+    return {
+        ...env,
+        LOTAR_IGNORE_HOME_CONFIG: '1',
+        LOTAR_TASKS_DIR: path.join(dir, '.tasks'),
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: path.join(dir, '.demo', 'gitconfig'),
+    };
+}
+
 const PEOPLE = {
     priya: { name: 'Priya Natarajan', email: 'priya@atlas.example' },
     marco: { name: 'Marco Bianchi', email: 'marco@atlas.example' },
@@ -313,10 +327,10 @@ function writeLauncher(dir) {
 /**
  * Seed the demo workspace into `dir` (created or replaced).
  *
- * @param {{ dir: string, bin: string, now?: number, log?: (msg: string) => void }} opts
+ * @param {{ dir: string, bin: string, now?: number, log?: (msg: string) => void, gitHistory?: boolean }} opts
  * @returns {{ dir: string, project: string, ids: Record<string, string>, holdFile: string }}
  */
-export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {} }) {
+export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {}, gitHistory = true }) {
     if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
 
@@ -325,15 +339,7 @@ export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {} }
     const seedStart = Date.now() - 1000;
     const tasksDir = path.join(dir, '.tasks');
 
-    const baseEnv = {
-        ...process.env,
-        LOTAR_IGNORE_HOME_CONFIG: '1',
-        LOTAR_TASKS_DIR: tasksDir,
-        GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_GLOBAL: path.join(dir, '.demo', 'gitconfig'),
-    };
-    delete baseEnv.LOTAR_PROJECT;
-    delete baseEnv.LOTAR_DEFAULT_PROJECT;
+    const baseEnv = demoEnvironment(dir);
 
     const git = (args, extraEnv = {}) => {
         const res = spawnSync('git', args, { cwd: dir, env: { ...baseEnv, ...extraEnv }, encoding: 'utf8' });
@@ -369,6 +375,7 @@ export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {} }
     };
 
     const commit = (actor, whenMs, message) => {
+        if (!gitHistory) return;
         git(['add', '-A']);
         const staged = spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: dir, env: baseEnv });
         if (staged.status === 0) return;
@@ -387,7 +394,7 @@ export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {} }
     // --- repository skeleton -------------------------------------------------
     mkdirSync(path.join(dir, '.demo'), { recursive: true });
     writeFileSync(path.join(dir, '.demo', 'gitconfig'), '[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n');
-    git(['init', '-q', '-b', 'main']);
+    if (gitHistory) git(['init', '-q', '-b', 'main']);
     writeFileSync(path.join(dir, '.gitignore'), '.demo/\n*.lock\n.tasks/**/*.context\n');
     for (const [rel, body] of Object.entries(SOURCE_FILES)) {
         mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
@@ -437,7 +444,7 @@ export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {} }
                 return `${ids[t.key]}: link ${url}`;
             });
         });
-        (t.code ?? []).forEach((code) => {
+        (gitHistory ? t.code ?? [] : []).forEach((code) => {
             add(at((t.flow?.[0]?.[0] ?? t.created) + 0.2, 16, 30), t.assignee ?? t.reporter, `${t.key}: code`, () => {
                 lotar(t.assignee ?? t.reporter, ['task', 'reference', 'add', 'code', ids[t.key], code]);
                 return `${ids[t.key]}: reference ${code}`;
@@ -514,7 +521,7 @@ export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {} }
       DEMO_AGENT_HOLD_FILE: ${JSON.stringify(holdFile)}
 agent:
   worktree:
-    enabled: true
+    enabled: ${gitHistory}
     dir: ${JSON.stringify(worktrees)}
     max_parallel_jobs: 2
 `);
