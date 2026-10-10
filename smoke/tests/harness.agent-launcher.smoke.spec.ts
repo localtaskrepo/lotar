@@ -6,7 +6,10 @@ import process from 'node:process';
 import { describe, expect, it } from 'vitest';
 import {
     GATE_AGENT_SCRIPT,
+    HOSTILE_PROMPT,
+    ensureAgentWrapper,
     createFixtureAgents,
+    createGateFixture,
     nodeExecutable,
     windowsLauncherContent,
 } from '../helpers/agent-fixtures.js';
@@ -297,6 +300,308 @@ describe('agent fixture launcher Windows counterfactuals', () => {
             );
             await agents.dispose();
             await fs.remove(dir).catch(() => undefined);
+        }
+    });
+});
+
+// DEV-101 end-to-end regressions: the REAL lotar-agent-wrapper must deliver a
+// complete multiline prompt (LF/CR, quotes, percent signs, cmd metacharacters,
+// spaces in every path) to an agent whose configured command is a Windows
+// batch forwarder. Rust std refuses to spawn .cmd/.bat children with such
+// arguments ("batch file arguments are invalid"), so the wrapper resolves
+// recognized shims (npm cmd-shims and LoTaR's own fixture forwarder) to the
+// executable they forward to and spawns that directly. These tests run the
+// actual wrapper binary on every platform: before the fix the .cmd child
+// fails to spawn on both Windows (std batch rejection) and Unix (exec format
+// error), after it the fixture boots and receives the prompt byte-exact.
+
+const NPM_CMD_SHIM_LINES = [
+    '@ECHO off',
+    'GOTO start',
+    ':find_dp0',
+    'SET dp0=%~dp0',
+    'EXIT /b',
+    ':start',
+    'SETLOCAL',
+    'CALL :find_dp0',
+    '',
+    'IF EXIST "%dp0%\\node.exe" (',
+    '  SET "_prog=%dp0%\\node.exe"',
+    ') ELSE (',
+    '  SET "_prog=node"',
+    '  SET PATHEXT=%PATHEXT:;.JS;=;%',
+    ')',
+    '',
+];
+
+/** Byte-accurate npm `cmd-shim` output for a `#!/usr/bin/env node` bin. */
+function npmCmdShimContent(target: string): string {
+    const lines = [
+        ...NPM_CMD_SHIM_LINES,
+        `endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "${target}" %*`,
+    ];
+    return `${lines.join('\r\n')}\r\n`;
+}
+
+interface BootSentinel {
+    readonly pid: number;
+    readonly platform: string;
+    readonly argv: string[];
+}
+
+async function readBootSentinel(gateDir: string, label: string): Promise<BootSentinel> {
+    const raw = await fs.readFile(path.join(gateDir, `boot-${label}.sentinel`), 'utf8');
+    return JSON.parse(raw) as BootSentinel;
+}
+
+describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
+    it('wrapper resolves an npm cmd shim and delivers the hostile prompt byte-exact', async () => {
+        const gate = await createGateFixture('lotar-smoke-gate-shim-');
+        const shimDir = path.join(
+            tmpdir(),
+            `lotar smoke shim dir-${process.pid}-${Date.now().toString(36)}`,
+        );
+        const targetRel = path.join('node_modules', 'lotar-test-agent', 'gate-agent.mjs');
+        await fs.ensureDir(path.join(shimDir, path.dirname(targetRel)));
+        await fs.copy(GATE_AGENT_SCRIPT, path.join(shimDir, targetRel));
+        const shimPath = path.join(shimDir, 'lotar-test-agent.cmd');
+        await fs.writeFile(
+            shimPath,
+            npmCmdShimContent('%dp0%\\node_modules\\lotar-test-agent\\gate-agent.mjs'),
+            'utf8',
+        );
+        const wrapper = await ensureAgentWrapper();
+
+        try {
+            const child = spawn(
+                wrapper,
+                [
+                    '--job-id',
+                    'dev101-shim',
+                    '--ticket-id',
+                    'TEST-1',
+                    '--runner',
+                    'copilot',
+                    '--',
+                    shimPath,
+                    '-p',
+                    '--output-format',
+                    'stream-json',
+                    '--input-format',
+                    'stream-json',
+                    '--mode',
+                    'plain',
+                    '--gate-dir',
+                    gate.dir,
+                    '--label',
+                    'shim',
+                    '--hold-ms',
+                    '15000',
+                    HOSTILE_PROMPT,
+                ],
+                { stdio: ['ignore', 'ignore', 'pipe'] },
+            );
+            const exit = awaitExit(child);
+
+            try {
+                await gate.waitForStarted('shim', 10_000);
+            } catch (error) {
+                const outcome = await exit;
+                throw new Error(
+                    `${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`,
+                );
+            }
+
+            const boot = await readBootSentinel(gate.dir, 'shim');
+            expect(boot.argv[boot.argv.length - 1]).toBe(HOSTILE_PROMPT);
+            const gateDirIndex = boot.argv.indexOf('--gate-dir');
+            expect(gateDirIndex).toBeGreaterThan(-1);
+            expect(boot.argv[gateDirIndex + 1]).toBe(gate.dir);
+            expect(path.resolve(boot.argv[1])).toBe(path.resolve(path.join(shimDir, targetRel)));
+
+            await gate.release();
+            const outcome = await exit;
+            expect(outcome.code).toBe(0);
+            await gate.waitForCompleted('shim', 10_000);
+        } finally {
+            await fs.writeFile(path.join(gate.dir, 'release.sentinel'), `${process.pid}\n`).catch(
+                () => undefined,
+            );
+            await gate.dispose();
+            await fs.remove(shimDir).catch(() => undefined);
+        }
+    });
+
+    it('wrapper resolves the fixture cmd launcher and delivers the same prompt', async () => {
+        const gate = await createGateFixture('lotar-smoke-gate-fwd-');
+        const fixtureArgs = gate.agentArgs({ mode: 'plain', label: 'fwd' });
+        const launcherDir = path.join(
+            tmpdir(),
+            `lotar smoke agents fwd-${process.pid}-${Date.now().toString(36)}`,
+        );
+        await fs.ensureDir(launcherDir);
+        const launcher = path.join(launcherDir, 'agent-launcher.cmd');
+        await fs.writeFile(
+            launcher,
+            windowsLauncherContent(GATE_AGENT_SCRIPT, fixtureArgs),
+            'utf8',
+        );
+        const wrapper = await ensureAgentWrapper();
+
+        try {
+            const child = spawn(
+                wrapper,
+                [
+                    '--job-id',
+                    'dev101-fwd',
+                    '--ticket-id',
+                    'TEST-1',
+                    '--runner',
+                    'copilot',
+                    '--',
+                    launcher,
+                    '-p',
+                    '--output-format',
+                    'stream-json',
+                    '--input-format',
+                    'stream-json',
+                    ...fixtureArgs,
+                    HOSTILE_PROMPT,
+                ],
+                { stdio: ['ignore', 'ignore', 'pipe'] },
+            );
+            const exit = awaitExit(child);
+
+            try {
+                await gate.waitForStarted('fwd', 10_000);
+            } catch (error) {
+                const outcome = await exit;
+                throw new Error(
+                    `${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`,
+                );
+            }
+
+            const boot = await readBootSentinel(gate.dir, 'fwd');
+            expect(boot.argv).toContain(HOSTILE_PROMPT);
+            expect(path.resolve(boot.argv[1])).toBe(path.resolve(GATE_AGENT_SCRIPT));
+            const gateDirValues = boot.argv
+                .map((arg, index) => (arg === '--gate-dir' ? boot.argv[index + 1] : undefined))
+                .filter((value): value is string => value !== undefined);
+            expect(gateDirValues[gateDirValues.length - 1]).toBe(gate.dir);
+
+            await gate.release();
+            const outcome = await exit;
+            expect(outcome.code).toBe(0);
+            await gate.waitForCompleted('fwd', 10_000);
+        } finally {
+            await fs.writeFile(path.join(gate.dir, 'release.sentinel'), `${process.pid}\n`).catch(
+                () => undefined,
+            );
+            await gate.dispose();
+            await fs.remove(launcherDir).catch(() => undefined);
+        }
+    });
+
+    it('wrapper appends the baked shim suffix after the forwarded argv (baked wins conflicts)', async () => {
+        const gate = await createGateFixture('lotar-smoke-gate-suffix-');
+        const wrongDir = path.join(
+            tmpdir(),
+            `lotar smoke wrong gate-${process.pid}-${Date.now().toString(36)}`,
+        );
+        await fs.ensureDir(wrongDir);
+        const bakedArgs = gate.agentArgs({ mode: 'plain', label: 'conflict' });
+        const launcherDir = path.join(
+            tmpdir(),
+            `lotar smoke agents suffix-${process.pid}-${Date.now().toString(36)}`,
+        );
+        await fs.ensureDir(launcherDir);
+        const launcher = path.join(launcherDir, 'agent-launcher.cmd');
+        await fs.writeFile(launcher, windowsLauncherContent(GATE_AGENT_SCRIPT, bakedArgs), 'utf8');
+        const wrapper = await ensureAgentWrapper();
+
+        try {
+            const child = spawn(
+                wrapper,
+                [
+                    '--job-id',
+                    'dev101-suffix',
+                    '--ticket-id',
+                    'TEST-1',
+                    '--runner',
+                    'copilot',
+                    '--',
+                    launcher,
+                    '-p',
+                    '--output-format',
+                    'stream-json',
+                    '--input-format',
+                    'stream-json',
+                    '--mode',
+                    'copilot',
+                    '--gate-dir',
+                    wrongDir,
+                    '--label',
+                    'wronglabel',
+                    '--hold-ms',
+                    '999999',
+                    HOSTILE_PROMPT,
+                ],
+                { stdio: ['ignore', 'ignore', 'pipe'] },
+            );
+            const exit = awaitExit(child);
+
+            try {
+                await gate.waitForStarted('conflict', 10_000);
+            } catch (error) {
+                const outcome = await Promise.race([
+                    exit,
+                    new Promise<null>((resolve) => {
+                        setTimeout(() => resolve(null), 1_000);
+                    }),
+                ]);
+                const detail = outcome
+                    ? `; wrapper exit=${outcome.code} stderr=${outcome.stderr}`
+                    : '';
+                throw new Error(`${(error as Error).message}${detail}`);
+            }
+
+            const boot = await readBootSentinel(gate.dir, 'conflict');
+            const argv = boot.argv;
+            expect(path.resolve(argv[1])).toBe(path.resolve(GATE_AGENT_SCRIPT));
+            expect(argv).toContain(HOSTILE_PROMPT);
+
+            const valuesFor = (flag: string): string[] =>
+                argv
+                    .map((arg, index) => (arg === flag ? argv[index + 1] : undefined))
+                    .filter((value): value is string => value !== undefined);
+            expect(valuesFor('--gate-dir')).toEqual([wrongDir, gate.dir]);
+            expect(valuesFor('--label')).toEqual(['wronglabel', 'conflict']);
+            expect(valuesFor('--mode')).toEqual(['copilot', 'plain']);
+
+            const promptIndex = argv.indexOf(HOSTILE_PROMPT);
+            const lastModeIndex = argv.lastIndexOf('--mode');
+            expect(promptIndex).toBeGreaterThan(-1);
+            expect(lastModeIndex).toBeGreaterThan(promptIndex);
+
+            await gate.release();
+            const outcome = await exit;
+            expect(outcome.code).toBe(0);
+            await gate.waitForCompleted('conflict', 10_000);
+
+            const wrongSentinels = fs
+                .readdirSync(wrongDir)
+                .filter((entry) => entry.endsWith('.sentinel'));
+            expect(wrongSentinels).toEqual([]);
+        } finally {
+            await fs.writeFile(path.join(gate.dir, 'release.sentinel'), `${process.pid}\n`).catch(
+                () => undefined,
+            );
+            await fs.writeFile(path.join(wrongDir, 'release.sentinel'), `${process.pid}\n`).catch(
+                () => undefined,
+            );
+            await gate.dispose();
+            await fs.remove(wrongDir).catch(() => undefined);
+            await fs.remove(launcherDir).catch(() => undefined);
         }
     });
 });

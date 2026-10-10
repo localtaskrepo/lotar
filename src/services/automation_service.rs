@@ -1003,47 +1003,266 @@ fn execute_run_action(
             )));
         }
     } else {
-        // Async: spawn, then monitor in a background thread for logging.
+        // Async: spawn, then monitor in background threads for logging.
         // Keep detached commands independent of the caller's stdio handles.
-        // The monitor drains captured stderr while waiting, so a chatty child
-        // cannot deadlock on a full pipe before its exit is observed.
+        // stdin/stdout are NUL and stderr is captured by a pipe that a
+        // dedicated reader drains while the exit is awaited, so a chatty
+        // child cannot deadlock on a full pipe before its exit is observed.
+        //
+        // Windows additionally needs the child to not inherit THIS
+        // process's own stdio pipe write ends: see
+        // `windows_async_stdio::detach_stdio_for_async_children`.
+        #[cfg(windows)]
+        windows_async_stdio::detach_stdio_for_async_children();
         cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::piped());
         let child = cmd.spawn().map_err(|e| {
             LoTaRError::ValidationError(format!("Failed to spawn async run command: {e}"))
         })?;
-        let task_id = task.id.clone();
-        std::thread::spawn(move || {
-            match child.wait_with_output() {
-                Ok(output) if !output.status.success() => {
-                    let status = output.status;
-                    let stderr_output = String::from_utf8_lossy(&output.stderr);
-                    if stderr_output.is_empty() {
-                        eprintln!(
-                            "[lotar][warn] Async automation run for task {} exited with {}",
-                            task_id, status
-                        );
-                    } else {
-                        eprintln!(
-                            "[lotar][warn] Async automation run for task {} exited with {}: {}",
-                            task_id,
-                            status,
-                            stderr_output.trim()
-                        );
-                    }
-                }
-                Err(e) => {
-                    eprintln!(
-                        "[lotar][warn] Async automation run for task {} failed to complete: {}",
-                        task_id, e
-                    );
-                }
-                _ => {} // success — nothing to log
-            }
-        });
+        spawn_async_run_monitor(child, task.id.clone());
     }
     Ok(())
+}
+
+/// Bounded stderr retained for async run failure logging.
+const ASYNC_STDERR_LOG_LIMIT: usize = 8 * 1024;
+
+/// How long the monitor waits for stderr EOF after the async child exits.
+/// A descendant that inherited the pipe's write end keeps EOF away for its
+/// own lifetime; the monitor must report without following it.
+const ASYNC_STDERR_EOF_GRACE: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Bounded byte buffer keeping the final `limit` bytes and counting what
+/// was dropped from the front, so logged stderr can say how much was
+/// skipped instead of growing without bound.
+#[derive(Default)]
+struct BoundedTail {
+    data: Vec<u8>,
+    dropped: usize,
+    limit: usize,
+}
+
+impl BoundedTail {
+    fn new(limit: usize) -> Self {
+        Self {
+            data: Vec::new(),
+            dropped: 0,
+            limit,
+        }
+    }
+
+    fn push(&mut self, bytes: &[u8]) {
+        if self.limit == 0 {
+            self.dropped += bytes.len();
+            return;
+        }
+        self.data.extend_from_slice(bytes);
+        if self.data.len() > self.limit {
+            let overflow = self.data.len() - self.limit;
+            self.data.drain(..overflow);
+            self.dropped += overflow;
+        }
+    }
+
+    fn snapshot(&self) -> String {
+        let mut text = String::from_utf8_lossy(&self.data).into_owned();
+        if self.dropped > 0 && !self.data.is_empty() {
+            text.insert_str(0, &format!("[+{} earlier stderr bytes]\n", self.dropped));
+        }
+        text
+    }
+}
+
+/// Monitor a fire-and-forget automation child: one reader thread drains
+/// stderr concurrently (so pipe backpressure can never wedge the child
+/// while it runs), while this thread observes the exit and then waits at
+/// most [`ASYNC_STDERR_EOF_GRACE`] for EOF. If the pipe stays open past
+/// the child's exit — a descendant inherited its write end — the monitor
+/// logs the bounded tail collected so far instead of blocking until that
+/// descendant exits.
+fn spawn_async_run_monitor(mut child: std::process::Child, task_id: String) {
+    use std::io::Read;
+
+    let stderr = child.stderr.take();
+    let tail = std::sync::Arc::new(std::sync::Mutex::new(BoundedTail::new(
+        ASYNC_STDERR_LOG_LIMIT,
+    )));
+    let (eof_tx, eof_rx) = std::sync::mpsc::channel::<()>();
+    if let Some(mut stderr) = stderr {
+        let tail = std::sync::Arc::clone(&tail);
+        std::thread::spawn(move || {
+            let mut chunk = [0u8; 4096];
+            loop {
+                match stderr.read(&mut chunk) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => tail
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .push(&chunk[..n]),
+                }
+            }
+            let _ = eof_tx.send(());
+        });
+    } else {
+        let _ = eof_tx.send(());
+    }
+
+    std::thread::spawn(move || {
+        let status = match child.wait() {
+            Ok(status) => status,
+            Err(e) => {
+                eprintln!(
+                    "[lotar][warn] Async automation run for task {task_id} failed to complete: {e}"
+                );
+                return;
+            }
+        };
+        let drained = stderr_eof_within_grace(&eof_rx, ASYNC_STDERR_EOF_GRACE);
+        let stderr_text = tail.lock().unwrap_or_else(|e| e.into_inner()).snapshot();
+        let held_note = if drained {
+            ""
+        } else {
+            " (stderr pipe still open, likely held by a descendant; tail truncated)"
+        };
+        if !status.success() {
+            if stderr_text.trim().is_empty() {
+                eprintln!(
+                    "[lotar][warn] Async automation run for task {task_id} exited with {status}{held_note}"
+                );
+            } else {
+                eprintln!(
+                    "[lotar][warn] Async automation run for task {task_id} exited with {status}{held_note}: {}",
+                    stderr_text.trim()
+                );
+            }
+        } else if !drained {
+            eprintln!(
+                "[lotar][warn] Async automation run for task {task_id} exited successfully; a descendant still holds its stderr pipe"
+            );
+        }
+    });
+}
+
+/// EOF (or a vanished reader) counts as drained; a pipe that stays silent
+/// past `grace` is treated as held open by a descendant.
+fn stderr_eof_within_grace(
+    eof_rx: &std::sync::mpsc::Receiver<()>,
+    grace: std::time::Duration,
+) -> bool {
+    matches!(
+        eof_rx.recv_timeout(grace),
+        Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+    )
+}
+
+/// Windows stdio inheritance scope for fire-and-forget automation runs.
+///
+/// Stable `std` spawns Windows children through `CreateProcessW` with
+/// `bInheritHandles=TRUE` and cannot attach
+/// `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` (the `CommandExt` attribute APIs
+/// are nightly-only), so every child inherits ALL currently-inheritable
+/// handles of this process — including our own stdout/stderr pipe write
+/// ends, which whatever spawned us (Node/execa/libuv) created inheritable.
+/// A `wait: false` child then holds those write ends for its whole
+/// lifetime, and any observer awaiting OUR stdio EOF (execa resolves on
+/// `close` = exit + streams ended) blocks until the child exits: a
+/// fire-and-forget run silently couples the caller's return to the child.
+///
+/// Clearing `HANDLE_FLAG_INHERIT` on our own std slots removes exactly
+/// those handles from every future child. `Stdio::inherit` spawns keep
+/// working because std duplicates the std slot into a fresh inheritable
+/// handle at spawn time (`Stdio::to_handle` → `Handle::duplicate(0, true,
+/// DUPLICATE_SAME_ACCESS)`), so explicit inheritance never depended on
+/// the parent flag. Only this process's own handle-table entries change;
+/// no system-wide state is touched, and console handles that refuse the
+/// flag change are left as-is.
+#[cfg(windows)]
+mod windows_async_stdio {
+    use std::sync::Once;
+
+    type Handle = *mut core::ffi::c_void;
+
+    pub(super) const STD_OUTPUT_HANDLE: u32 = 0xFFFF_FFF5;
+    pub(super) const STD_ERROR_HANDLE: u32 = 0xFFFF_FFF4;
+    pub(super) const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetStdHandle(nStdHandle: u32) -> Handle;
+        fn SetHandleInformation(hObject: Handle, dwMask: u32, dwFlags: u32) -> i32;
+        #[cfg(test)]
+        fn GetHandleInformation(hObject: Handle, lpdwFlags: *mut u32) -> i32;
+        #[cfg(test)]
+        fn GetFileType(hObject: Handle) -> u32;
+    }
+
+    static DETACH_ONCE: Once = Once::new();
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(super) enum SlotDetach {
+        NoHandle,
+        Cleared,
+        NotClearable,
+    }
+
+    pub(super) fn clear_std_slot(slot: u32) -> SlotDetach {
+        // SAFETY: both calls take plain handle values; null and
+        // INVALID_HANDLE_VALUE mean "no such stdio slot".
+        unsafe {
+            let handle = GetStdHandle(slot);
+            if handle.is_null() || handle == usize::MAX as Handle {
+                return SlotDetach::NoHandle;
+            }
+            if SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) != 0 {
+                SlotDetach::Cleared
+            } else {
+                SlotDetach::NotClearable
+            }
+        }
+    }
+
+    /// Idempotent, process-lifetime detach of this process's own stdio
+    /// write ends from every future child's inherited handle set.
+    pub(super) fn detach_stdio_for_async_children() {
+        DETACH_ONCE.call_once(|| {
+            let _ = clear_std_slot(STD_OUTPUT_HANDLE);
+            let _ = clear_std_slot(STD_ERROR_HANDLE);
+        });
+    }
+
+    #[cfg(test)]
+    pub(super) fn std_slot_flags(slot: u32) -> Option<u32> {
+        // SAFETY: GetHandleInformation writes a u32 flags value.
+        unsafe {
+            let handle = GetStdHandle(slot);
+            if handle.is_null() || handle == usize::MAX as Handle {
+                return None;
+            }
+            let mut flags: u32 = 0;
+            if GetHandleInformation(handle, &mut flags) != 0 {
+                Some(flags)
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Windows `GetFileType` code for the std slot, so tests can separate
+    /// captured pipe stdio (the detach must verifiably succeed there) from
+    /// console/character handles (which legitimately refuse the flag
+    /// change). `FILE_TYPE_UNKNOWN` (0) covers absent handles too.
+    #[cfg(test)]
+    pub(super) fn std_slot_file_type(slot: u32) -> u32 {
+        // SAFETY: GetFileType returns a DWORD file-type code for the handle.
+        unsafe {
+            let handle = GetStdHandle(slot);
+            if handle.is_null() || handle == usize::MAX as Handle {
+                return 0;
+            }
+            GetFileType(handle)
+        }
+    }
 }
 
 /// Apply one automation action.
@@ -1865,5 +2084,143 @@ mod dev21_cross_root_dependency_tests {
             ),
             vec!["PX-2".to_string(), "PX-3".to_string()]
         );
+    }
+}
+
+#[cfg(test)]
+mod async_run_monitor_tests {
+    use super::*;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn bounded_tail_keeps_final_bytes_and_reports_dropped_prefix() {
+        let mut tail = BoundedTail::new(8);
+        tail.push(b"abcdefgh");
+        assert_eq!(tail.dropped, 0);
+        assert_eq!(tail.data, b"abcdefgh".to_vec());
+
+        tail.push(b"ijklmn");
+        assert_eq!(tail.data, b"ghijklmn".to_vec());
+        assert_eq!(tail.dropped, 6);
+
+        let snapshot = tail.snapshot();
+        assert!(
+            snapshot.contains("[+6 earlier stderr bytes]\n"),
+            "{snapshot}"
+        );
+        assert!(snapshot.ends_with("ghijklmn"), "{snapshot}");
+    }
+
+    #[test]
+    fn bounded_tail_zero_limit_drops_everything() {
+        let mut tail = BoundedTail::new(0);
+        tail.push(b"xyz");
+        assert_eq!(tail.dropped, 3);
+        assert!(tail.data.is_empty());
+        assert_eq!(tail.snapshot(), "");
+    }
+
+    #[test]
+    fn eof_grace_treats_closed_channel_as_drained_and_silence_as_held() {
+        // A live-but-silent pipe (descendant holds the write end) only
+        // waits out the grace period before being reported as held.
+        let (silent_tx, silent_rx) = mpsc::channel::<()>();
+        let start = Instant::now();
+        assert!(!stderr_eof_within_grace(
+            &silent_rx,
+            Duration::from_millis(50)
+        ));
+        assert!(
+            start.elapsed() >= Duration::from_millis(45),
+            "grace returned early: {:?}",
+            start.elapsed()
+        );
+
+        // A reader that finished (message sent, then channel closed) is
+        // drained, including the already-disconnected case.
+        drop(silent_tx);
+        assert!(stderr_eof_within_grace(
+            &silent_rx,
+            Duration::from_millis(1)
+        ));
+
+        let (tx, rx) = mpsc::channel::<()>();
+        tx.send(()).unwrap();
+        assert!(stderr_eof_within_grace(&rx, Duration::from_millis(1)));
+    }
+}
+
+/// Native Windows proof of the stdio-inheritance scope. Runs wherever the
+/// lib tests run on Windows; the end-to-end coupling regression lives in
+/// the portable smoke selection (`cli.automation` /
+/// `api.automation.smoke.spec.ts`).
+#[cfg(all(test, windows))]
+mod windows_async_stdio_tests {
+    use super::windows_async_stdio::{self as sys};
+
+    const FILE_TYPE_PIPE: u32 = 0x0003;
+
+    #[test]
+    fn detach_clears_inherit_bit_on_pipe_stdio() {
+        for (name, slot) in [
+            ("stdout", sys::STD_OUTPUT_HANDLE),
+            ("stderr", sys::STD_ERROR_HANDLE),
+        ] {
+            let file_type = sys::std_slot_file_type(slot);
+            let outcome = sys::clear_std_slot(slot);
+            let flags = sys::std_slot_flags(slot);
+            if file_type == FILE_TYPE_PIPE {
+                // Captured pipe stdio (nextest/CI): the detach must
+                // verifiably clear the bit. A refusal on a real pipe is a
+                // genuine failure and must not be silently accepted.
+                assert_eq!(
+                    outcome,
+                    sys::SlotDetach::Cleared,
+                    "{name} std slot is a pipe; detach refused (file_type={file_type:#x})"
+                );
+                assert_eq!(
+                    flags.unwrap_or(u32::MAX) & sys::HANDLE_FLAG_INHERIT,
+                    0,
+                    "{name} pipe std slot still inheritable after detach"
+                );
+            } else {
+                // Console/character handles legitimately refuse
+                // SetHandleInformation; interactive runs take this arm and
+                // only report/query consistency is enforced there.
+                match (outcome, flags) {
+                    (sys::SlotDetach::NoHandle, None) => {}
+                    (sys::SlotDetach::NotClearable, _) => {}
+                    (sys::SlotDetach::Cleared, Some(flags)) => {
+                        assert_eq!(
+                            flags & sys::HANDLE_FLAG_INHERIT,
+                            0,
+                            "{name} std slot still inheritable after detach"
+                        );
+                    }
+                    other => panic!(
+                        "{name}: inconsistent detach state {other:?} (file_type={file_type:#x})"
+                    ),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn detach_is_idempotent_across_calls() {
+        sys::detach_stdio_for_async_children();
+        let first = sys::clear_std_slot(sys::STD_OUTPUT_HANDLE);
+        let second = sys::clear_std_slot(sys::STD_OUTPUT_HANDLE);
+        assert_eq!(first, second);
+        // Clearing an already-cleared slot stays cleared (idempotent
+        // outcome, not a flip-flop of the inherit bit).
+        if let sys::SlotDetach::Cleared = second {
+            let flags = sys::std_slot_flags(sys::STD_OUTPUT_HANDLE);
+            assert_eq!(
+                flags.unwrap_or(0) & sys::HANDLE_FLAG_INHERIT,
+                0,
+                "repeat detach re-armed the inherit flag"
+            );
+        }
     }
 }

@@ -23,7 +23,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve, win32 } from 'node:path'
+import { dirname, join, posix, relative, resolve, sep, win32 } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { packAssets, targetDirPaths } from '../compress-web.mjs'
@@ -105,13 +105,28 @@ function writeFixture(web) {
   writeFileSync(join(web, 'assets', 'photo.webp'), WEBP_BYTES)
 }
 
+function treeRelativePath(root, full, paths = { relative, sep }) {
+  return paths.relative(root, full).split(paths.sep).join('/')
+}
+
+test('tree assertions normalize host separators without rewriting literal posix backslashes', () => {
+  assert.equal(
+    treeRelativePath('D:\\demo space', 'D:\\demo space\\assets\\branding\\图标.ico', win32),
+    'assets/branding/图标.ico',
+  )
+  assert.equal(
+    treeRelativePath('/demo space', '/demo space/assets/literal\\name.svg', posix),
+    'assets/literal\\name.svg',
+  )
+})
+
 function listTree(root) {
   const files = []
   const collect = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name)
       if (entry.isDirectory()) collect(full)
-      else files.push(full.slice(root.length + 1))
+      else files.push(treeRelativePath(root, full))
     }
   }
   collect(root)

@@ -67,8 +67,13 @@ interface AutomationSimulateResponse {
 // callbacks stall once the pipe buffer fills), then records the drained
 // byte count and a completed marker and exits 0. A --bound-ms leak guard
 // aborts with an explicit marker so a wedged pipe can never leak the
-// process — that is what makes both monitor shapes below deterministic
-// without fixed sleeps.
+// process — but on Windows that guard cannot fire while the wedge holds
+// (pipe writes are synchronous there, so a full pipe blocks the child's
+// whole event loop, watchdog timer included). The old-shape leg therefore
+// owns its bound in the PARENT: the monitor replica kills the child after
+// a guard window instead of waiting on the child-local watchdog, which is
+// what makes both legs below deterministic on every platform without
+// fixed sleeps, inflated timeouts, or skips.
 const CHATTY_STDERR_SCRIPT = `import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -165,6 +170,172 @@ function chattyArgs(markerDir: string, label: string, totalBytes: number, boundM
     ];
 }
 
+// Descendant-held stderr fixture for the async monitor's bounded-grace
+// contract. The primary writes --total-bytes of newline-free stderr
+// (callback-awaited, unique head/tail sentinels embedded first/last),
+// spawns a descendant with stderr INHERITED (so it holds the automation
+// monitor's pipe write end), waits for the descendant's holding marker,
+// then exits nonzero. The descendant writes nothing to stderr until it
+// OBSERVES the primary-exit marker; it then writes a probe record to the
+// inherited stderr and records delivered/EPIPE markers — the probe is the
+// binding proof that the write endpoint genuinely survives the primary
+// (an alive-marker alone cannot prove that). Finally it waits for the
+// owned release marker under a bounded leak guard and records
+// released/bailed on exit.
+//
+// Windows note: the descendant MUST be spawned `detached: true`. libuv
+// assigns every non-detached child of a Node process to that process's
+// private global job object (src/win/process.c, uv_spawn ->
+// AssignProcessToJobObject) created with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+// (uv__init_global_job_handle); when the primary exits, the job handle
+// closes and the kernel kills the descendant, closing the inherited write
+// end and delivering a premature EOF to the monitor. `detached: true`
+// skips the assignment so the descendant survives the primary on both
+// platforms (POSIX detached = new session, harmless here).
+const DESCENDANT_STDERR_SCRIPT = `import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+
+function parseArgs(argv) {
+    const parsed = {};
+    for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i];
+        if (['--role', '--marker-dir', '--label', '--total-bytes', '--head-sentinel', '--tail-sentinel', '--exit', '--release-file', '--hold-ms'].includes(arg)) {
+            const value = argv[i + 1];
+            if (value !== undefined) {
+                parsed[arg] = value;
+                i += 1;
+            }
+        }
+    }
+    return parsed;
+}
+
+function intOr(raw, fallback) {
+    const value = Number.parseInt(raw ?? '', 10);
+    return Number.isInteger(value) ? value : fallback;
+}
+
+function writeMarker(dir, name, text) {
+    try {
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(path.join(dir, name), \`\${text}\\n\`);
+    } catch {
+        // Best effort: markers must never crash the fixture.
+    }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const options = parseArgs(process.argv.slice(2));
+const role = options['--role'] ?? 'primary';
+const markerDir = path.resolve(options['--marker-dir'] ?? '.');
+const label = options['--label'] ?? 'held';
+const holdMs = intOr(options['--hold-ms'], 20000);
+const releaseFile = path.resolve(options['--release-file'] ?? path.join(markerDir, \`release-\${label}.marker\`));
+
+if (role === 'descendant') {
+    writeMarker(markerDir, \`descendant-holding-\${label}.marker\`, \`pid=\${process.pid}\`);
+    const deadline = Date.now() + holdMs;
+    // Wait for the primary to exit first: the probe below must prove the
+    // inherited write endpoint survives the primary's death.
+    const primaryExited = path.join(markerDir, \`primary-exited-\${label}.marker\`);
+    while (!existsSync(primaryExited) && Date.now() < deadline) {
+        await sleep(10);
+    }
+    const probe = \`\\nPROBE-\${label}-\${process.pid}-stderr-endpoint-alive\\n\`;
+    try {
+        process.stderr.write(probe, (err) => {
+            writeMarker(
+                markerDir,
+                err ? \`probe-epipe-\${label}.marker\` : \`probe-delivered-\${label}.marker\`,
+                String(err ?? 'ok'),
+            );
+        });
+    } catch (err) {
+        writeMarker(markerDir, \`probe-epipe-\${label}.marker\`, String(err));
+    }
+    while (!existsSync(releaseFile) && Date.now() < deadline) {
+        await sleep(25);
+    }
+    writeMarker(
+        markerDir,
+        existsSync(releaseFile) ? \`descendant-released-\${label}.marker\` : \`descendant-bailed-\${label}.marker\`,
+        \`pid=\${process.pid}\`,
+    );
+    process.exit(0);
+}
+
+const totalBytes = intOr(options['--total-bytes'], 32768);
+const chunkBytes = 4096;
+const headSentinel = options['--head-sentinel'] ?? \`HEAD-\${label}\`;
+const tailSentinel = options['--tail-sentinel'] ?? \`TAIL-\${label}\`;
+const exitCode = intOr(options['--exit'], 7);
+writeMarker(markerDir, \`primary-started-\${label}.marker\`, \`pid=\${process.pid}\`);
+
+const chunks = [];
+let offset = 0;
+while (offset < totalBytes) {
+    const size = Math.min(chunkBytes, totalBytes - offset);
+    let chunk = 'x'.repeat(size);
+    if (offset === 0) {
+        chunk = headSentinel + chunk.slice(headSentinel.length);
+    }
+    if (offset + size >= totalBytes) {
+        chunk = chunk.slice(0, size - tailSentinel.length) + tailSentinel;
+    }
+    chunks.push(chunk);
+    offset += size;
+}
+
+let finished = false;
+function finish() {
+    if (finished) {
+        return;
+    }
+    finished = true;
+    (async () => {
+        const holdingMarker = path.join(markerDir, \`descendant-holding-\${label}.marker\`);
+        const deadline = Date.now() + 5000;
+        while (!existsSync(holdingMarker) && Date.now() < deadline) {
+            await sleep(10);
+        }
+        writeMarker(markerDir, \`primary-exited-\${label}.marker\`, \`pid=\${process.pid}\`);
+        process.exit(exitCode);
+    })();
+}
+
+function afterPayload() {
+    const child = spawn(
+        process.execPath,
+        [
+            process.argv[1],
+            '--role', 'descendant',
+            '--marker-dir', markerDir,
+            '--label', label,
+            '--release-file', releaseFile,
+            '--hold-ms', String(holdMs),
+        ],
+        // detached is load-bearing on Windows: it skips libuv's global
+        // kill-on-parent-exit job assignment (see fixture comment).
+        { stdio: ['ignore', 'ignore', 'inherit'], detached: true },
+    );
+    child.on('error', () => finish());
+    child.on('spawn', () => finish());
+    setTimeout(() => finish(), Math.min(holdMs, 5000)).unref();
+}
+
+function writeNext(index) {
+    if (index >= chunks.length) {
+        afterPayload();
+        return;
+    }
+    process.stderr.write(chunks[index], () => writeNext(index + 1));
+}
+
+writeNext(0);
+`;
+
 async function waitForMarker(filePath: string, timeoutMs: number): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -176,11 +347,28 @@ async function waitForMarker(filePath: string, timeoutMs: number): Promise<void>
     throw new Error(`Timed out after ${timeoutMs}ms waiting for ${filePath}`);
 }
 
-/** Pre-fix monitor replica: wait for exit first, read piped stderr after. */
-function monitorOldShape(child: ChildProcess): Promise<{ code: number | null }> {
+/** Pre-fix monitor replica: wait for exit first, read piped stderr after.
+ *
+ * The bound is parent-owned: on POSIX a wedged child still runs its own
+ * watchdog and exits by itself, but on Windows pipe writes are
+ * synchronous, so a child stalled on a full pipe has a frozen event loop
+ * and can never self-terminate — the guard here kills it so the replica
+ * always resolves inside `guardMs` instead of hanging the suite. */
+function monitorOldShapeGuarded(
+    child: ChildProcess,
+    guardMs: number,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null; killedByGuard: boolean }> {
     return new Promise((resolve, reject) => {
         child.on('error', reject);
-        child.on('close', (code) => resolve({ code }));
+        let killedByGuard = false;
+        const guard = setTimeout(() => {
+            killedByGuard = true;
+            child.kill();
+        }, guardMs);
+        child.on('close', (code, signal) => {
+            clearTimeout(guard);
+            resolve({ code, signal, killedByGuard });
+        });
     });
 }
 
@@ -511,11 +699,15 @@ describe.concurrent('REST API automation endpoints', () => {
         // Private counterfactual against the held pre-fix monitor shape
         // (child.wait() BEFORE reading piped stderr): with 256KiB of
         // callback-awaited stderr and no reader, the pipe buffer fills and
-        // the child can only exit through its leak-guard bound. The fixed
-        // shape (wait_with_output) drains while waiting and the child
-        // completes. Production is already fixed, so the old leg replicates
-        // the old monitor here rather than reverting anything; this models
-        // pipe-buffer semantics portably and is not a real Windows claim.
+        // the child cannot finish its payload. On POSIX it exits through
+        // its leak-guard bound; on Windows the same wedge freezes the
+        // child's event loop (synchronous pipe writes), so the parent-side
+        // guard kills it. Either way the completion markers stay absent —
+        // that absence is the wedge proof, never the child's own timer.
+        // The fixed shape (concurrent drain, the production monitor)
+        // drains while waiting and the child completes. Production is
+        // already fixed, so the old leg replicates the old monitor here
+        // rather than reverting anything.
         const oldDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-monitor-old-'));
         const newDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-monitor-new-'));
         const script = path.join(oldDir, 'chatty-stderr.mjs');
@@ -526,10 +718,20 @@ describe.concurrent('REST API automation endpoints', () => {
                 [script, ...chattyArgs('.', 'old', 262_144, 3_000)],
                 { cwd: oldDir, stdio: ['ignore', 'ignore', 'pipe'] },
             );
-            const oldOutcome = await monitorOldShape(oldChild);
-            expect(oldOutcome.code).toBe(3);
-            expect(fs.pathExistsSync(path.join(oldDir, 'aborted-old.marker'))).toBe(true);
+            // Guard is the child bound (3s) plus slack: on POSIX the child
+            // self-aborts first and close fires normally; on Windows only
+            // the guard can end the wedge.
+            const oldOutcome = await monitorOldShapeGuarded(oldChild, 4_000);
             expect(fs.pathExistsSync(path.join(oldDir, 'completed-old.marker'))).toBe(false);
+            expect(fs.pathExistsSync(path.join(oldDir, 'bytes-old.marker'))).toBe(false);
+            if (oldOutcome.killedByGuard) {
+                // Windows wedge shape: the frozen child never wrote any
+                // terminal marker at all.
+                expect(fs.pathExistsSync(path.join(oldDir, 'aborted-old.marker'))).toBe(false);
+            } else {
+                expect(oldOutcome.code).toBe(3);
+                expect(fs.pathExistsSync(path.join(oldDir, 'aborted-old.marker'))).toBe(true);
+            }
 
             const newChild = spawn(
                 nodeExecutable(),
@@ -607,5 +809,163 @@ ${indentBlock(
         } finally {
             await workspace.dispose();
         }
+    });
+
+    it('server async run reports descendant-held stderr within the bounded grace', async () => {
+        // Real public-boundary regression for the monitor's bounded-grace
+        // contract: the wait:false child exits nonzero after writing 32KiB
+        // of stderr, and its spawned descendant INHERITS that stderr and
+        // stays alive until an owned release. The production monitor (in
+        // the real server process) must log the primary's failure with the
+        // retained tail while the descendant still holds the pipe — not
+        // wait for descendant EOF. Asserted against the server's captured
+        // stderr stream, never against a replica.
+        const label = 'held';
+        const markerDirRel = 'held-markers';
+        const totalBytes = 32_768;
+        const headSentinel = `HEAD-${label}-7f3adrop`;
+        const tailSentinel = `TAIL-${label}-c9d1-END`;
+        const releaseRel = `${markerDirRel}/release-${label}.marker`;
+        const marker = (name: string) =>
+            path.join(workspace.root, markerDirRel, `${name}-${label}.marker`);
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: {
+                '.tasks/config.yml': BASE_CONFIG,
+                '.tasks/automation.yml': `automation:
+  rules:
+    - name: Descendant-held stderr
+      on:
+        created:
+${indentBlock(
+    nodeRunActionYaml(
+        [
+            'fixtures/descendant-stderr.mjs',
+            '--marker-dir',
+            markerDirRel,
+            '--label',
+            label,
+            '--total-bytes',
+            String(totalBytes),
+            '--head-sentinel',
+            headSentinel,
+            '--tail-sentinel',
+            tailSentinel,
+            '--exit',
+            '7',
+            '--release-file',
+            releaseRel,
+            '--hold-ms',
+            '20000',
+        ],
+        { wait: false },
+    ),
+    10,
+)}
+`,
+                'fixtures/descendant-stderr.mjs': DESCENDANT_STDERR_SCRIPT,
+            },
+        });
+
+        let server: Awaited<ReturnType<typeof startLotarServer>> | undefined;
+        const stderrChunks: string[] = [];
+        // Binding endpoint evidence captured during cleanup (before the
+        // workspace is disposed) and asserted after it: probe-delivered
+        // proves the descendant really wrote to the inherited stderr AFTER
+        // the primary exited, released proves the owned child finished.
+        let probeOutcome: 'delivered' | 'epipe' | 'missing' = 'missing';
+        let releasedSeen = false;
+        try {
+            server = await startLotarServer(workspace);
+            server.raw.stderr?.on('data', (chunk: unknown) => {
+                stderrChunks.push(String(chunk));
+            });
+
+            const createRes = await fetch(`${server.url}/api/tasks/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'Descendant held stderr task' }),
+            });
+            expect(createRes.status).toBe(201);
+            const createBody = (await createRes.json()) as { data: { id: string } };
+
+            await waitForMarker(marker('primary-started'), 10_000);
+            await waitForMarker(marker('primary-exited'), 10_000);
+            const primaryExitedAt = Date.now();
+
+            // Bounded poll scaled to the 1s monitor grace (plus scheduler
+            // slack): an EOF-waiting monitor would sit out the 20s hold.
+            // The diagnostic spans two physical lines (the dropped-byte
+            // notice embeds a newline before the retained payload), so it
+            // is extracted from prefix line through sentinel, not by
+            // single-line matching.
+            const prefixMarker = `Async automation run for task ${createBody.data.id}`;
+            const diagnosticDeadline = Date.now() + 5_000;
+            let line: string | undefined;
+            let diagnosticSeenAt = 0;
+            while (Date.now() < diagnosticDeadline) {
+                const full = stderrChunks.join('');
+                const prefixIndex = full.indexOf(prefixMarker);
+                const tailIndex = full.indexOf(tailSentinel, prefixIndex + 1);
+                if (prefixIndex >= 0 && tailIndex > prefixIndex) {
+                    const lineEnd = full.indexOf('\n', tailIndex + tailSentinel.length);
+                    line = full.slice(prefixIndex, lineEnd === -1 ? undefined : lineEnd);
+                    diagnosticSeenAt = Date.now();
+                    break;
+                }
+                await new Promise((resolve) => setTimeout(resolve, 25));
+            }
+            expect(line).toBeDefined();
+
+            // The descendant provably still holds the pipe: it never saw
+            // the release and its holding marker is present.
+            expect(fs.pathExistsSync(path.join(workspace.root, releaseRel))).toBe(false);
+            expect(fs.pathExistsSync(marker('descendant-holding'))).toBe(true);
+            expect(diagnosticSeenAt - primaryExitedAt).toBeLessThanOrEqual(5_000);
+
+            expect(/exited with exit (?:status|code):? 7/.test(line ?? '')).toBe(true);
+            expect(line).toContain(
+                '(stderr pipe still open, likely held by a descendant; tail truncated)',
+            );
+            // Bounded tail: the head sentinel was dropped, the tail
+            // sentinel retained, and the dropped-byte notice accounts for
+            // everything above the 8KiB retention window.
+            expect(line).not.toContain(headSentinel);
+            const droppedMatch = /\[\+(\d+) earlier stderr bytes\]/.exec(line ?? '');
+            expect(droppedMatch).not.toBeNull();
+            const dropped = Number.parseInt(droppedMatch?.[1] ?? '0', 10);
+            expect(dropped).toBeGreaterThanOrEqual(totalBytes - 8192 - 4096);
+            expect((line ?? '').length).toBeLessThanOrEqual(8192 + 1024);
+        } finally {
+            // Release and bounded-await the owned descendant on every path;
+            // its own hold bound is the final leak guard. Probe outcome is
+            // read before the workspace disappears so the post-cleanup
+            // assertions keep their evidence.
+            await fs
+                .writeFile(path.join(workspace.root, releaseRel), `${process.pid}\n`)
+                .catch(() => undefined);
+            if (server) {
+                await waitForMarker(marker('descendant-released'), 10_000)
+                    .then(() => {
+                        releasedSeen = true;
+                    })
+                    .catch(() => undefined);
+            }
+            probeOutcome = fs.pathExistsSync(marker('probe-delivered'))
+                ? 'delivered'
+                : fs.pathExistsSync(marker('probe-epipe'))
+                    ? 'epipe'
+                    : 'missing';
+            if (server) {
+                await server.stop();
+            }
+            await workspace.dispose();
+        }
+        // The descendant must have exited via the owned release (not its
+        // leak-guard bound) and its post-primary-exit stderr probe must
+        // have been delivered: the write endpoint was genuinely alive
+        // after the primary died, so the held-note contract above was
+        // asserted against a really-held pipe, not a marker file.
+        expect(releasedSeen).toBe(true);
+        expect(probeOutcome).toBe('delivered');
     });
 });

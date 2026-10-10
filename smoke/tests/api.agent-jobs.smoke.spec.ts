@@ -2,7 +2,12 @@ import fs from 'fs-extra';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createFixtureAgents, createGateFixture, type GateFixture } from '../helpers/agent-fixtures.js';
+import {
+    HOSTILE_PROMPT,
+    createFixtureAgents,
+    createGateFixture,
+    type GateFixture,
+} from '../helpers/agent-fixtures.js';
 import { startLotarServer } from '../helpers/server.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
@@ -226,7 +231,7 @@ describe.concurrent('Agent job smoke tests', () => {
                     body: JSON.stringify({
                         ticket_id: task.id,
                         agent: 'gated',
-                        prompt: 'Test prompt',
+                        prompt: HOSTILE_PROMPT,
                     }),
                 });
 
@@ -266,6 +271,26 @@ describe.concurrent('Agent job smoke tests', () => {
                 expect(runningJob).toBeTruthy();
                 expect(runningJob!.exit_code ?? null).toBeNull();
                 expect(runningEnvelope.data.queue_stats.running).toBeGreaterThanOrEqual(1);
+
+                // Prompt-integrity regression (DEV-101): the full job prompt
+                // (always multiline via ticket context, here also carrying
+                // CR/LF, quotes, percent signs, and cmd metacharacters) must
+                // reach the agent child byte-exact through the wrapper and
+                // the platform launcher. On Windows the launcher is a .cmd
+                // forwarder, so this asserts the wrapper's shim dispatch.
+                const boot = await fs.readFile(
+                    path.join(gate.dir, 'boot-progress.sentinel'),
+                    'utf8',
+                );
+                const bootArgv = (JSON.parse(boot) as { argv: string[] }).argv;
+                expect(
+                    bootArgv.some(
+                        (element) =>
+                            element.includes('Ticket context:') &&
+                            element.includes(`- ID: ${task.id}`) &&
+                            element.includes(HOSTILE_PROMPT),
+                    ),
+                ).toBe(true);
 
                 await gate.release();
 

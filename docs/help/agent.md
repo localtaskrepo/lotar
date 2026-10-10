@@ -26,6 +26,12 @@ If the wrapper is not available, jobs can still run, but `list-running` will sho
 - `LOTAR_AGENT_CONTEXT_EXTENSION` — extension for context files (default `.context`).
 - `LOTAR_AGENT_LOGS_DIR` — when set, enables debug logging to this directory (supports relative or absolute paths).
 
+## Windows agent commands
+
+Every job prompt is multiline (it embeds ticket context). Windows cannot pass such arguments through `cmd.exe` safely: Rust's spawn validation rejects CR/LF newlines in batch arguments outright, and `cmd.exe` argument forwarding can mangle other special characters. When an agent profile `command` resolves to a `.cmd`/`.bat` file, the wrapper therefore tries to resolve the shim to the executable it forwards to and runs that directly: npm-generated `cmd` shims (the standard `claude`, `codex`, `copilot`, and `gemini` global installs) are recognized and executed as `node <cli.js>` with the original arguments followed by any baked shim suffix, so the complete prompt arrives byte-exact. Batch commands the wrapper cannot recognize keep going through `cmd.exe` with the limitations above.
+
+For an unrecognized batch command, either point `command` at the CLI's native executable or a recognized npm shim path, or use a `command` runner profile: the `command` kind delivers the prompt through the `LOTAR_AGENT_PROMPT` environment variable instead of an argument, so any executable command line (including `command: node` with a script in `args`) works there. Setting `command: node` with the CLI entry in `args` does **not** work for the codex/claude/copilot/gemini kinds, because those prepend their own flags before profile arguments and node would parse those flags as its own.
+
 ## Default instructions
 
 LoTaR prepends agent instructions to each run. The built-in default describes the environment and workflow expectations; you can override it with an inline string or a file path under `agent.instructions`.

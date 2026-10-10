@@ -1,0 +1,43 @@
+title: Reduce CI compile critical path without reducing coverage
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-11T23:45:37.315099+00:00
+modified: 2026-10-12T00:26:56.008018+00:00
+comments:
+- date: 2026-10-12T00:05:01.721122+00:00
+  text: 'Outcome: Implemented reviewed compile/cache optimizations preserving runtime selections and all-target type checking. Windows now cargo-checks all targets/features fail-closed, then links only library+lotar-agent-wrapper harnesses for the same33native tests; run/manifest target flags/filter match. Linux full --lib/--bins/--tests gate unchanged. All4Rust setup actions explicitly install1.98.1 from workflow env pinned against rust-toolchain.toml by contract. Rust-cache keys now perjob/OS so release doesn''t win the ci-profile cache write; compiler-cache keys refresh perjob/lock/run with safe restore tiers instead of frozen immutable lock key. No retries/timeouts/concurrency/skip/Git/report/exit weakening. Evidence: independent performance/coverage review signoff,2actualworkflow contract tests pass; host cargo check all-targets11.69s and narrowed31? selection34locallyavailable cases across2binaries passed, full lint/Rust1346/UI770/smoke255 plusNode51pass. NativeDownloadedManifest33cases in2suites agrees oldunchangedselector. Measured baseline38182080597: Windows421s critical path (94s binary,230s testharnesscompile,2.085s native tests,6s portable); Linux270s (197scompile,22.5stests), release114s; release+smoke285s chain including58sbrowserinstall/95ssuite. Thus duration dominated by compilation/linking/cache ownership, not execution. Reports/evidence target/dev101-reports-20261011. Remaining: actual optimized Windows timings and warm-cache gains need newCI; first newRustcache lineage is cold, compare later warm runs. Do not claim sub5min measured; Playwright cache and other workflows deferred outside scope. No publication/Git mutation/user server changes. Guidance: no durable instruction finding. Implementation self-verified; readyDone independently of future timing measurement.'
+- date: 2026-10-12T00:05:36.533895+00:00
+  text: 'Count clarification: the narrowed host selection ran exactly34tests across2binaries (narrow-target-selection.log); ''31?'' in the previous note was a stray draft count. The actual downloaded native Windows manifest/JUnit ran33selected tests, all passed. These platform-specific counts are not exclusions or timing projections.'
+- date: 2026-10-12T00:26:56.008018+00:00
+  text: 'First published optimized run38186518559 fullyGREEN. Measured Windows job6m17 (was7m01), down44s, notsub5min. Targeted native nextest compile1m54 vs3m50 (116s saved); actual33tests2.079s. Offsetcosts: new all-targetcheck41s (preservescompilationcoverage), binarycompile2m20 vsold1m34 (cold/newcache), plussetup/post-save. Windows sccache explicitlymissed allnew/legacykeys then successfullysaved; bothnewjob-specific compiler snapshots saved. Rust quality5m02 with3m19compile and22.445stests; full1390 executednow, nofail-fast truncation. Release1m54, release+smoke3m53chain(browserinstall25s/suite78s), no longercritical. Actualtimings showcompilation stilldominates; warm-cacherun neededbeforefurtheroptimizationclaims. NoadditionalCI changes made after userreportedallgreen; keep currentstablechecks and measure futurecachedruns. Implementation remainsDone; no promise sub5min. Guidance: no durable finding.'
+description: 'Measured QA38182080597: Windows421s critical path,230s linking131test harnesses for33tests in2binaries; Rust197scompile/22.5stests. Retain all-target Windows compile checking and every designated native/portable runtime test; link only required harnesses. Align setup with pinned Rust1.98.1, separate immutable release/test cache ownership, refresh compiler-cache objects. Preserve Git fail-closed, JUnit/manifest coverage, zero retries and all budgets. Validate workflow contracts and report timing as estimate until next published run.'
+history:
+- at: 2026-10-11T23:45:47.453457+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-12T00:05:01.721122+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T00:05:36.533895+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T00:05:36.563014+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-12T00:26:56.008018+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

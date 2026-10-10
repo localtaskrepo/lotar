@@ -299,6 +299,8 @@ pub fn auto_detect_prefix(tasks_dir: &Path) -> Option<String> {
 }
 
 fn warn_insecure_home_config_permissions(path: &Path) {
+    #[cfg(not(unix))]
+    let _ = path;
     #[cfg(unix)]
     {
         static WARNED: OnceLock<()> = OnceLock::new();

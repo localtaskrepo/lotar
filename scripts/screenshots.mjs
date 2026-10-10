@@ -7,6 +7,7 @@
 //   node scripts/screenshots.mjs                 # reuse an existing binary (target/smoke or target/release)
 //   node scripts/screenshots.mjs --only board,agents --skip-hero --skip-terminal
 //   node scripts/screenshots.mjs --keep          # keep the demo workspace for inspection
+//   node scripts/screenshots.mjs --no-git        # refresh UI only; preserve Git-dependent media
 //
 // Output (docs/assets/screenshots/ by default):
 //   <shot>-light.webp / <shot>-dark.webp   1440x900 viewport at 2x, both themes
@@ -25,7 +26,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
-import { removeDemoWorkspace, seedDemoWorkspace } from './demo/workspace.mjs';
+import { demoEnvironment, removeDemoWorkspace, seedDemoWorkspace } from './demo/workspace.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BIN_NAME = process.platform === 'win32' ? 'lotar.exe' : 'lotar';
@@ -37,7 +38,7 @@ const THEMES = ['light', 'dark'];
 const PAGE_DEFAULTS = { locale: 'en-US', timezoneId: 'UTC' };
 
 function parseArgs(argv) {
-    const opts = { out: path.join(ROOT, 'docs', 'assets', 'screenshots'), only: null, hero: true, terminal: true, social: true, keep: false };
+    const opts = { out: path.join(ROOT, 'docs', 'assets', 'screenshots'), only: null, hero: true, terminal: true, social: true, keep: false, gitHistory: true };
     for (let i = 0; i < argv.length; i += 1) {
         const a = argv[i];
         if (a === '--out') opts.out = path.resolve(argv[++i]);
@@ -46,6 +47,7 @@ function parseArgs(argv) {
         else if (a === '--skip-terminal') opts.terminal = false;
         else if (a === '--skip-social') opts.social = false;
         else if (a === '--keep') opts.keep = true;
+        else if (a === '--no-git') opts.gitHistory = false;
         else if (a === '-h' || a === '--help') {
             console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 20).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
             process.exit(0);
@@ -82,9 +84,7 @@ async function startServer(bin, dir) {
         cwd: dir,
         // The browser user is "priya", so actors and "(you)" labels never show the host user.
         env: {
-            ...process.env,
-            LOTAR_IGNORE_HOME_CONFIG: '1',
-            LOTAR_TASKS_DIR: path.join(dir, '.tasks'),
+            ...demoEnvironment(dir),
             LOTAR_WEB_UI_EMBEDDED: '1',
             LOTAR_DEFAULT_REPORTER: 'priya',
         },
@@ -129,10 +129,26 @@ async function waitFor(check, { timeout = 30_000, interval = 250, label = 'condi
 // Page helpers
 // ---------------------------------------------------------------------------
 
+const pendingRequests = new WeakMap();
+
+async function newCapturePage(context) {
+    const page = await context.newPage();
+    const requests = new Set();
+    pendingRequests.set(page, requests);
+    page.on('request', (request) => {
+        if (request.resourceType() !== 'eventsource') requests.add(request);
+    });
+    page.on('requestfinished', (request) => requests.delete(request));
+    page.on('requestfailed', (request) => requests.delete(request));
+    return page;
+}
+
 async function settle(page, ms = 600) {
-    await page.waitForLoadState('networkidle').catch(() => {});
+    // Live EventSource streams never reach network idle.
+    await page.waitForLoadState('domcontentloaded');
     await page.evaluate(() => document.fonts?.ready);
     await sleep(ms);
+    await waitFor(() => pendingRequests.get(page).size === 0, { label: 'page requests excluding live events' });
 }
 
 async function openTaskFromBoard(page, title) {
@@ -154,10 +170,10 @@ async function showActivityTab(page, label) {
 // Shots: each prepares a page that is already at the right size and theme.
 function defineShots(demo) {
     return [
-        { name: 'tasks', path: '/' },
-        { name: 'board', path: '/boards' },
+        { name: 'tasks', path: `/?project=${demo.project}` },
+        { name: 'board', path: `/boards?project=${demo.project}` },
         {
-            name: 'sprints', path: '/sprints',
+            name: 'sprints', path: `/sprints?project=${demo.project}`,
             async prepare(page) {
                 // Open the active sprint's insights to show the burndown.
                 const insights = page.getByRole('button', { name: 'Insights' }).first();
@@ -167,8 +183,8 @@ function defineShots(demo) {
                 await settle(page, 900);
             },
         },
-        { name: 'insights', path: '/insights', settle: 1200 },
-        { name: 'calendar', path: '/calendar' },
+        { name: 'insights', path: `/insights?project=${demo.project}`, settle: 1200 },
+        { name: 'calendar', path: `/calendar?project=${demo.project}` },
         { name: 'automations', path: '/automations' },
         {
             name: 'sync', path: '/sync',
@@ -191,7 +207,7 @@ function defineShots(demo) {
             },
         },
         {
-            name: 'task-details', path: '/boards',
+            name: 'task-details', path: `/boards?project=${demo.project}`,
             async prepare(page) {
                 await openTaskFromBoard(page, demo.byKey.offline.title);
                 await showActivityTab(page, 'Comments');
@@ -200,7 +216,7 @@ function defineShots(demo) {
             },
         },
         {
-            name: 'task-commits', path: '/boards',
+            name: 'task-commits', path: `/boards?project=${demo.project}`,
             async prepare(page) {
                 await openTaskFromBoard(page, demo.byKey.offline.title);
                 await showActivityTab(page, 'Commits');
@@ -238,29 +254,36 @@ function kb(file) {
 // Captures
 // ---------------------------------------------------------------------------
 
-async function captureShots(browser, server, demo, opts, encoderPage) {
-    const shots = defineShots(demo).filter((s) => !opts.only || opts.only.has(s.name));
+async function captureShots(browser, server, demo, opts) {
+    const shots = defineShots(demo).filter((s) => (!opts.only || opts.only.has(s.name)) && (opts.gitHistory || s.name !== 'task-commits'));
+    const context = await browser.newContext({ ...PAGE_DEFAULTS, viewport: VIEWPORT, deviceScaleFactor: SCALE, colorScheme: THEMES[0], reducedMotion: 'reduce' });
+    await context.addInitScript(() => {
+        if (location.protocol === 'http:' || location.protocol === 'https:') {
+            localStorage.clear();
+            sessionStorage.clear();
+        }
+    });
+    const page = await newCapturePage(context);
     for (const theme of THEMES) {
-        const context = await browser.newContext({ ...PAGE_DEFAULTS, viewport: VIEWPORT, deviceScaleFactor: SCALE, colorScheme: theme, reducedMotion: 'reduce' });
-        const page = await context.newPage();
+        await page.emulateMedia({ colorScheme: theme });
         for (const shot of shots) {
             await page.goto(`${server.base}${shot.path}`);
             await settle(page, shot.settle ?? 700);
             if (shot.prepare) await shot.prepare(page);
             const png = await page.screenshot({ type: 'png' });
             const file = path.join(opts.out, `${shot.name}-${theme}.webp`);
-            writeFileSync(file, await toWebp(encoderPage, png));
+            writeFileSync(file, await toWebp(page, png));
             console.log(`  ${path.relative(ROOT, file)} (${kb(file)})`);
         }
-        await context.close();
     }
+    return page;
 }
 
 async function assignToAgent(server, id) {
     await api(server.base, '/api/tasks/update', { id, assignee: '@claude' });
 }
 
-async function captureAgents(browser, server, demo, opts, encoderPage) {
+async function captureAgents(browser, server, demo, opts) {
     // Hold the stub mid-run so both themes catch a live, streaming job.
     writeFileSync(demo.holdFile, 'hold');
     try {
@@ -273,7 +296,7 @@ async function captureAgents(browser, server, demo, opts, encoderPage) {
         await sleep(5_500);
         for (const theme of THEMES) {
             const context = await browser.newContext({ ...PAGE_DEFAULTS, viewport: VIEWPORT, deviceScaleFactor: SCALE, colorScheme: theme, reducedMotion: 'reduce' });
-            const page = await context.newPage();
+            const page = await newCapturePage(context);
             await page.goto(`${server.base}/agents`);
             await settle(page, 600);
             const running = page.locator('.job-card.job-running').first();
@@ -281,7 +304,7 @@ async function captureAgents(browser, server, demo, opts, encoderPage) {
             await page.locator('.job-card.job-running .log-row').nth(4).waitFor({ timeout: 15_000 });
             await settle(page, 500);
             const file = path.join(opts.out, `agents-${theme}.webp`);
-            writeFileSync(file, await toWebp(encoderPage, await page.screenshot({ type: 'png' })));
+            writeFileSync(file, await toWebp(page, await page.screenshot({ type: 'png' })));
             console.log(`  ${path.relative(ROOT, file)} (${kb(file)})`);
             await context.close();
         }
@@ -298,9 +321,9 @@ function backoffTitle(demo) {
 async function recordHero(browser, server, demo, opts, tmp) {
     const videoDir = path.join(tmp, 'video');
     const context = await browser.newContext({ ...PAGE_DEFAULTS, viewport: VIEWPORT, deviceScaleFactor: 1, colorScheme: 'light', recordVideo: { dir: videoDir, size: VIEWPORT } });
-    const page = await context.newPage();
+    const page = await newCapturePage(context);
     const t0 = Date.now();
-    await page.goto(`${server.base}/boards`);
+    await page.goto(`${server.base}/boards?project=${demo.project}`);
     await settle(page, 300);
     const startAt = (Date.now() - t0) / 1000;
 
@@ -330,7 +353,7 @@ async function recordHero(browser, server, demo, opts, tmp) {
     await card.getByRole('button', { name: 'Show logs' }).click();
     await waitFor(async () => (await page.locator('.job-card.job-completed').count()) > 0, { timeout: 40_000, label: 'hero job completion' });
     await sleep(1500);
-    await page.getByRole('link', { name: 'Boards' }).click();
+    await page.goto(`${server.base}/boards?project=${demo.project}`);
     await settle(page, 600);
     await sleep(800);
     await openTaskFromBoard(page, title);
@@ -370,9 +393,8 @@ function encodeAnimation(video, startAt, endAt, outBase, tmp) {
     return null;
 }
 
-async function captureSocial(browser, opts, heroShot) {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 640 }, deviceScaleFactor: 1, colorScheme: 'dark' });
-    const page = await context.newPage();
+async function captureSocial(page, opts, heroShot) {
+    await page.setViewportSize({ width: 1280, height: 640 });
     const img = readFileSync(heroShot).toString('base64');
     await page.setContent(`<!doctype html><html><head><style>
         * { box-sizing: border-box; margin: 0; }
@@ -394,9 +416,8 @@ async function captureSocial(browser, opts, heroShot) {
     <img class="shot" src="data:image/webp;base64,${img}"></body></html>`);
     await page.locator('img.shot').evaluate((el) => el.decode());
     const file = path.join(path.dirname(opts.out), 'social-preview.png');
-    await page.screenshot({ path: file, type: 'png' });
+    await page.screenshot({ path: file, type: 'png', scale: 'css' });
     console.log(`  ${path.relative(ROOT, file)} (${kb(file)})`);
-    await context.close();
 }
 
 function recordTerminal(bin, demo, opts) {
@@ -409,10 +430,8 @@ function recordTerminal(bin, demo, opts) {
         cwd: demo.dir,
         stdio: 'inherit',
         env: {
-            ...process.env,
+            ...demoEnvironment(demo.dir),
             PATH: `${path.dirname(bin)}${path.delimiter}${process.env.PATH}`,
-            LOTAR_IGNORE_HOME_CONFIG: '1',
-            LOTAR_TASKS_DIR: path.join(demo.dir, '.tasks'),
             LOTAR_DEFAULT_REPORTER: 'priya',
         },
     });
@@ -430,40 +449,36 @@ async function main() {
     const bin = resolveBinary();
     mkdirSync(opts.out, { recursive: true });
     const tmp = mkdtempSync(path.join(os.tmpdir(), 'lotar-screens-'));
-    // A short, fixed workspace path keeps agent worktree paths readable in the shots.
-    // Canonical (symlink-free) so the server's git lookups match `git rev-parse` output.
-    const demoBase = process.platform !== 'win32' && existsSync('/tmp') ? '/tmp' : os.tmpdir();
-    const demoRoot = path.join(realpathSync(demoBase), 'lotar-demo');
+    // Own a unique workspace; never replace another capture's or user's demo.
+    const demoRoot = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'lotar-demo-')));
     const dir = path.join(demoRoot, 'atlas');
 
-    rmSync(demoRoot, { recursive: true, force: true });
     console.log(`Seeding demo workspace in ${dir}`);
-    const demo = seedDemoWorkspace({ dir, bin });
+    const demo = seedDemoWorkspace({ dir, bin, gitHistory: opts.gitHistory });
+    if (!opts.gitHistory) console.warn('Git-free capture: preserving existing agent, hero, commit-history and terminal media.');
 
     // The terminal recording mutates tasks; run it on its own copy of the workspace.
     const server = await startServer(bin, dir);
     console.log(`Serving ${server.base}`);
     const browser = await chromium.launch({ args: (process.env.LOTAR_SCREENSHOT_CHROMIUM_ARGS || '').split(',').filter(Boolean) });
-    const encoderContext = await browser.newContext();
-    const encoderPage = await encoderContext.newPage();
     try {
         console.log('Screenshots');
-        await captureShots(browser, server, demo, opts, encoderPage);
-        if (opts.hero && (!opts.only || opts.only.has('hero'))) {
+        const page = await captureShots(browser, server, demo, opts);
+        if (opts.gitHistory && opts.hero && (!opts.only || opts.only.has('hero'))) {
             console.log('Hero recording');
             const { video, startAt, endAt } = await recordHero(browser, server, demo, opts, tmp);
             const out = encodeAnimation(video, startAt, endAt, path.join(opts.out, 'hero-agent-loop'), tmp);
             if (out) console.log(`  ${path.relative(ROOT, out)} (${kb(out)})`);
         }
-        if (!opts.only || opts.only.has('agents')) {
+        if (opts.gitHistory && (!opts.only || opts.only.has('agents'))) {
             console.log('Agent jobs');
-            await captureAgents(browser, server, demo, opts, encoderPage);
+            await captureAgents(browser, server, demo, opts);
         }
         if (opts.social && (!opts.only || opts.only.has('social'))) {
             const source = path.join(opts.out, 'board-dark.webp');
             if (existsSync(source)) {
                 console.log('Social preview');
-                await captureSocial(browser, opts, source);
+                await captureSocial(page, opts, source);
             }
         }
     } finally {
@@ -471,7 +486,7 @@ async function main() {
         server.stop();
     }
 
-    if (opts.terminal && (!opts.only || opts.only.has('terminal'))) {
+    if (opts.gitHistory && opts.terminal && (!opts.only || opts.only.has('terminal'))) {
         console.log('Terminal recording');
         const termDir = path.join(demoRoot, 'atlas-terminal');
         const termDemo = seedDemoWorkspace({ dir: termDir, bin });

@@ -18,7 +18,12 @@ use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 
 fn write_task_file(dir: &Path, id: u32, title: &str) {
-    let task = Task::new(dir.to_path_buf(), title.to_string(), Priority::default());
+    let mut task = Task::new(dir.to_path_buf(), title.to_string(), Priority::default());
+    // `Task::new` stamps `created` from the wall clock, and RFC3339 output
+    // trims subsecond trailing zeros (0/3/6/9 fractional digits vary by call
+    // and host clock granularity). Pin it so the serialized byte length
+    // depends only on the title bytes.
+    task.created = "2026-01-01T00:00:00.000000000+00:00".to_string();
     let yaml = serde_yaml_ng::to_string(&task).expect("serialize task");
     fs::write(dir.join(format!("{id}.yml")), yaml).expect("write task file");
 }

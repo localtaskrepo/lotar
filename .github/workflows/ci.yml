@@ -10,6 +10,8 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Kept in sync with rust-toolchain.toml by the workflow contract test.
+  RUST_TOOLCHAIN: '1.98.1'
 
 # Cancel in-progress runs when a new commit is pushed
 concurrency:
@@ -32,14 +34,14 @@ jobs:
 
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      # No explicit toolchain input: the action installs the toolchain pinned
-      # in rust-toolchain.toml so CI and local development stay identical.
+      with:
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
 
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: true
-        shared-key: ci-${{ runner.os }}
+        shared-key: ci-${{ github.job }}-${{ runner.os }}
         save-if: true
 
     - name: Install sccache
@@ -51,8 +53,10 @@ jobs:
       uses: actions/cache@v5
       with:
         path: .sccache
-        key: sccache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
         restore-keys: |
+          sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
+          sccache-${{ runner.os }}-${{ github.job }}-
           sccache-${{ runner.os }}-
 
     - name: Determine Node version
@@ -123,14 +127,14 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        # Toolchain comes from rust-toolchain.toml.
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
         components: rustfmt, clippy
         
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: true
-        shared-key: ci-${{ runner.os }}
+        shared-key: ci-${{ github.job }}-${{ runner.os }}
         save-if: true
 
     - name: Install sccache
@@ -142,8 +146,10 @@ jobs:
       uses: actions/cache@v5
       with:
         path: .sccache
-        key: sccache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
         restore-keys: |
+          sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
+          sccache-${{ runner.os }}-${{ github.job }}-
           sccache-${{ runner.os }}-
 
     - name: Install cargo-nextest
@@ -332,7 +338,8 @@ jobs:
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      # Toolchain comes from rust-toolchain.toml.
+      with:
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
 
     - name: Install sccache
       uses: taiki-e/install-action@v2
@@ -343,15 +350,17 @@ jobs:
       uses: actions/cache@v5
       with:
         path: .sccache
-        key: sccache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
         restore-keys: |
+          sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
+          sccache-${{ runner.os }}-${{ github.job }}-
           sccache-${{ runner.os }}-
 
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: true
-        shared-key: ci-${{ runner.os }}
+        shared-key: ci-${{ github.job }}-${{ runner.os }}
         save-if: true
 
     # Node is required before the first Rust build: the binary embeds the
@@ -423,15 +432,26 @@ jobs:
       with:
         tool: nextest
 
+    # Preserve Windows compilation coverage for every target without linking
+    # 129 unused integration-test executables before this selected runtime gate.
+    - name: Compile-check all Windows targets
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        cargo check --profile ci --all-targets --all-features
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
     # Module selection, not a name list: every test under the storage
     # safety and scan modules runs here, so platform-specific cases (the
     # Windows atomic-readonly one included) and future additions are
     # covered without maintaining witness names.
-    - name: Run storage safety and scan selection (nextest)
+    # If a future runtime selector needs an integration suite, add its
+    # --test target to both run and list; all suites are compile-checked above.
+    - name: Run storage safety, scan, and process regressions (nextest)
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
-        cargo nextest run --cargo-profile ci --all-features --retries 0 --failure-output=immediate-final --lib --bins --tests -E 'test(storage::safety::) | test(utils::scan::)'
+        cargo nextest run --cargo-profile ci --all-features --retries 0 --failure-output=immediate-final --lib --bin lotar-agent-wrapper -E 'test(storage::safety::) | test(utils::scan::) | binary(lotar-agent-wrapper) | test(services::automation_service::windows_async_stdio_tests::) | test(services::automation_service::async_run_monitor_tests::)'
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - name: Enforce selection coverage (manifest vs JUnit)
@@ -441,9 +461,9 @@ jobs:
         New-Item -ItemType Directory -Force -Path target/nextest | Out-Null
         # --run-ignored all keeps ignored tests visible as selected-but-ignored
         # so the checker rejects them instead of silently filtering them out.
-        cargo nextest list --cargo-profile ci --all-features --lib --bins --tests --run-ignored all --message-format json -E 'test(storage::safety::) | test(utils::scan::)' | Out-File -Encoding utf8 target/nextest/windows-manifest.json
+        cargo nextest list --cargo-profile ci --all-features --lib --bin lotar-agent-wrapper --run-ignored all --message-format json -E 'test(storage::safety::) | test(utils::scan::) | binary(lotar-agent-wrapper) | test(services::automation_service::windows_async_stdio_tests::) | test(services::automation_service::async_run_monitor_tests::)' | Out-File -Encoding utf8 target/nextest/windows-manifest.json
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        python scripts/check-test-coverage.py --label 'windows storage::safety + utils::scan' --manifest target/nextest/windows-manifest.json --junit target/nextest/default/junit.xml
+        python scripts/check-test-coverage.py --label 'windows storage + scan + process regressions' --manifest target/nextest/windows-manifest.json --junit target/nextest/default/junit.xml
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - name: Upload Windows nextest report
@@ -522,6 +542,8 @@ jobs:
       
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
       
     - name: Cache cargo-audit
       uses: actions/cache@v5

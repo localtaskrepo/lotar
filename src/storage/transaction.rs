@@ -73,6 +73,7 @@ pub(crate) mod fault {
         FAIL_PARENT_SYNC_ONCE.with(|cell| cell.set(true));
     }
 
+    #[cfg(unix)]
     pub(crate) fn take_fail_parent_sync_once() -> bool {
         FAIL_PARENT_SYNC_ONCE.with(|cell| cell.replace(false))
     }
@@ -102,6 +103,7 @@ pub(crate) mod fault {
         FAIL_JOURNAL_REMOVAL_FSYNC_ONCE.with(|cell| cell.set(true));
     }
 
+    #[cfg(unix)]
     pub(crate) fn take_fail_journal_removal_fsync_once() -> bool {
         FAIL_JOURNAL_REMOVAL_FSYNC_ONCE.with(|cell| cell.replace(false))
     }

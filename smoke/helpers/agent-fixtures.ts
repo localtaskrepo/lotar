@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { resolveBinaryPath } from './binary.js';
 
 const fixturesDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,6 +17,42 @@ export const GATE_AGENT_SCRIPT = path.resolve(fixturesDir, 'gate-agent.mjs');
 /** Absolute path of the Node runtime executing the smoke suite. */
 export function nodeExecutable(): string {
     return process.execPath;
+}
+
+/**
+ * Prompt exercising every character class that batch forwarding (cmd.exe)
+ * and command-line quoting can mangle: LF and CR newlines (the exact class
+ * Rust std rejects in batch arguments), double quotes, percent expansion,
+ * cmd metacharacters, tabs, trailing whitespace, and non-ASCII text.
+ * Agents must receive it byte-exact in the final prompt argv element.
+ */
+export const HOSTILE_PROMPT = [
+    'First line with "double quotes" and %PATH% and %dp0% expansion',
+    'metacharacters: & echo pwned | rem comment <redirect> ^caret^ && ||',
+    'tab:\tand trailing space: ',
+    'lone carriage return\rGAP and windows newline\r\nfinal line',
+    'unicode ø æ 漢字 🚀',
+].join('\n');
+
+/**
+ * Absolute path of the lotar-agent-wrapper binary that ships next to the
+ * lotar binary resolved by the smoke harness.
+ */
+export function agentWrapperPath(): string {
+    const name =
+        process.platform === 'win32' ? 'lotar-agent-wrapper.exe' : 'lotar-agent-wrapper';
+    return path.join(path.dirname(resolveBinaryPath()), name);
+}
+
+/** agentWrapperPath plus an existence check with an actionable error. */
+export async function ensureAgentWrapper(): Promise<string> {
+    const wrapperPath = agentWrapperPath();
+    if (!(await fs.pathExists(wrapperPath))) {
+        throw new Error(
+            `lotar-agent-wrapper was not found at ${wrapperPath}. Run \`npm run build:smoke\` before this spec.`,
+        );
+    }
+    return wrapperPath;
 }
 
 let launchCounter = 0;
