@@ -1,0 +1,9 @@
+title: Tasks and Sprints pages have pagination controls in different locations
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-10T21:11:15.417133+00:00
+description: |-
+  Tasks page has it at the bottom with a numbering system, while sprints have it at the top, and not sure there's numbered pages to jump to.
+  Anyway has to be considered how pagination works with open sprints. Per sprint? Total? Only paginate the backlog (which should equal per sprint). Probably per sprint then.

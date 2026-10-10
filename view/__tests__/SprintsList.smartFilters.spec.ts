@@ -91,6 +91,7 @@ vi.mock('../components/SprintViewSettings.vue', () => ({
 }))
 
 vi.mock('../composables/useSprints', () => ({
+    useSprintFilterOptions: () => ref([]),
     useSprints: () => ({
         sprints: ref<any[]>([]),
         loading: ref(false),
@@ -108,6 +109,7 @@ vi.mock('../composables/useTaskPanelController', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
+        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['Todo', 'Doing', 'Done', 'Closed']),
         priorities: ref<string[]>(['Low', 'Med', 'High']),

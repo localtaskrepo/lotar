@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-06T02:15:15.915372+00:00
-modified: 2026-10-09T22:05:23.250794+00:00
+modified: 2026-10-10T17:54:21.539534+00:00
 comments:
 - date: 2026-10-09T19:01:10.325190+00:00
   text: 'Plan: remove duplicateCustom filtersUI onlyafterunifiedsearch supports explicitfield:key=value/key=value expressions and builtinaliases; preserveunknowncolon terms asfreetext, quotes and storedstructuredfilterobject/key/query shape. Replace extra string reparse/hinttextboxwithstructuredextra record/search errors and removableactivechips; routecustomfieldpresets to mainsearch with focus/no partialcommit, preserveprops/storage/project/querycache/sort-single-owner/deletion contracts. Clean existinginline filters panel (notnewmodal): labelledcompactresponsive controls, quickpicks/viewoptions sections, sharedsearchsyntax guidance+errors, clear/close affordances andkeyboard/autocomplete semantics. Scope sharedFilterBar Tasks/Board/Calendar/Sprints users, noRESTDTOchanges or mutationAPI. Regressionstestparser/UI legacycustomsnapshots/props/chipremoval/clear/preset/draftinvalid preservation; actualbackenddesktop/mobile visual+keyboard+crossview customfield filter membership. Requiredlint/Rust/UI/freshsmoke beforeDone, no repositoryGit/index/commit/push/worktrees; preserveearlierhighestfirstBoard logic.'
@@ -17,6 +17,14 @@ comments:
   text: 'Additionaluser scope: compactmobileExport/Columns/Bulkselect/relatedactions asicon-onlywithaccessiblelabels/titles/pressedstates, moveNewtaskfromTasksfilterrowtoappheadernextbrand availableallviews/contextproject. Parent ownsFilterBar/funnel toggle+sharedresponsiveutility/BoardCalendarSprintsfieldactions/smoke/docs; childApp+unit andchildTasksListtoolbar+relatedselector migrations isolatedownership. Searchclear+Tagsremoved+visiblehintnowSR-only/topalignment verified136targetedcases and2actualdesktopmobile fourviewcases; staleCustominputs userconfirmedfixedbybrowserreloadon8080. Existingfullsmoke3 failureswereoldTagsinput locators inDEV65query-isolation tests; migrated tosame tags=...+Enter withreplacementandallmembership/error/retryassertions/budgets unchanged. No processesstopped/restarted;8080 probeafterreleasebuildfoundlistenergone(user-ownedstateleftalone),8888 oldserveruntouched. Oldhelperruntime artifacts rebuilt afteruserclean; noGit/index/commit/worktrees.'
 - date: 2026-10-09T22:05:23.227202+00:00
   text: 'Userfollowupscomplete: Tagsplaintextinputremovedtoo (tagsstate/search/chips/snapshotretained), end-of-inputxvisibleforwrittencontent clearsfreeq/draft/errors/autocomplete/refocus WITHOUT otherappliedcriteria/scope/sort. VisibleduplicatedhintSR-only, baralignedtop; mobileFiltersfunnelicon/countbadge andatomiccompactactions. Export/Columns/Bulkpressedbutton mobileicon-only36pxtargets+compactselectionstatus(accessiblename), desktoplabels; sharedresponsivefieldsactionsBoardCalendarSprints. GlobalNewtasknextLoTaRbrand outsideoverflowNav availableallroutes, knownquery/taskprefixcontext|null(nofirstprojectguess), disabledopenTaskPanel/no draftreset; existingHostupsert/SSErefresh unchanged, no duplicatecreationcallback/API. LocalTaskstoolbarAddremoved; empty/keyboardcontextualnew handlersretained. SourceRole/API data semantics unchanged. Evidence:3followupunitred34pass->37green;4newFilterBar+7App+4toolbarcases (701->716fullUI);50focusedApp/toolbar/Bargreen.2newactualdesktop/mobileglobalactioncases keyboardEnteropen/cancel5routes+knownACTproject/guard/oneactualACTcreate+Boardmembership; enhanced2filtercases Tagsabsence/MaintagsUI/searchx/ARIAerrors/focus/menu/alignment/hiddenhint;3DEV65membership/outofband/queryerrorcases migratedoldTags locator tosame tags=...Enter, no budgets weakened. ExistingglobalNew selectorsmigratedincludingstrictmembershipcases; initialfullsmokeoldTags/Add locatorsfailcorrected, transientnew-queryBeta assertionnowpollspositive loadedrow rather thannegative-empty intermediate. Full warningfree lint-actions clean,1326Rustpass45existingGit exclusions,716UIpass70files,233freshsmoke-actions-green25Git skips56passed6skippedfiles; finalaria-selection-status sourceonlyfollowup types/50UI+4freshactualbrowsercasespass, no behavior edits afterfullgates. Screenshots6synthetic desktop/mobile inspected target/smoke-artifacts/{filters,actions}; finalreleasebuildwarningfree target/release/lotar. Liveuserrestarted8080verifiedstaticindex-BtHy0XNw exactlymatcheslatestdisk, clear/global/compactmarkersTRUE, oldCustomplaceholderFALSE; no usertaskdata or secretsread/mutations and no processesstopped/restartedbyagent (8888untouched). UserconfirmedfreshreloadoldCustomgone; initialsourceTagsleftacknowledgedcorrected. Docsclarifybuild/restart/browserreload+actions. Independentreadonlyreview SIGNOFF lowselectionlabeladdressed; no repoGit/index/stage/commit/push/worktree/RESTshapechanges. Logs target/dev98-search-20261009/. Remaining:no scopedblocker; Git-capable/Windows/remoteCI/physicalscreenreader/otherbrowser notclaimed. Guidance:no agentpolicycorrection; helpusage clarified.'
+- date: 2026-10-10T00:36:07.073598+00:00
+  text: 'UserrefinementwhileCI101workerfinishes: atwide/maxcontentwidth Quickpicks/Viewoptions column besideFilterfields ratherthanverticalstack; removevisibleFilterfieldssectionheading, inputlabels shareQuickpickstyle/baseline. Narrow/mobileexistingstacked2colfields retained, no criteria/state/chip/snapshot/query/sort semantics changes. Validateactualmaxwidth+mobile/keyboard/screenshot/fontgeometry. Currentpreviousworknowcommittedbyuser47d56eb(mainoriginmatch), onlyongoingAgentJobsCIhunksdirtybeforeUI. Prepareworktreeforpossibleamend aftercombinedchecks; no gitstateoperationperformedyet, CI101staysopenuntilrepairsvalidated.'
+- date: 2026-10-10T00:50:53.969955+00:00
+  text: 'Wide-layoutmilestone: namedinline-sizecontainer(1000pxcontentthreshold) putsQuickpicks/Viewoptions left andfieldcontrolsright atmaxwidth; removedvisualFilterfieldsheading butkeptnamedARIAgroup, inputlabels shareQuickpicksfont/weight/lineheight andcontroltopgap. Smallercontainersstackexistingmobile2colfields.Projectfullwidth. No script/filter/query/prefs changes.37componentcasesgreen;2actualbackenddesktop1600/mobile390casesgreen assertsidebyside/topbaseline vsstacked, fontsidentical/no overflow/popup/keyboard/all4views; finalscreenshotswaitforloadedpresetmetadatanotintermediateemptyconfig andinspected. Logs target/dev98-wide-20261010/. StillInProgress pendingcombinedCI/fullgates andamenddecision(noGitmutations). Priorcodecommittedbyuser47d56eb, ongoingAgentJobsworkerchangesunrelatedpreserved. CI101notclosed.'
+- date: 2026-10-10T17:19:02.284084+00:00
+  text: 'Outcome: Wide filter-panel refinement complete: Quick picks/View options beside named filter-fields group at content width >=1000px, visible Filter fields heading removed, labels share typography/control baseline; mobile/narrow layout and all filter/query/preferences behavior retained. Evidence: 37 FilterBar unit cases; actual desktop 1600x1000/mobile 390x844 cases green and screenshots inspected target/smoke-artifacts/filters/tasks-{desktop,mobile}.png. Combined final lint clean, 1333 Rust passed/45 existing Git exclusions, 728 UI passed, fresh-build smoke 249 passed/25 existing Git skips; logs target/dev101-ci-20261009/consolidation-{lint,tests,smoke}-final.log and focused target/dev98-wide-20261010/. Remaining: no scoped implementation blocker; latest changes remain uncommitted/unpublished, no amendment/staging/push/user server restart performed. Remote QA/native Windows/other browser/physical screen-reader verification not claimed; DEV-101 owns CI repair. Guidance: no durable finding.'
+- date: 2026-10-10T17:54:21.539534+00:00
+  text: 'Outcome: User follow-up complete: removed panel Close filters X button; Filters toggle and Escape still dismiss with focus restoration, search-clear and Clear conditions behavior unchanged. Evidence: 37 FilterBar cases green including no-close-button/toggle/Escape assertions; two actual desktop/mobile browser cases green, screenshots inspected target/smoke-artifacts/filters/tasks-{desktop,mobile}.png. Full lint clean, 1333 Rust/728 UI pass, fresh-build smoke final249pass/25existingGit skips; existing45RustGit exclusions. First smoke had existing request-start vs row-render race at field:sprint assertion; now polls expected Beta row under same budget, no production/filter semantics change. Logs target/dev101-ci-20261009/filter-no-close-{lint,tests,browser,smoke-final}.log. Release binary rebuilt with final assets. Remaining: no scoped blocker; Done retained, changes uncommitted, user server not restarted (running embedded server needs restart/browser reload to show rebuilt UI). Guidance: no durable finding.'
 description: The Tasks (and probably other) filters panel has a field for "custom filters" which should already be covered by the normal search bar, so this one can probably be removed.
 history:
 - at: 2026-10-09T19:01:10.287853+00:00
@@ -65,3 +73,31 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-10T00:36:07.042608+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-10T00:36:07.073598+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T00:50:53.969955+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T17:19:02.284084+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T17:19:07.374080+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-10T17:54:21.539534+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

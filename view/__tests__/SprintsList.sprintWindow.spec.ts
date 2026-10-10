@@ -99,6 +99,7 @@ vi.mock('../composables/useSprints', async () => {
     const vue = await import('vue')
     sprintsState.sprintsRef ??= vue.ref<any[]>([])
     return {
+        useSprintFilterOptions: () => vue.ref([]),
         useSprints: () => ({
             sprints: sprintsState.sprintsRef!,
             loading: vue.ref(false),
@@ -117,6 +118,7 @@ vi.mock('../composables/useTaskPanelController', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
+        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['open', 'done']),
         priorities: ref<string[]>(['low', 'med', 'high']),

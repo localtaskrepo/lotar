@@ -83,6 +83,10 @@
         :types="types"
         :sprint-options="sprintFilterOptions"
         :custom-presets="customFilterPresets"
+        :tag-options="filterOptions.tags"
+        :assignee-options="filterOptions.assignees"
+        :custom-field-values="filterOptions.customFieldValues"
+        :custom-field-options="availableCustomFields"
         :value="filterPayload"
         :show-status="false"
         emit-project-key
@@ -311,6 +315,7 @@ import UiSelect from '../components/UiSelect.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useCompletionPolicy, ensureCompletionPolicy, normalizeStatusKey } from '../composables/useCompletionPolicy'
 import { useConfig } from '../composables/useConfig'
+import { useFilterOptions } from '../composables/useFilterOptions'
 import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { MS_PER_DAY } from '../utils/date'
 import { storageGet, storageGetJson, storageSet, storageSetJson } from '../utils/storage'
@@ -326,7 +331,7 @@ import { findLastStatusChangeAt } from '../utils/taskHistory'
 
 const route = useRoute()
 const { projects, refresh: refreshProjects, loading: loadingProjects } = useProjects()
-const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, loading: loadingConfig } = useConfig()
+const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, loading: loadingConfig, scope: configScope, tags: configuredTags, members } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const store = useTaskStore()
 // DEV-65: read the board's keyed query so other consumers (panel, routes in
@@ -352,6 +357,9 @@ const completion = useCompletionPolicy({ tasks: () => items.value })
 const { openTaskPanel } = useTaskPanelController()
 
 const project = ref<string>(route.query.project ? String(route.query.project) : '')
+const filterOptions = useFilterOptions(() => items.value, () => project.value, {
+  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
+})
 const draggingId = ref<string>('')
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ clear?: () => void } | null>(null)

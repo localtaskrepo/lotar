@@ -30,11 +30,15 @@ let launchCounter = 0;
  * a cmd forwarder (Windows) both satisfy that without bash/date/sleep, and
  * neither parses the runner flags — the fixtures read their own argv.
  */
-async function writeAgentLauncher(dir: string, script: string): Promise<string> {
+async function writeAgentLauncher(
+    dir: string,
+    script: string,
+    args: readonly string[],
+): Promise<string> {
     launchCounter += 1;
     if (process.platform === 'win32') {
         const launcher = path.join(dir, `agent-launcher-${launchCounter}.cmd`);
-        await fs.writeFile(launcher, `@"${nodeExecutable()}" "${script}" %*\r\n`, 'utf8');
+        await fs.writeFile(launcher, windowsLauncherContent(script, args), 'utf8');
         return launcher;
     }
     const launcher = path.join(dir, `agent-launcher-${launchCounter}.mjs`);
@@ -49,6 +53,26 @@ async function writeAgentLauncher(dir: string, script: string): Promise<string> 
     );
     await fs.chmod(launcher, 0o755);
     return launcher;
+}
+
+/**
+ * Content of the Windows cmd forwarder. The profile's own arguments are
+ * baked in AFTER `%*` (each token double-quoted) so the values the gated
+ * fixtures depend on (`--gate-dir`, `--label`, `--mode`, ...) reach the
+ * fixture verbatim even if argument forwarding through the runner/wrapper/
+ * cmd chain mangles the forwarded tail: the fixture parsers accept repeated
+ * flags and let the last occurrence win, and the baked occurrence is last.
+ * Batch-unsafe characters are rejected rather than silently rewritten.
+ */
+export function windowsLauncherContent(script: string, args: readonly string[]): string {
+    for (const value of [nodeExecutable(), script, ...args]) {
+        if (/["%\x00-\x1f\x7f]/.test(value) || value.endsWith('\\')) {
+            throw new Error('Windows fixture launcher values cannot contain quotes, percent signs, control characters, or a trailing backslash');
+        }
+    }
+    const baked = args.map((arg) => `"${arg}"`).join(' ');
+    const tail = baked.length > 0 ? ` ${baked}` : '';
+    return `@"${nodeExecutable()}" "${script}" %*${tail}\r\n`;
 }
 
 export interface AgentFixtureSpec {
@@ -80,22 +104,23 @@ export async function createFixtureAgents(
     const dir = await mkdtemp(path.join(tmpdir(), prefix));
     const launchers = new Map<string, string>();
 
-    const launcherFor = async (script: string): Promise<string> => {
-        const existing = launchers.get(script);
+    const launcherFor = async (script: string, args: readonly string[]): Promise<string> => {
+        const key = [script, ...args].join('\u0000');
+        const existing = launchers.get(key);
         if (existing) {
             return existing;
         }
-        const launcher = await writeAgentLauncher(dir, script);
-        launchers.set(script, launcher);
+        const launcher = await writeAgentLauncher(dir, script, args);
+        launchers.set(key, launcher);
         return launcher;
     };
 
     const commands = new Map<string, string>();
     const blocks: string[] = [];
     for (const [name, spec] of Object.entries(specs)) {
-        const launcher = await launcherFor(spec.script ?? MOCK_AGENT_SCRIPT);
-        commands.set(name, launcher);
         const args = spec.args ?? [];
+        const launcher = await launcherFor(spec.script ?? MOCK_AGENT_SCRIPT, args);
+        commands.set(name, launcher);
         const lines = [
             `  ${name}:`,
             `    runner: "copilot"`,
@@ -113,7 +138,7 @@ export async function createFixtureAgents(
         blocks.push(lines.join('\n'));
     }
     if (blocks.length === 0) {
-        await fs.remove(dir);
+        await fs.remove(dir).catch(() => undefined);
         throw new Error('createFixtureAgents requires at least one agent profile');
     }
 
@@ -126,7 +151,7 @@ export async function createFixtureAgents(
             }
             return command;
         },
-        dispose: () => fs.remove(dir),
+        dispose: () => fs.remove(dir).catch(() => undefined),
     };
 }
 
@@ -179,6 +204,15 @@ export interface GateFixture {
     release(): Promise<void>;
     startedExists(label: string): boolean;
     completedExists(label: string): boolean;
+    /** Whether the gate child's earliest boot marker is present. */
+    bootExists(label: string): boolean;
+    /**
+     * Compact one-line evidence string for timeout diagnostics: which gate
+     * markers exist for the label plus a bounded listing of every sentinel
+     * in the gate directory. Proves "process never booted" vs "booted but
+     * held" vs "wrong gate directory" on failure.
+     */
+    diagnostics(label: string): string;
     /** Labels of children that wrote a started sentinel. */
     startedLabels(): string[];
     waitForStarted(label: string, timeoutMs?: number): Promise<void>;
@@ -197,6 +231,7 @@ async function pollUntil(
     predicate: () => boolean,
     timeoutMs: number,
     description: string,
+    evidence?: () => string,
 ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -205,7 +240,8 @@ async function pollUntil(
         }
         await new Promise((resolve) => setTimeout(resolve, 25));
     }
-    throw new Error(`Timed out after ${timeoutMs}ms waiting for ${description}`);
+    const detail = evidence ? `; ${evidence()}` : '';
+    throw new Error(`Timed out after ${timeoutMs}ms waiting for ${description}${detail}`);
 }
 
 const STARTED_PATTERN = /^started-(.*)\.sentinel$/;
@@ -233,6 +269,28 @@ export async function createGateFixture(prefix = 'lotar-smoke-gate-'): Promise<G
             timeoutMs,
             `completed-${label}.sentinel in ${dir}`,
         );
+    };
+
+    const diagnostics = (label: string): string => {
+        const markers = [
+            `boot=${fs.pathExistsSync(sentinelPath(`boot-${label}.sentinel`))}`,
+            `started=${fs.pathExistsSync(sentinelPath(`started-${label}.sentinel`))}`,
+            `completed=${fs.pathExistsSync(sentinelPath(`completed-${label}.sentinel`))}`,
+            `release=${fs.pathExistsSync(releasePath)}`,
+        ].join(' ');
+        let extra = '';
+        try {
+            const sentinels = fs
+                .readdirSync(dir)
+                .filter((entry) => entry.endsWith('.sentinel'))
+                .sort();
+            extra = `; sentinels=[${sentinels.slice(0, 12).join(', ')}${
+                sentinels.length > 12 ? `, …+${sentinels.length - 12}` : ''
+            }]`;
+        } catch {
+            extra = '; sentinels=<gate directory unreadable>';
+        }
+        return `gate-dir=${dir} ${markers}${extra}`;
     };
 
     const release = async (): Promise<void> => {
@@ -268,15 +326,25 @@ export async function createGateFixture(prefix = 'lotar-smoke-gate-'): Promise<G
         release,
         startedExists: (label: string) => fs.pathExistsSync(sentinelPath(`started-${label}.sentinel`)),
         completedExists: (label: string) => fs.pathExistsSync(sentinelPath(`completed-${label}.sentinel`)),
+        bootExists: (label: string) => fs.pathExistsSync(sentinelPath(`boot-${label}.sentinel`)),
+        diagnostics,
         startedLabels,
         waitForStarted: async (label: string, timeoutMs = 10_000): Promise<void> => {
             await pollUntil(
                 () => fs.pathExistsSync(sentinelPath(`started-${label}.sentinel`)),
                 timeoutMs,
                 `started-${label}.sentinel in ${dir}`,
+                () => diagnostics(label),
             );
         },
-        waitForCompleted,
+        waitForCompleted: async (label: string, timeoutMs = 10_000): Promise<void> => {
+            await pollUntil(
+                () => fs.pathExistsSync(sentinelPath(`completed-${label}.sentinel`)),
+                timeoutMs,
+                `completed-${label}.sentinel in ${dir}`,
+                () => diagnostics(label),
+            );
+        },
         drain,
         dispose: async (): Promise<void> => {
             try {

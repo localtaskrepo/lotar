@@ -79,6 +79,11 @@
         :priorities="priorities"
         :types="types"
         :custom-presets="customFilterPresets"
+        :sprint-options="sprintFilterOptions"
+        :tag-options="filterOptions.tags"
+        :assignee-options="filterOptions.assignees"
+        :custom-field-values="filterOptions.customFieldValues"
+        :custom-field-options="availableCustomFields"
         :enable-due-soon="false"
         :enable-recent="false"
         :value="filterPayload"
@@ -230,11 +235,12 @@ import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import { useConfig } from '../composables/useConfig'
+import { useFilterOptions } from '../composables/useFilterOptions'
 import { useColumns } from '../composables/useColumns'
 import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
-import { useSprints } from '../composables/useSprints'
+import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay, toDateKey } from '../utils/date'
@@ -269,14 +275,18 @@ const initialLoading = computed(() => {
   return query.status.value === 'loading' || query.status.value === 'idle'
 })
 const { sprints: sprintList, refresh: refreshSprints } = useSprints()
+const sprintFilterOptions = useSprintFilterOptions(sprintList)
 const { openTaskPanel } = useTaskPanelController()
-const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig } = useConfig()
+const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, scope: configScope, tags: configuredTags, members } = useConfig()
 const { sprintColorForState } = useSprintFormatting(sprintList)
 
 // Initialize from the route at setup so the FilterBar's first emit echoes the
 // real project instead of a transient empty value that would strip ?project=
 // from the URL before onMounted runs.
 const project = ref<string>(route.query.project ? String(route.query.project) : '')
+const filterOptions = useFilterOptions(() => calendarQuery.value?.tasks.value ?? [], () => project.value, {
+  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
+})
 const cursor = ref<Date>(new Date()) // month cursor
 const monthKey = computed(() => `${cursor.value.getFullYear()}-${String(cursor.value.getMonth() + 1).padStart(2, '0')}`)
 const monthSlideDirection = ref<'forward' | 'backward'>('forward')

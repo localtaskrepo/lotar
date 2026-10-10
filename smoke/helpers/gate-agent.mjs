@@ -12,6 +12,10 @@
 //   --exit <code>      exit code after the gate is released (default 0)
 //
 // Protocol:
+//   0. write boot-<label>.sentinel (earliest possible diagnostics marker:
+//      pid, platform, full argv — written before validation can fail so a
+//      missing started marker is provably either "process never reached the
+//      script" (no boot marker anywhere) or "booted but held/failed")
 //   1. emit the pre-gate runner lines for the selected mode
 //   2. write started-<label>.sentinel
 //   3. poll for release.sentinel until it appears or the hold bound elapses
@@ -49,6 +53,26 @@ const requestedHold = Number.parseInt(options['--hold-ms'] ?? '20000', 10);
 const holdMs = Number.isInteger(requestedHold) ? requestedHold : 20000;
 const requestedExit = Number.parseInt(options['--exit'] ?? '0', 10);
 const exitCode = Number.isInteger(requestedExit) ? requestedExit : 0;
+
+function writeMarker(name, payload) {
+    try {
+        mkdirSync(gateDir, { recursive: true });
+        writeFileSync(path.join(gateDir, name), `${JSON.stringify(payload)}\n`);
+    } catch {
+        // Best effort: diagnostics must never crash the fixture.
+    }
+}
+
+// Step 0: prove the process booted and record how it was invoked, before
+// the gate-dir/mode validation below can reject a mangled argv.
+writeMarker(`boot-${label}.sentinel`, {
+    pid: process.pid,
+    platform: process.platform,
+    argv: process.argv,
+    gateDir: gateDir ?? null,
+    mode,
+    holdMs,
+});
 
 if (!gateDir) {
     console.error('gate-agent: --gate-dir is required');

@@ -48,7 +48,7 @@ export interface GrammarKeyMeta {
     /** Which value style the key expects. */
     values: 'options' | 'assignee' | 'due' | 'recent' | 'flag' | 'text'
     /** Option list id, resolved by the caller (e.g. 'statuses', 'sprints'). */
-    optionsFrom?: 'statuses' | 'priorities' | 'types' | 'sprints' | 'projects' | 'customFields'
+    optionsFrom?: 'statuses' | 'priorities' | 'types' | 'sprints' | 'projects' | 'tags' | 'customFields'
 }
 
 export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
@@ -58,7 +58,7 @@ export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
     { key: 'sprints', aliases: ['sprint', 'sprints'], label: 'Sprint', values: 'options', optionsFrom: 'sprints' },
     { key: 'project', aliases: ['project', 'projectkey'], label: 'Project', values: 'options', optionsFrom: 'projects' },
     { key: 'assignee', aliases: ['assignee', 'owner'], label: 'Assignee', values: 'assignee' },
-    { key: 'tags', aliases: ['tag', 'tags'], label: 'Tag', values: 'text' },
+    { key: 'tags', aliases: ['tag', 'tags'], label: 'Tag', values: 'options', optionsFrom: 'tags' },
     { key: 'due', aliases: ['due', 'duedate', 'dueon'], label: 'Due', values: 'due' },
     { key: 'recent', aliases: ['recent'], label: 'Recent', values: 'recent' },
     { key: 'needs', aliases: ['needs', 'need'], label: 'Needs', values: 'text' },
@@ -101,10 +101,16 @@ function normalizeReservedKey(input: string): string {
     return input.toLowerCase().replace(/[-_\s]+/g, '')
 }
 
-/** Fixed value lists for non-option keys. */
+/**
+ * Fixed value lists matching the strict backend parsers (src/services/task_query.rs):
+ * `due` accepts today/soon/later/overdue, `recent` only 7d, and `needs`
+ * a CSV of effort/due. The former `week`/`month`/`1d`/`30d` entries were
+ * server-rejected values and are gone.
+ */
 export const GRAMMAR_FIXED_VALUES: Partial<Record<string, string[]>> = {
-    due: ['today', 'soon', 'overdue', 'week', 'month'],
-    recent: ['1d', '7d', '30d'],
+    due: ['today', 'soon', 'later', 'overdue'],
+    recent: ['7d'],
+    needs: ['effort', 'due'],
 }
 
 export function findGrammarKey(token: string): GrammarKeyMeta | null {
@@ -487,6 +493,12 @@ export interface FilterValueSource {
     sprints?: Array<{ id: number; label: string }>
     projects?: Array<{ prefix: string; name?: string }>
     customFields?: string[]
+    /** Existing tags in scope; suggested only behind an explicit tag:/tags: prefix. */
+    tags?: string[]
+    /** Project members offered alongside the assignee sentinels. */
+    assignees?: string[]
+    /** Known values per custom field name; fields without an entry get no value suggestions. */
+    customFieldValues?: Record<string, string[]>
 }
 
 export interface SuggestionItem {
@@ -510,34 +522,83 @@ function optionsFor(meta: GrammarKeyMeta, source: FilterValueSource): string[] {
             return (source.sprints ?? []).map((s) => String(s.id))
         case 'projects':
             return (source.projects ?? []).map((p) => p.prefix)
+        case 'tags':
+            return source.tags ?? []
         default:
             return []
     }
 }
 
-function valueSuggestions(meta: GrammarKeyMeta, source: FilterValueSource): SuggestionItem[] {
+/** A completable value for any filter key, before the key/separator is attached. */
+interface ValueCandidate {
+    /** Wire value inserted into the draft (quoted separately when needed). */
+    value: string
+    /** Display and match label. */
+    label: string
+    /** Secondary hint (e.g. the value kind). */
+    hint: string
+}
+
+function valueCandidates(meta: GrammarKeyMeta, source: FilterValueSource): ValueCandidate[] {
     if (meta.values === 'options') {
-        return optionsFor(meta, source).map((value) => ({
-            insert: `${meta.key}:${value}`,
-            label: value,
+        return optionCandidates(meta, source).map((candidate) => ({
+            value: candidate.value,
+            label: candidate.label,
             hint: meta.label,
         }))
     }
     if (meta.values === 'assignee') {
         return [
-            { insert: 'assignee:@me', label: 'Me', hint: 'Assignee' },
-            { insert: 'assignee:__none__', label: 'No assignee', hint: 'Assignee' },
+            { value: '@me', label: 'Me', hint: 'Assignee' },
+            { value: '__none__', label: 'No assignee', hint: 'Assignee' },
+            ...(source.assignees ?? []).map((name) => ({ value: name, label: name, hint: 'Assignee' })),
         ]
     }
-    if (meta.values === 'due' || meta.values === 'recent') {
-        return (GRAMMAR_FIXED_VALUES[meta.key] ?? []).map((value) => ({
-            insert: `${meta.key}:${value}`,
-            label: value,
-            hint: meta.label,
-        }))
+    const fixed = GRAMMAR_FIXED_VALUES[meta.key]
+    if (fixed) {
+        return fixed.map((value) => ({ value, label: value, hint: meta.label }))
     }
     if (meta.values === 'flag') {
-        return [{ insert: `${meta.key}:true`, label: meta.label, hint: 'Toggle' }]
+        return [{ value: 'true', label: meta.label, hint: 'Toggle' }]
+    }
+    return []
+}
+
+/**
+ * Backend `sort_by` builtin keys (src/services/task_query.rs); `custom:<name>`
+ * entries are appended per supplied custom field.
+ */
+const SORT_BY_BUILTINS = [
+    'priority', 'status', 'effort', 'due-date', 'created', 'modified',
+    'assignee', 'reporter', 'title', 'type', 'project', 'id', 'tags', 'sprints',
+]
+
+/**
+ * Value candidates for any canonical filter key: grammar keys, the
+ * assignment-only routing keys (deletion/order/sort_by; `q` is free text so
+ * it yields none), and `field:<name>` customs resolved through
+ * `customFieldValues` (case-insensitive). Unknown keys yield nothing —
+ * values are never fabricated for arbitrary text fields.
+ */
+function candidatesForKey(key: string, source: FilterValueSource): ValueCandidate[] {
+    const meta = GRAMMAR_KEYS.find((m) => m.key === key)
+    if (meta) return valueCandidates(meta, source)
+    if (key === 'deletion') {
+        return ['active', 'deleted', 'all'].map((value) => ({ value, label: value, hint: 'Visibility' }))
+    }
+    if (key === 'order') {
+        return ['asc', 'desc'].map((value) => ({ value, label: value, hint: 'Sort order' }))
+    }
+    if (key === 'sort_by') {
+        const customs = (source.customFields ?? []).map((name) => `custom:${name}`)
+        return [...SORT_BY_BUILTINS, ...customs].map((value) => ({ value, label: value, hint: 'Sort field' }))
+    }
+    if (key.startsWith('field:')) {
+        const name = key.slice('field:'.length)
+        const values =
+            Object.entries(source.customFieldValues ?? []).find(([field]) => field.toLowerCase() === name.toLowerCase())?.[1]
+            ?? []
+        return values.map((value) => ({ value, label: value, hint: 'Value' }))
     }
     return []
 }
@@ -569,65 +630,156 @@ function customFieldSuggestions(partial: string, source: FilterValueSource): Sug
         }))
 }
 
+/** Keys whose filter value is a CSV multi-select (one chip per entry). */
+const CSV_VALUE_KEYS = new Set(['status', 'priority', 'type', 'sprints', 'tags', 'needs'])
+
+const VALUE_SUGGESTION_LIMIT = 10
+/** sort_by lists every backend builtin plus custom:<name>, so it needs more room. */
+const SORT_BY_SUGGESTION_LIMIT = 30
+
 /**
- * Suggest completions for the token currently being typed.
- * Returns key suggestions before a `:`, value suggestions after it, and
- * value matches for bare words that look like partial values ("todo").
- * `field:` offers custom field names from the source, inserting an editable
- * `field:<quoted name>=` prefix.
+ * Assignment-only routing keys: their colon form is NOT part of the grammar
+ * (`deletion:deleted` stays free text), so they are suggested as `key=`
+ * prefixes only, matching how they parse (`key=value`, bare or `field:key=`).
+ */
+const ASSIGNMENT_KEY_PREFIXES: SuggestionItem[] = [
+    { insert: 'deletion=', label: 'deletion=', hint: 'Visibility' },
+    { insert: 'order=', label: 'order=', hint: 'Sort order' },
+    { insert: 'sort_by=', label: 'sort_by=', hint: 'Sort field' },
+    { insert: 'q=', label: 'q=', hint: 'Search text' },
+]
+
+/** Matching text for a partially typed value: drop one opening quote (and its closing partner when present). */
+function partialNeedle(raw: string): string {
+    const quote = raw[0]
+    if (quote !== '"' && quote !== "'") return raw
+    if (raw.length >= 2 && raw[raw.length - 1] === quote) return raw.slice(1, -1)
+    return raw.slice(1)
+}
+
+/**
+ * Render suggested value(s) as the raw text after `key:`/`key=`. Safe values
+ * stay bare; CSV entries stay comma-joined while every entry is safe,
+ * otherwise the whole value is quoted so the token still parses cleanly (an
+ * entry-level quote inside a CSV value would read as an unmatched quote).
+ */
+function valueInsertText(parts: string[]): string {
+    const joined = parts.join(',')
+    return parts.every((part) => SAFE_VALUE.test(part)) ? joined : quoteIfNeeded(joined, SAFE_VALUE)
+}
+
+function completeValue(key: string, keyPart: string, rawValue: string, source: FilterValueSource): SuggestionItem[] {
+    const candidates = candidatesForKey(key, source)
+    if (!candidates.length) return []
+    const parts = CSV_VALUE_KEYS.has(key) ? splitTopLevel(rawValue, (ch) => ch === ',') : [rawValue]
+    const partial = parts[parts.length - 1] ?? ''
+    const earlier = parts.slice(0, -1).map((part) => unquoteSegment(part).value)
+    const lower = partialNeedle(partial).toLowerCase()
+    const limit = key === 'sort_by' ? SORT_BY_SUGGESTION_LIMIT : VALUE_SUGGESTION_LIMIT
+    return candidates
+        .filter((c) => !lower || c.label.toLowerCase().includes(lower) || c.value.toLowerCase().includes(lower))
+        .slice(0, limit)
+        .map((c) => ({ insert: `${keyPart}${valueInsertText([...earlier, c.value])}`, label: c.label, hint: c.hint }))
+}
+
+function keySuggestions(lower: string, source: FilterValueSource): SuggestionItem[] {
+    const keyMatches = lower
+        ? GRAMMAR_KEYS.filter((meta) => meta.aliases.some((a) => a.startsWith(lower)))
+        : GRAMMAR_KEYS.filter((meta) => meta.values !== 'flag')
+    const assignmentPrefixes = ASSIGNMENT_KEY_PREFIXES.filter((item) => item.insert.startsWith(lower))
+    if (!lower || keyMatches.length || assignmentPrefixes.length) {
+        const items: SuggestionItem[] = keyMatches.slice(0, 8).map((meta) => ({
+            insert: `${meta.key}:`,
+            label: `${meta.key}:`,
+            hint: meta.label,
+        }))
+        items.push(...assignmentPrefixes)
+        if ('field'.startsWith(lower)) items.push(customFieldPrefixSuggestion())
+        return items
+    }
+    // Bare word matching no key alias: offer value completions across
+    // option-backed keys so partial matches stay keyboard-selectable. Tags
+    // are deliberately excluded — a plain word must stay free text even when
+    // it matches an existing tag (explicit tag:/tags: only).
+    const matches: SuggestionItem[] = []
+    for (const meta of GRAMMAR_KEYS) {
+        if (meta.values !== 'options' || meta.key === 'tags') continue
+        for (const candidate of optionCandidates(meta, source)) {
+            if (candidate.label.toLowerCase().includes(lower)) {
+                matches.push({
+                    insert: `${meta.key}:${quoteIfNeeded(candidate.value, SAFE_VALUE)}`,
+                    label: candidate.label,
+                    hint: meta.label,
+                })
+                if (matches.length >= VALUE_SUGGESTION_LIMIT) return matches
+            }
+        }
+    }
+    if (!matches.length && 'field'.startsWith(lower)) matches.push(customFieldPrefixSuggestion())
+    return matches
+}
+
+function colonValueSuggestions(trimmed: string, colon: number, source: FilterValueSource): SuggestionItem[] {
+    const rawKey = trimmed.slice(0, colon).toLowerCase()
+    const rawValue = trimmed.slice(colon + 1)
+    if (rawKey === 'field') {
+        const fieldEq = findTopLevel(rawValue, '=')
+        if (fieldEq !== -1) {
+            return fieldAssignmentSuggestions(rawValue.slice(0, fieldEq), rawValue.slice(fieldEq + 1), source)
+        }
+        return customFieldSuggestions(rawValue, source)
+    }
+    const meta = findGrammarKey(rawKey)
+    if (!meta) return []
+    return completeValue(meta.key, `${meta.key}:`, rawValue, source)
+}
+
+function assignmentValueSuggestions(trimmed: string, eq: number, source: FilterValueSource): SuggestionItem[] {
+    const keyRaw = trimmed.slice(0, eq)
+    const rawValue = trimmed.slice(eq + 1)
+    if (isFieldKey(keyRaw.toLowerCase())) {
+        return fieldAssignmentSuggestions(keyRaw.slice(keyRaw.indexOf(':') + 1), rawValue, source)
+    }
+    const keySeg = unquoteSegment(keyRaw)
+    if (!keySeg.ok || keySeg.quoted) return []
+    const key = keySeg.value.trim().toLowerCase()
+    if (!key) return []
+    // Bare equality never maps aliases (legacy parseCustomFilter behavior):
+    // only canonical keys and the assignment-only routing keys get values,
+    // so `owner=` stays a custom key with no fabricated suggestions.
+    return completeValue(key, `${key}=`, rawValue, source)
+}
+
+function fieldAssignmentSuggestions(nameRaw: string, rawValue: string, source: FilterValueSource): SuggestionItem[] {
+    const trimmedName = nameRaw.trim()
+    const nameSeg = unquoteSegment(trimmedName)
+    if (!nameSeg.ok) return []
+    const name = nameSeg.quoted ? nameSeg.value : nameSeg.value.trim()
+    if (!name) return []
+    // Quoted names stay literal custom fields even when they collide with
+    // reserved aliases (`field:"sprint"=x` is a custom `sprint` field).
+    const builtin = nameSeg.quoted ? undefined : RESERVED_FIELD_ALIASES[normalizeReservedKey(name)]
+    const key = builtin ?? `field:${name.toLowerCase()}`
+    return completeValue(key, `field:${trimmedName}=`, rawValue, source)
+}
+
+/**
+ * Suggest completions for the token currently being typed. Key suggestions
+ * (grammar keys plus the assignment-only `deletion=`/`order=`/`sort_by=`/`q=`
+ * prefixes) appear before a separator; value suggestions appear after a
+ * colon alias (`status:in`), a canonical `=` key (`status=in`) or an explicit
+ * `field:name=` alias, preserving the typed key form so equality keeps its
+ * replacement semantics. Values are quoted with the shared serializer
+ * helpers whenever needed so every insert re-parses cleanly, and CSV
+ * fragments complete only the last entry (`tags:ui,op` -> `tags:ui,ops`).
  */
 export function suggestForFragment(fragment: string, source: FilterValueSource): SuggestionItem[] {
     const trimmed = fragment.trimStart()
-    const colon = trimmed.indexOf(':')
-    if (colon === -1) {
-        const lower = trimmed.toLowerCase()
-        const keyMatches = lower
-            ? GRAMMAR_KEYS.filter((meta) => meta.aliases.some((a) => a.startsWith(lower)))
-            : GRAMMAR_KEYS.filter((meta) => meta.values !== 'flag')
-        if (!lower || keyMatches.length) {
-            const items: SuggestionItem[] = keyMatches.slice(0, 8).map((meta) => ({
-                insert: `${meta.key}:`,
-                label: `${meta.key}:`,
-                hint: meta.label,
-            }))
-            if ('field'.startsWith(lower)) items.push(customFieldPrefixSuggestion())
-            return items
-        }
-        // Bare word matching no key alias: offer value completions across
-        // option-backed keys so partial matches stay keyboard-selectable.
-        const matches: SuggestionItem[] = []
-        for (const meta of GRAMMAR_KEYS) {
-            if (meta.values !== 'options') continue
-            for (const candidate of optionCandidates(meta, source)) {
-                if (candidate.label.toLowerCase().includes(lower)) {
-                    matches.push({ insert: `${meta.key}:${candidate.value}`, label: candidate.label, hint: meta.label })
-                    if (matches.length >= 10) return matches
-                }
-            }
-        }
-        if (!matches.length && 'field'.startsWith(lower)) matches.push(customFieldPrefixSuggestion())
-        return matches
-    }
-    const rawKey = trimmed.slice(0, colon).toLowerCase()
-    const rawValue = unquote(trimmed.slice(colon + 1))
-    if (rawKey === 'field') return customFieldSuggestions(rawValue, source)
-    const meta = findGrammarKey(rawKey)
-    if (!meta) return []
-    const lower = rawValue.toLowerCase()
-    return valueSuggestions(meta, source)
-        .filter((sug) => !lower || sug.label.toLowerCase().includes(lower))
-        .slice(0, 10)
-}
-
-function unquote(value: string): string {
-    if (value.length >= 2) {
-        const first = value[0]
-        const last = value[value.length - 1]
-        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-            return value.slice(1, -1)
-        }
-    }
-    return value
+    const colon = findTopLevel(trimmed, ':')
+    const eq = findTopLevel(trimmed, '=')
+    if (colon === -1 && eq === -1) return keySuggestions(trimmed.toLowerCase(), source)
+    if (eq !== -1 && (colon === -1 || eq < colon)) return assignmentValueSuggestions(trimmed, eq, source)
+    return colonValueSuggestions(trimmed, colon, source)
 }
 
 /** A structured filter rendered as a dismissible chip. */

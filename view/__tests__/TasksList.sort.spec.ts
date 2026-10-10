@@ -169,6 +169,7 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
+        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
         statuses: configStore.statuses,
         priorities: configStore.priorities,
         types: configStore.types,

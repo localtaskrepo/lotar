@@ -1,0 +1,9 @@
+title: Ticket is marked as modified when no fields change
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-10T00:38:53.062033+00:00
+description: |-
+  I just dragged a ticket on the board and dropped it back where it was, meaning it stayed in "todo", but then a modified property was added.
+  This should only happen when an actual modification happens not when everything stays the same. A signal could be if a history entry is being made, but validate if that is useful here.

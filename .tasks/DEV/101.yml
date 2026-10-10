@@ -1,15 +1,26 @@
 title: Repair QA timezone, Windows locking, and smoke concurrency failures
-status: InProgress
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-09T23:47:49.776890+00:00
-modified: 2026-10-10T00:08:47.454980+00:00
+modified: 2026-10-10T17:23:02.392771+00:00
 comments:
 - date: 2026-10-09T23:49:18.154597+00:00
   text: 'Plan: readyfixesforusernextcommit only(no stage/commit/push/checkout). Preserve45already-stagedbranding/filter files andindex; addonlyCIrelevantworktreehunks. ConfirmedmainQA37864256299@5ddf077: timezonewrongassert(query_predicates...X1duetomorrowcorrecttodayonUTCrollover), WinOS33lockcontentionclassifiedUncategorizednotWouldBlock(no retry), 2smoke timeouts reloadtwosessions/livejobcard. Fixwithouttimeout increases/retries/skips/coverage-gate weakening. Reproduce UTCtest+platformneutralfs2contention, inspectactualnetworkidle/preconnect andSSEstartup/snapshot race withdeterministicpublic-boundarytests; preservelock->journal->callback/force safety andtaskAPIcontracts. Windowsmissingportable-artifact secondaryskip guardcorrectonlyifteststepnotattempted, missingafterattemptmuststillfail. Targetednextest/node/UI/browser &fulllint/Rust/UI/freshsmoke, runtimeGit exclusions explicit, Windowsactualrunnotclaimed. Allread-onlyGitinspection alloweduserclarification; no Gitstatechangingopsoruserprocesschanges.'
 - date: 2026-10-10T00:08:47.454980+00:00
   text: 'Progress: UTCfailure reproduced1red(date rollover X1) thenexpectedDatebucketcorrectedTESTONLY, UTC/LA/Tokyo allgreen; no runtimequery change. Win33contentionclassifierredonhost withexplicitfs2NativeMarker then17storage/dategreen,2sec/10ms/journal/callback/temp ordering intact. Parentreadonlyreview verifiedfs2Windowserror33native source/Unixalias andUTCmath/reportguard; foundwrongserde_yaml crate innewworkflowtest, fixedserde_yaml_ng beforefullgates. Windows portable report stepid+always/attempted-only guard andstrictmissing-after-attempt contracttest added(no qualitygate weakening). Its first compileoverlappednetworkchild transientE0596 webserver helper/newimports; no testpassclaim, parentwillrerunafterchildcomplete. Existing45stagedfiles retainedindexunchanged; newfixesunstaged/usernextcommitno stage/commit/push. Remainingnetworkidle/preconnect/SSEsnapshot smoke rootcause/repairownedchild then source review/fullgates, actualWindows/Gitcapability/remoteCI limits explicit.'
+- date: 2026-10-10T01:08:57.658418+00:00
+  text: 'Publishedverificationupdate: user-pushed47d QA38009424813 provesLinuxRust+fullcoverageandWindowssafety/scan+coveragePASS (originalUTC/Winlockfailuresresolvedonactualrunners). Stillred: Linuxui.advanceddefaultloadreload30s remains1fail267pass, Windowsportable2fail30pass(APIgatedstarted-progress.sentinel10s absent, CLIasynccompletedFiletruebeforerelease). No remotetriggers usedread-onlyevidence. Reloadchildresumedwithnewactualsymptom;Windowsfixture/automationchild boundedseparateownedfiles. ParentAgentJobs hardeningfoundsilentopen-refreshsupersedinginitial leftloadingpermanent/hidfailure;2UIred+11guards ->13green via latestrefreshfinallyownsloading andreportErrors inheritsinitialvisibleload,50withFilterBargreen. ParentnewwideUI37+2green trackedDEV98 separately. KeepCI101open untilremainingactualCI failureclasses fixed/no timeout/skips/retry/serialization weakening; no amend/forcepush ofpublished47d yet. UnrelateduserDEV102noop-modificationticketobservedREADONLY nottouched.'
+- date: 2026-10-10T02:18:31.191522+00:00
+  text: 'Windowsfollowupmilestone: portable selection+harness35/35local workerreported(nativeWindowsrerunPENDING). CI20.21sCLI/20shold stronglysuggestsinheritedstdio class, notprovenstdin-specific channel; readonlyreviewconfirmedexeca parentpipes andwarnedpriorstdin narrativeoverstated. Correctedservicecomment detachedstdio class; monitorchild.wait_with_output nowdrainsstderrwhilewait toavoidchattypipe deadlock (newdaemon-stderrpublicregression delegatedpending). Windowslauncherguardsaddedforquote/percent/control/trailingbackslash values; lastwinsbakedfixtureargs retainsknownsafeprofiles; unsafe-input andcleanup testsdelegatedpendingreviewfixes, no runtimeWindows successclaim. MediumreviewnotyetfinalSIGNOFF. Root18storage/date/workflowcasesgreenUTC, Windowsworkflow nowincludesnewlauncher regressionfile(actualWindowsnextpushwillrun35selection). AgentJobsinitialsilent-supersede loading/error2red->13UIgreen. Linuxreloadactualpublishedfailurestillresearchedownchild; no fullgreen/deployclaim or CI101completion/amend yet, budgets/gates unchanged.'
+- date: 2026-10-10T17:07:21.858496+00:00
+  text: 'Outcome: Continue real two-tab same-profile reload repair, not separate-context test workaround. Plan: share/ref-count /api/events streams across task, config, sync and agent consumers while retaining per-consumer listeners/reconnect reconciliation; restore concurrent default-load reload regression. Evidence: current useSse creates one EventSource per call; Tasks uses task-store, task-page and config watcher streams. Remaining: red/green lifecycle tests, independent review, then unchanged full lint/test/smoke gates; native Windows and published QA still pending. Guidance: no durable finding; Git writes and user server changes remain out of scope.'
+- date: 2026-10-10T17:18:47.501288+00:00
+  text: 'Outcome: Consolidated all current /api/events UI consumers into one ref-counted source per tab/server-parameter scope, with consumer-owned kind routing, listener cleanup, reconnect callbacks and late-open reconciliation. Permanently CLOSED sources replaced without old-owner cache eviction (new genuine red-to-green regression). Restored original same-context advanced reload test; ungated real-binary canary verifies one stream per tab, live task updates to both and concurrent default-load reload. Separate-context/single-process skip workaround and investigation-only spec removed. Evidence: six shared-SSE unit cases; 19 SSE/AgentJobs focused cases; seven reload/raw-socket cases passed, five existing Git exclusions. Full final lint clean; nextest 1333 passed/45 existing Git exclusions (UTC, zero retries), UI 728 passed, build-first smoke 249 passed/25 existing Git skips. Logs target/dev101-ci-20261009/consolidation-{lint,tests,smoke}-final.log. Initial full smoke 247 pass/2 fail explained by obsolete kinds-based soft-delete instrumentation; pathname-based stream observation preserves all readiness/event/deletion assertions, focused 5/5 and final full gate green. Windows portable reviewer signed off; cosmetic indentation fixed. Remaining: SSE follow-up review result, native Windows and Git-capable/multi-process remote QA after developer publication; current published run 38009424813 remains failed, not represented as green. No Git mutations or user server restarts. Guidance: no durable finding.'
+- date: 2026-10-10T17:22:57.304213+00:00
+  text: 'Outcome: Scoped implementation and local self-verification complete. Independent final reviews sign off shared SSE lifecycle/CLOSED-cache recovery/same-context load+deletion regressions and Windows launcher/async drain/CI reporting. All current app event consumers now share one source per tab; source closes only with final consumer, late AgentJobs joins reconcile, kind/project/debounce scope preserved. Portable fixes retain bounded gate/no-early-completion contracts, last-wins Windows fixture args, unsafe-value rejection, best-effort cleanup and concurrent stderr drain. Evidence: final lint clean; full nextest 1333 passed/45 existing Git exclusions, UI 728 passed, fresh-build smoke 249 passed/25 existing Git skips (UTC, isolated OS TMPDIR, canonical concurrency, no retry/timeout/skip weakening). Four launcher cases pass after cosmetic-only review cleanup; release binary freshly built warning-free. Final logs target/dev101-ci-20261009/consolidation-{lint,tests,smoke,launcher,release}-final.log. Six SSE regressions include genuine red proofs; restored ungated two-tab test and six raw-socket cases pass. Remaining: changes uncommitted/unpublished; developer''s next publication must confirm actual Windows and Git-capable/multi-process Chromium QA. Published run 38009424813 remains failed; no remote-green/native-Windows claim and no workflow triggered. Current local Chromium uses --single-process; 45/25 exclusions are existing capability limits, not passed tests. Shared ready is test-only connection signal, not replayed to late subscribers; no production listener relies on it. This continuation made no Git mutations/user server restarts; unrelated DEV-102 untouched. Guidance: no durable finding. Marking Done for completed self-verified implementation, separate from pending publication/remote verification.'
 history:
 - at: 2026-10-09T23:49:18.154597+00:00
   actor: mallox
@@ -19,3 +30,31 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-10T01:08:57.658418+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T02:18:31.191522+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T17:07:21.858496+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T17:18:47.501288+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T17:22:57.304213+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T17:23:02.392771+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    new: mallox

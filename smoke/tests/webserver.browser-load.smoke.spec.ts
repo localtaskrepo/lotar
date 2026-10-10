@@ -1,55 +1,90 @@
 import { existsSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import type { Page } from '@playwright/test';
+import { describe, it } from 'vitest';
 import { resolveBinaryPath } from '../helpers/binary.js';
 import { startLotarServer } from '../helpers/server.js';
 import { withBrowser } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
-
 /**
  * Browser-level connection-handling regression for `lotar serve`, run
  * WITHOUT Git so it executes in sandboxes where .git initialization is
- * blocked. It mirrors the Linux CI failure (run 37864256299): two browser
- * sessions holding speculative preconnect sockets timed out on
- * `page.reload()` waiting for the load event, because the server serviced
- * accepted sockets serially and each idle preconnect starved later
- * requests until its 30s read timeout.
- *
- * The reloads use Playwright's DEFAULT waitUntil ('load') and default 30s
- * timeout — no relaxed waiting — so a regression back to serial servicing
- * fails this test the same way CI failed.
+ * blocked. Two tabs share ONE browser context — the real two-tab user
+ * scenario. The app holds a single consolidated /api/events stream per
+ * tab, so both tabs together stay far below Chromium's per-host
+ * connection pool cap and concurrent `page.reload()` calls must complete
+ * under Playwright's DEFAULT waitUntil ('load') and default 30s timeout —
+ * no relaxed waiting. A regression back to serial socket servicing or to
+ * multiple SSE streams per tab fails this test the same way the original
+ * Linux CI run (37864256299) failed.
  */
 
 const lotarBinaryAvailable = existsSync(resolveBinaryPath());
 
+function trackEventSourceRequests(page: Page): () => number {
+    const requests: string[] = [];
+    page.on('request', (request) => {
+        if (request.url().includes('/api/events')) {
+            requests.push(request.url());
+        }
+    });
+    return () => requests.length;
+}
+
 describe.skipIf(!lotarBinaryAvailable)('lotar serve browser load contract (real binary, no git)', () => {
-    it('two browser sessions reload concurrently and both see the added task', async () => {
+    it('two tabs in one context each hold one event source and reload concurrently', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({ name: 'dev101-browser-load-' });
         try {
             const server = await startLotarServer(workspace);
             try {
-                const response = await fetch(`${server.url}/api/tasks/add?project=DEVA`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: 'Dev101 reload task' }),
-                });
-                expect(response.status).toBeLessThan(300);
+                const addTaskViaApi = async (title: string): Promise<void> => {
+                    const response = await fetch(`${server.url}/api/tasks/add?project=DEVA`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title }),
+                    });
+                    expect(response.status).toBeLessThan(300);
+                };
+                await addTaskViaApi('Dev101 reload task');
 
                 await withBrowser({}, async (context) => {
                     const pageA = await context.newPage();
                     const pageB = await context.newPage();
+                    const eventSourcesA = trackEventSourceRequests(pageA);
+                    const eventSourcesB = trackEventSourceRequests(pageB);
+
                     await Promise.all([
                         pageA.goto(server.url, { waitUntil: 'load' }),
                         pageB.goto(server.url, { waitUntil: 'load' }),
                     ]);
-
-                    // Default waitUntil ('load') and default 30s timeout:
-                    // the exact call shape that failed in CI.
-                    await Promise.all([pageA.reload(), pageB.reload()]);
-
                     await Promise.all([
                         pageA.waitForSelector('text=Dev101 reload task', { timeout: 15_000 }),
                         pageB.waitForSelector('text=Dev101 reload task', { timeout: 15_000 }),
                     ]);
+
+                    // Exactly one consolidated /api/events source per tab.
+                    await expect.poll(eventSourcesA, { timeout: 15_000 }).toBe(1);
+                    await expect.poll(eventSourcesB, { timeout: 15_000 }).toBe(1);
+
+                    await addTaskViaApi('Dev101 live update task');
+
+                    // The real task event reaches both tabs before any reload,
+                    // and neither tab needed a second SSE connection to see it.
+                    await Promise.all([
+                        pageA.waitForSelector('text=Dev101 live update task', { timeout: 15_000 }),
+                        pageB.waitForSelector('text=Dev101 live update task', { timeout: 15_000 }),
+                    ]);
+                    expect(eventSourcesA()).toBe(1);
+                    expect(eventSourcesB()).toBe(1);
+
+                    // Default waitUntil 'load' and default timeout on purpose.
+                    await Promise.all([pageA.reload(), pageB.reload()]);
+
+                    await Promise.all([
+                        pageA.waitForSelector('text=Dev101 live update task', { timeout: 15_000 }),
+                        pageB.waitForSelector('text=Dev101 live update task', { timeout: 15_000 }),
+                    ]);
+                    await expect.poll(eventSourcesA, { timeout: 15_000 }).toBe(2);
+                    await expect.poll(eventSourcesB, { timeout: 15_000 }).toBe(2);
                 });
             } finally {
                 await server.stop();

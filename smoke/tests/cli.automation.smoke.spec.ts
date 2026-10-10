@@ -505,9 +505,21 @@ ${indentBlock(nodeRunActionYaml([gate.script, ...gate.agentArgs({ mode: 'plain',
             // started but cannot be completed (the release file does not
             // exist yet). A blocking run would keep addTask from returning
             // until the child finished.
+            const addTaskStartedAt = Date.now();
             const task = await workspace.addTask('Async gate test');
+            const addTaskMs = Date.now() - addTaskStartedAt;
             await gate.waitForStarted('automation', 10_000);
-            expect(gate.completedExists('automation')).toBe(false);
+            if (gate.completedExists('automation')) {
+                // Same predicate as expect(...).toBe(false), with evidence:
+                // an addTask duration close to the 20s hold bound means the
+                // CLI did not return until the wait:false child self-exited
+                // (the async spawn stayed coupled to the parent process).
+                throw new Error(
+                    `async run child completed before release; addTask blocked for ${addTaskMs}ms ` +
+                        `(child hold bound is 20000ms — a duration near it means lotar task add waited ` +
+                        `for the wait:false child to self-exit); ${gate.diagnostics('automation')}`,
+                );
+            }
 
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
             expect(yaml.tags).toContain('async-verified');

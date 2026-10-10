@@ -29,6 +29,13 @@ fn attempted_windows_smoke_runs_still_require_a_report_but_skipped_runs_do_not()
         .expect("report guard requires a named test step");
     let condition = upload["if"].as_str().unwrap();
     assert!(
+        run["run"]
+            .as_str()
+            .unwrap()
+            .contains("smoke/tests/harness.agent-launcher.smoke.spec.ts"),
+        "portable launcher regressions must also execute on Windows"
+    );
+    assert!(
         condition.contains("always()"),
         "reports must survive a failed test run"
     );

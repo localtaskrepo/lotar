@@ -1,0 +1,61 @@
+title: Complete filter autocomplete and add search syntax reference
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-10T18:39:19.012412+00:00
+modified: 2026-10-10T21:14:16.041806+00:00
+comments:
+- date: 2026-10-10T18:41:24.312311+00:00
+  text: 'Plan: keep shared FilterBar grammar/data contracts intact; add scoped existing tag/member/custom-value sources and complete colon/equality value suggestions with safe quoting/CSV preservation. Fix invalid due/recent suggestions to current backend enum values and add needs/visibility/sort completions without changing unknown-colon parsing. Add a help icon directly beside search opening a labelled inline reference for every supported filter kind, aliases, valid values and colon-vs-equality semantics; keyboard Escape/outside dismissal must not apply or clear filters. Parent owns FilterBar UI/sourcing/browser; bounded child owns grammar and unit tests, read-only child identifies option sources. No REST changes/Git mutations/user-server restarts; targeted red/green then required full lint/Rust/UI/fresh smoke and desktop/mobile screenshot inspection.'
+- date: 2026-10-10T19:10:58.914133+00:00
+  text: 'Outcome: Completed option-backed tag/member/custom-field value autocomplete, safe quoted insertion and CSV preservation, supported colon/equality completions including visibility/sort/text prefixes. Plain tag-like words remain free text; unknown colon terms, bare owner= custom semantics, quoted reserved literal custom names, prototype-named fields and replacement/merge grammar preserved. Corrected due/recent/needs suggestions to backend-valid enums. Shared sources in Tasks/Board/Calendar/Sprints combine config with observed own-query values, retain knowledge per scope without query-membership writes or extra fetches, hide stale/foreign scopes, preserve literal custom whitespace and ''*''. Full configured custom names beyond quick-pick cap and shared sprint choices supplied in all four views. Added labelled bounded help region via icon beside search with every supported type/alias/syntax, keyboard and project-scope/value-source limits; help opens/dismisses without filter mutation. Existing serve docs updated. Evidence: independent parent-source and final grammar/smoke reviews sign off; focused163 UI tests; four desktop/mobile original/new browser cases; four inspected images target/smoke-artifacts/filters/{help,autocomplete}-{desktop,mobile}.png. Final lint clean; full nextest1333pass/45existingGit exclusions (UTC zero retries), UI769pass, fresh-build smoke251pass/25existingGit skips; release rebuilt. Logs target/dev103-20261010/{lint-green,tests-green,smoke-green,unit-focused,autocomplete-final,screenshots-final,release-final}.log. Initial failures retained: Calendar mock omitted new sprint helper (fixed mock); incomplete-draft browser test now dismisses newly available suggestions before raw Enter; new fixture assumptions corrected to actual scoped/free-text membership and topmost Escape behavior. Full smoke initially had existing boot-marker partial JSON race and agent running-status timeout: boot observer now waits complete validated JSON under same10s bound; unchanged agent test targeted and full rerun green (no product-agent fix/new timeout/retry/concurrency/skip relaxation). Remaining: known option values are configured/observed loaded values, not an exhaustive all-task facet scan; unknown free-form values remain manually enterable. Actual Windows/Git-dependent scenarios and other browsers/physical screen-reader not claimed. Changes uncommitted, unrelated DEV-102 untouched, no user-server restart; running embedded server needs restart/browser reload for rebuilt assets. Guidance: no durable finding.'
+- date: 2026-10-10T21:09:41.047933+00:00
+  text: 'Follow-up plan: compact borderless ghost help control32x32 with4px search gap, retain shared focus ring and add accent/tinted open state driven by aria-expanded. Decouple outside-click logic so Filters toggle and filter panel controls do not dismiss help. Scope Escape: panel controls/search while panel open close Filters only; help/toggle close help only. Genuine red regression reproduced coupled click dismissal and search-Escape ambiguity, now43 FilterBar cases green. Added desktop/mobile style/open-state/independent-control browser assertions; next full gates and rebuilt release. No Git mutations/user server restart or unrelated task edits.'
+- date: 2026-10-10T21:14:10.840383+00:00
+  text: 'Outcome: Follow-up complete. Help is a borderless ghost/icon-only32px control4px from search (was bordered36px/8px gap), with accent icon/tinted background while aria-expanded=true and existing keyboard focus ring preserved. Filter toggle and panel controls no longer dismiss help via outside-click; closing help does not close Filters. Escape in panel/search with Filters open closes only Filters; Escape scoped to help closes only help; menu precedence retained. Evidence: genuine pre-fix click/Escape regression;43 FilterBar cases green including independent toggles/controls/focus/no filter writes. Desktop/mobile real-browser assertions verify0px border32x32 size<=4.5px gap and different open/closed color, both disclosure directions and help active state; refreshed screenshots inspected target/smoke-artifacts/filters/{help,autocomplete}-{desktop,mobile}.png. Full lint clean,1333Rust/770UI/251fresh-build smoke pass; existing45RustGit exclusions/25smokeGit skips unchanged, UTC, no new retries/timeouts/concurrency changes. Release warning-free rebuilt; evidence target/dev103-20261010/help-controls-{lint,tests,smoke,release}.log. Remaining: no scoped blocker; native Windows/Git-capable/other-browser/physical screen-reader checks not claimed. Changes uncommitted, unrelated work preserved; no Git mutations or user server restart. Running embedded server needs restart/browser reload to display new build. Guidance: no durable finding.'
+description: Offer existing project-scoped tag and assignee options plus all valid filter completions; preserve current colon/equality/custom-field grammar and keyboard behavior. Add accessible compact help next to search listing supported filter types, syntax and valid values. Verify scoped data, quoted values, keyboard/help dismissal, desktop/mobile browser behavior and required lint/test/smoke gates.
+history:
+- at: 2026-10-10T18:39:24.120262+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-10T18:41:24.312311+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T19:10:58.914133+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T19:11:05.399170+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-10T21:05:57.078678+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-10T21:09:41.047933+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T21:14:10.840383+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-10T21:14:16.041806+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -181,6 +181,11 @@
         :priorities="priorities"
         :types="types"
         :custom-presets="customFilterPresets"
+        :sprint-options="sprintFilterOptions"
+        :tag-options="filterOptions.tags"
+        :assignee-options="filterOptions.assignees"
+        :custom-field-values="filterOptions.customFieldValues"
+        :custom-field-options="availableCustomFields"
         :value="filterPayload"
         emit-project-key
         storage-key="lotar.sprints.filter"
@@ -792,12 +797,13 @@ import UiSelect from '../components/UiSelect.vue'
 import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog.vue'
 import { showToast } from '../components/toast'
 import { useConfig } from '../composables/useConfig'
+import { useFilterOptions } from '../composables/useFilterOptions'
 import { useCopyModifier } from '../composables/useCopyModifier'
 import { buildServerFilter, listFromCsv, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useColumns } from '../composables/useColumns'
 import { ensureCompletionPolicies, useCompletionPolicy } from '../composables/useCompletionPolicy'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
-import { useSprints } from '../composables/useSprints'
+import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { MS_PER_DAY, formatRelativeTime, fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
 import { formatMember } from '../utils/member'
@@ -903,6 +909,7 @@ function loadHighlightPreference(): boolean {
 const route = useRoute()
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, missingSprints, hasMissing: hasMissingSprints } = useSprints()
+const sprintFilterOptions = useSprintFilterOptions(sprints)
 const { openTaskPanel } = useTaskPanelController()
 const {
   sprintDefaults,
@@ -910,6 +917,9 @@ const {
   priorities,
   types,
   customFields: availableCustomFields,
+  scope: configScope,
+  tags: configuredTags,
+  members,
   refresh: refreshConfigDefaults,
 } = useConfig()
 
@@ -1014,6 +1024,9 @@ function parseDateLike(value?: string | null) {
 const allowClosed = ref(false)
 const timeRange = ref<TimeRangeKey>(loadStoredTimeRange())
 const tasks = ref<TaskDTO[]>([])
+const filterOptions = useFilterOptions(() => tasks.value, () => project.value, {
+  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
+})
 const tasksLoading = ref(false)
 const initialized = ref(false)
 

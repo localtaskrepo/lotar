@@ -47,6 +47,9 @@ const source = {
     sprints: [{ id: 1, label: 'Sprint 1' }, { id: 2, label: 'Sprint 2' }],
     projects: [{ prefix: 'DEV' }, { prefix: 'LOTA' }],
     customFields: ['sprint', 'iteration'],
+    tags: ['ui', 'ops', 'ux'],
+    assignees: ['alice', 'bob'],
+    customFieldValues: { sprint: ['inc-1'], iteration: ['beta', 'ga'], 'my field': ['a b'] },
 }
 
 describe('parseFilterQuery', () => {
@@ -503,8 +506,211 @@ describe('suggestForFragment', () => {
         expect(suggestions.some((s) => s.insert === 'field:')).toBe(false)
     })
 
-    it('offers no suggestions for completed custom assignments', () => {
-        expect(suggestForFragment('field:iteration=', source)).toEqual([])
+    it('offers no value suggestions for custom assignments without known values', () => {
+        expect(suggestForFragment('field:iteration=', { customFields: ['iteration'] })).toEqual([])
+    })
+})
+
+describe('suggestForFragment fixed value enums (backend-strict)', () => {
+    it('suggests exactly the backend-valid due buckets', () => {
+        expect(suggestForFragment('due:', source).map((s) => s.insert)).toEqual(['due:today', 'due:soon', 'due:later', 'due:overdue'])
+    })
+
+    it('suggests 7d as the only recent window', () => {
+        expect(suggestForFragment('recent:', source).map((s) => s.insert)).toEqual(['recent:7d'])
+    })
+
+    it('suggests effort and due for needs', () => {
+        expect(suggestForFragment('needs:', source).map((s) => s.insert)).toEqual(['needs:effort', 'needs:due'])
+    })
+
+    it('filters fixed values by partial input', () => {
+        expect(suggestForFragment('due:to', source).map((s) => s.insert)).toEqual(['due:today'])
+    })
+})
+
+describe('suggestForFragment tags and assignee options', () => {
+    it('keeps the tag key-prefix pick at tags: and immediately offers known values', () => {
+        expect(suggestForFragment('tag', source)).toEqual([{ insert: 'tags:', label: 'tags:', hint: 'Tag' }])
+        expect(suggestForFragment('tags:', source).map((s) => s.insert)).toEqual(['tags:ui', 'tags:ops', 'tags:ux'])
+    })
+
+    it('suggests supplied tags behind the explicit tag prefix', () => {
+        expect(suggestForFragment('tags:', source).map((s) => s.insert)).toEqual(['tags:ui', 'tags:ops', 'tags:ux'])
+        expect(suggestForFragment('tag:op', source).map((s) => s.insert)).toEqual(['tags:ops'])
+    })
+
+    it('offers no tag suggestions without supplied options', () => {
+        expect(suggestForFragment('tags:', {})).toEqual([])
+    })
+
+    it('keeps bare words free text even when they match an existing tag', () => {
+        expect(suggestForFragment('roadmap', { tags: ['roadmap'] })).toEqual([])
+    })
+
+    it('keeps Me and No assignee plus supplied members', () => {
+        expect(suggestForFragment('assignee:', source).map((s) => s.insert)).toEqual([
+            'assignee:@me',
+            'assignee:__none__',
+            'assignee:alice',
+            'assignee:bob',
+        ])
+    })
+
+    it('matches members and the @me sentinel by partial input', () => {
+        expect(suggestForFragment('assignee:al', source).map((s) => s.insert)).toEqual(['assignee:alice'])
+        expect(suggestForFragment('assignee:@m', source).map((s) => s.insert)).toEqual(['assignee:@me'])
+    })
+
+    it('quotes assignee names that need it and round-trips', () => {
+        const suggestions = suggestForFragment('assignee:ops', { assignees: ['ops team'] })
+        expect(suggestions.map((s) => s.insert)).toEqual(['assignee:"ops team"'])
+        expect(parseFilterQuery(suggestions[0]!.insert).filters.assignee).toBe('ops team')
+    })
+})
+
+describe('suggestForFragment safe quoting and parse round-trips', () => {
+    it('quotes values containing spaces on every insertion path', () => {
+        expect(suggestForFragment('status:in', source).map((s) => s.insert)).toEqual(['status:"In Progress"'])
+        expect(suggestForFragment('state:in', source).map((s) => s.insert)).toEqual(['status:"In Progress"'])
+        expect(suggestForFragment('status=in', source).map((s) => s.insert)).toEqual(['status="In Progress"'])
+    })
+
+    it('keeps colon inserts on merge semantics and equality inserts on replacement', () => {
+        const colon = parseFilterQuery('status:"In Progress"')
+        expect(colon.filters).toEqual({ status: 'In Progress' })
+        expect(colon.replaceKeys).toBeUndefined()
+        const assigned = parseFilterQuery('status="In Progress"')
+        expect(assigned.filters).toEqual({ status: 'In Progress' })
+        expect(assigned.replaceKeys).toEqual(['status'])
+    })
+
+    it('round-trips every inserted suggestion through the parser', () => {
+        const inserts = [
+            ...suggestForFragment('status:in', source).map((s) => s.insert),
+            ...suggestForFragment('status=in', source).map((s) => s.insert),
+            ...suggestForFragment('tags:ui,op', source).map((s) => s.insert),
+            ...suggestForFragment('tags:release', { tags: ['release candidate'] }).map((s) => s.insert),
+            ...suggestForFragment('field:"sprint"=in', source).map((s) => s.insert),
+            ...suggestForFragment('assignee:ops', { assignees: ['ops team'] }).map((s) => s.insert),
+        ]
+        expect(inserts.length).toBeGreaterThan(0)
+        for (const token of inserts) {
+            const parsed = parseFilterQuery(token)
+            expect(parsed.errors).toBeUndefined()
+            expect(parsed.text).toBe('')
+        }
+    })
+})
+
+describe('suggestForFragment CSV fragments', () => {
+    it('completes the last csv entry without dropping earlier values', () => {
+        expect(suggestForFragment('tags:ui,op', source).map((s) => s.insert)).toEqual(['tags:ui,ops'])
+        expect(suggestForFragment('needs:effort,d', source).map((s) => s.insert)).toEqual(['needs:effort,due'])
+    })
+
+    it('quotes the whole csv value when an entry contains spaces', () => {
+        expect(suggestForFragment('status:"In Progress",to', source).map((s) => s.insert)).toEqual(['status:"In Progress,Todo"'])
+        expect(parseFilterQuery('status:"In Progress,Todo"').filters.status).toBe('In Progress,Todo')
+        expect(chipsForFilterValue({ status: 'In Progress,Todo' }, source)).toHaveLength(2)
+    })
+
+    it('round-trips csv completions through the parser', () => {
+        expect(parseFilterQuery('tags:ui,ops').filters).toEqual({ tags: 'ui,ops' })
+        expect(parseFilterQuery('needs:effort,due').filters).toEqual({ needs: 'effort,due' })
+    })
+
+    it('completes csv fragments after equality with replacement semantics', () => {
+        expect(suggestForFragment('tags=ui,op', source).map((s) => s.insert)).toEqual(['tags=ui,ops'])
+        const parsed = parseFilterQuery('tags=ui,ops')
+        expect(parsed.filters).toEqual({ tags: 'ui,ops' })
+        expect(parsed.replaceKeys).toEqual(['tags'])
+    })
+})
+
+describe('suggestForFragment equality completions', () => {
+    it('suggests values after canonical bare keys', () => {
+        expect(suggestForFragment('status=To', source).map((s) => s.insert)).toEqual(['status=Todo'])
+        expect(suggestForFragment('STATUS=to', source).map((s) => s.insert)).toEqual(['status=Todo'])
+        expect(suggestForFragment('mine=', source).map((s) => s.insert)).toEqual(['mine=true'])
+    })
+
+    it('keeps bare aliases custom without value suggestions', () => {
+        expect(suggestForFragment('state=To', source)).toEqual([])
+        expect(suggestForFragment('owner=op', source)).toEqual([])
+    })
+
+    it('suggests the assignment-only key prefixes', () => {
+        expect(suggestForFragment('del', source).map((s) => s.insert)).toEqual(['deletion='])
+        expect(suggestForFragment('', source).map((s) => s.insert)).toEqual(expect.arrayContaining(['deletion=', 'order=', 'sort_by=', 'q=']))
+    })
+
+    it('suggests deletion and order values', () => {
+        expect(suggestForFragment('deletion=', source).map((s) => s.insert)).toEqual(['deletion=active', 'deletion=deleted', 'deletion=all'])
+        expect(suggestForFragment('order=a', source).map((s) => s.insert)).toEqual(['order=asc'])
+    })
+
+    it('suggests backend sort_by builtins plus supplied custom fields', () => {
+        const inserts = suggestForFragment('sort_by=', source).map((s) => s.insert)
+        expect(inserts).toContain('sort_by=priority')
+        expect(inserts).toContain('sort_by=due-date')
+        expect(inserts).toContain('sort_by=sprints')
+        expect(inserts).toContain('sort_by=custom:sprint')
+        expect(suggestForFragment('sort_by=custom:', source).map((s) => s.insert)).toEqual(['sort_by=custom:sprint', 'sort_by=custom:iteration'])
+    })
+
+    it('offers no colon or q= value suggestions for assignment-only keys', () => {
+        expect(suggestForFragment('deletion:d', source)).toEqual([])
+        expect(suggestForFragment('q=anything', source)).toEqual([])
+    })
+})
+
+describe('suggestForFragment field: value completions', () => {
+    it('suggests builtin values after explicit field: aliases preserving the typed form', () => {
+        expect(suggestForFragment('field:STATE=T', source).map((s) => s.insert)).toEqual(['field:STATE=Todo'])
+        expect(suggestForFragment('field:sprint=', source).map((s) => s.insert)).toEqual(['field:sprint=1', 'field:sprint=2'])
+    })
+
+    it('suggests known custom field values case-insensitively', () => {
+        expect(suggestForFragment('field:iteration=b', source).map((s) => s.insert)).toEqual(['field:iteration=beta'])
+        expect(suggestForFragment('field:Iteration=', source).map((s) => s.insert)).toEqual(['field:Iteration=beta', 'field:Iteration=ga'])
+    })
+
+    it('respects quoted reserved literal names with their known values', () => {
+        expect(suggestForFragment('field:"sprint"=in', source).map((s) => s.insert)).toEqual(['field:"sprint"=inc-1'])
+        expect(parseFilterQuery('field:"sprint"=inc-1').filters).toEqual({ 'field:sprint': 'inc-1' })
+    })
+
+    it('quotes custom values that need it and round-trips', () => {
+        const suggestions = suggestForFragment('field:"my field"=a', source)
+        expect(suggestions.map((s) => s.insert)).toEqual(['field:"my field"="a b"'])
+        expect(parseFilterQuery(suggestions[0]!.insert).filters).toEqual({ 'field:my field': 'a b' })
+    })
+
+    it('does not fabricate values for arbitrary text custom fields', () => {
+        expect(suggestForFragment('field:unknown=x', { customFields: ['unknown'] })).toEqual([])
+    })
+
+    it('uses own-property safety for literal constructor/__proto__ value lookups', () => {
+        const ownOnly = JSON.parse('{"constructor": ["own-ctor"], "__proto__": ["proto-own"]}')
+        expect(suggestForFragment('field:constructor=o', { customFieldValues: ownOnly }).map((s) => s.insert)).toEqual(['field:constructor=own-ctor'])
+        expect(suggestForFragment('field:__proto__=p', { customFieldValues: ownOnly }).map((s) => s.insert)).toEqual(['field:__proto__=proto-own'])
+        const parsed = parseFilterQuery('field:__proto__=proto-own')
+        expect(Object.prototype.hasOwnProperty.call(parsed.filters, 'field:__proto__')).toBe(true)
+        expect(parsed.filters['field:__proto__']).toBe('proto-own')
+    })
+
+    it('never resolves prototype properties as custom field values', () => {
+        expect(suggestForFragment('field:constructor=x', {})).toEqual([])
+        expect(suggestForFragment('field:toString=x', { customFields: ['toString'] })).toEqual([])
+    })
+
+    it('agrees with the canonical lowercase custom key while preserving the typed name and configured value casing', () => {
+        const mixed = { customFieldValues: { Iteration: ['Beta', 'GA'] } }
+        expect(suggestForFragment('field:iteration=b', mixed).map((s) => s.insert)).toEqual(['field:iteration=Beta'])
+        expect(suggestForFragment('field:Iteration=b', mixed).map((s) => s.insert)).toEqual(['field:Iteration=Beta'])
+        expect(suggestForFragment('field:ITERATION=', mixed).map((s) => s.insert)).toEqual(['field:ITERATION=Beta', 'field:ITERATION=GA'])
+        expect(parseFilterQuery('field:ITERATION=Beta').filters).toEqual({ 'field:iteration': 'Beta' })
     })
 })
 

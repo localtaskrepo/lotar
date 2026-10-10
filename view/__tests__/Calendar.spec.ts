@@ -147,6 +147,7 @@ vi.mock('../composables/useTaskStore', () => ({
 }))
 
 vi.mock('../composables/useSprints', () => ({
+    useSprintFilterOptions: () => ref([]),
     useSprints: () => ({
         sprints: sprintsStore.sprints,
         refresh: sprintsStore.refresh,

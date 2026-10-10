@@ -1,6 +1,10 @@
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'fs-extra';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { indentBlock, nodeExecutable, nodeRunActionYaml } from '../helpers/agent-fixtures.js';
 import { startLotarServer } from '../helpers/server.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
@@ -55,6 +59,142 @@ interface AutomationSimulateResponse {
         task_before: Record<string, unknown> | null;
         task_after: Record<string, unknown> | null;
     };
+}
+
+// Bounded chatty-stderr fixture for the async automation monitor contract.
+// Writes --total-bytes to stderr in --chunk-bytes writes, each awaited via
+// its write callback (honest backpressure: with no draining reader the
+// callbacks stall once the pipe buffer fills), then records the drained
+// byte count and a completed marker and exits 0. A --bound-ms leak guard
+// aborts with an explicit marker so a wedged pipe can never leak the
+// process — that is what makes both monitor shapes below deterministic
+// without fixed sleeps.
+const CHATTY_STDERR_SCRIPT = `import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+function parseArgs(argv) {
+    const parsed = {};
+    for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i];
+        if (['--marker-dir', '--label', '--chunk-bytes', '--total-bytes', '--bound-ms'].includes(arg)) {
+            const value = argv[i + 1];
+            if (value !== undefined) {
+                parsed[arg] = value;
+                i += 1;
+            }
+        }
+    }
+    return parsed;
+}
+
+function intOr(raw, fallback) {
+    const value = Number.parseInt(raw ?? '', 10);
+    return Number.isInteger(value) ? value : fallback;
+}
+
+const options = parseArgs(process.argv.slice(2));
+const markerDir = options['--marker-dir'] ?? '.';
+const label = options['--label'] ?? 'chatty';
+const chunkBytes = intOr(options['--chunk-bytes'], 65536);
+const totalBytes = intOr(options['--total-bytes'], 327680);
+const boundMs = intOr(options['--bound-ms'], 15000);
+const chunk = 'x'.repeat(chunkBytes);
+let written = 0;
+let settled = false;
+
+function writeMarker(name, text) {
+    try {
+        mkdirSync(markerDir, { recursive: true });
+        writeFileSync(path.join(markerDir, name), text);
+    } catch {
+        // Best effort: markers must never crash the fixture.
+    }
+}
+
+const bound = setTimeout(() => {
+    if (settled) {
+        return;
+    }
+    settled = true;
+    writeMarker(\`aborted-\${label}.marker\`, \`written=\${written} bound=\${boundMs}\\n\`);
+    process.exit(3);
+}, boundMs);
+
+function writeNext() {
+    if (settled) {
+        return;
+    }
+    if (written >= totalBytes) {
+        settled = true;
+        clearTimeout(bound);
+        writeMarker(\`bytes-\${label}.marker\`, \`\${written}\\n\`);
+        writeMarker(\`completed-\${label}.marker\`, \`\${process.pid}\\n\`);
+        process.exit(0);
+    }
+    const size = Math.min(chunkBytes, totalBytes - written);
+    process.stderr.write(size === chunkBytes ? chunk : chunk.slice(0, size), (err) => {
+        if (settled) {
+            return;
+        }
+        if (err) {
+            settled = true;
+            clearTimeout(bound);
+            writeMarker(\`aborted-\${label}.marker\`, \`written=\${written} error=\${err}\\n\`);
+            process.exit(4);
+        }
+        written += size;
+        writeNext();
+    });
+}
+
+writeNext();
+`;
+
+function chattyArgs(markerDir: string, label: string, totalBytes: number, boundMs: number): string[] {
+    return [
+        '--marker-dir',
+        markerDir,
+        '--label',
+        label,
+        '--chunk-bytes',
+        '65536',
+        '--total-bytes',
+        String(totalBytes),
+        '--bound-ms',
+        String(boundMs),
+    ];
+}
+
+async function waitForMarker(filePath: string, timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        if (fs.pathExistsSync(filePath)) {
+            return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(`Timed out after ${timeoutMs}ms waiting for ${filePath}`);
+}
+
+/** Pre-fix monitor replica: wait for exit first, read piped stderr after. */
+function monitorOldShape(child: ChildProcess): Promise<{ code: number | null }> {
+    return new Promise((resolve, reject) => {
+        child.on('error', reject);
+        child.on('close', (code) => resolve({ code }));
+    });
+}
+
+/** Fixed monitor replica (wait_with_output): drain stderr while waiting. */
+async function monitorNewShape(child: ChildProcess): Promise<{ code: number | null; stderrBytes: number }> {
+    let stderrBytes = 0;
+    child.stderr?.on('data', (chunk: Buffer) => {
+        stderrBytes += chunk.length;
+    });
+    const code = await new Promise<number | null>((resolve, reject) => {
+        child.on('error', reject);
+        child.on('close', (exitCode) => resolve(exitCode));
+    });
+    return { code, stderrBytes };
 }
 
 describe.concurrent('REST API automation endpoints', () => {
@@ -359,6 +499,108 @@ describe.concurrent('REST API automation endpoints', () => {
                 const autoComments = comments.filter((c) => c.text.includes('automation fired'));
                 // Cooldown should have prevented the second fire
                 expect(autoComments.length).toBe(1);
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('monitor counterfactual: wait-then-read wedges a chatty stderr child, concurrent drain completes', async () => {
+        // Private counterfactual against the held pre-fix monitor shape
+        // (child.wait() BEFORE reading piped stderr): with 256KiB of
+        // callback-awaited stderr and no reader, the pipe buffer fills and
+        // the child can only exit through its leak-guard bound. The fixed
+        // shape (wait_with_output) drains while waiting and the child
+        // completes. Production is already fixed, so the old leg replicates
+        // the old monitor here rather than reverting anything; this models
+        // pipe-buffer semantics portably and is not a real Windows claim.
+        const oldDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-monitor-old-'));
+        const newDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-monitor-new-'));
+        const script = path.join(oldDir, 'chatty-stderr.mjs');
+        await fs.writeFile(script, CHATTY_STDERR_SCRIPT, 'utf8');
+        try {
+            const oldChild = spawn(
+                nodeExecutable(),
+                [script, ...chattyArgs('.', 'old', 262_144, 3_000)],
+                { cwd: oldDir, stdio: ['ignore', 'ignore', 'pipe'] },
+            );
+            const oldOutcome = await monitorOldShape(oldChild);
+            expect(oldOutcome.code).toBe(3);
+            expect(fs.pathExistsSync(path.join(oldDir, 'aborted-old.marker'))).toBe(true);
+            expect(fs.pathExistsSync(path.join(oldDir, 'completed-old.marker'))).toBe(false);
+
+            const newChild = spawn(
+                nodeExecutable(),
+                [script, ...chattyArgs('.', 'new', 262_144, 15_000)],
+                { cwd: newDir, stdio: ['ignore', 'ignore', 'pipe'] },
+            );
+            const newOutcome = await monitorNewShape(newChild);
+            expect(newOutcome.code).toBe(0);
+            expect(newOutcome.stderrBytes).toBeGreaterThanOrEqual(262_144);
+            await waitForMarker(path.join(newDir, 'completed-new.marker'), 5_000);
+            const drained = Number.parseInt(
+                await fs.readFile(path.join(newDir, 'bytes-new.marker'), 'utf8'),
+                10,
+            );
+            expect(drained).toBeGreaterThanOrEqual(262_144);
+            expect(fs.pathExistsSync(path.join(newDir, 'aborted-new.marker'))).toBe(false);
+        } finally {
+            await fs.remove(oldDir).catch(() => undefined);
+            await fs.remove(newDir).catch(() => undefined);
+        }
+    });
+
+    it('server async run drains a chatty stderr child without wedging the monitor', async () => {
+        // The automation must fire inside the SERVER process (task created
+        // via the REST API while the server hosts the spawned child), so
+        // the production monitor thread is the one under test. The child
+        // writes 320KiB of callback-awaited stderr before its completed
+        // marker: with the pre-fix monitor it could only exit through its
+        // leak-guard bound (aborted marker); the fixed monitor drains while
+        // waiting and the run completes.
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: {
+                '.tasks/config.yml': BASE_CONFIG,
+                '.tasks/automation.yml': `automation:
+  rules:
+    - name: Chatty async run
+      on:
+        created:
+${indentBlock(
+    nodeRunActionYaml(
+        ['fixtures/chatty-stderr.mjs', ...chattyArgs('chatty-markers', 'server', 327_680, 15_000)],
+        { wait: false },
+    ),
+    10,
+)}
+`,
+                'fixtures/chatty-stderr.mjs': CHATTY_STDERR_SCRIPT,
+            },
+        });
+
+        try {
+            const server = await startLotarServer(workspace);
+            try {
+                const createRes = await fetch(`${server.url}/api/tasks/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: 'Chatty async run task' }),
+                });
+                expect(createRes.status).toBe(201);
+
+                const markers = path.join(workspace.root, 'chatty-markers');
+                await waitForMarker(path.join(markers, 'completed-server.marker'), 10_000);
+
+                const drained = Number.parseInt(
+                    await fs.readFile(path.join(markers, 'bytes-server.marker'), 'utf8'),
+                    10,
+                );
+                expect(drained).toBeGreaterThanOrEqual(262_144);
+                const aborted = await fs.readFile(path.join(markers, 'aborted-server.marker'), 'utf8')
+                    .catch(() => null);
+                expect(aborted).toBeNull();
             } finally {
                 await server.stop();
             }

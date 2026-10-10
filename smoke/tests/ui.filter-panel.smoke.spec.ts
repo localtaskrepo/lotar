@@ -43,7 +43,7 @@ function seed(): Record<string, string> {
 
 describe.concurrent('Unified filter search and panel (DEV-98)', () => {
     for (const viewport of [
-        { label: 'desktop', width: 1280, height: 900 },
+        { label: 'desktop', width: 1600, height: 1000 },
         { label: 'mobile', width: 390, height: 844 },
     ]) {
         it(`uses one search input and preserves scoped filters on ${viewport.label}`, async ({ expect }) => {
@@ -72,7 +72,21 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         expect(await page.getByLabel('Custom filters', { exact: true }).count()).toBe(0);
                         expect(await panel.getByPlaceholder('Tags', { exact: true }).count()).toBe(0);
                         expect(await panel.getByRole('heading', { name: 'Quick picks', exact: true }).count()).toBe(1);
-                        expect(await panel.getByRole('heading', { name: 'Filter fields', exact: true }).count()).toBe(1);
+                        expect(await panel.getByRole('heading', { name: 'Filter fields', exact: true }).count()).toBe(0);
+                        const quick = panel.locator('.filter-bar__picks-column');
+                        const fields = panel.getByRole('group', { name: 'Filter fields', exact: true });
+                        const quickBox = await quick.boundingBox();
+                        const fieldsBox = await fields.boundingBox();
+                        if (viewport.label === 'desktop') {
+                            expect(fieldsBox!.x).toBeGreaterThan(quickBox!.x + quickBox!.width);
+                            expect(Math.abs(fieldsBox!.y - quickBox!.y)).toBeLessThanOrEqual(1);
+                        } else {
+                            expect(fieldsBox!.y).toBeGreaterThanOrEqual(quickBox!.y + quickBox!.height);
+                        }
+                        const title = quick.getByRole('heading', { name: 'Quick picks', exact: true });
+                        const label = fields.locator('.filter-bar__field-label').first();
+                        expect(await title.evaluate(el => [getComputedStyle(el).fontSize, getComputedStyle(el).fontWeight, getComputedStyle(el).lineHeight]))
+                            .toEqual(await label.evaluate(el => [getComputedStyle(el).fontSize, getComputedStyle(el).fontWeight, getComputedStyle(el).lineHeight]));
                         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
                         const searchBounds = await search.boundingBox();
                         const toggleBounds = await toggle.boundingBox();
@@ -118,14 +132,17 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         await search.press('Enter');
                         await expect.poll(() => listQueries.some(query => new URLSearchParams(query).get('field:sprint') === 'inc-2')).toBe(true);
                         expect(listQueries.some(query => new URLSearchParams(query).get('sprints') === 'inc-2')).toBe(false);
-                        expect(await page.getByText('Beta task', { exact: true }).count()).toBe(1);
+                        await expect.poll(() => page.getByText('Beta task', { exact: true }).count()).toBe(1);
                         await page.getByRole('button', { name: 'Remove filter sprint inc-2', exact: true }).click();
                         await expect.poll(() => new URL(page.url()).searchParams.has('field:sprint')).toBe(false);
                         await search.press('Escape');
                         if (!(await panel.isVisible())) await toggle.click();
+                        await expect.poll(() => panel.getByRole('button', { name: 'iteration', exact: true }).count()).toBe(1);
                         await page.screenshot({ path: path.join(artifacts, `tasks-${viewport.label}.png`), animations: 'disabled' });
 
                         await search.fill('status:Done field:iteration=');
+                        // Keep this a raw incomplete draft rather than accepting a known value.
+                        await search.press('Escape');
                         await search.press('Enter');
                         await page.locator('.filter-bar__search-error').waitFor({ state: 'visible' });
                         expect(await search.getAttribute('aria-invalid')).toBe('true');
@@ -160,7 +177,8 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                             await panel.getByRole('button', { name: 'Clear conditions', exact: true }).click();
                             await expect.poll(() => alpha.count()).toBe(1);
                             expect(await page.getByTestId('filter-project').inputValue()).toBe('FIL');
-                            await panel.getByRole('button', { name: 'Close filters', exact: true }).click();
+                            expect(await panel.getByRole('button', { name: 'Close filters', exact: true }).count()).toBe(0);
+                            await toggle.click();
                             await panel.waitFor({ state: 'detached' });
                             expect(await toggle.evaluate(el => el === document.activeElement)).toBe(true);
                         }

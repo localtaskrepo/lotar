@@ -20,7 +20,7 @@
           label="Refresh jobs"
           title="Refresh jobs"
           variant="ghost"
-          @click="refresh"
+          @click="refresh()"
         />
       </div>
     </header>
@@ -62,8 +62,8 @@
       </button>
     </div>
 
-    <div v-if="loading" class="muted">Loading jobs…</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+      <div v-if="loading && !jobs.length" class="muted">Loading jobs…</div>
+      <div v-else-if="error" class="error">{{ error }}</div>
 
     <UiEmptyState
       v-else-if="!filteredJobs.length"
@@ -291,19 +291,23 @@ const recentEventJobs = new Map<string, { job: AgentJob; seq: number }>()
 // only the most recently issued refresh may apply its snapshot.
 let refreshSeq = 0
 
-async function refresh() {
+async function refresh(options: { silent?: boolean } = {}) {
   const myRefresh = ++refreshSeq
-  console.debug('[dev101] refresh-start', myRefresh)
-  loading.value = true
-  error.value = ''
+  const reportErrors = !options.silent || loading.value
+  // A silent reconcile (stream-open) never blanks the visible list or the
+  // error state; it only updates data when it lands.
+  if (!options.silent) {
+    loading.value = true
+    error.value = ''
+  }
   const seqAtRequest = eventSeq
   try {
     const jobsResponse = await api.listAgentJobs()
     if (myRefresh !== refreshSeq) {
-      console.debug('[dev101] refresh-skip', myRefresh)
+      // A newer refresh superseded this one; its snapshot is at least as
+      // fresh and owns the application (and the loading flag).
       return
     }
-    console.debug('[dev101] refresh-apply', myRefresh, jobsResponse.jobs.length)
     // The response is a snapshot from before any event that arrived during
     // the flight; those events win and are merged back over the list.
     const byId = new Map(jobsResponse.jobs.map((existing) => [existing.id, existing]))
@@ -315,8 +319,7 @@ async function refresh() {
     jobs.value = sortJobs([...byId.values()])
     queueStats.value = jobsResponse.queue_stats || null
   } catch (err) {
-    console.debug('[dev101] refresh-error', myRefresh, String(err))
-    if (myRefresh === refreshSeq) {
+    if (reportErrors && myRefresh === refreshSeq) {
       error.value = err instanceof Error ? err.message : String(err)
     }
   } finally {
@@ -637,9 +640,11 @@ function setupSse() {
 
   // Reconcile whenever the stream (re)opens: events delivered before the
   // first open are lost, and events during a disconnect gap are missed, so
-  // the pre-open snapshot cannot be trusted once the stream is live.
-  sse?.es.addEventListener('open', () => {
-    void refresh()
+  // the pre-open snapshot cannot be trusted once the stream is live. The
+  // reconcile is silent so a slow or dropped fetch can never blank the
+  // already-visible list.
+  sse?.on('open', () => {
+    void refresh({ silent: true })
   })
 }
 

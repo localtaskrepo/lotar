@@ -152,6 +152,14 @@ Once started, the server provides:
 	3. **Filesystem fallback** (`target/web/`, only when no custom path is configured)
 - Use `--web-ui-embedded` or `LOTAR_WEB_UI_EMBEDDED=1` to skip the custom path and only serve embedded assets.
 
+### Search Filters
+
+The shared search in Tasks, Board, Calendar and Sprints accepts plain search words plus filters such as `status:Todo`, `tags:ui`, `assignee:@me` and `field:iteration=beta`. The help icon beside the search opens the complete filter reference, including aliases, visibility and sorting assignments. Arrow keys navigate autocomplete; Enter or Tab accepts a suggestion. Quote values containing spaces, for example `status:"In Progress"` or `tags:"release candidate"`.
+
+Tag, assignee and custom-field value suggestions combine configured choices with values observed in tasks loaded in the current project scope. They retain observed choices when other filters hide those rows, but do not enumerate every task or borrow values from another selected project. Values not suggested can still be entered directly. Status, priority, type, sprint and project choices use their existing option lists.
+
+Smart-filter suggestions use the server's supported values: `due:today|soon|later|overdue`, `recent:7d`, and `needs:effort|due` (the `|` separates alternatives here, not query syntax). Use commas for multiple values. For multi-select filters, colon tokens add selections while canonical `key=value` assignments replace them. `deletion=active|deleted|all`, `order=asc|desc` and `sort_by=priority` are assignments, not colon filters. Unknown colon terms remain plain search text; quote reserved custom names such as `field:"sprint"=inc-2` to distinguish them from native filters.
+
 ### Custom Web UI
 
 You can serve a custom or development UI by pointing to a directory containing web assets:

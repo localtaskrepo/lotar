@@ -72,6 +72,20 @@
       </div>
 
       <UiButton
+        :id="controlId('help-toggle')"
+        type="button"
+        class="filter-bar__help-toggle"
+        variant="ghost"
+        icon-only
+        aria-label="Search filter help"
+        title="Search filter help"
+        :aria-expanded="helpOpen ? 'true' : 'false'"
+        :aria-controls="controlId('help')"
+        data-testid="filter-help-toggle"
+        @click="toggleHelp"
+      ><IconGlyph name="help" /></UiButton>
+
+      <UiButton
         :id="controlId('toggle')"
         :variant="panelOpen ? 'primary' : ''"
         type="button"
@@ -92,6 +106,27 @@
         <slot name="actions" />
       </div>
     </div>
+
+    <section
+      v-if="helpOpen"
+      :id="controlId('help')"
+      class="filter-bar__help"
+      role="region"
+      tabindex="0"
+      :aria-labelledby="controlId('help-title')"
+      data-testid="filter-help"
+    >
+      <h3 :id="controlId('help-title')">Search filters</h3>
+      <p>Combine search words with filters. Arrow keys navigate suggestions; Enter or Tab accepts one. Enter applies a typed filter. Quote values containing spaces.</p>
+      <dl class="filter-bar__help-types">
+        <div v-for="item in filterHelp" :key="item.syntax">
+          <dt><code>{{ item.syntax }}</code><span>{{ item.label }}</span></dt>
+          <dd>{{ item.description }}<span v-if="item.aliases"> Aliases: {{ item.aliases }}.</span></dd>
+        </div>
+      </dl>
+      <p>Use commas for multiple statuses, priorities, types, sprints, tags or missing fields. For multi-select filters, colon adds selections; <code>key=value</code> replaces them. Custom fields use <code>field:name=value</code> or <code>name=value</code>; quote reserved custom names, such as <code>field:"sprint"=inc-2</code>.</p>
+      <p>Suggestions combine configured options with values from tasks loaded in the current project scope. Search text, assignees and custom values can also be typed directly. Unknown colon terms and quoted literals remain search text.</p>
+    </section>
 
     <div v-if="activeChips.length" class="filter-bar__chips-row" data-testid="filter-chips" role="group" aria-label="Applied filters">
       <span v-for="chip in activeChips" :key="`${chip.key}-${chip.value}`" class="filter-bar__chip">
@@ -125,17 +160,11 @@
           >
             Clear conditions
           </UiButton>
-          <UiButton
-            type="button"
-            class="filter-bar__panel-close"
-            aria-label="Close filters"
-            @click="closePanel"
-          >
-            ×
-          </UiButton>
         </div>
       </div>
 
+      <div class="filter-bar__panel-content">
+        <div class="filter-bar__picks-column">
       <section class="filter-bar__section" :aria-labelledby="controlId('quick-picks-title')">
         <h4 :id="controlId('quick-picks-title')" class="filter-bar__section-title">Quick picks</h4>
         <SmartListChips
@@ -154,9 +183,9 @@
         <h4 :id="controlId('view-options-title')" class="filter-bar__section-title">View options</h4>
         <slot name="panel" />
       </section>
+        </div>
 
-      <section class="filter-bar__section" :aria-labelledby="controlId('fields-title')">
-        <h4 :id="controlId('fields-title')" class="filter-bar__section-title">Filter fields</h4>
+      <div class="filter-bar__fields-group" role="group" aria-label="Filter fields">
         <div class="filter-bar__fields">
           <div class="filter-bar__field filter-bar__field--project">
             <span class="filter-bar__field-label" :id="controlId('project-label')">Project</span>
@@ -349,7 +378,8 @@
           </div>
 
         </div>
-      </section>
+      </div>
+      </div>
     </section>
   </div>
 </template>
@@ -360,6 +390,7 @@ import { storageGetJson, storageRemove, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import {
     chipsForFilterValue,
+    canonicalCustomFilterKey,
     filterFragment,
     findGrammarKey,
     GRAMMAR_KEYS,
@@ -386,6 +417,10 @@ const props = withDefaults(
     priorities?: string[]
     types?: string[]
     sprintOptions?: Array<{ id: number; label: string }>
+    tagOptions?: string[]
+    assigneeOptions?: string[]
+    customFieldValues?: Record<string, string[]>
+    customFieldOptions?: string[]
     value?: Record<string, string>
     storageKey?: string
     showStatus?: boolean
@@ -438,6 +473,33 @@ const showStatusSelect = computed(() => props.showStatus)
 const showOrderSelect = computed(() => props.showOrder !== false)
 
 const panelOpen = ref(false)
+const helpOpen = ref(false)
+const helpDescriptions: Record<string, string> = {
+  status: 'Configured workflow statuses.',
+  priority: 'Configured priorities.',
+  type: 'Configured task types.',
+  sprints: 'Sprint IDs; suggestions show sprint names.',
+  project: 'Project prefixes.',
+  assignee: 'Member name, @me for yourself, or __none__ for unassigned tasks.',
+  tags: 'Existing tags, or a tag you type.',
+  due: 'today, soon, later or overdue.',
+  recent: '7d: modified within the last seven days.',
+  needs: 'effort or due: tasks missing those fields.',
+  mine: 'true: tasks assigned to you.',
+}
+const filterHelp = computed(() => [
+  ...GRAMMAR_KEYS.map(meta => ({ syntax: `${meta.key}:value`, label: meta.label, description: helpDescriptions[meta.key] || '', aliases: meta.aliases.filter(alias => alias !== meta.key).join(', ') })),
+  { syntax: 'field:name=value', label: 'Custom field', description: 'A custom field name and value; known names and values are suggested.', aliases: '' },
+  { syntax: 'q="search words"', label: 'Search text', description: 'Plain words search tasks; q= explicitly sets the search text.', aliases: '' },
+  { syntax: 'deletion=active', label: 'Visibility', description: 'active, deleted or all.', aliases: '' },
+  { syntax: 'order=asc', label: 'Sort direction', description: 'asc or desc.', aliases: '' },
+  { syntax: 'sort_by=priority', label: 'Sort field', description: 'priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints or custom:name.', aliases: '' },
+])
+
+function toggleHelp() {
+  helpOpen.value = !helpOpen.value
+  suggestionsOpen.value = false
+}
 
 function closePanel() {
   closeAllMenus()
@@ -637,6 +699,7 @@ function invertSprint() {
 function onDocumentClick(event: MouseEvent) {
   const target = event.target as Node | null
   if (!target) return
+  if (helpOpen.value && !['help', 'help-toggle', 'toggle', 'panel'].some(part => document.getElementById(controlId(part))?.contains(target))) helpOpen.value = false
 
   if (statusMenuOpen.value && statusDropdown.value && !statusDropdown.value.contains(target)) {
     statusMenuOpen.value = false
@@ -660,6 +723,11 @@ function onDocumentKeydown(event: KeyboardEvent) {
     if (openMenu) {
       closeAllMenus()
       document.getElementById(controlId(openMenu))?.focus()
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    } else if (helpOpen.value && (document.getElementById(controlId('help'))?.contains(event.target as Node) || document.getElementById(controlId('help-toggle'))?.contains(event.target as Node) || (event.target === searchInput.value && !panelOpen.value))) {
+      helpOpen.value = false
+      document.getElementById(controlId('help-toggle'))?.focus()
       event.preventDefault()
       event.stopImmediatePropagation()
     } else if (panelOpen.value) {
@@ -830,7 +898,14 @@ const suggestionSource = computed(() => ({
   types: props.types ?? [],
   sprints: props.sprintOptions ?? [],
   projects: projects.value ?? [],
-  customFields: (props.customPresets ?? []).map(preset => preset.expression.replace(/^field:/i, '').replace(/=$/, '')),
+  tags: props.tagOptions ?? [],
+  assignees: props.assigneeOptions ?? [],
+  customFieldValues: props.customFieldValues ?? {},
+  customFields: [...new Set([
+    ...(props.customFieldOptions ?? []).filter(name => name && name !== '*'),
+    ...(props.customPresets ?? []).map(preset => canonicalCustomFilterKey(preset.expression.replace(/=$/, '')).replace(/^field:/i, '')),
+    ...Object.keys(props.customFieldValues ?? {}),
+  ])],
 }))
 
 const suggestions = computed<SuggestionItem[]>(() => {
@@ -865,7 +940,7 @@ function onSearchInput(event: Event) {
   const fragment = currentFragment()
   const fragmentKey = fragment.split(':')[0] || ''
   const keyPrefix = fragment.toLowerCase()
-  const completingKey = !!keyPrefix && ['field', ...GRAMMAR_KEYS.flatMap(meta => meta.aliases)].some(key => key.startsWith(keyPrefix))
+  const completingKey = !!keyPrefix && ['field', 'q', 'order', 'sort_by', 'deletion', ...GRAMMAR_KEYS.flatMap(meta => meta.aliases)].some(key => key.startsWith(keyPrefix))
   searchPending.value = !!(Object.keys(parsed.filters).length || parsed.errors?.length || completingKey || keyPrefix.startsWith('field:') || (fragment.includes(':') && findGrammarKey(fragmentKey)))
   // Structured drafts are committed on Enter; normal text still searches live.
   if (!searchPending.value) query.value = parsed.text
@@ -1178,6 +1253,8 @@ defineExpose({ appendCustomFilter, clear: onClear })
 </script>
 <style scoped>
 .filter-bar {
+  container-type: inline-size;
+  container-name: filter-controls;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1269,6 +1346,68 @@ defineExpose({ appendCustomFilter, clear: onClear })
 
 .filter-bar__toggle {
   flex-shrink: 0;
+}
+
+.filter-bar__help-toggle.btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-left: -4px;
+  border: 0;
+}
+
+.filter-bar__help-toggle.btn[aria-expanded="true"] {
+  background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+}
+
+.filter-bar__help {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--text-sm, 0.875rem);
+  max-height: min(60vh, 520px);
+  overflow: auto;
+}
+
+.filter-bar__help h3 {
+  margin: 0;
+  font-size: inherit;
+}
+
+.filter-bar__help p {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+}
+
+.filter-bar__help-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 12px 24px;
+  margin: 16px 0;
+}
+
+.filter-bar__help dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.filter-bar__help dt span {
+  color: var(--color-muted);
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.filter-bar__help dd {
+  margin: 4px 0 0;
+  color: var(--color-muted);
+}
+
+.filter-bar__help code {
+  overflow-wrap: anywhere;
 }
 
 .filter-bar__suggestions {
@@ -1404,11 +1543,34 @@ defineExpose({ appendCustomFilter, clear: onClear })
   gap: var(--space-2, 0.5rem);
 }
 
-.filter-bar__section-title {
+.filter-bar__section-title,
+.filter-bar__field-label {
   margin: 0;
   font-size: var(--text-xs, 0.75rem);
   font-weight: 600;
   color: var(--color-muted);
+  line-height: 1.4;
+}
+
+.filter-bar__panel-content,
+.filter-bar__picks-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+  min-width: 0;
+}
+
+.filter-bar__fields-group {
+  min-width: 0;
+}
+
+@container filter-controls (min-width: 1000px) {
+  .filter-bar__panel-content {
+    display: grid;
+    grid-template-columns: minmax(240px, 0.4fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-4, 1rem);
+  }
 }
 
 .filter-bar__fields {
@@ -1420,13 +1582,11 @@ defineExpose({ appendCustomFilter, clear: onClear })
 .filter-bar__field {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2, 0.5rem);
   min-width: 0;
 }
 
 .filter-bar__field-label {
-  font-size: var(--text-xs, 0.75rem);
-  color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

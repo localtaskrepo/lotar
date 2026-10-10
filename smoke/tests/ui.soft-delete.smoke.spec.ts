@@ -46,7 +46,7 @@ async function withLiveTaskPage(
             window.EventSource = class extends NativeEventSource {
                 constructor(url: string | URL, options?: EventSourceInit) {
                     super(url, options);
-                    if (new URL(String(url), window.location.href).searchParams.get('kinds')?.includes('task_deleted')) {
+                    if (new URL(String(url), window.location.href).pathname === '/api/events') {
                         this.addEventListener('ready', () => { state.taskEventsReady = true; });
                         for (const kind of ['task_created', 'task_updated', 'task_deleted']) {
                             this.addEventListener(kind, event => {

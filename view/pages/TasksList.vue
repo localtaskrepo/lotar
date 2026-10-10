@@ -36,6 +36,10 @@
         :types="types"
         :sprint-options="sprintFilterOptions"
         :custom-presets="customFilterPresets"
+        :tag-options="filterOptions.tags"
+        :assignee-options="filterOptions.assignees"
+        :custom-field-values="filterOptions.customFieldValues"
+        :custom-field-options="availableCustomFields"
         :value="filter"
         storage-key="lotar.tasks.filter"
         @update:value="onFilterUpdate"
@@ -402,6 +406,7 @@ import UiModal from '../components/UiModal.vue'
 import { useActivity } from '../composables/useActivity'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
+import { useFilterOptions } from '../composables/useFilterOptions'
 import { buildServerFilter, useCustomFilterPresets } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
@@ -475,7 +480,7 @@ function clampOffset(value: number): number {
 const { add: addActivity, markTaskTouch, removeTaskTouch, touches: activityTouches } = useActivity()
 
 const route = useRoute()
-const { statuses, priorities, types, refresh: refreshConfig, customFields: availableCustomFields } = useConfig()
+const { statuses, priorities, types, refresh: refreshConfig, customFields: availableCustomFields, scope: configScope, tags: configuredTags, members } = useConfig()
 const statusOptions = computed(() => [...(statuses.value || [])])
 const priorityOptions = computed(() => [...(priorities.value || [])])
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
@@ -630,6 +635,9 @@ watch(
 // server's timezone-sensitive date handling can never diverge from what the
 // user sees — and the CSV export, produced from the same query, matches.
 const queryTasks = computed<TaskDTO[]>(() => tasksQuery.value?.tasks.value ?? [])
+const filterOptions = useFilterOptions(() => queryTasks.value, () => filter.value.project || '', {
+  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
+})
 const shownTasks = computed(() => {
   const ranks = tasksQuery.value?.ranks.value
   const items = queryTasks.value

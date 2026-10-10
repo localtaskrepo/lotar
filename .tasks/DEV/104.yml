@@ -1,0 +1,7 @@
+title: No easy way to add ticket to sprint
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-10T21:08:39.030978+00:00
+description: Currently there's no easy way in the sprint view to add a ticket to a sprint. We should probably have a simple way of adding a ticket to the sprints or backlog.

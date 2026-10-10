@@ -38,10 +38,16 @@ vi.mock('../composables/useSse', () => ({
                 }),
             } as unknown as EventSource,
             on: vi.fn((event: string, handler: (ev: { data: string }) => void) => {
+                if (event === 'open') {
+                    if (!lifecycle.has(event)) lifecycle.set(event, new Set())
+                    lifecycle.get(event)!.add(handler as unknown as () => void)
+                    return
+                }
                 if (!handlers.has(event)) handlers.set(event, new Set())
                 handlers.get(event)!.add(handler)
             }),
             off: vi.fn((event: string, handler: (ev: { data: string }) => void) => {
+                if (event === 'open') lifecycle.get(event)?.delete(handler as unknown as () => void)
                 handlers.get(event)?.delete(handler)
             }),
             close,
@@ -186,6 +192,44 @@ afterEach(() => {
 })
 
 describe('AgentJobs stop-all confirmation', () => {
+    it('settles the initial loading state when stream-open reconciliation supersedes its request', async () => {
+        const initial = deferred<{ jobs: AgentJob[] }>()
+        const reconcile = deferred<{ jobs: AgentJob[] }>()
+        ;(api.listAgentJobs as any).mockReturnValueOnce(initial.promise).mockReturnValueOnce(reconcile.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            expect(wrapper.text()).toContain('Loading jobs')
+            openSse()
+            reconcile.resolve({ jobs: [] })
+            await flushPromises()
+            expect(wrapper.text()).not.toContain('Loading jobs')
+            initial.resolve({ jobs: [runningJob] })
+            await flushPromises()
+            expect(wrapper.findAll('.job-card')).toHaveLength(0)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('reports a superseding initial reconciliation failure instead of a permanent loader or false empty success', async () => {
+        const initial = deferred<{ jobs: AgentJob[] }>()
+        const reconcile = deferred<{ jobs: AgentJob[] }>()
+        ;(api.listAgentJobs as any).mockReturnValueOnce(initial.promise).mockReturnValueOnce(reconcile.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            openSse()
+            reconcile.reject(new Error('queue unavailable'))
+            await flushPromises()
+            expect(wrapper.text()).toContain('queue unavailable')
+            expect(wrapper.text()).not.toContain('Loading jobs')
+            initial.resolve({ jobs: [] })
+            await flushPromises()
+            expect(wrapper.text()).toContain('queue unavailable')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
     it('opens an explicit confirmation dialog instead of calling the API immediately', async () => {
         const wrapper = await mountAgentJobs()
 

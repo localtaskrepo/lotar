@@ -478,6 +478,7 @@ jobs:
         New-Item -ItemType Directory -Force -Path target/smoke-report | Out-Null
         npm run test:smoke:quick -- `
           smoke/tests/fixtures.agent.smoke.spec.ts `
+          smoke/tests/harness.agent-launcher.smoke.spec.ts `
           smoke/tests/api.agent-jobs.smoke.spec.ts `
           smoke/tests/cli.automation.smoke.spec.ts `
           smoke/tests/api.automation.smoke.spec.ts `

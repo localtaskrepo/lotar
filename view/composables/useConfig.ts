@@ -176,6 +176,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
   }
 
   return {
+    scope: currentProject,
     cfg,
     loading,
     error,

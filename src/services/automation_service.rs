@@ -1003,21 +1003,22 @@ fn execute_run_action(
             )));
         }
     } else {
-        // Async: spawn, then monitor in a background thread for logging
-        cmd.stdout(std::process::Stdio::null())
+        // Async: spawn, then monitor in a background thread for logging.
+        // Keep detached commands independent of the caller's stdio handles.
+        // The monitor drains captured stderr while waiting, so a chatty child
+        // cannot deadlock on a full pipe before its exit is observed.
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::piped());
-        let mut child = cmd.spawn().map_err(|e| {
+        let child = cmd.spawn().map_err(|e| {
             LoTaRError::ValidationError(format!("Failed to spawn async run command: {e}"))
         })?;
         let task_id = task.id.clone();
         std::thread::spawn(move || {
-            match child.wait() {
-                Ok(status) if !status.success() => {
-                    let mut stderr_output = String::new();
-                    if let Some(mut stderr) = child.stderr.take() {
-                        use std::io::Read;
-                        let _ = stderr.read_to_string(&mut stderr_output);
-                    }
+            match child.wait_with_output() {
+                Ok(output) if !output.status.success() => {
+                    let status = output.status;
+                    let stderr_output = String::from_utf8_lossy(&output.stderr);
                     if stderr_output.is_empty() {
                         eprintln!(
                             "[lotar][warn] Async automation run for task {} exited with {}",

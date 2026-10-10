@@ -1,7 +1,8 @@
 import fs from 'fs-extra';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createFixtureAgents, createGateFixture } from '../helpers/agent-fixtures.js';
+import { createFixtureAgents, createGateFixture, type GateFixture } from '../helpers/agent-fixtures.js';
 import { startLotarServer } from '../helpers/server.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
@@ -133,6 +134,65 @@ ${worktreeLines.join('\n')}
 ${agentsYaml}`;
 }
 
+/**
+ * Windows-spawn failure evidence for the gated-agent test: when the started
+ * sentinel never appears, prove where the chain broke instead of reporting
+ * a bare timeout. Bounded and best effort — every section degrades to a
+ * short "<absent>" marker rather than throwing.
+ */
+async function gatedJobEvidence(
+    serverUrl: string,
+    jobId: string,
+    gate: GateFixture,
+    logsDir: string,
+): Promise<string> {
+    const parts: string[] = [gate.diagnostics('progress')];
+    try {
+        const envelope = await fetchJobsEnvelope(serverUrl);
+        const job = envelope.data.jobs.find((j) => j.id === jobId);
+        parts.push(
+            job
+                ? `job status=${job.status} exit_code=${job.exit_code ?? 'null'} last_message=${JSON.stringify(job.last_message ?? null)}`
+                : 'job=<missing from /api/jobs>',
+        );
+    } catch (err) {
+        parts.push(`job lookup failed: ${String(err)}`);
+    }
+    try {
+        const content = await fs.readFile(path.join(logsDir, `${jobId}.jsonl`), 'utf8');
+        const lines = content.trim().split('\n').filter((line) => line.length > 0);
+        parts.push(`job log tail:\n${lines.slice(-12).join('\n')}`);
+    } catch {
+        parts.push('job log=<absent>');
+    }
+    // A mangled --gate-dir would materialize sentinels in a DIFFERENT
+    // lotar-smoke-gate-api-* directory; listing strays proves or refutes it.
+    try {
+        const strays: string[] = [];
+        for (const entry of fs.readdirSync(tmpdir())) {
+            if (!entry.startsWith('lotar-smoke-gate-api-') || strays.length >= 10) {
+                continue;
+            }
+            try {
+                const markers = fs
+                    .readdirSync(path.join(tmpdir(), entry))
+                    .filter((file) => file.endsWith('.sentinel'));
+                if (markers.length > 0) {
+                    strays.push(`${entry}: ${markers.join(',')}`);
+                }
+            } catch {
+                // Transient temp entry; ignore.
+            }
+        }
+        if (strays.length > 0) {
+            parts.push(`stray gate dirs with sentinels (gate-dir mangling evidence): ${strays.join(' | ')}`);
+        }
+    } catch {
+        // Temp listing is best effort.
+    }
+    return parts.join('\n');
+}
+
 describe.concurrent('Agent job smoke tests', () => {
     it('runs a gated agent job and captures progress events deterministically', async () => {
         const gate = await createGateFixture('lotar-smoke-gate-api-');
@@ -185,7 +245,21 @@ describe.concurrent('Agent job smoke tests', () => {
                 // Synchronize with the worker: the started sentinel proves the
                 // runner child actually launched, and the gate holds it
                 // mid-run, so the running snapshot below is real state.
-                await gate.waitForStarted('progress');
+                try {
+                    await gate.waitForStarted('progress');
+                } catch (error) {
+                    // Enrich the timeout with job/log/gate evidence so a
+                    // Windows spawn failure is diagnosable from the failure
+                    // message alone (runner/wrapper/cmd stderr shows up as
+                    // job last_message progress lines).
+                    const evidence = await gatedJobEvidence(
+                        server.url,
+                        jobId,
+                        gate,
+                        path.join(workspace.root, '.logs'),
+                    );
+                    throw new Error(`${(error as Error).message}\n${evidence}`);
+                }
 
                 const runningEnvelope = await waitForJobStatus(server.url, jobId, ['running']);
                 const runningJob = runningEnvelope.data.jobs.find((j) => j.id === jobId);
