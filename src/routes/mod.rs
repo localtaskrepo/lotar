@@ -16,7 +16,7 @@ use crate::services::{
     reference_service::ReferenceService, scan_service::ScanService, sprint_service::SprintService,
     sync_service::SyncService, task_service::TaskService,
 };
-use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
+use crate::storage::sprint::{Sprint, SprintCapacity, SprintPlan};
 use crate::workspace::TasksDirectoryResolver;
 use crate::{
     api_types::{
@@ -167,117 +167,10 @@ pub(super) fn sprint_from_create_request(payload: &SprintCreateRequest) -> Sprin
     sprint
 }
 
-pub(super) fn apply_update_to_sprint(target: &mut Sprint, payload: &SprintUpdateRequest) {
-    if let Some(label) = payload.label.clone() {
-        let plan = target.plan.get_or_insert_with(SprintPlan::default);
-        plan.label = clean_opt_string(Some(label));
-    }
-    if let Some(goal) = payload.goal.clone() {
-        let plan = target.plan.get_or_insert_with(SprintPlan::default);
-        plan.goal = clean_opt_string(Some(goal));
-    }
-    if let Some(length) = payload.plan_length.clone() {
-        let plan = target.plan.get_or_insert_with(SprintPlan::default);
-        plan.length = clean_opt_string(Some(length));
-    }
-    if let Some(ends_at) = payload.ends_at.clone() {
-        let plan = target.plan.get_or_insert_with(SprintPlan::default);
-        plan.ends_at = clean_opt_string(Some(ends_at));
-    }
-    if let Some(starts_at) = payload.starts_at.clone() {
-        let plan = target.plan.get_or_insert_with(SprintPlan::default);
-        plan.starts_at = clean_opt_string(Some(starts_at));
-    }
-    if let Some(overdue_after) = payload.overdue_after.clone() {
-        let plan = target.plan.get_or_insert_with(SprintPlan::default);
-        plan.overdue_after = clean_opt_string(Some(overdue_after));
-    }
-    if let Some(notes) = payload.notes.clone() {
-        let plan = target.plan.get_or_insert_with(SprintPlan::default);
-        plan.notes = clean_opt_string(Some(notes));
-    }
-    if let Some(capacity_points) = payload.capacity_points {
-        match capacity_points {
-            Some(value) => {
-                let plan = target.plan.get_or_insert_with(SprintPlan::default);
-                plan.capacity
-                    .get_or_insert_with(SprintCapacity::default)
-                    .points = Some(value);
-            }
-            None => {
-                if let Some(plan) = target.plan.as_mut()
-                    && let Some(capacity) = plan.capacity.as_mut()
-                {
-                    capacity.points = None;
-                    if capacity.points.is_none() && capacity.hours.is_none() {
-                        plan.capacity = None;
-                    }
-                }
-            }
-        }
-    }
-    if let Some(capacity_hours) = payload.capacity_hours {
-        match capacity_hours {
-            Some(value) => {
-                let plan = target.plan.get_or_insert_with(SprintPlan::default);
-                plan.capacity
-                    .get_or_insert_with(SprintCapacity::default)
-                    .hours = Some(value);
-            }
-            None => {
-                if let Some(plan) = target.plan.as_mut()
-                    && let Some(capacity) = plan.capacity.as_mut()
-                {
-                    capacity.hours = None;
-                    if capacity.points.is_none() && capacity.hours.is_none() {
-                        plan.capacity = None;
-                    }
-                }
-            }
-        }
-    }
-
-    if let Some(actual_started_at) = payload.actual_started_at.clone() {
-        match actual_started_at {
-            Some(value) => {
-                let actual = target.actual.get_or_insert_with(SprintActual::default);
-                actual.started_at = clean_opt_string(Some(value));
-            }
-            None => {
-                if let Some(actual) = target.actual.as_mut() {
-                    actual.started_at = None;
-                }
-            }
-        }
-    }
-
-    if let Some(actual_closed_at) = payload.actual_closed_at.clone() {
-        match actual_closed_at {
-            Some(value) => {
-                let actual = target.actual.get_or_insert_with(SprintActual::default);
-                actual.closed_at = clean_opt_string(Some(value));
-            }
-            None => {
-                if let Some(actual) = target.actual.as_mut() {
-                    actual.closed_at = None;
-                }
-            }
-        }
-    }
-
-    let should_clear_actual = matches!(
-        target.actual.as_ref(),
-        Some(actual) if actual.started_at.is_none() && actual.closed_at.is_none()
-    );
-    if should_clear_actual {
-        target.actual = None;
-    }
-
-    if let Some(plan) = target.plan.as_ref()
-        && !plan_has_values(plan)
-    {
-        target.plan = None;
-    }
+pub(super) fn sprint_patch_from_request(
+    payload: &SprintUpdateRequest,
+) -> crate::services::sprint_service::SprintMetadataPatch {
+    crate::services::sprint_service::SprintMetadataPatch::from_request(payload)
 }
 
 pub(super) fn plan_has_values(plan: &SprintPlan) -> bool {

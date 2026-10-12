@@ -1025,6 +1025,15 @@ async function applyAssignment(ids: string[], assignee: string) {
   const failures: Array<{ id: string; error: unknown }> = []
   let success = 0
   for (const id of unique) {
+    // DEV-102: assigning the exact current assignee is a client-side no-op
+    // — no request, no upsert. Exact trimmed-string equality only:
+    // "@me"/agent aliases are never resolved or strip-@ compared here, so
+    // an unresolved identity (e.g. "@me" vs the stored user) defers to the
+    // server's durable no-op handling instead of being silenced.
+    const current = store._map.value.get(id)
+    if (current && (current.assignee ?? '').trim() === assignee.trim()) {
+      continue
+    }
     try {
       const updated = await api.updateTask(id, { assignee })
       if (scope === filterGeneration) store.upsert(updated)
@@ -1082,6 +1091,11 @@ async function unassignTasks(ids: string[]) {
   const failures: Array<{ id: string; error: unknown }> = []
   let success = 0
   for (const id of unique) {
+    // DEV-102: unassigning a task with no current assignee is a no-op.
+    const current = store._map.value.get(id)
+    if (current && !(current.assignee ?? '').trim()) {
+      continue
+    }
     try {
       const updated = await api.updateTask(id, { assignee: '' as any })
       if (scope === filterGeneration) store.upsert(updated)
@@ -1141,6 +1155,8 @@ async function performSprintAction(
   try {
     const response = mode === 'add' ? await api.sprintAdd(payload) : await api.sprintRemove(payload)
     const changed = response.modified.length
+    const replacedCount = Array.isArray(response.replaced) ? response.replaced.length : 0
+    const cleanedReferences = response.integrity?.auto_cleanup?.removed_references ?? 0
     const sprintName = response.sprint_label || `Sprint #${response.sprint_id}`
     if (changed > 0) {
       const verb = mode === 'add' ? 'Added' : 'Removed'
@@ -1165,8 +1181,15 @@ async function performSprintAction(
     if (response.integrity?.missing_sprints && response.integrity.missing_sprints.length) {
       showToast(`Still spotting missing sprint IDs: ${response.integrity.missing_sprints.map((id) => `#${id}`).join(', ')}`)
     }
-    await refreshSprints(true)
-    await applyFilter(filter.value, 'none')
+    // DEV-102: reconcile only after a real change — modified tasks, sprint
+    // reassignments, or integrity cleanup. A response that modified nothing
+    // needs no sprint refresh and no task-list re-filter; skipping it can
+    // never skip reconciliation of an actual change because every real
+    // change signal above is included in the gate.
+    if (changed > 0 || replacedCount > 0 || cleanedReferences > 0) {
+      await refreshSprints(true)
+      await applyFilter(filter.value, 'none')
+    }
   } catch (e:any) {
     showToast(e.message || (mode === 'add' ? 'Failed to assign to sprint' : 'Failed to remove from sprint'))
   }

@@ -231,6 +231,40 @@ impl AutomationService {
             return Err(LoTaRError::ValidationError(validation.to_string()));
         }
 
+        // DEV-102 no-op boundary: the incoming file is fully parsed and
+        // validated first, and the CURRENT stored file must read and parse
+        // before equality is considered (a malformed current file blocks
+        // the change instead of being silently replaced). When the stored
+        // complete rules are already effective-equal to the submission,
+        // the write is skipped: bytes, mtime, and formatting (including
+        // comments and unknown extensions) are preserved, caches stay
+        // untouched, and callers see `updated: false`. A missing file is
+        // creation semantics and always writes.
+        let scope_label = if project.is_some() {
+            "project"
+        } else {
+            "global"
+        };
+        let current = match project {
+            Some(prefix) => automation_persistence::load_project_automation(tasks_dir, prefix),
+            None => automation_persistence::load_global_automation(tasks_dir),
+        }
+        .map_err(|e| {
+            LoTaRError::ValidationError(format!(
+                "Failed to read current {} automation configuration: {}",
+                scope_label, e
+            ))
+        })?;
+        if current
+            .as_ref()
+            .is_some_and(|current| automation_persistence::files_effectively_equal(current, &file))
+        {
+            return Ok(AutomationSetOutcome {
+                updated: false,
+                validation,
+            });
+        }
+
         match project {
             Some(prefix) => {
                 automation_persistence::save_project_automation(tasks_dir, prefix, &file)?

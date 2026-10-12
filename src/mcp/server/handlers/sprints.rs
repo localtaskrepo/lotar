@@ -22,7 +22,7 @@ use crate::services::sprint_velocity::{
     DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
 };
 use crate::storage::manager::Storage;
-use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
+use crate::storage::sprint::{Sprint, SprintCapacity, SprintPlan};
 use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
@@ -216,68 +216,6 @@ fn plan_has_values(plan: &SprintPlan) -> bool {
         || plan.capacity.is_some()
         || plan.overdue_after.is_some()
         || plan.notes.is_some()
-}
-
-fn apply_update_to_sprint(target: &mut Sprint, payload: &SprintUpdateRequest) {
-    let plan = target.plan.get_or_insert_with(SprintPlan::default);
-
-    if payload.label.is_some() {
-        plan.label = clean_opt_string(payload.label.clone());
-    }
-    if payload.goal.is_some() {
-        plan.goal = clean_opt_string(payload.goal.clone());
-    }
-    if payload.plan_length.is_some() {
-        plan.length = clean_opt_string(payload.plan_length.clone());
-    }
-    if payload.ends_at.is_some() {
-        plan.ends_at = clean_opt_string(payload.ends_at.clone());
-    }
-    if payload.starts_at.is_some() {
-        plan.starts_at = clean_opt_string(payload.starts_at.clone());
-    }
-    if payload.capacity_points.is_some() || payload.capacity_hours.is_some() {
-        let cap = plan.capacity.get_or_insert_with(SprintCapacity::default);
-        if let Some(value) = &payload.capacity_points {
-            cap.points = *value;
-        }
-        if let Some(value) = &payload.capacity_hours {
-            cap.hours = *value;
-        }
-        if cap.points.is_none() && cap.hours.is_none() {
-            plan.capacity = None;
-        }
-    }
-    if payload.overdue_after.is_some() {
-        plan.overdue_after = clean_opt_string(payload.overdue_after.clone());
-    }
-    if payload.notes.is_some() {
-        plan.notes = clean_opt_string(payload.notes.clone());
-    }
-
-    if payload.actual_started_at.is_some() || payload.actual_closed_at.is_some() {
-        let actual = target.actual.get_or_insert_with(SprintActual::default);
-        if let Some(value) = &payload.actual_started_at {
-            actual.started_at = value.clone();
-        }
-        if let Some(value) = &payload.actual_closed_at {
-            actual.closed_at = value.clone();
-        }
-
-        let should_clear_actual = matches!(
-            target.actual.as_ref(),
-            Some(actual) if actual.started_at.is_none() && actual.closed_at.is_none()
-        );
-        if should_clear_actual {
-            target.actual = None;
-        }
-    }
-
-    if let Some(plan) = target.plan.as_ref()
-        && !plan_has_values(plan)
-    {
-        target.plan = None;
-    }
 }
 
 pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -571,8 +509,10 @@ pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
     };
 
     let mut storage = Storage::new(&resolver.path);
-    let existing = match SprintService::get(&storage, sprint_id) {
-        Ok(record) => record,
+    let patch = crate::services::sprint_service::SprintMetadataPatch::from_request(&body);
+
+    let outcome = match SprintService::update_with_patch(&mut storage, sprint_id, &patch) {
+        Ok(outcome) => outcome,
         Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
             return err(
                 req.id,
@@ -581,21 +521,6 @@ pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
                 None,
             );
         }
-        Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": error.to_string()})),
-            );
-        }
-    };
-
-    let mut sprint = existing.sprint.clone();
-    apply_update_to_sprint(&mut sprint, &body);
-
-    let outcome = match SprintService::update(&mut storage, sprint_id, sprint) {
-        Ok(outcome) => outcome,
         Err(error) => {
             return domain_service_error(req.id, "Failed to update sprint", &error);
         }

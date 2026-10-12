@@ -394,7 +394,7 @@ impl TaskRelationships {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskComment {
     pub date: String,

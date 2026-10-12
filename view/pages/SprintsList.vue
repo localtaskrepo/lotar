@@ -2289,6 +2289,26 @@ async function onSprintDrop(event: DragEvent, id: number) {
       return
     }
   }
+  // DEV-102: dropping a task on a sprint it already occupies is a
+  // client-side no-op when the add itself cannot change anything — move
+  // mode with the target as the sole membership, or copy mode with the
+  // target already among the memberships. Everything else keeps the
+  // request and the response-authoritative remove/refresh flow: a
+  // genuinely different sprint reassigns (add + silent source remove), and
+  // a multi-membership move-mode drop still trims via force_single.
+  // Unknown task state (stale row) defers to the server.
+  const draggedTask = tasks.value.find((item) => item.id === taskId)
+  if (draggedTask) {
+    const memberships = normalizeSprintMembership(draggedTask.sprints)
+    if (!copyMode && memberships.length === 1 && memberships[0] === id) {
+      onTaskDragEnd()
+      return
+    }
+    if (copyMode && memberships.includes(id)) {
+      onTaskDragEnd()
+      return
+    }
+  }
   let added = false
   try {
     added = await assignTasksToSprint([taskId], id, { forceSingle: !copyMode })

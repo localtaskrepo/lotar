@@ -215,7 +215,24 @@ impl StorageOperations {
         let project_path = root_path.join(&project_folder);
 
         with_storage_lock(&project_path, "task", || {
-            let (file_path, file_string) = Self::prepare_task_edit(&project_path, id, new_task)?;
+            let file_path = match Self::get_file_path_for_id(&project_path, id) {
+                Some(path) => path,
+                None => return Err("Task file not found".into()),
+            };
+            let content = fs::read_to_string(&file_path)?;
+            let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
+                .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
+            let merged = Self::merge_task_extensions(&old_task, new_task);
+            // DEV-102 semantic no-op guard: when the stored task and the
+            // merged replacement are structurally equal, keep the original
+            // bytes — comments, key order, quoting, and mtime included —
+            // instead of publishing a formatting-only reserialization.
+            // Real data differences (typed fields, custom fields,
+            // references, user extensions) still rewrite the file.
+            if old_task == merged {
+                return Ok(());
+            }
+            let file_string = serde_yaml_ng::to_string(&merged)?;
             atomic_write_file(&file_path, &file_string)?;
 
             // No longer need to update index - simplified architecture
@@ -304,12 +321,20 @@ impl StorageOperations {
         let content = fs::read_to_string(&file_path)?;
         let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
             .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
-        let mut task = new_task.clone();
-        let mut extras = old_task.extra_fields;
-        extras.extend(task.extra_fields);
-        task.extra_fields = extras;
-        let file_string = serde_yaml_ng::to_string(&task)?;
+        let merged = Self::merge_task_extensions(&old_task, new_task);
+        let file_string = serde_yaml_ng::to_string(&merged)?;
         Ok((file_path, file_string))
+    }
+
+    /// Merge the stored task's user-owned YAML extensions into a replacement
+    /// candidate (DTO-based replacements do not carry them). Candidate
+    /// extensions win per key, mirroring the historical edit behavior.
+    fn merge_task_extensions(stored: &Task, replacement: &Task) -> Task {
+        let mut merged = replacement.clone();
+        let mut extras = stored.extra_fields.clone();
+        extras.extend(merged.extra_fields.clone());
+        merged.extra_fields = extras;
+        merged
     }
 
     /// Delete a task

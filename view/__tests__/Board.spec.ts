@@ -212,6 +212,7 @@ vi.mock('../composables/useTaskPanelController', () => ({
 
 import Board from '../pages/Board.vue'
 import { invalidateCompletionPolicies } from '../composables/useCompletionPolicy'
+import { showToast } from '../components/toast'
 
 function policyConfig(overrides: Record<string, unknown> = {}) {
     return {
@@ -1482,6 +1483,129 @@ describe('Board semantic swimlane order (DEV-87)', () => {
             expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['Medium'])
             expect(wrapper.find('.swimlane-count').text()).toBe('1')
             expect(wrapper.findAll('article.task')).toHaveLength(1)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})
+
+describe('Board no-op drop guards (DEV-102)', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+        routeState.query = { project: 'ACME' }
+        taskMap.value = new Map()
+        taskVersion.value = 0
+        boardQueryHandles.clear()
+        configStore.statuses.value = ['Todo', 'Doing', 'Done']
+        configStore.priorities.value = ['low', 'med', 'high']
+        configStore.types.value = ['task']
+        showConfigMock.mockReset().mockResolvedValue({})
+        setStatusMock.mockClear()
+        vi.mocked(showToast).mockClear()
+        invalidateCompletionPolicies()
+        localStorage.clear()
+    })
+    afterEach(() => {
+        configStore.priorities.value = ['low', 'med', 'high']
+        configStore.types.value = ['task']
+        vi.useRealTimers()
+    })
+
+    async function mountSettled() {
+        const wrapper = mount(Board)
+        await flushPromises()
+        setStatusMock.mockClear()
+        tasksStore.upsert.mockClear()
+        boardHandleFor({ project: 'ACME' }).refresh.mockClear()
+        vi.mocked(showToast).mockClear()
+        return wrapper
+    }
+
+    it('drops on the current column without any request, optimistic write, toast, or refresh', async () => {
+        const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = await mountSettled()
+        try {
+            const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-1'))!
+            await card.trigger('dragstart')
+            await wrapper.find('.column[data-column-kind="status"][data-status="Todo"]').trigger('drop')
+            await flushPromises()
+
+            expect(setStatusMock).not.toHaveBeenCalled()
+            expect(tasksStore.upsert).not.toHaveBeenCalled()
+            expect(boardHandleFor({ project: 'ACME' }).refresh).not.toHaveBeenCalled()
+            expect(showToast).not.toHaveBeenCalled()
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('treats a case-variant of the configured label as the same effective status', async () => {
+        const tasks = [baseTask({ id: 'ACME-1', status: 'todo' })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = await mountSettled()
+        try {
+            // The task renders inside the configured "Todo" column.
+            const todoColumn = wrapper.find('.column[data-column-kind="status"][data-status="Todo"]')
+            expect(todoColumn.find('article.card.task').text()).toContain('ACME-1')
+
+            const card = todoColumn.find('article.card.task')
+            await card.trigger('dragstart')
+            await todoColumn.trigger('drop')
+            await flushPromises()
+
+            expect(setStatusMock).not.toHaveBeenCalled()
+            expect(tasksStore.upsert).not.toHaveBeenCalled()
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('keeps distinct raw statuses sharing a bucket a real server-judged write', async () => {
+        configStore.statuses.value = ['Todo', 'Doing', 'Done', '__other__']
+        // "Other" normalizes onto the configured "__other__" bucket but is a
+        // distinct raw value: the drop must still write "__other__".
+        const tasks = [baseTask({ id: 'ACME-1', status: 'Other' })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = await mountSettled()
+        try {
+            const configured = wrapper.find('.column[data-column-kind="status"][data-status="__other__"]')
+            expect(configured.find('article.card.task').text()).toContain('ACME-1')
+
+            const card = configured.find('article.card.task')
+            await card.trigger('dragstart')
+            await configured.trigger('drop')
+            await flushPromises()
+
+            expect(setStatusMock).toHaveBeenCalledExactlyOnceWith('ACME-1', '__other__')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('posts exactly one status change for a genuine cross-column drop and reconciles', async () => {
+        const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = await mountSettled()
+        try {
+            const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-1'))!
+            await card.trigger('dragstart')
+            await wrapper.find('.column[data-column-kind="status"][data-status="Doing"]').trigger('drop')
+            await flushPromises()
+
+            expect(setStatusMock).toHaveBeenCalledExactlyOnceWith('ACME-1', 'Doing')
+            expect(tasksStore.upsert).toHaveBeenCalledTimes(1)
+            expect(boardHandleFor({ project: 'ACME' }).refresh).toHaveBeenCalled()
+            expect(showToast).toHaveBeenCalled()
         } finally {
             wrapper.unmount()
         }

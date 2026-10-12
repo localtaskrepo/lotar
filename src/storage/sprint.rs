@@ -327,6 +327,12 @@ impl SprintPlan {
             && self.notes.is_none()
     }
 
+    /// Whether any plan field carries a value; empty plans are pruned on
+    /// write, so update patches use this to decide pruning.
+    pub fn has_values(&self) -> bool {
+        !self.is_empty()
+    }
+
     fn normalize_text_fields(&mut self) {
         Self::normalize_text(&mut self.label);
         Self::normalize_text(&mut self.goal);

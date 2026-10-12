@@ -500,9 +500,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
         match removed {
             Ok((outcome, still_referenced, deleted)) => {
                 ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                let actor =
-                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                if outcome.changed {
+                    let actor =
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                }
                 ok_json(
                     200,
                     json!({"data": crate::api_types::AttachmentRemoveResponse { task: outcome.task, deleted, still_referenced }}),
@@ -949,13 +951,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(msg) => return bad_request(msg),
         };
-        match TaskService::update(&mut storage, &id, patch) {
-            Ok(task) => {
-                let actor =
-                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                crate::api_events::emit_task_updated(&task, actor.as_deref());
-                ok_json(200, json!({"data": task}))
-            }
+        match TaskService::update_with_context(
+            &mut storage,
+            &id,
+            patch,
+            crate::services::task_service::TaskUpdateContext {
+                emit_api_event: true,
+                ..Default::default()
+            },
+        ) {
+            Ok(task) => ok_json(200, json!({"data": task})),
             Err(e) => map_lotar_error(e),
         }
     });
@@ -982,13 +987,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
             status: Some(new_status),
             ..Default::default()
         };
-        match TaskService::update(&mut storage, &id, patch) {
-            Ok(task) => {
-                let actor =
-                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                crate::api_events::emit_task_updated(&task, actor.as_deref());
-                ok_json(200, json!({"data": task}))
-            }
+        match TaskService::update_with_context(
+            &mut storage,
+            &id,
+            patch,
+            crate::services::task_service::TaskUpdateContext {
+                emit_api_event: true,
+                ..Default::default()
+            },
+        ) {
+            Ok(task) => ok_json(200, json!({"data": task})),
             Err(e) => map_lotar_error(e),
         }
     });
@@ -1046,15 +1054,18 @@ pub(super) fn register(api_server: &mut ApiServer) {
         if trimmed.is_empty() {
             return bad_request("Missing text".into());
         }
-        let dto = match TaskService::update_comment(&mut storage, &id, index, trimmed) {
-            Ok(dto) => dto,
-            // Typed classification (DEV-58): malformed IDs, bad indices,
-            // and tombstone refusals stay 400s; storage faults are 500s.
-            Err(err) => return map_lotar_error(err),
-        };
-        let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-        crate::api_events::emit_task_updated(&dto, actor.as_deref());
-        ok_json(200, json!({"data": dto}))
+        let receipt =
+            match TaskService::update_comment_with_receipt(&mut storage, &id, index, trimmed) {
+                Ok(receipt) => receipt,
+                // Typed classification (DEV-58): malformed IDs, bad indices,
+                // and tombstone refusals stay 400s; storage faults are 500s.
+                Err(err) => return map_lotar_error(err),
+            };
+        if receipt.changed {
+            let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+            crate::api_events::emit_task_updated(&receipt.dto, actor.as_deref());
+        }
+        ok_json(200, json!({"data": receipt.dto}))
     });
 
     // POST /api/tasks/delete {id, hard?=false}
@@ -1073,7 +1084,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         if payload.id.trim().is_empty() {
             return bad_request("Missing id".into());
         }
-        let outcome = match TaskService::delete_with_options(
+        let (outcome, changed) = match TaskService::delete_with_receipt(
             &mut storage,
             payload.id.trim(),
             req.query.get("project").map(|s| s.as_str()),
@@ -1087,7 +1098,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 return map_lotar_error(err);
             }
         };
-        if outcome.deleted {
+        if changed {
             // Emit the CANONICAL id: a padded request alias (TP-001) must not
             // leak into UI event streams as a stale identity. Soft and hard
             // deletion both surface as task_deleted; the tombstone state and
@@ -1114,15 +1125,17 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
             _ => return bad_request("Missing id".into()),
         };
-        match TaskService::restore(
+        match TaskService::restore_with_receipt(
             &mut storage,
             &id,
             req.query.get("project").map(|s| s.as_str()),
         ) {
-            Ok(dto) => {
-                let actor = crate::utils::identity::resolve_current_user(None);
-                crate::api_events::emit_task_updated(&dto, actor.as_deref());
-                ok_json(200, json!({"data": dto}))
+            Ok(receipt) => {
+                if receipt.changed {
+                    let actor = crate::utils::identity::resolve_current_user(None);
+                    crate::api_events::emit_task_updated(&receipt.dto, actor.as_deref());
+                }
+                ok_json(200, json!({"data": receipt.dto}))
             }
             Err(err) => map_lotar_error(err),
         }

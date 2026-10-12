@@ -74,6 +74,28 @@ pub fn to_canonical_yaml(file: &AutomationFile) -> LoTaRResult<String> {
     serde_yaml_ng::to_string(&output).map_err(LoTaRError::from)
 }
 
+/// Whether two automation files carry the same COMPLETE effective rules
+/// (DEV-102 no-op boundary), compared under the same projection
+/// [`to_canonical_yaml`] serializes: the ordered rule list plus
+/// `max_iterations`.
+///
+/// Parse-normalized spellings compare equal — a bare rule list versus the
+/// `rules:` map form, serde aliases such as `triggers`/`when`, scalar/list
+/// condition shorthands, and scalar/singleton-list actions, except the
+/// variant-sensitive assignee placeholders, so equivalent syntax does not rewrite
+/// the stored file. Anything that changes matching behavior does not
+/// compare equal: rule content, rule ORDER, `max_iterations`, cooldowns,
+/// names, conditions, and actions are all part of the comparison.
+///
+/// Comments and unknown extensions in the stored raw file are invisible
+/// here by design: a semantically equal submission preserves them (and the
+/// file's bytes/mtime) instead of canonical-reformatting the file; removing
+/// such raw-only content requires editing the file, not `set`.
+pub fn files_effectively_equal(a: &AutomationFile, b: &AutomationFile) -> bool {
+    a.automation.rules() == b.automation.rules()
+        && a.automation.max_iterations() == b.automation.max_iterations()
+}
+
 fn load_automation_from_path(path: &Path) -> LoTaRResult<Option<AutomationFile>> {
     if !path.exists() {
         return Ok(None);

@@ -2,9 +2,9 @@ use std::path::Path;
 
 use crate::cli::args::sprint::{SprintCreateArgs, SprintUpdateArgs};
 use crate::output::OutputRenderer;
-use crate::services::sprint_service::SprintService;
+use crate::services::sprint_service::{SprintMetadataPatch, SprintService};
 use crate::storage::manager::Storage;
-use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
+use crate::storage::sprint::{Sprint, SprintCapacity, SprintPlan};
 
 use super::support::{SprintOperationKind, render_operation_response};
 
@@ -59,15 +59,28 @@ pub(crate) fn handle_update(
 
     let sprint_id = update_args.resolved_sprint_id();
 
-    let existing = SprintService::get(&storage, sprint_id).map_err(|err| err.to_string())?;
-
-    let mut sprint = existing.sprint.clone();
-    apply_update_to_sprint(&mut sprint, update_args);
+    let patch = SprintMetadataPatch {
+        label: update_args.label.clone().map(Some),
+        goal: update_args.goal.clone().map(Some),
+        plan_length: update_args.plan_length.clone().map(Some),
+        ends_at: update_args.ends_at.clone().map(Some),
+        starts_at: update_args.starts_at.clone().map(Some),
+        overdue_after: update_args.overdue_after.clone().map(Some),
+        notes: update_args.notes.clone().map(Some),
+        capacity_points: update_args.capacity_points.map(Some),
+        capacity_hours: update_args.capacity_hours.map(Some),
+        actual_started_at: update_args.actual_started_at.clone().map(Some),
+        actual_closed_at: update_args.actual_closed_at.clone().map(Some),
+    };
 
     let warnings_enabled = resolved_config.sprint_notifications.enabled;
 
-    let outcome = SprintService::update(&mut storage, sprint_id, sprint)
-        .map_err(|err| format!("Failed to update sprint: {}", err))?;
+    let outcome = SprintService::update_with_patch(&mut storage, sprint_id, &patch).map_err(
+        |err| match err {
+            crate::errors::LoTaRError::SprintNotFound(_) => err.to_string(),
+            other => format!("Failed to update sprint: {}", other),
+        },
+    )?;
 
     render_operation_response(
         SprintOperationKind::Update,
@@ -148,60 +161,4 @@ fn clean_opt_string(input: Option<String>) -> Option<String> {
             Some(trimmed.to_string())
         }
     })
-}
-
-fn apply_update_to_sprint(sprint: &mut Sprint, update: &SprintUpdateArgs) {
-    if update.label.is_some()
-        || update.goal.is_some()
-        || update.plan_length.is_some()
-        || update.ends_at.is_some()
-        || update.starts_at.is_some()
-        || update.overdue_after.is_some()
-        || update.notes.is_some()
-    {
-        let plan = sprint.plan.get_or_insert_with(SprintPlan::default);
-
-        if update.label.is_some() {
-            plan.label = clean_opt_string(update.label.clone());
-        }
-        if update.goal.is_some() {
-            plan.goal = clean_opt_string(update.goal.clone());
-        }
-        if update.plan_length.is_some() {
-            plan.length = clean_opt_string(update.plan_length.clone());
-        }
-        if update.ends_at.is_some() {
-            plan.ends_at = clean_opt_string(update.ends_at.clone());
-        }
-        if update.starts_at.is_some() {
-            plan.starts_at = clean_opt_string(update.starts_at.clone());
-        }
-        if update.overdue_after.is_some() {
-            plan.overdue_after = clean_opt_string(update.overdue_after.clone());
-        }
-        if update.notes.is_some() {
-            plan.notes = clean_opt_string(update.notes.clone());
-        }
-    }
-
-    if update.capacity_points.is_some() || update.capacity_hours.is_some() {
-        let plan = sprint.plan.get_or_insert_with(SprintPlan::default);
-        let capacity = plan.capacity.get_or_insert_with(SprintCapacity::default);
-        if let Some(points) = update.capacity_points {
-            capacity.points = Some(points);
-        }
-        if let Some(hours) = update.capacity_hours {
-            capacity.hours = Some(hours);
-        }
-    }
-
-    if update.actual_started_at.is_some() || update.actual_closed_at.is_some() {
-        let actual = sprint.actual.get_or_insert_with(SprintActual::default);
-        if update.actual_started_at.is_some() {
-            actual.started_at = clean_opt_string(update.actual_started_at.clone());
-        }
-        if update.actual_closed_at.is_some() {
-            actual.closed_at = clean_opt_string(update.actual_closed_at.clone());
-        }
-    }
 }

@@ -357,7 +357,7 @@ impl<T> ConfigurableField<T> where
 
 // Specialized implementation for String fields that support wildcard
 // This will serialize as a direct array without the "values" wrapper
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StringConfigField {
     pub values: Vec<String>,
 }
@@ -403,7 +403,12 @@ impl StringConfigField {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Equality is the no-op boundary for config mutations (DEV-102): a
+/// candidate equal to the loaded raw configuration leaves the stored bytes,
+/// mtime, caches, and events untouched. It compares the RAW override layer
+/// (Option presence), so an explicit override equal to an inherited default
+/// is a genuine provenance change, never a no-op.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProjectConfig {
     pub project_name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -565,7 +570,12 @@ impl ProjectConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Equality is the no-op boundary for config mutations (DEV-102); see
+/// [`ProjectConfig`]. The one wrinkle is `server_port`: the deserialized
+/// struct cannot distinguish an absent key from the built-in default, so
+/// the candidate pipeline additionally treats an explicit port request as
+/// a change while the raw file has no pin (DEV-71 `ServerPortSaveIntent`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GlobalConfig {
     #[serde(default = "default_port")]
     pub server_port: u16,

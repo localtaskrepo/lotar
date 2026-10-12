@@ -1531,12 +1531,13 @@ automation:
     // Wait for cooldown to expire
     sleep(Duration::from_millis(1100));
 
-    // Third update — rule should fire again
+    // A genuine third update after expiry should fire again; repeating High
+    // would be a no-op and must not dispatch automation.
     TaskService::update(
         &mut storage,
         &created.id,
         TaskUpdate {
-            priority: Some("High".into()),
+            priority: Some("Low".into()),
             ..Default::default()
         },
     )

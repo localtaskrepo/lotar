@@ -344,7 +344,7 @@ describe('TaskPanel nullable clears', () => {
 })
 
 describe('TaskPanel custom field JSON preservation', () => {
-  it('resends untouched non-string values verbatim and edits as strings', async () => {
+  it('skips unchanged commits, resends untouched non-string values verbatim, and edits as strings', async () => {
     currentTask = task('A-1', 'A-1', {
       custom_fields: { product: 'Core', points: 42, meta: { a: 1 }, active: true },
     })
@@ -353,16 +353,12 @@ describe('TaskPanel custom field JSON preservation', () => {
     const vm = wrapper.vm as any
     api.updateTask.mockClear()
 
+    // DEV-102: an unchanged replace-all map equals the task's persisted
+    // values structurally (raw numbers/booleans/objects included), so the
+    // blur commit must not patch at all.
     await vm.commitCustomFields()
-    expect(api.updateTask).toHaveBeenCalledTimes(1)
-    expect(api.updateTask.mock.calls[0]![1]!.custom_fields).toEqual({
-      product: 'Core',
-      points: 42,
-      meta: { a: 1 },
-      active: true,
-    })
+    expect(api.updateTask).not.toHaveBeenCalled()
 
-    api.updateTask.mockClear()
     vm.updateCustomFieldValue('product', 'Edited')
     await vm.commitCustomFields()
     expect(api.updateTask).toHaveBeenCalledTimes(1)
@@ -371,5 +367,133 @@ describe('TaskPanel custom field JSON preservation', () => {
     expect(patch.custom_fields.points).toBe(42)
     expect(patch.custom_fields.meta).toEqual({ a: 1 })
     expect(patch.custom_fields.active).toBe(true)
+  })
+
+  it('treats a string edit of a numeric-looking value as a real change', async () => {
+    // All configured fields must exist on the task so the editor's built
+    // replace-all map equals the persisted baseline (ensure-added empty
+    // configured fields would themselves be a real additive change).
+    currentTask = task('A-1', 'A-1', {
+      custom_fields: { product: '', points: 42, meta: '', active: '' },
+    })
+    const wrapper = panel('A-1')
+    await flushPromises()
+    const vm = wrapper.vm as any
+    api.updateTask.mockClear()
+
+    // Retyping the same digits keeps the raw number: still a no-op.
+    await vm.commitCustomFields()
+    expect(api.updateTask).not.toHaveBeenCalled()
+
+    vm.updateCustomFieldValue('points', '43')
+    await vm.commitCustomFields()
+    expect(api.updateTask).toHaveBeenCalledTimes(1)
+    expect(api.updateTask.mock.calls[0]![1]!.custom_fields).toEqual({ product: '', points: '43', meta: '', active: '' })
+  })
+})
+
+describe('TaskPanel no-op mutation guards (DEV-102)', () => {
+  it('custom-field input blur without edits sends no patch', async () => {
+    currentTask = task('A-1', 'A-1', {
+      custom_fields: { product: 'Core', points: 5, active: true, meta: { a: 1, nested: [1, 2] } },
+    })
+    const wrapper = panel('A-1')
+    await flushPromises()
+    api.updateTask.mockClear()
+
+    // Blur both the name and value inputs of the first row through the real
+    // section wiring (UiInput passes @blur through to the native input).
+    const rowInputs = wrapper.findAll('.task-panel__custom-row input')
+    expect(rowInputs.length).toBeGreaterThan(1)
+    await rowInputs[0]!.trigger('blur')
+    await rowInputs[1]!.trigger('blur')
+    await flushPromises()
+
+    expect(api.updateTask).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('custom-field edit blur sends exactly one patch and later unchanged blurs none', async () => {
+    currentTask = task('A-1', 'A-1', {
+      custom_fields: { product: 'Core', points: 5, active: true, meta: { a: 1, nested: [1, 2] } },
+    })
+    const wrapper = panel('A-1')
+    await flushPromises()
+    api.updateTask.mockClear()
+
+    const rowInputs = wrapper.findAll('.task-panel__custom-row input')
+    await rowInputs[1]!.setValue('Edited')
+    await rowInputs[1]!.trigger('blur')
+    await flushPromises()
+
+    expect(api.updateTask).toHaveBeenCalledTimes(1)
+    expect(api.updateTask.mock.calls[0]![1]!.custom_fields).toEqual({
+      product: 'Edited',
+      points: 5,
+      active: true,
+      meta: { a: 1, nested: [1, 2] },
+    })
+    // Raw types ride along untouched: boolean stays boolean, object stays a
+    // structural value (not a string).
+    expect(typeof api.updateTask.mock.calls[0]![1]!.custom_fields.active).toBe('boolean')
+
+    api.updateTask.mockClear()
+    await rowInputs[1]!.trigger('blur')
+    await flushPromises()
+    expect(api.updateTask).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('re-selecting the current status in the dropdown sends no request and shows no toast', async () => {
+    currentTask = task('A-1')
+    const wrapper = panel('A-1')
+    await flushPromises()
+    api.updateTask.mockClear()
+    toast.mockClear()
+
+    // Summary selects: project, type, status, priority — the status select
+    // re-set to its current value fires the real change -> updateStatus path.
+    const selects = wrapper.findAll('.task-panel__form select')
+    const statusSelect = selects[2]!
+    expect((statusSelect.element as HTMLSelectElement).value).toBe('Open')
+    await statusSelect.setValue('Open')
+    await flushPromises()
+
+    expect(api.updateTask).not.toHaveBeenCalled()
+    expect(api.setStatus).not.toHaveBeenCalled()
+    expect(toast).not.toHaveBeenCalledWith('Status updated')
+    wrapper.unmount()
+  })
+
+  it('treats a case-variant of the current status as the same effective status', async () => {
+    currentTask = task('A-1')
+    const wrapper = panel('A-1')
+    await flushPromises()
+    const vm = wrapper.vm as any
+    api.updateTask.mockClear()
+
+    await vm.updateStatus('open')
+    await flushPromises()
+    expect(api.updateTask).not.toHaveBeenCalled()
+
+    // A genuinely different status still saves with its success toast.
+    await vm.updateStatus('Queued')
+    await flushPromises()
+    expect(api.updateTask).toHaveBeenCalledExactlyOnceWith('A-1', { status: 'Queued' })
+    expect(toast).toHaveBeenCalledWith('Status updated')
+    wrapper.unmount()
+  })
+
+  it('keeps distinct raw statuses like Other vs __other__ a real save', async () => {
+    currentTask = task('A-1', 'A-1', { status: '__other__' })
+    const wrapper = panel('A-1')
+    await flushPromises()
+    const vm = wrapper.vm as any
+    api.updateTask.mockClear()
+
+    await vm.updateStatus('Other')
+    await flushPromises()
+    expect(api.updateTask).toHaveBeenCalledExactlyOnceWith('A-1', { status: 'Other' })
+    wrapper.unmount()
   })
 })

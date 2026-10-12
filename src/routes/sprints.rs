@@ -671,18 +671,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("Sprint identifier must be provided".to_string());
         }
 
-        let existing = match SprintService::get(&storage, body.sprint) {
-            Ok(record) => record,
+        let patch = sprint_patch_from_request(&body);
+
+        let outcome = match SprintService::update_with_patch(&mut storage, body.sprint, &patch) {
+            Ok(outcome) => outcome,
             // Typed classification (DEV-58): unknown sprints are 404s;
             // storage faults are 500s.
-            Err(err) => return map_lotar_error(err),
-        };
-
-        let mut sprint = existing.sprint.clone();
-        apply_update_to_sprint(&mut sprint, &body);
-
-        let outcome = match SprintService::update(&mut storage, body.sprint, sprint) {
-            Ok(outcome) => outcome,
             Err(err) => return map_lotar_error(err),
         };
 

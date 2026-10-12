@@ -119,7 +119,31 @@ fn handle_set_assignee(
 
     let previous = task.assignee.clone();
 
-    if previous.as_deref() == Some(validated.as_str()) {
+    // DEV-102: resolve only the `@me` directive (identity substitution),
+    // then compare BOTH sides through the config-aware assignment
+    // comparison. That keeps a registered agent directive (`@copilot`)
+    // distinct from a same-named human (`copilot`) — a genuine
+    // transition — while legacy human spellings (stored `@Alice` vs
+    // `alice`) and case variants still compare equal. A same-value
+    // assignment must report the property no-op here — BEFORE the
+    // active-job refusal below blocks an effectively unchanged assignee.
+    // The resolution is used only for comparison; persistence still
+    // receives the validated candidate and re-resolves it under the store
+    // lock. An unresolvable `@me` (no identity configured) resolves to
+    // None and deliberately falls through to the regular flow instead of
+    // guessing.
+    let is_agent_profile = |name: &str| ctx.config.agent_profiles.contains_key(name);
+    let assignment_key = |value: &str| {
+        crate::utils::member::member_for_assignment_comparison(value, is_agent_profile)
+    };
+    let resolved_candidate =
+        crate::utils::identity::resolve_me_alias(validated.as_str(), Some(&ctx.storage.root_path));
+    let unchanged = resolved_candidate.as_deref().is_some_and(|next| {
+        previous
+            .as_deref()
+            .is_some_and(|current| assignment_key(current) == assignment_key(next))
+    });
+    if unchanged {
         render_assignee_noop(renderer, full_id, previous.as_deref());
         return Ok(());
     }

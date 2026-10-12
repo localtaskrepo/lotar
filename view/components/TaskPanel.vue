@@ -1771,6 +1771,8 @@ async function submitSprintDialog() {
         ? await api.sprintAdd(payload as any)
         : await api.sprintRemove(payload as any)
     const changed = response.modified.length
+    const replacedCount = Array.isArray(response.replaced) ? response.replaced.length : 0
+    const cleanedReferences = response.integrity?.auto_cleanup?.removed_references ?? 0
     if (changed) {
       const verb = sprintDialogMode.value === 'add' ? 'Assigned' : 'Removed'
       const preposition = sprintDialogMode.value === 'add' ? 'to' : 'from'
@@ -1794,7 +1796,12 @@ async function submitSprintDialog() {
       })
     }
     handleIntegrityFeedback(response.integrity)
-    await refreshSprintDataAfterMutation()
+    // DEV-102: reconcile the sprint list and task only after a real change
+    // (modified tasks, reassignments, or integrity cleanup). A pure no-op
+    // response leaves both untouched — no refresh requests.
+    if (changed > 0 || replacedCount > 0 || cleanedReferences > 0) {
+      await refreshSprintDataAfterMutation()
+    }
     closeSprintDialog(true)
   } catch (error: any) {
     showToast(error?.message || (sprintDialogMode.value === 'add' ? 'Failed to assign sprint' : 'Failed to remove sprint'))
@@ -1887,6 +1894,8 @@ async function removeSprintChip(sprintId: number) {
       cleanup_missing: true,
     } as any)
     const changed = response.modified.length
+    const replacedCount = Array.isArray(response.replaced) ? response.replaced.length : 0
+    const cleanedReferences = response.integrity?.auto_cleanup?.removed_references ?? 0
     const label = response.sprint_label || `Sprint #${response.sprint_id || sprintId}`
     if (changed) {
       showToast(`Removed ${changed} task${changed === 1 ? '' : 's'} from ${label}`)
@@ -1896,7 +1905,11 @@ async function removeSprintChip(sprintId: number) {
     const messages = Array.isArray(response.messages) ? response.messages : []
     messages.forEach((message) => showToast(message))
     handleIntegrityFeedback(response.integrity)
-    await refreshSprintDataAfterMutation()
+    // DEV-102: refresh only after a real change; a no-op removal leaves the
+    // sprint list and task state untouched.
+    if (changed > 0 || replacedCount > 0 || cleanedReferences > 0) {
+      await refreshSprintDataAfterMutation()
+    }
   } catch (error: any) {
     showToast(error?.message || 'Failed to remove sprint')
   } finally {

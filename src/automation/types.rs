@@ -50,7 +50,7 @@ impl AutomationRuleSet {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationRule {
     #[serde(default)]
     pub name: Option<String>,
@@ -64,7 +64,7 @@ pub struct AutomationRule {
     pub on: AutomationRuleActions,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationRuleActions {
     // Legacy catch-all: fires on any matching task change (create or update).
     // New configs should use specific event hooks below instead.
@@ -94,7 +94,7 @@ pub struct AutomationRuleActions {
     pub job_cancelled: Option<AutomationAction>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationConditionGroup {
     #[serde(default)]
     pub all: Option<Vec<AutomationConditionGroup>>,
@@ -110,7 +110,7 @@ pub struct AutomationConditionGroup {
     pub fields: HashMap<String, AutomationFieldCondition>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationChangeCondition {
     #[serde(default)]
     pub from: Option<AutomationFieldCondition>,
@@ -124,6 +124,24 @@ pub enum AutomationFieldCondition {
     Scalar(String),
     List(Vec<String>),
     Map(Box<AutomationFieldConditionMap>),
+}
+
+impl PartialEq for AutomationFieldCondition {
+    fn eq(&self, other: &Self) -> bool {
+        // Assignee placeholders are interpreted only in scalar form by the
+        // matcher. Keep their map spellings distinct rather than hiding a
+        // genuine behavior change behind shorthand normalization.
+        if let (Self::Scalar(value), Self::Map(_)) | (Self::Map(_), Self::Scalar(value)) =
+            (self, other)
+            && matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "@any" | "@agent" | "@user"
+            )
+        {
+            return false;
+        }
+        self.as_map() == other.as_map()
+    }
 }
 
 impl AutomationFieldCondition {
@@ -142,7 +160,7 @@ impl AutomationFieldCondition {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationFieldConditionMap {
     #[serde(default)]
     pub equals: Option<String>,
@@ -173,7 +191,7 @@ pub struct AutomationFieldConditionMap {
     pub older_than: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationAction {
     #[serde(default)]
     pub set: Option<AutomationActionSet>,
@@ -187,7 +205,7 @@ pub struct AutomationAction {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationRunCommand {
     pub command: String,
     #[serde(default)]
@@ -206,14 +224,14 @@ fn default_wait() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum AutomationRunAction {
     Shell(String),
     Command(AutomationRunCommand),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationActionSet {
     #[serde(default)]
     pub status: Option<String>,
@@ -241,7 +259,7 @@ pub struct AutomationActionSet {
     pub custom_fields: Option<HashMap<String, serde_yaml_ng::Value>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationTagAction {
     #[serde(default)]
     pub tags: Option<StringOrVec>,
@@ -262,6 +280,12 @@ pub struct AutomationTagAction {
 pub enum StringOrVec {
     Scalar(String),
     List(Vec<String>),
+}
+
+impl PartialEq for StringOrVec {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_vec() == other.as_vec()
+    }
 }
 
 impl StringOrVec {

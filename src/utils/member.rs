@@ -61,6 +61,15 @@ pub fn member_for_comparison(value: &str) -> String {
     value.trim().trim_start_matches('@').to_ascii_lowercase()
 }
 
+/// Compare assignment identities without conflating operational directives
+/// with same-named humans. Unknown human aliases still normalize as before.
+pub fn member_for_assignment_comparison(
+    value: &str,
+    is_agent_profile: impl Fn(&str) -> bool,
+) -> String {
+    normalize_member_value(value, is_agent_profile).to_ascii_lowercase()
+}
+
 /// Returns `true` when `c` is valid in a bare username
 /// (letters, digits, underscore, dash, period).
 pub fn is_username_char(c: char) -> bool {
@@ -87,6 +96,23 @@ pub fn is_email_like(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn assignment_comparison_preserves_registered_agent_directives() {
+        let agent = |name: &str| name == "copilot";
+        assert_ne!(
+            member_for_assignment_comparison("@copilot", agent),
+            member_for_assignment_comparison("copilot", agent)
+        );
+        assert_eq!(
+            member_for_assignment_comparison(" @Alice ", agent),
+            member_for_assignment_comparison("alice", agent)
+        );
+        assert_ne!(
+            member_for_assignment_comparison("@me", agent),
+            member_for_assignment_comparison("me", agent)
+        );
+    }
 
     #[test]
     fn builtin_directives() {

@@ -51,9 +51,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let project = body.get("project").and_then(|v| v.as_str());
         match ConfigService::set(&resolver, &map, global, project) {
             Ok(outcome) => {
-                let actor =
-                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                crate::api_events::emit_config_updated(actor.as_deref());
+                // Emit only for genuine writes (DEV-102): same-value,
+                // clearing-absent-override, and empty-entry no-ops keep the
+                // stored bytes and must not broadcast config_updated.
+                if outcome.updated {
+                    let actor =
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                    crate::api_events::emit_config_updated(actor.as_deref());
+                }
 
                 let warnings: Vec<String> = outcome
                     .validation

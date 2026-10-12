@@ -313,7 +313,7 @@ import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
-import { useCompletionPolicy, ensureCompletionPolicy, normalizeStatusKey } from '../composables/useCompletionPolicy'
+import { useCompletionPolicy, ensureCompletionPolicy, completionStatusKey, normalizeStatusKey } from '../composables/useCompletionPolicy'
 import { useConfig } from '../composables/useConfig'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
@@ -887,9 +887,22 @@ async function onDrop(target: BoardColumnDescriptor) {
   // writing its real status value.
   if (target.synthetic) return
   const targetStatus = target.label
+  const existing = items.value.find(t => t.id === id)
+  // DEV-102: dropping a card on the column its effective status already
+  // occupies is a pure no-op — no optimistic upsert, no status POST, no
+  // toast, no refresh. The comparison mirrors the server's ASCII
+  // case-folded configured-label matching (a task's "todo" already satisfies
+  // the configured "Todo" column) but deliberately does NOT strip
+  // separators, so distinct raw statuses that merely share a bucket — e.g.
+  // a task's "Other" inside a configured "__other__" column — still produce
+  // a real status write judged by the server. The board has no
+  // within-column order payload today; if column-local reordering ever
+  // gains persistence, this guard must be revisited first.
+  if (existing && completionStatusKey(existing.status) === completionStatusKey(targetStatus)) {
+    return
+  }
   try {
     // Optimistic move via store (resolved against this board's query)
-    const existing = items.value.find(t => t.id === id)
     if (existing) {
       store.upsert({ ...existing, status: targetStatus })
     }

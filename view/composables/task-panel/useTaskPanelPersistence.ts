@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from 'vue'
 import { nextTick, watch } from 'vue'
 import type { TaskDTO } from '../../api/types'
+import { completionStatusKey } from '../useCompletionPolicy'
 import { fromDateInputValue, toDateInputValue } from '../../utils/date'
 import { applyTaskSnapshot, isDeletedTask, projectOf } from '../../utils/text'
 
@@ -412,6 +413,13 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
     const updateStatus = async (status: string) => {
         if (!canEdit()) return
         if (!status) return
+        // DEV-102: re-selecting the task's current effective status (e.g.
+        // closing the dropdown on the already-selected option) is a no-op:
+        // no request, no success toast. The comparison mirrors the server's
+        // ASCII case-folded configured-label matching and deliberately does
+        // NOT strip separators — distinct raw statuses such as "Other" vs
+        // "__other__" stay a real, server-judged change.
+        if (completionStatusKey(status) === completionStatusKey(options.task.status)) return
         const outcome = await enqueuePatch(options.task.id, { status })
         if (outcome.ok && !outcome.stale) {
             options.showToast('Status updated')

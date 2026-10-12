@@ -48,9 +48,35 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
     // Untouched values are resent verbatim so replace-all custom_fields
     // patches never degrade numbers/booleans/objects to their string form.
     const rawCustomFieldValues: Record<string, unknown> = {}
+    // DEV-102: the task's persisted custom_fields snapshot (raw values) as
+    // last applied from the server. Blur commits that would resend exactly
+    // this map are skipped; null means "no baseline yet" (defer to server).
+    let appliedTaskCustomFields: Record<string, unknown> | null = null
 
     const displayValue = (value: unknown): string =>
         value === undefined || value === null ? '' : String(value)
+
+    /**
+     * Structural deep equality for custom-field maps: preserves raw types
+     * (string "5" differs from number 5, boolean true differs from "true"),
+     * compares arrays order-sensitively, objects key-order-insensitively,
+     * and nested values recursively — never a JSON.stringify comparison,
+     * which would falsely differ on key order alone.
+     */
+    const customFieldValuesEqual = (a: unknown, b: unknown): boolean => {
+        if (a === b) return true
+        if (Array.isArray(a) && Array.isArray(b)) {
+            return a.length === b.length && a.every((value, index) => customFieldValuesEqual(value, b[index]))
+        }
+        if (a !== null && b !== null && typeof a === 'object' && typeof b === 'object') {
+            const aKeys = Object.keys(a as Record<string, unknown>)
+            const bKeys = Object.keys(b as Record<string, unknown>)
+            return aKeys.length === bKeys.length && aKeys.every((key) =>
+                Object.prototype.hasOwnProperty.call(b, key) &&
+                customFieldValuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
+        }
+        return false
+    }
 
     const buildCustomFields = () => {
         const out: Record<string, unknown> = {}
@@ -69,7 +95,15 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
         if (options.mode.value !== 'edit' || !options.ready.value || options.suppressWatch.value) {
             return
         }
-        await options.applyPatch({ custom_fields: buildCustomFields() })
+        const next = buildCustomFields()
+        // DEV-102: blurring an untouched custom-field row must not patch.
+        // Skip only when the would-be replace-all map structurally equals
+        // the task's persisted values; without a baseline (task not yet
+        // applied) the patch is deferred to the server.
+        if (appliedTaskCustomFields && customFieldValuesEqual(next, appliedTaskCustomFields)) {
+            return
+        }
+        await options.applyPatch({ custom_fields: next })
     }
 
     const addField = async () => {
@@ -95,6 +129,7 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
         Object.keys(customFields).forEach((key) => delete customFields[key])
         Object.keys(customFieldKeys).forEach((key) => delete customFieldKeys[key])
         Object.keys(rawCustomFieldValues).forEach((key) => delete rawCustomFieldValues[key])
+        appliedTaskCustomFields = null
         newField.key = ''
         newField.value = ''
     }
@@ -145,6 +180,9 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
 
     const applyTaskCustomFields = (values: Record<string, unknown>) => {
         resetCustomFields()
+        // Baseline for the DEV-102 blur no-op guard: snapshot the persisted
+        // raw values (deep copy) before the editor state is derived from them.
+        appliedTaskCustomFields = structuredClone(values ?? {})
         Object.entries(values).forEach(([rawKey, value]) => {
             const targetKey = (rawKey || '').trim()
             if (!targetKey) return

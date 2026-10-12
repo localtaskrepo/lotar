@@ -59,6 +59,18 @@ impl Default for TaskUpdateContext {
     }
 }
 
+/// Shared update outcome (DEV-102): the projected task DTO plus whether the
+/// update was a genuine effective change. Effective no-ops write nothing
+/// (task, project-config, or sprint bytes), never touch `modified` or
+/// history, and fire no API events or automation, so transport layers can
+/// surface accurate receipts and events from `changed` without any public
+/// DTO shape change.
+#[derive(Debug)]
+pub struct TaskUpdateReceipt {
+    pub dto: TaskDTO,
+    pub changed: bool,
+}
+
 /// Execution context for comment mutations, shared by every surface so
 /// single and bulk operations record identical history and fire identical
 /// post-commit hooks.
@@ -712,6 +724,20 @@ impl TaskService {
         index: usize,
         text: &str,
     ) -> LoTaRResult<TaskDTO> {
+        Self::update_comment_with_receipt(storage, id, index, text).map(|receipt| receipt.dto)
+    }
+
+    /// [`Self::update_comment`] with a change receipt (DEV-102): the locked
+    /// mutation closure's own `changed` flag reports whether the edit was
+    /// genuine, so transport layers can gate SSE/automation on it without
+    /// DTO or timestamp comparisons. The response body contract is
+    /// unchanged.
+    pub fn update_comment_with_receipt(
+        storage: &mut Storage,
+        id: &str,
+        index: usize,
+        text: &str,
+    ) -> LoTaRResult<TaskUpdateReceipt> {
         let parsed =
             TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let canonical = parsed.canonical();
@@ -749,13 +775,17 @@ impl TaskService {
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Ok(Self::to_dto(
+        let dto = Self::to_dto(
             &canonical,
             outcome.after,
             Some(&sprint_lookup),
             &config,
             chrono::Utc::now(),
-        ))
+        );
+        Ok(TaskUpdateReceipt {
+            dto,
+            changed: outcome.changed,
+        })
     }
 
     /// Fail fast for comment/reference mutations addressed to a task that
@@ -789,6 +819,21 @@ impl TaskService {
         patch: TaskUpdate,
         context: TaskUpdateContext,
     ) -> LoTaRResult<TaskDTO> {
+        Self::update_with_receipt(storage, id, patch, context).map(|receipt| receipt.dto)
+    }
+
+    /// Shared task update with a change receipt (DEV-102). The returned
+    /// [`TaskUpdateReceipt`] reports whether the update was a genuine
+    /// effective change, so transport layers (REST/MCP/CLI) can build
+    /// accurate events and responses without any public DTO shape change.
+    /// Effective no-ops write nothing, never touch `modified` or history,
+    /// and fire no API events or automation.
+    pub fn update_with_receipt(
+        storage: &mut Storage,
+        id: &str,
+        patch: TaskUpdate,
+        context: TaskUpdateContext,
+    ) -> LoTaRResult<TaskUpdateReceipt> {
         // Derive the project prefix from the canonical ID parse (final numeric
         // suffix) to locate the task. `canonical` (padded aliases collapsed,
         // e.g. TP-001 -> TP-1) is the single identity used for every
@@ -861,6 +906,7 @@ impl TaskService {
                 &existing,
                 parsed_status.as_ref(),
                 patch.assignee.as_deref(),
+                &config,
             )?;
         }
 
@@ -882,10 +928,16 @@ impl TaskService {
                 } else {
                     resolve_me_alias(trimmed, Some(&storage.root_path))
                 };
+                // Assignment-aware identity (DEV-102): a registered agent
+                // directive ("@copilot") and the bare human spelling
+                // ("copilot") are DIFFERENT assignees, so switching between
+                // them is blocked while a job is active exactly like any
+                // other reassignment.
+                let is_agent = |name: &str| config.agent_profiles.contains_key(name);
                 let same = match (&existing.assignee, &next_value) {
                     (Some(a), Some(b)) => {
-                        crate::utils::member::member_for_comparison(a)
-                            == crate::utils::member::member_for_comparison(b)
+                        crate::utils::member::member_for_assignment_comparison(a, is_agent)
+                            == crate::utils::member::member_for_assignment_comparison(b, is_agent)
                     }
                     (None, None) => true,
                     _ => false,
@@ -942,7 +994,21 @@ impl TaskService {
             }
             t.status = new_status.clone();
             let auto = config.auto_assign_on_status;
-            let is_first_change = old_status != new_status && t.assignee.is_none();
+            // DEV-102: only a genuine EFFECTIVE status transition
+            // auto-assigns. A legacy absent status compares as its
+            // DTO-projection default and spelling-only differences
+            // (todo vs Todo) are not transitions, so a no-op status
+            // patch cannot gain an assignee as a side effect.
+            let effective_old_status = if old_status.is_empty() {
+                config
+                    .effective_default_status()
+                    .unwrap_or_else(|| old_status.clone())
+            } else {
+                old_status.clone()
+            };
+            let effective_transition =
+                !crate::types::enum_token_eq(effective_old_status.as_str(), new_status.as_str());
+            let is_first_change = effective_transition && t.assignee.is_none();
             if auto
                 && is_first_change
                 && let Some(me) = resolve_current_user(Some(&storage.root_path))
@@ -1108,6 +1174,46 @@ impl TaskService {
             }
         }
 
+        Self::ensure_task_defaults(&mut t, &config, !explicit_tags);
+
+        // Effective existing state for the DEV-102 no-op comparison: exactly
+        // the defaults a read projection applies. An update must not repair
+        // or normalize untouched legacy data (absent enums, default tags,
+        // member spellings) through an effective no-op.
+        let mut effective_existing = existing.clone();
+        Self::ensure_task_defaults(&mut effective_existing, &config, false);
+
+        let (config, config_yaml) =
+            Self::plan_auto_populate_members(&storage.root_path, &derived, &t, config)?;
+        Self::enforce_membership(&t, &config, &derived)?;
+
+        // DEV-102 shared effective-no-op boundary: when the patch leaves
+        // every comparable field effectively unchanged and sprint membership
+        // is identical, return the current DTO without staging task, config,
+        // or sprint writes — no `modified` bump, no history entry, no API
+        // event, no automation. The original YAML bytes (comments, order,
+        // user extensions) and the file mtime are preserved, and a planned
+        // member-config repair stays in memory instead of being persisted.
+        // Validation above (enum parsing, strict members, journal recovery,
+        // review-owner and active-job checks) still ran in full, so invalid
+        // patches and pending-journal refusals keep failing closed.
+        if sprint_change.is_none()
+            && Self::tasks_effectively_equal(&effective_existing, &t, &config, explicit_tags)
+        {
+            let sprint_lookup = Self::load_sprint_lookup(storage);
+            let dto = Self::to_dto(
+                &canonical,
+                effective_existing,
+                Some(&sprint_lookup),
+                &config,
+                chrono::Utc::now(),
+            );
+            return Ok(TaskUpdateReceipt {
+                dto,
+                changed: false,
+            });
+        }
+
         let modified = chrono::Utc::now().to_rfc3339();
         t.modified = modified.clone();
 
@@ -1119,11 +1225,6 @@ impl TaskService {
                 changes,
             });
         }
-
-        Self::ensure_task_defaults(&mut t, &config, !explicit_tags);
-        let (config, config_yaml) =
-            Self::plan_auto_populate_members(&storage.root_path, &derived, &t, config)?;
-        Self::enforce_membership(&t, &config, &derived)?;
 
         t.sprints.clear();
 
@@ -1176,7 +1277,123 @@ impl TaskService {
                 AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
         }
 
-        Ok(dto)
+        Ok(TaskUpdateReceipt { dto, changed: true })
+    }
+
+    /// DEV-102 effective-equality between the projected existing state and
+    /// the update candidate for no-op detection. Compares the patchable
+    /// surface (plus fields the defaults pipeline touches) using the same
+    /// normalizations the update contract applies: canonical enum tokens,
+    /// assignment-aware members (config-registered agent directives stay
+    /// distinct from bare human spellings), canonical effort,
+    /// empty-as-absent scalars, trimmed acceptance criteria, and trimmed
+    /// tags. Ordered collections keep their order — a reordering is a real
+    /// change, never sorted away. `tags_relevant` is false when the patch
+    /// did not touch tags, so the configured default-tag fill cannot turn
+    /// a no-op into a repair. Untouched structured data (comments,
+    /// references, custom fields, user extensions, lifecycle state,
+    /// history) must match exactly so the guard can never mask real data
+    /// differences.
+    fn tasks_effectively_equal(
+        a: &Task,
+        b: &Task,
+        config: &ResolvedConfig,
+        tags_relevant: bool,
+    ) -> bool {
+        a.title == b.title
+            && crate::types::enum_token_eq(a.status.as_str(), b.status.as_str())
+            && crate::types::enum_token_eq(a.priority.as_str(), b.priority.as_str())
+            && crate::types::enum_token_eq(a.task_type.as_str(), b.task_type.as_str())
+            && Self::member_opt_effectively_equal(&a.reporter, &b.reporter, config)
+            && Self::member_opt_effectively_equal(&a.assignee, &b.assignee, config)
+            && Self::optional_scalar_effectively_equal(&a.due_date, &b.due_date)
+            && Self::effort_effectively_equal(&a.effort, &b.effort)
+            && Self::description_effectively_equal(&a.description, &b.description)
+            && Self::criteria_effectively_equal(&a.acceptance_criteria, &b.acceptance_criteria)
+            && (!tags_relevant || crate::utils::tags::normalize_tags(a.tags.clone()) == b.tags)
+            && a.relationships == b.relationships
+            && a.custom_fields == b.custom_fields
+            && a.comments == b.comments
+            && a.references == b.references
+            && a.subtitle == b.subtitle
+            && a.deleted_at == b.deleted_at
+            && a.history == b.history
+            && a.extra_fields == b.extra_fields
+    }
+
+    /// Member equality under the assignment-aware comparison: case- and
+    /// `@`-insensitive for humans, but config-registered agent directives
+    /// ("@copilot") and their bare spelling ("copilot") stay DISTINCT, so
+    /// agent/human reassignment is never suppressed as a no-op.
+    /// Whitespace-only values count as absent.
+    fn member_opt_effectively_equal(
+        a: &Option<String>,
+        b: &Option<String>,
+        config: &ResolvedConfig,
+    ) -> bool {
+        let is_agent = |name: &str| config.agent_profiles.contains_key(name);
+        let norm = |value: &Option<String>| {
+            value
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .map(|v| crate::utils::member::member_for_assignment_comparison(v, is_agent))
+        };
+        match (norm(a), norm(b)) {
+            (Some(a), Some(b)) => a == b,
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
+    /// Due-date-style scalar equality where whitespace-only and absent are
+    /// equivalent (the update contract stores clears as `None`).
+    fn optional_scalar_effectively_equal(a: &Option<String>, b: &Option<String>) -> bool {
+        fn norm(value: &Option<String>) -> Option<&str> {
+            value.as_deref().map(str::trim).filter(|v| !v.is_empty())
+        }
+        norm(a) == norm(b)
+    }
+
+    /// Description equality keeps every non-empty difference — leading
+    /// code-block indentation and trailing newlines included — because the
+    /// setter stores the value verbatim and Markdown layout is content.
+    /// Only an exact empty string and absence are equivalent (the empty
+    /// clear).
+    fn description_effectively_equal(a: &Option<String>, b: &Option<String>) -> bool {
+        fn norm(value: &Option<String>) -> Option<&str> {
+            value.as_deref().filter(|v| !v.is_empty())
+        }
+        norm(a) == norm(b)
+    }
+
+    /// Effort equality in the canonical form the update contract applies;
+    /// unparseable legacy values compare by their trimmed text.
+    fn effort_effectively_equal(a: &Option<String>, b: &Option<String>) -> bool {
+        match (a.as_deref(), b.as_deref()) {
+            (Some(a), Some(b)) => Self::canonical_effort(a) == Self::canonical_effort(b),
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
+    fn canonical_effort(value: &str) -> String {
+        crate::utils::effort::parse_effort(value)
+            .map(|parsed| parsed.canonical)
+            .unwrap_or_else(|_| value.trim().to_string())
+    }
+
+    /// Acceptance-criteria equality after the update contract's trim and
+    /// empty-item filtering, preserving order.
+    fn criteria_effectively_equal(a: &[String], b: &[String]) -> bool {
+        let norm = |values: &[String]| -> Vec<String> {
+            values
+                .iter()
+                .map(|item| item.trim().to_string())
+                .filter(|item| !item.is_empty())
+                .collect()
+        };
+        norm(a) == norm(b)
     }
 
     fn current_job_matches_ticket(id: &str) -> bool {
@@ -1206,12 +1423,18 @@ impl TaskService {
         existing: &Task,
         parsed_status: Option<&TaskStatus>,
         patch_assignee: Option<&str>,
+        config: &ResolvedConfig,
     ) -> LoTaRResult<()> {
         if !matches_review_state(&existing.status) {
             return Ok(());
         }
 
         let status_changed = parsed_status.is_some_and(|next| next != &existing.status);
+        // Assignment-aware identity (DEV-102): switching between a
+        // registered agent directive ("@copilot") and the bare human
+        // spelling ("copilot") is a real assignee change and must be
+        // authorized by the reporter like any other review transition.
+        let is_agent = |name: &str| config.agent_profiles.contains_key(name);
         let assignee_changed = patch_assignee.is_some_and(|next| {
             let trimmed = next.trim();
             let next_value = if trimmed.is_empty() {
@@ -1221,8 +1444,8 @@ impl TaskService {
             };
             match (&existing.assignee, &next_value) {
                 (Some(a), Some(b)) => {
-                    crate::utils::member::member_for_comparison(a)
-                        != crate::utils::member::member_for_comparison(b)
+                    crate::utils::member::member_for_assignment_comparison(a, is_agent)
+                        != crate::utils::member::member_for_assignment_comparison(b, is_agent)
                 }
                 (None, None) => false,
                 _ => true,
@@ -1345,6 +1568,24 @@ impl TaskService {
         project: Option<&str>,
         hard: bool,
     ) -> LoTaRResult<TaskDeleteResponse> {
+        Self::delete_with_receipt(storage, id, project, hard).map(|(response, _)| response)
+    }
+
+    /// [`Self::delete_with_options`] with a change receipt (DEV-102):
+    /// returns the unchanged public response plus whether THIS call
+    /// genuinely changed persisted state. A repeated soft deletion of an
+    /// already-deleted task keeps reporting `deleted: true` (state-after
+    /// semantics) with `changed == false`, taken from the locked mutation
+    /// closure itself, so routes can gate `task_deleted` SSE on it. Hard
+    /// deletions either remove the file (`changed == true`) or fail with
+    /// the existing missing-task error; `modified` stays untouched and
+    /// tombstones stay read-only exactly as before.
+    pub fn delete_with_receipt(
+        storage: &mut Storage,
+        id: &str,
+        project: Option<&str>,
+        hard: bool,
+    ) -> LoTaRResult<(TaskDeleteResponse, bool)> {
         let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
 
         if hard {
@@ -1356,18 +1597,21 @@ impl TaskService {
             if !removed {
                 return Err(LoTaRError::TaskNotFound(canonical.clone()));
             }
-            return Ok(TaskDeleteResponse {
-                deleted: true,
-                hard: true,
-                warnings,
-            });
+            return Ok((
+                TaskDeleteResponse {
+                    deleted: true,
+                    hard: true,
+                    warnings,
+                },
+                true,
+            ));
         }
 
         // Soft delete: locked read-modify-write over the freshest state so a
         // concurrent edit can never be lost, and a tombstone never overwrites
         // a concurrent restore. `modified` is deliberately untouched.
         let root_path = storage.root_path.clone();
-        storage.mutate_task(&canonical, move |task| {
+        let outcome = storage.mutate_task(&canonical, move |task| {
             if task.deleted_at.is_some() {
                 // Idempotent no-op: no write, no extra history entry.
                 return Ok(false);
@@ -1386,11 +1630,14 @@ impl TaskService {
             Ok(true)
         })?;
 
-        Ok(TaskDeleteResponse {
-            deleted: true,
-            hard: false,
-            warnings: Vec::new(),
-        })
+        Ok((
+            TaskDeleteResponse {
+                deleted: true,
+                hard: false,
+                warnings: Vec::new(),
+            },
+            outcome.changed,
+        ))
     }
 
     /// Warnings for a hard deletion: every managed attachment blob that
@@ -1488,6 +1735,20 @@ impl TaskService {
     /// CURRENT config (fail closed, no status mutation). Restoring an
     /// active task is a no-op that returns the current DTO without history.
     pub fn restore(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
+        Self::restore_with_receipt(storage, id, project).map(|receipt| receipt.dto)
+    }
+
+    /// [`Self::restore`] with a change receipt (DEV-102): the locked
+    /// mutation closure's own `changed` flag distinguishes a genuine
+    /// tombstone restore from the idempotent active-task no-op, so routes
+    /// can gate `task_updated` SSE on it. `modified` stays untouched,
+    /// stored enums are still validated against the current config, and
+    /// the response body contract is unchanged.
+    pub fn restore_with_receipt(
+        storage: &mut Storage,
+        id: &str,
+        project: Option<&str>,
+    ) -> LoTaRResult<TaskUpdateReceipt> {
         let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
 
         let config = Self::restore_config(storage.root_path.as_path(), &derived)?;
@@ -1518,7 +1779,11 @@ impl TaskService {
             Ok(true)
         })?;
 
-        Ok(Self::dto_from_task(storage, &canonical, outcome.after))
+        let dto = Self::dto_from_task(storage, &canonical, outcome.after);
+        Ok(TaskUpdateReceipt {
+            dto,
+            changed: outcome.changed,
+        })
     }
 
     /// Restoration and its preview must not silently skip unreadable layers.

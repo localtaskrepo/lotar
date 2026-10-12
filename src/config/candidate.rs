@@ -9,6 +9,13 @@
 //! write persists the result. Dry runs execute the identical pipeline and omit
 //! only the write. Rejected changes leave the target file bytes untouched,
 //! create no configuration artifacts, and never bootstrap storage.
+//! A candidate identical to the ORIGINAL RAW configuration (DEV-102) is an
+//! effective no-op: the write, cache invalidation, and any caller-visible
+//! "updated" signal are suppressed, while the full validation contract —
+//! invalid values, malformed current configuration, task conflicts, and the
+//! force boundary — still applies unchanged. Equality is judged on the raw
+//! override structs, not the resolved view: creating an explicit override
+//! equal to an inherited default is a genuine provenance change.
 
 use crate::config::operations::{
     apply_field_to_global_config, apply_field_to_project_config, canonicalize_field_name,
@@ -43,7 +50,9 @@ pub struct ConfigSetRequest {
 
 /// Outcome of an applied (or dry-run) candidate.
 pub struct ConfigSetResult {
-    /// Whether the configuration file was written (always false for dry runs).
+    /// Whether the configuration file was written: always false for dry
+    /// runs and for candidates identical to the stored raw configuration
+    /// (DEV-102 no-ops skip the write, cache invalidation, and events).
     pub updated: bool,
     /// Validation feedback for the after-state (warnings may include forced
     /// task conflicts; pre-existing issues are surfaced, not hidden).
@@ -204,21 +213,35 @@ pub fn apply_config_set(
             // port even when the value equals the built-in default, so the
             // canonical serializer must emit the key; unrelated mutations
             // preserve any existing pin via the save adapter's default.
-            let port_intent = if canonical.iter().any(|(field, _)| field == "server_port") {
+            let port_requested = canonical.iter().any(|(field, _)| field == "server_port");
+            let port_intent = if port_requested {
                 crate::config::operations::ServerPortSaveIntent::ExplicitPin
             } else {
                 crate::config::operations::ServerPortSaveIntent::PreserveExisting
             };
 
-            finish(
-                tasks_dir,
-                scope,
-                request,
-                canonical,
-                validation,
-                &conflicts,
-                || save_global(tasks_dir, &candidate, port_intent),
-            )
+            // DEV-102 no-op boundary: the write is skipped only when the
+            // stored file already exists, the complete candidate equals the
+            // original RAW global config, and any explicit port request
+            // re-pins a port the file already carries. A pin request
+            // without a stored pin is a genuine provenance change even for
+            // the built-in default value (the serializer would emit the
+            // key); a missing file means the save itself is the change
+            // (bootstrap/creation semantics, e.g. project creation).
+            let global_path = crate::utils::paths::global_config_path(tasks_dir);
+            let port_pin_missing = port_requested
+                && crate::config::persistence::config_file_server_port(
+                    &global_path,
+                    "global config",
+                )
+                .ok()
+                .flatten()
+                .is_none();
+            let changed = !global_path.exists() || candidate != global_base || port_pin_missing;
+
+            finish(request, canonical, validation, &conflicts, changed, || {
+                save_global(tasks_dir, &candidate, port_intent)
+            })
         }
         ConfigScope::Project(prefix) => {
             let project_base = load_project_base(tasks_dir, prefix)?;
@@ -262,27 +285,34 @@ pub fn apply_config_set(
                 )?;
             }
 
-            finish(
-                tasks_dir,
-                scope,
-                request,
-                canonical,
-                validation,
-                &conflicts,
-                || save_project(tasks_dir, prefix, &candidate),
-            )
+            // DEV-102 no-op boundary: skip the write only when the stored
+            // project config already exists and the complete candidate
+            // equals the original RAW override layer. A missing file means
+            // creation semantics (the write is the change); an explicit
+            // override equal to an inherited default differs from `None`
+            // and is therefore a genuine provenance change.
+            let changed = !crate::utils::paths::project_config_path(tasks_dir, prefix).exists()
+                || candidate != project_base;
+            finish(request, canonical, validation, &conflicts, changed, || {
+                save_project(tasks_dir, prefix, &candidate)
+            })
         }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Enforce the conflict/force boundary, then persist unless dry-running or
+/// the candidate is an effective no-op (DEV-102). Validation and conflict
+/// rejection run identically for no-ops: an invalid request or malformed
+/// current configuration is still rejected; only the write (and with it the
+/// cache invalidation inside the save adapters) is skipped when `changed`
+/// is false, so stored bytes and mtime are preserved and callers see
+/// `updated: false`.
 fn finish(
-    _tasks_dir: &Path,
-    _scope: &ConfigScope,
     request: &ConfigSetRequest,
     canonical: Vec<(String, String)>,
     mut validation: ValidationResult,
     conflicts: &[String],
+    changed: bool,
     save: impl FnOnce() -> Result<(), ConfigError>,
 ) -> Result<ConfigSetResult, ConfigError> {
     if !conflicts.is_empty() {
@@ -300,11 +330,21 @@ fn finish(
         }
     }
 
+    let normalized_fields: Vec<String> = canonical.into_iter().map(|(field, _)| field).collect();
+
     if request.dry_run {
         return Ok(ConfigSetResult {
             updated: false,
             validation,
-            normalized_fields: canonical.into_iter().map(|(field, _)| field).collect(),
+            normalized_fields,
+        });
+    }
+
+    if !changed {
+        return Ok(ConfigSetResult {
+            updated: false,
+            validation,
+            normalized_fields,
         });
     }
 
@@ -313,7 +353,7 @@ fn finish(
     Ok(ConfigSetResult {
         updated: true,
         validation,
-        normalized_fields: canonical.into_iter().map(|(field, _)| field).collect(),
+        normalized_fields,
     })
 }
 
