@@ -19,6 +19,7 @@
 	--space-5: 1.25rem;
 	--space-6: 1.5rem;
 	--space-8: 2rem;
+	--control-height: max(36px, 2.25rem);
 	/* Radii */
 	--radius-sm: 0.25rem;
 	--radius-md: 0.375rem;
@@ -333,6 +334,7 @@ p {
 	align-items: center;
 	justify-content: center;
 	gap: var(--space-2);
+	min-height: var(--control-height);
 	padding: calc(var(--space-2) - 2px) var(--space-4);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
@@ -354,9 +356,10 @@ p {
 
 .btn.icon-only {
 	padding: 0;
-	width: 2.25rem;
-	height: 2.25rem;
-	min-width: auto;
+	width: var(--control-height);
+	height: var(--control-height);
+	min-width: var(--control-height);
+	flex-shrink: 0;
 	gap: 0;
 }
 
@@ -366,8 +369,8 @@ p {
 
 @media (max-width: 640px) {
 	.btn.responsive-action {
-		min-width: 36px;
-		height: 36px;
+		min-width: var(--control-height);
+		height: var(--control-height);
 		padding: 0 8px;
 		gap: 0;
 	}
@@ -380,9 +383,9 @@ p {
 .btn.icon-only.small,
 .btn.small.icon-only {
 	padding: 0;
-	width: 2.25rem;
-	height: 2.25rem;
-	min-width: auto;
+	width: var(--control-height);
+	height: var(--control-height);
+	min-width: var(--control-height);
 }
 
 .btn:hover {
@@ -633,6 +636,7 @@ main {
 .scan-card__header .btn {
 	padding: var(--space-1) var(--space-2);
 	font-size: var(--text-xs);
+	min-height: 1.75rem;
 }
 
 .scan-card__header .btn.is-hidden {

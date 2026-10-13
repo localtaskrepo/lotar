@@ -1116,6 +1116,10 @@ export interface AgentJobCancelAllResponse {
 
 export interface AgentJobLogEntry {
   kind: string
+  /** Stable per-job identity: positive, starts at 1, strictly monotonic for the
+   * job's lifetime, never reused after in-memory truncation. Identical to the
+   * `sequence` on the corresponding SSE `agent_job_*` event. */
+  sequence: number
   at: string
   message?: string | null
 }

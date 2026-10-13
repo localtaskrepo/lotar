@@ -245,7 +245,11 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
             .refreshConfig(project)
             .then(() => {
                 if (request !== projectGeneration || project !== options.form.project || options.mode.value !== 'create') return
+                // Preserve the latest global membership, including draft edits
+                // made while the project's configuration was loading.
+                const sprintMembership = Array.isArray(options.form.sprints) ? [...options.form.sprints] : []
                 applyDefaults(project)
+                options.form.sprints = sprintMembership
                 options.ready.value = true
             })
             .catch((error: unknown) => {

@@ -276,4 +276,20 @@ const sizeClass = computed(() => {
 .ui-modal__card--xl {
   padding: var(--space-5, 2rem);
 }
+
+@media (max-width: 640px) {
+  .ui-modal__overlay {
+    padding: 12px;
+  }
+
+  .ui-modal__card {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .ui-modal__card--lg,
+  .ui-modal__card--xl {
+    padding: var(--space-4, 1rem);
+  }
+}
 </style>

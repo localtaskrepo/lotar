@@ -7496,6 +7496,12 @@
           "kind": {
             "type": "string"
           },
+          "sequence": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Stable per-job event identity: positive, starts at 1, strictly monotonic for the job's lifetime, never reused after in-memory log truncation. Matches the sequence field on SSE agent_job_* events.",
+            "minimum": 1
+          },
           "at": {
             "type": "string"
           },
@@ -7506,6 +7512,7 @@
         },
         "required": [
           "kind",
+          "sequence",
           "at"
         ]
       },

@@ -94,6 +94,7 @@ struct AgentJobRecord {
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentJobEvent {
     pub kind: String,
+    pub sequence: u64,
     pub at: String,
     pub message: Option<String>,
 }
@@ -106,6 +107,9 @@ struct AgentJobRuntime {
 struct AgentJobState {
     record: AgentJobRecord,
     events: Vec<AgentJobEvent>,
+    /// Per-job lifetime event counter; survives in-memory event truncation so
+    /// sequences are never reused even after EVENT_LOG_LIMIT trimming.
+    next_sequence: u64,
     runtime: Option<AgentJobRuntime>,
     cancellation_finalized: bool,
 }
@@ -315,6 +319,7 @@ impl AgentJobService {
                         is_merge_job,
                     },
                     events: Vec::new(),
+                    next_sequence: 0,
                     runtime: None,
                     cancellation_finalized: false,
                 },
@@ -439,8 +444,8 @@ impl AgentJobService {
             if state.record.status != AgentJobStatus::Cancelled {
                 state.record.status = AgentJobStatus::Cancelled;
                 state.record.finished_at = Some(Utc::now().to_rfc3339());
-                push_event(state, "agent_job_cancelled", None);
-                emit_job_event("agent_job_cancelled", &state.record, None);
+                let event = push_event(state, "agent_job_cancelled", None);
+                emit_job_event(&event, &state.record);
                 cancelled = true;
             }
             let job = state.record.to_dto_with_cancelled(cancelled);
@@ -551,8 +556,8 @@ impl AgentJobService {
             .jobs
             .get_mut(id)
             .ok_or_else(|| LoTaRError::ValidationError("Job not found".to_string()))?;
-        push_event(state, "agent_job_input", Some(trimmed.to_string()));
-        emit_job_event("agent_job_input", &state.record, Some(trimmed.to_string()));
+        let event = push_event(state, "agent_job_input", Some(trimmed.to_string()));
+        emit_job_event(&event, &state.record);
 
         Ok(state.record.to_dto())
     }
@@ -1275,8 +1280,8 @@ fn run_job(
             if let Some(path) = context.worktree_path.as_ref() {
                 let msg = format!("Worktree: {}", path.to_string_lossy());
                 update_job(&job_id, |state| {
-                    push_event(state, "agent_job_progress", Some(msg.clone()));
-                    emit_job_event("agent_job_progress", &state.record, Some(msg.clone()));
+                    let event = push_event(state, "agent_job_progress", Some(msg.clone()));
+                    emit_job_event(&event, &state.record);
                 });
             }
             context
@@ -1293,8 +1298,8 @@ fn run_job(
             }
             let msg = format!("Worktree setup skipped: {}", err);
             update_job(&job_id, |state| {
-                push_event(state, "agent_job_progress", Some(msg.clone()));
-                emit_job_event("agent_job_progress", &state.record, Some(msg.clone()));
+                let event = push_event(state, "agent_job_progress", Some(msg.clone()));
+                emit_job_event(&event, &state.record);
             });
             WorktreeContext {
                 working_dir: resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone()),
@@ -1336,8 +1341,8 @@ fn run_job(
         }
         state.record.status = AgentJobStatus::Running;
         state.record.started_at = Some(started_at.clone());
-        push_event(state, "agent_job_started", None);
-        emit_job_event("agent_job_started", &state.record, None);
+        let event = push_event(state, "agent_job_started", None);
+        emit_job_event(&event, &state.record);
     });
 
     if cancelled {
@@ -1455,8 +1460,8 @@ fn run_job(
                 if !msg.is_empty() {
                     update_job(&job_id_clone, |state| {
                         state.record.last_message = Some(msg.clone());
-                        push_event(state, "agent_job_progress", Some(msg.clone()));
-                        emit_job_event("agent_job_progress", &state.record, Some(msg.clone()));
+                        let event = push_event(state, "agent_job_progress", Some(msg.clone()));
+                        emit_job_event(&event, &state.record);
                     });
                 }
             })
@@ -1780,8 +1785,8 @@ fn handle_runner_line(
                 if let Some(ref msg) = message {
                     state.record.last_message = Some(msg.clone());
                 }
-                push_event(state, "agent_job_progress", message.clone());
-                emit_job_event("agent_job_progress", &state.record, message.clone());
+                let event = push_event(state, "agent_job_progress", message.clone());
+                emit_job_event(&event, &state.record);
             });
         }
         RunnerEventKind::Message => {
@@ -1793,8 +1798,8 @@ fn handle_runner_line(
                 if let Some(ref msg) = message {
                     state.record.last_message = Some(msg.clone());
                 }
-                push_event(state, "agent_job_message", message.clone());
-                emit_job_event("agent_job_message", &state.record, message.clone());
+                let event = push_event(state, "agent_job_message", message.clone());
+                emit_job_event(&event, &state.record);
             });
         }
         RunnerEventKind::Result => {
@@ -1834,8 +1839,8 @@ fn finalize_job(
         } else {
             "agent_job_failed"
         };
-        push_event(state, event_kind, None);
-        emit_job_event(event_kind, &state.record, None);
+        let event = push_event(state, event_kind, None);
+        emit_job_event(&event, &state.record);
     });
     if !finalized {
         let _ = AgentContextService::append_messages(
@@ -1943,8 +1948,8 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
         state.record.finished_at = Some(now.clone());
         state.record.last_message = Some(message.clone());
         state.record.summary = Some(message.clone());
-        push_event(state, "agent_job_failed", Some(message.clone()));
-        emit_job_event("agent_job_failed", &state.record, Some(message.clone()));
+        let event = push_event(state, "agent_job_failed", Some(message.clone()));
+        emit_job_event(&event, &state.record);
     });
     if !failed {
         return;
@@ -2087,13 +2092,16 @@ fn should_stop_job(job_id: &str) -> bool {
     false
 }
 
-fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) {
+fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
     let at = Utc::now().to_rfc3339();
-    state.events.push(AgentJobEvent {
+    state.next_sequence = state.next_sequence.saturating_add(1);
+    let event = AgentJobEvent {
         kind: kind.to_string(),
+        sequence: state.next_sequence,
         at: at.clone(),
-        message: message.clone(),
-    });
+        message,
+    };
+    state.events.push(event.clone());
     if state.events.len() > EVENT_LOG_LIMIT {
         let start = state.events.len().saturating_sub(EVENT_LOG_LIMIT);
         state.events = state.events[start..].to_vec();
@@ -2104,14 +2112,14 @@ fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) {
         &state.record.workspace_root,
         state.record.agent_logs_dir.as_deref(),
         &state.record.id,
-        kind,
-        &at,
-        message,
+        &event.kind,
+        &event.at,
+        event.message.clone(),
     );
+    event
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn emit_job_event(kind: &str, record: &AgentJobRecord, message: Option<String>) {
+fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
     let payload = json!({
         "id": record.id,
         "ticket_id": record.ticket_id,
@@ -2122,12 +2130,14 @@ fn emit_job_event(kind: &str, record: &AgentJobRecord, message: Option<String>) 
         "started_at": record.started_at,
         "finished_at": record.finished_at,
         "exit_code": record.exit_code,
-        "message": message,
+        "sequence": event.sequence,
+        "at": event.at,
+        "message": event.message,
         "worktree_path": record.worktree_path,
         "worktree_branch": record.worktree_branch,
     });
     crate::api_events::emit(&crate::api_events::ApiEvent {
-        kind: kind.to_string(),
+        kind: event.kind.clone(),
         data: payload,
     });
 }
@@ -2297,6 +2307,155 @@ mod tests {
             runner: Some("command".to_string()),
             agent: None,
         }
+    }
+
+    fn unit_job_state(id: &str) -> AgentJobState {
+        let tasks_dir = std::env::temp_dir().join("dev108-no-logs").join(".tasks");
+        AgentJobState {
+            record: AgentJobRecord {
+                id: id.to_string(),
+                ticket_id: "TEST-1".to_string(),
+                tasks_dir,
+                workspace_root: std::env::temp_dir().join("dev108-no-logs"),
+                // None keeps AgentLogService::append_event a no-op.
+                agent_logs_dir: None,
+                runner: "command".to_string(),
+                runner_kind: AgentRunnerKind::Command,
+                agent_profile: None,
+                status: AgentJobStatus::Running,
+                created_at: Utc::now().to_rfc3339(),
+                started_at: None,
+                finished_at: None,
+                exit_code: None,
+                last_message: None,
+                summary: None,
+                session_id: None,
+                worktree_path: None,
+                worktree_branch: None,
+                is_merge_job: false,
+            },
+            events: Vec::new(),
+            next_sequence: 0,
+            runtime: None,
+            cancellation_finalized: false,
+        }
+    }
+
+    #[test]
+    fn push_event_sequences_start_positive_and_stay_strictly_monotonic() {
+        let mut state = unit_job_state("job-dev108-mono");
+        let started = push_event(&mut state, "agent_job_started", None);
+        let first = push_event(&mut state, "agent_job_progress", Some("identical".into()));
+        let second = push_event(&mut state, "agent_job_progress", Some("identical".into()));
+
+        assert_eq!(started.sequence, 1, "sequences are positive and start at 1");
+        assert!(first.sequence > started.sequence);
+        assert!(second.sequence > first.sequence);
+        // Identical payloads must still carry distinct identities.
+        assert_eq!(first.kind, second.kind);
+        assert_eq!(first.message, second.message);
+        assert_ne!(first.sequence, second.sequence);
+        assert_eq!(
+            state
+                .events
+                .iter()
+                .map(|event| event.sequence)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn push_event_sequence_survives_event_log_truncation() {
+        let mut state = unit_job_state("job-dev108-trunc");
+        let total = EVENT_LOG_LIMIT + 25;
+        for idx in 0..total {
+            push_event(&mut state, "agent_job_progress", Some(format!("m{idx}")));
+        }
+
+        assert_eq!(state.events.len(), EVENT_LOG_LIMIT, "snapshot is capped");
+        let sequences: Vec<u64> = state.events.iter().map(|event| event.sequence).collect();
+        assert!(
+            sequences.windows(2).all(|pair| pair[0] < pair[1]),
+            "capped snapshot stays strictly monotonic"
+        );
+        assert_eq!(
+            sequences.first(),
+            Some(&((total - EVENT_LOG_LIMIT + 1) as u64)),
+            "oldest entries are trimmed, not renumbered"
+        );
+        assert_eq!(sequences.last(), Some(&(total as u64)));
+
+        // Sequences are never reused after the cap: the next push continues
+        // the lifetime counter instead of deriving from the vec length.
+        let next = push_event(&mut state, "agent_job_progress", Some("after-cap".into()));
+        assert_eq!(next.sequence, total as u64 + 1);
+        assert_eq!(state.events.len(), EVENT_LOG_LIMIT);
+        assert_eq!(
+            state.events.last().map(|event| event.sequence),
+            Some(next.sequence)
+        );
+    }
+
+    #[test]
+    fn emit_job_event_carries_exact_pushed_sequence_and_at() {
+        static SSE_TEST_COUNTER: std::sync::atomic::AtomicU64 =
+            std::sync::atomic::AtomicU64::new(0);
+        let job_id = format!(
+            "job-dev108-sse-{}-{}",
+            std::process::id(),
+            SSE_TEST_COUNTER.fetch_add(1, Ordering::SeqCst)
+        );
+        let mut state = unit_job_state(&job_id);
+        let rx = crate::api_events::subscribe();
+
+        let first = push_event(&mut state, "agent_job_progress", Some("same".into()));
+        emit_job_event(&first, &state.record);
+        let second = push_event(&mut state, "agent_job_progress", Some("same".into()));
+        emit_job_event(&second, &state.record);
+        // Push-only kinds consume sequence numbers but are never emitted.
+        push_event(&mut state, "agent_job_raw", Some("raw line".into()));
+        push_event(&mut state, "agent_job_init", None);
+        push_event(&mut state, "agent_job_result", None);
+
+        let mut sse = Vec::new();
+        while let Ok(event) = rx.recv_timeout(Duration::from_millis(150)) {
+            if event.data.get("id").and_then(|id| id.as_str()) == Some(job_id.as_str()) {
+                sse.push(event);
+            }
+        }
+
+        assert_eq!(sse.len(), 2, "only the emitted pair reaches SSE");
+        for (received, pushed) in sse.iter().zip([&first, &second]) {
+            assert_eq!(received.kind, "agent_job_progress");
+            assert_eq!(
+                received.data.get("sequence"),
+                Some(&serde_json::json!(pushed.sequence))
+            );
+            assert_eq!(received.data.get("at"), Some(&serde_json::json!(pushed.at)));
+            assert_eq!(
+                received.data.get("message"),
+                Some(&serde_json::json!("same"))
+            );
+        }
+        assert_eq!(sse[0].data.get("sequence"), Some(&serde_json::json!(1)));
+
+        // REST snapshot parity: the emitted entries are byte-identical members
+        // of the stored log, and push-only kinds hold their own sequences.
+        assert_eq!(
+            state
+                .events
+                .iter()
+                .map(|event| (event.kind.as_str(), event.sequence))
+                .collect::<Vec<_>>(),
+            vec![
+                ("agent_job_progress", 1),
+                ("agent_job_progress", 2),
+                ("agent_job_raw", 3),
+                ("agent_job_init", 4),
+                ("agent_job_result", 5),
+            ]
+        );
     }
 
     #[test]
