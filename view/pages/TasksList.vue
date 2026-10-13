@@ -210,42 +210,15 @@
       />
     </div>
 
-    <nav v-if="hasTasks && totalPages > 1" class="pagination-bar" aria-label="Task list pagination">
-      <UiButton
-        variant="ghost"
-        type="button"
-        aria-label="Previous page"
-        :disabled="loading || !hasPrevPage"
-        @click="prevPage"
-      >
-        <IconGlyph name="chevron-left" />
-        <span>Prev</span>
-      </UiButton>
-      <template v-for="(p, i) in visiblePageNumbers" :key="i">
-        <span v-if="p === '...'" class="pagination-ellipsis muted">&hellip;</span>
-        <UiButton
-          v-else
-          :variant="p === currentPage ? 'primary' : 'ghost'"
-          type="button"
-          :aria-label="`Page ${p}`"
-          :aria-current="p === currentPage ? 'page' : undefined"
-          :disabled="loading"
-          @click="goToPage(p)"
-        >
-          {{ p }}
-        </UiButton>
-      </template>
-      <UiButton
-        variant="ghost"
-        type="button"
-        aria-label="Next page"
-        :disabled="loading || !hasNextPage"
-        @click="nextPage"
-      >
-        <span>Next</span>
-        <IconGlyph name="chevron-right" />
-      </UiButton>
-    </nav>
+    <UiPagination
+      v-if="hasTasks && totalPages > 1"
+      :offset="pageOffset"
+      :total="totalCount"
+      :page-size="pageLimit"
+      :disabled="loading"
+      ariaLabel="Task list pagination"
+      @page="goToPage"
+    />
 
     <UiModal :open="assignDialogOpen" :aria-label="assignDialogTitle" @close="closeAssignDialog">
           <form class="col tasks-modal__form" @submit.prevent="submitAssignDialog">
@@ -403,6 +376,7 @@ import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
+import UiPagination from '../components/UiPagination.vue'
 import { useActivity } from '../composables/useActivity'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
@@ -656,25 +630,8 @@ const shownCount = computed(() => shownTasks.value.length)
 const totalCount = computed(() => tasksQuery.value?.total.value ?? 0)
 const pageStart = computed(() => (totalCount.value > 0 ? pageOffset.value + 1 : 0))
 const pageEnd = computed(() => Math.min(pageOffset.value + shownCount.value, totalCount.value))
-const hasPrevPage = computed(() => pageOffset.value > 0)
-const hasNextPage = computed(() => pageOffset.value + shownCount.value < totalCount.value)
 const hasTasks = computed(() => shownCount.value > 0)
-const currentPage = computed(() => Math.floor(pageOffset.value / pageLimit.value) + 1)
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageLimit.value)))
-const visiblePageNumbers = computed(() => {
-  const total = totalPages.value
-  const current = currentPage.value
-  if (total <= 1) return []
-  const pages: (number | '...')[] = []
-  pages.push(1)
-  const rangeStart = Math.max(2, current - 3)
-  const rangeEnd = Math.min(total - 1, current + 3)
-  if (rangeStart > 2) pages.push('...')
-  for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i)
-  if (rangeEnd < total - 1) pages.push('...')
-  if (total > 1) pages.push(total)
-  return pages
-})
 
 async function syncPaginationUrl(nav: 'push' | 'replace' = 'push') {
   const q: Record<string, string> = { ...filter.value }
@@ -697,20 +654,6 @@ function cancelPendingFilterApply() {
     clearTimeout(debounceTimer)
     debounceTimer = null
   }
-}
-
-async function prevPage() {
-  if (!hasPrevPage.value) return
-  cancelPendingFilterApply()
-  pageOffset.value = Math.max(0, pageOffset.value - pageLimit.value)
-  await syncPaginationUrl()
-}
-
-async function nextPage() {
-  if (!hasNextPage.value) return
-  cancelPendingFilterApply()
-  pageOffset.value = pageOffset.value + pageLimit.value
-  await syncPaginationUrl()
 }
 
 async function goToPage(page: number) {
@@ -1553,7 +1496,7 @@ watch(
     if (disposed || suppressRouteSync) return
     if (debounceTimer) clearTimeout(debounceTimer)
 
-    const nextOffset = clampOffset(queryInt((query as any).offset, pageOffset.value))
+    const nextOffset = clampOffset(queryInt((query as any).offset, 0))
     const nextFilter = Object.fromEntries(
       Object.entries(query)
         .filter(([key]) => key !== 'offset')
@@ -1693,7 +1636,7 @@ const handleTaskUpdated = (task: TaskDTO) => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 2.25rem;
+  min-height: var(--control-height);
   padding: 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1708,9 +1651,9 @@ const handleTaskUpdated = (task: TaskDTO) => {
 @media (max-width: 640px) {
   .tasks-toolbar-btn {
     padding: 0;
-    width: 2.25rem;
-    height: 2.25rem;
-    min-width: auto;
+    width: var(--control-height);
+    height: var(--control-height);
+    min-width: var(--control-height);
     gap: 0;
   }
 
@@ -1731,7 +1674,7 @@ const handleTaskUpdated = (task: TaskDTO) => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 2.25rem;
+  min-height: var(--control-height);
 }
 
 .menu-popover {
@@ -1775,18 +1718,6 @@ const handleTaskUpdated = (task: TaskDTO) => {
 
 .menu-item.danger {
   color: var(--color-danger, #c62828);
-}
-
-.pagination-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.pagination-ellipsis {
-  padding: 0 4px;
 }
 
 .tasks-modal__form {

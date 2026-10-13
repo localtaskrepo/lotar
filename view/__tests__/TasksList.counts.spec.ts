@@ -84,7 +84,7 @@ vi.mock('../components/IconGlyph.vue', () => ({
 
 vi.mock('../components/UiButton.vue', () => ({
     default: {
-        props: ['variant', 'iconOnly', 'disabled', 'type', 'ariaLabel', 'title'],
+        props: ['variant', 'iconOnly', 'disabled', 'type', 'title'],
         emits: ['click'],
         template: '<button type="button" class="btn" @click="$emit(\'click\', $event)"><slot /></button>',
     },
@@ -314,6 +314,45 @@ describe('TasksList counts', () => {
         await flushPromises()
         vm.setSelectedIds(['B-1'])
         expect(vm.selectedIds).toEqual(['B-1'])
+        wrapper.unmount()
+    })
+
+    it('pages through the shared footer pager and syncs the URL offset', async () => {
+        tasksStore.items.value = Array.from({ length: 120 }, (_, idx) => baseTask({ id: `PRJ-${idx + 1}` }))
+        const wrapper = mount(TasksList, {
+            global: {
+                stubs: {
+                    Teleport: true,
+                },
+            },
+        })
+
+        await flushPromises()
+        vi.runAllTimers()
+        await flushPromises()
+
+        const pager = wrapper.find('nav[aria-label="Task list pagination"]')
+        expect(pager.exists()).toBe(true)
+        expect(wrapper.find('h1').text()).toContain('(1–50 / 120)')
+
+        await pager.find('button[aria-label="Page 2"]').trigger('click')
+        await flushPromises()
+
+        const vm = wrapper.vm as any
+        expect(vm.pageOffset).toBe(50)
+        expect(vm.shownTasks).toHaveLength(50)
+        expect(vm.shownTasks[0].id).toBe('PRJ-51')
+        expect(wrapper.find('h1').text()).toContain('(51–100 / 120)')
+        expect(routerPushMock).toHaveBeenLastCalledWith(expect.objectContaining({
+            query: expect.objectContaining({ offset: '50' }),
+        }))
+
+        // A single page renders no pager at all.
+        tasksStore.items.value = tasksStore.items.value.slice(0, 50)
+        await flushPromises()
+        vi.runAllTimers()
+        await flushPromises()
+        expect(wrapper.find('nav[aria-label="Task list pagination"]').exists()).toBe(false)
         wrapper.unmount()
     })
 

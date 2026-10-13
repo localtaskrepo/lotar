@@ -2,6 +2,7 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 import UiModal from '../components/UiModal.vue'
+import UiModalSource from '../components/UiModal.vue?raw'
 
 const wrappers: VueWrapper[] = []
 const initialOverflow = document.body.style.overflow
@@ -214,5 +215,15 @@ describe('UiModal accessibility contract (DEV-69)', () => {
     key(document, 'Escape')
     expect(wrapper.emitted('close')).toBeUndefined()
     expect(dialog.contains(document.activeElement)).toBe(true)
+  })
+
+  it('keeps overlay insets, bounded height and large-card padding consistent on small screens', () => {
+    const style = UiModalSource.match(/<style[^>]*>([\s\S]*?)<\/style>/)?.[1] ?? ''
+    expect(style).toMatch(/\.ui-modal__overlay[^{}]*\{[^}]*padding:\s*24px/)
+    expect(style).toMatch(/\.ui-modal__card[^{}]*\{[^}]*max-height:\s*calc\(100dvh - 48px\)/)
+    const smallScreen = style.match(/@media \(max-width:\s*640px\)\s*\{([\s\S]*)\}\s*$/)?.[1] ?? ''
+    expect(smallScreen).toMatch(/\.ui-modal__overlay[^{}]*\{[^}]*padding:\s*12px/)
+    expect(smallScreen).toMatch(/\.ui-modal__card[^{}]*\{[^}]*max-height:\s*calc\(100dvh - 24px\)/)
+    expect(smallScreen).toMatch(/\.ui-modal__card--lg,\s*\.ui-modal__card--xl[^{}]*\{[^}]*padding:\s*var\(--space-4, 1rem\)/)
   })
 })

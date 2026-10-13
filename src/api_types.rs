@@ -392,6 +392,11 @@ pub struct AgentProfileInfo {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobLogEntry {
     pub kind: String,
+    /// Stable per-job event identity: positive, starts at 1, strictly
+    /// monotonic for the job's lifetime, and never reused after in-memory
+    /// log truncation. Matches the `sequence` sent on SSE `agent_job_*`
+    /// events for lossless REST/SSE cache joins.
+    pub sequence: u64,
     pub at: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub message: Option<String>,

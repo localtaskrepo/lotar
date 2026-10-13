@@ -1,7 +1,61 @@
 title: No easy way to add ticket to sprint
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-10T21:08:39.030978+00:00
+modified: 2026-10-12T23:56:38.611333+00:00
+comments:
+- date: 2026-10-12T22:44:57.292769+00:00
+  text: 'Plan: add clear accessible Add task controls in each sprint header and the backlog header using existing shared new-task panel. Carry initialSprint through controller/host/panel initialization alongside current project; existing TaskCreate.sprints provides atomic create-with-membership, no add-then-assign and no REST shape changes. Make draft sprint chips editable/removable before saving without mutation requests; concrete IDs only for create mode, retain existing edit-mode server selector behavior. Respect current closed-sprint opt-in/disabled controls and project scope; do not silently downgrade a missing target to backlog (server rejects atomically). Existing drag/drop, copy, no-op and pagination behavior preserved. Verification: targeted UI tests for button target/scope/reconcile, panel prefill/draft changes/reset/submit; durable real browser sprint+backlog creation, one add request carrying sprints, no premature writes/cancel persistence, closed controls; fresh build/browser checks plus full lint/test/smoke. Parent owns ticket and smoke files, implementation worker owns frontend files/tests. No Git writes or user-server changes; scenario workspaces must be verified isolated before any CLI use. Guidance: no durable finding.'
+- date: 2026-10-12T22:48:18.636166+00:00
+  text: 'Browser regression coverage written: smoke/tests/ui.sprint-task-create.smoke.spec.ts collects3 cases. Desktop/mobile exercise selected sprint creation via one POST /api/tasks/add carrying sprints:[1], local draft removal/reselection with zero membership writes, project filter WEB versus default ALT, sibling sprint isolation, backlog creation with no sprint, cancel/reopen no carry-over or task artifact. Third case deletes the selected fixture sprint after panel opens and expects failed atomic create, retained draft and no unintended backlog task. Baseline built UI red reproduced: desktop case cannot find sprint-add-task (feature absent),2 filtered cases not counted as passes. Frontend implementation remains in progress; parent will fresh-build before executing positives and inspect screenshots. All scenario files use verified SmokeWorkspace OS temp roots, no fixture CLI fallback or real-backlog scenario writes.'
+- date: 2026-10-12T23:02:37.638185+00:00
+  text: 'Milestone: frontend controls+initialSprint+local draft sprints implemented; new UI10/10 and full802/802 green, vue-tsc clean. Parent fresh browser4/4 green incl desktop/mobile, atomic sprint/backlog payloads, project switching, closed opt-in and disappeared-target404 with draft/no task retained; desktop/mobile screenshots inspected under target/smoke-artifacts/sprint-create. Independent frontend review found Medium: create-to-create controls enabled while panelopen do not reinitialize target, allowing stale destination intent. Parent reproduced enabled Beta control with Alpha draftopen; fix underway disables contextual controls/guards while shared panelopen, matching global Add task. Initial full lint clean and Rust1422 passed/45 existing Git exclusions (zero retries); UI802 pass. Full fresh smoke gate FAILED:264 pass,25 existing Git skips,one existing ui.agent-jobs live stream test timed out waiting running after phaseone log. Separate bounded diagnostic investigates; failure not erased or claimed passed. No tests weakened/retries/timeouts/concurrency changes. Smoke raw typecheck remains pre-existing debt outside this task; bundler-mode diagnostics do not name new suite. Remaining: open-draft guard follow-up review/browser, agent-gate diagnosis, repeat impacted/full gates, then task reconciliation. Guidance: no durable finding.'
+- date: 2026-10-12T23:13:11.768562+00:00
+  text: 'Reviewed destination fixes signoff24/24 targeted: contextual add buttons+handlers disabled while shared panelopen; latest sprint membership read at current config completion before defaults, so edits made during pendingprojectconfig persist (red restored[101] after DOMremove, green create7+scope12). Parent removed production fallback for incomplete controller mocks and filled actual mock state in four existing SprintsList fixtures. Mobile action uses established icon-only responsive-action styling with stable accessible label. Fresh corrected fullsmoke still264pass/25skips/oneexistinglive-log fail; diagnostics prove card194ms/logs765ms but phase20754ms, gate completed=true release=false, APIcompletedexit0. This is not merely UI slowload: logs are missing while fixtureheld. Tracked independently as real BUG DEV-108, investigating partial SSE log cache suppressing persisted-history fetch on open. No timeout/retry/concurrency/fixture bound changes and no weakened live-running assertion. Remaining DEV104: final frontend/full gates after bounded confirmed DEV108 repair; exact completion readback.'
+- date: 2026-10-12T23:44:34.548390+00:00
+  text: 'Additional filter-safety correction self-verified: onCreated originally pushed the TaskDTO optimistically into the page task query. Held authoritative refresh regression failed (newrow1 instead0), proving DTO-based membership inference. Callback now leaves the shared entity-cache upsert to TaskPanelHost and onlyrefreshes the serverquery; matching newtasks appear after authoritative response, excludedtasks neverflicker into view whilepending. Targeted SprintsList.addTask6+TaskPanel.createSprints7+scopeSafety12=25/25 green. Desktop/mobile5 browsercases alreadygreenonpreceding featureversion; finalfreshgate willinclude thiscallbackcorrection after DEV108 sequencecontract lands. No unchanged mutation guard or existing row edit path broadened; no additional taskscope/backendchanges for104. Guidance: no durable finding.'
+- date: 2026-10-12T23:56:33.324777+00:00
+  text: 'Outcome: sprint and backlog headers now offer accessible Add task actions using the shared create panel. The current project and concrete sprint destination are prefilled; existing atomic task creation includes membership in one request. Draft sprint additions/removals stay local until save, concrete selectors replace the former save-first dead end, project switches preserve the latest draft membership, and closed-sprint opt-ins remain intact. Contextual actions disable while any panel is open to protect the current draft. TaskPanelHost updates the entity cache; the page refreshes server-authoritative query membership instead of optimistically injecting filtered rows. Existing edit, drag/copy, and DEV-102 no-op behavior remain unchanged. Evidence: red-green regressions for missing controls, open-draft destination safety, pending-config chip removal, and held filtered-query creation. Focused creation/scope tests25/25; combined creation/logs47/47; independent final review signed off. Fresh desktop/mobile browser5/5 cover atomic sprint/backlog creation, project scope, no pre-save writes, cancel/reopen reset, closed opt-in, disappeared target atomic refusal with retained draft, and actual delayed-config removal. Screenshots inspected at target/smoke-artifacts/sprint-create (desktop1280x900, mobile390x844); existing responsive icon-only pattern avoids wrapped mobile labels. Full smoke originally exposed the real DEV-108 partial log-cache defect; its tracked sequence-contract repair is now Done, with completed-job exact-once browser checks added and no timeout/retry/concurrency changes. Final npm run lint:agent passed typecheck, all-target/all-feature Clippy -D warnings, and formatting. Final npm run test:agent passed1425 Rust tests across137 binaries with zero retries and814 UI tests across76 files. Final fresh npm run test:smoke:agent passed266 tests across64 passing files. Remaining: existing45 Git-dependent Rust exclusions and25 smoke skips are excluded, not passed; existing useFilterBuilder inject warnings and raw smoke typecheck debt remain. Worker reported one earlier unidentified transient UI failure followed by clean runs; parent final UI gate is green, not a claim of general flake elimination. No commit/staging/push, user-server restart, or scenario fixtures in the real backlog. Changes are ready uncommitted; rebuild backend/UI together for the updated log-event contract. Guidance: no durable finding.'
 description: Currently there's no easy way in the sprint view to add a ticket to a sprint. We should probably have a simple way of adding a ticket to the sprints or backlog.
+history:
+- at: 2026-10-12T22:44:32.786280+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-12T22:44:57.292769+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T22:48:18.636166+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:02:37.638185+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:13:11.768562+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:44:34.548390+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:56:33.324777+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:56:38.611333+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

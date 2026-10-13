@@ -55,12 +55,17 @@ describe.concurrent('Accessible shared dialogs (DEV-69)', () => {
                             await dialog.evaluate(el => { el.scrollTop = 0; });
                             const box = await dialog.boundingBox();
                             expect(box).not.toBeNull();
-                            expect(box!.width).toBeLessThanOrEqual(viewport.width);
+                            const inset = viewport.width <= 640 ? 12 : 24;
+                            expect(box!.width).toBeLessThanOrEqual(viewport.width - 2 * inset);
+                            expect(box!.x).toBeGreaterThanOrEqual(inset);
+                            expect(box!.y).toBeGreaterThanOrEqual(inset);
+                            expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width - inset);
+                            expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height - inset);
                             const sizing = await dialog.evaluate(el => {
                                 const style = getComputedStyle(el);
                                 return { max: style.maxHeight, min: style.minHeight, box: style.boxSizing, padding: style.padding, innerHeight, scroll: el.scrollHeight };
                             });
-                            expect(box!.height, JSON.stringify(sizing)).toBeLessThanOrEqual(viewport.height - 48);
+                            expect(box!.height, JSON.stringify(sizing)).toBeLessThanOrEqual(viewport.height - 2 * inset);
                             await dialog.screenshot({ path: path.join(artifacts, `${screenshot}-${viewport.label}.png`) });
                             await page.keyboard.press('Escape');
                             await dialog.waitFor({ state: 'detached' });

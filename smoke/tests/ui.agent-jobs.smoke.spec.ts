@@ -363,21 +363,47 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
             try {
                 await withPage(`${server.url}/agents`, async (page) => {
+                    const jobStartedAt = Date.now();
                     await startJobViaApi(server.url, task.id, 'slow', 'Stream the logs slowly');
+                    const startReturnedAfterMs = Date.now() - jobStartedAt;
                     await page.waitForSelector('.job-card', { timeout: 15_000 });
+                    const cardObservedAfterMs = Date.now() - jobStartedAt;
                     await page.click('button:has-text("Show logs")');
+                    const logsOpenedAfterMs = Date.now() - jobStartedAt;
 
                     const liveLogText = await waitForText(page, '.log-panel', 'phase one');
+                    const phaseObservedAfterMs = Date.now() - jobStartedAt;
                     expect(liveLogText).toContain('phase one');
 
                     // The agent is provably mid-run: it is held on the gate,
                     // so the running status is real state rather than a race.
-                    await waitForJobStatusViaApi(server.url, task.id, 'running');
+                    try {
+                        await waitForJobStatusViaApi(server.url, task.id, 'running');
+                    } catch (error) {
+                        throw new Error(`${(error as Error).message}; start=${startReturnedAfterMs}ms card=${cardObservedAfterMs}ms logs=${logsOpenedAfterMs}ms phase=${phaseObservedAfterMs}ms; ${gate.diagnostics('stream')}; jobs=${JSON.stringify(await fetchJobsViaApi(server.url, task.id))}`);
+                    }
+
+                    const logSnapshot = await fetch(`${server.url}/api/jobs/logs?id=${encodeURIComponent((await fetchJobsViaApi(server.url, task.id))[0]!.id)}`);
+                    expect(logSnapshot.ok).toBe(true);
+                    const events = (await logSnapshot.json()).data.events as Array<{ sequence: number; at: string; kind: string; message?: string | null }>;
+                    const sequences = events.map(event => event.sequence);
+                    expect(sequences.every(sequence => Number.isSafeInteger(sequence) && sequence > 0)).toBe(true);
+                    expect(sequences.every((sequence, index) => index === 0 || sequence > sequences[index - 1]!)).toBe(true);
+                    expect(events.every(event => typeof event.at === 'string' && event.at.length > 0)).toBe(true);
+                    expect(events.filter(event => event.message === 'phase one')).toHaveLength(1);
 
                     await gate.release();
 
                     const completedLogText = await waitForText(page, '.log-panel', 'phase one / phase two done');
                     expect(completedLogText).toContain('phase one / phase two done');
+                    await waitForJobStatusViaApi(server.url, task.id, 'completed');
+                    await page.getByRole('button', { name: 'Hide logs', exact: true }).click();
+                    const reopenedSnapshot = page.waitForResponse(response => new URL(response.url()).pathname === '/api/jobs/logs');
+                    await page.getByRole('button', { name: 'Show logs', exact: true }).click();
+                    expect((await reopenedSnapshot).ok()).toBe(true);
+                    await waitForText(page, '.log-panel', 'phase one / phase two done');
+                    expect(await page.locator('.log-message').filter({ hasText: 'phase one / phase two done' }).count()).toBe(1);
+                    expect(await page.locator('.log-message').filter({ hasText: /^Job started$/ }).count()).toBe(1);
                 });
 
                 // Worker finalization is awaited before any teardown.

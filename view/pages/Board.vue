@@ -1007,6 +1007,8 @@ onUnmounted(() => {
 .column { border: 1px solid var(--border); border-radius: var(--radius-base); background: var(--bg); min-height: 200px; display: flex; flex-direction: column; }
 .column.over-limit { border-color: color-mix(in oklab, var(--color-danger) 40%, var(--border)); }
 .board-col-add {
+  min-width: var(--control-height);
+  min-height: var(--control-height);
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
@@ -1054,14 +1056,13 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 .board-controls :is(.ui-select, .btn) {
-  min-height: 2.25rem;
-  height: 2.25rem;
+  min-height: var(--control-height);
   padding-top: 0;
   padding-bottom: 0;
 }
 .board-controls .btn.icon-only {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--control-height);
+  height: var(--control-height);
 }
 .wip-editor {
   position: relative;

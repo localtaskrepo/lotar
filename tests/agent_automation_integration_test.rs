@@ -606,6 +606,7 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     .expect("update assignee");
 
     // Both process launches and the intervening automation run need headroom under suite load.
+    let deadline = Instant::now() + Duration::from_secs(10);
     let jobs = wait_for_completed_jobs(&created.id, 2, 10_000);
     assert!(
         jobs.len() == 2 && jobs.iter().all(|job| job.status == "completed"),
@@ -624,7 +625,13 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
         .expect("test job recorded");
     assert_eq!(test_job.status, "completed");
 
-    let run_output = fs::read_to_string(&run_log).expect("read run log");
+    // The async command can finish after both jobs; keep the original wait budget.
+    let expected_output = format!("{}|{implement_agent}", created.id);
+    let run_output =
+        wait_for_file_content(&run_log, deadline, "automation run output", |content| {
+            content == expected_output
+        })
+        .expect("read completed run log");
     assert!(run_output.contains(&created.id));
     assert!(run_output.contains(implement_agent));
 

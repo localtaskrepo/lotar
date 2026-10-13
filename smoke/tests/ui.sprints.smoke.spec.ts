@@ -282,10 +282,11 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     await page.waitForSelector(backlogRowSelector, { timeout: 15_000 });
 
                     await page.click('.task-panel__sprint-field .chip-field__add');
-                    await page.waitForSelector('.task-panel-dialog__overlay', { timeout: 10_000 });
-                    await page.selectOption('.task-panel-dialog__overlay select.input', sprintId);
-                    await page.click('.task-panel-dialog__overlay button[type="submit"]');
-                    await page.waitForSelector('.task-panel-dialog__overlay', { state: 'detached', timeout: 15_000 });
+                    const sprintDialog = page.getByRole('dialog', { name: 'Assign to sprint', exact: true });
+                    await sprintDialog.waitFor({ state: 'visible', timeout: 10_000 });
+                    await sprintDialog.locator('select.input').selectOption(sprintId);
+                    await sprintDialog.locator('button[type="submit"]').click();
+                    await sprintDialog.waitFor({ state: 'detached', timeout: 15_000 });
 
                     await page.waitForSelector(sprintRowSelector, { timeout: 15_000 });
                     await page.waitForSelector(backlogRowSelector, { state: 'detached', timeout: 15_000 });

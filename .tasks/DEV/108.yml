@@ -1,0 +1,55 @@
+title: Opening cached Agent Jobs logs can miss persisted live output
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-12T23:12:52.447293+00:00
+modified: 2026-10-12T23:57:22.980709+00:00
+comments:
+- date: 2026-10-12T23:15:16.235845+00:00
+  text: 'Evidence refined without weakening assertions/policy: full quick smoke on fresh currentbinary again264pass/25skips/onefailure. Instrumented stage timings show API9ms, jobcard194ms, logsopened765ms, phaseobserved20754ms; gate boot/started/completed alltrue, releasefalse; job completed exit0. Thus page/card/controls are ready promptly and the live phase is missing until fixture20s expiry, not simply late UI mount. Candidate confirmed by source: toggleLogs only fetches persisted history when logsByJob[id] undefined, but agent_job_started/init SSE appendLog initializes that cache with partial history. Bounded worker adding deterministic cached-started + persisted-phaseone regression and safe snapshot/live merge, no fixturebound/timeout/retry/concurrency changes. Parent owns new failure diagnostics. Full gate remains failed pending source fix/proof; standalone1/1 is diagnostic only. Guidance: no durable finding.'
+- date: 2026-10-12T23:29:59.394257+00:00
+  text: 'Outcome interim: always fetch persisted logs when opening the panel even if SSE initialized a partial cache; guard in-flight requests per job and join snapshot/live log data. Worker deterministic red4fail/14pass then18/18 green; fixed unit UiButton stub doubleclick fallthrough with emits declaration (real component clicks once). Parent fresh npm run test:smoke:agent now266passed/25existing Git skips across70files64pass6skip,18.39s. Previously four fullruns failed same phaseone live condition, with diagnostic gateexpirybeforeexplicitrelease; fixture20sbound/live-running assertion/retries/concurrency unchanged. Final npm run lint:agent PASS; npm run test:agent Rust1422passed/45existingGitexclusions and UI809passed/76files. Independentreview still pending snapshot/live alignment against actualservercontract: log API200cap, raw/init/result snapshot-only, SSE has no log-event timestamp/ID; repeatedidentical chunks are distinct. Keep open until merge safety reviewed; no blanket claim zero duplication/loss without evidence. Guidance: no durable finding.'
+- date: 2026-10-12T23:33:12.876527+00:00
+  text: 'Review blocked initial heuristic merge despite root-fix fullsmoke266pass: HIGH actual snapshot-only runner result interleaves before terminal event, defeating contiguous raw content alignment and duplicating entire completed logs on reopen. LOW genuine repeatedidenticalprogress can contentmatch wrong instance and be suppressed. Backend source confirms SSE lacks eventIDs/eventtimestamp while snapshot includes push-only raw/init/result and caps200; content+clienttime cannot unambiguouslyjoin. Corrective plan now: required per-job positive monotonic sequence on REST log entries and same sequence+exactserverat on SSE; counter neverreuses after200cap. BackendworkerownsRust/TSentrytype/OpenAPI/existingSSEdocs/targetedRusttests, frontendworkerreplacescontentheuristics with sequencekeyedorderedjoin and dedup, including delayedalready-snapshottedSSE suppression. Repeatedidenticalchunks remain distinct bysequence. Existing JSONL/CLI/taskYAML compatibility preserved; no timer/retry/concurrency/assertionchanges or user-server/Git writes. Earliergreenrootfix not claimed finalmergesignoff. Remaining: contract-synced correction, deterministichigh/low red-green, independent finalreview andfreshfullgates. Guidance: no durable finding.'
+- date: 2026-10-12T23:55:56.745635+00:00
+  text: 'Outcome: confirmed partial SSE log cache gap repaired and content heuristics fully removed. Opening logs always fetches server history; per-job in-flight dedup retained. Required positive per-job lifetime sequence is shared by REST AgentJobEvent/AgentJobLogEntry and SSE together with exactserverat; all10push/emitpairs return/use sameentry underregistrylock, raw/init/result consume IDs but remain REST-only. Rust/api_types/TS/OpenAPI/existingSSE+agenthelpdocs synchronized; JSONL/CLI/taskYAMLformats untouched. Client rawcache is one per-jobsequenceMap capped1000 plus explicit evictionfloor; allsnapshots/liveevents immediatelyjoin in sequenceorder, exactIDs firstwriterwins, repeatedidenticalchunks distinctIDs survive, belowexplicittrimfloor cannotresurrect, queuedolderSSE outside API200cap rendersimmediately. Local sequence-less inputappend removed, canonicalSSEecho used. Evidence: initialrootred4/18 thenrootgreen18; heuristic reviewHigh completedresult-interleave duplicate +Low identicalchunkloss fixedstructurally byIDs; sequencefrontend22/22 includinginterleave, repeatedchunks, delayedecho, cap/floor, queuedbackfill; parentstrongerimmediatebackfillred thenfixed,47/47feature+logs focused casesgreen. NewRustsequence/retention/pairingtests3/3 independentlyverified; worker module16/lib354/agent42targetedpassed,10existingGitexclusionsreportednotpassed. Real livebrowser strengthened: whilejobrunning RESTsequencepositive/strictordered/serverat andphaseoneexactone; actualresult/completion thenHide/Show historyrefetch showsfinalmessage+Jobstarted exactlyonce. Oldembeddedbinarysequencecontractred recorded. Final npm run test:smoke:agent freshbuild266passed/25existing Git skips,70files64pass6skip; final npm run lint:agent clean; final npm run test:agent1425Rustpassed/45Gitprofileexclusions zero retries,814UIpassed/76files. Priorfourfullsmokefailuresrecorded, not erased; fixture20s bound, testtimeouts/retries/concurrency/assertions unchanged (only strongerchecks+failuretimings). Independent finalreviewsignoff, targeted62UI+3Rust; parentactualAgentJobscount22 (reviewbody24labeltypo, aggregate62consistent). Remaining: Git-backedexclusions remainunverified; existingUIinjectwarnings andrawsmokeTSdebt notfixed. UI/backendmustupgrade together; oldserverdoesnotprovide requiredsequence, nolegacyfallback perprojectpre-adoptionpolicy. No user-serverrestart/Gitwrites/publication, codeuncommitted. Guidance: no durable finding.'
+description: 'Discovered while verifying DEV-104: opening Agent Jobs logs trusted any partial SSE cache and skipped persisted history, so live phase-one output stayed invisible until the unchanged20-second fixture expired. Repair fetch-on-open and per-job in-flight handling, and use stable positive per-job event sequence IDs shared by REST snapshots and SSE instead of ambiguous content matching. Synchronize Rust/TypeScript/OpenAPI/help contracts; preserve exact-once terminal records, genuinely repeated chunks, immediate ordered backfill, bounded retention, and immutable event identity. Preserve existing JSONL/CLI/task YAML storage formats. Do not extend test or fixture timeouts, introduce retries or concurrency changes, or weaken the real-running assertion. Completed implementation, review findings/corrections, red-green evidence, and full gate results are recorded in comments.'
+history:
+- at: 2026-10-12T23:13:00.232204+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-12T23:15:16.235845+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:29:59.394257+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:33:12.876527+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:55:56.745635+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-12T23:56:10.699436+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-12T23:57:22.980709+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: 'Discovered while verifying DEV-104. Four unchanged-concurrency full smoke runs fail the existing live-log test; diagnostic run start API9ms, card194ms, log panel765ms, phase20754ms. Gate reports completed=true release=false and API completed exit0: phase-one becomes visible only after unchanged20s self-exit. Opening logs currently skips history fetch if any SSE started/init event initialized logsByJob, so partial cache may omit earlier persisted progress. Standalone test passes1/1. Reproduce deterministically with partial SSE cache + server log snapshot, fix only confirmed frontend cache gap while preserving in-flight SSE progress and normalization, then fresh full smoke validation. Do not extend timeouts/retries/concurrency, weaken running-state assertion, or change API/backend contracts.'
+    new: 'Discovered while verifying DEV-104: opening Agent Jobs logs trusted any partial SSE cache and skipped persisted history, so live phase-one output stayed invisible until the unchanged20-second fixture expired. Repair fetch-on-open and per-job in-flight handling, and use stable positive per-job event sequence IDs shared by REST snapshots and SSE instead of ambiguous content matching. Synchronize Rust/TypeScript/OpenAPI/help contracts; preserve exact-once terminal records, genuinely repeated chunks, immediate ordered backfill, bounded retention, and immutable event identity. Preserve existing JSONL/CLI/task YAML storage formats. Do not extend test or fixture timeouts, introduce retries or concurrency changes, or weaken the real-running assertion. Completed implementation, review findings/corrections, red-green evidence, and full gate results are recorded in comments.'

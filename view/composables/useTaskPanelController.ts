@@ -16,6 +16,8 @@ interface OpenTaskPanelOptions extends TaskPanelCallbacks {
     initialProject?: string | null
     initialStatus?: string | null
     initialDueDate?: string | null
+    /** DEV-104: concrete sprint id prefilled into a create-mode draft. */
+    initialSprint?: number | null
     focusSection?: TaskPanelFocusSection | null
 }
 
@@ -27,6 +29,7 @@ interface TaskPanelState {
     initialProject: string | null
     initialStatus: string | null
     initialDueDate: string | null
+    initialSprint: number | null
     focusSection: TaskPanelFocusSection | null
     callbacks: TaskPanelCallbacks | null
 }
@@ -37,6 +40,7 @@ const state = reactive<TaskPanelState>({
     initialProject: null,
     initialStatus: null,
     initialDueDate: null,
+    initialSprint: null,
     focusSection: null,
     callbacks: null,
 })
@@ -46,6 +50,7 @@ function openTaskPanel(options: OpenTaskPanelOptions) {
     state.initialProject = options.initialProject ?? null
     state.initialStatus = options.initialStatus ?? null
     state.initialDueDate = options.initialDueDate ?? null
+    state.initialSprint = options.initialSprint ?? null
     state.focusSection = options.focusSection ?? null
     state.callbacks = {
         onClose: options.onClose ?? null,
@@ -65,6 +70,7 @@ function closeTaskPanel() {
     state.initialProject = null
     state.initialStatus = null
     state.initialDueDate = null
+    state.initialSprint = null
     state.focusSection = null
     state.callbacks = null
     if (onClose) {

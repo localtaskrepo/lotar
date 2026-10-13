@@ -127,7 +127,7 @@ Agent lifecycle automation now lives in the dedicated automation rules file. See
 
 ## Notes
 
-- Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running.
+- Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running. Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.
 - Context history is persisted to `<project>/<ticket><extension>` files next to each ticket.
 - When `agent_logs_dir` is configured, job events are also persisted to `<logs_dir>/<JOB_ID>.jsonl` files for debugging.
 - `lotar agent status` and `lotar agent logs` read from log files if the job is not in memory (requires `agent_logs_dir` to be set).

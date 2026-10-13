@@ -175,7 +175,9 @@ describe('TaskPanel with real config and persistence', () => {
       project: 'B', title: 'Entered title', reporter: 'B-reporter', assignee: 'B-owner', tags: ['B-tag'],
       custom_fields: { product: '' },
     })
-    expect(api.addTask.mock.calls[0]![0].sprints).toBeUndefined()
+    // DEV-104: sprint memberships are global (cross-project), so the B config
+    // reload keeps the draft's sprint destination instead of dropping it.
+    expect(api.addTask.mock.calls[0]![0].sprints).toEqual([42])
   })
 
   it('does not reopen or make a closed panel ready after an initial project-list await', async () => {

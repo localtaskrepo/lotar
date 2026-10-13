@@ -5,6 +5,7 @@
     :initial-project="panelState.initialProject ?? undefined"
     :initial-status="panelState.initialStatus ?? undefined"
     :initial-due-date="panelState.initialDueDate ?? undefined"
+    :initial-sprint="panelState.initialSprint ?? undefined"
     :focus-section="panelState.focusSection ?? undefined"
     :lifecycle-reload="lifecycleTick"
     @close="handleClose"

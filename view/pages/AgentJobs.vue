@@ -140,7 +140,7 @@
               <div v-else class="log-list">
                 <div
                   v-for="entry in logsByJob[job.id] || []"
-                  :key="entry.at + entry.kind + (entry.message || '')"
+                  :key="entry.sequence"
                   class="log-row"
                 >
                   <span class="log-kind">{{ entry.kind }}</span>
@@ -350,11 +350,13 @@ function updateFromEvent(payload: any, kind: string) {
   mergeJob(next)
   recentEventJobs.set(next.id, { job: next, seq: ++eventSeq })
   if (kind.startsWith('agent_job_')) {
-    appendLog(next.id, {
+    const entry: AgentJobLogEntry = {
       kind,
-      at: new Date().toISOString(),
-      message: payload.message || null,
-    })
+      at: payload.at,
+      message: payload.message ?? null,
+      sequence: payload.sequence,
+    }
+    updateLogEntries(next.id, [entry])
   }
   // Update queue stats on job state changes
   if (['agent_job_started', 'agent_job_completed', 'agent_job_failed', 'agent_job_cancelled'].includes(kind)) {
@@ -393,7 +395,12 @@ function sortJobs(list: AgentJob[]): AgentJob[] {
 
 async function toggleLogs(id: string) {
   openLogs.value[id] = !openLogs.value[id]
-  if (openLogs.value[id] && typeof logsByJob.value[id] === 'undefined') {
+  // A cache entry only proves live events arrived, not that the persisted
+  // history was loaded: progress emitted before the stream went live is
+  // missing from it. Fetch on every newly-open so the server history is
+  // visible while the job is still running; loadLogs dedupes concurrent
+  // requests per job.
+  if (openLogs.value[id]) {
     await loadLogs(id)
   }
 }
@@ -402,19 +409,41 @@ function isLogsOpen(id: string) {
   return !!openLogs.value[id]
 }
 
+const logEvents = new Map<string, Map<number, AgentJobLogEntry>>()
+const logEvictionFloors = new Map<string, number>()
+const LOG_BUFFER_LIMIT = 1000
+
 async function loadLogs(id: string) {
+  if (logsLoading.value[id]) return
   logsLoading.value[id] = true
   logsError.value[id] = ''
   try {
     const response = await api.getAgentJobLogs(id)
-    logsByJob.value = {
-      ...logsByJob.value,
-      [id]: normalizeLogEntries(response.events),
-    }
+    updateLogEntries(id, response.events)
   } catch (err) {
     logsError.value[id] = err instanceof Error ? err.message : String(err)
   } finally {
     logsLoading.value[id] = false
+  }
+}
+
+// Both sources share event identity, so late snapshots and queued broadcasts
+// can join without overwriting live output or matching identical chunks.
+function updateLogEntries(id: string, entries: AgentJobLogEntry[]) {
+  const retained = logEvents.get(id) ?? new Map<number, AgentJobLogEntry>()
+  const floor = logEvictionFloors.get(id) ?? 0
+  for (const entry of entries) {
+    if (!Number.isSafeInteger(entry.sequence) || entry.sequence <= floor || retained.has(entry.sequence)) continue
+    retained.set(entry.sequence, entry)
+  }
+  const ordered = [...retained.values()].sort((a, b) => a.sequence - b.sequence)
+  const evicted = ordered.splice(0, Math.max(0, ordered.length - LOG_BUFFER_LIMIT))
+  for (const entry of evicted) retained.delete(entry.sequence)
+  if (evicted.length) logEvictionFloors.set(id, evicted[evicted.length - 1]!.sequence)
+  logEvents.set(id, retained)
+  logsByJob.value = {
+    ...logsByJob.value,
+    [id]: normalizeLogEntries(ordered),
   }
 }
 
@@ -448,45 +477,6 @@ function normalizeLogEntries(entries: AgentJobLogEntry[]): AgentJobLogEntry[] {
   }
 
   return normalized
-}
-
-function appendLog(id: string, entry: AgentJobLogEntry) {
-  const message = entry.message ?? ''
-  if (!shouldDisplayLogEntry(entry)) return
-
-  const existing = logsByJob.value[id] || []
-  const last = existing[existing.length - 1]
-
-  if (entry.kind === 'agent_job_progress' && message.trim()) {
-    if (last && last.kind === 'agent_job_progress') {
-      const updated = [...existing]
-      updated[updated.length - 1] = {
-        ...last,
-        at: entry.at,
-        message: `${last.message || ''}${message}`,
-      }
-      logsByJob.value = {
-        ...logsByJob.value,
-        [id]: updated,
-      }
-      return
-    }
-  }
-
-  if (entry.kind === 'agent_job_message' && message.trim() && last && last.kind === 'agent_job_progress') {
-    const updated = [...existing]
-    updated[updated.length - 1] = entry
-    logsByJob.value = {
-      ...logsByJob.value,
-      [id]: updated,
-    }
-    return
-  }
-
-  logsByJob.value = {
-    ...logsByJob.value,
-    [id]: [...existing, entry],
-  }
 }
 
 async function cancel(id: string) {
@@ -556,7 +546,9 @@ async function sendMessage(id: string) {
   try {
     const response = await api.sendAgentJobMessage({ id, message })
     mergeJob(response.job)
-    appendLog(id, { kind: 'agent_job_input', at: new Date().toISOString(), message })
+    // The input entry renders from its agent_job_input SSE echo, which
+    // carries the server sequence and timestamp; a local append could not
+    // participate in the sequence-keyed dedup.
     setMessageDraft(id, '')
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
