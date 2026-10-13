@@ -17,7 +17,7 @@ use lotar::storage::task::parse_task_yaml_tolerant;
 use lotar::types::ReferenceEntry;
 use lotar::utils::paths;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 fn workspace(extra_config: &str) -> (tempfile::TempDir, PathBuf) {
     let tmp = tempfile::tempdir().unwrap();
@@ -100,6 +100,20 @@ fn seed_padded_sprint_member(tasks_dir: &Path) -> PathBuf {
 
 fn mtime(path: &Path) -> SystemTime {
     std::fs::metadata(path).unwrap().modified().unwrap()
+}
+
+fn set_old_mtime(path: &Path) -> SystemTime {
+    // Rapid writes can share one filesystem clock tick. An old fixture
+    // timestamp makes the genuine-write assertion independent of granularity.
+    let old = SystemTime::UNIX_EPOCH + Duration::from_secs(946_684_800);
+    std::fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(old)
+        .unwrap();
+    assert_eq!(mtime(path), old);
+    old
 }
 
 fn updated_events(rx: &std::sync::mpsc::Receiver<api_events::ApiEvent>) -> usize {
@@ -355,7 +369,7 @@ fn genuine_change_writes_history_and_emits_one_event() {
         std::fs::read(&task_path).unwrap(),
         std::fs::read(&config_path).unwrap(),
     );
-    let task_mtime = mtime(&task_path);
+    let task_mtime = set_old_mtime(&task_path);
 
     let rx = api_events::subscribe();
     let receipt = TaskService::update_with_receipt(
@@ -514,7 +528,7 @@ fn storage_edit_keeps_original_bytes_for_semantically_equal_tasks() {
 fn storage_edit_still_writes_changed_references() {
     let (_tmp, tasks_dir) = workspace("");
     let task_path = seed_task(&tasks_dir, "1.yml", RAW_TASK);
-    let task_mtime = mtime(&task_path);
+    let task_mtime = set_old_mtime(&task_path);
 
     let mut parsed = parse_task_yaml_tolerant(RAW_TASK).expect("parse raw task");
     parsed.references.push(ReferenceEntry {
@@ -536,7 +550,10 @@ fn comment_edit_receipt_reports_genuine_and_idempotent_changes() {
     let task_path = seed_task(&tasks_dir, "1.yml", RAW_TASK);
     let mut storage = Storage::new(&tasks_dir);
     TaskService::add_comment(&mut storage, "TEST-1", "note").expect("comment");
-    let (bytes_before, mtime_before) = (std::fs::read(&task_path).unwrap(), mtime(&task_path));
+    let (bytes_before, mtime_before) = (
+        std::fs::read(&task_path).unwrap(),
+        set_old_mtime(&task_path),
+    );
 
     // Same-text edit: idempotent no-op, receipt reports changed == false,
     // and nothing is written.

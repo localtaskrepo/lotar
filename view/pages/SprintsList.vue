@@ -53,40 +53,40 @@
                 <IconGlyph name="close" />
               </UiButton>
             </header>
-            <div class="row" style="gap: 12px; flex-wrap: wrap;">
-              <label class="col" style="gap: 4px; min-width: 200px;">
+            <div class="sprint-form__grid sprint-form__grid--names">
+              <label class="sprint-form__field">
                 <span class="muted">Label<span class="muted"> *</span></span>
                 <input ref="firstField" class="input" v-model="form.label" placeholder="Sprint name" required />
               </label>
-              <label class="col" style="gap: 4px; min-width: 200px;">
+              <label class="sprint-form__field">
                 <span class="muted">Goal</span>
                 <input class="input" v-model="form.goal" placeholder="Optional goal" />
               </label>
             </div>
-            <div class="row" style="gap: 12px; flex-wrap: wrap;">
-              <label class="col" style="gap: 4px; min-width: 200px;">
+            <div class="sprint-form__grid sprint-form__grid--schedule">
+              <label class="sprint-form__field">
                 <span class="muted">Planned start</span>
                 <input class="input" type="datetime-local" step="60" v-model="form.starts_at" />
               </label>
-              <label class="col" style="gap: 4px; min-width: 200px;">
+              <label class="sprint-form__field">
                 <span class="muted">Planned end</span>
                 <input class="input" type="datetime-local" step="60" v-model="form.ends_at" />
               </label>
-              <label class="col" style="gap: 4px; min-width: 160px;">
+              <label class="sprint-form__field">
                 <span class="muted">Length</span>
                 <input class="input" v-model="form.plan_length" placeholder="2w, 10d" />
               </label>
             </div>
-            <div class="row" style="gap: 12px; flex-wrap: wrap;">
-              <label class="col" style="gap: 4px; min-width: 150px;">
+            <div class="sprint-form__grid sprint-form__grid--capacity">
+              <label class="sprint-form__field">
                 <span class="muted">Capacity (points)</span>
                 <input class="input" type="number" inputmode="numeric" v-model="form.capacity_points" />
               </label>
-              <label class="col" style="gap: 4px; min-width: 150px;">
+              <label class="sprint-form__field">
                 <span class="muted">Capacity (hours)</span>
                 <input class="input" type="number" inputmode="numeric" v-model="form.capacity_hours" />
               </label>
-              <label class="col" style="gap: 4px; min-width: 160px;">
+              <label class="sprint-form__field">
                 <span class="muted">Overdue after</span>
                 <input class="input" v-model="form.overdue_after" placeholder="12h" />
               </label>
@@ -259,7 +259,7 @@
           @drop.prevent="onSprintDrop($event, sprint.id)"
         >
           <header class="group-header">
-            <button class="collapse-btn" type="button" :aria-expanded="isExpanded(sectionKey(sprint.id))" @click="toggleSection(sectionKey(sprint.id))">
+            <button class="collapse-btn" type="button" :aria-expanded="isExpanded(sectionKey(sprint.id))" :aria-label="`${isExpanded(sectionKey(sprint.id)) ? 'Collapse' : 'Expand'} ${sprint.display_name}`" @click="toggleSection(sectionKey(sprint.id))">
               <span aria-hidden="true">{{ isExpanded(sectionKey(sprint.id)) ? '▾' : '▸' }}</span>
             </button>
             <div class="group-title">
@@ -398,6 +398,18 @@
             <div class="group-actions">
               <UiLoader v-if="isLifecycleBusy(sprint.id)" size="sm" />
               <UiButton
+                class="small responsive-action"
+                type="button"
+                data-testid="sprint-add-task"
+                :aria-label="`Add task to ${sprint.display_name}`"
+                :title="sprintAddTitle(sprint)"
+                :disabled="busy || taskPanelOpen || sprintAddDisabled(sprint)"
+                @click="openCreateForSprint(sprint)"
+              >
+                <IconGlyph name="plus" aria-hidden="true" />
+                <span class="responsive-action__label">Add task</span>
+              </UiButton>
+              <UiButton
                 v-if="canStartSprint(sprint)"
                 class="small"
                 type="button"
@@ -489,7 +501,7 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="task in getSortedTasksForSprint(sprint.id)"
+                      v-for="task in getPagedTasksForSprint(sprint.id)"
                       :key="task.id + '-' + sprint.id"
                       class="task-row"
                       :class="{
@@ -579,15 +591,23 @@
                         </template>
                       </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </transition>
-        </UiCard>
+                   </tbody>
+                 </table>
+               </div>
+               <UiPagination
+                 :offset="sprintTaskOffset(sprint.id)"
+                 :total="getSortedTasksForSprint(sprint.id).length"
+                 :page-size="tasksPageSize"
+                 :disabled="busy"
+                 :ariaLabel="`Sprint #${sprint.id} pagination`"
+                 @page="goToSprintPage(sprint.id, $event)"
+               />
+             </div>
+           </transition>
+         </UiCard>
 
-        <UiCard
-          ref="backlogRef"
+         <UiCard
+           ref="backlogRef"
           id="backlog"
           class="sprint-group backlog-group"
           :class="{ 'sprint-group--drop': hoverBacklog }"
@@ -598,7 +618,7 @@
           @drop.prevent="onBacklogDrop($event)"
         >
           <header class="group-header">
-            <button class="collapse-btn" type="button" :aria-expanded="isExpanded('backlog')" @click="toggleSection('backlog')">
+            <button class="collapse-btn" type="button" :aria-expanded="isExpanded('backlog')" :aria-label="isExpanded('backlog') ? 'Collapse backlog' : 'Expand backlog'" @click="toggleSection('backlog')">
               <span aria-hidden="true">{{ isExpanded('backlog') ? '▾' : '▸' }}</span>
             </button>
             <div class="group-title">
@@ -615,27 +635,19 @@
                 </template>
                 <template v-else>{{ backlogPageStart }}–{{ backlogPageEnd }} / {{ backlogTotalCount }}</template>
               </span>
+            </div>
+            <div class="group-actions backlog-actions">
               <UiButton
-                variant="ghost"
+                class="small responsive-action"
                 type="button"
-                aria-label="Previous backlog page"
-                title="Previous backlog page"
-                :disabled="!backlogHasPrevPage"
-                @click="backlogPrevPage"
+                data-testid="backlog-add-task"
+                aria-label="Add backlog task"
+                title="Add backlog task"
+                :disabled="busy || taskPanelOpen"
+                @click="openCreateForBacklog"
               >
-                <IconGlyph name="chevron-left" />
-                <span>Prev</span>
-              </UiButton>
-              <UiButton
-                variant="ghost"
-                type="button"
-                aria-label="Next backlog page"
-                title="Next backlog page"
-                :disabled="!backlogHasNextPage"
-                @click="backlogNextPage"
-              >
-                <span>Next</span>
-                <IconGlyph name="chevron-right" />
+                <IconGlyph name="plus" aria-hidden="true" />
+                <span class="responsive-action__label">Add task</span>
               </UiButton>
             </div>
           </header>
@@ -758,15 +770,23 @@
                         </template>
                       </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </transition>
-        </UiCard>
-      </div>
-    </template>
-  </section>
+                   </tbody>
+                 </table>
+               </div>
+               <UiPagination
+                 :offset="backlogOffset"
+                 :total="backlogTotalCount"
+                 :page-size="tasksPageSize"
+                 :disabled="busy"
+                 ariaLabel="Backlog pagination"
+                 @page="goToBacklogPage"
+               />
+             </div>
+           </transition>
+         </UiCard>
+       </div>
+     </template>
+   </section>
 </template>
 
 <script setup lang="ts">
@@ -793,6 +813,7 @@ import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
+import UiPagination from '../components/UiPagination.vue'
 import UiSelect from '../components/UiSelect.vue'
 import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog.vue'
 import { showToast } from '../components/toast'
@@ -910,7 +931,9 @@ const route = useRoute()
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, missingSprints, hasMissing: hasMissingSprints } = useSprints()
 const sprintFilterOptions = useSprintFilterOptions(sprints)
-const { openTaskPanel } = useTaskPanelController()
+const { state: taskPanelState, openTaskPanel } = useTaskPanelController()
+// Preserve an open draft instead of silently changing its destination.
+const taskPanelOpen = computed(() => taskPanelState.open)
 const {
   sprintDefaults,
   statuses,
@@ -1235,6 +1258,8 @@ watch(
   sort,
   (value) => {
     storageSetJson(sortStorageKey, value)
+    // DEV-105: a different ordering invalidates every saved page position.
+    resetAllPagingOffsets()
   },
   { deep: true },
 )
@@ -1490,26 +1515,34 @@ const busy = computed(
 
 const sortedBacklogTasks = computed(() => sortTasks(backlogTasks.value))
 
-const backlogPageSize = ref(readTasksPageSizePreference())
+// DEV-105: one shared page size (the tasks preference) drives the backlog and
+// every sprint table; each list keeps its own independent offset.
+const tasksPageSize = ref(readTasksPageSizePreference())
 const backlogOffset = ref(0)
+const sprintTaskOffsets = reactive<Record<number, number>>({})
 
 const backlogTotalCount = computed(() => sortedBacklogTasks.value.length)
 const backlogPageStart = computed(() => (backlogTotalCount.value ? backlogOffset.value + 1 : 0))
-const backlogPageEnd = computed(() => Math.min(backlogOffset.value + backlogPageSize.value, backlogTotalCount.value))
-const backlogHasPrevPage = computed(() => backlogOffset.value > 0)
-const backlogHasNextPage = computed(() => backlogOffset.value + backlogPageSize.value < backlogTotalCount.value)
+const backlogPageEnd = computed(() => Math.min(backlogOffset.value + tasksPageSize.value, backlogTotalCount.value))
 
 const pagedBacklogTasks = computed(() => {
-  if (backlogOffset.value === 0 && backlogTotalCount.value <= backlogPageSize.value) {
+  if (backlogOffset.value === 0 && backlogTotalCount.value <= tasksPageSize.value) {
     return sortedBacklogTasks.value
   }
-  return sortedBacklogTasks.value.slice(backlogOffset.value, backlogOffset.value + backlogPageSize.value)
+  return sortedBacklogTasks.value.slice(backlogOffset.value, backlogOffset.value + tasksPageSize.value)
 })
 
 let stopPreferencesListener: (() => void) | null = null
 
+function pageOffsetFor(total: number, page: number): number {
+  const size = Math.max(1, tasksPageSize.value)
+  const pageCount = Math.max(1, Math.ceil(Math.max(0, total) / size))
+  const clamped = Math.max(1, Math.min(page, pageCount))
+  return (clamped - 1) * size
+}
+
 function clampBacklogOffset() {
-  const size = Math.max(1, backlogPageSize.value)
+  const size = Math.max(1, tasksPageSize.value)
   const total = backlogTotalCount.value
   if (total <= 0) {
     backlogOffset.value = 0
@@ -1519,22 +1552,59 @@ function clampBacklogOffset() {
   backlogOffset.value = Math.min(Math.max(0, backlogOffset.value), maxOffset)
 }
 
-function backlogPrevPage() {
-  const next = Math.max(0, backlogOffset.value - backlogPageSize.value)
-  backlogOffset.value = next
+function sprintTaskOffset(id: number): number {
+  return sprintTaskOffsets[id] ?? 0
 }
 
-function backlogNextPage() {
-  const total = backlogTotalCount.value
-  if (total <= 0) return
-  const next = backlogOffset.value + backlogPageSize.value
-  if (next >= total) return
-  backlogOffset.value = next
+function goToBacklogPage(page: number) {
+  backlogOffset.value = pageOffsetFor(backlogTotalCount.value, page)
 }
 
-watch([sortedBacklogTasks, backlogPageSize], () => {
+function goToSprintPage(id: number, page: number) {
+  sprintTaskOffsets[id] = pageOffsetFor(getSortedTasksForSprint(id).length, page)
+}
+
+// The slice happens AFTER getSortedTasksForSprint, so ordering, membership,
+// drag semantics, and multi-sprint participation are untouched by paging.
+function getPagedTasksForSprint(id: number): TaskDTO[] {
+  const size = Math.max(1, tasksPageSize.value)
+  const offset = sprintTaskOffset(id)
+  const sorted = getSortedTasksForSprint(id)
+  if (offset === 0 && sorted.length <= size) {
+    return sorted
+  }
+  return sorted.slice(offset, offset + size)
+}
+
+function resetAllPagingOffsets() {
+  backlogOffset.value = 0
+  Object.keys(sprintTaskOffsets).forEach((key) => {
+    delete sprintTaskOffsets[Number(key)]
+  })
+}
+
+// Clamp when arrays shrink (e.g. the last page was deleted) and evict offsets
+// whose sprint no longer has any tasks.
+function clampSprintOffsets() {
+  const size = Math.max(1, tasksPageSize.value)
+  Object.entries(sprintTaskOffsets).forEach(([key, offset]) => {
+    const id = Number(key)
+    const total = getSortedTasksForSprint(id).length
+    if (total <= 0) {
+      delete sprintTaskOffsets[id]
+      return
+    }
+    const maxOffset = Math.max(0, Math.floor((total - 1) / size) * size)
+    if (offset > maxOffset) {
+      sprintTaskOffsets[id] = maxOffset
+    }
+  })
+}
+
+watch(tasks, () => {
   clampBacklogOffset()
-})
+  clampSprintOffsets()
+}, { deep: true })
 
 const analyticsSummary = computed(
   () => sprintAnalytics.getSummary(selectedAnalyticsSprintId.value) as SprintSummaryReportResponse | undefined,
@@ -1607,11 +1677,20 @@ watch(visibleSprints, (list) => {
       expanded[sectionKey(sprint.id)] = true
     }
   })
+  // DEV-105: drop page positions for sprints that left the visible window.
+  const visibleIds = new Set(list.map((sprint) => sprint.id))
+  Object.keys(sprintTaskOffsets)
+    .map(Number)
+    .filter((id) => !visibleIds.has(id))
+    .forEach((id) => {
+      delete sprintTaskOffsets[id]
+    })
 })
 
 watch(
   filter,
   () => {
+    resetAllPagingOffsets()
     scheduleTasksRefresh()
   },
   { deep: true },
@@ -1623,7 +1702,10 @@ watch(
     refreshConfigDefaults(p || undefined).catch((error) => {
       console.warn('Failed to refresh sprint defaults', error)
     })
-    if (prev !== undefined) scheduleTasksRefresh()
+    if (prev !== undefined) {
+      resetAllPagingOffsets()
+      scheduleTasksRefresh()
+    }
   },
   { immediate: true },
 )
@@ -2413,6 +2495,48 @@ function handleTaskPanelUpdated(updated: TaskDTO) {
   }
 }
 
+// DEV-104: sprint-header/backlog Add task controls open the shared create
+// panel with the destination prefilled. The sprint id is carried verbatim —
+// even if sprint metadata is stale — so creation can never silently fall
+// back to the backlog; the atomic create request rejects a missing id.
+function sprintAddDisabled(sprint: SprintListItem) {
+  return isClosedSprintId(sprint.id) && !allowClosed.value
+}
+
+function sprintAddTitle(sprint: SprintListItem) {
+  if (sprintAddDisabled(sprint)) {
+    return 'Enable "Allow editing closed sprints" above to add tasks'
+  }
+  return `Add task to ${sprint.display_name}`
+}
+
+function openCreateForSprint(sprint: SprintListItem) {
+  if (taskPanelOpen.value || busy.value || isLifecycleBusy(sprint.id) || sprintAddDisabled(sprint)) return
+  openTaskPanel({
+    taskId: 'new',
+    initialProject: project.value || null,
+    initialSprint: sprint.id,
+    onCreated: handleTaskPanelCreated,
+  })
+}
+
+function openCreateForBacklog() {
+  if (taskPanelOpen.value || busy.value) return
+  openTaskPanel({
+    taskId: 'new',
+    initialProject: project.value || null,
+    initialSprint: null,
+    onCreated: handleTaskPanelCreated,
+  })
+}
+
+// The host updates the entity cache; only the server query establishes which
+// newly created tasks belong in this filtered view.
+function handleTaskPanelCreated(created: TaskDTO) {
+  if (!created || !created.id) return
+  void refreshAll(true)
+}
+
 function onTaskRowClick(task: TaskDTO, event: MouseEvent) {
   if (!task?.id) return
   if (event?.defaultPrevented) return
@@ -2815,8 +2939,8 @@ function focusBacklogIfRequested() {
 onMounted(() => {
   stopPreferencesListener = onPreferencesChanged((key) => {
     if (key !== 'lotar.preferences.tasks.pageSize') return
-    backlogPageSize.value = readTasksPageSizePreference()
-    backlogOffset.value = 0
+    tasksPageSize.value = readTasksPageSizePreference()
+    resetAllPagingOffsets()
   })
 
   bindCopyModifierListeners()
@@ -2890,16 +3014,6 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.icon-only {
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  padding: 0;
-}
-
 .filter-meta {
   display: flex;
   flex-direction: column;
@@ -2944,7 +3058,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
-  height: 2.25rem;
+  min-height: var(--control-height);
 }
 
 .columns-popover {
@@ -2992,16 +3106,20 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: var(--control-height);
+  height: var(--control-height);
+  flex: 0 0 auto;
+  align-self: flex-start;
   cursor: pointer;
   color: inherit;
 }
 
 .group-title {
   display: flex;
+  flex: 1 1 136px;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .group-title__heading {
@@ -3009,11 +3127,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .group-title h2 {
   margin: 0;
   font-size: var(--text-lg, 1.125rem);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .group-meta {
@@ -3122,9 +3243,15 @@ onUnmounted(() => {
   display: block;
 }
 
+.meta-item--truncate {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .meta-item--truncate .meta-value,
 .meta-value--truncate {
   display: inline-block;
+  min-width: 0;
   max-width: clamp(160px, 25vw, 240px);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3169,6 +3296,8 @@ onUnmounted(() => {
 .group-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .group-body {
@@ -3380,7 +3509,6 @@ onUnmounted(() => {
 
 .filter-meta__actions .create-sprint-button {
   font-weight: 600;
-  height: 2.25rem;
   padding: 0 var(--space-4, 1rem);
   gap: var(--space-2, 0.5rem);
 }
@@ -3416,13 +3544,38 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.btn.small {
-  padding: 4px 10px;
-  font-size: var(--text-sm, 0.875rem);
-}
-
 .sprint-modal__form {
   gap: var(--space-4, 1rem);
+}
+
+/* DEV-105: named responsive grids replace hard per-field min-widths so the
+   create/edit dialog fits 320/390/tablet widths without horizontal scroll. */
+.sprint-form__grid {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sprint-form__grid--names {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sprint-form__grid--schedule,
+.sprint-form__grid--capacity {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sprint-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sprint-form__field .input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 
 .sprint-modal__header {
@@ -3452,6 +3605,18 @@ onUnmounted(() => {
   .group-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+  .sprint-form__grid--schedule,
+  .sprint-form__grid--capacity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .sprint-form__grid--names,
+  .sprint-form__grid--schedule,
+  .sprint-form__grid--capacity {
+    grid-template-columns: 1fr;
   }
 }
 </style>

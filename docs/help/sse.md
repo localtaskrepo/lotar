@@ -32,13 +32,21 @@ Combine filters freely: e.g., subscribe to only `task_created` from project `ENG
 - `sync_progress` — `{ "run_id": "sync-...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "entry": {"status":"created|updated|skipped|failed", "task_id": "PREFIX-1", "reference": "owner/repo#123", "message": "...", "at": "..."}, "project": "<PREFIX>", "remote": "<remote>", "direction": "pull|push" }`.
 - `sync_completed` — `{ "run_id": "sync-...", "project": "<PREFIX>"|null, "report": { "id": "...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "stored_path": "sync-...json", ... }, "finished_at": "..." }`. `project` mirrors the report's resolved execution project (runs without an explicit project fall back to the configured default project) and is `null` when none resolves; `null` never matches a `project` filter.
 - `sync_failed` — `{ "run_id": "sync-...", "error": "...", "finished_at": "...", "project": "<PREFIX>", "remote": "<remote>", "direction": "pull|push" }`.
-- `agent_job_started` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "runner": "copilot|codex|claude|gemini|command", "status": "running", "created_at": "...", "started_at": "..." }`.
-- `agent_job_progress` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "running", "message": "..." }`.
-- `agent_job_message` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "running", "message": "..." }`.
-- `agent_job_input` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "running", "message": "..." }`.
-- `agent_job_completed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "completed", "finished_at": "...", "exit_code": 0 }`.
-- `agent_job_failed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "failed", "finished_at": "...", "exit_code": 1 }`.
-- `agent_job_cancelled` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "cancelled", "finished_at": "..." }`.
+- `agent_job_started` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "runner": "copilot|codex|claude|gemini|command", "status": "running", "created_at": "...", "started_at": "...", "sequence": 1, "at": "..." }`.
+- `agent_job_progress` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "running", "message": "...", "sequence": 2, "at": "..." }`.
+- `agent_job_message` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "running", "message": "...", "sequence": 3, "at": "..." }`.
+- `agent_job_input` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "running", "message": "...", "sequence": 4, "at": "..." }`.
+- `agent_job_completed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "completed", "finished_at": "...", "exit_code": 0, "sequence": 7, "at": "..." }`.
+- `agent_job_failed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "failed", "finished_at": "...", "exit_code": 1, "sequence": 7, "at": "..." }`.
+- `agent_job_cancelled` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "cancelled", "finished_at": "...", "sequence": 5, "at": "..." }`.
+
+Every `agent_job_*` SSE event carries `sequence` and `at` taken from the exact
+same log entry served by `GET /api/jobs/logs`: `sequence` is the stable per-job
+identity (positive, starts at 1, strictly monotonic for the job's lifetime, and
+never reused after in-memory log truncation), so a client can join its live SSE
+cache with a REST snapshot losslessly by `(id, sequence)`. The push-only kinds
+`agent_job_raw`, `agent_job_init`, and `agent_job_result` consume sequence
+numbers and appear in the REST log, but are never streamed over SSE.
 - `ready` — `{}`; only emitted when both `LOTAR_SSE_READY=1` and `ready=1` are in effect.
 
 Every event is written as:

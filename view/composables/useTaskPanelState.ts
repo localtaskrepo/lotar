@@ -26,6 +26,8 @@ export interface TaskPanelProps {
     initialProject?: string | null
     initialStatus?: string | null
     initialDueDate?: string | null
+    /** DEV-104: concrete sprint id prefilled into a create-mode draft. */
+    initialSprint?: number | null
 }
 
 export interface TaskPanelEmit {
@@ -490,6 +492,21 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
                 }
                 if (props.initialDueDate) {
                     form.due_date = props.initialDueDate
+                }
+                // DEV-104: prefill the draft's sprint destination after
+                // applyDefaults (which resets sprint state). The id is kept
+                // verbatim — no sprint-metadata cross-check — so a failed or
+                // stale metadata load can never silently downgrade the
+                // destination to the backlog; the atomic create payload is
+                // validated server-side.
+                const initialSprintId = props.initialSprint
+                if (
+                    typeof initialSprintId === 'number' &&
+                    Number.isInteger(initialSprintId) &&
+                    initialSprintId > 0 &&
+                    !form.sprints.includes(initialSprintId)
+                ) {
+                    form.sprints = [...form.sprints, initialSprintId]
                 }
                 ready.value = true
                 loading.value = false

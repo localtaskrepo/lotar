@@ -103,6 +103,7 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useTaskPanelController', () => ({
     useTaskPanelController: () => ({
+        state: { open: false },
         openTaskPanel: vi.fn(),
     }),
 }))

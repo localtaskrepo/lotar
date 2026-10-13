@@ -1,9 +1,87 @@
 title: Tasks and Sprints pages have pagination controls in different locations
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-10T21:11:15.417133+00:00
-description: |-
-  Tasks page has it at the bottom with a numbering system, while sprints have it at the top, and not sure there's numbered pages to jump to.
-  Anyway has to be considered how pagination works with open sprints. Per sprint? Total? Only paginate the backlog (which should equal per sprint). Probably per sprint then.
+modified: 2026-10-13T18:48:12.889592+00:00
+comments:
+- date: 2026-10-13T02:16:12.472743+00:00
+  text: 'Scope expanded by current developer request: review sprint/backlog sections and dialogs at desktop/tablet/mobile sizes, unify arrangement and button sizing, and standardize Tasks/Sprints pagination. Plan: one presentational numbered footer pager shared by Tasks, each sprint, and backlog; independent per-sprint/backlog offsets, existing page-size preference, slice after existing ordering, clamp/reset on relevant data/filter/sort/pref changes. Preserve Tasks query/URL/selection semantics, closed-sprint gates, server-authoritative membership, no-op guards, drag/copy, and DEV104 creation flow. Standard common action baseline36px with explicit compact inline exceptions; responsive create/edit sprint field grids and bounded shared-modal padding; use existing UiModal for TaskPanel sprint assignment only so focus/Escape behavior is consistent. Scope does not include DEV109 backlog ordering or unrelated modal/data-fetch refactors. Existing approved staged changes must remain staged and unchanged in the index; modifications are layered in working tree only (read-only cached-diff fingerprint29c3e9d8d6c51b7ff4c477dd36eb34c020e4b741950451f3702cf3573a8098c1). Two bounded frontend owners, parent owns native tracking/all smoke/browser audit. Verification: capture baseline and corrected layouts/geometry at1440/1024/768/390/320, exercise dialogs/narrow height/focus, numbered paging per list independently and preference/query safety, targeted regressions plus final full gates. No Git writes, user-server changes, test-timeout/retry/concurrency changes, real-backlog scenario fixtures, or new documentation files. Guidance: no durable finding.'
+- date: 2026-10-13T03:33:12.295315+00:00
+  text: 'Outcome interim: shared numbered footer pagination now serves Tasks, each sprint, and backlog, with independent list offsets and existing page-size preferences. Named responsive sprint form grids, common control token max(36px,2.25rem), non-shrinking square icon targets, improved header wrapping/disclosure labels, and TaskPanel sprint-only shared UiModal are implemented. Evidence: before screenshots/geometry at1440/1024/768/390/320 showed natural text actions31.5px vs icons36px and icon widths squeezed to19.6px. Measured root font is16px; the earlier14px root explanation was incorrect (natural text/padding sizing caused31.5px). Corrected images/geometry are in target/smoke-artifacts/sprint-layout/after; font/image layout unchanged otherwise. Browser first correction caught input width100% content-box overflow at all widths; fixed locally with border-box, not hidden overflow or relaxed checks. Latest browser6 viewport cases pass including844x390 landscape, exact36px controls/squares, contained fields, reachable footer, Tab trap/Escape/focus restoration/draft retention. The remaining functional case reproduced pre-existing Tasks Back-to-no-offset retaining page2; route fallback is now0, fresh confirmation pending. Shared pager red-green tests also preserve non-aligned deep links and prevent fractional pageSize0.5 from producing NaN/Infinity pages. Independent final review signed off229/229 focused UI tests and clean frontend typecheck; parent focused58/58 green, analytics mock completed instead of production fallback. Approved index fingerprint remains29c3e9d8d6c51b7ff4c477dd36eb34c020e4b741950451f3702cf3573a8098c1. Remaining: fresh full smoke plus final lint/Rust/UI gates, final screenshot inspection, exact task completion reconciliation. DEV109 ordering is not part of this work; no Git writes or user-server changes. Guidance: no durable finding.'
+- date: 2026-10-13T04:11:10.315078+00:00
+  text: 'Outcome: requested responsive review and implementation complete, independently reviewed and self-verified. One shared numbered footer pager serves Tasks, every sprint, and backlog; offsets are independent, slice follows existing sort, preference/filter/project/sort resets and data-shrink clamps preserve membership/order. Tasks URL semantics now correctly restore page1 when Back removes offset; non-aligned deep links still re-align when clicking the highlighted page; malformed/fractional pager sizes cannot produce NaN/Infinity. Common action token max(36px,2.25rem) aligns text/icon/card/dialog/Board controls, prevents icon shrink, and scales with larger root text. Disclosure stays beside wrapped titles and has accessible Expand/Collapse labels. Sprint create/edit fields use responsive2/3-column grids collapsing to one column, border-box inputs, reachable scrollable footers, and bounded mobile gutters. Long goal metadata is clamped within the title area while full tooltip/label text remains. TaskPanel sprint assignment alone uses existing UiModal for real Tab trapping, busy Escape guards, focus restoration, and preserved draft/no-op/closed gates. Explicit compact attachment/Scan utilities and the previously approved borderless32px search-help target remain compact. Evidence: baseline screenshots/geometry at1440/1024/768/390/320, corrected additional844x390 landscape. Natural text actions31.5px vs icons36px and squeezed19.6px icon widths reproduced; measured rootfont16px, prior14px explanation corrected. Real overflow from content-box100% input grids failed all widths, then border-box fixed it without hiding overflow. Seven durable browser cases now pass: exact sizing/containment and create/edit/assign dialogs at six viewports plus independent footer paging and actual Back/Forward URI behavior. Final320 goal-containment regression red304.56px beyond267px bound, then targeted CSS clamp and full fresh gate green. Screenshots and geometry inspected under target/smoke-artifacts/sprint-layout/{before,after}; final320 headers, desktop form, short-landscape footer inspected. Independent final review signed off229/229 targeted UI plus clean frontend typecheck; parent scoped58/58. Final npm run lint:agent passed vue-tsc, all-target/all-feature Clippy -D warnings, and formatting. Final npm run test:agent passed1425 Rust tests/137 binaries with zero retries and836 UI tests/77 files. Final fresh npm run test:smoke:agent passed273 tests/65 files with25 existing skips/6 skipped files. Earlier full-smoke3 failures recorded: help grew36px (fixed explicit32px exception, existing assertion retained) and old48px mobile-gutter test assumption (updated to strict12px-mobile/24px-desktop four-edge bounds, not relaxed wholesale). Board-route test typo corrected from singular to existing plural; no product route change. Remaining: existing45 Git-dependent Rust exclusions and25 smoke skips are unverified, not passed; existing useFilterBuilder inject warnings remain. No server/API change, no DEV109 ordering work, no user-server restart or Git writes. All approved staged bytes remain identical: cached-diff SHA25629c3e9d8d6c51b7ff4c477dd36eb34c020e4b741950451f3702cf3573a8098c1. New modifications remain unstaged/uncommitted. Guidance: no durable finding.'
+- date: 2026-10-13T16:43:27.707386+00:00
+  text: 'CI follow-up requested against the latest ticket, with authorized amend and force-with-lease push of latest commit 289a5fa. Plan: inspect failed Rust Quality logs, reproduce root causes, fix deterministic regression assertions or product behavior as warranted, run targeted tests plus required full lint/Rust/UI/smoke gates, record verification limits, and amend/push only intended changes. Latest run 38346953038 passed formatting and Clippy but failed storage_edit_still_writes_changed_references at tests/task_noop_update_test.rs:530: both filesystem mtimes were identical. Investigating timestamp granularity rather than adding sleeps, retries, skips, or changing CI coverage.'
+- date: 2026-10-13T16:50:27.725394+00:00
+  text: 'CI investigation: prior run38317691139 and latest run38346953038 both failed the same genuine-reference-edit mtime assertion; bytes were already persisted, but Linux assigned identical timestamps to rapid writes. tests/task_noop_update_test.rs now pins a fixed past mtime before all three genuine-write assertions, preserving their strict inequality checks and validating the fixture timestamp. All21 tests passed25 stress iterations with default features and another25 iterations with all CI features, zero retries. Adjacent no-op test audit found no equivalent unsafe inequality assertions. Full all-feature Rust validation then exposed an independent async fixture race in auto_queue_assignment_chains_agents_and_runs_commands: job completion was visible before automation-run.log existed, and panic teardown deleted the script before launch. Reused existing content-aware wait with exact ticket/profile output and the original shared10-second job-wait budget; no added timeout, retry, skip, or production change. Full frontend836/836 passed; targeted async stress and final full gates pending. Latest Windows job passed; older EBUSY cleanup failure is not claimed fixed by these changes. Guidance: no durable finding.'
+- date: 2026-10-13T16:54:44.039527+00:00
+  text: 'Outcome: CI follow-up fixes complete and self-verified. Test-only changes in task_noop_update_test.rs eliminate Linux filesystem-clock flakiness without removing any mtime, byte, history, event, or receipt assertions. agent_automation_integration_test.rs waits for exact async command output using the existing helper and original shared10-second budget, avoiding premature fixture teardown. Evidence: failing GitHub runs38317691139 and38346953038; second race reproduced in initial full Rust run with missing automation-run.log. Repaired no-op suite21/21 across25 stress iterations each for default and all features; repaired chain25/25 stress iterations. Final full all-feature Rust gate passed1425 tests/137 binaries with zero retries; UI836 tests/77 files passed; fresh-build smoke273 tests/65 files passed. Final lint:agent passed frontend typecheck, all-target/all-feature Clippy -D warnings, cargo fmt check; git diff --check clean. Remaining:45 Git-required Rust exclusions and25 existing smoke skips are not local passes; existing Vue injection warnings unchanged. No production or CI workflow/coverage changes, no added sleeps/timeouts/retries/skips. Remote GitHub validation will follow the authorized amend of289a5fa and explicit-lease push; remote main was verified at289a5fa11211eab6fa926f2b252703eedfc9d147. Guidance: no durable finding.'
+- date: 2026-10-13T18:48:12.889592+00:00
+  text: 'Integration and remote verification: amended289a5fa as8b22f5f9e90746b6285b8216622d2adc5e8aa758 and force-with-lease pushed to main, checking the exact expected old remote SHA. No hook bypass or persistent Git configuration changes: raw pre-push nextest hit the known local Git restriction, then the intact hook passed1425 tests using the existing gitless profile; HTTPS transport used for this invocation after SSH timed out. GitHub Quality Assurance run38448782171 succeeded for8b22f5f: Rust formatting, all-target/all-feature Clippy, zero-retry full Linux nextest suite AND manifest-vs-JUnit full-suite coverage gate passed, including Git-required tests unavailable locally. Windows all-target compile, native regressions, selection coverage and portable automation smoke also passed. UI, release build, smoke and Rust security audit all passed. CodeQL run38448780440 succeeded. Evidence: https://github.com/localtaskrepo/lotar/actions/runs/38448782171 and https://github.com/localtaskrepo/lotar/actions/runs/38448780440. Outcome: both test races resolved and remote CI green; DEV-105 Done. Remaining: no code or CI follow-up; this post-push verification comment is a local ticket-only update, not part of the already verified commit. Guidance: no durable finding.'
+description: Standardize Tasks, sprint, and backlog pagination using one accessible numbered footer component. Each sprint and the backlog paginate independently with the existing page-size preference, preserving current ordering, query membership, selection, and closed-sprint behavior. Review and correct control arrangement and dialog layouts across desktop, tablet, mobile, and short landscape windows; common action controls use a36px baseline with non-shrinking square icons and explicit compact utility exceptions. Use responsive sprint form grids, bounded shared dialog sizing/focus behavior, and preserve Tasks deep-link/back/forward pagination. Backlog ordering (DEV-109), server/API shapes, unrelated dialogs, and data-fetch architecture are outside this scope. Existing approved staged work must remain unchanged in the index; requested modifications are layered in the working tree.
+history:
+- at: 2026-10-13T02:02:46.557605+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-13T02:16:12.472743+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T03:33:12.295315+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T04:10:34.340926+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: |-
+      Tasks page has it at the bottom with a numbering system, while sprints have it at the top, and not sure there's numbered pages to jump to.
+      Anyway has to be considered how pagination works with open sprints. Per sprint? Total? Only paginate the backlog (which should equal per sprint). Probably per sprint then.
+    new: Standardize Tasks, sprint, and backlog pagination using one accessible numbered footer component. Each sprint and the backlog paginate independently with the existing page-size preference, preserving current ordering, query membership, selection, and closed-sprint behavior. Review and correct control arrangement and dialog layouts across desktop, tablet, mobile, and short landscape windows; common action controls use a36px baseline with non-shrinking square icons and explicit compact utility exceptions. Use responsive sprint form grids, bounded shared dialog sizing/focus behavior, and preserve Tasks deep-link/back/forward pagination. Backlog ordering (DEV-109), server/API shapes, unrelated dialogs, and data-fetch architecture are outside this scope. Existing approved staged work must remain unchanged in the index; requested modifications are layered in the working tree.
+- at: 2026-10-13T04:11:10.315078+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T04:11:55.897430+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-13T16:43:07.804879+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-13T16:43:27.707386+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T16:50:27.725394+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T16:54:44.039527+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T16:54:44.065686+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-13T18:48:12.889592+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

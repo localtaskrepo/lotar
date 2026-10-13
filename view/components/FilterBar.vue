@@ -1352,6 +1352,8 @@ defineExpose({ appendCustomFilter, clear: onClear })
   flex-shrink: 0;
   width: 32px;
   height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   padding: 0;
   margin-left: -4px;
   border: 0;

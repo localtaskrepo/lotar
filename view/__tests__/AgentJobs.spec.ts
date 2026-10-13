@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentJob, AgentJobCancelAllResponse } from '../api/types'
+import type { AgentJob, AgentJobCancelAllResponse, AgentJobLogEntry, AgentJobLogsResponse } from '../api/types'
 import AgentJobs from '../pages/AgentJobs.vue'
 
 const sseCalls: Array<{
@@ -70,6 +70,10 @@ const stubs = {
     },
     UiButton: {
         props: ['type'],
+        // Declare the click emit so a trigger('click') fires the parent
+        // handler exactly once, matching the real component's native
+        // fallthrough behavior (no fallthrough + emit double fire).
+        emits: ['click'],
         template: '<button :type="type || \'button\'" @click="$emit(\'click\')"><slot /></button>',
     },
     UiCard: { template: '<section><slot /></section>' },
@@ -452,5 +456,477 @@ describe('AgentJobs live synchronization', () => {
         expect(wrapper.findAll('.job-card').length).toBe(1)
         expect(wrapper.text()).toContain('late-marker')
         wrapper.unmount()
+    })
+})
+
+describe('AgentJobs log sequence join', () => {
+    const logJobA = job('job-logs-a', { agent: 'logs-alpha', created_at: '2026-10-08T10:20:01.000Z' })
+    const logJobB = job('job-logs-b', { agent: 'logs-beta', created_at: '2026-10-08T10:20:02.000Z' })
+
+    function listJobs(...jobs: AgentJob[]) {
+        ;(api.listAgentJobs as any).mockResolvedValue({
+            jobs,
+            queue_stats: { running: jobs.length, queued: 0, max_parallel: 2 },
+        })
+    }
+
+    function cardFor(wrapper: ReturnType<typeof mount>, marker: string) {
+        const card = wrapper.findAll('.job-card').find((candidate) => candidate.text().includes(marker))
+        expect(card, `job card ${marker}`).toBeTruthy()
+        return card!
+    }
+
+    async function clickLogsToggle(wrapper: ReturnType<typeof mount>, marker: string) {
+        const card = cardFor(wrapper, marker)
+        const label = card.find('.log-panel').exists() ? 'Hide logs' : 'Show logs'
+        const button = card.findAll('button').find((candidate) => candidate.text() === label)
+        expect(button, `${label} button`).toBeTruthy()
+        await button!.trigger('click')
+        await flushPromises()
+    }
+
+    function logEntry(kind: string, sequence: number, at: string, message?: string): AgentJobLogEntry {
+        return { kind, at, sequence, message: message ?? null }
+    }
+
+    /** Emit a broadcast-kind SSE event carrying the required sequence and server at. */
+    function emitLiveSse(kind: string, payload: Record<string, unknown>) {
+        emitSse(kind, { id: 'job-logs-a', ticket_id: 'DEV-1', ...payload })
+    }
+
+    function panelText(wrapper: ReturnType<typeof mount>, marker = 'logs-alpha') {
+        return cardFor(wrapper, marker).find('.log-panel').text()
+    }
+
+    function occurrences(text: string, needle: string) {
+        return text.split(needle).length - 1
+    }
+
+    it('fetches persisted history on open even when live events already initialized a partial cache', async () => {
+        // Reproduces the smoke failure shape: broadcast events initialized a
+        // partial live cache, but the phase-one progress was persisted before
+        // the stream joined and was never delivered. Opening the logs must
+        // still load the server history while the job is running.
+        listJobs(logJobA)
+        ;(api.getAgentJobLogs as any).mockResolvedValue({
+            job: logJobA,
+            events: [
+                logEntry('agent_job_started', 1, '2026-10-08T10:20:01.100Z'),
+                logEntry('agent_job_init', 2, '2026-10-08T10:20:01.150Z', 'runner ready'),
+                logEntry('agent_job_progress', 3, '2026-10-08T10:20:01.300Z', 'phase one complete'),
+            ],
+        } satisfies AgentJobLogsResponse)
+        const wrapper = await mountAgentJobs()
+        try {
+            emitLiveSse('agent_job_started', { status: 'running', sequence: 1, at: '2026-10-08T10:20:01.100Z' })
+            emitLiveSse('agent_job_progress', {
+                status: 'running',
+                message: 'phase one complete',
+                sequence: 3,
+                at: '2026-10-08T10:20:01.300Z',
+            })
+            await flushPromises()
+
+            await clickLogsToggle(wrapper, 'logs-alpha')
+
+            expect(api.getAgentJobLogs).toHaveBeenCalledWith('job-logs-a')
+            expect(panelText(wrapper)).toContain('phase one complete')
+            expect(panelText(wrapper)).toContain('runner ready')
+            expect(cardFor(wrapper, 'logs-alpha').find('.status-chip').text()).toBe('running')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('merges a snapshot with REST-only init/result entries interleaved with the live tail without duplicates', async () => {
+        // agent_job_init and agent_job_result are persisted but never
+        // broadcast, so the live tail is non-contiguous with the snapshot.
+        // A watched job completing (result between last progress and
+        // completed) must reopen without duplicated rows.
+        listJobs(logJobA)
+        ;(api.getAgentJobLogs as any).mockResolvedValue({
+            job: { ...logJobA, status: 'completed', finished_at: '2026-10-08T10:20:02.000Z' },
+            events: [
+                logEntry('agent_job_started', 1, '2026-10-08T10:20:01.100Z'),
+                logEntry('agent_job_init', 2, '2026-10-08T10:20:01.150Z', 'runner ready'),
+                logEntry('agent_job_progress', 3, '2026-10-08T10:20:01.200Z', 'phase one chunk'),
+                logEntry('agent_job_result', 4, '2026-10-08T10:20:01.900Z', 'result summary'),
+                logEntry('agent_job_completed', 5, '2026-10-08T10:20:02.000Z', 'done summary'),
+            ],
+        } satisfies AgentJobLogsResponse)
+        const wrapper = await mountAgentJobs()
+        try {
+            emitLiveSse('agent_job_started', { status: 'running', sequence: 1, at: '2026-10-08T10:20:01.100Z' })
+            emitLiveSse('agent_job_progress', {
+                status: 'running',
+                message: 'phase one chunk',
+                sequence: 3,
+                at: '2026-10-08T10:20:01.200Z',
+            })
+            emitLiveSse('agent_job_completed', {
+                status: 'completed',
+                finished_at: '2026-10-08T10:20:02.000Z',
+                message: 'done summary',
+                sequence: 5,
+                at: '2026-10-08T10:20:02.000Z',
+            })
+            await flushPromises()
+
+            await clickLogsToggle(wrapper, 'logs-alpha')
+
+            const text = panelText(wrapper)
+            expect(occurrences(text, 'Job started')).toBe(1)
+            expect(occurrences(text, 'runner ready')).toBe(1)
+            expect(occurrences(text, 'phase one chunk')).toBe(1)
+            expect(occurrences(text, 'result summary')).toBe(1)
+            expect(occurrences(text, 'done summary')).toBe(1)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('keeps a genuinely repeated identical chunk with a new sequence instead of matching the older instance', async () => {
+        // Identical repeated deltas are distinct events: the snapshot holds
+        // an older identical chunk, a new one arrives during the fetch
+        // flight, and both must survive (content joins matched the older
+        // instance and dropped the new chunk).
+        listJobs(logJobA)
+        const logs = deferred<AgentJobLogsResponse>()
+        ;(api.getAgentJobLogs as any).mockReturnValue(logs.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            emitLiveSse('agent_job_started', { status: 'running', sequence: 1, at: '2026-10-08T10:20:01.100Z' })
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            expect(panelText(wrapper)).toContain('Loading logs')
+
+            emitLiveSse('agent_job_progress', {
+                status: 'running',
+                message: 'repeated chunk',
+                sequence: 7,
+                at: '2026-10-08T10:20:03.000Z',
+            })
+            await flushPromises()
+
+            logs.resolve({
+                job: logJobA,
+                events: [
+                    logEntry('agent_job_started', 1, '2026-10-08T10:20:01.100Z'),
+                    logEntry('agent_job_init', 2, '2026-10-08T10:20:01.150Z', 'runner ready'),
+                    logEntry('agent_job_progress', 5, '2026-10-08T10:20:02.000Z', 'repeated chunk'),
+                ],
+            })
+            await flushPromises()
+
+            const text = panelText(wrapper)
+            expect(occurrences(text, 'repeated chunk')).toBe(2)
+            expect(occurrences(text, 'runner ready')).toBe(1)
+            expect(occurrences(text, 'Job started')).toBe(1)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('ignores delayed SSE events the snapshot already covered and appends only newer sequences', async () => {
+        listJobs(logJobA)
+        const logs = deferred<AgentJobLogsResponse>()
+        ;(api.getAgentJobLogs as any).mockReturnValue(logs.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            emitLiveSse('agent_job_started', { status: 'running', sequence: 1, at: '2026-10-08T10:20:01.100Z' })
+            await clickLogsToggle(wrapper, 'logs-alpha')
+
+            logs.resolve({
+                job: { ...logJobA, status: 'completed', finished_at: '2026-10-08T10:20:01.400Z' },
+                events: [
+                    logEntry('agent_job_started', 1, '2026-10-08T10:20:01.100Z'),
+                    logEntry('agent_job_init', 2, '2026-10-08T10:20:01.150Z', 'runner ready'),
+                    logEntry('agent_job_progress', 3, '2026-10-08T10:20:01.200Z', 'old chunk'),
+                    logEntry('agent_job_completed', 4, '2026-10-08T10:20:01.400Z', 'done summary'),
+                ],
+            })
+            await flushPromises()
+
+            // The debounced broadcast of an event the snapshot already
+            // covered arrives late; it must not append a duplicate.
+            emitLiveSse('agent_job_progress', {
+                status: 'running',
+                message: 'old chunk',
+                sequence: 3,
+                at: '2026-10-08T10:20:01.200Z',
+            })
+            await flushPromises()
+            expect(occurrences(panelText(wrapper), 'old chunk')).toBe(1)
+            expect(occurrences(panelText(wrapper), 'done summary')).toBe(1)
+
+            // A genuinely newer event still appends exactly once.
+            emitLiveSse('agent_job_progress', {
+                status: 'running',
+                message: 'fresh chunk',
+                sequence: 6,
+                at: '2026-10-08T10:20:04.000Z',
+            })
+            await flushPromises()
+            expect(occurrences(panelText(wrapper), 'fresh chunk')).toBe(1)
+            expect(occurrences(panelText(wrapper), 'runner ready')).toBe(1)
+            expect(occurrences(panelText(wrapper), 'Job started')).toBe(1)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('orders the merged log by numeric sequence, not timestamps', async () => {
+        listJobs(logJobA)
+        ;(api.getAgentJobLogs as any).mockResolvedValue({
+            job: logJobA,
+            events: [
+                logEntry('agent_job_message', 30, '2026-10-08T09:00:00.000Z', 'ord-thirty'),
+                logEntry('agent_job_started', 10, '2026-10-08T12:00:00.000Z'),
+            ],
+        } satisfies AgentJobLogsResponse)
+        const wrapper = await mountAgentJobs()
+        try {
+            emitLiveSse('agent_job_message', {
+                status: 'running',
+                message: 'ord-twenty',
+                sequence: 20,
+                at: '2026-10-08T11:00:00.000Z',
+            })
+            await flushPromises()
+
+            await clickLogsToggle(wrapper, 'logs-alpha')
+
+            const rows = cardFor(wrapper, 'logs-alpha').findAll('.log-row')
+            expect(rows.map((row) => row.text())).toEqual([
+                expect.stringContaining('Job started'),
+                expect.stringContaining('ord-twenty'),
+                expect.stringContaining('ord-thirty'),
+            ])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('joins the 200-event snapshot suffix with the 1000-entry live buffer without duplicates or resurrection', async () => {
+        listJobs(logJobA)
+        const logs = deferred<AgentJobLogsResponse>()
+        ;(api.getAgentJobLogs as any).mockReturnValue(logs.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            // Fill the live buffer past its retention cap: sequences 1..1005
+            // arrive, so the head (1..5) is trimmed and only 6..1005 remain.
+            for (let sequence = 1; sequence <= 1005; sequence++) {
+                emitLiveSse('agent_job_progress', {
+                    status: 'running',
+                    message: `bulk-${sequence}`,
+                    sequence,
+                    at: '2026-10-08T10:20:00.000Z',
+                })
+            }
+            await flushPromises()
+
+            // A stale delayed event below the live watermark must not be
+            // recorded; if it were, it would union into the merged rows.
+            emitLiveSse('agent_job_message', {
+                status: 'running',
+                message: 'stale resurrect',
+                sequence: 2,
+                at: '2026-10-08T10:20:00.000Z',
+            })
+            await flushPromises()
+
+            // The server snapshot is capped to the newest 200 events.
+            const snapshot = Array.from({ length: 200 }, (_, i) => {
+                const sequence = 806 + i
+                return logEntry('agent_job_progress', sequence, '2026-10-08T10:20:00.000Z', `bulk-${sequence}`)
+            })
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            logs.resolve({ job: logJobA, events: snapshot })
+            await flushPromises()
+
+            const text = panelText(wrapper)
+            // Every overlapped sequence appears exactly once.
+            expect(occurrences(text, 'bulk-900')).toBe(1)
+            expect(text).toContain('bulk-1005')
+            // Retention boundary: the oldest retained live entry survives,
+            // the trimmed head and the stale resurrection do not come back.
+            expect(text).toContain('bulk-6')
+            expect(text).not.toContain('bulk-5bulk-6')
+            expect(text).not.toContain('stale resurrect')
+
+            // After the merge, snapshot-covered sequences stay ignored and
+            // only sequences beyond the watermark append.
+            emitLiveSse('agent_job_progress', {
+                status: 'running',
+                message: 'stale-late',
+                sequence: 900,
+                at: '2026-10-08T10:20:00.000Z',
+            })
+            emitLiveSse('agent_job_progress', {
+                status: 'running',
+                message: 'tail chunk',
+                sequence: 1006,
+                at: '2026-10-08T10:21:00.000Z',
+            })
+            await flushPromises()
+            expect(panelText(wrapper)).not.toContain('stale-late')
+            expect(panelText(wrapper)).toContain('tail chunk')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('accepts queued SSE entries older than the snapshot window instead of dropping them', async () => {
+        // The API snapshot only captures the newest 200 events; broadcasts
+        // still queued in the SSE debounce can be older than that window
+        // and were never seen by this client. They must be rendered in order
+        // immediately, not rejected for being
+        // below the snapshot's newest sequence.
+        listJobs(logJobA)
+        const first = deferred<AgentJobLogsResponse>()
+        const second = deferred<AgentJobLogsResponse>()
+        ;(api.getAgentJobLogs as any).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            // Delivered live before the fetch: 200..249.
+            for (let sequence = 200; sequence <= 249; sequence++) {
+                emitLiveSse('agent_job_progress', {
+                    status: 'running',
+                    message: `gap-${sequence}`,
+                    sequence,
+                    at: '2026-10-08T10:20:00.000Z',
+                })
+            }
+            await clickLogsToggle(wrapper, 'logs-alpha')
+
+            // The snapshot window only covers the newest 200 events.
+            const windowed = (kind: string, message: string) =>
+                Array.from({ length: 200 }, (_, i) =>
+                    logEntry(kind, 301 + i, '2026-10-08T10:20:01.000Z', `${message}-${301 + i}`))
+            first.resolve({ job: logJobA, events: windowed('agent_job_progress', 'snap') })
+            await flushPromises()
+            expect(panelText(wrapper)).toContain('snap-450')
+            expect(panelText(wrapper)).toContain('gap-249')
+
+            // The debounce now delivers 250..300, older than the snapshot
+            // window and never seen: render the backfill immediately, and the
+            // list (which already ends at snap-500) stays sequence-ordered.
+            for (let sequence = 250; sequence <= 300; sequence++) {
+                emitLiveSse('agent_job_progress', {
+                    status: 'running',
+                    message: `gap-${sequence}`,
+                    sequence,
+                    at: '2026-10-08T10:20:00.500Z',
+                })
+            }
+            await flushPromises()
+            expect(panelText(wrapper)).toContain('gap-250')
+            expect(panelText(wrapper)).toContain('gap-300')
+            expect(panelText(wrapper).indexOf('gap-250')).toBeLessThan(panelText(wrapper).indexOf('snap-450'))
+
+            // The next merge replays the buffered backfill in order.
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            second.resolve({ job: logJobA, events: windowed('agent_job_progress', 'snap') })
+            await flushPromises()
+            const text = panelText(wrapper)
+            expect(text).toContain('gap-250')
+            expect(text).toContain('gap-300')
+            expect(text.indexOf('gap-250')).toBeLessThan(text.indexOf('snap-450'))
+            expect(occurrences(text, 'snap-450')).toBe(1)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('does not stack pending log requests for repeated toggles and refetches on a later open', async () => {
+        listJobs(logJobA)
+        const first = deferred<AgentJobLogsResponse>()
+        const second = deferred<AgentJobLogsResponse>()
+        ;(api.getAgentJobLogs as any).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            emitLiveSse('agent_job_started', { status: 'running', sequence: 1, at: '2026-10-08T10:20:01.100Z' })
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            expect(api.getAgentJobLogs).toHaveBeenCalledTimes(1)
+
+            // Close and reopen while the first request is still pending: the
+            // in-flight snapshot must satisfy the reopen, not a second request.
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            expect(api.getAgentJobLogs).toHaveBeenCalledTimes(1)
+
+            first.resolve({
+                job: logJobA,
+                events: [logEntry('agent_job_started', 1, '2026-10-08T10:20:01.100Z')],
+            })
+            await flushPromises()
+            expect(panelText(wrapper)).toContain('Job started')
+
+            // A later open fetches a fresh snapshot again.
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            expect(api.getAgentJobLogs).toHaveBeenCalledTimes(2)
+            second.resolve({
+                job: logJobA,
+                events: [
+                    logEntry('agent_job_started', 1, '2026-10-08T10:20:01.100Z'),
+                    logEntry('agent_job_progress', 9, '2026-10-08T10:20:05.000Z', 'later chunk'),
+                ],
+            })
+            await flushPromises()
+            expect(panelText(wrapper)).toContain('later chunk')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('fetches log snapshots per job independently', async () => {
+        listJobs(logJobA, logJobB)
+        const alpha = deferred<AgentJobLogsResponse>()
+        const beta = deferred<AgentJobLogsResponse>()
+        ;(api.getAgentJobLogs as any).mockImplementation((id: string) =>
+            id === 'job-logs-a' ? alpha.promise : beta.promise)
+        const wrapper = await mountAgentJobs()
+        try {
+            emitSse('agent_job_started', {
+                id: 'job-logs-a',
+                ticket_id: 'DEV-1',
+                status: 'running',
+                sequence: 1,
+                at: '2026-10-08T10:20:01.100Z',
+            })
+            emitSse('agent_job_started', {
+                id: 'job-logs-b',
+                ticket_id: 'DEV-1',
+                status: 'running',
+                sequence: 1,
+                at: '2026-10-08T10:20:02.100Z',
+            })
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            await clickLogsToggle(wrapper, 'logs-beta')
+            expect(api.getAgentJobLogs).toHaveBeenCalledWith('job-logs-a')
+            expect(api.getAgentJobLogs).toHaveBeenCalledWith('job-logs-b')
+            expect(api.getAgentJobLogs).toHaveBeenCalledTimes(2)
+
+            // Beta's snapshot resolves first; alpha stays pending without
+            // blocking its sibling.
+            beta.resolve({
+                job: logJobB,
+                events: [logEntry('agent_job_progress', 4, '2026-10-08T10:20:03.000Z', 'beta history')],
+            })
+            await flushPromises()
+            expect(panelText(wrapper, 'logs-beta')).toContain('beta history')
+            expect(panelText(wrapper, 'logs-alpha')).toContain('Loading logs')
+
+            alpha.resolve({
+                job: logJobA,
+                events: [logEntry('agent_job_progress', 7, '2026-10-08T10:20:04.000Z', 'alpha history')],
+            })
+            await flushPromises()
+            expect(panelText(wrapper, 'logs-alpha')).toContain('alpha history')
+            expect(panelText(wrapper, 'logs-beta')).toContain('beta history')
+        } finally {
+            wrapper.unmount()
+        }
     })
 })

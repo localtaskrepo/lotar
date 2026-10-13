@@ -454,63 +454,58 @@
       </div>
     </Transition>
   </Teleport>
-  <Teleport to="body">
-    <div
-      v-if="sprintDialogOpen"
-      class="task-panel-dialog__overlay"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="sprintDialogTitle"
-      @click.self="closeSprintDialog"
-    >
-      <UiCard class="task-panel-dialog__card">
-        <form class="task-panel-dialog__form" @submit.prevent="submitSprintDialog">
-          <header class="task-panel-dialog__header">
-            <h2>{{ sprintDialogTitle }}</h2>
-            <UiButton
-              variant="ghost"
-              icon-only
-              type="button"
-              :disabled="sprintDialogSubmitting"
-              aria-label="Close dialog"
-              title="Close dialog"
-              @click="closeSprintDialog"
-            >
-              <IconGlyph name="close" />
-            </UiButton>
-          </header>
-          <label class="task-panel-dialog__field">
-            <span class="muted">Sprint</span>
-            <select
-              class="input"
-              v-model="sprintDialogSelection"
-              :disabled="sprintDialogMode === 'add' && !sprintOptions.length"
-            >
-              <option v-for="option in sprintOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
-          <p v-if="sprintDialogMode === 'add' && !sprintOptions.length" class="muted">No sprints available yet.</p>
-          <label v-if="sprintDialogMode === 'add'" class="task-panel-dialog__checkbox">
-            <input type="checkbox" v-model="sprintDialogAllowClosed" /> Allow assigning to closed sprints
-          </label>
-          <footer class="task-panel-dialog__footer">
-            <UiButton
-              variant="primary"
-              type="submit"
-              :disabled="sprintDialogSubmitting || (sprintDialogMode === 'add' && !sprintOptions.length)"
-            >
-              {{ sprintDialogSubmitting ? (sprintDialogMode === 'add' ? 'Assigning…' : 'Removing…') : sprintDialogTitle }}
-            </UiButton>
-            <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">
-              Cancel
-            </UiButton>
-          </footer>
-        </form>
-      </UiCard>
-    </div>
-  </Teleport>
+  <UiModal
+    :open="sprintDialogOpen"
+    :dismissible="!sprintDialogSubmitting"
+    :aria-label="sprintDialogTitle"
+    size="md"
+    @close="closeSprintDialog()"
+  >
+    <form class="task-panel-dialog__form task-panel-dialog__form--sprint" @submit.prevent="submitSprintDialog">
+      <header class="task-panel-dialog__header">
+        <h2>{{ sprintDialogTitle }}</h2>
+        <UiButton
+          variant="ghost"
+          icon-only
+          type="button"
+          :disabled="sprintDialogSubmitting"
+          aria-label="Close dialog"
+          title="Close dialog"
+          @click="closeSprintDialog"
+        >
+          <IconGlyph name="close" />
+        </UiButton>
+      </header>
+      <label class="task-panel-dialog__field">
+        <span class="muted">Sprint</span>
+        <select
+          class="input"
+          v-model="sprintDialogSelection"
+          :disabled="sprintDialogMode === 'add' && !dialogSprintOptions.length"
+        >
+          <option v-for="option in dialogSprintOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+      <p v-if="sprintDialogMode === 'add' && !dialogSprintOptions.length" class="muted">No sprints available yet.</p>
+      <label v-if="sprintDialogMode === 'add'" class="task-panel-dialog__checkbox">
+        <input type="checkbox" v-model="sprintDialogAllowClosed" /> Allow assigning to closed sprints
+      </label>
+      <footer class="task-panel-dialog__footer">
+        <UiButton
+          variant="primary"
+          type="submit"
+          :disabled="sprintDialogSubmitting || (sprintDialogMode === 'add' && !dialogSprintOptions.length)"
+        >
+          {{ sprintDialogSubmitting ? (sprintDialogMode === 'add' ? 'Assigning…' : 'Removing…') : sprintDialogTitle }}
+        </UiButton>
+        <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">
+          Cancel
+        </UiButton>
+      </footer>
+    </form>
+  </UiModal>
   <Teleport to="body">
     <div
       v-if="syncDialogOpen"
@@ -647,6 +642,7 @@ import MarkdownContent from './MarkdownContent.vue'
 import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
 import UiLoader from './UiLoader.vue'
+import UiModal from './UiModal.vue'
 import TaskPanelCommentsTab from './task-panel/TaskPanelCommentsTab.vue'
 import TaskPanelCommitsTab from './task-panel/TaskPanelCommitsTab.vue'
 import TaskPanelCustomFieldsSection from './task-panel/TaskPanelCustomFieldsSection.vue'
@@ -664,6 +660,8 @@ const props = defineProps<{
   initialProject?: string | null
   initialStatus?: string | null
   initialDueDate?: string | null
+  /** DEV-104: concrete sprint id prefilled into a create-mode draft. */
+  initialSprint?: number | null
   focusSection?: string | null
   /** DEV-92: bumped by TaskPanelHost on external lifecycle transitions. */
   lifecycleReload?: number
@@ -716,6 +714,7 @@ const {
   hasAssignedSprints,
   assignedSprintNotice,
   sprintOptions,
+  sprintLookup,
   hasSprints,
   relationDefs,
   relationships,
@@ -886,6 +885,17 @@ const sprintDialogSelection = ref('active')
 const sprintDialogAllowClosed = ref(false)
 const removingSprintId = ref<number | null>(null)
 const sprintChipLabels = computed(() => assignedSprints.value.map((entry) => entry.label))
+
+// DEV-104: create-mode drafts can only carry concrete sprint ids — the
+// active/next/previous server selectors resolve against a persisted task,
+// which does not exist before the atomic create request.
+const dialogSprintOptions = computed(() => {
+  if (mode.value !== 'create') return sprintOptions.value
+  return sprintOptions.value.filter((option) => {
+    const id = Number(option.value)
+    return Number.isInteger(id) && id > 0
+  })
+})
 
 const syncConfigInspect = ref<ConfigInspectResult | null>(null)
 const syncConfigProject = ref<string | null>(null)
@@ -1653,7 +1663,7 @@ function handleIntegrityFeedback(integrity?: SprintIntegrityDiagnostics | null) 
 }
 
 watch(
-  sprintOptions,
+  dialogSprintOptions,
   (options) => {
     if (!options.length) {
       sprintDialogSelection.value = 'active'
@@ -1712,7 +1722,7 @@ function openSprintDialog(mode: 'add' | 'remove') {
     return
   }
   sprintDialogMode.value = mode
-  sprintDialogSelection.value = sprintOptions.value[0]?.value ?? 'active'
+  sprintDialogSelection.value = dialogSprintOptions.value[0]?.value ?? 'active'
   sprintDialogAllowClosed.value = false
   sprintDialogOpen.value = true
 }
@@ -1750,6 +1760,13 @@ function parseSprintToken(token: string): number | string | undefined {
 
 async function submitSprintDialog() {
   if (sprintDialogSubmitting.value) return
+  // DEV-104: in create mode the membership lives on the draft only — no
+  // sprint API calls before the task exists. The atomic create payload
+  // carries the final ids and the server rejects missing ones.
+  if (mode.value === 'create') {
+    submitSprintDialogDraft()
+    return
+  }
   const taskId = form.id || props.taskId
   if (!taskId || taskId === 'new') {
     showToast('Save the task before managing sprints')
@@ -1808,6 +1825,31 @@ async function submitSprintDialog() {
   } finally {
     sprintDialogSubmitting.value = false
   }
+}
+
+/** DEV-104: local draft mutation for create mode; never sends a request. */
+function submitSprintDialogDraft() {
+  const sprintRef = parseSprintToken(sprintDialogSelection.value)
+  if (sprintDialogMode.value === 'add') {
+    if (typeof sprintRef !== 'number' || !Number.isInteger(sprintRef) || sprintRef <= 0) {
+      showToast('Select a sprint')
+      return
+    }
+    const state = (sprintLookup.value[sprintRef]?.state || '').toLowerCase()
+    if (state === 'complete' && !sprintDialogAllowClosed.value) {
+      showToast('Enable "Allow assigning to closed sprints" to add this sprint.')
+      return
+    }
+    if (form.sprints.includes(sprintRef)) {
+      showToast('Sprint already selected')
+      closeSprintDialog(true)
+      return
+    }
+    form.sprints = [...form.sprints, sprintRef]
+  } else if (typeof sprintRef === 'number') {
+    form.sprints = form.sprints.filter((id) => id !== sprintRef)
+  }
+  closeSprintDialog(true)
 }
 
 function formatRemote(remote: SyncRemoteConfig): string {
@@ -1881,6 +1923,11 @@ async function submitSyncDialog() {
 async function removeSprintChip(sprintId: number) {
   if (removingSprintId.value !== null) return
   if (rejectDeletedMutation('managing sprints')) return
+  // DEV-104: draft memberships are local in create mode — no request.
+  if (mode.value === 'create') {
+    form.sprints = form.sprints.filter((id) => id !== sprintId)
+    return
+  }
   const taskId = form.id || props.taskId
   if (!taskId || taskId === 'new') {
     showToast('Save the task before managing sprints')
@@ -2430,6 +2477,28 @@ details.task-panel__group:not([open]) {
   flex-wrap: wrap;
 }
 
+.task-panel-dialog__form--sprint .task-panel-dialog__header {
+  min-width: 0;
+}
+
+.task-panel-dialog__form--sprint .task-panel-dialog__header h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.task-panel-dialog__form--sprint .task-panel-dialog__field .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.task-panel-dialog__form--sprint .task-panel-dialog__checkbox {
+  flex-wrap: wrap;
+}
+
+.task-panel-dialog__form--sprint .task-panel-dialog__footer {
+  flex-wrap: wrap;
+}
+
 .task-panel__tabs {
   display: flex;
   gap: var(--space-2, 0.5rem);
@@ -2675,6 +2744,8 @@ textarea {
 .task-panel__attachment-remove.btn.icon-only {
   width: 1.6rem;
   height: 1.6rem;
+  min-width: 0;
+  min-height: 0;
 }
 
 .task-panel__attachment-remove.btn.icon-only .icon-glyph {
