@@ -98,16 +98,40 @@ pub fn refresh_code_reference(
         .rsplit_once('#')
         .map(|(file, _)| file)
         .unwrap_or(code_ref);
+    let mut occupied: std::collections::HashSet<String> = references
+        .iter()
+        .filter_map(|reference| reference.code.clone())
+        .collect();
+    let mut replacements = std::collections::HashMap::new();
     let mut changed = false;
     for reference in references.iter_mut() {
         if let Some(code) = reference.code.as_ref()
-            && code
-                .rsplit_once('#')
-                .is_some_and(|(path, anchor)| path == file && anchor.parse::<usize>().is_ok())
+            && let Some((path, anchor)) = code.rsplit_once('#')
+            && path == file
+            && let Ok(old_line) = anchor.parse::<usize>()
             && code != code_ref
             && !live_refs.contains(code)
         {
-            reference.code = Some(code_ref.to_string());
+            // Do not collapse a moved mention into an already-live anchor.
+            // Mixed entries sharing one old anchor must relocate together.
+            let replacement = replacements
+                .entry(code.clone())
+                .or_insert_with(|| {
+                    live_refs
+                        .iter()
+                        .filter_map(|candidate| {
+                            let (path, anchor) = candidate.rsplit_once('#')?;
+                            let line = anchor.parse::<usize>().ok()?;
+                            (path == file && !occupied.contains(candidate))
+                                .then_some((candidate, line))
+                        })
+                        .min_by_key(|(_, line)| line.abs_diff(old_line))
+                        .map(|(candidate, _)| candidate.clone())
+                        .unwrap_or_else(|| code_ref.to_string())
+                })
+                .clone();
+            occupied.insert(replacement.clone());
+            reference.code = Some(replacement);
             changed = true;
         }
     }
@@ -365,6 +389,49 @@ pub fn parse_inline_attributes(line: &str) -> InlineAttrs {
 #[cfg(test)]
 mod scan_utils_tests {
     use super::{parse_inline_attributes, strip_bracket_attributes};
+
+    #[test]
+    fn refresh_relocates_stale_anchors_to_unoccupied_live_mentions_and_keeps_metadata() {
+        use crate::types::ReferenceEntry;
+        let mut references = vec![
+            ReferenceEntry {
+                code: Some("main.rs#1".into()),
+                ..Default::default()
+            },
+            ReferenceEntry {
+                code: Some("main.rs#2".into()),
+                link: Some("https://example.invalid/a".into()),
+                ..Default::default()
+            },
+            ReferenceEntry {
+                code: Some("main.rs#2".into()),
+                github: Some("example/repo#1".into()),
+                ..Default::default()
+            },
+        ];
+        let live = vec!["main.rs#1".into(), "main.rs#4".into()];
+        assert!(super::refresh_code_reference(
+            &mut references,
+            "main.rs#1",
+            &live
+        ));
+        assert_eq!(references.len(), 3);
+        assert_eq!(references[0].code.as_deref(), Some("main.rs#1"));
+        assert_eq!(references[1].code.as_deref(), Some("main.rs#4"));
+        assert_eq!(
+            references[1].link.as_deref(),
+            Some("https://example.invalid/a")
+        );
+        assert_eq!(references[2].code.as_deref(), Some("main.rs#4"));
+        assert_eq!(references[2].github.as_deref(), Some("example/repo#1"));
+        let before = references.clone();
+        assert!(!super::refresh_code_reference(
+            &mut references,
+            "main.rs#4",
+            &live
+        ));
+        assert_eq!(references, before);
+    }
 
     #[cfg(unix)]
     #[test]

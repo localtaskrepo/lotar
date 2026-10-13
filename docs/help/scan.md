@@ -72,6 +72,7 @@ tests/integration.rs:56
 - Mixed time/point effort values are rejected. Supported units include minutes/hours/days/weeks (`1h 30m`, `90m`) or points (`3pt`).
 - `--strip-attributes[=<bool>]` overrides `scan.strip_attributes` to decide whether parsed `[key=value]` blocks stay in the matched comment after LoTaR injects the new ID. Brackets in surrounding source syntax are not metadata and are preserved.
 - Each task receives a bidirectional reference entry: `code` anchors look like `path/to/file.rs#118`. Existing anchors are refreshed whenever scan spots a known ID, even if no new TODOs are added.
+- With `scan.enable_mentions` on (the default), bare known-ID mentions in comments — lines carrying an existing ticket key without any signal word — are tracked through the same anchor refresh. Mentions never create tasks: unknown or external ticket keys are skipped, mention tracking never rewrites source text, and keys inside quoted strings or executable code do not count because discovery shares the same quote-aware comment recognizer.
 - Anchor refresh replaces stale locations only within the intended file, retaining repeated live hits, other-file references, links, and metadata on mixed reference entries. Without `--reanchor`, LoTaR still repairs drifted anchors during non-dry-run scans.
 - Source edits are validated before creating a task and written by atomic replacement, preserving file permissions. Read-only files and symlinks are rejected. If a source write or reverse-reference update fails, scan reports failure and attempts to remove the newly created task; rollback failures are included in the error. Completed earlier entries are not rolled back, and task-creation side effects such as configuration or automation are not transactional.
 - Replacements are fully prepared before a final source-content check and rename. Cooperating scans serialize that check and rename: Unix uses source/replacement inode locks and reopens stale inodes after a concurrent rename; other platforms use persistent per-path locks in the user cache. Source locks are separate from task-storage locks, and scan removes only its own staging file. A non-locking editor can still write in the small interval between the final comparison and rename; this is not an atomic compare-and-swap against arbitrary editors.
@@ -94,7 +95,7 @@ Tweak the vocabulary via:
 - `LOTAR_SCAN_SIGNAL_WORDS="TODO,FIXME,DEBT"`
 - `scan.signal_words` in `.tasks/config.yml`, `.tasks/<PROJECT>/config.yml`, or `~/.lotar`
 - `scan.ticket_patterns` to add regex capture groups for custom ticket IDs. The built-in detector recognizes uppercase keys matching the canonical ID grammar, including full hyphenated prefixes (`ABC-OPS-12`, never just the `OPS-12` slice); configure custom patterns for lower-case, Unicode, or digit-leading key styles.
-- `scan.enable_ticket_words` / `scan.enable_mentions` to control whether bare ticket keys add anchors without creating new tasks
+- `scan.enable_ticket_words` / `scan.enable_mentions` to control triggers and bare-key mentions: ticket keys never create tasks, and with mentions enabled (default) bare known-ID comments only anchor existing tasks
 
 ## Configuration cheat sheet
 
@@ -103,7 +104,7 @@ Tweak the vocabulary via:
 | `scan.strip_attributes` | `.tasks/config.yml`, project config, or CLI flag | CLI > project > env > home > global > defaults (drop the project layer when the command is global). |
 | `LOTAR_SCAN_SIGNAL_WORDS` | Environment | Comma-separated list; beats any config file. |
 | `scan.signal_words` | Home/global/project | Extend/replace the trigger words per scope. |
-| `scan.enable_mentions` | Config | When true (default) bare IDs add anchors without creating tasks. |
+| `scan.enable_mentions` | Config | When true (default) bare IDs in comments add anchors to existing tasks without creating tasks; unknown or external IDs are skipped. |
 | `scan.enable_ticket_words` | Config | Treat words like `Feature:` as valid triggers. |
 
 Example snippets:

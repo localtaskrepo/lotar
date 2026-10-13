@@ -80,11 +80,10 @@ Configuration precedence follows the same idea: CLI flag → environment → hom
 ## Output Styles
 
 - **Text**: colorful summaries for terminals.
-- **Table**: clean columns when you need to scan IDs quickly.
 - **JSON**: structured payloads for scripts and dashboards.
-- **Markdown**: copy/paste directly into docs or pull requests.
+- **Table/Markdown aliases**: `table`, `markdown`, and `md` currently produce the same text output, not separate table or Markdown renderings.
 
-Switch formats with `--format` and keep piping them into other tools (e.g., `lotar list --format markdown | tee TASKS.md`).
+Switch formats with `--format text|json`. For machine-readable output, use `lotar --format json list`; see [list](./list.md) for filtering, pagination, and alias limitations.
 
 ## Launch Points
 
@@ -92,4 +91,3 @@ Switch formats with `--format` and keep piping them into other tools (e.g., `lot
 - `lotar serve --open` – browser UI + REST API + SSE stream
 - `lotar mcp` – IDE or AI agent integrations (JSON-RPC)
 - `lotar scan <paths>` – turn TODO/FIXME comments into tasks
-

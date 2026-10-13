@@ -162,12 +162,14 @@ impl CommandHandler for ScanHandler {
         };
 
         let mut all_results = Vec::new();
+        let mut all_mentions = Vec::new();
         for root in roots {
             renderer.log_debug(format_args!("scan: scanning path={}", root.display()));
             let mut scanner = scanner::Scanner::new(root)
                 .with_include_ext(&args.include)
                 .with_exclude_ext(&args.exclude)
-                .with_modified_only(args.modified_only);
+                .with_modified_only(args.modified_only)
+                .with_mention_tracking(cfg_enable_mentions);
             // Merge regular signal words with issue-type words if enabled
             let mut final_words = cfg_words.clone();
             for w in &issue_type_words {
@@ -180,12 +182,18 @@ impl CommandHandler for ScanHandler {
             }
             scanner = scanner
                 .with_ticket_detection(cfg_ticket_patterns.as_deref(), cfg_enable_ticket_words);
-            let mut results = scanner.scan();
+            let (mut results, mut mentions) = scanner.scan_with_mentions();
             all_results.append(&mut results);
+            all_mentions.append(&mut mentions);
         }
 
         // Ensure deterministic ordering across roots
         all_results.sort_by(|a, b| {
+            a.file_path
+                .cmp(&b.file_path)
+                .then(a.line_number.cmp(&b.line_number))
+        });
+        all_mentions.sort_by(|a, b| {
             a.file_path
                 .cmp(&b.file_path)
                 .then(a.line_number.cmp(&b.line_number))
@@ -435,24 +443,10 @@ impl CommandHandler for ScanHandler {
                                 let rel =
                                     crate::utils::paths::repo_relative_display(&entry.file_path);
                                 let line_number = entry.line_number;
-                                let live_refs: Vec<String> = all_lines
+                                let live_refs: Vec<String> = tmp_scanner
+                                    .key_mention_lines(&entry.file_path, &contents, &task_id)
                                     .iter()
-                                    .enumerate()
-                                    .filter(|(index, line)| {
-                                        tmp_scanner
-                                            .matched_source_comment_range(
-                                                &entry.file_path,
-                                                &contents,
-                                                index + 1,
-                                            )
-                                            .and_then(|range| {
-                                                tmp_scanner
-                                                    .extract_ticket_key_from_line(&line[range])
-                                            })
-                                            .as_deref()
-                                            == Some(task_id.as_str())
-                                    })
-                                    .map(|(index, _)| format!("{}#{}", rel, index + 1))
+                                    .map(|line| format!("{}#{}", rel, line))
                                     .collect();
                                 edit_task_with_context(_resolver, &task_id, None, |task| {
                                     let code_ref = format!("{}#{}", rel, line_number);
@@ -475,6 +469,19 @@ impl CommandHandler for ScanHandler {
             if !args.dry_run && applied > 0 && !json {
                 renderer.emit_success(format_args!("Applied {} update(s).", applied));
             }
+        }
+
+        // Safe known-ticket mention path: bare known-ID comment mentions never
+        // create tasks and never edit source; they only anchor existing tasks.
+        // Runs after the create loop so tasks created in this run are anchored too.
+        if !args.dry_run && cfg_enable_mentions && !all_mentions.is_empty() {
+            Self::refresh_bare_mentions(
+                _resolver,
+                renderer,
+                cfg_ticket_patterns.as_deref(),
+                cfg_enable_ticket_words,
+                &all_mentions,
+            )?;
         }
 
         if json {
@@ -530,6 +537,60 @@ fn replace_line(contents: &str, line_number_1based: usize, new_line: &str) -> Op
 // custom_fields-based source_refs helper removed; we now use Task.references with code anchors
 
 impl ScanHandler {
+    /// Anchor bare known-ticket mentions: comment lines carrying an existing
+    /// ticket key without a signal word. Never creates tasks (unknown or
+    /// external keys are skipped) and never edits source text.
+    fn refresh_bare_mentions(
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+        ticket_patterns: Option<&[String]>,
+        enable_ticket_words: bool,
+        mentions: &[scanner::Reference],
+    ) -> Result<(), String> {
+        let line_scanner = scanner::Scanner::new(PathBuf::from("."))
+            .with_ticket_detection(ticket_patterns, enable_ticket_words);
+        let mut anchored = 0usize;
+        for entry in mentions {
+            let task_id = entry.uuid.as_str();
+            if task_id.is_empty() {
+                continue;
+            }
+            // Unknown or external ticket mentions do not imply a local task exists.
+            let prefix = match crate::storage::TaskId::parse(task_id) {
+                Ok(parsed) => parsed.project,
+                Err(_) => continue,
+            };
+            if crate::storage::manager::Storage::try_open(&resolver.path)
+                .and_then(|storage| storage.get(task_id, &prefix))
+                .is_none()
+            {
+                continue;
+            }
+            let Ok(contents) = std::fs::read_to_string(&entry.file_path) else {
+                continue;
+            };
+            let live_lines = line_scanner.key_mention_lines(&entry.file_path, &contents, task_id);
+            if !live_lines.contains(&entry.line_number) {
+                // Source changed since discovery; only live mentions are anchored.
+                continue;
+            }
+            let rel = crate::utils::paths::repo_relative_display(&entry.file_path);
+            let code_ref = format!("{}#{}", rel, entry.line_number);
+            let live_refs: Vec<String> = live_lines
+                .iter()
+                .map(|line| format!("{}#{}", rel, line))
+                .collect();
+            edit_task_with_context(resolver, task_id, None, |task| {
+                refresh_code_reference(&mut task.references, &code_ref, &live_refs)
+            })?;
+            anchored += 1;
+        }
+        if anchored > 0 {
+            renderer.emit_info(format_args!("Anchored {} bare mention(s).", anchored));
+        }
+        Ok(())
+    }
+
     /// Re-anchor existing task references by searching for their key occurrences
     /// near the previous anchor line, with a fallback to a full-file search.
     /// If `window_hint` is None, a default small window will be used.
@@ -552,6 +613,10 @@ impl ScanHandler {
         }
 
         let mut updates = 0usize;
+        let line_scanner = scanner::Scanner::new(PathBuf::from(".")).with_ticket_detection(
+            ctx.config.scan_ticket_patterns.as_deref(),
+            ctx.config.scan_enable_ticket_words,
+        );
         // Compute repo root once for this pass
         let repo_root = std::env::current_dir()
             .ok()
@@ -619,12 +684,11 @@ impl ScanHandler {
                 let Ok(content) = std::fs::read_to_string(&abs_path) else {
                     continue;
                 };
-                let lines: Vec<&str> = content.lines().collect();
+                let candidates = line_scanner.key_mention_lines(&abs_path, &content, &key);
 
                 // If the original line still contains the key marker, nothing to do
                 if let Some(orig_line) = orig_line_opt
-                    && let Some(existing) = lines.get(orig_line.saturating_sub(1))
-                    && Self::line_contains_key(existing, &key)
+                    && candidates.contains(&orig_line)
                 {
                     // Ensure canonical formatting of code ref
                     let rel = crate::utils::paths::repo_relative_display(&abs_path);
@@ -636,42 +700,21 @@ impl ScanHandler {
                     continue;
                 }
 
-                // Proximity search window around original line (if known)
-                let mut best_line: Option<usize> = None;
-                if let Some(orig_line) = orig_line_opt {
-                    let start = orig_line.saturating_sub(window);
-                    let end = (orig_line + window).min(lines.len());
-                    for ln in start..=end {
-                        if ln == 0 || ln > lines.len() {
-                            continue;
-                        }
-                        let text = lines[ln - 1];
-                        if Self::line_contains_key(text, &key) {
-                            best_line = Some(ln);
-                            break;
-                        }
-                    }
-                }
-
-                // Fallback: full-file search for the exact key token markers
-                if best_line.is_none() {
-                    // Try to find all candidate lines and pick the closest to original, else the first
-                    let mut candidates: Vec<usize> = Vec::new();
-                    for (idx, text) in lines.iter().enumerate() {
-                        if Self::line_contains_key(text, &key) {
-                            candidates.push(idx + 1);
-                        }
-                    }
-                    if !candidates.is_empty() {
-                        if let Some(orig_line) = orig_line_opt {
-                            // Choose nearest to original
-                            candidates.sort_by_key(|&ln| ln.abs_diff(orig_line));
-                            best_line = candidates.first().copied();
-                        } else {
-                            best_line = candidates.first().copied();
-                        }
-                    }
-                }
+                let best_line = if let Some(orig_line) = orig_line_opt {
+                    candidates
+                        .iter()
+                        .copied()
+                        .filter(|line| line.abs_diff(orig_line) <= window)
+                        .min_by_key(|line| line.abs_diff(orig_line))
+                        .or_else(|| {
+                            candidates
+                                .iter()
+                                .copied()
+                                .min_by_key(|line| line.abs_diff(orig_line))
+                        })
+                } else {
+                    candidates.first().copied()
+                };
 
                 if let Some(new_line) = best_line {
                     let rel = crate::utils::paths::repo_relative_display(&abs_path);
@@ -718,21 +761,6 @@ impl ScanHandler {
         } else {
             (code.to_string(), None)
         }
-    }
-
-    fn line_contains_key(line: &str, key: &str) -> bool {
-        if line.contains(&format!("({})", key)) {
-            return true;
-        }
-        // Accept [ticket=KEY] with optional spaces and case-insensitive ticket
-        let pattern = format!(r"(?i)\[\s*ticket\s*=\s*{}\s*\]", regex::escape(key));
-        if regex::Regex::new(&pattern)
-            .map(|re| re.is_match(line))
-            .unwrap_or(false)
-        {
-            return true;
-        }
-        false
     }
 
     fn git_rename_map(repo_root: &std::path::Path) -> std::collections::HashMap<String, String> {

@@ -80,7 +80,7 @@ docker run --rm \
 
 ```bash
 lotar add "Setup project" --project=myapp --priority=HIGH
-lotar list --project=myapp --format=table
+lotar list --project=myapp --format=text
 lotar status 1 in_progress
 lotar serve --open  # launches the web UI locally
 lotar scan ./src    # optional: capture TODOs
@@ -159,7 +159,7 @@ cutting a new version or when exercising the Scoop/Homebrew verification workflo
 # Task Management
 lotar add "Title" --type=feature --priority=HIGH
 lotar list --project=backend --status=IN_PROGRESS
-lotar list --search="keyword" --priority=HIGH
+lotar list "keyword" --priority=HIGH
 lotar status PROJ-001 DONE
 lotar assignee PROJ-001 user@example.com
 

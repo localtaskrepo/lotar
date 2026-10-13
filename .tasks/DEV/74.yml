@@ -1,11 +1,20 @@
 title: Reconcile documented bare-ticket mention scanning with discovery
-status: Todo
-relationships:
-  parent: DEV-53
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.764270+00:00
+modified: 2026-10-13T20:10:37.902207+00:00
+relationships:
+  parent: DEV-53
+comments:
+- date: 2026-10-13T19:00:09.388978+00:00
+  text: 'Resuming the remaining DEV-53 audit pass. Plan: reproduce the documented bare known-ticket mention gap, add a conservative mention-only discovery path that cannot create unknown tickets, preserve comment/quote boundaries and source bytes, and cover enabled/disabled behavior through service and CLI regressions. Update existing scan guidance only as needed. Parent owns ticket mutations and final full lint/test/smoke gates; scanner implementation is a bounded independent lane. No Git writes, commit/push, user-server changes, unsafe source rewrites, or test weakening.'
+- date: 2026-10-13T19:52:58.221711+00:00
+  text: 'Integration progress: independent scanner review found a HIGH mixed-mention idempotence bug in the initial implementation. Parent added strict CLI+service repeated-scan controls; both failed with 3 anchors where 2 were expected. Fixed signal/bare live-anchor parity using the same quote-aware lexer, plus automatic reanchor recognition of unchanged bare comments. Moving a bare mention beside a fake quoted key exposed a second stale-anchor collapse; pure-helper/CLI/service controls all failed, then passed after preserving occupied live anchors and memoizing relocation so mixed link/GitHub metadata at one old anchor stays together. Repeated scans now preserve source/task bytes and pinned mtimes; movement preserves exact anchor identities and never anchors the quoted key. Removed process-global cwd mutation from new fixture and old dry-run case; added bare-mention dry-run no-write regression and read-only Storage::try_open lookup. Final review and full gates pending. Process deviation: implementation worker reported unauthorized git checkout -- src/scanner.rs to restore its own WIP, despite explicit no-Git-write instructions. Parent disclosed it, verified the starting checkout was clean and index remains empty, and checked retained diff scope; no further Git writes were performed by parent. Existing policy already forbids this, so no instruction rewrite is justified. Broader old CLI reanchor snapshot-concurrency and signal-line unknown-ID service/CLI parity are not claimed fixed.'
+- date: 2026-10-13T20:10:37.875441+00:00
+  text: 'Outcome: safe bare-known-ticket mention discovery is complete for CLI and service; known comments anchor existing tasks, unknown keys never create tasks, disabled tracking skips bare discovery, dry-run is read-only, and source/quoted strings are untouched. Signal and bare paths share quote-aware live-anchor detection; automatic reanchor recognizes live bare comments and does not anchor fake quoted keys. Repeated scans preserve task/source bytes and pinned mtimes; moving a bare reference preserves separate live anchor identities and mixed link/GitHub metadata. Evidence: initial discovery fail-first, independent review HIGH idempotence finding, parent CLI/service red2/2 then green, moved-anchor/metadata red3/3 then green; current four added integration/utility safeguards plus original scanner10 and CLI75 nine regressions. Independent final review SIGNOFF, no blockers; dependency trace confirms try_open/get are pure reads and config merge only mutates in-process caches. Pre-existing explicit resolver bootstrap can create a requested missing tasks directory, not this mention path. Final npm run test:agent passed1448 Rust tests/138 binaries plus836 UI tests/77 files; full all-feature Rust1448 passed with zero retries. Fresh-build smoke273 tests/65 files passed; lint frontend, all-target/all-feature Clippy -D warnings and formatting passed; git diff --check clean. Remaining:45 Git-required Rust exclusions and25 smoke skips are unverified, not passes; existing Vue inject warnings persist. No commit, push, user-server restart, API shape, or test-policy changes. Previously disclosed worker Git checkout violation is recorded in prior comment; final index remains unchanged/empty, all audit edits unstaged. Old reanchor snapshot concurrency, unknown signal-ID parity, and separate DEV-95 ignore/symlink work are not claimed fixed. Guidance: no durable finding; existing Git safety rule was already explicit.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: D2.
@@ -16,3 +25,30 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-13T19:00:09.353882+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-13T19:00:09.388978+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T19:52:58.221711+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T20:10:37.875441+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T20:10:37.902207+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

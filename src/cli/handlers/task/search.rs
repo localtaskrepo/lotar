@@ -103,16 +103,47 @@ impl SearchHandler {
             task_filter.project = Some(project_prefix);
         }
 
-        let (custom_where, remaining_where, _) =
-            crate::utils::custom_fields::partition_where_filters(&args.r#where, &ctx.config);
-        for (name, values) in custom_where {
-            let entry = task_filter.custom_fields.entry(name).or_default();
-            entry.extend(values);
+        let mut where_filters = Vec::new();
+        for (key, value) in &args.r#where {
+            let key = key.trim();
+            if key.is_empty()
+                || value.trim().is_empty()
+                || key.ends_with(['!', '<', '>'])
+                || key.eq_ignore_ascii_case("field:")
+            {
+                return Err(format!(
+                    "Invalid --where '{key}={value}': only non-empty key=value equality predicates are supported"
+                ));
+            }
+
+            // Builtins take precedence over wildcard custom fields, while
+            // explicit field:<name> remains an unambiguous custom-field query.
+            if let Some(field) = crate::utils::fields::is_reserved_field(key) {
+                if !matches!(
+                    field,
+                    "assignee" | "reporter" | "status" | "priority" | "type" | "tags" | "project"
+                ) {
+                    return Err(format!("Unsupported --where field '{key}'"));
+                }
+                where_filters.push((field.to_string(), value.clone()));
+            } else if let Some(name) =
+                crate::utils::custom_fields::resolve_filter_name(key, &ctx.config)
+            {
+                task_filter
+                    .custom_fields
+                    .entry(crate::utils::custom_fields::canonicalize(&name))
+                    .or_default()
+                    .push(value.clone());
+            } else {
+                return Err(format!(
+                    "Unknown --where field '{key}': use a supported builtin, configured custom field, or field:<name>"
+                ));
+            }
         }
 
         Ok(BuiltTaskFilter {
             task_filter,
-            where_filters: remaining_where,
+            where_filters,
         })
     }
 

@@ -1,12 +1,17 @@
 title: Design explicit ownership-safe cleanup for abandoned atomic-write temporary files
 status: Todo
-relationships:
-  parent: DEV-53
-  related: [DEV-32]
 priority: Low
 type: Chore
 reporter: mallox
 created: 2026-09-06T11:10:31.930814+00:00
+modified: 2026-10-13T20:03:19.759441+00:00
+relationships:
+  related:
+  - DEV-32
+  parent: DEV-53
+comments:
+- date: 2026-10-13T20:03:19.759441+00:00
+  text: 'Read-only design inventory after DEV-74/75; remains Todo, no cleanup implementation or temp deletion performed. Next step: ownership-aware report-first design covering atomic temp siblings, per-workspace queue state/worker locks, agent logs, configured report/artifact roots and test scratch roots. Filename prefixes/PIDs are discovery hints, NOT sufficient ownership proof: require canonical approved workspace/root plus explicit marker/registration, verified process-start identity (PID reuse), per-kind liveness/lock checks, and immediate pre-delete file/directory identity verification; permission or platform uncertainty stays report-only. Reuse transaction-engine symlink/component refusal and worker try-lock patterns. Keep pending transaction/sync journals as recovery data, never garbage; inert lock files are intentional and must not be swept. Attachments and Git worktrees retain their existing typed-reference and ownership/clean/merged safety owners; home/config files are not cleanup candidates. Default dry-run with exact candidate/proof/refusal reasons; no age-only deletion and no arbitrary system-temp traversal. Production cross-platform liveness/TOCTOU guarantees need design review before a later destructive implementation. Acceptance cases must preserve live config/task/sprint/source writers, reject symlink escapes/lookalike user files/PID reuse/uncertain states, and identify only provably owned crash orphans. Serve maintenance guidance must agree with any approved design.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: DEV-32/DEV-53 follow-up.
@@ -17,3 +22,8 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-13T20:03:19.759441+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

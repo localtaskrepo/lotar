@@ -93,11 +93,13 @@ impl ScanService {
         }
 
         let mut all_results = Vec::new();
+        let mut all_mentions = Vec::new();
         for root in roots {
             let mut scan = scanner::Scanner::new(root)
                 .with_include_ext(&request.include)
                 .with_exclude_ext(&request.exclude)
-                .with_modified_only(request.modified_only);
+                .with_modified_only(request.modified_only)
+                .with_mention_tracking(scan_config.enable_mentions);
 
             if !final_words.is_empty() {
                 scan = scan.with_signal_words(&final_words);
@@ -107,10 +109,17 @@ impl ScanService {
                 scan_config.ticket_patterns.as_deref(),
                 scan_config.enable_ticket_words,
             );
-            all_results.extend(scan.scan());
+            let (results, mentions) = scan.scan_with_mentions();
+            all_results.extend(results);
+            all_mentions.extend(mentions);
         }
 
         all_results.sort_by(|a, b| {
+            a.file_path
+                .cmp(&b.file_path)
+                .then(a.line_number.cmp(&b.line_number))
+        });
+        all_mentions.sort_by(|a, b| {
             a.file_path
                 .cmp(&b.file_path)
                 .then(a.line_number.cmp(&b.line_number))
@@ -371,23 +380,10 @@ impl ScanService {
                     if let Some(task_id) = existing_key.as_deref() {
                         let code_ref = format!("{}#{}", rel_path, entry.line_number);
                         let contents = std::fs::read_to_string(&entry.file_path)?;
-                        let live_refs: Vec<String> = contents
-                            .lines()
-                            .enumerate()
-                            .filter(|(index, line)| {
-                                line_scanner
-                                    .matched_source_comment_range(
-                                        &entry.file_path,
-                                        &contents,
-                                        index + 1,
-                                    )
-                                    .and_then(|range| {
-                                        line_scanner.extract_ticket_key_from_line(&line[range])
-                                    })
-                                    .as_deref()
-                                    == Some(task_id)
-                            })
-                            .map(|(index, _)| format!("{}#{}", rel_path, index + 1))
+                        let live_refs: Vec<String> = line_scanner
+                            .key_mention_lines(&entry.file_path, &contents, task_id)
+                            .iter()
+                            .map(|line| format!("{}#{}", rel_path, line))
                             .collect();
                         let updated = storage
                             .as_mut()
@@ -433,6 +429,120 @@ impl ScanService {
                 original_line: Some(original_line.clone()),
                 updated_line,
                 message,
+            };
+            update_summary(&mut summary, status);
+            entries.push(scan_entry);
+        }
+
+        // Safe known-ticket mention path: bare known-ID comment mentions never
+        // create tasks and never edit source; they only anchor existing tasks.
+        // Runs after the entry loop so tasks created in this run are anchored too.
+        for mention in all_mentions {
+            let rel_path = repo_relative_display(&mention.file_path);
+            let key = target_key(&rel_path, mention.line_number);
+            if !target_keys.is_empty() && !target_keys.contains(&key) {
+                continue;
+            }
+            let task_id = mention.uuid.clone();
+            let original_line = std::fs::read_to_string(&mention.file_path)
+                .ok()
+                .and_then(|contents| {
+                    contents
+                        .lines()
+                        .nth(mention.line_number - 1)
+                        .map(|line| line.to_string())
+                })
+                .unwrap_or_default();
+            let scan_entry = ScanEntry {
+                status: String::new(),
+                action: ACTION_REFRESH.to_string(),
+                file: rel_path.clone(),
+                line: mention.line_number,
+                title: mention.title.clone(),
+                annotation: mention.annotation.clone(),
+                code_reference: format!("{}#{}", rel_path, mention.line_number),
+                existing_key: Some(task_id.clone()),
+                task_id: None,
+                original_line: Some(original_line),
+                updated_line: None,
+                message: None,
+            };
+
+            // Unknown or external ticket mentions do not imply a local task exists.
+            let task_exists = crate::storage::TaskId::parse(&task_id)
+                .ok()
+                .map(|parsed| parsed.project)
+                .is_some_and(|prefix| {
+                    Storage::try_open(&resolver.path)
+                        .and_then(|storage| storage.get(&task_id, &prefix))
+                        .is_some()
+                });
+            if !task_exists {
+                let scan_entry = ScanEntry {
+                    status: STATUS_SKIPPED.to_string(),
+                    action: ACTION_SKIP.to_string(),
+                    message: Some("External ticket mention: no local task".to_string()),
+                    ..scan_entry
+                };
+                update_summary(&mut summary, STATUS_SKIPPED);
+                entries.push(scan_entry);
+                continue;
+            }
+
+            if dry_run {
+                let scan_entry = ScanEntry {
+                    status: STATUS_UPDATED.to_string(),
+                    task_id: Some(task_id.clone()),
+                    message: Some("Dry run: would refresh reference".to_string()),
+                    ..scan_entry
+                };
+                update_summary(&mut summary, STATUS_UPDATED);
+                entries.push(scan_entry);
+                continue;
+            }
+
+            // Only live mentions are anchored; source may have changed since discovery.
+            let live = std::fs::read_to_string(&mention.file_path)
+                .map(|contents| {
+                    let live_lines =
+                        line_scanner.key_mention_lines(&mention.file_path, &contents, &task_id);
+                    if !live_lines.contains(&mention.line_number) {
+                        return Vec::new();
+                    }
+                    live_lines
+                        .iter()
+                        .map(|line| format!("{}#{}", rel_path, line))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if live.is_empty() {
+                let scan_entry = ScanEntry {
+                    status: STATUS_SKIPPED.to_string(),
+                    action: ACTION_SKIP.to_string(),
+                    message: Some("Mention is no longer live".to_string()),
+                    ..scan_entry
+                };
+                update_summary(&mut summary, STATUS_SKIPPED);
+                entries.push(scan_entry);
+                continue;
+            }
+
+            let code_ref = format!("{}#{}", rel_path, mention.line_number);
+            let updated = storage
+                .as_mut()
+                .ok_or_else(|| LoTaRError::ValidationError("Storage unavailable".to_string()))
+                .and_then(|storage| {
+                    update_task_code_reference(storage, &task_id, &code_ref, &live)
+                });
+            let (status, task_id, message) = match updated {
+                Ok(_) => (STATUS_UPDATED, Some(task_id.clone()), None),
+                Err(err) => (STATUS_FAILED, Some(task_id.clone()), Some(err.to_string())),
+            };
+            let scan_entry = ScanEntry {
+                status: status.to_string(),
+                task_id,
+                message,
+                ..scan_entry
             };
             update_summary(&mut summary, status);
             entries.push(scan_entry);
@@ -604,7 +714,9 @@ fn build_target_keys(targets: &[crate::api_types::ScanTarget]) -> HashSet<String
 mod scan_service_tests {
     use super::ScanService;
     use crate::api_types::{ScanRequest, ScanTarget};
+    use crate::storage::manager::Storage;
     use crate::workspace::TasksDirectoryResolver;
+    use std::path::PathBuf;
 
     #[test]
     fn source_changed_after_prepare_rolls_back_only_losing_task() {
@@ -673,6 +785,246 @@ mod scan_service_tests {
         }));
     }
 
+    struct BareMentionFixture {
+        temp: tempfile::TempDir,
+        resolver: TasksDirectoryResolver,
+        file_path: PathBuf,
+        original: String,
+    }
+
+    impl BareMentionFixture {
+        fn new(source_line: &str) -> Self {
+            let temp = tempfile::tempdir().expect("tempdir");
+            let tasks_dir = temp.path().join(".tasks");
+            std::fs::create_dir(&tasks_dir).expect("create tasks dir");
+            let src_dir = temp.path().join("src");
+            std::fs::create_dir_all(&src_dir).expect("create src dir");
+            let file_path = src_dir.join("lib.rs");
+            let original = format!("{source_line}\n");
+            std::fs::write(&file_path, &original).expect("write file");
+            let resolver = TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None)
+                .expect("resolve tasks dir");
+            Self {
+                temp,
+                resolver,
+                file_path,
+                original,
+            }
+        }
+
+        fn tasks_dir(&self) -> PathBuf {
+            self.temp.path().join(".tasks")
+        }
+
+        fn create_task(&self, project: &str) -> String {
+            let mut storage = Storage::new(&self.tasks_dir());
+            let task = crate::storage::task::Task::new(
+                self.tasks_dir(),
+                "existing task".into(),
+                crate::types::Priority::new("medium"),
+            );
+            storage.add(&task, project, None).expect("add task")
+        }
+
+        fn request(&self, dry_run: bool) -> ScanRequest {
+            ScanRequest {
+                paths: vec![self.temp.path().to_string_lossy().to_string()],
+                include: Vec::new(),
+                exclude: Vec::new(),
+                project: Some("SAFE".into()),
+                dry_run,
+                strip_attributes: None,
+                reanchor: false,
+                modified_only: false,
+                targets: Vec::<ScanTarget>::new(),
+            }
+        }
+    }
+
+    #[test]
+    fn scan_service_refreshes_reference_for_bare_known_mention() {
+        let fixture = BareMentionFixture::new("// SAFE-1 bare mention without signal word");
+        let task_id = fixture.create_task("SAFE");
+        assert_eq!(task_id, "SAFE-1");
+
+        let response = ScanService::run(&fixture.resolver, fixture.request(false)).unwrap();
+        assert_eq!(response.summary.created, 0);
+        assert_eq!(response.summary.updated, 1);
+        assert_eq!(response.entries.len(), 1);
+        let entry = &response.entries[0];
+        assert_eq!(entry.action, "refresh");
+        assert_eq!(entry.existing_key.as_deref(), Some("SAFE-1"));
+        assert_eq!(entry.task_id.as_deref(), Some("SAFE-1"));
+        assert!(entry.code_reference.ends_with("src/lib.rs#1"));
+
+        // Mention tracking never rewrites source text.
+        assert_eq!(
+            std::fs::read_to_string(&fixture.file_path).unwrap(),
+            fixture.original
+        );
+
+        let storage = Storage::new(&fixture.tasks_dir());
+        let task = storage.get("SAFE-1", "SAFE").expect("task exists");
+        assert!(
+            task.references.iter().any(|r| r
+                .code
+                .as_deref()
+                .is_some_and(|c| c.ends_with("src/lib.rs#1"))),
+            "expected code anchor for bare mention: {:?}",
+            task.references
+        );
+    }
+
+    #[test]
+    fn scan_service_bare_mentions_never_create_unknown_tasks() {
+        let fixture = BareMentionFixture::new("// OTHER-9 external ticket mention");
+        fixture.create_task("SAFE");
+
+        let response = ScanService::run(&fixture.resolver, fixture.request(false)).unwrap();
+        assert_eq!(response.summary.created, 0);
+        assert_eq!(response.summary.failed, 0);
+        assert_eq!(response.entries.len(), 1);
+        let entry = &response.entries[0];
+        assert_eq!(entry.action, "skip");
+        assert_eq!(entry.existing_key.as_deref(), Some("OTHER-9"));
+
+        assert!(!fixture.tasks_dir().join("OTHER").exists());
+        assert_eq!(
+            std::fs::read_to_string(&fixture.file_path).unwrap(),
+            fixture.original
+        );
+    }
+
+    #[test]
+    fn scan_service_skips_bare_mentions_when_mentions_disabled() {
+        let fixture = BareMentionFixture::new("// SAFE-1 bare mention while disabled");
+        let task_id = fixture.create_task("SAFE");
+        assert_eq!(task_id, "SAFE-1");
+        std::fs::write(
+            fixture.tasks_dir().join("SAFE").join("config.yml"),
+            "scan_enable_mentions: false\n",
+        )
+        .expect("write project config");
+
+        let response = ScanService::run(&fixture.resolver, fixture.request(false)).unwrap();
+        assert_eq!(response.summary.created, 0);
+        assert_eq!(response.summary.updated, 0);
+        assert!(response.entries.is_empty());
+
+        let storage = Storage::new(&fixture.tasks_dir());
+        let task = storage.get("SAFE-1", "SAFE").expect("task exists");
+        assert!(
+            task.references.is_empty(),
+            "mentions disabled must not anchor: {:?}",
+            task.references
+        );
+    }
+
+    #[test]
+    fn scan_service_mixed_signal_and_bare_mentions_are_idempotent() {
+        let fixture = BareMentionFixture::new("// TODO (SAFE-1): signal\n// SAFE-1 bare mention");
+        fixture.create_task("SAFE");
+        ScanService::run(&fixture.resolver, fixture.request(false)).unwrap();
+        let task_path = fixture.tasks_dir().join("SAFE/1.yml");
+        let old = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(946_684_800);
+        for path in [&task_path, &fixture.file_path] {
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(old)
+                .unwrap();
+        }
+        let before = std::fs::read(&task_path).unwrap();
+        for _ in 0..3 {
+            ScanService::run(&fixture.resolver, fixture.request(false)).unwrap();
+            let task = Storage::new(&fixture.tasks_dir())
+                .get("SAFE-1", "SAFE")
+                .unwrap();
+            assert_eq!(task.references.len(), 2, "unchanged scan grew anchors");
+            assert_eq!(std::fs::read(&task_path).unwrap(), before);
+            assert_eq!(
+                std::fs::metadata(&task_path).unwrap().modified().unwrap(),
+                old
+            );
+            assert_eq!(
+                std::fs::read_to_string(&fixture.file_path).unwrap(),
+                fixture.original
+            );
+            assert_eq!(
+                std::fs::metadata(&fixture.file_path)
+                    .unwrap()
+                    .modified()
+                    .unwrap(),
+                old
+            );
+        }
+        let moved =
+            "// TODO (SAFE-1): signal\n\nlet fake = \"(SAFE-1)\";\n// SAFE-1 bare mention\n";
+        std::fs::write(&fixture.file_path, moved).unwrap();
+        ScanService::run(&fixture.resolver, fixture.request(false)).unwrap();
+        let task = Storage::new(&fixture.tasks_dir())
+            .get("SAFE-1", "SAFE")
+            .unwrap();
+        assert_eq!(
+            task.references.len(),
+            2,
+            "relocation duplicated an existing live anchor"
+        );
+        assert!(
+            task.references[0]
+                .code
+                .as_deref()
+                .unwrap()
+                .ends_with("src/lib.rs#1")
+        );
+        assert!(
+            task.references[1]
+                .code
+                .as_deref()
+                .unwrap()
+                .ends_with("src/lib.rs#4")
+        );
+        assert_eq!(std::fs::read_to_string(&fixture.file_path).unwrap(), moved);
+    }
+
+    #[test]
+    fn scan_service_bare_mention_dry_run_preserves_task_and_source() {
+        let fixture = BareMentionFixture::new("// SAFE-1 bare mention");
+        fixture.create_task("SAFE");
+        let task_path = fixture.tasks_dir().join("SAFE/1.yml");
+        let before = std::fs::read(&task_path).unwrap();
+        let old = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(946_684_800);
+        for path in [&task_path, &fixture.file_path] {
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(old)
+                .unwrap();
+        }
+        let response = ScanService::run(&fixture.resolver, fixture.request(true)).unwrap();
+        assert!(response.dry_run);
+        assert_eq!(response.summary.created, 0);
+        assert_eq!(response.summary.updated, 1);
+        assert_eq!(std::fs::read(&task_path).unwrap(), before);
+        assert_eq!(
+            std::fs::metadata(&task_path).unwrap().modified().unwrap(),
+            old
+        );
+        assert_eq!(
+            std::fs::read_to_string(&fixture.file_path).unwrap(),
+            fixture.original
+        );
+        assert_eq!(
+            std::fs::metadata(&fixture.file_path)
+                .unwrap()
+                .modified()
+                .unwrap(),
+            old
+        );
+    }
+
     #[test]
     fn scan_service_dry_run_reports_create_action() {
         let temp = tempfile::tempdir().expect("tempdir");
@@ -683,8 +1035,6 @@ mod scan_service_tests {
         std::fs::create_dir_all(&src_dir).expect("create src dir");
         let file_path = src_dir.join("lib.rs");
         std::fs::write(&file_path, "// TODO: Add retry logic\n").expect("write file");
-
-        std::env::set_current_dir(repo_path).expect("set cwd");
 
         let resolver = TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None)
             .expect("resolve tasks dir");

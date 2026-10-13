@@ -250,7 +250,8 @@ pub struct Scanner {
     signal_words: Vec<String>,                     // lowercase tokens like todo, fixme
     custom_ticket_key_regexes: Option<Vec<Regex>>, // configured ticket key patterns
     enable_ticket_words: bool,                     // treat ticket keys as triggers
-    modified_only: bool,                           // limit scan to git-modified files
+    track_mentions: bool, // collect bare known-ticket mentions without signal words
+    modified_only: bool,  // limit scan to git-modified files
 }
 
 impl Scanner {
@@ -280,6 +281,7 @@ impl Scanner {
             ticket_key_regex,
             custom_ticket_key_regexes: None,
             enable_ticket_words: false,
+            track_mentions: false,
             modified_only: false,
         }
     }
@@ -377,6 +379,14 @@ impl Scanner {
         self
     }
 
+    /// Enable collection of bare known-ticket mentions: comment lines that carry a
+    /// ticket key but no signal word. Mentions never create tasks or edit source;
+    /// consumers must only use them to anchor already-existing tasks.
+    pub fn with_mention_tracking(mut self, on: bool) -> Self {
+        self.track_mentions = on;
+        self
+    }
+
     fn build_ticket_regexes() -> (Regex, Regex) {
         // [ticket=DEMO-123] or [ticket = DEMO-123]; keys may contain hyphenated
         // prefixes (ABC-OPS-12) consistent with the canonical ID grammar.
@@ -391,20 +401,36 @@ impl Scanner {
     }
 
     pub fn scan(&mut self) -> Vec<Reference> {
+        self.scan_with_mentions().0
+    }
+
+    /// Scan and partition findings: the first vector holds signal-word references
+    /// (task-creation candidates and signal-line mentions), the second holds bare
+    /// known-ticket mentions collected when mention tracking is enabled.
+    pub fn scan_with_mentions(&mut self) -> (Vec<Reference>, Vec<Reference>) {
         // Collect candidate files first, then process in parallel
         let files = self.collect_candidate_files(self.path.as_path());
 
         #[cfg(feature = "parallel")]
-        let mut references: Vec<Reference> = files
+        let per_file: Vec<(Vec<Reference>, Vec<Reference>)> = files
             .par_iter()
-            .flat_map(|path| self.scan_file_collect(path.as_path()))
+            .map(|path| self.scan_file_collect(path.as_path()))
             .collect();
 
         #[cfg(not(feature = "parallel"))]
-        let mut references: Vec<Reference> = files
+        let per_file: Vec<(Vec<Reference>, Vec<Reference>)> = files
             .iter()
-            .flat_map(|path| self.scan_file_collect(path.as_path()))
+            .map(|path| self.scan_file_collect(path.as_path()))
             .collect();
+
+        let (mut references, mut mentions) = per_file.into_iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut references, mut mentions), (file_references, file_mentions)| {
+                references.extend(file_references);
+                mentions.extend(file_mentions);
+                (references, mentions)
+            },
+        );
 
         // Deterministic ordering by file then line
         references.sort_by(|a, b| {
@@ -412,9 +438,14 @@ impl Scanner {
                 .cmp(&b.file_path)
                 .then(a.line_number.cmp(&b.line_number))
         });
+        mentions.sort_by(|a, b| {
+            a.file_path
+                .cmp(&b.file_path)
+                .then(a.line_number.cmp(&b.line_number))
+        });
 
         self.last_scan = references.clone();
-        references
+        (references, mentions)
     }
 
     fn is_supported_ext(ext: &str) -> bool {
@@ -552,7 +583,12 @@ impl Scanner {
             .map(|(_, token)| *token)
     }
 
-    fn scan_file(&self, file_path: &Path, references: &mut Vec<Reference>) {
+    fn scan_file(
+        &self,
+        file_path: &Path,
+        references: &mut Vec<Reference>,
+        mentions: &mut Vec<Reference>,
+    ) {
         if let Ok(file_contents) = fs::read_to_string(file_path)
             && let Some(extension) = file_path.extension()
             && let Some(ext_str) = extension.to_str()
@@ -565,6 +601,7 @@ impl Scanner {
                     self.process_comment_line(
                         file_path,
                         references,
+                        mentions,
                         line_number + 1,
                         &raw_line[range],
                     );
@@ -577,12 +614,28 @@ impl Scanner {
         &self,
         file_path: &Path,
         references: &mut Vec<Reference>,
+        mentions: &mut Vec<Reference>,
         line_number_1based: usize,
         line: &str,
     ) {
-        // Only proceed when a signal word is present. Bare ticket keys do not trigger scanning
-        // (they are handled as mentions by the scan handler if enabled).
+        // Signal-word findings require a signal word. Comment lines without one can
+        // still carry a bare ticket key: when mention tracking is enabled they are
+        // reported separately so the scan consumer can anchor the existing task.
         if !self.signal_regex.is_match(line) {
+            if self.track_mentions {
+                let trimmed = line.trim().trim_start_matches('*').trim();
+                if let Some(uuid) = self.extract_ticket_key_from_line(trimmed) {
+                    mentions.push(Reference {
+                        file_path: file_path.to_path_buf(),
+                        line_number: line_number_1based,
+                        title: String::new(),
+                        uuid,
+                        annotation: trimmed.to_string(),
+                        code_block: String::new(),
+                        comment_block: String::new(),
+                    });
+                }
+            }
             return;
         }
 
@@ -804,16 +857,92 @@ impl Scanner {
         None
     }
 
-    fn scan_file_collect(&self, file_path: &Path) -> Vec<Reference> {
+    /// One-based line numbers whose comment ranges mention `key`, using the same
+    /// quote-aware lexer as discovery. Covers both signal-word and bare mentions;
+    /// keys in quoted strings or executable source are never reported.
+    pub fn key_mention_lines(&self, path: &Path, contents: &str, key: &str) -> Vec<usize> {
+        let extension = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let mut lexer = CommentLexer::default();
+        let mut lines = Vec::new();
+        for (index, line) in contents.lines().enumerate() {
+            let mentioned = lexer.ranges(line, &extension).iter().any(|range| {
+                self.extract_ticket_key_from_line(&line[range.clone()])
+                    .as_deref()
+                    == Some(key)
+            });
+            if mentioned {
+                lines.push(index + 1);
+            }
+        }
+        lines
+    }
+
+    fn scan_file_collect(&self, file_path: &Path) -> (Vec<Reference>, Vec<Reference>) {
         let mut refs = Vec::new();
-        self.scan_file(file_path, &mut refs);
-        refs
+        let mut mentions = Vec::new();
+        self.scan_file(file_path, &mut refs, &mut mentions);
+        (refs, mentions)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scan_with_mentions_separates_bare_keys_from_signal_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("sample.rs");
+        std::fs::write(
+            &file,
+            "// TODO ABC-1: signal line\nlet s = \"ABC-2 in string\";\n// ABC-2 bare mention\n",
+        )
+        .unwrap();
+        let mut scanner = Scanner::new(dir.path().to_path_buf()).with_mention_tracking(true);
+        let (references, mentions) = scanner.scan_with_mentions();
+        assert_eq!(references.len(), 1);
+        assert_eq!(references[0].uuid, "ABC-1");
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].uuid, "ABC-2");
+        assert_eq!(mentions[0].line_number, 3);
+    }
+
+    #[test]
+    fn mention_tracking_is_off_by_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("sample.rs");
+        std::fs::write(&file, "// ABC-2 bare mention\n").unwrap();
+        let mut scanner = Scanner::new(dir.path().to_path_buf());
+        let (references, mentions) = scanner.scan_with_mentions();
+        assert!(references.is_empty());
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn key_mention_lines_cover_signal_and_bare_comments_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("sample.rs");
+        std::fs::write(
+            &file,
+            "// TODO ABC-1: signal mention\nlet s = \"ABC-1 quoted\";\n// ABC-1 bare mention\nfn plain() {}\n",
+        )
+        .unwrap();
+        let scanner = Scanner::new(dir.path().to_path_buf());
+        let contents = std::fs::read_to_string(&file).unwrap();
+        assert_eq!(
+            scanner.key_mention_lines(&file, &contents, "ABC-1"),
+            vec![1, 3]
+        );
+        assert!(
+            scanner
+                .key_mention_lines(&file, &contents, "ABC-2")
+                .is_empty()
+        );
+    }
 
     #[test]
     fn signal_regexes_compile_with_unicode_features() {

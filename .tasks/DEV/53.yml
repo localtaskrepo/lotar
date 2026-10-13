@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-09-06T09:13:57.902147+00:00
-modified: 2026-09-11T04:45:04.537670+00:00
+modified: 2026-10-13T20:12:08.756820+00:00
 relationships:
   related:
   - DEV-17
@@ -81,6 +81,8 @@ comments:
   text: 'Reconciliation (ticket-mutation subagent, no git): the description CLOSURE clause retaining InProgress until the safety delivery is committed is obsolete under the current AGENTS.md completion policy: self-verified completed work is marked Done without waiting for commit or integration, and ticket completion is reported separately from commit state. That clause predates the current lifecycle and must not gate closure; no assertion is made here about the commit state of any delivery (DEV-54 comments cover different deliveries). The remaining closure conditions are substantiated by this ticket record: all 90 audit observations are mapped to explicit owners in the S/C/M/U/T/D coverage comments (31 scoped follow-ups DEV-54 through DEV-84 plus existing DEV-17/DEV-21), and each open child holds its own acceptance criteria and dependencies, so remaining obligations are explicitly transferred rather than implied by this umbrella. DEV-53 therefore represents the independently verified safety-wave scope (historical gates: lint clean; 844 Rust with 6 explicit Git skips; 262 UI; 98 smoke with 23 Git skips; 192 schema safety; platform/Git exclusions owned by DEV-79), not a claim that all children are fixed. Recommended evidence-based closure: mark DEV-53 Done once the coordinator confirms no untransferred obligation remains inside the safety scope; open children keep their scopes. Status intentionally left InProgress for that decision.'
 - date: 2026-09-11T04:45:04.515779+00:00
   text: 'Closure: Outcome: safety-wave delivery closed Done as an independently verified, explicitly scoped delivery; this is not an umbrella claim that all audit findings are fixed, and deferred obligations stay open in their linked tickets. Evidence: historical verification gates recorded in this ticket description; description CLOSURE corrected via native CLI to the current self-verification/no-commit lifecycle with deferred owners named (transactions DEV-55, UI external-process/cross-tab refresh DEV-65, Git/platform coverage DEV-79, remaining DEV-54..DEV-84 follow-ups); the commit-gated closure clause is superseded. Coordinator final gates for the current reconciliation wave all pass: lint:agent, test:agent Rust 872 passed/6 skips/retries 0 and UI 275 passed, smoke:agent rebuilt 102 passed/23 skips/0 fail. Remaining: no child closed by this action; children keep their own scopes; Git/environment exclusions remain unverified under DEV-79. Guidance: no durable finding; no instruction edits required.'
+- date: 2026-10-13T20:12:08.756820+00:00
+  text: 'Audit continuation handoff: DEV-74 and DEV-75 completed, independently reviewed, self-verified and exact-ID read back Done. Scanner known bare mentions, no-create/quote/source/dry-run safety, repeat-scan idempotence, moved anchor identity and mixed metadata covered; CLI equality validation, wildcard builtin precedence, executable search/help and truthful text-format aliases covered. Final default and all-feature Rust1448 passed/138 binaries, frontend836 passed/77 files, fresh-build smoke273 passed/65 files, lint/format/diff-check clean.45 Git-required Rust exclusions and25 smoke skips remain unverified locally. Exactly two audit-pass-2 tickets remain Todo: DEV-83 broader docs reconciliation and DEV-84 explicit ownership-safe cleanup design. Their concrete code-backed next steps are recorded natively; do not conflate separate feature backlog or DEV-95 scanner ignore/symlink work with audit completion. Umbrella remains open. No commit/push or user-server change in this wave; all edits unstaged. Worker Git checkout policy deviation is disclosed and recorded in DEV-74; parent retained baseline/index and corrected review findings, no blanket historical compliance claim. Guidance: no durable finding.'
 description: |-
   Second-pass audit umbrella and delivery log.
 
@@ -212,3 +214,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-13T20:12:08.756820+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

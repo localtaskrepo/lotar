@@ -77,6 +77,216 @@ fn scan_does_not_add_reference_when_mentions_disabled() {
     );
 }
 
+fn count_task_files(project_dir: &std::path::Path) -> usize {
+    std::fs::read_dir(project_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            name.ends_with(".yml") && name.chars().next().is_some_and(|c| c.is_ascii_digit())
+        })
+        .count()
+}
+
+#[test]
+fn scan_tracks_bare_known_ticket_mentions_without_signal_words() {
+    let tf = TestFixtures::new();
+    let root = tf.temp_dir.path();
+
+    let mut add = crate::common::lotar_cmd().unwrap();
+    add.current_dir(root)
+        .arg("add")
+        .arg("Mentioned task")
+        .assert()
+        .success();
+    let (project, task_file) = project_and_task_paths(root);
+    let id = format!("{project}-1");
+    assert!(task_file.exists());
+
+    // Bare known-ID mention: no TODO/signal word anywhere on the line.
+    let src = root.join("main.rs");
+    let source_text = format!("// {id} introduced this behavior\n");
+    fs::write(&src, &source_text).unwrap();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .arg("scan")
+        .assert()
+        .success();
+
+    let yaml = fs::read_to_string(&task_file).unwrap().replace('\\', "/");
+    assert!(
+        yaml.contains("code: main.rs#1"),
+        "bare mention should anchor the known task: {yaml}"
+    );
+
+    // Mention tracking never rewrites source text.
+    assert_eq!(fs::read_to_string(&src).unwrap(), source_text);
+
+    // The bare mention must not create an additional task.
+    let project_dir = root.join(".tasks").join(&project);
+    assert_eq!(count_task_files(&project_dir), 1);
+}
+
+#[test]
+fn scan_bare_mentions_never_create_unknown_tasks() {
+    let tf = TestFixtures::new();
+    let root = tf.temp_dir.path();
+
+    // Bootstrap a project (and its tasks root), then remove the bootstrap task.
+    let mut add = crate::common::lotar_cmd().unwrap();
+    add.current_dir(root)
+        .arg("add")
+        .arg("bootstrap")
+        .assert()
+        .success();
+    let (project, bootstrap_task) = project_and_task_paths(root);
+    fs::remove_file(bootstrap_task).unwrap();
+
+    // Unknown/external ticket key on a comment line without signal words.
+    let src = root.join("main.rs");
+    let source_text = "// OTHER-99 external ticket mention\n".to_string();
+    fs::write(&src, &source_text).unwrap();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .arg("scan")
+        .assert()
+        .success();
+
+    assert!(!root.join(".tasks").join("OTHER").exists());
+    let project_dir = root.join(".tasks").join(&project);
+    assert_eq!(count_task_files(&project_dir), 0);
+    assert_eq!(fs::read_to_string(&src).unwrap(), source_text);
+}
+
+#[test]
+fn scan_does_not_track_bare_mentions_when_mentions_disabled() {
+    let tf = TestFixtures::new();
+    let root = tf.temp_dir.path();
+
+    let mut add = crate::common::lotar_cmd().unwrap();
+    add.current_dir(root)
+        .arg("add")
+        .arg("Mentioned task")
+        .assert()
+        .success();
+    let (project, task_file) = project_and_task_paths(root);
+    let id = format!("{project}-1");
+
+    let proj_dir = root.join(".tasks").join(&project);
+    fs::write(proj_dir.join("config.yml"), "scan_enable_mentions: false\n").unwrap();
+
+    let src = root.join("main.rs");
+    fs::write(&src, format!("// {id} bare mention while disabled\n")).unwrap();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .arg("scan")
+        .assert()
+        .success();
+
+    let yaml = fs::read_to_string(&task_file).unwrap();
+    assert!(
+        !yaml.contains("references:"),
+        "bare mentions must not anchor while scan_enable_mentions is false; got: {yaml}"
+    );
+}
+
+#[test]
+fn scan_bare_mentions_ignore_keys_inside_quoted_strings() {
+    let tf = TestFixtures::new();
+    let root = tf.temp_dir.path();
+
+    let mut add = crate::common::lotar_cmd().unwrap();
+    add.current_dir(root)
+        .arg("add")
+        .arg("Mentioned task")
+        .assert()
+        .success();
+    let (project, task_file) = project_and_task_paths(root);
+    let id = format!("{project}-1");
+
+    let src = root.join("main.rs");
+    let source_text =
+        format!("let quoted = \"{id} inside a string\";\n// {id} real comment mention\n");
+    fs::write(&src, &source_text).unwrap();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .arg("scan")
+        .assert()
+        .success();
+
+    let yaml = fs::read_to_string(&task_file).unwrap().replace('\\', "/");
+    assert!(
+        yaml.contains("code: main.rs#2"),
+        "comment mention should anchor line 2: {yaml}"
+    );
+    assert!(
+        !yaml.contains("code: main.rs#1"),
+        "quoted string must not be treated as a mention: {yaml}"
+    );
+    assert_eq!(fs::read_to_string(&src).unwrap(), source_text);
+}
+
+#[test]
+fn mixed_signal_and_bare_mentions_preserve_anchors_without_rewriting() {
+    let fixture = TestFixtures::new();
+    common::cargo_bin_in(&fixture)
+        .args(["add", "Mentioned task"])
+        .assert()
+        .success();
+    let (project, task_file) = project_and_task_paths(fixture.get_temp_path());
+    let id = format!("{project}-1");
+    let source = fixture.get_temp_path().join("main.rs");
+    let text = format!("// TODO ({id}): signal\n// {id} bare mention\n");
+    fs::write(&source, &text).unwrap();
+    common::cargo_bin_in(&fixture)
+        .arg("scan")
+        .assert()
+        .success();
+    let old = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(946_684_800);
+    for path in [&task_file, &source] {
+        fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+    }
+    let before = fs::read(&task_file).unwrap();
+    for args in [vec!["scan"], vec!["scan", "--reanchor"], vec!["scan"]] {
+        common::cargo_bin_in(&fixture).args(args).assert().success();
+        let task: lotar::storage::task::Task =
+            serde_yaml_ng::from_slice(&fs::read(&task_file).unwrap()).unwrap();
+        assert_eq!(task.references.len(), 2, "unchanged scan grew anchors");
+        assert_eq!(fs::read(&task_file).unwrap(), before);
+        assert_eq!(fs::metadata(&task_file).unwrap().modified().unwrap(), old);
+        assert_eq!(fs::read_to_string(&source).unwrap(), text);
+        assert_eq!(fs::metadata(&source).unwrap().modified().unwrap(), old);
+    }
+    let moved = format!("// TODO ({id}): signal\n\nlet fake = \"({id})\";\n// {id} bare mention\n");
+    fs::write(&source, &moved).unwrap();
+    common::cargo_bin_in(&fixture)
+        .args(["scan", "--reanchor"])
+        .assert()
+        .success();
+    let task: lotar::storage::task::Task =
+        serde_yaml_ng::from_slice(&fs::read(&task_file).unwrap()).unwrap();
+    let anchors: Vec<_> = task
+        .references
+        .iter()
+        .filter_map(|entry| entry.code.as_deref())
+        .collect();
+    assert_eq!(anchors, vec!["main.rs#1", "main.rs#4"]);
+    assert_eq!(fs::read_to_string(&source).unwrap(), moved);
+}
+
 #[test]
 fn scan_reanchor_flag_preserves_cross_file_anchors() {
     let tf = TestFixtures::new();

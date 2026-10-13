@@ -10,7 +10,7 @@ Install LoTaR first: see [Installation](install.md).
 # Create a task. The first command in a repository creates .tasks/ with default settings.
 lotar add "Add user authentication" --type feature --priority high
 
-# List and search (the query matches IDs, titles, descriptions, and tags)
+# List and search (case-insensitive substrings in IDs, titles, subtitles, descriptions, and tags)
 lotar list
 lotar list "auth"
 lotar list --status todo --priority high
@@ -69,7 +69,7 @@ These flags work with every command:
 
 | Flag | Purpose |
 | --- | --- |
-| `--format text\|table\|json\|markdown` | Output style. Use `json` for scripts. |
+| `--format text\|json` | Output style. Use `json` for scripts; `table`, `markdown`, and `md` are aliases for text, not separate renderers. |
 | `--tasks-dir <PATH>` | Use a different `.tasks` workspace (created if missing). |
 | `--project, -p <PREFIX>` | Force the project context. `lotar serve` ignores it; use `--port` there. |
 | `--log-level <level>`, `--verbose` | Diagnostic output. |

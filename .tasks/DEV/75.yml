@@ -1,13 +1,27 @@
 title: Align CLI list predicate and output-format behavior with documented examples
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-57]
-  related: [DEV-3, DEV-5, DEV-13, DEV-17]
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.783908+00:00
+modified: 2026-10-13T20:10:37.964879+00:00
+relationships:
+  depends_on:
+  - DEV-57
+  related:
+  - DEV-3
+  - DEV-5
+  - DEV-13
+  - DEV-17
+  parent: DEV-53
+comments:
+- date: 2026-10-13T19:00:09.440530+00:00
+  text: 'Resuming DEV-53 audit pass alongside DEV-74. Plan: verify the current CLI list contract rather than assuming September findings still apply; make list/help examples executable, pin positional search and supported empty/inequality predicates, correct inaccurate format/search claims or implement the narrowly promised behavior, and reject unsupported predicates rather than silently ignoring them. Keep DEV-3/5/13 broader features open. Preserve current query semantics, user-owned data, and unrelated approved work; add focused command/output regressions and run required final gates. No Git writes or CI publication in this wave.'
+- date: 2026-10-13T19:16:58.332200+00:00
+  text: 'Progress: reproduced two real CLI gaps with failing regressions: unsupported empty predicates reported success even for an empty workspace, and builtin assignee predicates were misclassified as custom fields when configuration enabled ''*''. Fixed pre-search validation/routing without changing REST/MCP shapes or adding a broader query language. Current supported non-empty equality filters remain fuzzy; canonical builtin names take precedence, explicit field:<name> addresses literal stored custom keys, repeated custom-key aliases share the existing OR behavior. Empty/negative/comparison predicates and dangling --where now fail explicitly. Corrected docs/README positional search, embedded list/main/tour help, and developer CLI contract; text/table/markdown/md remain documented identical text outputs, not new renderers. Nine new regressions cover all five text-search surfaces, exact predicate result sets, wildcard precedence, reserved custom names/case, invalid queries with empty storage, aliases/pagination, embedded help and task/config byte+mtime preservation. Scoped33/33 tests across5 targets passed, including existing list and shared-query coverage. One overlapping title/subtitle fixture token was corrected to distinct values; no production search assertion was weakened. Independent review and final combined gates pending. DEV-3/5/13 broader features remain open; no durable guidance finding.'
+- date: 2026-10-13T20:10:37.944305+00:00
+  text: 'Outcome: CLI list/help examples now match implemented behavior. Positional search covers IDs, titles, subtitles, descriptions and tags; unsupported --search example corrected. Non-empty equality remains supported with existing fuzzy semantics and same-key OR/cross-key AND; builtin names win over wildcard custom fields, explicit field:<name> remains literal, canonical key aliases group consistently. Empty/negative/comparison predicates, unsupported builtin/unknown strict bare keys and dangling --where now fail before search, including empty workspaces. Values after the first ''='' remain literal (not expressions); greedy --where query-first ordering is explicit. Table/markdown/md are honestly documented text aliases; no broader renderer/query/age/aggregation feature completion claimed. Evidence:9 new regression tests, exact result sets and error diagnostics, all5 text surfaces, reporter/tag/negative builtin coverage, wildcard/literal-reserved-name cases, byte+old-mtime preservation, embedded help and alias/pagination equality; existing list/shared-query targets33/33 passed. Independent reviewer SIGNOFF9/9, no blockers; low notes on literal values/greedy ordering documented and reporter regression added. Final npm run test:agent passed1448 Rust/138 binaries and836 UI/77 files; all-feature Rust1448 passed zero retries; fresh-build smoke273/65 files passed; final frontend/all-target/all-feature warning-denied Clippy/formatting lint and diff --check clean. Remaining:45 Git-required Rust exclusions and25 existing smoke skips are not local passes, existing Vue inject warnings unchanged. DEV-3/5/13/17 broader features and DEV-83 docs/84 cleanup design remain open with exact next steps. All changes unstaged/uncommitted; no push, user-server restart, REST/MCP shape, or policy change. Guidance: no durable finding.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: D8.
@@ -19,3 +33,30 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-13T19:00:09.409268+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-13T19:00:09.440530+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T19:16:58.332200+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T20:10:37.944305+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T20:10:37.964879+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -610,8 +610,8 @@ pub struct TaskSearchArgs {
     #[arg(long = "due-soon", num_args = 0..=1, value_name = "DAYS")]
     pub due_soon: Option<Option<usize>>, // --due-soon or --due-soon=N
 
-    /// Unified filters: key=value, repeatable (keys: assignee|status|priority|type|tag|project|field:<name>)
-    #[arg(long = "where", value_parser = crate::cli::args::common::parse_key_value, num_args=0.., value_delimiter=None)]
+    /// Non-empty key=value equality filters, repeatable (assignee|reporter|status|priority|type|tag|project|field:<name>)
+    #[arg(long = "where", value_parser = crate::cli::args::common::parse_key_value, num_args=1.., value_delimiter=None)]
     #[serde(default)]
     pub r#where: Vec<(String, String)>,
 

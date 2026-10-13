@@ -33,10 +33,10 @@ Each section links to relevant source files and tests. Additions should follow t
 ### lotar list
 
 - **User help:** [../help/list.md](../help/list.md)
-- **Args & handler:** `TaskSearchArgs` + `TaskPostFilters` in `src/cli/args/task.rs`; `SearchHandler` in `src/cli/handlers/task/search.rs`.
-- **Core services:** `storage::manager::Storage` for index reads, `services::task_service::TaskService::search` for per-project merging, post-filter pipeline in `search.rs`.
-- **Features:** alias `ls`, multi-project resolution, additive filters, `--where` custom field lookups, limit/sort combination, text/table/json renderers.
-- **Tests:** `tests/cli_list_alias_test.rs`, `tests/cli_list_effort_filters_and_sort_test.rs`, `tests/comment_command_test.rs` (shared search utilities).
+- **Args & handler:** `TaskSearchArgs` in `src/cli/args/task.rs`; `SearchHandler` and `TaskPostFilters` in `src/cli/handlers/task/search.rs`.
+- **Core services:** `storage::manager::Storage` for reads and text/custom-field filtering, the post-filter pipeline in `search.rs`, and the shared `services::task_query` sorting executor.
+- **Features:** alias `ls`, multi-project resolution, additive filters, non-empty `--where key=value` equality predicates, limit/sort combination, text and JSON output. `table`/`markdown`/`md` are text aliases; empty values, negation, and comparison operators fail explicitly before searching. Builtin predicate names take precedence over wildcard custom fields; `field:<name>` explicitly selects a custom field.
+- **Tests:** `tests/cli_list_alias_test.rs`, `tests/cli_list_effort_filters_and_sort_test.rs`, `tests/cli_list_pagination_test.rs`, `tests/dev75_cli_list_contract_test.rs`.
 
 ### lotar status
 
