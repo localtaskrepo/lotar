@@ -1,10 +1,11 @@
 title: Design explicit ownership-safe cleanup for abandoned atomic-write temporary files
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.930814+00:00
-modified: 2026-10-13T20:03:19.759441+00:00
+modified: 2026-10-13T21:11:10.110875+00:00
 relationships:
   related:
   - DEV-32
@@ -12,6 +13,12 @@ relationships:
 comments:
 - date: 2026-10-13T20:03:19.759441+00:00
   text: 'Read-only design inventory after DEV-74/75; remains Todo, no cleanup implementation or temp deletion performed. Next step: ownership-aware report-first design covering atomic temp siblings, per-workspace queue state/worker locks, agent logs, configured report/artifact roots and test scratch roots. Filename prefixes/PIDs are discovery hints, NOT sufficient ownership proof: require canonical approved workspace/root plus explicit marker/registration, verified process-start identity (PID reuse), per-kind liveness/lock checks, and immediate pre-delete file/directory identity verification; permission or platform uncertainty stays report-only. Reuse transaction-engine symlink/component refusal and worker try-lock patterns. Keep pending transaction/sync journals as recovery data, never garbage; inert lock files are intentional and must not be swept. Attachments and Git worktrees retain their existing typed-reference and ownership/clean/merged safety owners; home/config files are not cleanup candidates. Default dry-run with exact candidate/proof/refusal reasons; no age-only deletion and no arbitrary system-temp traversal. Production cross-platform liveness/TOCTOU guarantees need design review before a later destructive implementation. Acceptance cases must preserve live config/task/sprint/source writers, reject symlink escapes/lookalike user files/PID reuse/uncertain states, and identify only provably owned crash orphans. Serve maintenance guidance must agree with any approved design.'
+- date: 2026-10-13T20:48:19.109437+00:00
+  text: Starting DEV-84 design pass from clean checkout. Scope is abandoned atomic-write temporary files, not generic cache/log/worktree/attachment deletion or a restored directory sweep. Verify exact writer/lock/journal/source contracts; specify an explicit report-first operation with ownership proof, live-writer exclusion, PID-reuse and symlink/TOCTOU refusal, crash recovery behavior and deterministic acceptance tests. Validate platform feasibility rather than promising that filename/PID/age or one task lock proves abandonment. Persist design in existing authoritative storage documentation and native ticket, with implementation dependencies/follow-up clearly separate. No temp deletion, cleanup CLI, policy weakening, Git writes, or user-server changes in this design pass.
+- date: 2026-10-13T21:05:04.529148+00:00
+  text: 'Design milestone: documented a private registered staging/capsule protocol in existing docs/developers/task-model.md, with held write lease and stable workspace maintenance gate; current legacy PID/counter and scanner outer-stage files remain report-only. Inventory verified config/init writers are unlocked and current helper production roots are selected tasks/project/sprint parents plus separate scanner source staging; earlier broad log/cache/worktree inventory is explicitly NOT this operation''s scope. Collector never waits for capsule/domain locks under the gate, never adopts stale capsules, and must preserve pending/corrupt recovery state. Source lease spans callback and publication; file/parent identity and native handle backend required, platform uncertainty refuses apply. Default inspection cannot initialize control roots or create/truncate locks. Includes deterministic live-writer/crash/PID-reuse/lookalike/symlink/retirement/race/refusal matrix. Existing baseline storage/recovery/source46/46 tests passed, zero retries (318 other unit tests filtered, not full-suite passes); all8 new source links resolve and diff --check clean. Embedded serve help and independent design review pending. No runtime implementation or deletion, API/CLI contract change, Git writes, or server changes. Future implementation requires a separate ticket and native platform verification; no guarantee of power-loss durability or malicious same-account isolation.'
+- date: 2026-10-13T21:11:10.088332+00:00
+  text: 'Outcome: DEV-84 design complete, no runtime collector or deletion implemented. Authoritative section docs/developers/task-model.md#atomic-temp-maintenance-design-dev-84 specifies private versioned registered capsules, explicit workspace/parent/purpose authority, two-phase empty-payload identity registration, whole-write lease, stable workspace gate and non-blocking collector claims. Legacy PID/counter and source .lotar-scan files remain report-only; no adoption/name/PID/age-only proof. Covers unlocked config/init writers, source outer-stage callbacks/publication, journal fences, domain-lock ordering, lease-inode retirement, identity/ACL/symlink/reparse/hardlink refusal, native handle backend limits and explicit cooperation boundary. Default inspection performs no initialization, lock creation/truncation, persisted report, recovery or deletion. Deterministic implementation matrix covers active task/config/sprint/source, crash phases, PID reuse, foreign/lookalike roots, replacement races, recovery journals, multiple collectors, partial errors and retry/no-op. Independent review SIGNOFF with no blocking flaws; non-blocking payload-identity sequencing note clarified with explicit two-phase registration. Verification: current safety/recovery/source46/46 zero-retry nextest tests passed;318 other unit tests filtered, not passes. All9 new relative source/follow-up links and local heading resolve, git diff --check clean, warning-free CI-profile binary build and actual embedded serve help confirmed current no-cleanup-command/future-protocol wording. Prior help attempt used an older binary and was not counted; rebuilt CLI verified. Documentation-only pass: no full UI/smoke/lint rerun required; no proposed capsule acceptance case is claimed implemented or native Windows backend tested. Remaining implementation tracked as Todo DEV-110, linked in design; separate human safety review and native Linux/Windows plus full lint/test/fresh-smoke gates required before enabling apply. No existing data removed, runtime/API shape, repository policy, user-server or Git state changes; edits remain unstaged/uncommitted. Guidance: no durable instruction finding.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: DEV-32/DEV-53 follow-up.
@@ -27,3 +34,29 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-13T20:48:19.073699+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-13T20:48:19.109437+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T21:05:04.529148+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T21:11:10.088332+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-13T21:11:10.110875+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -25,7 +25,7 @@ Combine filters freely: e.g., subscribe to only `task_created` from project `ENG
 
 - `task_created` / `task_updated` — Full `TaskDTO` JSON (see `src/api_types.rs`). The payload always includes `id`, `title`, `status`, etc., and adds `triggered_by` when identity resolution succeeds.
 - `task_deleted` — `{ "id": "<PROJECT-N>", "triggered_by"?: string }`.
-- `config_updated` — `{ "triggered_by"?: string }`; emitted after `lotar config set`, REST config writes, or other config-mutating actions in `src/routes.rs`.
+- `config_updated` — `{ "triggered_by"?: string }`; emitted after `lotar config set`, REST config writes in `src/routes/config.rs`, and automation `set` in `src/routes/automation.rs`.
 - `project_changed` — `{ "name": "<PROJECT>" }`; raised by the `.tasks` watcher whenever YAML files are created, modified, or removed under that project.
 - `sync_started` — `{ "run_id": "sync-...", "direction": "pull|push", "provider": "jira|github", "remote": "<remote>", "project": "<PREFIX>", "dry_run": true|false, "started_at": "..." }`.
 - `sync_progress` — `{ "run_id": "sync-...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "entry": {"status":"created|updated|skipped|failed", "task_id": "PREFIX-1", "reference": "owner/repo#123", "message": "...", "at": "..."}, "project": "<PREFIX>", "remote": "<remote>", "direction": "pull|push" }`.

@@ -25,15 +25,15 @@ Accent choices are stored in `localStorage` (`lotar.accent`). Disable the toggle
 
 ## Table Layout Reset
 
-Use **Reset saved columns and sorting** to clear TaskTable preferences stored per project. The handler walks through `localStorage` and removes keys that start with `lotar.taskTable.columns` or `lotar.taskTable.sort`, matching the persistence logic in `view/composables/useTaskTableState.ts`.
+Use **Reset saved columns and sorting** to clear saved columns, column order, and sort settings for both Tasks and Sprints across projects. It removes the `lotar.taskTable.columns*`, `lotar.taskTable.columnOrder*`, `lotar.taskTable.sort*`, and corresponding `lotar.sprints.*` keys, plus `lotar.boardFields*` and `lotar.calendarHoverFields*`. It does not reset theme, accent, page size, hidden tabs, or repository data.
 
 ## Filter Reset
 
-Select **Clear last used filter** to remove the saved filter state for the Tasks list (`localStorage` key `lotar.tasks.filter`). The next visit will start with the default filter set. Saved filters are validated against the server's project list on load, so a stale project from another LoTaR instance served on the same port is dropped automatically.
+Select **Clear last used filter** to remove `lotar.tasks.filter`, `lotar.sprints.filter`, `lotar.calendar.filter`, and `lotar.boards.filter` from localStorage and legacy sessionStorage. It does not delete saved-filter presets or repository data. An explicit URL query can still restore filters on the next visit.
 
 ## Tasks List
 
-Use **Default page size** to control how many tasks the Tasks list shows per page by default. This setting is stored in `localStorage` and only applies to the current browser.
+Use **Default page size** (25, 50, 100, or 200; default 50) for Tasks and the independent Sprint/backlog pagers. It is browser-scoped; an explicit Tasks URL page size takes precedence. See [list pagination](./list.md#pagination) for the separate CLI contract.
 
 ## Navigation
 
@@ -58,10 +58,10 @@ These preferences apply per project and per browser—other users or machines ke
 
 ## Related CLI Options
 
-Use `lotar serve` to launch the web UI. The subcommand exposes a long `--port` flag (default 8080) plus the global `--project` flag (`-p`) shared with every CLI command:
+Use `lotar serve` to launch the workspace-wide UI. Port selection uses `--port` or `-p` (configured `server.port`, default 8080). Serve accepts a hidden `--project` compatibility flag but ignores it; select/filter projects inside the UI, not by using `-p` for a project.
 
 ```bash
-lotar serve --port=3090 --host=0.0.0.0 --project=AUTH --tasks-dir=/work/.tasks
+lotar serve -p 3090 --tasks-dir=/work/.tasks
 ```
 
-The `lotar serve` command intentionally omits a short `-p` for port because `-p` is reserved for the global project flag. Pass `--tasks-dir` or other global flags the same way—whatever context you pick for the CLI is what the browser UI will read.
+The default bind is loopback; do not add `--host=0.0.0.0` unless network exposure is intentional. See [serve](./serve.md) for bind, port-0, and fallback behavior. Other project-scoped commands keep their own `--project` shorthand; the serve exception is specific to this subcommand.

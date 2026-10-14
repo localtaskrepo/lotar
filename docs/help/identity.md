@@ -6,7 +6,7 @@ Central reference for identity resolution and people fields.
 ## Sources and resolution order
 
 Used wherever a person is needed (assignee, reporter, default_reporter):
-1) Merged config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → home → project → global → defaults)
+1) Merged config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → project → env vars like `LOTAR_DEFAULT_REPORTER` → home → global → defaults)
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
@@ -21,7 +21,7 @@ The special value `@me` resolves to the current user via the order above across 
 Notes:
 - Project manifest detection is best-effort and reads only local files in your repo root (no external tools). For package.json it supports both string and object forms of `author`, and falls back to the first `contributors` entry.
 - For Cargo.toml we parse the first `authors` entry. For .csproj we read the `<Authors>` element.
-- Identity is cached per tasks directory. Updating configuration (`lotar config set default.reporter ...`) or editing manifests automatically invalidates the cache via the config persistence layer.
+- Identity is cached per tasks directory. Configuration persistence invalidates affected caches; local detector caches also track their source files. This is not a filesystem-watcher guarantee for every external edit.
 - Git identity reads the local configuration from the repository's shared Git directory, including linked worktrees with relative or absolute `gitdir`/`commondir` metadata. Branch details use the checkout's own `HEAD`; remote details use the same shared local config. Missing or unreadable routing metadata skips this detector rather than borrowing another repository. This remains local-file detection, not a complete expansion of Git's global config, includes, or worktree-specific overrides.
 - The Git identity cache tracks resolved metadata paths and modification timestamps, so shared-config edits, worktree branch switches, and changed metadata targets refresh cached identity details.
 
@@ -48,7 +48,7 @@ lotar whoami --explain --format=json
 - assignee: who should execute the task; can be set explicitly or inferred via first-change semantics (below).
 
 ## First-change auto-assign
-- If `auto.assign_on_status: true`, when a task moves away from the default/first status for the first time and has no assignee, LoTaR sets `assignee = resolved current user`.
+- With `auto.assign_on_status: true`, the shared mutation service can assign the resolved current user on an effective status transition while the task is unassigned. A no-op transition does not gain an owner. The standalone CLI status handler additionally uses the configured default/first state and can prefer a CODEOWNERS default owner before identity; this is not part of the `@me` resolution chain.
 - Explicit assignees are never overwritten.
 
 Example (CLI):
@@ -59,5 +59,5 @@ lotar status 1 in_progress  # assignee becomes @me
 
 ## Tips
 - Use `lotar whoami --explain` to see your identity and source chain.
-- Use `--dry-run --format=json` to preview identity effects on create/status/edit.
+- Use `lotar whoami --explain --format=json` to inspect identity without mutating a task. Supported previews include `lotar status ID STATE --dry-run --explain` and `lotar task edit ID --assignee @me --dry-run`; consult each command's help rather than assuming `--dry-run` exists on every creation alias or person-field command.
 - See also: [Resolution & Precedence](./precedence.md).

@@ -70,9 +70,9 @@ These extensions are separate from `custom_fields` and are not added to REST/MCP
 ## Enumerations & config-driven values
 
 - `TaskStatus`, `Priority`, and `TaskType` are thin wrappers around strings. They validate against the arrays declared in `config.yml` under `issue_states`, `issue_priorities`, and `issue_types`. The examples below are defaults; workspaces routinely customize them.
-	- `issue_states`: e.g., `TODO`, `IN_PROGRESS`, `VERIFY`, `BLOCKED`, `DONE`, `CANCELED`.
-	- `issue_priorities`: e.g., `Low`, `Medium`, `High`, `Critical`, `Blocker`.
-	- `issue_types`: e.g., `feature`, `bug`, `epic`, `spike`, `chore`.
+	- `issue_states`: built-in `Todo`, `InProgress`, `NeedsReview`, `Done`.
+	- `issue_priorities`: built-in `Low`, `Medium`, `High`.
+	- `issue_types`: built-in `Feature`, `Bug`, `Chore`.
 - Because these values are data-driven, client code should not assume a fixed enum list; always render the exact casing stored on the task.
 - Finished status is defined by the task's resolved project policy (`issue.done_states`), not by a client-side comparison with literal `Done`. See [Done States](./config.md#done-states).
 

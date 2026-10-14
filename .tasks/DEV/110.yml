@@ -1,0 +1,16 @@
+title: Implement ownership-registered staging and explicit temp maintenance
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-13T21:07:27.638816+00:00
+modified: 2026-10-13T21:13:16.886274+00:00
+comments:
+- date: 2026-10-13T21:13:16.886274+00:00
+  text: Unstarted implementation follow-up, not audit-pass-2 closure work. Design DEV-84 is Done and reviewed; scope/reference docs/developers/task-model.md#atomic-temp-maintenance-design-dev-84. No capsule protocol or collector exists today;46 baseline safety tests are not its acceptance coverage. Any apply implementation requires separately reviewed safety semantics and native handle/locking/reparse/race tests; tests must use isolated fixtures and owned children, never real workspace/system-temp cleanup. Legacy siblings remain report-only, even dead PID or old timestamps. Current root producer inventory is explicit tasks/project/sprint/config/init/journal paths plus separately scoped scanner staging, not home/log/queue/report/attachment/worktree deletion. No blanket force option or restored lock-time sweep. Native Linux/Windows plus full repository gates required before enabling deletion; fail toward inspection-only on unavailable filesystem proof.
+description: Implementation follow-up to DEV-84 design in docs/developers/task-model.md#atomic-temp-maintenance-design-dev-84. The design is not a shipped collector or permission to delete existing data. Implement explicit typed workspace/parent/purpose ownership context, private versioned per-write capsules, two-phase payload-identity registration, held lifetime lease, and stable workspace gate across registration/publication/retirement. Cover task/sprint/config/init/journal producers and scanner outer staging; preserve existing domain locks, callback/source validation, permissions and recovery semantics. Default inspection must open existing data only, never initialize roots, create/truncate locks, sweep directories, or persist reports. Legacy PID/counter and .lotar-scan files remain report-only; never retrofit proof. Any future apply mode requires separate human safety review and natively tested handle/identity, symlink/reparse/hardlink, locking and ACL backends; unavailable proof means report-only, never force/sweep. Journal data/purpose, ordinary storage/source locks, unknown formats/entries/roots and uncertain recovery stay protected. Implement deterministic isolated barriers/child-crash cases from DEV-84 matrix, including active lockless config and source outer-stage lifetime, mixed writer/collector lock ordering and stale-lease retirement. Validate all Linux/Windows cases and full lint/test/fresh-build smoke gates before enabling apply. Do not run maintenance against real workspace/system temp data as part of implementation. Keep REST/CLI contracts synchronized if new surfaces are added.
+history:
+- at: 2026-10-13T21:13:16.886274+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -31,26 +31,28 @@ lotar priority 1
 lotar priority 1 high
 
 # With explicit project
-lotar priority 123 critical --project=backend
+lotar priority 123 medium --project=backend
 
 # JSON output for automation
 lotar priority 1 low --format=json
 
-JSON payloads include `status`, `action`, `task_id`, and the before/after values. When the requested priority matches the current value the command returns a `noop` record instead of writing.
 ```
+
+Changed JSON payloads include `status`, `task_id`, `old_priority`, and `new_priority`. An unchanged request returns the current `priority` and an unchanged message without writing; do not require an `action` field.
 
 ## Priority Values
 
-Available priorities depend on your project configuration. Common defaults:
+Available priorities depend on your project configuration. Built-in defaults:
 
 - `low` - Low priority task
 - `medium` - Medium priority task (usually default)
 - `high` - High priority task
-- `critical` - Critical priority task requiring immediate attention
+
+`Critical` and other additional labels require configuration before use.
 
 Check your project's valid priorities:
 ```bash
-lotar config show --project=backend --format=json | jq -r '.data.issue.priorities[]'
+lotar config show --project=backend --format=json --full | jq -r '.config.issue_priorities[]'
 ```
 
 ## Task ID resolution
@@ -83,14 +85,13 @@ Both interfaces provide identical functionality.
 Priority changes support all output formats:
 - `text` (default): Human-readable with colors and emojis
 - `json`: Machine-readable for scripts and automation  
-- `table`: Clean tabular format
-- `markdown`: Documentation-friendly format
+- `table` / `markdown` / `md`: aliases for the same text output, not separate renderers
 
 ## Error Handling
 
 Common errors and solutions:
 
-- **Invalid priority**: Check valid priorities with `lotar config show priorities`
+- **Invalid priority**: Inspect `lotar config show --project=backend --full` or use the JSON recipe above; `config show priorities` is not a subcommand.
 - **Task not found**: Verify task ID and project context
 - **Permission denied**: Check file permissions in tasks directory
 - **Invalid project**: Verify project exists and is properly configured

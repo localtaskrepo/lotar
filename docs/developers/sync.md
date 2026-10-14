@@ -20,15 +20,17 @@ Sync integrations are still in beta. Use least-privilege credentials and verify 
 - `lotar pull github-company`
 - `lotar push github-company`
 - `lotar sync check <remote>` (validate credentials, filters, and project/repo settings)
+- `lotar push <remote> --task AUTH-1` / `lotar pull <remote> --task AUTH-1` (target one local task, with the same reference identity and pending-creation recovery rules)
 
 Flags (shared):
 - `--project <PREFIX>` (limit to a specific project)
 - `--auth-profile <name>` (override home config)
 - `--dry-run` (show planned changes only)
+- `--task <ID>` (push/pull selection only; check validates the remote, not an issue)
 
 ## UI + MCP entrypoints
 
-- UI: expose separate Push and Pull buttons per remote.
+- UI: the Sync page has separate Push, Pull, and Check buttons per remote plus reports. An existing task's **Sync issue** dialog chooses a remote and Pull/Push direction and submits `task_id` for that task; save a new task before syncing it. Auth profiles are managed outside the UI, as described below.
 - MCP: separate tools for `sync_pull` and `sync_push` (no combined sync tool).
 
 ## Identity (platform references)

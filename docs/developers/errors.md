@@ -6,7 +6,7 @@ LoTaR surfaces consistent error envelopes across the REST API, CLI, and MCP stdi
 
 Every REST response is either `{"data": ...}` (success) or `{"error": { ... }}`.
 
-```json
+```http
 HTTP/1.1 400 Bad Request
 {
 	"error": {
@@ -19,10 +19,10 @@ HTTP/1.1 400 Bad Request
 
 | HTTP status | `error.code` | When it is returned | Source |
 | --- | --- | --- | --- |
-| `400` | `INVALID_ARGUMENT` | Request validation failures: missing parameters, malformed JSON bodies, invalid filters, priority/type parsing errors, invalid task IDs, or git preconditions. Raised through `bad_request(..)` in `src/routes.rs`. |
-| `404` | `NOT_FOUND` | Task or sprint lookups that miss (e.g., comment edits, sprint lifecycle updates). Uses `not_found(..)` in `src/routes.rs`. |
-| `500` | `INTERNAL` | Anything that bubbles up from storage/config IO, YAML parsing, or service errors. The message mirrors the underlying error for easier debugging. Sourced via `internal(..)` in `src/routes.rs`. |
-| `500` | `SERIALIZE` | Only emitted when the server fails to encode the JSON payload (see `json_serialize_error` in `src/routes.rs`). Indicates a bug; retrying usually succeeds once the underlying issue is fixed. |
+| `400` | `INVALID_ARGUMENT` | Request validation failures: missing parameters, malformed JSON bodies, invalid filters, priority/type parsing errors, invalid task IDs, or git preconditions. Raised through `bad_request(..)` in `src/routes/mod.rs`. |
+| `404` | `NOT_FOUND` | Task or sprint lookups that miss (e.g., comment edits, sprint lifecycle updates). Uses `not_found(..)` in `src/routes/mod.rs`. |
+| `500` | `INTERNAL` | Storage/config IO, YAML parsing, or service errors mapped as internal failures. Sourced via `internal(..)` and the domain mapper in `src/routes/mod.rs`. |
+| `500` | `SERIALIZE` | Server JSON encoding failure (`json_serialize_error` in `src/routes/mod.rs`); an implementation error, not a promised transient retry condition. |
 
 `details` is optional; it appears when a handler adds structured context to the `internal(..)` payload. Conflicts (`409`) remain unused today—they are reserved for future optimistic concurrency features.
 

@@ -1,5 +1,7 @@
 # Agent CLI integration plan
 
+> **Historical document (supersession note).** This is the original pre-implementation design plan, preserved as written. Current implementation status lives in `docs/developers/agent-automation-tracker.md`; the SSE contract lives in `docs/developers/sse.md`. Code references below to `src/routes.rs` predate its split into the `src/routes/` modules (job endpoints in `src/routes/jobs.rs`, automation endpoints in `src/routes/automation.rs`), and job state is no longer purely ephemeral (see the Storage note).
+
 ## Goal
 Enable LoTaR to orchestrate installed agent CLIs (Copilot CLI, Claude Code, Codex CLI, Gemini CLI) and capture reliable job status/progress without relying on the model to self-report.
 
@@ -63,6 +65,7 @@ Enable LoTaR to orchestrate installed agent CLIs (Copilot CLI, Claude Code, Code
 - Minimal context storage per ticket (e.g., `.context` with last N messages)
 - Optional event log (bounded) for troubleshooting; avoid full raw logs by default
 - **No job persistence in repo**: job state is ephemeral; web UI can cache last-seen state in browser storage only.
+  - *Superseded:* job events are now appended to persistent per-job log files (`src/services/agent_log_service.rs`, surfaced via `GET /api/jobs/logs`); job records themselves stay outside the repo.
 
 ## UI
 - Job panel for running/completed jobs
@@ -322,7 +325,7 @@ agents:
 ## Technical spec (implementation plan)
 ### Integration points in the codebase
 - **Config**: extend `src/config/types.rs` + `src/config/operations.rs` + `src/config/resolution.rs` + `src/config/env_overrides.rs` to add agent profiles + context storage flag.
-- **REST**: add job endpoints in `src/routes.rs` and DTOs in `src/api_types.rs`; update `docs/openapi.json` and `view/api/types.ts`.
+- **REST**: add job endpoints in `src/routes.rs` and DTOs in `src/api_types.rs`; update `docs/openapi.json` and `view/api/types.ts`. (*Historical path: `src/routes.rs` has since been split into `src/routes/` modules — jobs in `src/routes/jobs.rs`, automation in `src/routes/automation.rs`.)
 - **SSE**: reuse `src/api_events.rs` to emit `agent_job_*` events; `src/web_server.rs` already forwards events.
 - **CLI**: add `lotar agent` args under `src/cli/args/` and handlers under `src/cli/handlers/`.
 - **Services**: add `agent_job_service` (job lifecycle + supervisor), `agent_runner` (CLI adapters), and `agent_context_service` (per-ticket `.context` storage).
@@ -391,5 +394,6 @@ agents:
 
 ### Follow-ups
 - [ ] Decide whether to add a per-job events endpoint (`/api/jobs/events`) or keep SSE-only and update docs accordingly.
+  - *Resolved since:* no separate endpoint was added; `GET /api/jobs/logs` serves the per-job event log and clients join it with the live SSE cache losslessly by `(id, sequence)` (see `docs/developers/sse.md`).
 - [ ] Add job detail/timeline UI plus ticket-level job status widgets.
 - [ ] Implement web UI local storage cache for last-seen jobs (non-authoritative).

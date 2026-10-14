@@ -2,6 +2,8 @@
 
 *Last Updated: August 1, 2025*
 
+> Historical architecture snapshot, reconciled October 13, 2026 (DEV-83). Preserve the original rationale below, but do not use its enum lists, example task YAML, global-index layout, or four-character-prefix claims as today's executable contract. Current references: [Task Model](./help/task-model.md), [Configuration](./help/config-reference.md), [Sprints](./help/sprints.md), and [storage/transaction implementation](../src/storage/transaction.rs). Superseded decisions are identified explicitly rather than silently rewriting history.
+
 ## System Architecture
 
 LoTaR follows a clean, modular architecture built around Rust's type safety and performance characteristics.
@@ -117,7 +119,7 @@ Sprints are stored separately from project task files so lifecycle data stays ca
 
 - Sprint identifiers come from the filename (`<number>.yml`) and are not duplicated inside the YAML body.
 - Writers produce deterministic key ordering and drop empty values to keep Git diffs clean.
-- Sprint files never embed task identifiers. Tasks own a `sprints: []` array and CLI helpers (`sprint add | move | remove | backlog`) enforce the single-membership contract unless `--force` is explicitly supplied.
+- **Superseded task-owned membership model:** "Sprint files never embed task identifiers. Tasks own a `sprints: []` array." Current sprint files contain `tasks: [{id, order?}]`, which are authoritative for membership/order; task DTO `sprints`/`sprint_order` are derived, and legacy task YAML memberships remain readable rather than authoritative. DEV-55 coordinates participating updates and recovery under ordered locks; see [current sprint storage](./help/task-model.md#sprints--ordering) and [transactions](../src/storage/transaction.rs). CLI helpers retain their documented single-membership/force rules.
 
 ### YAML Structure
 
@@ -175,6 +177,8 @@ End dates prefer `plan.ends_at`; otherwise the planner adds `plan.length` to the
 **Decision**: Use `PROJ-1` format for external references (4-character prefix + sequential number)  
 **Rationale**: Human-readable, unique, sortable, professional, compact
 
+**Superseded detail:** prefixes are not limited to four characters. Use the current validated grammar in [Task Model](./help/task-model.md#identity-and-ids); ID allocation is not a promise of permanent non-reuse after physical removal.
+
 ### AD-004: Command Pattern for CLI
 **Decision**: Implement CLI using Command trait pattern  
 **Rationale**: Extensibility, testability, maintainability, consistent error handling
@@ -183,9 +187,13 @@ End dates prefer `plan.ends_at`; otherwise the planner adds `plan.length` to the
 **Decision**: Use Rust enums for status, priority, task type  
 **Rationale**: Compile-time validation, performance, consistency, evolution support
 
+**Superseded implementation:** these are configurable string wrappers validated against resolved project vocabularies, not a fixed built-in enum list. See [Configuration Reference](./help/config-reference.md).
+
 ### AD-006: Global Index for Performance
 **Decision**: Maintain global index file for searches  
 **Rationale**: Sub-100ms performance, cross-project search, scalability
+
+**Historical, not the current storage contract:** do not create the example `index.yml` or depend on this performance claim. Current storage/search code works over task files and its caches; see [storage search](../src/storage/search.rs).
 
 ### AD-007: Embedded Web Interface
 **Decision**: Include Vue frontend (built with Vite) in Rust binary  

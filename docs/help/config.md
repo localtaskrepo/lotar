@@ -67,6 +67,7 @@ lotar config set <KEY> <VALUE> [--global] [--dry-run] [--force]
 
 Details:
 - Use canonical keys such as `server.port`, `issue.tags`, or `custom_fields`, or the shipped flat names (`server_port`, `tags`). Both spellings map to the same field, including the exceptions `default.strict_members` -> `strict_members` and `issue.tags` -> `tags`. Supplying two spellings of one field with different values is rejected; identical values deduplicate. Arrays/maps accept JSON strings (e.g., `"[\"frontend\",\"backend\"]"`) or comma-separated values (e.g., `frontend,backend`).
+- Not every nested YAML path has a dotted mutation alias. For sprint defaults/notifications use the shipped setter fields `sprints_defaults_length`, `sprints_defaults_overdue_after`, `sprints_defaults_capacity_points`, `sprints_defaults_capacity_hours`, and `sprints_notifications_enabled`. Invalid-field errors list accepted flat names; do not assume the YAML nesting alone makes a CLI setter valid.
 - Project scope is chosen via the CLI-wide `--project` flag or the configured `default.project`. Pass `--global` to edit `.tasks/config.yml` instead.
 - `--dry-run` runs the exact validation pipeline of a real write — field/schema checks, resolved-configuration checks, and conflict detection against existing tasks — and exits nonzero without editing files when the change would be rejected. Only the write is skipped; no configuration files are created.
 - `--force` applies the change despite task-compatibility conflicts (an existing task whose status/type/priority would fall outside the new lists). Schema errors (wrong field name/value), malformed configuration or task files, and newly broken resolved-configuration invariants still abort, with or without `--force`.
@@ -244,8 +245,6 @@ Copy settings between projects while preserving unique identifiers:
 lotar config init --project=new-service --copy-from=existing-service
 ```
 
-```
-
 ## Done States
 
 `issue.done_states` defines which task statuses count as finished. It is independent of sprint lifecycle states and agent-job states. The dotted spelling, nested YAML spelling, and flat `issue_done_states` alias address the same field.
@@ -294,9 +293,7 @@ Resolved configuration responses expose `effective_done_states`, `done_states_mo
 Automation (defaults inherited from global):
 - `auto.populate_members` - Automatically add new assignees/reporters to the project member list when strict members are enabled (default: true)
 - `auto.set_reporter` - If true, set reporter automatically on create/update when missing
-- `auto.assign_on_status` - If true, auto-assign assignee on first meaningful status change
-    - First-change is defined as: when a task moves away from the default.status (or the first state if default unset) and the task currently has no assignee.
-    - The assignee chosen is, in order: CODEOWNERS default owner (when available and `auto.codeowners_assign` is true) → resolved current user (see Identity Resolution below).
+- `auto.assign_on_status` - If true, the shared mutation service may assign the resolved current user on an effective status transition while unassigned; no-op transitions do not gain an owner. The standalone CLI status handler additionally uses the configured default/first state and may prefer CODEOWNERS when enabled. Do not infer CODEOWNERS parity across all mutation surfaces; see [Identity & Users](./identity.md).
 - `auto.codeowners_assign` - Enable CODEOWNERS fallback when auto-assigning on first status change
 - `auto.tags_from_path` - Allow monorepo path heuristics to seed tags when no defaults were provided
 - `auto.branch_infer_type` - Infer task type from branch prefixes like feat/, fix/, chore/
@@ -327,7 +324,7 @@ Automation (defaults inherited from global):
 - `sprints.notifications.enabled` - Toggle lifecycle warnings for start/close operations (default: true). Accepts the same precedence chain as other config keys and can be overridden per project.
 - `scan.signal_words` - Default scanner keywords (default: `["TODO","FIXME","HACK","BUG","NOTE"]`)
 - `scan.ticket_patterns` - Regex patterns used globally for ticket detection
-- `scan.enable_ticket_words` - Promote task type words (e.g., "Feature") to signal words (default: false)
+- `scan.enable_ticket_words` - Promote task type words (e.g., "Feature") to signal words (built-in default: true)
 - `scan.enable_mentions` - Emit references for existing ticket keys (default: true)
 - `scan.strip_attributes` - Remove inline attribute blocks after insertion (default: true)
 - Automation:
@@ -384,7 +381,7 @@ branch:
 
 - `--project <PREFIX_OR_NAME>` - Override auto-detected project for any config subcommand (same resolution rules as `lotar config show --project`).
 - `--config KEY=VALUE` - Inline configuration override for the current invocation. Accepts the same field names as `lotar config set`, including dotted canonical aliases (e.g., `--config default.strict_members=false`). Multiple flags can be supplied; later ones win, and two spellings of one field with different values are rejected. Existing per-command options remain as shorthands.
-- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--format <FORMAT>` - Text or JSON; table/markdown/md are text aliases, not separate renderers.
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
 
@@ -404,10 +401,7 @@ Notes:
 ## Identity Resolution and @me
 
 - Anywhere a person field is accepted (reporter, assignee, default_reporter), the special value `@me` is allowed.
-- `@me` resolves to the current user using this order:
-    1) Merged config `default_reporter` (following the precedence above)
-    2) git config at repo root: user.name or user.email
-    3) System environment: $USER or $USERNAME
+- `@me` resolves via merged `default_reporter`, repository-local Git identity (when enabled), system user, then best-effort manifest author. Project configuration outranks env/home/global in merged defaults. See [Identity & Users](./identity.md) for toggles, caching, and inspection.
 - This resolution is used consistently by CLI, REST, and MCP.
 
 ## Notes

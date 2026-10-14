@@ -39,9 +39,9 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 
 - [x] CLI — `agent run`, `status`, `logs`, `cancel`, `check`, `list-running`, `list-jobs`, `worktree list/cleanup`, `worker`, `queue`
 - [x] CLI — `automation simulate` / `dry-run`
-- [x] REST API — Full CRUD for jobs, queue stats, automation inspect/set/simulate endpoints
-- [x] SSE events — `agent_job_started`, `agent_job_init`, `agent_job_progress`, `agent_job_message`, `agent_job_result`, `agent_job_completed`, `agent_job_failed`, `agent_job_cancelled`
-- [x] MCP tools — Agent job creation (`agent_execute`, `agent_run`) and management (`agent_status`, `agent_cancel`, `agent_list_jobs`)
+- [x] REST API — Job create/list/get/logs/cancel/cancel-all/message (`src/routes/jobs.rs`), queue stats, automation inspect/set/simulate (`src/routes/automation.rs`)
+- [x] SSE events — `agent_job_started`, `agent_job_progress`, `agent_job_message`, `agent_job_input`, `agent_job_completed`, `agent_job_failed`, `agent_job_cancelled` (payloads in `docs/developers/sse.md`). The push-only kinds `agent_job_raw`, `agent_job_init`, and `agent_job_result` consume sequence numbers and appear in the REST log (`GET /api/jobs/logs`) but are never streamed over SSE.
+- [x] MCP tools — Job creation and management (`agent_run`, `agent_status`, `agent_cancel`, `agent_list_jobs`, `agent_send_message`)
 - [x] Web UI — Agent Jobs page with queue stats, job creation, profile picker, live log viewer, cancel/remove
 - [x] Fix agent-in-members bug — `@`-prefixed agent profiles filtered from member lists
 
@@ -50,14 +50,15 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 - [x] **Agent profile names added to member list** — Fixed in `missing_members_for_task` and Vue `preloadPeople`.
 - [x] **CLI `add` missing automation trigger** — `AddHandler` bypassed `AutomationService`. Fixed: automation now fires after `storage.add()`.
 - [x] **Home config interference in tests** — `~/.lotar` overriding workspace config. Fixed: `LOTAR_IGNORE_HOME_CONFIG=1` in smoke env.
-- [ ] **`lotar init --project` broken** — Configs generated in project dir instead of global; default project not set. (Not agent-specific but blocks clean onboarding.)
-- [ ] **CLI single-field commands skip automation** — `lotar priority`, `lotar status` etc. use `ctx.storage.edit()` directly, bypassing `TaskService::update` and automation triggers. Only `lotar task add` and API/MCP paths fire automation.
+- [x] **`lotar init --project` broken** — Fixed: project init writes the project config under the tasks root and `ensure_global_config_has_default` always sets `default.project` in the global config (`src/cli/handlers/config/init/mod.rs`).
+- [x] **CLI single-field commands skip automation** — Fixed: `lotar priority`, `lotar status`, `lotar assignee`, `lotar due`, and `lotar effort` route through `TaskService::update` and fire automation; covered by `tests/cli_single_field_automation_test.rs`.
 
 ## Known Gotchas
 
 - **Config format**: Custom statuses must use `issue: states: [...]`, not `statuses: [...]` at the top level. Same for `issue: priorities:` and `issue: types:`. See `src/config/normalization.rs`.
 - **`MatchMode::OnChange`**: For `updated` events, each field in `when` conditions must have actually changed in the update. Single-field CLI commands only include that one field in the changeset. For `created` events, all fields count as "new".
 - **`default: project:`**: The config's default project is only used in certain code paths. `detect_project_name()` returns a value first (from env → project files → git repo → directory name → "default"). Use `-p <project>` to force prefix.
+- **Wrapper process discovery is system-wide**: `running_job_for_ticket()` scans all system processes for `lotar-agent-wrapper` by design (wrapper-based discovery lets `list-running` work without persistence; see `src/cli/handlers/agent.rs`). Ticket matching is alias-aware (DEV-56). Concurrent runs that spawn wrappers can observe each other's jobs.
 
 ---
 
@@ -65,11 +66,14 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 
 ### Rust Unit/Integration Tests
 
-- 745 tests total
-- 4 agent automation integration tests (`tests/agent_automation_integration_test.rs`): success, failure, cancel, multi-phase chaining
-- 96 pre-existing failures from workspace `.tasks/` contamination (not from automation changes)
+Counts are static source counts (`#[test]` / `#[tokio::test]`), not run results; git-gated tests are included in the count.
 
-### Smoke Tests (103 total across 29 files)
+- 1498 test functions across `src/` and `tests/`
+- 35 agent automation integration tests (`tests/agent_automation_integration_test.rs`): lifecycle, failure, cancel, multi-phase chaining
+- Related suites: `tests/agent_safety_test.rs`, `tests/cli_agent_check_test.rs`, `tests/cli_single_field_automation_test.rs`, `tests/dev59_automation_composition_test.rs`, `tests/dev102_automation_noop_test.rs`
+- `on.commented` is implemented and covered: `AutomationEvent::Commented` exists in `src/services/automation_service.rs` and is dispatched by `TaskService::add_comment_with_context` (`src/services/task_service.rs`); automation's own comment actions use `CommentContext::automation()` and never re-dispatch it (recursion guard). Tested in `tests/dev60_shared_mutation_test.rs` and the CLI comment tests.
+
+### Smoke Tests (278 tests across 71 files; static `it(` count)
 
 #### CLI Automation (`cli.automation.smoke.spec.ts`) — 16 tests
 | Test | Status |
@@ -113,30 +117,33 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 | `agent worktree list` shows no worktrees | ✅ |
 | `agent worktree cleanup` runs without error | ✅ |
 
-#### REST API Automation (`api.automation.smoke.spec.ts`) — 8 tests
+#### REST API Automation (`api.automation.smoke.spec.ts`) — 11 tests
 | Test | Status |
 |------|--------|
 | `GET /api/automation/show` returns current rules | ✅ |
 | `GET /api/automation/show?project=X` returns project-scoped rules | ✅ |
 | `POST /api/automation/set` saves valid YAML | ✅ |
-| `POST /api/automation/set` rejects invalid YAML | ✅ |
+| `POST /api/automation/set` rejects invalid YAML and cooldowns without rewriting rules | ✅ |
 | `POST /api/automation/simulate` returns matching rule | ✅ |
 | `POST /api/automation/simulate` with no match returns empty | ✅ |
 | Round-trip: set rules → create task → verify automation fired | ✅ |
 | Cooldown prevents re-firing within window (server mode) | ✅ |
+| Monitor counterfactual: wait-then-read wedges a chatty stderr child, concurrent drain completes | ✅ |
+| Server async run drains a chatty stderr child without wedging the monitor | ✅ |
+| Server async run reports descendant-held stderr within the bounded grace | ✅ |
 
 #### MCP Agent Tools (`mcp.agent-tools.smoke.spec.ts`) — 9 tests
 | Test | Status |
 |------|--------|
 | `agent_list_jobs` returns empty list | ✅ |
 | `agent_status` error for missing id | ✅ |
-| `agent_status` error for non-existent job | ✅ |
-| `agent_cancel` error for non-existent job | ✅ |
-| `agent_run` validates parameters | ✅ |
-| `agent_execute` validates parameters | ✅ |
+| `agent_status` tool failure for non-existent job | ✅ |
+| `agent_cancel` tool failure for non-existent job | ✅ |
+| `agent_run` error for missing required params | ✅ |
+| `agent_send_message` error for missing params | ✅ |
+| Agent tools appear in tools/list | ✅ |
 | `agent_run` with command runner creates and starts a job | ✅ |
 | `agent_status` returns details for an existing job | ✅ |
-| Tool listing includes agent tools | ✅ |
 
 #### MCP High-Value (`mcp.high-value.smoke.spec.ts`) — includes agent tests
 | Test | Status |
@@ -150,32 +157,31 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 | Mock agent job creation → completion → log capture | ✅ |
 | Job status transitions via REST API | ✅ |
 
-**Known flake**: `api.agent-jobs.smoke.spec.ts` spawns `lotar-agent-wrapper` processes visible system-wide. When running concurrently, `lotar status` in CLI automation tests scans all processes and may find these wrappers, failing with "active agent job" error. This is a pre-existing issue in the `running_job_for_ticket` function which uses system-wide process scanning.
+**Known flake source**: `api.agent-jobs.smoke.spec.ts` spawns `lotar-agent-wrapper` processes visible system-wide. When running concurrently, `lotar status` in CLI automation tests scans all processes and may find these wrappers, failing with an "active agent job" error. This is inherent to wrapper-based discovery in `running_job_for_ticket` (system-wide process scan, alias-aware ticket matching per DEV-56), not a persistence bug.
 
-#### WebUI Agent Jobs (`ui.agent-jobs.smoke.spec.ts`) — 4 tests
+#### WebUI Agent Jobs (`ui.agent-jobs.smoke.spec.ts`) — 6 tests
 | Test | Status |
 |------|--------|
 | Renders page heading and queue stats | ✅ |
 | Shows completed job in job list | ✅ |
-| Filter tabs present and clickable | ✅ |
-| New job form toggles and shows fields | ✅ |
+| Completed filter removes non-matching jobs and keeps matching ones | ✅ |
+| Streams log entries live while a job is running | ✅ |
+| Groups multiple jobs for the same ticket into one card (retry: 2) | ✅ |
+| Stops queued and running jobs only after accessible confirmation | ✅ |
 
-#### WebUI Automation (`ui.automation.smoke.spec.ts`) — 3 tests
+#### WebUI Automation (`ui.automation.smoke.spec.ts`) — 6 tests
 | Test | Status |
 |------|--------|
+| Cannot save old rules while a new project load is pending or failed | ✅ |
 | Renders rules from automation.yml | ✅ |
 | Simulator tab renders and shows empty state for no match | ✅ |
 | Rules and Simulator tabs toggle content | ✅ |
+| Creates a rule through the guided dialog | ✅ |
+| Guided dialog shows project-aware suggestions | ✅ |
 
 ### Remaining Test Gaps
 
-The following test scenarios are NOT yet covered. Most require either unimplemented features (`on.commented`), complex setup (sprints, date conditions), or worktree infrastructure (agent worktree with completed job).
-
-#### Not implemented (blocked)
-
-| Test | Reason |
-|------|--------|
-| `on.commented` event fires automation | `Commented` event not in `AutomationEvent` enum; comment handler bypasses `AutomationService` |
+The following test scenarios are NOT yet covered. Most require complex setup (sprints, date conditions) or worktree infrastructure (agent worktree with completed job). `on.commented` is no longer a gap: it is implemented and covered (see Rust tests above).
 
 #### Complex setup (deferred)
 
@@ -201,7 +207,6 @@ The following test scenarios are NOT yet covered. Most require either unimplemen
 | Test | Notes |
 |------|-------|
 | `POST /api/automation/set` returns warnings for unknown fields | Valid YAML with typos returns warnings |
-| Cancel button cancels a running job in WebUI | Start slow job, click cancel, verify status change |
 
 ## Key Files
 
@@ -209,18 +214,20 @@ The following test scenarios are NOT yet covered. Most require either unimplemen
 |------|-------|
 | Runner adapters | `src/services/agent_runner.rs` |
 | Job lifecycle | `src/services/agent_job_service.rs` |
+| Job event logs | `src/services/agent_log_service.rs` |
 | File-backed queue | `src/services/agent_queue_service.rs` |
 | Automation engine | `src/services/automation_service.rs`, `src/services/automation_matching.rs` |
 | Automation types | `src/automation/types.rs`, `src/automation/persistence.rs`, `src/automation/template.rs` |
 | Config types | `src/config/types.rs` (agent profiles, automation config, worktree config) |
 | Config normalization | `src/config/normalization.rs` (parses `issue.states/types/priorities`) |
 | CLI args/handlers | `src/cli/args/agent.rs`, `src/cli/handlers/agent.rs`, `src/cli/handlers/mod.rs` |
-| REST routes | `src/routes.rs` (job + automation endpoints) |
+| REST routes | `src/routes/jobs.rs` (job endpoints), `src/routes/automation.rs` (automation endpoints) |
 | API DTOs | `src/api_types.rs` |
+| MCP handlers | `src/mcp/server/handlers/agent.rs` |
 | UI page | `view/pages/AgentJobs.vue` |
 | UI types | `view/api/types.ts` |
 | Templates | `src/config/templates/agent-pipeline.yml`, `src/config/templates/agent-reviewed.yml` |
-| Integration tests | `tests/agent_automation_integration_test.rs` |
+| Integration tests | `tests/agent_automation_integration_test.rs`, `tests/agent_safety_test.rs`, `tests/cli_agent_check_test.rs`, `tests/cli_single_field_automation_test.rs`, `tests/dev59_automation_composition_test.rs`, `tests/dev102_automation_noop_test.rs` |
 | Smoke: CLI automation | `smoke/tests/cli.automation.smoke.spec.ts` |
 | Smoke: CLI agent commands | `smoke/tests/cli.agent-commands.smoke.spec.ts` |
 | Smoke: CLI config/agent | `smoke/tests/cli.config-agent.smoke.spec.ts` |
@@ -237,6 +244,13 @@ The following test scenarios are NOT yet covered. Most require either unimplemen
 
 | Bug | Severity | Details |
 |-----|----------|---------|
-| `on.commented` event not implemented | Medium | `AutomationEvent` enum lacks `Commented` variant. Comment CLI handler doesn't call `AutomationService`. Rules with `on: [commented]` are silently ignored. |
-| `TaskService::create` returns pre-automation DTO | Low | After `create()`, the returned task DTO reflects the state *before* automation ran. Callers must re-fetch via `TaskService::get` to see automated changes. Affects `POST /api/tasks/add` response body. |
-| Process-wide agent job detection causes test flake | Low | `running_job_for_ticket()` uses `sysinfo::System` to scan ALL system processes for `lotar-agent-wrapper`. During parallel test runs, wrapper processes from `api.agent-jobs.smoke.spec.ts` cause false positives in concurrent CLI tests. |
+| Cross-test visibility of wrapper processes | Low | `running_job_for_ticket()` scans all system processes for `lotar-agent-wrapper` by design (wrapper-based discovery, `src/cli/handlers/agent.rs`). Concurrent runs that spawn wrappers can observe each other's jobs; ticket matching is alias-aware (DEV-56). |
+
+## Fixed (formerly tracked here)
+
+| Former bug | Resolution |
+|-----|---------|
+| `on.commented` not implemented | `AutomationEvent::Commented` exists and is dispatched by `TaskService::add_comment_with_context`; automation comment actions cannot recurse (`CommentContext::automation()`). |
+| `TaskService::create` returned pre-automation DTO | `create()` re-fetches the task after `apply_task_update` and returns the post-automation state (`src/services/task_service.rs`). |
+| `lotar init --project` mis-placed configs / unset default project | Project config written under the tasks root; `ensure_global_config_has_default` always sets `default.project`. |
+| CLI single-field commands bypassed automation | `priority`/`status`/`assignee`/`due`/`effort` route through `TaskService::update`; covered by `tests/cli_single_field_automation_test.rs`. |

@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All configuration keys by scope with types and notes. Canonical YAML uses nested groups and only emits values that differ from the built-in defaults. If `.tasks/config.yml` contains just a comment, you're still using the defaults listed below.
+Canonical configuration groups by scope, with types and effective built-in defaults. Canonical YAML only emits non-default values; a comment-only `.tasks/config.yml` still uses defaults. Inspect `lotar config show --full --format=json` for resolved flat fields under `.config`; this CLI envelope is not REST's `.data`. YAML/dotted names below are input names, not JSON response paths. Typed fields and aliases are defined in `src/config/types.rs` and `src/config/normalization.rs`.
 
 ## Precedence
 CLI > project > env > home > global > defaults (commands without a project skip the project step). See [Resolution & Precedence](./precedence.md).
@@ -10,30 +10,35 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - default.project: string (default project prefix)
 - default.assignee: string
 - default.reporter: string
-- default.priority: enum Priority
-- default.status: enum TaskStatus
+- default.priority: configured string (default Medium)
+- default.status: optional configured string (unset by default; creation uses the first configured state)
 - default.tags: string[]
 - default.strict_members: boolean (default false)
 - members: string[]
 - issue.states: string[] (e.g., [Todo, InProgress, NeedsReview, Done])
 - issue.done_states: optional nonempty string[] of finished task statuses, all drawn from the effective `issue.states`. An explicit list replaces inference; omitted project values inherit, and without any explicit list LoTaR infers completion after resolving the project's workflow. See [Done States](./config.md#done-states).
-- issue.types: string[] (feature, bug, epic, spike, chore)
-- issue.priorities: string[] (Low, Medium, High, Critical)
-- issue.tags: string[]
-- custom_fields: string[]
+- issue.types: string[] (built-in [Feature, Bug, Chore])
+- issue.priorities: string[] (built-in [Low, Medium, High]; Critical requires configuration)
+- issue.tags: string[] (default wildcard ["*"])
+- custom_fields: string[] (default wildcard ["*"])
 - attachments.dir: string (default "@attachments")
 - attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited; positive values are MiB
 - sync.reports_dir: string (default "@reports")
 - sync.write_reports: boolean (default true)
 - agent.context_enabled: boolean (default true) — when true, LoTaR stores per-ticket `.context` files to support agent resume/continue; disable for stateless runs. If you don’t want to share context files, add `.context` to `.gitignore`.
+- agent.context_extension: string (default ".context")
+- agent.logs_dir: optional string (default workspace `.agent-logs`; see [Agent Jobs](./agent.md))
 - agent.instructions: string | { file: string } (default: built-in) — prepended to agent prompts. Inline strings are used directly; file paths can be absolute or relative to the tasks directory.
 - agent.worktree.enabled: boolean (default false) — when true, agent jobs run inside a git worktree.
 - agent.worktree.dir: string (default computed) — optional worktree root directory; relative paths resolve from the repo’s parent directory.
 - agent.worktree.branch_prefix: string (default "agent/") — prefix used when creating agent branches.
+- agent.worktree.max_parallel_jobs: optional positive integer (unset means unlimited)
+- agent.worktree.cleanup_on_done / cleanup_on_failure / cleanup_on_cancel / cleanup_delete_branches: booleans (default false). Eligibility and clean/merged/active-job safeguards still apply; see [Agent Jobs](./agent.md).
+- agent.automation.on_start / on_success / on_failure / on_cancel: lifecycle action maps (`set_status`, `reassign_to`). Defaults start at InProgress, succeed at NeedsReview with `assignee_or_reporter`, and leave failure/cancel empty. Custom workflows must provide compatible actions; see [Agent Jobs](./agent.md).
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
-- scan.enable_ticket_words: boolean (default: false) — when true, issue-type words (like Feature/Bug/Chore) act as signal words in addition to TODO/FIXME/etc. Note: bare ticket keys alone do not trigger creation.
+- scan.enable_ticket_words: boolean (built-in default: true) — issue-type words act as signal words in addition to TODO/FIXME/etc. Bare ticket keys alone never create tasks.
 - scan.enable_mentions: boolean (default: true) — when true, add code anchors under `references` for existing ticket keys found in source
 - scan.strip_attributes: boolean (default: true) — when true, remove inline [key=value] attribute blocks from source after inserting the ticket key
 - auto.identity: boolean (default true)
@@ -46,6 +51,11 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - auto.branch_infer_status: boolean (default true)
 - auto.branch_infer_priority: boolean (default true)
 - auto.populate_members: boolean (default true)
+- branch.type_aliases / branch.status_aliases / branch.priority_aliases: maps of branch token to configured label (default empty)
+- sprints.defaults.length / sprints.defaults.overdue_after: optional duration strings (e.g., 2w / 12h); see the recipes below
+- sprints.defaults.capacity_points / capacity_hours: optional nonnegative numbers
+- sprints.notifications.enabled: boolean (default true; project-overridable)
+- web_ui_path: optional global-only path (top-level spelling), for an external web bundle
 - remotes: map (named remotes)
 - remotes.<name>.provider: enum (jira|github)
 - remotes.<name>.project: string (Jira project key)
@@ -69,7 +79,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - auth_profiles.<name>.api_url: string
 
 ## Home and Project keys
-Same shape as global; project values override global for that project. Use `project.name` for an optional human-readable label (the folder name remains the canonical identifier).
+Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `default.project`, sprint defaults, and `web_ui_path` are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
 
 Auth profiles are home-only: `auth_profiles` is ignored in project configs (secrets never live in the repo). Remotes can be configured globally or per-project; project remotes override/extend global remotes.
 
@@ -78,42 +88,42 @@ Project configs can also override any automation toggle inherited from global de
 > Legacy: older configs may include `issue.categories`. The key is normalized for compatibility but is not consumed by the runtime. Prefer modeling these labels with `custom_fields` (the dotted alias remains accepted for compatibility).
 
 ## Examples
+
+These are three separate files, not one YAML document with duplicate keys. Spaces, not tabs, are required for indentation.
+
 ```yaml
 # ~/.lotar (home config)
 default:
-	project: DEMO
+  project: DEMO
+```
 
+```yaml
 # .tasks/config.yml (global)
 issue:
-	states: [Todo, InProgress, NeedsReview, Done]
-	priorities: [Low, Medium, High]
+  states: [Todo, InProgress, NeedsReview, Done]
+  priorities: [Low, Medium, High]
 scan:
-	signal_words: [TODO, FIXME]
-	ticket_patterns: ["[A-Z]{2,}-\\d+"]
-	enable_ticket_words: true
-	enable_mentions: true
+  signal_words: [TODO, FIXME]
+  ticket_patterns: ["[A-Z]{2,}-\\d+"]
+  enable_ticket_words: true
+  enable_mentions: true
 
 attachments:
-	# Relative paths resolve under the tasks directory (the `.tasks` folder)
-	dir: "@attachments"
-	# 0 disables uploads, -1 is unlimited, positive values are MiB
-	max_upload_mb: 10
+  # Relative paths resolve under the tasks directory
+  dir: "@attachments"
+  # 0 disables uploads, -1 is unlimited, positive values are MiB
+  max_upload_mb: 10
 
 sync:
-	# Sync reports (stored under .tasks/@reports by default)
-	reports_dir: "@reports"
-	write_reports: true
+  reports_dir: "@reports"
+  write_reports: true
 
 agent:
-	# Disable .context persistence (stateless mode)
-	context_enabled: false
-	# Default agent instructions (inline or file)
-	instructions:
-		file: "@agent-instructions.md"
-	# Optional worktree support for agent jobs
-	worktree:
-		enabled: true
-		branch_prefix: "agent/"
+  context_enabled: false
+  instructions: "Follow the project's checked-in development guidance."
+  worktree:
+    enabled: true
+    branch_prefix: "agent/"
 
 # Automation rules live in a separate file:
 # - Global: .tasks/automation.yml
@@ -121,45 +131,59 @@ agent:
 # - Home: ~/.lotar.automation.yml
 
 agents:
-	# Short form
-	myclaude: claude
-	# Long form
-	copilot-default:
-		runner: copilot
-	codex-default:
-		runner: codex
-		args: ["--model", "o3"]
+  myclaude: claude
+  copilot-default:
+    runner: copilot
+  codex-default:
+    runner: codex
+```
 
+```yaml
 # .tasks/DEMO/config.yml (project)
 project:
-	name: Demo Service
+  name: Demo Service
 issue:
-	types: [feature, bug, chore]
+  types: [Feature, Bug, Chore]
 attachments:
-	# Project-specific override (optional)
-	max_upload_mb: 25
+  max_upload_mb: 25
 scan:
-	enable_mentions: false  # example: disable adding anchors for existing keys in this project
+  enable_mentions: false
 auto:
-	identity: true
-	identity_git: true
-	assign_on_status: true
+  identity: true
+  identity_git: true
+  assign_on_status: true
 default:
-	tags: [oncall, sev]
+  tags: [oncall, sev]
 
 remotes:
-	jira-home:
-		provider: jira
-		project: DEMO
-		auth_profile: jira.default
-		mapping:
-			title: summary
-			status:
-				field: status
-				values:
-					Todo: to-do
-					Done: done
+  jira-home:
+    provider: jira
+    project: DEMO
+    auth_profile: jira.default
+    mapping:
+      title: summary
+      status:
+        field: status
+        values:
+          Todo: to-do
+          Done: done
 ```
+
+The remote example is configuration only. Before a real sync, configure its home auth profile as documented in [Sync](../developers/sync.md); validation of YAML is not a credential or connectivity check.
+
+## Duration and JSON Recipes
+
+```bash
+# Preview before persisting global sprint defaults
+lotar config set sprints_defaults_length 2w --global --dry-run
+lotar config set sprints_defaults_overdue_after 12h --global --dry-run
+lotar config show --full --format=json | jq '.config.sprint_defaults'
+
+# Read configured labels, including built-in values omitted from a partial show
+lotar config show --project=DEMO --full --format=json | jq -r '.config.issue_priorities[]'
+```
+
+Nested YAML paths are not all exposed as dotted CLI mutation aliases: the sprint recipes deliberately use the shipped flat setter names. Sprint defaults are stored as strings: config set/dry-run can accept a malformed duration, and sprint creation can persist it with a warning rather than reject it. Do not treat successful config or sprint creation as proof of a usable schedule. Dry-run runs the same implemented config validators as persistence, not every downstream parser. [DEV-111](../../.tasks/DEV/111.yml) tracks stricter default-duration validation. Use [sprint](./sprints.md) for length/grace inputs and [automation](./automation.md) for its separately validated cooldown grammar.
 
 ## Validation
 - Values are checked against allowed enums.

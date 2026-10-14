@@ -22,7 +22,7 @@ lotar status 42
 lotar status 42 in_progress
 
 # Explicit project (global flag shared by all commands)
-lotar status 123 verify --project=backend
+lotar status 123 needs_review --project=backend
 
 # JSON output for automation
 lotar status AUTH-7 done --format=json
@@ -69,7 +69,7 @@ Changing a status follows these stages:
 1. Resolve the workspace/project and load the task.
 2. Validate `<NEW_STATUS>` against the merged `issue_states` from config.
 3. Detect no-op transitions and report when the status already matches.
-4. Decide whether auto-assign should add an owner (when enabled) by checking CODEOWNERS defaults first and then falling back to identity resolution (the same order `@me` uses).
+4. Decide whether this standalone CLI handler should add an owner (when enabled) by checking CODEOWNERS defaults first, then falling back to identity. CODEOWNERS is not itself part of the `@me` identity chain; generic service updates can make their own unassigned-transition decision.
 5. If `--dry-run` is present, emit the preview (and optional explanation) and exit without touching disk.
 6. Otherwise write the updated status, optionally set the assignee, save the task file, and print the result.
 
@@ -81,15 +81,14 @@ Each project controls allowed statuses via `issue_states` and `default_status` i
 
 - `todo` - planned work
 - `in_progress` - actively being developed
-- `verify` - undergoing review or QA
-- `blocked` - waiting on a dependency
+- `needs_review` - undergoing review
 - `done` - complete and verified
 
 List the effective values for a project:
 
 ```bash
 lotar config show --project=backend
-lotar config show --project=backend --format=json | jq -r '.data.issue_states[]'
+lotar config show --project=backend --format=json --full | jq -r '.config.issue_states[]'
 ```
 
 ## Task ID and project resolution
