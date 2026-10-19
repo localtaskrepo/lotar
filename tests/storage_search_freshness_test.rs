@@ -1,11 +1,9 @@
-//! Contract tests for storage search freshness: the mtime-keyed task cache
+//! Contract tests for storage search freshness: the content-keyed parse cache
 //! must behave exactly like an uncached scan — external edits, deletes, and
 //! new files are all reflected in subsequent searches.
 //!
-//! Freshness is driven deterministically: after every external rewrite the
-//! file's mtime is set explicitly to a strictly increasing clock via
-//! `File::set_modified`, so no wall-clock sleep is required and the (mtime,
-//! len) cache fingerprint changes only through the controlled dimension.
+//! Tests control timestamps explicitly, including unchanged mtime/length cases,
+//! without wall-clock sleeps or filesystem clock-granularity assumptions.
 
 mod common;
 
@@ -113,6 +111,83 @@ fn search_detects_same_length_title_edit_via_mtime_only() {
     let mut clock = MtimeClock::new();
     set_mtime(&task_file, clock.advance());
 
+    assert_eq!(search_titles(&storage), vec!["modified title"]);
+}
+
+#[test]
+fn search_and_get_detect_same_length_edits_with_unchanged_mtime() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_dir = tmp.path().join("tasks");
+    let project_dir = tasks_dir.join("CACHE");
+    fs::create_dir_all(&project_dir).unwrap();
+    let task_file = project_dir.join("1.yml");
+    write_task_file(&project_dir, 1, "original title");
+    let storage = Storage::new(&tasks_dir);
+    assert_eq!(search_titles(&storage), vec!["original title"]);
+    assert_eq!(
+        storage.get("CACHE-1", "CACHE").unwrap().title,
+        "original title"
+    );
+    let before = fs::metadata(&task_file).unwrap();
+    let mtime = before.modified().unwrap();
+    write_task_file(&project_dir, 1, "modified title");
+    set_mtime(&task_file, mtime);
+    assert_eq!(fs::metadata(&task_file).unwrap().len(), before.len());
+    assert_eq!(
+        storage.get("CACHE-1", "CACHE").unwrap().title,
+        "modified title"
+    );
+    assert_eq!(search_titles(&storage), vec!["modified title"]);
+    write_task_file(&project_dir, 1, "original title");
+    set_mtime(&task_file, mtime);
+    assert_eq!(search_titles(&storage), vec!["original title"]);
+    assert_eq!(
+        storage.get("CACHE-1", "CACHE").unwrap().title,
+        "original title"
+    );
+}
+
+#[test]
+fn cached_task_detects_atomic_replacement_with_preserved_metadata() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_dir = tmp.path().join("tasks");
+    let project_dir = tasks_dir.join("CACHE");
+    fs::create_dir_all(&project_dir).unwrap();
+    write_task_file(&project_dir, 1, "original title");
+    let task_file = project_dir.join("1.yml");
+    let storage = Storage::new(&tasks_dir);
+    assert_eq!(search_titles(&storage), vec!["original title"]);
+    let before = fs::metadata(&task_file).unwrap();
+    write_task_file(&project_dir, 2, "modified title");
+    let replacement = project_dir.join("2.yml");
+    set_mtime(&replacement, before.modified().unwrap());
+    assert_eq!(fs::metadata(&replacement).unwrap().len(), before.len());
+    fs::rename(replacement, &task_file).unwrap();
+    assert_eq!(search_titles(&storage), vec!["modified title"]);
+    assert_eq!(
+        storage.get("CACHE-1", "CACHE").unwrap().title,
+        "modified title"
+    );
+}
+
+#[test]
+fn cached_task_does_not_mask_corruption_with_preserved_metadata() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_dir = tmp.path().join("tasks");
+    let project_dir = tasks_dir.join("CACHE");
+    fs::create_dir_all(&project_dir).unwrap();
+    write_task_file(&project_dir, 1, "original title");
+    let task_file = project_dir.join("1.yml");
+    let storage = Storage::new(&tasks_dir);
+    assert_eq!(search_titles(&storage), vec!["original title"]);
+    let before = fs::metadata(&task_file).unwrap();
+    let mtime = before.modified().unwrap();
+    fs::write(&task_file, "x".repeat(before.len() as usize)).unwrap();
+    set_mtime(&task_file, mtime);
+    assert!(search_titles(&storage).is_empty());
+    assert!(storage.get("CACHE-1", "CACHE").is_none());
+    write_task_file(&project_dir, 1, "modified title");
+    set_mtime(&task_file, mtime);
     assert_eq!(search_titles(&storage), vec!["modified title"]);
 }
 

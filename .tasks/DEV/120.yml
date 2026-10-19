@@ -1,0 +1,7 @@
+title: Use locked fresh mutation for all scanner task reference updates
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-14T01:10:45.296858+00:00
+description: DEV-112 fixed stale whole-task publication in CLI reanchor, but adjacent edit_task_with_context (scan_handler.rs) and update_task_code_reference (scan_service.rs) still load/get a task before mutating references and passing a whole snapshot to storage.edit. This can overwrite concurrent comments, custom fields or other references in create/known-mention paths despite the write lock; latest YAML extensions alone are merged. Add deterministic fail-first concurrency controls at each public CLI/service boundary, migrate to fresh Storage::mutate_task or equivalent locked receipts, preserve exact no-op byte/mtime and user metadata, derived root/ID validation and error mapping. Keep source preparation rollback and task/source sequencing unchanged; do not run source IO or re-entrant callbacks inside task lock. Review shared mutation seam rather than copying new test-only hooks without need. Separately scoped existing-data-loss hardening; not claimed fixed by DEV-112.

@@ -83,6 +83,7 @@
               :key="col"
               :class="[{ sortable: isSortableCol(col), active: isSortableCol(col) && sort.key === col }]"
               :aria-sort="isSortableCol(col) ? (sort.key === col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined"
+              :data-column="col"
               @dragover.prevent="onColDragOver(col, $event)"
               @drop.prevent="onColDrop(col, $event)"
             >
@@ -256,6 +257,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState';
+import { useColumnDragReorder } from '../composables/useColumnDragReorder';
 import { formatMember } from '../utils/member';
 import ColumnsMenu from './ColumnsMenu.vue';
 import IconGlyph from './IconGlyph.vue';
@@ -307,75 +309,20 @@ const {
 
 const rowsKey = computed(() => sorted.value.map(t => t.id).join('|'))
 
-type ColumnKey = import('../composables/useColumns').ColKey
-
-const draggingCol = ref<ColumnKey | null>(null)
-const dragOverCol = ref<ColumnKey | null>(null)
-const dragOverPos = ref<'before' | 'after'>('before')
-const lastDragAt = ref(0)
-
-function onHeaderActivate(col: ColumnKey) {
-  if (Date.now() - lastDragAt.value < 250) return
-  onSort(col)
-}
-
-function moveColumn(from: ColumnKey, to: ColumnKey, pos: 'before' | 'after') {
-  if (from === to) return
-  const next = columnOrder.value.filter((c) => c !== from)
-  const idx = next.indexOf(to)
-  if (idx < 0) return
-  const insertAt = pos === 'after' ? idx + 1 : idx
-  next.splice(insertAt, 0, from)
-  columnOrder.value = next
-}
-
-function onColDragStart(col: ColumnKey, event: DragEvent) {
-  draggingCol.value = col
-  dragOverCol.value = null
-  dragOverPos.value = 'before'
-  lastDragAt.value = Date.now()
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
-    try {
-      event.dataTransfer.setData('application/x-lotar-col', col)
-      event.dataTransfer.setData('text/plain', col)
-    } catch {
-      // ignore
-    }
-  }
-}
-
-function onColDragOver(col: ColumnKey, event: DragEvent) {
-  dragOverCol.value = col
-  const target = event.currentTarget as HTMLElement | null
-  if (!target) {
-    dragOverPos.value = 'before'
-    return
-  }
-  const rect = target.getBoundingClientRect?.()
-  if (!rect || !rect.width) {
-    dragOverPos.value = 'before'
-    return
-  }
-  const mid = rect.left + rect.width / 2
-  dragOverPos.value = event.clientX <= mid ? 'before' : 'after'
-}
-
-function onColDrop(target: ColumnKey, event: DragEvent) {
-  const source = (event.dataTransfer?.getData('application/x-lotar-col') || event.dataTransfer?.getData('text/plain') || '') as ColumnKey
-  if (source) moveColumn(source, target, dragOverPos.value)
-  draggingCol.value = null
-  dragOverCol.value = null
-  dragOverPos.value = 'before'
-  lastDragAt.value = Date.now()
-}
-
-function onColDragEnd() {
-  draggingCol.value = null
-  dragOverCol.value = null
-  dragOverPos.value = 'before'
-  lastDragAt.value = Date.now()
-}
+const {
+  draggingCol,
+  dragOverCol,
+  dragOverPos,
+  onHeaderActivate,
+  onColDragStart,
+  onColDragOver,
+  onColDrop,
+  onColDragEnd,
+} = useColumnDragReorder({
+  mime: 'application/x-lotar-col',
+  columnOrder,
+  onSort,
+})
 
 const sprintLookup = computed(() => props.sprintLookup ?? {})
 const hasSprintsLocal = computed(() => props.hasSprints ?? false)

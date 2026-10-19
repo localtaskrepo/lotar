@@ -822,6 +822,7 @@ import { useFilterOptions } from '../composables/useFilterOptions'
 import { useCopyModifier } from '../composables/useCopyModifier'
 import { buildServerFilter, listFromCsv, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useColumns } from '../composables/useColumns'
+import { useColumnDragReorder } from '../composables/useColumnDragReorder'
 import { ensureCompletionPolicies, useCompletionPolicy } from '../composables/useCompletionPolicy'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
@@ -1164,73 +1165,20 @@ const columnStore = useColumns({
 const { columns, columnOrder, visibleColumns, toggleColumn, resetColumns } = columnStore
 const columnsSet = computed(() => new Set(columns.value))
 
-const draggingCol = ref<ColumnKey | null>(null)
-const dragOverCol = ref<ColumnKey | null>(null)
-const dragOverPos = ref<'before' | 'after'>('before')
-const lastColDragAt = ref(0)
-
-function onHeaderActivate(col: ColumnKey) {
-  if (Date.now() - lastColDragAt.value < 250) return
-  onSort(col)
-}
-
-function moveColumn(from: ColumnKey, to: ColumnKey, pos: 'before' | 'after') {
-  if (from === to) return
-  const next = columnOrder.value.filter((c) => c !== from)
-  const idx = next.indexOf(to)
-  if (idx < 0) return
-  const insertAt = pos === 'after' ? idx + 1 : idx
-  next.splice(insertAt, 0, from)
-  columnOrder.value = next
-}
-
-function onColDragStart(col: ColumnKey, event: DragEvent) {
-  draggingCol.value = col
-  dragOverCol.value = null
-  dragOverPos.value = 'before'
-  lastColDragAt.value = Date.now()
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
-    try {
-      event.dataTransfer.setData('application/x-lotar-sprints-col', col)
-      event.dataTransfer.setData('text/plain', col)
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-function onColDragOver(col: ColumnKey, event: DragEvent) {
-  dragOverCol.value = col
-  const target = event.currentTarget as HTMLElement | null
-  if (!target) {
-    dragOverPos.value = 'before'
-    return
-  }
-  const rect = target.getBoundingClientRect?.()
-  if (!rect || !rect.width) {
-    dragOverPos.value = 'before'
-    return
-  }
-  const mid = rect.left + rect.width / 2
-  dragOverPos.value = event.clientX <= mid ? 'before' : 'after'
-}
-
-function onColDrop(target: ColumnKey, event: DragEvent) {
-  const source = (event.dataTransfer?.getData('application/x-lotar-sprints-col') || event.dataTransfer?.getData('text/plain') || '') as ColumnKey
-  if (source) moveColumn(source, target, dragOverPos.value)
-  draggingCol.value = null
-  dragOverCol.value = null
-  dragOverPos.value = 'before'
-  lastColDragAt.value = Date.now()
-}
-
-function onColDragEnd() {
-  draggingCol.value = null
-  dragOverCol.value = null
-  dragOverPos.value = 'before'
-  lastColDragAt.value = Date.now()
-}
+const {
+  draggingCol,
+  dragOverCol,
+  dragOverPos,
+  onHeaderActivate,
+  onColDragStart,
+  onColDragOver,
+  onColDrop,
+  onColDragEnd,
+} = useColumnDragReorder({
+  mime: 'application/x-lotar-sprints-col',
+  columnOrder,
+  onSort,
+})
 
 const headerLabel = (col: ColumnKey) => columnStore.headerLabel(col)
 

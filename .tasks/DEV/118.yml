@@ -1,0 +1,7 @@
+title: Share automation set-action parsing and define simulate parity
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-14T00:46:59.896906+00:00
+description: Deferred after DEV-112. Apply and simulate independently enumerate set fields/parse enums; simulate currently omits due/effort/custom values and does not fully resolve templates/assignee. First extract shared pure supported-field/parse plan preserving current mutation receipts/completion policy; then explicitly define preview parity and template/resolver behavior before changing output. Test every set field and alias against apply/preview, recursion and no-op guards. Keep implicit feature additions separate from move-only cleanup. No implementation in DEV-112.

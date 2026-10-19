@@ -1,0 +1,7 @@
+title: Consolidate configuration field metadata without changing supported keys
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-14T00:46:59.748754+00:00
+description: Deferred after DEV-112. Centralize field scope, aliases and inspect/source-label metadata duplicated in config/operations.rs GLOBAL/PROJECT_CONFIG_FIELDS, normalization.rs CONFIG_PATHS, source_labels.rs and candidate relevant-field sets. Keep typed setters and existing accepted/rejected key spellings, provenance, empty-clear/inheritance, force and full-candidate validation contracts unchanged. Do not union catalogs into silently newly accepted dotted aliases or replace typed config with a dynamic engine. Add completeness/invariant tests, alias/scope/dryrun/noop regression coverage; coordinate future duration policy DEV-111 separately. Work only when assigned; no implementation in DEV-112.

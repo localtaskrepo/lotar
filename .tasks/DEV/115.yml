@@ -1,0 +1,7 @@
+title: Share sprint and backlog task-cell rendering
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-14T00:46:59.808396+00:00
+description: Deferred after DEV-112. Replace near-identical SprintsList sprint-row and backlog-cell templates with one cohesive renderer. Preserve contextSprintId versus null tooltip behavior, sprint chips versus backlog placeholder, completion-aware overdue styling, accessible controls, shared column order and page selection/drag membership semantics. Reuse current formatting/columns helpers; no design or API change. Focused render/pagination/filter/add-task tests and browser table geometry required. No implementation in DEV-112.

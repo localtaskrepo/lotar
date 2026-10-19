@@ -1,0 +1,7 @@
+title: Reconcile scanner reanchor flag behavior across CLI and API
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-14T01:10:45.252994+00:00
+description: DEV-112 independent review found CLI args.reanchor and service request.reanchor defined/documented but not used. Current CLI runs reanchor during non-dry-run scans regardless of flag; REST request flag is ignored. Diff review confirms current cleanup did not remove a previously read flag, but historical snapshots show older behavior, so do not label contract drift intentional without decision. Define intended semantics then align CLI/API/help/OpenAPI/TS shapes as required, preserving default scanning/known mentions/no-create/dryrun and source safety. Characterize flag true/false/default through public boundaries, no accidental full-workspace reanchor on target-filtered requests. Separate behavior-changing follow-up, not implemented in DEV-112.

@@ -11,6 +11,133 @@ pub struct InlineAttrs {
     pub fields: Vec<(String, String)>,
 }
 
+/// Pure snapshot of the scanner-relevant configuration shared by the CLI and
+/// API scan surfaces. Each surface keeps its own fallback when no
+/// configuration can be read at all.
+#[derive(Debug, Clone)]
+pub(crate) struct ScanConfigSnapshot {
+    pub(crate) signal_words: Vec<String>,
+    pub(crate) ticket_patterns: Option<Vec<String>>,
+    pub(crate) enable_ticket_words: bool,
+    pub(crate) enable_mentions: bool,
+    pub(crate) strip_attributes: bool,
+    pub(crate) issue_type_words: Vec<String>,
+}
+
+impl ScanConfigSnapshot {
+    /// CLI fallback when no configuration can be read: scanner defaults with
+    /// mention tracking left enabled. `strip_attributes` is unused on this
+    /// path; the CLI resolves stripping through its own project lookup.
+    pub(crate) fn cli_fallback() -> Self {
+        Self {
+            signal_words: Vec::new(),
+            ticket_patterns: None,
+            enable_ticket_words: false,
+            enable_mentions: true,
+            strip_attributes: false,
+            issue_type_words: Vec::new(),
+        }
+    }
+
+    /// API service fallback when no configuration can be read: identical to
+    /// the CLI fallback except attribute stripping defaults to on.
+    pub(crate) fn service_fallback() -> Self {
+        Self {
+            strip_attributes: true,
+            ..Self::cli_fallback()
+        }
+    }
+}
+
+/// Resolve the shared scanner snapshot from a configuration manager, using
+/// the project override when available and the resolved root config
+/// otherwise. Pure lookup: selection order matches both historical surfaces.
+pub(crate) fn scan_config_from_manager(
+    manager: &crate::config::manager::ConfigManager,
+    project: Option<&str>,
+) -> ScanConfigSnapshot {
+    let resolved = match project {
+        Some(project_name) => manager
+            .get_project_config(project_name)
+            .unwrap_or_else(|_| manager.get_resolved_config().clone()),
+        None => manager.get_resolved_config().clone(),
+    };
+    let issue_type_words = if resolved.scan_enable_ticket_words {
+        resolved
+            .issue_types
+            .values
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    ScanConfigSnapshot {
+        signal_words: resolved.scan_signal_words,
+        ticket_patterns: resolved.scan_ticket_patterns,
+        enable_ticket_words: resolved.scan_enable_ticket_words,
+        enable_mentions: resolved.scan_enable_mentions,
+        strip_attributes: resolved.scan_strip_attributes,
+        issue_type_words,
+    }
+}
+
+/// Merge regular signal words with issue-type words, skipping
+/// case-insensitive duplicates. Shared by the CLI and API scan surfaces.
+pub(crate) fn merge_signal_words(
+    signal_words: &[String],
+    issue_type_words: &[String],
+) -> Vec<String> {
+    let mut merged = signal_words.to_vec();
+    for word in issue_type_words {
+        if !merged
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(word))
+        {
+            merged.push(word.clone());
+        }
+    }
+    merged
+}
+
+/// Build the quote-aware line scanner both surfaces use for comment ranges,
+/// key extraction, and mention analysis. Signal words are applied only when
+/// provided, matching the historical per-surface construction.
+pub(crate) fn configured_line_scanner(
+    ticket_patterns: Option<&[String]>,
+    enable_ticket_words: bool,
+    signal_words: &[String],
+) -> crate::scanner::Scanner {
+    let mut scanner = crate::scanner::Scanner::new(std::path::PathBuf::from("."))
+        .with_ticket_detection(ticket_patterns, enable_ticket_words);
+    if !signal_words.is_empty() {
+        scanner = scanner.with_signal_words(signal_words);
+    }
+    scanner
+}
+
+/// Replace a specific 1-based line in the file content and return the new
+/// content, preserving the trailing-newline shape of the input.
+pub(crate) fn replace_line_contents(
+    contents: &str,
+    line_number_1based: usize,
+    new_line: &str,
+) -> Option<String> {
+    let mut lines: Vec<&str> = contents.lines().collect();
+    if line_number_1based == 0 || line_number_1based > lines.len() {
+        return None;
+    }
+    lines[line_number_1based - 1] = new_line;
+    let mut out = String::new();
+    for (i, line) in lines.iter().enumerate() {
+        out.push_str(line);
+        if i + 1 < lines.len() || contents.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    Some(out)
+}
+
 /// Strip parsed metadata from a comment segment, never from the surrounding source.
 pub fn strip_bracket_attributes(line: &str) -> String {
     let mut out = String::with_capacity(line.len());

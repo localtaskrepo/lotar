@@ -1,0 +1,7 @@
+title: Extract TaskPanel attachment and link handling into scoped composables
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-14T00:46:59.837953+00:00
+description: Deferred after DEV-112. Move cohesive file/URL/drag/drop/reference subsystem out of TaskPanel using existing composables/task-panel patterns, in small slices rather than one giant context object. Preserve task/draft generation checks, pending-drop batching, drag-depth reset, preferences, applyReferencesFromTaskResponse semantics, user-owned files versus managed attachments, permissions and modal focus. Tests TaskPanel.attachmentPrefix/pendingDrops plus reference detach/upload and browser drag behavior required. No frontend redesign or API/YAML compatibility loss. No implementation in DEV-112.

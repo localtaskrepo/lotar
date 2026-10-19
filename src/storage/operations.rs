@@ -148,7 +148,7 @@ impl StorageOperations {
         let locations = parsed.locate(root_path);
         match locations.len() {
             0 => None,
-            // Route through the mtime-validated parse cache shared with search
+            // Route through the content-validated parse cache shared with search
             1 => crate::storage::search::StorageSearch::load_task_file(&locations[0].file),
             // Duplicate ID across roots: identity is ambiguous, never guess.
             _ => None,

@@ -444,8 +444,7 @@ impl AgentJobService {
             if state.record.status != AgentJobStatus::Cancelled {
                 state.record.status = AgentJobStatus::Cancelled;
                 state.record.finished_at = Some(Utc::now().to_rfc3339());
-                let event = push_event(state, "agent_job_cancelled", None);
-                emit_job_event(&event, &state.record);
+                record_and_emit(state, "agent_job_cancelled", None);
                 cancelled = true;
             }
             let job = state.record.to_dto_with_cancelled(cancelled);
@@ -556,8 +555,7 @@ impl AgentJobService {
             .jobs
             .get_mut(id)
             .ok_or_else(|| LoTaRError::ValidationError("Job not found".to_string()))?;
-        let event = push_event(state, "agent_job_input", Some(trimmed.to_string()));
-        emit_job_event(&event, &state.record);
+        record_and_emit(state, "agent_job_input", Some(trimmed.to_string()));
 
         Ok(state.record.to_dto())
     }
@@ -1280,8 +1278,7 @@ fn run_job(
             if let Some(path) = context.worktree_path.as_ref() {
                 let msg = format!("Worktree: {}", path.to_string_lossy());
                 update_job(&job_id, |state| {
-                    let event = push_event(state, "agent_job_progress", Some(msg.clone()));
-                    emit_job_event(&event, &state.record);
+                    record_and_emit(state, "agent_job_progress", Some(msg.clone()));
                 });
             }
             context
@@ -1298,8 +1295,7 @@ fn run_job(
             }
             let msg = format!("Worktree setup skipped: {}", err);
             update_job(&job_id, |state| {
-                let event = push_event(state, "agent_job_progress", Some(msg.clone()));
-                emit_job_event(&event, &state.record);
+                record_and_emit(state, "agent_job_progress", Some(msg.clone()));
             });
             WorktreeContext {
                 working_dir: resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone()),
@@ -1341,8 +1337,7 @@ fn run_job(
         }
         state.record.status = AgentJobStatus::Running;
         state.record.started_at = Some(started_at.clone());
-        let event = push_event(state, "agent_job_started", None);
-        emit_job_event(&event, &state.record);
+        record_and_emit(state, "agent_job_started", None);
     });
 
     if cancelled {
@@ -1460,8 +1455,7 @@ fn run_job(
                 if !msg.is_empty() {
                     update_job(&job_id_clone, |state| {
                         state.record.last_message = Some(msg.clone());
-                        let event = push_event(state, "agent_job_progress", Some(msg.clone()));
-                        emit_job_event(&event, &state.record);
+                        record_and_emit(state, "agent_job_progress", Some(msg.clone()));
                     });
                 }
             })
@@ -1785,8 +1779,7 @@ fn handle_runner_line(
                 if let Some(ref msg) = message {
                     state.record.last_message = Some(msg.clone());
                 }
-                let event = push_event(state, "agent_job_progress", message.clone());
-                emit_job_event(&event, &state.record);
+                record_and_emit(state, "agent_job_progress", message.clone());
             });
         }
         RunnerEventKind::Message => {
@@ -1798,8 +1791,7 @@ fn handle_runner_line(
                 if let Some(ref msg) = message {
                     state.record.last_message = Some(msg.clone());
                 }
-                let event = push_event(state, "agent_job_message", message.clone());
-                emit_job_event(&event, &state.record);
+                record_and_emit(state, "agent_job_message", message.clone());
             });
         }
         RunnerEventKind::Result => {
@@ -1839,8 +1831,7 @@ fn finalize_job(
         } else {
             "agent_job_failed"
         };
-        let event = push_event(state, event_kind, None);
-        emit_job_event(&event, &state.record);
+        record_and_emit(state, event_kind, None);
     });
     if !finalized {
         let _ = AgentContextService::append_messages(
@@ -1948,8 +1939,7 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
         state.record.finished_at = Some(now.clone());
         state.record.last_message = Some(message.clone());
         state.record.summary = Some(message.clone());
-        let event = push_event(state, "agent_job_failed", Some(message.clone()));
-        emit_job_event(&event, &state.record);
+        record_and_emit(state, "agent_job_failed", Some(message.clone()));
     });
     if !failed {
         return;
@@ -2140,6 +2130,18 @@ fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
         kind: event.kind.clone(),
         data: payload,
     });
+}
+
+/// Record-then-stream pair for SSE-visible job events. Log-only kinds
+/// (agent_job_raw/init/result) stay on bare `push_event`.
+fn record_and_emit(
+    state: &mut AgentJobState,
+    kind: &str,
+    message: Option<String>,
+) -> AgentJobEvent {
+    let event = push_event(state, kind, message);
+    emit_job_event(&event, &state.record);
+    event
 }
 
 #[cfg(test)]
@@ -2398,7 +2400,7 @@ mod tests {
     }
 
     #[test]
-    fn emit_job_event_carries_exact_pushed_sequence_and_at() {
+    fn record_and_emit_carries_exact_pushed_sequence_and_at() {
         static SSE_TEST_COUNTER: std::sync::atomic::AtomicU64 =
             std::sync::atomic::AtomicU64::new(0);
         let job_id = format!(
@@ -2409,11 +2411,9 @@ mod tests {
         let mut state = unit_job_state(&job_id);
         let rx = crate::api_events::subscribe();
 
-        let first = push_event(&mut state, "agent_job_progress", Some("same".into()));
-        emit_job_event(&first, &state.record);
-        let second = push_event(&mut state, "agent_job_progress", Some("same".into()));
-        emit_job_event(&second, &state.record);
-        // Push-only kinds consume sequence numbers but are never emitted.
+        let first = record_and_emit(&mut state, "agent_job_progress", Some("same".into()));
+        let second = record_and_emit(&mut state, "agent_job_progress", Some("same".into()));
+        // Log-only kinds consume sequence numbers but are never emitted.
         push_event(&mut state, "agent_job_raw", Some("raw line".into()));
         push_event(&mut state, "agent_job_init", None);
         push_event(&mut state, "agent_job_result", None);

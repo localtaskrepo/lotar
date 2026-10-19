@@ -7,7 +7,9 @@ use crate::storage::manager::Storage;
 use crate::types::{CustomFields, custom_value_string};
 use crate::utils::paths::repo_relative_display;
 use crate::utils::scan::{
-    parse_inline_attributes, refresh_code_reference, validate_source_write, write_source,
+    ScanConfigSnapshot, configured_line_scanner, merge_signal_words, parse_inline_attributes,
+    refresh_code_reference, replace_line_contents, scan_config_from_manager, validate_source_write,
+    write_source,
 };
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
@@ -82,15 +84,8 @@ impl ScanService {
             .strip_attributes
             .unwrap_or(scan_config.strip_attributes);
 
-        let mut final_words = scan_config.signal_words.clone();
-        for word in &scan_config.issue_type_words {
-            if !final_words
-                .iter()
-                .any(|existing| existing.eq_ignore_ascii_case(word))
-            {
-                final_words.push(word.clone());
-            }
-        }
+        let final_words =
+            merge_signal_words(&scan_config.signal_words, &scan_config.issue_type_words);
 
         let mut all_results = Vec::new();
         let mut all_mentions = Vec::new();
@@ -125,13 +120,11 @@ impl ScanService {
                 .then(a.line_number.cmp(&b.line_number))
         });
 
-        let mut line_scanner = scanner::Scanner::new(PathBuf::from(".")).with_ticket_detection(
+        let line_scanner = configured_line_scanner(
             scan_config.ticket_patterns.as_deref(),
             scan_config.enable_ticket_words,
+            &final_words,
         );
-        if !final_words.is_empty() {
-            line_scanner = line_scanner.with_signal_words(&final_words);
-        }
 
         let target_keys = build_target_keys(&request.targets);
 
@@ -572,54 +565,15 @@ fn update_summary(summary: &mut ScanSummary, status: &str) {
     }
 }
 
-struct ScanConfigSnapshot {
-    signal_words: Vec<String>,
-    ticket_patterns: Option<Vec<String>>,
-    enable_ticket_words: bool,
-    enable_mentions: bool,
-    strip_attributes: bool,
-    issue_type_words: Vec<String>,
-}
-
 fn resolve_scan_config(
     resolver: &TasksDirectoryResolver,
     project: Option<&str>,
 ) -> ScanConfigSnapshot {
-    let manager = ConfigManager::new_manager_with_tasks_dir_readonly(resolver.path.as_path()).ok();
-    if let Some(manager) = manager {
-        let resolved = match project {
-            Some(project_name) => manager
-                .get_project_config(project_name)
-                .unwrap_or_else(|_| manager.get_resolved_config().clone()),
-            None => manager.get_resolved_config().clone(),
-        };
-        let issue_type_words = if resolved.scan_enable_ticket_words {
-            resolved
-                .issue_types
-                .values
-                .iter()
-                .map(|t| t.to_string())
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-        ScanConfigSnapshot {
-            signal_words: resolved.scan_signal_words,
-            ticket_patterns: resolved.scan_ticket_patterns,
-            enable_ticket_words: resolved.scan_enable_ticket_words,
-            enable_mentions: resolved.scan_enable_mentions,
-            strip_attributes: resolved.scan_strip_attributes,
-            issue_type_words,
-        }
-    } else {
-        ScanConfigSnapshot {
-            signal_words: Vec::new(),
-            ticket_patterns: None,
-            enable_ticket_words: false,
-            enable_mentions: true,
-            strip_attributes: true,
-            issue_type_words: Vec::new(),
-        }
+    match ConfigManager::new_manager_with_tasks_dir_readonly(resolver.path.as_path()).ok() {
+        Some(manager) => scan_config_from_manager(&manager, project),
+        // API fallback: scanner defaults with mention tracking on and
+        // attribute stripping forced on.
+        None => ScanConfigSnapshot::service_fallback(),
     }
 }
 
@@ -641,23 +595,14 @@ fn replace_line(
     new_line: &str,
     source_writer: &mut impl FnMut(&Path, &str, &str) -> Result<(), String>,
 ) -> Result<(), String> {
-    let mut lines: Vec<&str> = contents.lines().collect();
-    if line_number == 0 || line_number > lines.len() {
-        return Err(format!(
+    let updated = replace_line_contents(contents, line_number, new_line).ok_or_else(|| {
+        format!(
             "Line {} is out of range (max {})",
             line_number,
-            lines.len()
-        ));
-    }
-    lines[line_number - 1] = new_line;
-    let mut out = String::new();
-    for (idx, line) in lines.iter().enumerate() {
-        out.push_str(line);
-        if idx + 1 < lines.len() || contents.ends_with('\n') {
-            out.push('\n');
-        }
-    }
-    source_writer(path, contents, &out)
+            contents.lines().count()
+        )
+    })?;
+    source_writer(path, contents, &updated)
         .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
     Ok(())
 }

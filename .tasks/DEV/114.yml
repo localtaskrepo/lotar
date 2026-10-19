@@ -1,0 +1,7 @@
+title: Align sprint task sorting with the shared task sort contract
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-14T00:46:59.778479+00:00
+description: Deferred behavioral alignment after DEV-112. SprintsList private raw-string comparator differs from view/utils/taskSort.ts in effort, null dates, numeric memberships and ID ties. Characterize actual row orders and decide intended parity; use colKeyToSortBy/shared sortTasks only after acceptance cases. Preserve lotar.sprints.sort, column mappings and DEV-105 independent pager offset resets/clamps; do not change manual backlog ordering (DEV-109). Test parity for units/nulls/ties/custom keys and browser ordering. Not a silent move-only cleanup; no implementation in DEV-112.

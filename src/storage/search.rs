@@ -8,18 +8,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::SystemTime;
 
-/// Cached parse of one task file, validated on every read by the file's
-/// (mtime, len) fingerprint. Entries are never trusted across an external
-/// modification: any edit changes the mtime (APFS has nanosecond granularity)
-/// and virtually always the length too, so the next search re-parses the file.
-/// This makes the cache behave exactly like an uncached scan while skipping
-/// the YAML parse for unchanged files — including in serve mode, where tasks
-/// are routinely edited on disk by other tools.
+/// Cache the parsed task, not a promise that metadata uniquely identifies bytes.
+/// Content is read each time so equal-size edits, preserved timestamps and atomic
+/// replacements cannot hide changes. Unchanged files still skip YAML parsing.
 struct CachedTask {
-    mtime: SystemTime,
-    len: u64,
+    content: String,
     task: Arc<Task>,
 }
 
@@ -36,26 +30,18 @@ fn task_cache() -> &'static Mutex<HashMap<PathBuf, CachedTask>> {
 pub struct StorageSearch;
 
 impl StorageSearch {
-    /// Load and parse a task file, using the (mtime, len)-validated parse cache.
+    /// Load and parse a task file, using a content-validated parse cache.
     /// Corrupt files warn once and return None, mirroring uncached behavior.
     pub fn load_task_file(path: &Path) -> Option<Task> {
-        let metadata = fs::metadata(path).ok()?;
-        let mtime = metadata.modified().ok()?;
-        let len = metadata.len();
-
+        let content = fs::read_to_string(path).ok()?;
         let cache_key = path.to_path_buf();
         if let Ok(cache) = task_cache().lock()
             && let Some(hit) = cache.get(&cache_key)
-            && hit.mtime == mtime
-            && hit.len == len
+            && hit.content == content
         {
             return Some((*hit.task).clone());
         }
 
-        let content = match fs::read_to_string(path) {
-            Ok(content) => content,
-            Err(_) => return None,
-        };
         let task = match serde_yaml_ng::from_str::<Task>(&content) {
             Ok(task) => task,
             Err(e) => {
@@ -73,8 +59,7 @@ impl StorageSearch {
             cache.insert(
                 cache_key,
                 CachedTask {
-                    mtime,
-                    len,
+                    content,
                     task: Arc::new(task.clone()),
                 },
             );

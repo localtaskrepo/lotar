@@ -8,7 +8,9 @@ use crate::output::OutputRenderer;
 use crate::project;
 use crate::scanner;
 use crate::utils::scan::{
-    parse_inline_attributes, refresh_code_reference, validate_source_write, write_source,
+    ScanConfigSnapshot, configured_line_scanner, merge_signal_words, parse_inline_attributes,
+    refresh_code_reference, replace_line_contents, scan_config_from_manager, validate_source_write,
+    write_source,
 };
 use crate::workspace::TasksDirectoryResolver;
 use std::path::PathBuf;
@@ -95,71 +97,26 @@ impl CommandHandler for ScanHandler {
             Err(_) => None,
         };
 
-        // Load config (global or project-specific) to obtain scan settings
-        let (
-            cfg_words,
-            cfg_ticket_patterns,
-            cfg_enable_ticket_words,
-            cfg_enable_mentions,
-            issue_type_words,
-        ): (Vec<String>, Option<Vec<String>>, bool, bool, Vec<String>) = {
-            let mgr = crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
+        // Load config (global or project-specific) to obtain scan settings.
+        // When no configuration can be read at all, fall back to scanner
+        // defaults with mention tracking left enabled (CLI behavior).
+        let scan_cfg =
+            match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
                 _resolver.path.as_path(),
             )
-            .ok();
-            if let Some(mgr) = mgr {
-                if let Some(project_name) = effective_project_for_config.as_deref() {
-                    if let Ok(resolved) = mgr.get_project_config(project_name) {
-                        let mut type_words: Vec<String> = Vec::new();
-                        if resolved.scan_enable_ticket_words {
-                            type_words = resolved
-                                .issue_types
-                                .values
-                                .iter()
-                                .map(|t| t.to_string())
-                                .collect();
-                        }
-                        (
-                            resolved.scan_signal_words,
-                            resolved.scan_ticket_patterns,
-                            resolved.scan_enable_ticket_words,
-                            resolved.scan_enable_mentions,
-                            type_words,
-                        )
-                    } else {
-                        let r = mgr.get_resolved_config();
-                        let mut type_words: Vec<String> = Vec::new();
-                        if r.scan_enable_ticket_words {
-                            type_words =
-                                r.issue_types.values.iter().map(|t| t.to_string()).collect();
-                        }
-                        (
-                            r.scan_signal_words.clone(),
-                            r.scan_ticket_patterns.clone(),
-                            r.scan_enable_ticket_words,
-                            r.scan_enable_mentions,
-                            type_words,
-                        )
-                    }
-                } else {
-                    let r = mgr.get_resolved_config();
-                    let mut type_words: Vec<String> = Vec::new();
-                    if r.scan_enable_ticket_words {
-                        type_words = r.issue_types.values.iter().map(|t| t.to_string()).collect();
-                    }
-                    (
-                        r.scan_signal_words.clone(),
-                        r.scan_ticket_patterns.clone(),
-                        r.scan_enable_ticket_words,
-                        r.scan_enable_mentions,
-                        type_words,
-                    )
+            .ok()
+            {
+                Some(mgr) => {
+                    scan_config_from_manager(&mgr, effective_project_for_config.as_deref())
                 }
-            } else {
-                // Fallback: use scanner defaults by returning empty to skip override
-                (Vec::new(), None, false, true, Vec::new())
-            }
-        };
+                None => ScanConfigSnapshot::cli_fallback(),
+            };
+        let final_words = merge_signal_words(&scan_cfg.signal_words, &scan_cfg.issue_type_words);
+        let line_scanner = configured_line_scanner(
+            scan_cfg.ticket_patterns.as_deref(),
+            scan_cfg.enable_ticket_words,
+            &final_words,
+        );
 
         let mut all_results = Vec::new();
         let mut all_mentions = Vec::new();
@@ -169,19 +126,14 @@ impl CommandHandler for ScanHandler {
                 .with_include_ext(&args.include)
                 .with_exclude_ext(&args.exclude)
                 .with_modified_only(args.modified_only)
-                .with_mention_tracking(cfg_enable_mentions);
-            // Merge regular signal words with issue-type words if enabled
-            let mut final_words = cfg_words.clone();
-            for w in &issue_type_words {
-                if !final_words.iter().any(|v| v.eq_ignore_ascii_case(w)) {
-                    final_words.push(w.clone());
-                }
-            }
+                .with_mention_tracking(scan_cfg.enable_mentions);
             if !final_words.is_empty() {
                 scanner = scanner.with_signal_words(&final_words);
             }
-            scanner = scanner
-                .with_ticket_detection(cfg_ticket_patterns.as_deref(), cfg_enable_ticket_words);
+            scanner = scanner.with_ticket_detection(
+                scan_cfg.ticket_patterns.as_deref(),
+                scan_cfg.enable_ticket_words,
+            );
             let (mut results, mut mentions) = scanner.scan_with_mentions();
             all_results.append(&mut results);
             all_mentions.append(&mut mentions);
@@ -262,17 +214,7 @@ impl CommandHandler for ScanHandler {
                                 )
                             })?;
                     {
-                        let mut tmp_scanner = scanner::Scanner::new(PathBuf::from("."))
-                            .with_ticket_detection(
-                                cfg_ticket_patterns.as_deref(),
-                                cfg_enable_ticket_words,
-                            );
-                        let mut words = cfg_words.clone();
-                        words.extend(issue_type_words.iter().cloned());
-                        if !words.is_empty() {
-                            tmp_scanner = tmp_scanner.with_signal_words(&words);
-                        }
-                        let range = tmp_scanner
+                        let range = line_scanner
                             .matched_source_comment_range(
                                 &entry.file_path,
                                 &contents,
@@ -280,9 +222,9 @@ impl CommandHandler for ScanHandler {
                             )
                             .ok_or("Cannot establish a safe scan comment boundary")?;
                         let existing_key =
-                            tmp_scanner.extract_ticket_key_from_line(&orig_line[range.clone()]);
+                            line_scanner.extract_ticket_key_from_line(&orig_line[range.clone()]);
                         if existing_key.is_none() {
-                            if tmp_scanner
+                            if line_scanner
                                 .suggest_source_insertion(
                                     &entry.file_path,
                                     &contents,
@@ -357,7 +299,7 @@ impl CommandHandler for ScanHandler {
                             }
 
                             // Insert (KEY) after signal word; optionally strip bracket attributes
-                            let new_line = tmp_scanner
+                            let new_line = line_scanner
                                 .suggest_source_insertion(
                                     &entry.file_path,
                                     &contents,
@@ -391,7 +333,7 @@ impl CommandHandler for ScanHandler {
                             // Only emit and write when a real change occurs
                             if new_line != orig_line
                                 && let Some(updated) =
-                                    replace_line(&contents, entry.line_number, &new_line)
+                                    replace_line_contents(&contents, entry.line_number, &new_line)
                             {
                                 if args.dry_run && !json {
                                     renderer.emit_raw_stdout(format_args!(
@@ -426,7 +368,7 @@ impl CommandHandler for ScanHandler {
                                     applied += 1;
                                 }
                             }
-                        } else if !args.dry_run && cfg_enable_mentions {
+                        } else if !args.dry_run && scan_cfg.enable_mentions {
                             // Movement/relocation resilience: if an existing key is present, ensure
                             // the corresponding task has a code reference for this file+line.
                             if let Some(task_id) = existing_key {
@@ -443,7 +385,7 @@ impl CommandHandler for ScanHandler {
                                 let rel =
                                     crate::utils::paths::repo_relative_display(&entry.file_path);
                                 let line_number = entry.line_number;
-                                let live_refs: Vec<String> = tmp_scanner
+                                let live_refs: Vec<String> = line_scanner
                                     .key_mention_lines(&entry.file_path, &contents, &task_id)
                                     .iter()
                                     .map(|line| format!("{}#{}", rel, line))
@@ -474,12 +416,12 @@ impl CommandHandler for ScanHandler {
         // Safe known-ticket mention path: bare known-ID comment mentions never
         // create tasks and never edit source; they only anchor existing tasks.
         // Runs after the create loop so tasks created in this run are anchored too.
-        if !args.dry_run && cfg_enable_mentions && !all_mentions.is_empty() {
+        if !args.dry_run && scan_cfg.enable_mentions && !all_mentions.is_empty() {
             Self::refresh_bare_mentions(
                 _resolver,
                 renderer,
-                cfg_ticket_patterns.as_deref(),
-                cfg_enable_ticket_words,
+                scan_cfg.ticket_patterns.as_deref(),
+                scan_cfg.enable_ticket_words,
                 &all_mentions,
             )?;
         }
@@ -517,23 +459,6 @@ fn rollback_created_task(
     }
 }
 
-/// Replace a specific 1-based line in the file content and return the new content
-fn replace_line(contents: &str, line_number_1based: usize, new_line: &str) -> Option<String> {
-    let mut lines: Vec<&str> = contents.lines().collect();
-    if line_number_1based == 0 || line_number_1based > lines.len() {
-        return None;
-    }
-    lines[line_number_1based - 1] = new_line;
-    let mut out = String::new();
-    for (i, line) in lines.iter().enumerate() {
-        out.push_str(line);
-        if i + 1 < lines.len() || contents.ends_with('\n') {
-            out.push('\n');
-        }
-    }
-    Some(out)
-}
-
 // custom_fields-based source_refs helper removed; we now use Task.references with code anchors
 
 impl ScanHandler {
@@ -547,8 +472,7 @@ impl ScanHandler {
         enable_ticket_words: bool,
         mentions: &[scanner::Reference],
     ) -> Result<(), String> {
-        let line_scanner = scanner::Scanner::new(PathBuf::from("."))
-            .with_ticket_detection(ticket_patterns, enable_ticket_words);
+        let line_scanner = configured_line_scanner(ticket_patterns, enable_ticket_words, &[]);
         let mut anchored = 0usize;
         for entry in mentions {
             let task_id = entry.uuid.as_str();
@@ -599,6 +523,19 @@ impl ScanHandler {
         renderer: &crate::output::OutputRenderer,
         window_hint: Option<usize>,
     ) -> Result<(), String> {
+        Self::reanchor_with_before_apply(_resolver, renderer, window_hint, |_| Ok(()))
+    }
+
+    /// Same re-anchor pass with a seam fired after planning and immediately
+    /// before each task write, mirroring `write_source_with_prepared`: the
+    /// callback can simulate a concurrent editor landing between the search
+    /// snapshot and the publication of updated references.
+    fn reanchor_with_before_apply(
+        _resolver: &crate::workspace::TasksDirectoryResolver,
+        renderer: &crate::output::OutputRenderer,
+        window_hint: Option<usize>,
+        mut before_apply: impl FnMut(&str) -> Result<(), String>,
+    ) -> Result<(), String> {
         let window = window_hint.unwrap_or(7);
         let mut ctx = match TaskCommandContext::new_read_only(_resolver, None, None) {
             Ok(ctx) => ctx,
@@ -613,9 +550,10 @@ impl ScanHandler {
         }
 
         let mut updates = 0usize;
-        let line_scanner = scanner::Scanner::new(PathBuf::from(".")).with_ticket_detection(
+        let line_scanner = configured_line_scanner(
             ctx.config.scan_ticket_patterns.as_deref(),
             ctx.config.scan_enable_ticket_words,
+            &[],
         );
         // Compute repo root once for this pass
         let repo_root = std::env::current_dir()
@@ -628,16 +566,19 @@ impl ScanHandler {
             std::collections::HashMap::new()
         };
 
-        for (task_id, mut task) in tasks.drain(..) {
+        for (task_id, task) in tasks.drain(..) {
             // Skip tasks without references
             if task.references.is_empty() {
                 continue;
             }
 
-            // Track if this task changed
-            let mut changed = false;
+            // Planned old -> new anchors computed from the snapshot. All source
+            // I/O stays in this planning pass; the plan is applied later to the
+            // freshest task state under the project task lock so concurrent
+            // comments, references, custom fields, and extensions survive.
+            let mut plan: Vec<(String, String)> = Vec::new();
 
-            for r in task.references.iter_mut() {
+            for r in task.references.iter() {
                 // Avoid borrowing r.code across mutations by cloning it first
                 let code_ref_opt = r.code.clone();
                 let Some(code_ref) = code_ref_opt else {
@@ -694,8 +635,7 @@ impl ScanHandler {
                     let rel = crate::utils::paths::repo_relative_display(&abs_path);
                     let new_code = format!("{}#{}", rel, orig_line);
                     if r.code.as_deref() != Some(&new_code) {
-                        r.code = Some(new_code.clone());
-                        changed = true;
+                        plan.push((code_ref, new_code));
                     }
                     continue;
                 }
@@ -720,19 +660,40 @@ impl ScanHandler {
                     let rel = crate::utils::paths::repo_relative_display(&abs_path);
                     let new_code = format!("{}#{}", rel, new_line);
                     if r.code.as_deref() != Some(&new_code) {
-                        r.code = Some(new_code.clone());
-                        changed = true;
                         renderer.log_debug(format_args!("reanchor: {} -> {}", code_ref, new_code));
+                        plan.push((code_ref, new_code));
                     }
                 }
             }
 
-            if changed {
-                task.modified = chrono::Utc::now().to_rfc3339();
-                ctx.storage
-                    .edit(&task_id, &task)
+            if !plan.is_empty() {
+                before_apply(&task_id)?;
+                let outcome = ctx
+                    .storage
+                    .mutate_task(&task_id, |fresh| {
+                        // Apply each planned anchor only where the old code is
+                        // still present in the fresh state: references a
+                        // concurrent editor added, changed, or removed are left
+                        // exactly as written.
+                        let mut changed = false;
+                        for reference in fresh.references.iter_mut() {
+                            let Some(code) = reference.code.clone() else {
+                                continue;
+                            };
+                            if let Some((_, new_code)) = plan.iter().find(|(old, _)| *old == code) {
+                                reference.code = Some(new_code.clone());
+                                changed = true;
+                            }
+                        }
+                        if changed {
+                            fresh.modified = chrono::Utc::now().to_rfc3339();
+                        }
+                        Ok(changed)
+                    })
                     .map_err(TaskStorageAction::Update.map_err(&task_id))?;
-                updates += 1;
+                if outcome.changed {
+                    updates += 1;
+                }
             }
         }
 
@@ -793,5 +754,151 @@ impl ScanHandler {
             }
         }
         map
+    }
+}
+
+#[cfg(test)]
+mod reanchor_tests {
+    use super::ScanHandler;
+    use crate::output::{LogLevel, OutputFormat, OutputRenderer};
+    use crate::types::ReferenceEntry;
+    use crate::workspace::TasksDirectoryResolver;
+    use std::path::PathBuf;
+
+    struct ReanchorFixture {
+        temp: tempfile::TempDir,
+        resolver: TasksDirectoryResolver,
+        task_id: String,
+    }
+
+    impl ReanchorFixture {
+        /// Task SAFE-1 anchored at `main.rs#1` while the key now lives on a
+        /// later line, so the re-anchor pass must relocate the anchor.
+        fn new(source: &str) -> Self {
+            let temp = tempfile::tempdir().unwrap();
+            let tasks_dir = temp.path().join(".tasks");
+            std::fs::create_dir(&tasks_dir).unwrap();
+            std::fs::write(temp.path().join("main.rs"), source).unwrap();
+            let resolver =
+                TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None).unwrap();
+            let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
+            let task = crate::storage::task::Task::new(
+                tasks_dir.clone(),
+                "reanchor target".into(),
+                crate::types::Priority::new("medium"),
+            );
+            let task_id = storage.add(&task, "SAFE", None).unwrap();
+            let mut task = storage.get(&task_id, "SAFE").unwrap();
+            task.references = vec![ReferenceEntry {
+                code: Some("main.rs#1".into()),
+                ..Default::default()
+            }];
+            storage.edit(&task_id, &task).unwrap();
+            Self {
+                temp,
+                resolver,
+                task_id,
+            }
+        }
+
+        fn tasks_dir(&self) -> PathBuf {
+            self.temp.path().join(".tasks")
+        }
+
+        fn run<F>(&self, before_apply: F) -> Result<(), String>
+        where
+            F: FnMut(&str) -> Result<(), String>,
+        {
+            let original_cwd = std::env::current_dir().unwrap();
+            std::env::set_current_dir(self.temp.path()).unwrap();
+            let renderer = OutputRenderer::new(OutputFormat::Text, LogLevel::Error);
+            let result = ScanHandler::reanchor_with_before_apply(
+                &self.resolver,
+                &renderer,
+                None,
+                before_apply,
+            );
+            std::env::set_current_dir(&original_cwd).unwrap();
+            result
+        }
+    }
+
+    #[test]
+    fn reanchor_preserves_concurrent_task_edits() {
+        let fixture = ReanchorFixture::new("// filler\n// filler two\n// SAFE-1: moved\n");
+        let tasks_dir = fixture.tasks_dir();
+        fixture
+            .run(|task_id| {
+                // Deterministic concurrent editor: lands between the search
+                // snapshot and the task write, adding a comment, a code
+                // reference, and a custom field that must all survive.
+                let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
+                let mut fresh = storage.get(task_id, "SAFE").ok_or("task missing")?;
+                fresh.comments.push(crate::types::TaskComment {
+                    date: "2026-10-13T00:00:00Z".into(),
+                    text: "concurrent note".into(),
+                });
+                fresh.references.push(ReferenceEntry {
+                    code: Some("other.rs#7".into()),
+                    ..Default::default()
+                });
+                fresh
+                    .custom_fields
+                    .insert("severity".into(), crate::types::custom_value_string("high"));
+                storage.edit(task_id, &fresh).map_err(|e| e.to_string())?;
+                Ok(())
+            })
+            .unwrap();
+
+        let verify = crate::storage::manager::Storage::new(&fixture.tasks_dir());
+        let updated = verify.get(&fixture.task_id, "SAFE").unwrap();
+        assert!(
+            updated
+                .references
+                .iter()
+                .any(|r| r.code.as_deref() == Some("main.rs#3")),
+            "re-anchor did not relocate: {:?}",
+            updated.references
+        );
+        assert!(
+            updated
+                .references
+                .iter()
+                .any(|r| r.code.as_deref() == Some("other.rs#7")),
+            "concurrent reference lost: {:?}",
+            updated.references
+        );
+        assert!(
+            updated.comments.iter().any(|c| c.text == "concurrent note"),
+            "concurrent comment lost: {:?}",
+            updated.comments
+        );
+        assert!(
+            updated.custom_fields.contains_key("severity"),
+            "concurrent custom field lost: {:?}",
+            updated.custom_fields
+        );
+    }
+
+    #[test]
+    fn reanchor_without_changes_never_rewrites_task_files() {
+        let fixture = ReanchorFixture::new("// SAFE-1: still here\n");
+        let task_path = fixture.tasks_dir().join("SAFE/1.yml");
+        let old = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(946_684_800);
+        std::fs::File::options()
+            .write(true)
+            .open(&task_path)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let before = std::fs::read(&task_path).unwrap();
+        fixture
+            .run(|_| Err("no-op re-anchor must not apply any task write".to_string()))
+            .unwrap();
+        assert_eq!(std::fs::read(&task_path).unwrap(), before);
+        assert_eq!(
+            std::fs::metadata(&task_path).unwrap().modified().unwrap(),
+            old
+        );
     }
 }

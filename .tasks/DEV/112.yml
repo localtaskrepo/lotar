@@ -1,0 +1,43 @@
+title: Harden task reads and consolidate small shared cleanup helpers
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-14T00:46:20.764834+00:00
+modified: 2026-10-14T01:12:18.288714+00:00
+comments:
+- date: 2026-10-14T00:52:25.333778+00:00
+  text: 'Plan/progress: current first wave owns cache/reanchor safeguards and three small helper refactors; larger efforts created as Todo113 config metadata,114 sort alignment,115 sprint cells,116 TaskPanel attachments,117 sync orchestration,118 automation planning. Separate owned UI/scanner/agent lanes use no Git commands and parent serializes tracking/final gates. Cache preserved-mtime/equal-length control FAILED returning original rather than modified title. Replaced metadata trust with exact-content validation, retaining YAML parse cache and size-bound entry count; deliberate tradeoff is each read fetches content and retains cached source bytes (no stale-mtime or hash collision assumptions). Expanded same-fingerprint get/search, atomic replace and corruption controls; scoped19/19 cache/path tests passed. Existing metadata-changing tests retained. Agent helper lane reports16/16 sequence/log-only behavior tests; no API/logshape change. Will measure existing read/perf budget cases after source handoff, not weaken thresholds. Final broader guards/UI/browser/full lint/test/fresh-smoke/review pending. No durable guidance finding.'
+- date: 2026-10-14T00:59:52.844726+00:00
+  text: 'Verification milestone: full frontend849/849 across79 files passed after shared column drag extraction; targeted lane107/107 andfrontendtypecheckpassed. Cache/event independent review SIGNOFF, no blockers: exact bytes rather than metadata, IO outside mutex, parsed task stillcached; known extra source-string memory retained under unchanged100k entry bound, no universal low-memory claim. Agent10 streamedpairs and3 log-only sites verified,16 focusedtests passed. Dedicated performance runner17/17 passed and all13 existing budgets enforced with zero retries (local/uncontrolled, not server-cache memory benchmark); helper control intentional panic/SKIP aretestfixturechecks, not dropped budgets. Compilewarning in scanner-owned transient test reported to owner before full lint. New browserdrag/persistence smoke written by UIlane and awaitsparentfreshbuildexecution; independentUI/scannerreview+finalfullgatespending. Existing VueuseFilterBuilder injectwarnings unchanged; no masking, threshold/retry orfeaturepolicychanges. Deferred113-118 remainunstarted.'
+- date: 2026-10-14T01:12:18.266704+00:00
+  text: 'Outcome: first-wave improvements complete, independently reviewed and self-verified. Parse cache reads and compares exact file contents, eliminating same-size/preserved-mtime and atomic-replacement stale reads while retaining parsed-task reuse; corrupted equal-fingerprint files no longer hide behind old cached data. CLI reanchor plans source changes outside locks then applies only still-present old anchors via fresh Storage::mutate_task, preserving concurrent comments/references/custom fields/extensions and no-op bytes/mtime. Shared column drag composable replaces TaskTable/Sprints duplication with same MIME/text fallback, hidden-order persistence,250ms guard, keyboard/reset behavior; current sorting policy unchanged. Agent streamed recording/emission helper replaces10 pairs, preserving exact sequence/time/SSE shape and3 log-only kinds. Shared scanner config/word/line helpers preserve CLI/API fallback, scope, output/dryrun/unknown-ID/source differences rather than new generic pipeline. Evidence: cache red1 stale title then19 scoped cache/path green; new cache3 cases cover get/search/atomic replace/corruption. Reanchor deterministic red concurrent loss then5/5+89 mixed scan green. UI107 targeted+full849/79 files, agent16 focused; independent cache/event/UI/scanner reviews SIGNOFF no blockers. Real browser fresh-build column-drag smoke passed Tasks/Sprints reorder and reload persistence, then final full smoke274 tests/66 files passed with25 existing skips/6 skipped files. Final full Rust1453 tests/138 binaries passed BOTH default and all-feature runs with zero retries;45 Git-required exclusions are unverified, not passes. Final lint frontend/all-target/all-feature Clippy -D warnings/fmt and diff --check passed. Dedicated perf17/17 passed with13 unchanged budgets enforced; local/uncontrolled and not server-cache memory benchmark. Cache tradeoff retains source bytes and reads IO each lookup; no low-memory guarantee. Existing Vue inject warnings unchanged. Deferred113 metadata/114 sort/115 cells/116 attachments/117 sync/118 automation remainTodo. Reviewer-discovered119 unused reanchor flag contract and120 adjacent create/mention get->edit snapshot races separatelytrackedTodo; not claimed fixed. Currentwave No API/YAML/logschema/sorting-policy changes; no Git commands by workers, no parent Git writes, no staging/commit/push, user-server restart, actual sync/cleanup, timeout/retry/concurrency/skip/assertion weakening. All changes unstaged/uncommitted. Guidance: no durable finding.'
+description: 'Authorized cleanup first wave: characterize and fix task parse-cache freshness for equal-size/preserved-mtime replacements; move CLI reanchoring from stale whole-task replacement to fresh locked mutation preserving concurrent comments/references/extensions and no-op receipts; share TaskTable/Sprints column drag reorder without changing MIME/persistence/sort guards; pair streamed agent log recording/emission preserving sequence/payload and raw/init/result log-only behavior; consolidate pure scanner configuration/build/word-merge/line helpers while retaining CLI/service output, fallback, dry-run and error differences. Keep runtime/API/task YAML contracts and existing sorting policy unchanged. Parent serializes ticket state, review and full lint/test/fresh-smoke gates. Add fail-first deterministic cache/reanchor regressions, focused UI/helper/event parity coverage and browser drag/sort checks. No Git writes, staging, commit/push, worktree or user-server changes; isolated fixtures only. Larger metadata, UI decomposition, sort-policy, sync and automation planning refactors get separate unstarted tickets.'
+history:
+- at: 2026-10-14T00:46:59.718303+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-14T00:52:25.333778+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-14T00:59:52.844726+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-14T01:12:18.266704+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-14T01:12:18.288714+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
