@@ -1,7 +1,47 @@
 title: Use locked fresh mutation for all scanner task reference updates
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T01:10:45.296858+00:00
+modified: 2026-10-20T17:24:51.945950+00:00
+comments:
+- date: 2026-10-20T17:11:23.652131+00:00
+  text: 'Plan: replace the remaining scanner read-modify-whole-snapshot writes in CLI edit_task_with_context and service update_task_code_reference with fresh Storage::mutate_task closures. First add deterministic fail-first concurrency regressions through CLI/service boundaries using a shared pre-mutation seam if necessary; prove concurrent comments/custom fields/references and unknown YAML metadata survive, and exact no-op bytes/mtime remain unchanged. Preserve derived project/root/error behavior, source IO and rollback ordering outside task locks. Run focused scanner/storage checks then full lint, tests and fresh-build smoke. Work in this checkout; leave unrelated untracked DEV-126/127/128 untouched; no Git writes or real-workspace scans.'
+- date: 2026-10-20T17:18:24.600187+00:00
+  text: 'Progress: six deterministic public-boundary regressions all failed before the production change with ''concurrent comment was lost'' (CLI/service x creation/known TODO/bare mention). Both helpers now preserve their existing lookup/ID/error resolution, discard snapshots and mutate fresh task references under Storage::mutate_task; only changed references advance modified. One cfg(test) thread-local root/ID-scoped pre-write hook serves edit and mutate, consumes callbacks before invocation outside locks and has RAII cleanup. Six tests now cover 12 interleavings including a concurrent editor that already installs the desired anchor: that writer''s modified and exact formatted bytes survive the fresh no-op. All cases preserve concurrent comments, unrelated refs, custom fields and nested YAML extensions; unchanged repeats preserve source/task exact bytes and pinned mtimes. Focused all-feature scanner library suite27/27 passed. Independent source review found no blockers; full gates next. No source/rollback ordering or public API/YAML shape changes.'
+- date: 2026-10-20T17:24:51.918952+00:00
+  text: |-
+    Outcome: completed scanner task-reference lost-update hardening. CLI edit_task_with_context and service update_task_code_reference keep existing ID/project/root/existence resolution and error mapping, but apply pure reference updates to the freshly parsed task under Storage::mutate_task. Only real reference changes advance modified. No source IO/callbacks run inside these task mutation closures, and source preparation/publication/rollback ordering, public API and user YAML shape are unchanged.
+    Evidence: all six public CLI/service create/known-TODO/bare-mention regressions failed before the fix with concurrent comment loss, then passed. Expanded six tests cover12 interleavings including concurrent installation of the desired anchor, preserving the other writer's modified and exact formatted bytes on fresh no-op. Concurrent comments, unrelated references, custom fields, nested extensions survive; unchanged repeats keep exact task/source bytes and pinned mtimes. One scoped cfg(test) root/ID-targeted thread-local hook shared by edit/mutate runs before lock acquisition, consumes callbacks before invocation and clears unused registrations via RAII. Independent read-only review found no blockers. Final lint:agent passed frontend typecheck, all-target/all-feature Clippy-Dwarnings and fmt; initial test-module placement lint was fixed, not suppressed. test:agent passed Rust1460 across138 binaries and frontend849 across79 files; all-feature Rust full suite1460 passed separately. Fresh-build smoke274 across66 files passed. git diff --check clean.
+    Remaining:45 Git-required Rust exclusions and25 smoke skips remain unverified locally, not passes; existing Vue inject warnings unchanged. Native Linux/Windows execution and remote CI were not run. The deterministic seam proves fresh-state publication, not the underlying cross-process lock implementation; existing storage/rollback suites passed unchanged. Changes remain unstaged/uncommitted in this checkout; unrelated untracked DEV-126/127/128 preserved. No real-workspace scanner execution, Git writes, server restarts or release changes.
+    Guidance: no durable finding.
 description: DEV-112 fixed stale whole-task publication in CLI reanchor, but adjacent edit_task_with_context (scan_handler.rs) and update_task_code_reference (scan_service.rs) still load/get a task before mutating references and passing a whole snapshot to storage.edit. This can overwrite concurrent comments, custom fields or other references in create/known-mention paths despite the write lock; latest YAML extensions alone are merged. Add deterministic fail-first concurrency controls at each public CLI/service boundary, migrate to fresh Storage::mutate_task or equivalent locked receipts, preserve exact no-op byte/mtime and user metadata, derived root/ID validation and error mapping. Keep source preparation rollback and task/source sequencing unchanged; do not run source IO or re-entrant callbacks inside task lock. Review shared mutation seam rather than copying new test-only hooks without need. Separately scoped existing-data-loss hardening; not claimed fixed by DEV-112.
+history:
+- at: 2026-10-20T17:11:23.613166+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T17:11:23.652131+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T17:18:24.600187+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T17:24:51.918952+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T17:24:51.945950+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

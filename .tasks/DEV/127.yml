@@ -1,0 +1,7 @@
+title: lotar serve keeps the identity it resolved at startup after config changes
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-20T03:20:20.924376+00:00
+description: 'Observed with lotar 0.8.0. The identity cache in src/utils/identity.rs is never invalidated when the workspace config changes, so a running server keeps the old identity for /api/whoami and for review-guarded status/assignee changes from the web UI, while the CLI already resolves the new one. Repro: start ''lotar --tasks-dir .tasks serve -p <port>'' with no default.reporter; GET /api/whoami returns the OS user; add default.reporter: alice to .tasks/config.yml; GET /api/whoami still returns the OS user after several seconds, while ''lotar whoami'' prints alice. Only restarting the server picks it up. Users see ''Only reporter X can change status'' in the UI and cannot tell why. Acceptance: config changes that affect identity (default.reporter, auto.identity, auto.identity-git) invalidate the identity cache in a running server, or the UI shows the resolved identity and that a restart is needed; regression test for whoami after a config edit.'

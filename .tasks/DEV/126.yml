@@ -1,0 +1,7 @@
+title: Identity detection ignores project-level default.reporter
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-20T03:20:20.913445+00:00
+description: 'Observed with lotar 0.8.0 (Homebrew) in a downstream workspace; code at a4ef8ef. A project config (.tasks/<PRJ>/config.yml) with default.reporter: alice does not affect identity: ''lotar --tasks-dir .tasks whoami --explain'' reports the OS user (source $USER, confidence 60). Only default.reporter in the global .tasks/config.yml is honoured (then source config.default_reporter). Repro: .tasks/config.yml {default: {project: PRJ}}; .tasks/PRJ/config.yml {default: {reporter: alice}}; run whoami. ConfigDefaultReporterDetector (src/utils/identity_detectors.rs) reads load_and_merge_configs(root) without the project layer. Impact: review-guarded transitions (enforce_review_owner_transition) compare the reporter with this identity, so a project that sets its owner only in project config locks its owner out of NeedsReview tickets. Acceptance: identity resolution follows the documented precedence including the project tier for the active/default project (or the docs state explicitly that it does not), whoami --explain names the tier used, and a regression test covers the project-only case.'

@@ -214,6 +214,8 @@ impl StorageOperations {
 
         let project_path = root_path.join(&project_folder);
 
+        #[cfg(test)]
+        before_task_write::run(root_path, id);
         with_storage_lock(&project_path, "task", || {
             let file_path = match Self::get_file_path_for_id(&project_path, id) {
                 Some(path) => path,
@@ -269,6 +271,8 @@ impl StorageOperations {
 
         let project_path = root_path.join(&project_folder);
 
+        #[cfg(test)]
+        before_task_write::run(root_path, id);
         with_storage_lock(&project_path, "task", || {
             let file_path = match Self::get_file_path_for_id(&project_path, id) {
                 Some(path) => path,
@@ -542,5 +546,61 @@ impl StorageOperations {
             "Could not generate unique prefix for project '{}'",
             project_name
         ))
+    }
+}
+
+/// Simulate an editor committing after a caller's lookup, before its write lock.
+#[cfg(test)]
+pub(crate) mod before_task_write {
+    use std::cell::RefCell;
+    use std::path::{Path, PathBuf};
+
+    struct Hook {
+        root: PathBuf,
+        id: String,
+        callback: Box<dyn FnOnce()>,
+    }
+
+    thread_local! {
+        static HOOK: RefCell<Option<Hook>> = const { RefCell::new(None) };
+    }
+
+    pub(crate) struct Guard;
+
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            HOOK.with(|slot| slot.borrow_mut().take());
+        }
+    }
+
+    pub(crate) fn install(root: &Path, id: &str, callback: impl FnOnce() + 'static) -> Guard {
+        HOOK.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            assert!(slot.is_none(), "task-write hook already installed");
+            *slot = Some(Hook {
+                root: root.to_path_buf(),
+                id: id.to_string(),
+                callback: Box::new(callback),
+            });
+        });
+        Guard
+    }
+
+    pub(super) fn run(root: &Path, id: &str) {
+        let hook = HOOK.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            if slot
+                .as_ref()
+                .is_some_and(|hook| hook.root == root && hook.id == id)
+            {
+                slot.take()
+            } else {
+                None
+            }
+        });
+        // Consume the hook and release its borrow before the editor uses storage.
+        if let Some(hook) = hook {
+            (hook.callback)();
+        }
     }
 }

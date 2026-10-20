@@ -26,16 +26,16 @@ where
     F: FnOnce(&mut crate::storage::task::Task) -> bool,
 {
     let mut ctx = TaskCommandContext::new(resolver, project_hint, Some(task_id))?;
-    let LoadedTask {
-        full_id, mut task, ..
-    } = load_task(&mut ctx, task_id, project_hint)?;
-    let changed = mutator(&mut task);
-    if changed {
-        task.modified = chrono::Utc::now().to_rfc3339();
-        ctx.storage
-            .edit(&full_id, &task)
-            .map_err(TaskStorageAction::Update.map_err(&full_id))?;
-    }
+    let LoadedTask { full_id, .. } = load_task(&mut ctx, task_id, project_hint)?;
+    ctx.storage
+        .mutate_task(&full_id, |fresh| {
+            let changed = mutator(fresh);
+            if changed {
+                fresh.modified = chrono::Utc::now().to_rfc3339();
+            }
+            Ok(changed)
+        })
+        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
     Ok(())
 }
 

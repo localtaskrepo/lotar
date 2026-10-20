@@ -1,0 +1,7 @@
+title: Review guard can permanently lock tickets whose reporter cannot act
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-20T03:20:20.932424+00:00
+description: 'Observed with lotar 0.8.0; logic in enforce_review_owner_transition (src/services/task_service.rs). In NeedsReview only the exact reporter may change status or assignee, with no override. When the reporter is an agent name (agents usually run under the same OS account, so they resolve to the human''s identity), a departed member, or any name no current identity matches, the ticket cannot leave review through CLI, REST, MCP or UI except by editing the reporter. Repro: identity alice; ''lotar add t --reporter bot -p PRJ''; ''lotar status PRJ-1 NeedsReview'' succeeds; ''lotar status PRJ-1 Done'' fails with ''Only reporter bot can change status or assignee until review is resolved''. Acceptance (design to choose): a configurable reviewer/owner set per project (or the project owner) may resolve reviews; or agent-reported tickets route review to a configured human; error text explains the path forward; tests for agent reporter and unknown reporter.'

@@ -514,6 +514,241 @@ pub fn parse_inline_attributes(line: &str) -> InlineAttrs {
 }
 
 #[cfg(test)]
+mod reference_mutation_tests {
+    use crate::api_types::ScanRequest;
+    use crate::cli::ScanArgs;
+    use crate::cli::handlers::{CommandHandler, ScanHandler};
+    use crate::output::{LogLevel, OutputFormat, OutputRenderer};
+    use crate::services::scan_service::ScanService;
+    use crate::storage::manager::Storage;
+    use crate::storage::operations::before_task_write;
+    use crate::storage::task::Task;
+    use crate::types::{Priority, ReferenceEntry, TaskComment, custom_value_string};
+    use crate::workspace::TasksDirectoryResolver;
+    use std::cell::{Cell, RefCell};
+    use std::fs;
+    use std::rc::Rc;
+
+    #[derive(Clone, Copy)]
+    enum Surface {
+        Cli,
+        Service,
+    }
+
+    fn run(surface: Surface, resolver: &TasksDirectoryResolver, source: &std::path::Path) {
+        let paths = vec![source.to_string_lossy().to_string()];
+        match surface {
+            Surface::Cli => {
+                ScanHandler::execute(
+                    ScanArgs {
+                        paths,
+                        include: Vec::new(),
+                        exclude: Vec::new(),
+                        detailed: false,
+                        context: 0,
+                        dry_run: false,
+                        strip_attributes: None,
+                        reanchor: false,
+                        modified_only: false,
+                    },
+                    Some("SAFE"),
+                    resolver,
+                    &OutputRenderer::new(OutputFormat::Json, LogLevel::Error),
+                )
+                .unwrap();
+            }
+            Surface::Service => {
+                let response = ScanService::run(
+                    resolver,
+                    ScanRequest {
+                        paths,
+                        project: Some("SAFE".into()),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+                assert_eq!(response.summary.failed, 0);
+                assert_eq!(response.entries.len(), 1);
+                assert_eq!(response.entries[0].task_id.as_deref(), Some("SAFE-1"));
+                assert_eq!(response.summary.created + response.summary.updated, 1);
+            }
+        }
+    }
+
+    fn preserves_concurrent_edits(surface: Surface, source: &str, create: bool) {
+        for already_anchored in [false, true] {
+            // A private parent prevents lookup from discovering sibling test workspaces.
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path().join("workspace");
+            let tasks = root.join(".tasks");
+            fs::create_dir_all(&tasks).unwrap();
+            fs::write(
+                tasks.join("config.yml"),
+                "default:\n  project: SAFE\n  reporter: tester\nauto:\n  identity: false\n",
+            )
+            .unwrap();
+            let source_path = root.join("main.rs");
+            fs::write(&source_path, source).unwrap();
+            let resolver =
+                TasksDirectoryResolver::resolve(Some(tasks.to_str().unwrap()), None).unwrap();
+            if !create {
+                let mut storage = Storage::new(&tasks);
+                let task = Task::new(
+                    tasks.clone(),
+                    "existing task".into(),
+                    Priority::new("medium"),
+                );
+                assert_eq!(storage.add(&task, "SAFE", None).unwrap(), "SAFE-1");
+            }
+
+            let edited = Rc::new(Cell::new(false));
+            let was_edited = Rc::clone(&edited);
+            let committed_bytes = Rc::new(RefCell::new(None));
+            let editor_bytes = Rc::clone(&committed_bytes);
+            let editor_tasks = tasks.clone();
+            let desired_anchor = format!("{}#1", source_path.display());
+            let _guard = before_task_write::install(&tasks, "SAFE-1", move || {
+                let mut editor = Storage::new(&editor_tasks);
+                editor
+                    .mutate_task("SAFE-1", |fresh| {
+                        fresh.comments.push(TaskComment {
+                            date: "2026-10-20T00:00:00Z".into(),
+                            text: "concurrent comment".into(),
+                        });
+                        fresh.references.push(ReferenceEntry {
+                            code: Some("other.rs#7".into()),
+                            ..Default::default()
+                        });
+                        if already_anchored {
+                            fresh.references.push(ReferenceEntry {
+                                code: Some(desired_anchor),
+                                ..Default::default()
+                            });
+                        }
+                        fresh.modified = "2000-01-01T00:00:00Z".into();
+                        fresh
+                            .custom_fields
+                            .insert("severity".into(), custom_value_string("high"));
+                        fresh.extra_fields.insert(
+                            "user_meta".into(),
+                            serde_yaml_ng::from_str("nested: {enabled: true, labels: [one, two]}")
+                                .unwrap(),
+                        );
+                        Ok(true)
+                    })
+                    .unwrap();
+                let task_path = editor_tasks.join("SAFE/1.yml");
+                let formatted = format!(
+                    "# Concurrent editor formatting\n{}",
+                    fs::read_to_string(&task_path).unwrap()
+                );
+                fs::write(&task_path, formatted).unwrap();
+                *editor_bytes.borrow_mut() = Some(fs::read(&task_path).unwrap());
+                was_edited.set(true);
+            });
+
+            run(surface, &resolver, &source_path);
+            assert!(edited.get(), "concurrent editor was not exercised");
+            let updated = Storage::new(&tasks).get("SAFE-1", "SAFE").unwrap();
+            if already_anchored {
+                assert_eq!(updated.modified, "2000-01-01T00:00:00Z");
+                assert_eq!(
+                    fs::read(tasks.join("SAFE/1.yml")).unwrap(),
+                    *committed_bytes.borrow().as_ref().unwrap()
+                );
+            } else {
+                assert_ne!(updated.modified, "2000-01-01T00:00:00Z");
+            }
+            assert_eq!(updated.comments.len(), 1, "concurrent comment was lost");
+            assert_eq!(updated.comments[0].text, "concurrent comment");
+            assert_eq!(
+                updated.custom_fields.get("severity"),
+                Some(&custom_value_string("high"))
+            );
+            assert_eq!(
+                updated.extra_fields.get("user_meta"),
+                Some(
+                    &serde_yaml_ng::from_str("nested: {enabled: true, labels: [one, two]}")
+                        .unwrap()
+                )
+            );
+            assert_eq!(updated.references.len(), 2, "concurrent reference was lost");
+            assert!(
+                updated
+                    .references
+                    .iter()
+                    .any(|r| r.code.as_deref() == Some("other.rs#7"))
+            );
+            assert!(updated.references.iter().any(|r| {
+                r.code
+                    .as_deref()
+                    .is_some_and(|code| code.ends_with("main.rs#1"))
+            }));
+            let expected_source = if create {
+                "// TODO (SAFE-1): create task\n"
+            } else {
+                source
+            };
+            assert_eq!(fs::read_to_string(&source_path).unwrap(), expected_source);
+
+            // An unchanged repeat must preserve user formatting and both file mtimes.
+            let task_path = tasks.join("SAFE/1.yml");
+            let formatted = format!(
+                "# User-owned formatting\n{}user_layout: {{flag: 'yes'}}\n",
+                fs::read_to_string(&task_path).unwrap()
+            );
+            fs::write(&task_path, &formatted).unwrap();
+            let old =
+                std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(946_684_800);
+            for path in [&task_path, &source_path] {
+                fs::File::options()
+                    .write(true)
+                    .open(path)
+                    .unwrap()
+                    .set_modified(old)
+                    .unwrap();
+            }
+            run(surface, &resolver, &source_path);
+            assert_eq!(fs::read_to_string(&task_path).unwrap(), formatted);
+            assert_eq!(fs::read_to_string(&source_path).unwrap(), expected_source);
+            for path in [&task_path, &source_path] {
+                assert_eq!(fs::metadata(path).unwrap().modified().unwrap(), old);
+            }
+        }
+    }
+
+    #[test]
+    fn cli_create_preserves_concurrent_edits() {
+        preserves_concurrent_edits(Surface::Cli, "// TODO: create task\n", true);
+    }
+
+    #[test]
+    fn cli_known_todo_preserves_concurrent_edits() {
+        preserves_concurrent_edits(Surface::Cli, "// TODO (SAFE-1): existing task\n", false);
+    }
+
+    #[test]
+    fn cli_bare_mention_preserves_concurrent_edits() {
+        preserves_concurrent_edits(Surface::Cli, "// SAFE-1 bare mention\n", false);
+    }
+
+    #[test]
+    fn service_create_preserves_concurrent_edits() {
+        preserves_concurrent_edits(Surface::Service, "// TODO: create task\n", true);
+    }
+
+    #[test]
+    fn service_known_todo_preserves_concurrent_edits() {
+        preserves_concurrent_edits(Surface::Service, "// TODO (SAFE-1): existing task\n", false);
+    }
+
+    #[test]
+    fn service_bare_mention_preserves_concurrent_edits() {
+        preserves_concurrent_edits(Surface::Service, "// SAFE-1 bare mention\n", false);
+    }
+}
+
+#[cfg(test)]
 mod scan_utils_tests {
     use super::{parse_inline_attributes, strip_bracket_attributes};
 

@@ -617,17 +617,19 @@ fn update_task_code_reference(
         .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
         .project;
 
-    let mut task = storage
+    // Preserve lookup errors without publishing the possibly stale lookup result.
+    storage
         .get(task_id, &derived)
         .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
-    let changed = refresh_code_reference(&mut task.references, code_ref, live_refs);
-
-    if changed {
-        task.modified = Utc::now().to_rfc3339();
-        storage.edit(task_id, &task)?;
-    }
-    Ok(changed)
+    let outcome = storage.mutate_task(task_id, |fresh| {
+        let changed = refresh_code_reference(&mut fresh.references, code_ref, live_refs);
+        if changed {
+            fresh.modified = Utc::now().to_rfc3339();
+        }
+        Ok(changed)
+    })?;
+    Ok(outcome.changed)
 }
 
 fn coerce_entry_title(title: &str, annotation: &str, rel_path: &str, line: usize) -> String {
