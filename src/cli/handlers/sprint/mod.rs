@@ -27,6 +27,44 @@ impl CommandHandler for SprintHandler {
         };
 
         match action {
+            SprintAction::Order(args) => {
+                let storage = crate::storage::manager::Storage {
+                    root_path: tasks_root,
+                };
+                let sprint = match args.sprint.as_deref() {
+                    None => None,
+                    Some(reference) => {
+                        let records =
+                            crate::services::sprint_service::SprintService::list(&storage)
+                                .map_err(|error| error.to_string())?;
+                        Some(crate::services::sprint_assignment::resolve_sprint_id(
+                            &records,
+                            Some(reference),
+                        )?)
+                    }
+                };
+                let response = crate::services::task_order::reorder(
+                    &storage,
+                    &crate::api_types::TaskOrderRequest {
+                        task: args.task,
+                        sprint,
+                        before: args.before,
+                        after: args.after,
+                        allow_closed: args.allow_closed,
+                    },
+                )
+                .map_err(|error| error.to_string())?;
+                if matches!(renderer.format, crate::output::OutputFormat::Json) {
+                    renderer.emit_json(&response);
+                } else {
+                    renderer.emit_success(if response.changed {
+                        "Task order updated"
+                    } else {
+                        "Task order unchanged"
+                    });
+                }
+                Ok(())
+            }
             SprintAction::Create(create_args) => {
                 operations::handle_create(&create_args, &tasks_root, renderer)
             }

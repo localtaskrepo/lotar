@@ -181,6 +181,33 @@ impl Sprint {
     }
 }
 
+/// Backlog sequence metadata, separate from numeric sprint membership files.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct BacklogOrder {
+    #[serde(default)]
+    pub tasks: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub modified: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub history: Vec<SprintHistoryEntry>,
+    #[serde(flatten, default)]
+    pub extra_fields: BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+impl BacklogOrder {
+    pub fn path(tasks_root: &Path) -> PathBuf {
+        tasks_root.join("@sprints").join("backlog.yml")
+    }
+
+    pub fn load(tasks_root: &Path) -> crate::errors::LoTaRResult<Self> {
+        match fs::read_to_string(Self::path(tasks_root)) {
+            Ok(contents) => Ok(serde_yaml_ng::from_str(&contents)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(error) => Err(error.into()),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SprintTaskEntry {

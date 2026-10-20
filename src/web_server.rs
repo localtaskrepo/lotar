@@ -895,6 +895,23 @@ fn start_tasks_watcher() {
 
         drop(tx);
 
+        let order_storage = crate::storage::manager::Storage {
+            root_path: tasks_dir.clone(),
+        };
+        let mut order_snapshots = HashMap::new();
+        if let Ok(order) = crate::services::task_order::get_order(&order_storage, None) {
+            order_snapshots.insert(None, order.tasks);
+        }
+        if let Ok(records) = crate::services::sprint_service::SprintService::list(&order_storage) {
+            for record in records {
+                if let Ok(order) =
+                    crate::services::task_order::get_order(&order_storage, Some(record.id))
+                {
+                    order_snapshots.insert(Some(record.id), order.tasks);
+                }
+            }
+        }
+
         // Simple loop: for any modify/create/remove, emit project_changed events.
         while let Ok(res) = rx.recv() {
             let Ok(event) = res else {
@@ -917,6 +934,44 @@ fn start_tasks_watcher() {
                                     components.next()
                                     && let Some(project) = project_os.to_str()
                                 {
+                                    if project == "@sprints"
+                                        && p.extension().and_then(|value| value.to_str())
+                                            == Some("yml")
+                                    {
+                                        let stem = p
+                                            .file_stem()
+                                            .and_then(|value| value.to_str())
+                                            .unwrap_or_default();
+                                        let container = if stem == "backlog" {
+                                            Some(None)
+                                        } else {
+                                            stem.parse::<u32>().ok().filter(|id| *id > 0).map(Some)
+                                        };
+                                        if let Some(sprint_id) = container {
+                                            let storage = crate::storage::manager::Storage {
+                                                root_path: tasks_dir.clone(),
+                                            };
+                                            if let Ok(order) =
+                                                crate::services::task_order::get_order(
+                                                    &storage, sprint_id,
+                                                )
+                                            {
+                                                if order_snapshots.get(&sprint_id)
+                                                    == Some(&order.tasks)
+                                                {
+                                                    continue;
+                                                }
+                                                order_snapshots
+                                                    .insert(sprint_id, order.tasks.clone());
+                                                crate::api_events::emit(
+                                                    &crate::api_events::ApiEvent {
+                                                        kind: "task_order_changed".into(),
+                                                        data: serde_json::json!({"sprint_id": sprint_id, "tasks": order.tasks}),
+                                                    },
+                                                );
+                                            }
+                                        }
+                                    }
                                     // Skip reserved internal directories (e.g. @sprints)
                                     // to avoid treating sprint file changes as task events.
                                     if !project.starts_with('@') {

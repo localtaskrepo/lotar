@@ -1357,6 +1357,44 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
     )
 }
 
+pub(crate) fn handle_sprint_reorder(req: JsonRpcRequest) -> JsonRpcResponse {
+    let request: crate::api_types::TaskOrderRequest =
+        match serde_json::from_value(req.params.clone()) {
+            Ok(request) => request,
+            Err(error) => {
+                return err(
+                    req.id,
+                    -32602,
+                    &format!("Invalid order request: {error}"),
+                    None,
+                );
+            }
+        };
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(resolver) => resolver,
+        Err(error) => return err(req.id, -32603, &error, None),
+    };
+    let storage = Storage {
+        root_path: resolver.path,
+    };
+    match crate::services::task_order::reorder(&storage, &request) {
+        Ok(response) => ok(
+            req.id,
+            json!({"content": [{"type": "text", "text": serde_json::to_string(&response).expect("serializable order")}]}),
+        ),
+        Err(error) => {
+            let code = match &error {
+                crate::errors::LoTaRError::ValidationError(_)
+                | crate::errors::LoTaRError::TaskNotFound(_)
+                | crate::errors::LoTaRError::SprintNotFound(_)
+                | crate::errors::LoTaRError::InvalidTaskId(_) => -32602,
+                _ => -32603,
+            };
+            err(req.id, code, &error.to_string(), None)
+        }
+    }
+}
+
 pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,

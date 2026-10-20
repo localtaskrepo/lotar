@@ -30,8 +30,8 @@ use super::handlers::{
     handle_agent_status, handle_config_set, handle_config_show, handle_project_list,
     handle_project_stats, handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown,
     handle_sprint_create, handle_sprint_delete, handle_sprint_get, handle_sprint_list,
-    handle_sprint_remove, handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
-    handle_sync_pull, handle_sync_push, handle_task_bulk_comment_add,
+    handle_sprint_remove, handle_sprint_reorder, handle_sprint_summary, handle_sprint_update,
+    handle_sprint_velocity, handle_sync_pull, handle_sync_push, handle_task_bulk_comment_add,
     handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
     handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete,
     handle_task_get, handle_task_list, handle_task_reference_add, handle_task_reference_remove,
@@ -203,6 +203,11 @@ pub(crate) fn tool_specs() -> &'static [ToolSpec] {
             name: "sprint_backlog",
             method: "sprint/backlog",
             handler: handle_sprint_backlog,
+        },
+        ToolSpec {
+            name: "sprint_reorder",
+            method: "sprint/reorder",
+            handler: handle_sprint_reorder,
         },
         ToolSpec {
             name: "project_list",
@@ -494,7 +499,8 @@ mod tests {
             })
             .collect();
         advertised.sort();
-        assert_eq!(advertised.len(), 38, "advertised tool count changed");
+        assert_eq!(advertised.len(), 39, "advertised tool count changed");
+        assert!(advertised.iter().any(|name| name == "sprint_reorder"));
 
         let mut registered: Vec<&str> = tool_specs().iter().map(|spec| spec.name).collect();
         registered.sort_unstable();

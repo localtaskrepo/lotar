@@ -127,6 +127,31 @@ pub fn btreemap_u32_is_empty(map: &BTreeMap<u32, u32>) -> bool {
     map.is_empty()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TaskOrderRequest {
+    pub task: String,
+    #[serde(default)]
+    pub sprint: Option<u32>,
+    #[serde(default)]
+    pub before: Option<String>,
+    #[serde(default)]
+    pub after: Option<String>,
+    #[serde(default)]
+    pub allow_closed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskOrderResponse {
+    pub status: String,
+    pub tasks: Vec<String>,
+    pub changed: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub sprint_id: Option<u32>,
+}
+
 fn deserialize_double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
 where
     D: Deserializer<'de>,

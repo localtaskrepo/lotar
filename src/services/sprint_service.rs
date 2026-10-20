@@ -212,6 +212,12 @@ impl SprintService {
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             if !entry.path().is_file()
+                || entry
+                    .path()
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .and_then(|stem| stem.parse::<u32>().ok())
+                    .is_none()
                 || !matches!(
                     entry.path().extension().and_then(|ext| ext.to_str()),
                     Some("yml" | "yaml")

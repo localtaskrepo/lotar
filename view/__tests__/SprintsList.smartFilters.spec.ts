@@ -15,8 +15,14 @@ vi.mock('vue-router', () => ({
 
 const showConfigMock = vi.hoisted(() => vi.fn(async () => ({})))
 
+vi.mock('../composables/useSse', () => ({
+    useSse: () => ({ on: vi.fn(), close: vi.fn() }),
+}))
+
 vi.mock('../api/client', () => ({
     api: {
+        getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
+        reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
         listTasks: vi.fn(),
         showConfig: showConfigMock,
     },

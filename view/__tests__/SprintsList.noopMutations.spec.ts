@@ -13,6 +13,8 @@ vi.mock('vue-router', () => ({
 }))
 
 const api = vi.hoisted(() => ({
+    getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
+    reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
     listTasks: vi.fn(),
     sprintAdd: vi.fn(),
     sprintRemove: vi.fn(),
@@ -20,6 +22,10 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock('../api/client', () => ({ api }))
+
+vi.mock('../composables/useSse', () => ({
+    useSse: () => ({ on: vi.fn(), close: vi.fn() }),
+}))
 
 vi.mock('../components/toast', () => ({
     showToast: vi.fn(),
@@ -303,7 +309,7 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
         wrapper.unmount()
     })
 
-    it('move-dropping a multi-membership task onto one of its sprints still trims via force_single', async () => {
+    it('in Manual mode, move-dropping a multi-membership task onto one of its sprints still trims via force_single', async () => {
         api.listTasks.mockResolvedValue({
             status: 'ok',
             count: 1,
@@ -313,6 +319,8 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
             tasks: [makeTask('PRJ-001', [1, 2])],
         })
         const wrapper = await mountSettled()
+
+        await wrapper.find('[data-sprint-id="1"] [data-testid="sprint-manual-order"]').trigger('click')
 
         api.sprintAdd.mockResolvedValueOnce(sprintResponse({
             action: 'add', sprint_id: 1, sprint_label: 'Alpha', modified: ['PRJ-001'],

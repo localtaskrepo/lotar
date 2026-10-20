@@ -15,7 +15,7 @@ pub(super) use projects::{handle_project_list, handle_project_stats};
 pub(super) use sprints::{
     handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create,
     handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove,
-    handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
+    handle_sprint_reorder, handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
 };
 pub(super) use sync::{handle_sync_pull, handle_sync_push};
 pub(super) use tasks::{

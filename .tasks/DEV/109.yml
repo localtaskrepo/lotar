@@ -1,7 +1,106 @@
 title: Can't set ticket order in backlog
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-13T01:43:36.855318+00:00
+modified: 2026-10-20T22:07:25.238394+00:00
+comments:
+- date: 2026-10-20T19:30:08.628475+00:00
+  text: 'Plan: implement persistent manual backlog task ordering while preserving explicit column sorts, stable filter/page semantics and existing sprint membership moves. First characterize current sprint order meaning and backlog ranking/storage; choose minimal compatible persistence and public mutation contract rather than client-only order. Keep Rust/TS/OpenAPI/help synchronized and add no-op/validation/storage, UI pagination/filter/order and real-browser reload regressions. No automatic real-workspace ordering/migration or changes to deferred sprint comparator parity DEV114. Work current checkout; no Git writes or release/server operations.'
+- date: 2026-10-20T19:50:26.643554+00:00
+  text: |-
+    Implementation: chose optional positiveu32 per-task backlog_rank, not new central record, custom field or sprint0. No-op/set/null-clear via ordinary locked TaskUpdate pipeline/history; rank retained while assigned; ranked asc, canonical UTF8-ID ties, unranked ID asc before backlog limit/cursor. General task-list/sprint column comparators unchanged (DEV114 separate). CLI add/task edit set/clear/dryrun, REST and MCP typed contracts supported; Rust/TS/OpenAPI/help aligned. UI TaskPanel labelled numeric rank field when no memberships; backlog Manual order toggle defaults off to preserve existing column-sort behavior, persists in browser, sorts full filtered results before paging, exits on shared column sort and only resets backlog page on mode changes. Existing row drags still membership changes, no drag/rebalance promise.
+    Evidence so far:9 focused all-feature backend/CLI tests and25 focused UI tests passed; new schema contract test added for full gates. UI tests cover global page order, independent sprint offsets, mode reload, column sort, rank refresh, Unicode tie parity, create/edit/clear/noop/invalid/draft retention and absent/null response reconciliation. First panel test caught duplicate clear autosave caused stale merge baseline; fixed without relaxing exactcallcount. Fresh desktop1440/mobile390 browser cases passed edit/save/clear/YAML/reload/project-filter/page behavior with validpageSize25 (corrected invalid fixture10, not application policy). Real REST/MCP contract cases pass valid/max/omitted/null/invalid shapes, exact no-op state, rank order before limit, no membership writes (MCP task envelope fixture corrected). Independent end-to-end static review: no blockers. Full gates next; no real-data rank assignment/migration, Git writes or user-server changes.
+- date: 2026-10-20T20:00:15.267797+00:00
+  text: |-
+    Outcome: delivered persistent manual backlog ranking end-to-end. Optional typed backlog_rank1..u32MAX on task YAML/DTO, absent by default; create supports initial rank; tri-state update omitted/nochange,null/clear,value/set. Ordinary locked transaction preserves no-op bytes/mtime/history and unrelated metadata/reporters; genuine rank edits record history and modified. Retains rank through sprint membership; no implicit task/sprint migration. Shared backlog readers order ranked asc, canonical UTF8-ID ties then unrankedID beforefilter-limited/cursor output; generalTaskList sorting and deferred DEV114 comparator work unchanged. CLI add/taskadd/taskedit set/clear/dryrun +REST/MCP mutation/read parity. UI labelled Backlog rank when unassigned; Manual order opt-in toggle preserves existing column sort preference, reloads mode, sorts all filtered rows beforepagination, shows badges onlymanualmode and handles Unicode IDs. Row drag still membership, not rankreorder/rebalance; numeric gaps intentional. Rust/TS/OpenAPI (includingTaskUpdateRequest/backlogentry) and taskmodel/CLI/sprint/MCP help aligned.
+    Evidence: final10 all-feature focused rank tests include storage compatibility/failclosed malformedsamekey, bounds/shapes, create/update/null/omission, metadata/history/noop, membershipretention, crossprojectfilterlimitordering, spawnedCLI set/clear/alias/dryrun/rejection and OpenAPI range/nullable/optional schema checks.25 focused UI tests pass: create/edit/noop/nullclear/defensivenull/omittedreload/failedsave reconciliation, invalidvalues/draftretention, global manual pages vsindependentSprintpages, reload/columnsorting/filterresultrefresh and Unicode ties. Four new real smoke cases pass: desktop1440/mobile390 editclear/reload/projectfilter/globalpageorder/badges/no-page-overflow, plus REST/MCP full max/null/omit/invalidcreateupdate/exactnoop/membershipread contracts. Runtime found/fixed clear autosave stale merge baseline; kept exactcallcount. Initial test assumptions fixed (validpageSize25 not10; MCP.task envelope; directTaskCreate serde fixture tags[]) and one ES target incompatible test.at replaced, no policy/assertion weakening. Independent end-to-end static review found no blockers. Final lint:agent passed vue-tsc/all-target-all-feature Clippy-Dwarnings/fmt. Full test:agent Rust1493/140 binaries and frontend866/80 files passed. Separate full all-feature Rust1493 passed. Fresh-build full smoke288/70 files passed. git diff --check clean.
+    Remaining: unchanged baseline Rust gitless45 exclusions/smoke25 skips are not passes; native Linux/Windows/remote CI not run. Existing Vue inject warnings unchanged. Same-name illtyped user metadata now errors without rewrite rather than losing data; existing tasks with no rank remain unchanged. No automatic rankassignment, hidden-page replacement, relative drag/rebalancing or new generic sort key. New rank is global per task, not separately per browser/filter/project view. Late-response rank generations/SSE clear rely partly on existing shared guards and reviewed replacement semantics; directHTTP/browser callbacks verified. All changes unstaged/uncommitted; no Git writes, user-server restart or realdata/config rank changes.
+    Guidance: no durable instruction finding; product/API documentation updated only.
+- date: 2026-10-20T20:41:07.565949+00:00
+  text: 'Revision requested by developer: numeric per-task rank storage/control is not desired; backlog order should live alongside sprint metadata and Sprints page needs real row drag ordering rather than only region membership drops. Reopened. Implement .tasks/@sprints/backlog.yml ordered task IDs, relative before/after moves under existing sprint lock/transaction, one metadata file per same-container reorder and no task YAML/history/modified changes. Add same-container sprint vector reorder as natural shared behavior; filtered/paged moves preserve unseen IDs. Replace unreleased rank fields/APIs/CLI/UI/docs/tests, no backwardcompat machinery since no actual backlog_rank values found in .tasks. Existing staged DEV109 snapshots/index remain untouched; revision layered in worktree only. Keep membership moves/copy/closed guards separate; crosscontainer row drop maymove membership then place relative anchor with honest errorhandling. Verify actual desktop/mobile drag/reload/filter/pagination, concurrency/noop/corruption and full gates. No Git writes, userdata migration or user-server operations.'
+- date: 2026-10-20T21:35:07.409845+00:00
+  text: |-
+    Revised outcome: removed unreleased per-task numeric ranks/flags/form fields entirely. Backlog sequence now lives in .tasks/@sprints/backlog.yml alongside numeric sprint files; it is not sprint0 and doesn't count as membership. Relative before/after service reloads current collection under coordinated sprint+origin/anchor project locks, preserving hidden/inactive IDs and user metadata. Existing sprint reorders update that numeric file's task vector. A same-container reorder edits only one collection file, never task YAML/timestamps/history. No-op metadata bytes/mtime preserved; genuine history uses compact moved-task positions/anchor and project-aware actor. Readonly missing-file projection and unlisted-ID fallback require no task migration; current real.tasks had no rank data.
+    UI: actual row-level upper/lower before/after drop markers and stopped bubbling, in backlog and sprint tables. Successful drag selects that container's persistent Manual mode; existing column sorting still available. Cross-container row drops preserve established membership/copy/closed logic, then place relative to target with truthful partial-failure message. Full busy state (order/task/sprint loading, lifecycle and reorder) blocks drag/drop; samecontainercopy gesture rejected. SSE service/watch notifications reconcile current server state rather than trusting potentially delayed snapshots; late read/write generations guarded. CLI sprint order, RESTGETbacklog/order +POSTsprints/order, MCPsprint_reorder and Rust/TS/OpenAPI/help agree.
+    Verification:16 all-feature storage/CLI tests passed (relative moves/filter/limit/noops/stale/corrupt/foreignroot/closed/inactive/metadatahistory/legacyvector consistency).49 focused sprint UI tests passed including before/after, row-vs-region, hidden-page anchors, copy/closed/busy states and SSE races. Six real targeted smoke cases passed via desktop1440/mobile390 actual row.dragTo and REST/MCP; snapshots prove all31 task files unchanged. Independent review found P2nestedmetadata roundtrip loss and P3incompletebusy guards; both fixed and follow-up review resolved them, no new findings. Raw Sprint mapping persistence preserves nestedplan/actual/taskentry/oldhistory values, paddedIDs and legacyorder decorations while physicalvector matches actualDTO reader. Final lint:agent passed vue-tsc/all-target/all-feature Clippy-Dwarnings/fmt; final default +separate allfeature Rust1499/140binaries passed; frontend867/79files passed. Full fresh-build smoke290/70files passed. Updated exact MCPcatalog count38->39 with explicitnewtool assertions, retaining uniqueness/binding/schema checks. git diff --check clean.
+    Remaining: routine baseline Gitless45 exclusions and smoke25 skips remain unverified, not passes; native Linux/Windows/remote CI not run. Existing Vue inject warnings unchanged. Crosscontainer membership+placement are sequential, not one atomic combinedoperation, with explicit failure reporting. Service/watcher may emit duplicate genuine-change notifications; clients reconcile idempotently, no-op service emits none. No automatic data conversion, real reorder, user-server restart or Git mutation. User updated staging and stagedCargo0.9.1 during work; preserved it. GeneratedCargo.lock only advances lotar package0.9.0->0.9.1. Latest review/registry/fixture fixes remain unstaged: verified state is full working tree, not staged snapshot alone.
+    Guidance: no durable instruction finding; product/API docs corrected for revised architecture.
+- date: 2026-10-20T21:50:16.052724+00:00
+  text: 'Follow-up requested: automatic field sorting must not silently switch to Manual or make a dragged task disappear. Implement explicit mode boundary: same-container reordering only when Manual is already enabled; attempted automatic-mode reorder gets visible contextual tooltip instructing switch, no metadata/membership request or mode/page change. Keep cross-container assignment available: automatic destination follows field sort (membership only), Manual destination may also place relative anchor. Remove implicit manual activation. Add list icon to mode buttons with text/accessible pressed state retained. Scoped UI + real desktop/mobile regressions for blocked attempt/task visibility/tooltip, manual success, cross-list behavior, busy/copy/closed guards. Leave existing staged work/index untouched, no backend/data changes or user-server operations.'
+- date: 2026-10-20T22:07:25.204938+00:00
+  text: |-
+    Follow-up outcome: automatic field sorting is now an explicit non-reorder mode. Same-container row and background drops show contextual visible tooltip 'Automatic sorting is on. Switch to Manual order to reorder tasks.' and return without reorder/membership calls, page resets or implicit Manual activation. Automatic source rows remain visible rather than dimmed. Cross-container automatic destinations still permit membership-only assignment under their field sort; Manual destinations keep anchor placement. Background guard also prevents accidental force_single trimming of multi-membership tasks when attempting Auto reordering. Both mode buttons reuse listIcon with text, accessible pressed state and active styling; titles reflect switching modes. Tooltip stays in viewport, does not intercept pointer drops and dismisses on row/region mouseleave, Escape, mode change and unmount. Updated help policy.
+    Evidence:55 focused SprintsList tests/6files passed, including blocked rows/regions in both containers, exact no mutation/count/member/mode changes, explicitManual existingpositive/copy/closed/busy/SSE cases, AutoCross membershiponly, icon/name and tooltip lifecycle. Preserved old force_single assertion by making its Manual context explicit. Actual desktop1440/mobile390 browser cases passed blocked native row.dragTo with exacttooltip, unchanged rows/order/taskYAML/noPOSTs, then explicitManual before/after/reload/filter/page flows. Independent review found missing regionmouseleave dismissal; fixed and extended directregression, no other blockers. Final full frontend typecheck passed; full lint:agent passed frontendtypes/all-target-all-feature Clippy-Dwarnings/fmt; latest default full Rust1499/140binaries and frontend873/79files passed; fresh-build smoke290/70files passed. git diff --check clean.
+    Remaining: no backend/order-storage/API contract changes in this followup, no actualproject/data/mode mutation or user-server restart. Routine existing Gitless45 exclusions/smoke25 skips not passes; existing Vue inject warnings unchanged, native Linux/Windows/remote CI not run. New followup is unstaged atop developer-staged prior DEV109/version0.9.1; no Git writes/index changes performed.
+    Guidance: no durable instruction finding; related product help updated only.
 description: Sprints support an order to tickets, the backlog does not.
+history:
+- at: 2026-10-20T19:30:08.591021+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T19:30:08.628475+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T19:50:26.643554+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T20:00:15.267797+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T20:00:15.305270+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-20T20:41:07.525330+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-20T20:41:07.565949+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T21:35:07.409845+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T21:35:07.441810+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-20T21:50:16.011790+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-20T21:50:16.052724+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T22:07:25.204938+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T22:07:25.238394+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

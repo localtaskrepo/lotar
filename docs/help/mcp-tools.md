@@ -144,6 +144,11 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `sprint_backlog`
 - **Params:** `project`, `status` list (defaults come from config), `tag` filter, `assignee`, `limit` (default 20, max 100), `cursor` (<= 5000), and `cleanup_missing`.
+- **Ordering:** Uses `.tasks/@sprints/backlog.yml` task-ID sequence, followed by unlisted IDs in canonical order. Filtering precedes ordering and cursor slicing follows it. Task files are not ranked or rewritten. See [manual backlog ordering](./sprints.md#manual-backlog-ordering).
+
+### `sprint_reorder`
+- **Params:** `task`, exactly one of `before`/`after`, optional positive `sprint` (omitted/null selects backlog), and `allow_closed`.
+- **Effect:** Relative move within the selected collection only; no membership changes or task-file writes. The server reloads current metadata under lock, preserving hidden/filter/page entries and rejecting invalid or stale anchors. Returns `tasks` plus `changed`; effective no-ops preserve stored bytes and timestamps.
 - **Validation:** `sort_by`, `order`, `due`, `recent`, and `needs` are not supported here. They were previously advertised but ignored; they now return `-32602` rather than silently returning an unfiltered backlog. Use `task_list` for those filters.
 - **Validation:** Explicit status values are canonicalized and validated against the selected project's configuration; invalid values return `-32602` with that project's suggestions. Validation also runs for empty results.
 - **Response:** Paginated backlog with `status`, `count`, `total`, `cursor`, `limit`, `nextCursor` (number or null), `tasks[]`, `missing_sprints`, optional project-scoped `enumHints`, and `truncated`/`hasMore` flags. Empty pages retain the same pagination fields; cursors beyond the result set are clamped to its length.

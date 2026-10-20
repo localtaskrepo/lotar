@@ -169,7 +169,7 @@ fn property_allows_null(property: &Value) -> bool {
 #[test]
 fn advertised_catalog_covers_every_registered_tool_with_schemas() {
     let tools = advertised_tools();
-    assert_eq!(tools.len(), 38, "advertised tool count changed");
+    assert_eq!(tools.len(), 39, "advertised tool count changed");
     let mut names: Vec<&str> = tools
         .iter()
         .filter_map(|tool| tool.get("name").and_then(|v| v.as_str()))
@@ -210,6 +210,7 @@ fn advertised_catalog_covers_every_registered_tool_with_schemas() {
         "task_list",
         "sprint_add",
         "sprint_remove",
+        "sprint_reorder",
         "sync_pull",
         "sync_push",
         "schema_discover",

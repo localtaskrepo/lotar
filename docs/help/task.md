@@ -68,6 +68,7 @@ lotar task edit <TASK_ID> [--title|-T] [--type|-t] [--priority|-P] [--reporter|-
 - When `auto.populate_members` is enabled, new reporter/assignee members and the task edit are saved in one coordinated transaction. Validation or write failures do not leave member configuration changes behind; a pending transaction that cannot be safely recovered blocks the edit.
 - `--dry-run` works with both text and JSON output (`--format=json` emits the preview envelope described in `docs/help/effort.md`).
 - Dry runs validate membership against an in-memory member list without writing task or configuration files.
+- Backlog and sprint task order is stored in collection metadata, not task fields. Use row drag-and-drop or `lotar sprint order`; see [manual backlog ordering](./sprints.md#manual-backlog-ordering).
 - Review-state status/assignee changes require the reporter or an explicit project reviewer from `review.reviewers`; empty lists keep reporter-only behavior. Reporter metadata is preserved and history records the acting identity. See [review resolution](./status.md#review-resolution).
 
 ### status

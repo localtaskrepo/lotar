@@ -47,6 +47,8 @@ pub enum SprintAction {
     Delete(SprintDeleteArgs),
     /// List tasks that are not assigned to any sprint
     Backlog(SprintBacklogArgs),
+    /// Reorder one task within the backlog or a sprint without changing membership
+    Order(SprintOrderArgs),
     /// List stored sprints with optional limit
     List(SprintListArgs),
     /// Show detailed information about a sprint
@@ -87,6 +89,24 @@ pub struct TaskSelectionArgs {
         value_delimiter = None
     )]
     pub r#where: Vec<(String, String)>,
+}
+
+#[derive(Args, Debug)]
+pub struct SprintOrderArgs {
+    /// Task to move (fully qualified ID)
+    pub task: String,
+    /// Place the task before this ID
+    #[arg(long, conflicts_with = "after", required_unless_present = "after")]
+    pub before: Option<String>,
+    /// Place the task after this ID
+    #[arg(long, conflicts_with = "before", required_unless_present = "before")]
+    pub after: Option<String>,
+    /// Sprint ID or reference; omitted selects the backlog
+    #[arg(long)]
+    pub sprint: Option<String>,
+    /// Allow reordering a closed sprint
+    #[arg(long)]
+    pub allow_closed: bool,
 }
 
 impl TaskSelectionArgs {

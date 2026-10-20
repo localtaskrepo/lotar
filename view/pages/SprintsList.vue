@@ -257,6 +257,7 @@
           @dragleave="onSprintDragLeave(sprint.id)"
           @dragover.prevent="onSprintDragOver"
           @drop.prevent="onSprintDrop($event, sprint.id)"
+          @mouseleave="hideReorderHint"
         >
           <header class="group-header">
             <button class="collapse-btn" type="button" :aria-expanded="isExpanded(sectionKey(sprint.id))" :aria-label="`${isExpanded(sectionKey(sprint.id)) ? 'Collapse' : 'Expand'} ${sprint.display_name}`" @click="toggleSection(sectionKey(sprint.id))">
@@ -396,6 +397,19 @@
             </div>
             <span class="group-count">{{ getTasksForSprint(sprint.id).length }} task{{ getTasksForSprint(sprint.id).length === 1 ? '' : 's' }}</span>
             <div class="group-actions">
+              <UiButton
+                class="small"
+                type="button"
+                :variant="isSprintManual(sprint.id) ? 'primary' : ''"
+                :aria-pressed="isSprintManual(sprint.id)"
+                :disabled="busy"
+                data-testid="sprint-manual-order"
+                :title="isSprintManual(sprint.id) ? 'Use field sorting' : 'Switch to Manual order to drag rows before or after another task'"
+                @click="toggleSprintManual(sprint.id)"
+              >
+                <IconGlyph name="list" aria-hidden="true" />
+                <span>Manual order</span>
+              </UiButton>
               <UiLoader v-if="isLifecycleBusy(sprint.id)" size="sm" />
               <UiButton
                 class="small responsive-action"
@@ -472,8 +486,8 @@
                       <th
                         v-for="col in visibleColumns"
                         :key="col"
-                        :class="['sortable', { active: sort.key === col }]"
-                        :aria-sort="ariaSort(col)"
+                        :class="['sortable', { active: !isSprintManual(sprint.id) && sort.key === col }]"
+                        :aria-sort="isSprintManual(sprint.id) ? 'none' : ariaSort(col)"
                         :data-column="col"
                         @dragover.prevent="onColDragOver(col, $event)"
                         @drop.prevent="onColDrop(col, $event)"
@@ -489,12 +503,12 @@
                           ]"
                           type="button"
                           draggable="true"
-                          @click="onHeaderActivate(col)"
+                          @click="activateContainerHeader(col, sprint.id)"
                           @dragstart="onColDragStart(col, $event)"
                           @dragend="onColDragEnd"
                         >
                           {{ headerLabel(col) }}
-                          <span class="sort-glyph" aria-hidden="true">{{ sortGlyph(col) }}</span>
+                          <span class="sort-glyph" aria-hidden="true">{{ isSprintManual(sprint.id) ? '⇅' : sortGlyph(col) }}</span>
                         </button>
                       </th>
                     </tr>
@@ -505,10 +519,18 @@
                       :key="task.id + '-' + sprint.id"
                       class="task-row"
                       :class="{
-                        'task-row--dragging': draggingTaskId === task.id,
+                        'task-row--dragging': draggingTaskId === task.id && draggingSourceSprint === sprint.id && isSprintManual(sprint.id),
+                        'task-row--before': rowMarker?.task === task.id && rowMarker.sprint === sprint.id && rowMarker.position === 'before',
+                        'task-row--after': rowMarker?.task === task.id && rowMarker.sprint === sprint.id && rowMarker.position === 'after',
                       }"
-                      draggable="true"
+                       :draggable="!busy"
+                       :title="isSprintManual(sprint.id) ? undefined : automaticOrderHint"
+                       :aria-describedby="reorderHint?.sprint === sprint.id ? 'task-order-tooltip' : undefined"
                       :data-task-id="task.id"
+                      @dragover="onRowDragOver($event, task.id, sprint.id)"
+                       @dragleave="rowMarker = null"
+                       @mouseleave="hideReorderHint"
+                      @drop="onRowDrop($event, task.id, sprint.id)"
                       @dragstart="onTaskDragStart($event, task.id, sprint.id)"
                       @dragend="onTaskDragEnd"
                       @click="onTaskRowClick(task, $event)"
@@ -616,6 +638,7 @@
           @dragleave="onBacklogDragLeave"
           @dragover.prevent="onBacklogDragOver($event)"
           @drop.prevent="onBacklogDrop($event)"
+          @mouseleave="hideReorderHint"
         >
           <header class="group-header">
             <button class="collapse-btn" type="button" :aria-expanded="isExpanded('backlog')" :aria-label="isExpanded('backlog') ? 'Collapse backlog' : 'Expand backlog'" @click="toggleSection('backlog')">
@@ -625,6 +648,7 @@
               <h2>Backlog</h2>
               <div class="group-meta">
                 <span class="muted">Unassigned tasks</span>
+                <span v-if="backlogManualOrder" class="muted">Drag rows to reorder</span>
               </div>
             </div>
             <div class="group-count backlog-count">
@@ -637,6 +661,19 @@
               </span>
             </div>
             <div class="group-actions backlog-actions">
+              <UiButton
+                class="small"
+                type="button"
+                :variant="backlogManualOrder ? 'primary' : ''"
+                :aria-pressed="backlogManualOrder"
+                :disabled="busy"
+                data-testid="backlog-manual-order"
+                :title="backlogManualOrder ? 'Use field sorting' : 'Switch to Manual order to drag rows before or after another task'"
+                @click="backlogManualOrder = !backlogManualOrder"
+              >
+                <IconGlyph name="list" aria-hidden="true" />
+                <span>Manual order</span>
+              </UiButton>
               <UiButton
                 class="small responsive-action"
                 type="button"
@@ -661,8 +698,8 @@
                       <th
                         v-for="col in visibleColumns"
                         :key="col"
-                        :class="['sortable', { active: sort.key === col }]"
-                        :aria-sort="ariaSort(col)"
+                        :class="['sortable', { active: !backlogManualOrder && sort.key === col }]"
+                        :aria-sort="backlogManualOrder ? 'none' : ariaSort(col)"
                         :data-column="col"
                         @dragover.prevent="onColDragOver(col, $event)"
                         @drop.prevent="onColDrop(col, $event)"
@@ -678,26 +715,34 @@
                           ]"
                           type="button"
                           draggable="true"
-                          @click="onHeaderActivate(col)"
+                          @click="activateContainerHeader(col, null)"
                           @dragstart="onColDragStart(col, $event)"
                           @dragend="onColDragEnd"
                         >
                           {{ headerLabel(col) }}
-                          <span class="sort-glyph" aria-hidden="true">{{ sortGlyph(col) }}</span>
+                          <span class="sort-glyph" aria-hidden="true">{{ backlogManualOrder ? '⇅' : sortGlyph(col) }}</span>
                         </button>
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr
-                      v-for="task in pagedBacklogTasks"
+                       v-for="task in pagedBacklogTasks"
                       :key="task.id"
                       class="task-row"
                       :class="{
-                        'task-row--dragging': draggingTaskId === task.id,
+                         'task-row--dragging': draggingTaskId === task.id && draggingSourceSprint === null && backlogManualOrder,
+                        'task-row--before': rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'before',
+                        'task-row--after': rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'after',
                       }"
-                      draggable="true"
+                        :draggable="!busy"
+                        :title="backlogManualOrder ? undefined : automaticOrderHint"
+                        :aria-describedby="reorderHint?.sprint === null ? 'task-order-tooltip' : undefined"
                       :data-task-id="task.id"
+                      @dragover="onRowDragOver($event, task.id, null)"
+                        @dragleave="rowMarker = null"
+                        @mouseleave="hideReorderHint"
+                      @drop="onRowDrop($event, task.id, null)"
                       @dragstart="onTaskDragStart($event, task.id, null)"
                       @dragend="onTaskDragEnd"
                       @click="onTaskRowClick(task, $event)"
@@ -786,7 +831,16 @@
          </UiCard>
        </div>
      </template>
-   </section>
+      <Teleport to="body">
+        <div
+          v-if="reorderHint"
+          id="task-order-tooltip"
+          role="tooltip"
+          class="task-order-tooltip"
+          :style="{ left: `${reorderHint.x}px`, top: `${reorderHint.y}px`, width: `${reorderHint.width}px` }"
+        >{{ automaticOrderHint }}</div>
+      </Teleport>
+    </section>
 </template>
 
 <script setup lang="ts">
@@ -818,6 +872,7 @@ import UiSelect from '../components/UiSelect.vue'
 import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog.vue'
 import { showToast } from '../components/toast'
 import { useConfig } from '../composables/useConfig'
+import { useSse } from '../composables/useSse'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { useCopyModifier } from '../composables/useCopyModifier'
 import { buildServerFilter, listFromCsv, useProjectFilterSync } from '../composables/useFilterBuilder'
@@ -1191,6 +1246,48 @@ const columnOptions = computed(() =>
 const isColumnVisible = (key: string) => columnsSet.value.has(key as ColumnKey)
 
 const sortState = loadStoredSort()
+const backlogManualOrder = ref(storageGetFlag('lotar.sprints.backlogManualOrder', false))
+const automaticOrderHint = 'Automatic sorting is on. Switch to Manual order to reorder tasks.'
+const reorderHint = ref<{ x: number; y: number; width: number; sprint: number | null } | null>(null)
+function hideReorderHint() { reorderHint.value = null }
+function isContainerManual(sprint: number | null) { return sprint === null ? backlogManualOrder.value : isSprintManual(sprint) }
+function showReorderHint(event: DragEvent, sprint: number | null) {
+  const bounds = event.currentTarget instanceof Element ? event.currentTarget.getBoundingClientRect() : null
+  const x = Number.isFinite(event.clientX) ? event.clientX : bounds?.left ?? 0
+  const y = Number.isFinite(event.clientY) ? event.clientY : bounds?.bottom ?? 0
+  const bottom = event.currentTarget instanceof Element && event.currentTarget.tagName === 'TR' ? bounds?.bottom ?? y : y
+  const viewportWidth = document.documentElement.clientWidth || window.innerWidth
+  const viewportHeight = document.documentElement.clientHeight || window.innerHeight
+  const width = Math.min(300, viewportWidth - 16)
+  reorderHint.value = {
+    sprint,
+    width,
+    x: Math.max(8, Math.min(x + 12, viewportWidth - width - 8)),
+    y: Math.max(8, Math.min(Math.max(y + 24, bottom + 8), viewportHeight - 100)),
+  }
+}
+function onOrderHintKeydown(event: KeyboardEvent) { if (event.key === 'Escape') hideReorderHint() }
+const manualSprints = ref<number[]>(storageGetJson<number[]>('lotar.sprints.manualOrder')?.filter(id => Number.isInteger(id) && id > 0) ?? [])
+const backlogOrder = ref<string[]>([])
+const backlogOrderLoading = ref(false)
+const reordering = ref(false)
+const rowMarker = ref<{ task: string; sprint: number | null; position: 'before' | 'after' } | null>(null)
+const orderGenerations = new Map<number | null, number>()
+let disposed = false
+function advanceOrderGeneration(sprint: number | null) {
+  const generation = (orderGenerations.get(sprint) ?? 0) + 1
+  orderGenerations.set(sprint, generation)
+  return generation
+}
+let taskGeneration = 0
+let orderSse: ReturnType<typeof useSse> | null = null
+const isSprintManual = (id: number) => manualSprints.value.includes(id)
+function toggleSprintManual(id: number) {
+  manualSprints.value = isSprintManual(id) ? manualSprints.value.filter(value => value !== id) : [...manualSprints.value, id]
+  delete sprintTaskOffsets[id]
+}
+watch(manualSprints, value => storageSetJson('lotar.sprints.manualOrder', value))
+watch([backlogManualOrder, manualSprints], hideReorderHint)
 const sort = reactive<{ key: ColumnKey | null; dir: 'asc' | 'desc' }>(
   sortState ?? {
     key: 'modified',
@@ -1212,13 +1309,22 @@ watch(
   { deep: true },
 )
 
+let sortingSprint: number | null = null
 function onSort(key: ColumnKey) {
+  hideReorderHint()
+  if (sortingSprint === null) backlogManualOrder.value = false
+  else manualSprints.value = manualSprints.value.filter(id => id !== sortingSprint)
   if (sort.key === key) {
     sort.dir = sort.dir === 'asc' ? 'desc' : 'asc'
   } else {
     sort.key = key
     sort.dir = 'asc'
   }
+}
+
+function activateContainerHeader(key: ColumnKey, sprint: number | null) {
+  sortingSprint = sprint
+  onHeaderActivate(key)
 }
 
 function ariaSort(key: ColumnKey) {
@@ -1458,15 +1564,27 @@ const backlogTasks = computed(() => tasks.value.filter((task) => !(Array.isArray
 const filtersActive = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
 const busy = computed(
-  () => sprintsLoading.value || tasksLoading.value || Object.keys(lifecycleBusy).length > 0,
+  () => reordering.value || backlogOrderLoading.value || sprintsLoading.value || tasksLoading.value || Object.keys(lifecycleBusy).length > 0,
 )
 
-const sortedBacklogTasks = computed(() => sortTasks(backlogTasks.value))
+const sortedBacklogTasks = computed(() => {
+  if (!backlogManualOrder.value) return sortTasks(backlogTasks.value)
+  const positions = new Map(backlogOrder.value.map((id, index) => [id, index]))
+  return [...backlogTasks.value].sort((a, b) => {
+    const difference = (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity)
+    if (difference) return difference
+    return canonicalIdCompare(a.id, b.id)
+  })
+})
 
 // DEV-105: one shared page size (the tasks preference) drives the backlog and
 // every sprint table; each list keeps its own independent offset.
 const tasksPageSize = ref(readTasksPageSizePreference())
 const backlogOffset = ref(0)
+watch(backlogManualOrder, (value) => {
+  storageSetFlag('lotar.sprints.backlogManualOrder', value)
+  backlogOffset.value = 0
+})
 const sprintTaskOffsets = reactive<Record<number, number>>({})
 
 const backlogTotalCount = computed(() => sortedBacklogTasks.value.length)
@@ -2084,6 +2202,7 @@ function scheduleTasksRefresh() {
 }
 
 async function refreshTasks() {
+  const generation = ++taskGeneration
   if (typeof window !== 'undefined' && filterTimer.value !== null) {
     window.clearTimeout(filterTimer.value)
     filterTimer.value = null
@@ -2115,12 +2234,14 @@ async function refreshTasks() {
     // and row styling agree with the server buckets for this exact result.
     await ensureCompletionPolicies(normalized)
     const filtered = applySprintSmartFilters(normalized, qnorm)
-    tasks.value = filtered
+    if (generation === taskGeneration) tasks.value = filtered
   } catch (error: any) {
-    showToast(error?.message || 'Failed to load sprint tasks')
-    tasks.value = []
+    if (generation === taskGeneration) {
+      showToast(error?.message || 'Failed to load sprint tasks')
+      tasks.value = []
+    }
   } finally {
-    tasksLoading.value = false
+    if (generation === taskGeneration) tasksLoading.value = false
     if (!initialized.value) {
       initialized.value = true
     }
@@ -2133,7 +2254,102 @@ async function refreshAll(force = false) {
   } catch (error: any) {
     showToast(error?.message || 'Failed to load sprints')
   }
-  await refreshTasks()
+  await Promise.all([refreshTasks(), refreshBacklogOrder()])
+}
+
+async function refreshBacklogOrder() {
+  const generation = advanceOrderGeneration(null)
+  backlogOrderLoading.value = true
+  try {
+    const response = await api.getBacklogOrder()
+    if (!disposed && generation === orderGenerations.get(null)) backlogOrder.value = response.tasks
+  } catch (error: any) {
+    if (!disposed && generation === orderGenerations.get(null)) showToast(error?.message || 'Failed to load backlog order')
+  } finally {
+    if (!disposed && generation === orderGenerations.get(null)) backlogOrderLoading.value = false
+  }
+}
+
+function applyTaskOrder(sprint: number | null, ids: string[]) {
+  if (sprint === null) backlogOrder.value = ids
+  else {
+    const positions = new Map(ids.map((id, index) => [id, index]))
+    tasks.value = tasks.value.map(task => positions.has(task.id)
+      ? { ...task, sprint_order: { ...task.sprint_order, [sprint]: positions.get(task.id)! + 1 } }
+      : task)
+  }
+}
+
+function onRowDragOver(event: DragEvent, task: string, sprint: number | null) {
+  if (!draggingTaskId.value || draggingCol.value || busy.value) return
+  if (!isContainerManual(sprint)) {
+    rowMarker.value = null
+    if (draggingSourceSprint.value === sprint) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none'
+      showReorderHint(event, sprint)
+    } else {
+      hideReorderHint()
+    }
+    return
+  }
+  hideReorderHint()
+  event.preventDefault()
+  event.stopPropagation()
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  rowMarker.value = { task, sprint, position: event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after' }
+}
+
+async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null) {
+  if (!draggingTaskId.value || draggingCol.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (busy.value) { onTaskDragEnd(); return }
+  const task = draggingTaskId.value
+  const source = draggingSourceSprint.value
+  const copyMode = resolveCopyModifier(event)
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+  rowMarker.value = null
+  const manual = isContainerManual(sprint)
+  if (source === sprint && !manual) {
+    showReorderHint(event, sprint)
+    onTaskDragEnd()
+    return
+  }
+  hideReorderHint()
+  if (task === anchor) { onTaskDragEnd(); return }
+  if (source === sprint && copyMode) {
+    showToast('Release the copy modifier to reorder tasks within this list.')
+    onTaskDragEnd()
+    return
+  }
+  if (!allowClosed.value && (isClosedSprintId(source) || isClosedSprintId(sprint))) {
+    showToast('Enable "Allow editing closed sprints" above to reorder this sprint.')
+    onTaskDragEnd()
+    return
+  }
+  reordering.value = true
+  let moved = false
+  try {
+    if (source !== sprint) {
+      moved = sprint === null ? await onBacklogDrop(event) === true : await onSprintDrop(event, sprint) === true
+      if (!moved) return
+    }
+    if (!manual) return
+    const generation = advanceOrderGeneration(sprint)
+    ++taskGeneration
+    tasksLoading.value = false
+    const response = await api.reorderTasks({ task, sprint, [position]: anchor, ...(allowClosed.value ? { allow_closed: true } : {}) })
+    if (disposed) return
+    if (generation === orderGenerations.get(sprint)) applyTaskOrder(sprint, response.tasks)
+  } catch (error: any) {
+    showToast(`${moved ? 'Task moved, but placement failed: ' : 'Could not reorder tasks: '}${error?.message || 'Refresh and try again.'}`)
+  } finally {
+    reordering.value = false
+    onTaskDragEnd()
+  }
 }
 
 async function handleManualRefresh() {
@@ -2258,6 +2474,7 @@ async function removeTasksFromSprint(taskIds: string[], sprintId: number, option
 }
 
 function onTaskDragStart(event: DragEvent, taskId: string, sourceSprint: number | null) {
+  if (busy.value || draggingCol.value) { event.preventDefault(); return }
   const target = event.target as HTMLElement | null
   if (target && target.closest('button, a, input, textarea, select')) {
     event.preventDefault()
@@ -2266,6 +2483,8 @@ function onTaskDragStart(event: DragEvent, taskId: string, sourceSprint: number 
   resolveCopyModifier(event)
   draggingTaskId.value = taskId
   draggingSourceSprint.value = sourceSprint
+  if (!isContainerManual(sourceSprint)) showReorderHint(event, sourceSprint)
+  else hideReorderHint()
   event.dataTransfer?.setData('text/plain', taskId)
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'copyMove'
@@ -2273,6 +2492,7 @@ function onTaskDragStart(event: DragEvent, taskId: string, sourceSprint: number 
 }
 
 function onTaskDragEnd() {
+  rowMarker.value = null
   draggingTaskId.value = null
   draggingSourceSprint.value = null
   hoverSprintId.value = null
@@ -2301,6 +2521,12 @@ function onSprintDragOver(event: DragEvent) {
 }
 
 async function onSprintDrop(event: DragEvent, id: number) {
+  if (draggingTaskId.value && draggingSourceSprint.value === id && !isSprintManual(id)) {
+    showReorderHint(event, id)
+    onTaskDragEnd()
+    return false
+  }
+  hideReorderHint()
   if (!draggingTaskId.value) return
   resolveCopyModifier(event)
   const taskId = draggingTaskId.value
@@ -2332,19 +2558,21 @@ async function onSprintDrop(event: DragEvent, id: number) {
     const memberships = normalizeSprintMembership(draggedTask.sprints)
     if (!copyMode && memberships.length === 1 && memberships[0] === id) {
       onTaskDragEnd()
-      return
+      return true
     }
     if (copyMode && memberships.includes(id)) {
       onTaskDragEnd()
-      return
+      return true
     }
   }
   let added = false
+  let succeeded = false
   try {
     added = await assignTasksToSprint([taskId], id, { forceSingle: !copyMode })
     if (added && !copyMode && source && source !== id) {
       await removeTasksFromSprint([taskId], source, { silent: true })
     }
+    succeeded = added
   } catch {
     /* errors already surfaced */
   } finally {
@@ -2353,6 +2581,7 @@ async function onSprintDrop(event: DragEvent, id: number) {
     }
     onTaskDragEnd()
   }
+  return succeeded
 }
 
 function onBacklogDragEnter(event: DragEvent) {
@@ -2379,6 +2608,12 @@ function onBacklogDragOver(event: DragEvent) {
 }
 
 async function onBacklogDrop(event: DragEvent) {
+  if (draggingTaskId.value && draggingSourceSprint.value === null && !backlogManualOrder.value) {
+    showReorderHint(event, null)
+    onTaskDragEnd()
+    return false
+  }
+  hideReorderHint()
   if (!draggingTaskId.value) return
   resolveCopyModifier(event)
   const taskId = draggingTaskId.value
@@ -2410,6 +2645,7 @@ async function onBacklogDrop(event: DragEvent) {
     }
   }
   let removedAny = false
+  let succeeded = false
   try {
     for (let index = 0; index < memberships.length; index += 1) {
       const sprintId = memberships[index]
@@ -2417,6 +2653,7 @@ async function onBacklogDrop(event: DragEvent) {
       const result = await removeTasksFromSprint([taskId], sprintId, { silent: index > 0 })
       removedAny = removedAny || result
     }
+    succeeded = removedAny
   } catch {
     /* toast already shown */
   } finally {
@@ -2425,6 +2662,7 @@ async function onBacklogDrop(event: DragEvent) {
     }
     onTaskDragEnd()
   }
+  return succeeded
 }
 
 function handleTaskPanelUpdated(updated: TaskDTO) {
@@ -2551,7 +2789,19 @@ function sortTasks(list: TaskDTO[] | undefined | null) {
 }
 
 function getSortedTasksForSprint(id: number) {
+  if (isSprintManual(id)) return [...getTasksForSprint(id)].sort((a, b) =>
+    ((a.sprint_order?.[id] ?? Infinity) - (b.sprint_order?.[id] ?? Infinity)) || canonicalIdCompare(a.id, b.id))
   return sortTasks(getTasksForSprint(id))
+}
+
+function canonicalIdCompare(a: string, b: string) {
+  // Match the server's code-point ordering rather than UTF-16 or locale order.
+  const left = Array.from(a, char => char.codePointAt(0)!)
+  const right = Array.from(b, char => char.codePointAt(0)!)
+  for (let index = 0; index < Math.min(left.length, right.length); index++) {
+    if (left[index] !== right[index]) return left[index]! - right[index]!
+  }
+  return left.length - right.length
 }
 
 function parseNumberInput(value: unknown): number | null {
@@ -2885,6 +3135,23 @@ function focusBacklogIfRequested() {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', onOrderHintKeydown)
+  orderSse = useSse('/api/events', { kinds: 'task_order_changed' }, {
+    onReconnect: () => { void refreshAll(true) },
+  })
+  orderSse.on('task_order_changed', event => {
+    if (disposed) return
+    try {
+      const payload = JSON.parse(event.data)
+      if (!Array.isArray(payload.tasks) || !payload.tasks.every((id: unknown) => typeof id === 'string')) return
+      if (payload.sprint_id != null && (!Number.isInteger(payload.sprint_id) || payload.sprint_id <= 0)) return
+      advanceOrderGeneration(payload.sprint_id ?? null)
+      ++taskGeneration
+      // Notifications may race after commit; reconcile current metadata rather
+      // than applying a delayed writer's snapshot over a newer order.
+      void Promise.all([refreshTasks(), refreshBacklogOrder()])
+    } catch { /* Ignore malformed events; reconnect reconciles from the server. */ }
+  })
   stopPreferencesListener = onPreferencesChanged((key) => {
     if (key !== 'lotar.preferences.tasks.pageSize') return
     tasksPageSize.value = readTasksPageSizePreference()
@@ -2907,6 +3174,11 @@ watch(() => route.query, async (q) => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', onOrderHintKeydown)
+  hideReorderHint()
+  disposed = true
+  ++taskGeneration
+  orderSse?.close()
   removeModalListeners()
   if (typeof window !== 'undefined') {
     if (filterTimer.value !== null) {
@@ -2920,6 +3192,25 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.task-order-tooltip {
+  position: fixed;
+  z-index: var(--z-tooltip);
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  padding: 9px 12px;
+  border: 1px solid color-mix(in oklab, var(--color-border) 80%, transparent);
+  border-radius: var(--radius-popover);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  box-shadow: var(--shadow-popover);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.task-row--before > td { box-shadow: inset 0 3px var(--color-primary, #4676d7); }
+.task-row--after > td { box-shadow: inset 0 -3px var(--color-primary, #4676d7); }
+
 .header {
   justify-content: space-between;
   align-items: flex-start;

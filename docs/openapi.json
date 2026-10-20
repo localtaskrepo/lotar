@@ -2546,9 +2546,34 @@
         ]
       }
     },
+    "/api/sprints/backlog/order": {
+      "get": {
+        "summary": "Read the global active backlog order",
+        "description": "Projects .tasks/@sprints/backlog.yml onto currently eligible tasks and appends unlisted IDs in canonical order. Missing metadata is an implicit default, not a write. Does not return a filtered/page replacement list or change task files.",
+        "responses": {
+          "200": {"description": "Full active backlog sequence", "content": {"application/json": {"schema": {"type": "object", "properties": {"data": {"$ref": "#/components/schemas/TaskOrderResponse"}}, "required": ["data"]}}}},
+          "400": {"description": "Invalid or corrupt order metadata"},
+          "500": {"description": "Storage read failed"}
+        }
+      }
+    },
+    "/api/sprints/order": {
+      "post": {
+        "summary": "Move a backlog or sprint task before/after a current anchor",
+        "description": "Fresh relative order mutation under the coordinated sprint lock. Updates only backlog.yml or the selected numeric sprint file, never task files or membership. No-ops preserve bytes and timestamps. Closed sprint changes require allow_closed. Emits task_order_changed for genuine changes.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TaskOrderRequest"}}}},
+        "responses": {
+          "200": {"description": "Authoritative full current order and changed flag", "content": {"application/json": {"schema": {"type": "object", "properties": {"data": {"$ref": "#/components/schemas/TaskOrderResponse"}}, "required": ["data"]}}}},
+          "400": {"description": "Invalid, stale, nonmember, foreign-root, deleted, corrupt, or disallowed closed-sprint target"},
+          "404": {"description": "Task or sprint not found"},
+          "500": {"description": "Storage mutation failed"}
+        }
+      }
+    },
     "/api/sprints/backlog": {
       "get": {
         "summary": "List backlog tasks (not assigned to any sprint)",
+        "description": "Filters backlog tasks and projects the ordered IDs from .tasks/@sprints/backlog.yml, followed by unlisted canonical IDs, before applying the limit. Does not change task files or sprint membership.",
         "responses": {
           "200": {
             "description": "OK"
@@ -5010,6 +5035,33 @@
           "removed_references",
           "updated_tasks"
         ]
+      },
+      "TaskOrderRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Move one task relative to one current anchor. Omitted/null sprint selects backlog; a positive sprint ID selects an existing sprint. Exactly one non-null before/after anchor is required. Current metadata is loaded under lock so hidden filtered/paged tasks are preserved; this is not a replacement-list API.",
+        "properties": {
+          "task": {"type": "string", "minLength": 1},
+          "sprint": {"type": "integer", "format": "int64", "minimum": 1, "maximum": 4294967295, "nullable": true},
+          "before": {"type": "string", "minLength": 1, "nullable": true},
+          "after": {"type": "string", "minLength": 1, "nullable": true},
+          "allow_closed": {"type": "boolean", "default": false}
+        },
+        "required": ["task"],
+        "oneOf": [
+          {"required": ["before"], "properties": {"before": {"type": "string", "minLength": 1}, "after": {"type": "string", "nullable": true, "enum": [null]}}},
+          {"required": ["after"], "properties": {"after": {"type": "string", "minLength": 1}, "before": {"type": "string", "nullable": true, "enum": [null]}}}
+        ]
+      },
+      "TaskOrderResponse": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string"},
+          "tasks": {"type": "array", "items": {"type": "string"}, "description": "Full active backlog order or complete sprint membership sequence, not only a visible page."},
+          "changed": {"type": "boolean", "description": "False preserves metadata bytes/timestamps and emits no changed-only API event."},
+          "sprint_id": {"type": "integer", "format": "int64", "minimum": 1, "maximum": 4294967295, "description": "Omitted for backlog."}
+        },
+        "required": ["status", "tasks", "changed"]
       },
       "SprintBacklogItem": {
         "type": "object",

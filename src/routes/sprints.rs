@@ -1,6 +1,40 @@
 use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
+    api_server.register_handler("GET", "/api/sprints/backlog/order", |_req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(resolver) => resolver,
+            Err(error) => {
+                return internal(json!({"error": {"code": "INTERNAL", "message": error}}));
+            }
+        };
+        let storage = crate::storage::manager::Storage {
+            root_path: resolver.path,
+        };
+        match crate::services::task_order::get_order(&storage, None) {
+            Ok(response) => ok_json(200, json!({"data": response})),
+            Err(error) => map_lotar_error(error),
+        }
+    });
+    api_server.register_handler("POST", "/api/sprints/order", |req: &HttpRequest| {
+        let body: crate::api_types::TaskOrderRequest = match serde_json::from_slice(&req.body) {
+            Ok(body) => body,
+            Err(error) => return bad_request(format!("Invalid body: {error}")),
+        };
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(resolver) => resolver,
+            Err(error) => {
+                return internal(json!({"error": {"code": "INTERNAL", "message": error}}));
+            }
+        };
+        let storage = crate::storage::manager::Storage {
+            root_path: resolver.path,
+        };
+        match crate::services::task_order::reorder(&storage, &body) {
+            Ok(response) => ok_json(200, json!({"data": response})),
+            Err(error) => map_lotar_error(error),
+        }
+    });
     api_server.register_handler("GET", "/api/sprints/list", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
             Ok(r) => r,

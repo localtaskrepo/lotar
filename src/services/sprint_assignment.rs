@@ -461,7 +461,17 @@ pub fn fetch_backlog(
         });
     }
 
-    entries.sort_by(|a, b| a.id.cmp(&b.id));
+    let order = crate::services::task_order::backlog_order_for_ids(
+        storage,
+        entries.iter().map(|entry| entry.id.clone()),
+    )
+    .map_err(|error| error.to_string())?;
+    let positions: HashMap<_, _> = order
+        .into_iter()
+        .enumerate()
+        .map(|(index, id)| (id, index))
+        .collect();
+    entries.sort_by_key(|entry| positions.get(&entry.id).copied().unwrap_or(usize::MAX));
 
     let mut truncated = false;
     if options.limit > 0 && entries.len() > options.limit {

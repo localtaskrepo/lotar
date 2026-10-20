@@ -65,6 +65,62 @@ Mixed-project status breakdowns still group by label, but the row's `done` flag 
 
 Add, move, remove, and backlog share the `--cleanup-missing` flag so you can scrub dangling sprint IDs before the command runs; missing references are also reported when you choose not to clean them. Only `add` and `move` support `--allow-closed`, and only `add` exposes `--force` because `move` already replaces existing memberships. The REST API and MCP tools expose the same cleanup toggles and reassignment metadata (messages plus structured `replaced` entries) for automation.
 
+## Manual backlog ordering
+
+Backlog order is an ordered task-ID list in `.tasks/@sprints/backlog.yml`,
+alongside the numeric sprint records. It is not stored on individual tasks:
+
+```yaml
+tasks:
+  - AUTH-42
+  - AUTH-9
+  - APP-3
+```
+
+Stored tasks appear in that sequence; tasks not yet listed follow by canonical
+ID. Inactive entries are retained so a task can regain its place when it returns
+from a sprint. The backlog file is not a sprint and never assigns membership.
+
+```bash
+lotar sprint order AUTH-42 --before AUTH-9
+lotar sprint order APP-3 --after AUTH-9
+lotar sprint backlog --project AUTH
+# Order within an existing sprint instead
+lotar sprint order AUTH-42 --before AUTH-9 --sprint 3
+```
+
+In the web UI, first select that table's **Manual order** button, then drag a
+task row to the upper or lower half of another row to place it **before** or
+**after** that task. An insertion line shows the target. This works in both
+backlog and sprint tables. The selected mode survives reload. Column sorting
+exits that table's manual mode without discarding its saved order.
+
+While automatic field sorting is active, attempts to reorder within the table
+are blocked with a tooltip explaining how to switch to Manual order. No saved
+order, page position, membership, or sorting mode changes as a result. Rows
+remain draggable for assignments between different containers.
+
+Moves specify a task and one relative anchor, not a replacement list from the
+visible page. Project/status filters and pagination therefore leave hidden
+tasks in their existing relative order. A same-table reorder updates only the
+backlog metadata file or the existing numeric sprint file; it does not rewrite
+task YAML, task timestamps, history, or sprint membership. Self/adjacent no-ops
+leave the order file unchanged as well.
+
+Dragging between containers retains the existing move/copy and closed-sprint
+rules. If the destination is automatically sorted, only membership changes and
+the selected field sort determines the displayed position. In a Manual
+destination, a drop on a row moves membership first, then places the task
+relative to that row; a placement failure is reported separately if membership
+already moved. Closed sprint reordering requires `--allow-closed` or the UI's
+existing allow-closed setting.
+
+REST `GET /api/sprints/backlog/order` reads the full active backlog sequence.
+`POST /api/sprints/order` and MCP `sprint_reorder` accept `task`, optional
+`sprint`, and exactly one of `before`/`after`; omitting `sprint` selects backlog.
+Filters are applied before the resulting order is paginated or limited. Normal
+task-list and explicit column sorting remain unchanged.
+
 ## Normalization and cleanup
 
 - `lotar sprint normalize [<id>] --check` — verifies that sprint files are already canonical. This is the default mode when neither `--check` nor `--write` is provided, making it ideal for CI guardrails: the CLI warns about offending sprint IDs and exits with a non-zero status so you know which ones need attention.

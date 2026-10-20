@@ -377,6 +377,41 @@ export interface TaskSelection {
   where?: Array<[string, string]>
 }
 
+export interface SprintBacklogItem {
+  id: string
+  title: string
+  status: string
+  priority: string
+  assignee?: string
+  due_date?: string
+  tags?: string[]
+}
+
+export interface TaskOrderRequest {
+  task: string
+  /** Omitted/null selects backlog; otherwise a positive sprint ID. */
+  sprint?: number | null
+  before?: string | null
+  after?: string | null
+  allow_closed?: boolean
+}
+
+export interface TaskOrderResponse {
+  status: string
+  tasks: string[]
+  changed: boolean
+  sprint_id?: number
+}
+
+export interface SprintBacklogResponse {
+  status: string
+  count: number
+  truncated: boolean
+  tasks?: SprintBacklogItem[]
+  missing_sprints?: number[]
+  integrity?: SprintIntegrityDiagnostics
+}
+
 export interface SprintAssignmentRequest {
   sprint?: number | string
   tasks: string[]

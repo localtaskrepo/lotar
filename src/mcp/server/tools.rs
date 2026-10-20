@@ -55,6 +55,22 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_sprint_remove_tool(),
         make_sprint_delete_tool(),
         make_sprint_backlog_tool(enum_hints),
+        json!({
+            "name": "sprint_reorder",
+            "description": "Move one task before or after another in the same container. Omit sprint (or pass null) for backlog; positive sprint selects that sprint. Exactly one of before/after is required. Does not change membership or task content.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string"},
+                    "sprint": {"type": ["integer", "null"], "minimum": 1, "maximum": 4294967295u64},
+                    "before": {"type": "string"},
+                    "after": {"type": "string"},
+                    "allow_closed": {"type": "boolean", "default": false}
+                },
+                "required": ["task"],
+                "additionalProperties": false
+            }
+        }),
         make_project_list_tool(enum_hints),
         make_project_stats_tool(enum_hints),
         make_config_show_tool(enum_hints),

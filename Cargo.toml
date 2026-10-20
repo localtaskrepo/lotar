@@ -1,6 +1,6 @@
 [package]
 name = "lotar"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2024"
 authors = ["Ravi Gairola <mallox@pyxzl.net>"]
 description = "A git-native task management CLI that stores issues as YAML files in your repository"

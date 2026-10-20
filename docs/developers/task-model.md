@@ -37,7 +37,7 @@ Field | Type | Notes
 `comments` | `TaskComment[]` | Each comment carries `{ date, text }`.
 `references` | `ReferenceEntry[]` | Code locations (`code`), external URLs (`link`), repository files (`file`), managed attachments (`attachment`), or platform references (`jira`, `github`).
 `sprints` | `u32[]` | Numeric sprint IDs the task belongs to.
-`sprint_order` | `BTreeMap<u32, u32>` | Optional manual ordering per sprint (task id → order index).
+`sprint_order` | `BTreeMap<u32, u32>` | Optional sprint-ID to task-position map projected from ordered membership records.
 `history` | `TaskChangeLogEntry[]` | Chronological change log entries (field deltas, actor, timestamp).
 `custom_fields` | `CustomFields` | Map of configured custom-field keys → YAML/JSON values. Skipped when empty.
 
@@ -54,7 +54,23 @@ Field | Type | Notes
 
 ### Sprints & ordering
 
-`sprints` mirrors the sprint memberships stored on the task file. When sprint assignment commands enable manual ordering, `sprint_order` stores a per-sprint sequence so boards and reports can render deterministic lanes. Both properties are managed by `SprintService` and `sprint_assignment` helpers.
+Canonical sprint records under `.tasks/@sprints/<id>.yml` hold ordered task
+memberships. `sprints` and `sprint_order` are task DTO projections of those
+records; the latter maps sprint IDs to each task's position. Legacy task YAML
+memberships remain a compatibility input, not a backlog ordering mechanism.
+
+Backlog order is a separate ordered task-ID list in
+`.tasks/@sprints/backlog.yml`, with user extensions preserved. It is not a fake
+sprint or a typed field on task YAML. Stored active backlog IDs are projected
+in sequence, followed by unlisted active IDs in canonical lexical order;
+inactive IDs may remain stored to preserve their place on return. Filters and
+pagination project this global sequence rather than replacing it.
+
+Relative `before`/`after` moves reload metadata under the coordinated sprint
+lock and update only that collection's file. Existing sprint moves reorder
+its membership vector without adding/removing members. Neither form rewrites
+task files, task history, or task timestamps, and no-op requests preserve
+metadata bytes and timestamps. General task-list sorting is unchanged.
 
 ## Enumerations & config-driven values
 
@@ -68,6 +84,7 @@ Field | Type | Notes
 
 - `TaskCreate` accepts `title`, optional `project`, and optional metadata for `priority`, `task_type`, `reporter`, `assignee`, `due_date`, `effort`, `description`, `tags`, `relationships`, `custom_fields`, and `sprints`. Missing properties are defaulted downstream.
 - `TaskUpdate` treats every field as optional and only patches values that are present in the JSON body. Passing `tags` replaces the entire list; omitting it leaves tags untouched.
+- Task creation/update does not set collection order. `TaskOrderRequest` supplies `task`, optional `sprint` (omitted/null means backlog), exactly one of `before`/`after`, and optional `allow_closed`. The response includes the full current `tasks` order and `changed`; caller-visible page subsets are never an authoritative replacement list.
 - Both structs live in `src/api_types.rs` and share the same schema in `docs/openapi.json`.
 
 ## Invariants & best practices

@@ -65,6 +65,8 @@ import type {
   SyncValidateResponse,
   TaskCreate,
   TaskDTO,
+  TaskOrderRequest,
+  TaskOrderResponse,
   TaskDeleteResponse,
   TaskListFilter,
   TaskListResponse,
@@ -289,6 +291,8 @@ export const api = {
   sprintDelete(payload: SprintDeleteRequest): Promise<SprintDeleteResponse> { return post('/api/sprints/delete', payload) },
   sprintAdd(payload: SprintAssignmentRequest): Promise<SprintAssignmentResponse> { return post('/api/sprints/add', payload) },
   sprintRemove(payload: SprintAssignmentRequest): Promise<SprintAssignmentResponse> { return post('/api/sprints/remove', payload) },
+  getBacklogOrder(): Promise<TaskOrderResponse> { return get('/api/sprints/backlog/order') },
+  reorderTasks(payload: TaskOrderRequest): Promise<TaskOrderResponse> { return post('/api/sprints/order', payload) },
   sprintSummary(sprint: number): Promise<SprintSummaryReportResponse> { return get('/api/sprints/summary', { sprint }) },
   sprintBurndown(sprint: number): Promise<SprintBurndownResponse> { return get('/api/sprints/burndown', { sprint }) },
   sprintVelocity(params: { limit?: number; include_active?: boolean; metric?: 'tasks' | 'points' | 'hours' } = {}): Promise<SprintVelocityResponse> {
