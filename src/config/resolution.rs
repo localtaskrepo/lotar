@@ -7,9 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{OnceLock, RwLock};
 
 // Simple in-process cache for resolved configuration keyed by tasks root path.
-// Entries are validated against the underlying config files' (mtime, len)
-// fingerprints so external edits invalidate them on the next lookup, and writes
-// through this process invalidate eagerly.
+// Entries are validated against config contents so external edits (including
+// preserved timestamps) invalidate them on the next lookup without reparsing
+// unchanged YAML. Writes through this process also invalidate eagerly.
 static CONFIG_CACHE: OnceLock<RwLock<HashMap<String, CachedConfig>>> = OnceLock::new();
 static CLI_OVERRIDE_LAYER: OnceLock<RwLock<Option<CliOverrideLayer>>> = OnceLock::new();
 
@@ -20,13 +20,9 @@ struct CachedConfig {
 }
 
 fn file_fingerprint(path: &Path) -> String {
-    match std::fs::metadata(path) {
-        Ok(meta) => match (meta.modified(), meta.created()) {
-            (Ok(mtime), _) => format!("{:?}:{}", mtime, meta.len()),
-            (Err(_), Ok(ctime)) => format!("c{:?}:{}", ctime, meta.len()),
-            (Err(_), Err(_)) => format!("len:{}", meta.len()),
-        },
-        Err(_) => "missing".to_string(),
+    match std::fs::read(path) {
+        Ok(contents) => blake3::hash(&contents).to_hex().to_string(),
+        Err(error) => format!("unreadable:{:?}", error.kind()),
     }
 }
 
@@ -39,8 +35,12 @@ fn config_fingerprint(tasks_dir: Option<&Path>, project: Option<&str>) -> String
     let mut parts = vec![file_fingerprint(&crate::utils::paths::global_config_path(
         &root,
     ))];
-    if let Some(home_dir) = dirs::home_dir() {
+    if crate::config::persistence::home_config_honored()
+        && let Some(home_dir) = dirs::home_dir()
+    {
         parts.push(file_fingerprint(&home_dir.join(".lotar")));
+    } else {
+        parts.push("home:ignored".to_string());
     }
     if let Some(prefix) = project
         && !prefix.trim().is_empty()
@@ -85,6 +85,15 @@ fn cache_key_for(tasks_dir: Option<&Path>) -> String {
     let env_signature = crate::config::env_overrides::env_signature();
     let cli_signature = cli_override_signature();
     format!("{}|ENV={}|CLI={}", root_str, env_signature, cli_signature)
+}
+
+/// Share configuration freshness with consumers that cache derived values.
+pub(crate) fn config_cache_signature(tasks_dir: Option<&Path>, project: Option<&str>) -> String {
+    format!(
+        "{}|FILES={}",
+        cache_key_for(tasks_dir),
+        config_fingerprint(tasks_dir, project)
+    )
 }
 
 /// Root portion of a cache key, shared by base and per-project entries.

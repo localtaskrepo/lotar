@@ -5,7 +5,7 @@ use std::sync::{OnceLock, RwLock};
 use super::identity_detectors as detectors_mod;
 pub use detectors_mod::{DetectContext, IdentityDetection, IdentitySource};
 
-// Detection cache keyed by tasks_root + project + env + git HEAD/config mtimes.
+// Detection cache keyed by configuration contents/layers + project + Git metadata.
 // A single cache backs both resolve_current_user and resolve_current_user_explain
 // so the two APIs can never disagree.
 static IDENTITY_CACHE: OnceLock<RwLock<HashMap<String, Option<IdentityDetection>>>> =
@@ -16,15 +16,7 @@ fn identity_cache() -> &'static RwLock<HashMap<String, Option<IdentityDetection>
 }
 
 fn cache_key(tasks_root: Option<&Path>, project: Option<&str>) -> String {
-    let root = tasks_root
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
-    let root_str = root
-        .canonicalize()
-        .unwrap_or(root)
-        .to_string_lossy()
-        .to_string();
-    let env_def_reporter = std::env::var("LOTAR_DEFAULT_REPORTER").unwrap_or_default();
+    let config = crate::config::resolution::config_cache_signature(tasks_root, project);
 
     // Include git config and HEAD mtimes so the key changes on updates/branch switches
     let start = tasks_root
@@ -38,10 +30,7 @@ fn cache_key(tasks_root: Option<&Path>, project: Option<&str>) -> String {
         String::new()
     };
 
-    format!(
-        "{}|PROJECT={:?}|DEF_REP={}|GIT={}",
-        root_str, project, env_def_reporter, git_stamp
-    )
+    format!("{}|PROJECT={:?}|GIT={}", config, project, git_stamp)
 }
 
 pub(crate) fn git_cache_fingerprint(git_entry: &Path) -> String {
@@ -159,4 +148,33 @@ pub fn invalidate_identity_cache(_tasks_root: Option<&Path>) {
 /// Invalidate explain cache (kept for API compatibility; same cache)
 pub fn invalidate_identity_explain_cache() {
     invalidate_identity_cache(None);
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn identity_cache_key_tracks_git_toggle_even_with_preserved_file_metadata() {
+        let temp = tempfile::tempdir().unwrap();
+        let tasks = temp.path().join("workspace/.tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        let path = tasks.join("config.yml");
+        std::fs::write(&path, "auto.identity_git: true \n").unwrap();
+        let stamp = std::fs::metadata(&path).unwrap().modified().unwrap();
+        let before = super::cache_key(Some(&tasks), Some("TEST"));
+        assert!(
+            before == super::cache_key(Some(&tasks), Some("TEST")),
+            "unchanged configuration must keep a stable cache key"
+        );
+        std::fs::write(&path, "auto.identity_git: false\n").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(stamp)
+            .unwrap();
+        assert!(
+            before != super::cache_key(Some(&tasks), Some("TEST")),
+            "identity cache key ignored a configuration change"
+        );
+    }
 }

@@ -1,7 +1,47 @@
 title: lotar serve keeps the identity it resolved at startup after config changes
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-20T03:20:20.924376+00:00
+modified: 2026-10-20T18:27:40.124740+00:00
+comments:
+- date: 2026-10-20T18:12:53.882996+00:00
+  text: 'Plan: make long-running identity cache entries follow identity-affecting configuration changes across workspace/project/home/environment/CLI layers, preserving DEV126 scope/precedence and review policy. Reproduce with same-process calls and an owned live-server whoami regression before fixing. Prefer a shared config freshness signature rather than TTL, watcher delays, or server restart. Include reporter/toggle changes, cached misses, provenance, independent workspace/project scopes, and same-size/timestamp-preserved external edits where relevant. Keep malformed-config behavior and cache bounds; no Git writes, user-server changes or review-policy redesign. Run focused checks then full lint/test/fresh smoke; unchanged baseline coverage limitations stay in ticket, not routine summaries.'
+- date: 2026-10-20T18:21:55.232496+00:00
+  text: 'Progress: reproduced five focused pre-fix Rust failures (stale workspace/project/home reporter, cached miss after identity toggle, unchanged key after auto.identity_git edit, active CLI overrides) and live HTTP failure (one server kept alpha after completed workspace edit to bravo). Production fix shares config source content fingerprints plus existing env/CLI signatures with identity cache. Config fingerprinting now hashes source bytes, not size/mtime; ignored versus active home layer is explicit. Unchanged YAML still uses resolved-config cache; bounded identity cache and existing precedence/error/review policies remain. Six focused Rust tests pass, covering preserved-mtime equal-length edits, atomic replacement, removal, provenance-only change, malformed-project fallback/repair, default.project changes, runtime environment toggles and home honored/ignored switches; removed DEV126 test''s manual identity invalidation workaround. Rebuilt targeted live smoke now passes immediate whoami updates, rejected-then-accepted review status and correct history actor, project override creation/replacement/removal, all in one owned server with no waits/retries/restarts. Independent static review found no blockers. Updated identity docs to remove restart workaround; full gates next.'
+- date: 2026-10-20T18:27:40.096852+00:00
+  text: |-
+    Outcome: running processes now refresh cached identity from a shared configuration freshness signature containing workspace/project/honored-home file content hashes and the existing environment/CLI layer signatures. Derived identity/explain/miss entries no longer outlive configuration changes. Configuration cache uses the same content fingerprints, detecting equal-length preserved-mtime edits, atomic replacements, creation/removal and repair, while retaining the unchanged-YAML fast path. Existing precedence, project scoping, review rules, error/fallback behavior and 256-entry identity bound remain. No watcher, TTL, sleep, restart, API shape or permission-policy change. Identity help/developer docs now describe next-lookup refresh rather than restart workaround.
+    Evidence: five Rust regressions plus live HTTP whoami case failed before production change. Six focused Rust regressions now pass, including runtime environment/CLI toggles, home honored/ignored changes, default.project switch, malformed-project fallback/repair, cached misses, provenance-only override, stable unchanged keys and auto.identity_git invalidation with preserved metadata. Live smoke keeps one server through rejected review transition, external workspace identity edit, immediate whoami refresh, successful identical transition/history actor, then project override create/preserved-metadata edit/removal. Final lint:agent passed frontend types, all-target/all-feature Clippy-Dwarnings and fmt. test:agent passed Rust1472/138 binaries and frontend849/79 files. Separate all-feature Rust1472 passed. Fresh-build smoke275/67 files passed. Independent static review found no blockers; git diff --check clean.
+    Remaining: unchanged baseline Rust gitless45 exclusions and smoke25 skips are not passes; native Linux/Windows/remote CI not run. Home-layer regression is Unix-only. Actual Git detector outcome under toggles is not exercised in the new non-Git fixture; the dedicated key test proves toggle invalidation and existing detector behavior remains unchanged. Content fingerprints read small complete config files each lookup; large/bulk-config performance not separately benchmarked, while full existing tests passed unchanged. Git/manifest source freshness beyond preexisting behavior and DEV128 review-policy redesign remain outside this fix. Existing Vue inject warnings unchanged. All changes unstaged/uncommitted; no Git writes, user-server restarts, real-workspace config changes or release operations.
+    Guidance: no durable instruction finding; related product documentation corrected only.
 description: 'Observed with lotar 0.8.0. The identity cache in src/utils/identity.rs is never invalidated when the workspace config changes, so a running server keeps the old identity for /api/whoami and for review-guarded status/assignee changes from the web UI, while the CLI already resolves the new one. Repro: start ''lotar --tasks-dir .tasks serve -p <port>'' with no default.reporter; GET /api/whoami returns the OS user; add default.reporter: alice to .tasks/config.yml; GET /api/whoami still returns the OS user after several seconds, while ''lotar whoami'' prints alice. Only restarting the server picks it up. Users see ''Only reporter X can change status'' in the UI and cannot tell why. Acceptance: config changes that affect identity (default.reporter, auto.identity, auto.identity-git) invalidate the identity cache in a running server, or the UI shows the resolved identity and that a restart is needed; regression test for whoami after a config edit.'
+history:
+- at: 2026-10-20T18:12:53.810113+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T18:12:53.882996+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T18:21:55.232496+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T18:27:40.096852+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T18:27:40.124740+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

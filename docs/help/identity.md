@@ -26,7 +26,7 @@ The special value `@me` resolves to the current user via the order above across 
 Notes:
 - Project manifest detection is best-effort and reads only local files in your repo root (no external tools). For package.json it supports both string and object forms of `author`, and falls back to the first `contributors` entry.
 - For Cargo.toml we parse the first `authors` entry. For .csproj we read the `<Authors>` element.
-- Identity is cached per tasks directory and effective project. A running process can retain a cached identity after configuration edits; restart it to refresh. Live configuration-driven identity invalidation is separate from project selection.
+- Identity is cached per tasks directory and effective project. Configuration changes refresh identity on the next lookup, including in a running server: no restart or watcher delay is needed. This covers workspace/project/home configuration and active environment/CLI overrides, including reporter and detector-toggle changes. Content checks detect equal-length edits even when timestamps are preserved.
 - Git identity reads the local configuration from the repository's shared Git directory, including linked worktrees with relative or absolute `gitdir`/`commondir` metadata. Branch details use the checkout's own `HEAD`; remote details use the same shared local config. Missing or unreadable routing metadata skips this detector rather than borrowing another repository. This remains local-file detection, not a complete expansion of Git's global config, includes, or worktree-specific overrides.
 - The Git identity cache tracks resolved metadata paths and modification timestamps, so shared-config edits, worktree branch switches, and changed metadata targets refresh cached identity details.
 

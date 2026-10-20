@@ -24,7 +24,7 @@ The special value `@me` resolves to the current user via the order above across 
 Notes:
 - Project manifest detection is best-effort and reads only local files in your repo root (no external tools). For package.json it supports both string and object forms of `author`, and falls back to the first `contributors` entry.
 - For Cargo.toml we parse the first `authors` entry. For .csproj we read the `<Authors>` element.
-- Identity is cached per tasks directory and effective project. A long-running process can retain a cached identity after configuration edits; restart it to refresh. Live configuration-driven identity invalidation is separate from project selection.
+- Identity is cached per tasks directory and effective project. Cache keys include workspace/project/home configuration contents and active environment/CLI override layers. The next lookup after a completed configuration edit refreshes identity, explain details, and cached unresolved results without restarting the process or waiting for a watcher. Content fingerprints also detect equal-length edits with preserved timestamps; unchanged configuration reuses the resolved-YAML cache.
 
 ## Inspecting the resolved identity
 
