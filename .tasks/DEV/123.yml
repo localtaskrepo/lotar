@@ -1,0 +1,16 @@
+title: Migrate to TypeScript 7 after stable Vue compiler support
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-19T20:21:43.664545+00:00
+modified: 2026-10-20T00:36:56.495585+00:00
+comments:
+- date: 2026-10-20T00:36:56.495585+00:00
+  text: Current user-approved build/devNodecontract is^24.15.0||>=26.0.0, notoldunqualified>=24. Preserveactualsupportedenginesattimeofmigration; noalphaTS/Vueorunused7dependencywitholdchecker. Floorstrictinstall/typecheck/buildpassedbutfullUIhosttimingsnotyetclean(121),so no blanketNativeNodefloor/runtimepassclaim. RustreleasebinarydoesnotrequireNode.
+description: 'Deferred from DEV-121 by explicit user decision: keep stable supported TypeScript6.0.3 until migration works without alpha/prerelease builds. Latest stableVue3.5.44/compiler-sfc andvue-tsc3.3.13 currently fail withtypescript7.0.2 despitebroadpeer range: vue-tsc needsremovedlib/tsc andSFCimportedtypesneedts.sys, breakingtypecheck/TaskTabletests/productionVitebuild. Re-evaluateonlywithstablecompatibletoolchain releases andactualAPI/buildproof, notpeerrangemetadata alone. Preservefulltypechecking, UI/smokecoverage/concurrency, Node>=24support andbuildoutput. No localpatch,node_moduleshacks, @vue-ignore, skipchecks orunusedTS7dependency alongsideoldcheckerjusttomarkupgradecomplete. Fullfrontendlint/tests/freshsmoke/releasebuild andnativeNodefloorvalidation beforeadoption. No prerelease/alpha dependency versions unlessuserseparatelychangespolicy.'
+history:
+- at: 2026-10-20T00:36:56.495585+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

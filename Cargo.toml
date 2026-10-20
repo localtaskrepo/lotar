@@ -24,23 +24,23 @@ path = "src/bin/lotar_agent_wrapper.rs"
 [dependencies]
 regex = { version = "1.13.1", default-features = false, features = ["std", "unicode", "unicode-perl"] }
 include_dir = "0.7.4"
-chrono = { version = "0.4.44", features = ["serde", "clock"], default-features = false }
-serde = { version = "1.0.228", features = ["derive"], default-features = false }
+chrono = { version = "0.4.45", features = ["serde", "clock"], default-features = false }
+serde = { version = "1.0.229", features = ["derive"], default-features = false }
 serde_yaml_ng = "0.10.0"
-serde_json = { version = "1.0.149", features = ["std"], default-features = false }
-thiserror = "2.0.18"
-dirs = "6.0.0"
-clap = { version = "4.6.0", features = ["derive", "std", "env"], default-features = false }
-clap_complete = "4.6.2"
+serde_json = { version = "1.0.154", features = ["std"], default-features = false }
+thiserror = "2.0.21"
+dirs = "7.0.0"
+clap = { version = "4.6.7", features = ["derive", "std", "env"], default-features = false }
+clap_complete = "4.6.11"
 rayon = { version = "1.12.0", default-features = false, optional = true }
-ignore = { version = "0.4.25" }
+ignore = { version = "0.4.33" }
 notify = "8.2.0"
-pulldown-cmark = { version = "0.13.3", default-features = false }
-blake3 = { version = "1.8.4", default-features = false, features = ["std"] }
+pulldown-cmark = { version = "0.13.4", default-features = false }
+blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
 base64 = { version = "0.23.1", default-features = false, features = ["std"] }
-ureq = { version = "3.3.0", features = ["json"] }
-flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
-libc = "0.2.185"
+ureq = { version = "3.4.2", features = ["json"] }
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+libc = "0.2.191"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 fs2 = "0.4.3"
 
@@ -86,10 +86,11 @@ strip = "none"
 split-debuginfo = "unpacked"
 
 [dev-dependencies]
-assert_cmd = "2.2.0"
+assert_cmd = "2.2.2"
 predicates = "3.1.4"
 tempfile = "3.27.0"
-ctor = "0.10.0"
+ctor = "1.0.13"
+dtor = "1.0.6"
 
 [features]
 default = ["parallel"]
@@ -99,5 +100,5 @@ schema = ["schemars"]
 parallel = ["dep:rayon"]
 
 [dependencies.schemars]
-version = "1.2.1"
+version = "1.2.3"
 optional = true

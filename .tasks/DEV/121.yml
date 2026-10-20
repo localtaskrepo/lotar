@@ -1,0 +1,85 @@
+title: Refresh release dependencies and resolve Rust security advisories
+status: Done
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-19T19:58:55.396472+00:00
+modified: 2026-10-20T01:17:28.135579+00:00
+comments:
+- date: 2026-10-19T20:02:29.833051+00:00
+  text: 'Scope confirmed by user: Latest majors too, explicitly including TypeScript6->7 andVitest4->5. CI failed four rustls0.23.45 advisories (fix>=0.23.46), unsafe-libyaml warning separate; npm audit additionally shows high source-map-js<1.2.2. Localcargo-audit0.22.2 installed underignoredtarget withisolatedCargo cache, no globalinstall/chown; defaultnpmcacheEPERMavoidedwithtarget/npm-cache. RustSecGitclone sandboxblocked so official immutablearchive/offline audit explored, no ignores or weakerCI. CompatibleRustdryrun46updates includesTLSfix; identify2newerbreaking crates beforemanifestpatch. Separate npmownerhandlesalllatestversions/major compatibility, parentCargo/audits/fullgates. No runtime versionbump/tag/release/Git writes orCIreruns authorized.'
+- date: 2026-10-19T20:06:15.749930+00:00
+  text: 'Local reproduction succeeded with cargo-audit0.22.2 against official RustSecarchive commit999ec89d5d3f10f20be14750ec8c2d8b44e0ac9b (1338advisories), no-fetch only because sandbox blocks .git clone; noadvisoryignores/stale flags. Original4TLSvulns reproduced, compatible46lockupdates removedall4. unsafe-libyaml0.2.11 unmaintained remains: parentserde_yaml_ng0.10.0 andparserarelateststable, removingwarning requiresseparateYAMLcompatibilitymigration, notblindpatch. Userapprovedlatestmajors: all26Rustdirectlatestverified; dirs7 changesunusedpreference_dir only, ctor1 removesdtor reexport/requiresunsafeattributes, nowadaptingexplicitdtor1 devdep andmatchingattrs. Allnpm21directlatestappliedinclVitest5/TS7; npmaudit0 andnodehelpers53passed, butvue-tsc3.3.13/Vue3.5.44 requireTS6 compilerAPIs, soTS7 blocksfrontendtypecheck andoneUItransform (842otherspassed). Usercompatibilityquestiondismissed; noapprovalassumedtorevertTS7 ordisablechecks. CompleteindependentRustworkwhilefrontendchoiceunresolved; no release-readyclaim orpublication.'
+- date: 2026-10-19T20:11:47.128042+00:00
+  text: 'Outcome so far: reproduced original cargo audit4TLSvulns fromGitHub39313754681, fixedrustls0.23.45->0.23.46 viaureq3.4.2 andrefreshedallRustdirectstablefloorrequirements/lock includingdirs7 andctor1. ctor1migration usesexplicitunsafe attributesandseparatedtor1, retainingtestinit/destructorsemantics. OfficialRustSecsnapshot999ec89d5d3f10f20be14750ec8c2d8b44e0ac9b1338advisories, no-fetch because .gitcloneblocked, CARGO_HOMEisolated: cargoauditPASS0vulnerabilities/1unmaintainedunsafe-libyamlwarning(noignore). Cargo update dryrunlocks0, all26originaldirects+newdtorlateststable,1.98.1pinunchanged. Npm21directlatestinclTypeScript7/Vitest5 andnpm auditPASS0vulns; source-map-js1.2.2fixedhigh advisory. Verification: fullallfeatureRust1453/138binariespassedzero retries,45Git-requiredexclusionsunverified; alltarget/allfeatureClippy-Dwarnings,cargofmt,diffcheckpassed; Nodehelper53passed. Frontend:842UItests/78filespassedbut1suiteTaskTabletransformfailed;vue-tscdoesnotstartbecauseTS7removedtypescript/lib/tsc; ViteproductionbuildfailsVueSFCimportedTaskTablePropsbecauseTS7lacksts.sys. No frontendtypecheck,fullUI,freshsmokeorproductionreleasepassclaimed. Supportedlateststablevue-tsc3.3.13/Vue3.5.44notTS7compatible; usermajorchoiceisexplicitbutfollow-upscopequestiondismissed, sonoapprovalassumedtopinTS6orweakenchecks. Remaining human decision: acceptdocumentedTS6compatibilityexceptionthenrerunfullgates+Playwright1.64browserinstall/releasebuild, ornarrow/securityonly, orkeepTS7anddeferrelease. unsafe-libyamlmaintenancetrackedseparately; latestnormalrefreshcannotremoveit. Releaseversion/tag/publicationnotperformed, Gitindexunchanged/allchangesunstaged,noserverorCIrerun/globalpermissionschanges. Guidance:nodurableinstructionfinding.'
+- date: 2026-10-19T20:20:56.799775+00:00
+  text: 'User resolved release blocker: keep supported old TypeScript until stable Vue/compiler/toolchain migration is available; no alpha builds. Restoring TypeScript~6.0.3 (patch-compatible6.0line, excludes7), retainingotherlatestupdatesinclVitest5. Fullfrontend/build/smoke/releaseverificationresumed. Clarification requested onRustSec: immutableadvisorysnapshotwaslocalGit-sandboxworkaround only, notCI/database pin. CurrentCIstillnormalcargo-auditwithfreshdatabase; noignoresorCIpolicychanges. Willdistinguishaudittoolversionpin(reproducibility),liveadvisorydata(securityfreshness),rustlsruntimepatch(done),andunsafe-libyamlmaintenancewarning(122); nofreezingadvisoriestomaskfailures.'
+- date: 2026-10-20T00:00:27.551574+00:00
+  text: UserapprovedNodeenginecompatibilitycorrection:^24.15.0 || >=26.0.0 replacesoverbroad>=24, because lateststablejsdom30.1.3needs24.15+andVitest5excludes25. Nodeisbuild/devtoolonly,notRustbinaryruntime. Fullfreshsmoke274/66filespassed,25existingGit-relatedskips; cargo build--release--all-features--lockedpassedwithfreshweb. DefaultRustwrapperfirstattemptfailedbeforeexecutionbecausenextestexclusioninventorytimedoutwhileparallelrelease/smokebuildscontended; no testfailurepassclaimed,noharnesstimeoutchanged. Willprebuildinventoryandrerunsequentially. StableTypeScript6restored:fullUI849/79passed,frontendlint/buildpassed,fullClippy/fmtpassed,Nodehelpers53passed. Browserinstallfirstnpmexecwrappertimedout(noresult),directlocalPlaywrightwithownedtargetcacheinstalledmatchingChromium1248successfully,noinstallpolicychanges. Independentreviewallotherdeps/ctormigrationnoissues;Nodecontractblockerresolvedbyuserapprovalandfloorverificationplanned.
+- date: 2026-10-20T00:36:56.209352+00:00
+  text: 'User decisions completed: TypeScript~6.0.3 stays until stable Vue/compiler migration(noalpha),future123; Nodeengine^24.15.0||>=26.0.0approvedandlock/installguideupdated. OfficialNode24.15Darwinarm64checksumverified; strictnpmci dryrun, vue-tsc andproductionVite/compressallpassedonfloor. RustSecclarification: noCI DBpinorignoreadded; snapshotonlylocalGit-sandboxworkaround, officialHEADrecheckedstill999ec89..; recommendfreshadvisorydata, optionalstablecargo-auditversion+versionedcacheforrepeatability. RuntimeTLSfixedrustls0.23.46; YAMLunmaintainedwarningseparate122. Verification: fulldefaultRust rerun1453/138passedzero retriesafterisolatedworker1pass2.3s; earlierdefaultattemptworker15sexittimeoutandearlierinventorytimeoutnotcountedpasses. All-featureRust1453passed, Clippy/fmtpassed, initialstableTS6UI849passed/fullsmoke274passed/Nodehelpers53passed andfreshreleasebinarybuildpassed. LATERfloorUIattempttimedout240s; sequentialNode24full818passed31failed(mainly5000ms), thenNode26full836passed13failed(timeoutsplusafter-timeoutdialogfocuscascade), despiteearlierNode26full849pass. Samearm64/14parallelism; hostload13-18andheavycompressionobserved, butdependencyslowdownNOTexcluded. Readonlydiagnosisfoundunconditionalunmountweaknessnew124; notrootcauseclaimed. ps/swapinspectiondenied; noprocessesremainedontheuniqueturn-ownedNode24executable, nounrelatedprocesseskilled. Latestreleasebuildafterinstall-docchangetimedout240s, notcountedasnewpass. Noassertion/timeouts/retries/concurrency/isolationorenginesuppressionchanged. Remaining: reproducecleanfullUIandsupportedfloor/helperchecks oncontrolledhost orprofilejsdom/Viteststartup; thenfreshreleaseverification/nativeLinuxWindows/Git45and25smokeskipsremainunverified. No releasereadyclaim,versionbump,tag,publish,commit/push,CIrerunoruserserverrestart; allchangesunstaged. NeedsReviewbecauseverificationnotfullygreen,notDone. Guidance:nodurableinstructionfinding.'
+- date: 2026-10-20T01:17:27.870353+00:00
+  text: 'Final rebuild/retest requested by user completed sequentially with normal budgets, retries0 and unchanged coverage. Initialhostload4.34/3.82/5.54 vsprior13-18; stagedsnapshotSHA25665b409a2b822f3f071e51b222f9d2c938334023e268df2aedf44e3151f941f5a preserved. FullUI849/79passedNode26.12in6.57s andNode24.15in7.18s;Node24helpers53/53passed, strictengineinstall/typecheck/Viteproduction/compresspassed. CI-profileRust1453/138passeddefault32.773s ANDallfeatures33.398s,zero retries;45Git-requiredexclusionsnotpasses. Fullfreshsmoke274/66passed25.22s,25existingGit-relatedskips/6filesnotpasses. Finalallfeaturelockedreleasebuildcompleted53.65sfromfinalsmoke-generatedwebembed;earliersequentialreleasebuildalso56.88s. Rebuiltlotar0.9.0versionverified. Fullfrontendlint/alltarget-allfeatureClippy-Dwarnings/formattingpassed. RustSecofficialHEADrechecked999ec89..matcheslocalarchivedb:0vulnerabilities,oneunmaintainedunsafe-libyamlwarning122;independentnpmjsonaudit0allseverities. Useroption1keepsliveRustSecCI/noDBpin/ignore. No newlyreproducedfunctionalissue: earliertimeoutsnotreproducedunchangedonsequentialrunsbothNodeversions,supportsresourcesensitivityratherthanaNode24-specificcompatdefect;doesnotproveoneexclusiveinitiatingcause. ExistingVueinjectwarningsandfailure-onlyunmountweakness124remain,TS7future123stablereleasesonly. No checktimeout/retry/concurrency/isolation/assertionchange,sourceedit,Gitwrite/commit/push/tag/publication,userserverrestart. Documentation/sourceandoriginalstagedticketbytesleftstagedunchanged;thisverificationcomment/Doneisalocalunstaged121layeronly. RemainingstandardnativeGit/LinuxWindowsCIandexcludedcaseverificationbeforepublicationarenotclaimedpassedlocally. DependencyrefreshselfverifiedDone;no releasepublished/versionbump. Guidance:nodurableinstructionfinding.'
+description: Release dependency preparation after failed QA run39313754681 at2b00a6a. Inspect and reproduce cargo audit; fix four rustls0.23.45 advisories RUSTSEC-2026-0346/0347/0348/0349 (patched>=0.23.46) and distinguish unsafe-libyaml unmaintained warning. Inventory current/latest Rust/npm dependencies; apply compatible stable upgrades, evaluate breaking updates deliberately rather than force or blanket ignores, preserve toolchain/features/API/task YAML contracts. Use isolated writable audit/npm caches (local cargo-audit absent, default npm cache permission error), do not chown or change global config. Run cargo/npm audits, lock consistency, warning-free lint, full Rust/UI/fresh smoke and relevant production release build. Document remaining advisories/MSRV/platform/test limits and unadopted breaking upgrades honestly. No release/version bump/tag/publication, Git writes/staging/commit/push, CI rerun or user-server restart without separate request.
+history:
+- at: 2026-10-19T20:00:45.417078+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-19T20:02:29.833051+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-19T20:06:15.749930+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-19T20:11:47.128042+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-19T20:11:47.147866+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: NeedsReview
+- at: 2026-10-19T20:20:56.763196+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: InProgress
+- at: 2026-10-19T20:20:56.799775+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T00:00:27.551574+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T00:36:56.209352+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T00:36:56.399272+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: NeedsReview
+- at: 2026-10-20T01:17:27.870353+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T01:17:28.135579+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: Done

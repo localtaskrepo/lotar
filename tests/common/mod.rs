@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 use assert_cmd::cargo::{CargoError, cargo_bin_cmd};
-use ctor::{ctor, dtor};
+use ctor::ctor;
+use dtor::dtor;
 use lotar::Storage;
 use serde_json::Value;
 use std::fs;
@@ -34,7 +35,7 @@ pub fn lotar_cmd() -> Result<Command, CargoError> {
     Ok(cmd)
 }
 
-#[ctor]
+#[ctor(unsafe)]
 unsafe fn init_lotar_test_environment() {
     reset_lotar_test_environment();
     scrub_repository_routing_env();
@@ -156,7 +157,7 @@ fn sweep_scratches_of_dead_owners(base: &std::path::Path) {
 #[cfg(not(unix))]
 fn sweep_scratches_of_dead_owners(_base: &std::path::Path) {}
 
-#[dtor]
+#[dtor(unsafe)]
 unsafe fn cleanup_owned_scratch() {
     // Best effort: normally empty because every fixture temp dir removes its
     // own tree on drop. Failures leave only an invisible dot-nested dir that

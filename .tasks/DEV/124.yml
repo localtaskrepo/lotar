@@ -1,0 +1,7 @@
+title: Ensure frontend mounted fixtures are cleaned up after failing tests
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-20T00:31:38.256935+00:00
+description: DEV-121 release verification diagnosis found TaskPanel.createSprints.spec.ts mounts onto document.body and calls unmount only at successful test tails; afterEach resetsrefs butdoesnotguaranteecomponent/listenercleanup. TimeoutthenleavesmultipleVuecontainers andcauseslaterfocus/dialog assertioncascades (observedinNode26output). Adopt scoped guaranteed VueTestUtils teardown or equivalent correctlyorderedafterEach cleanup, preservependingrequest/focus/draft assertions andfixtures, adddeterministicfailure-pathcleanupcoverage. Checkanalogousfixturesinotherfilesinboundedfollowup. This is NOT proof of initiating frontend slowdown or a cross-run processleak; investigateperformance separatelyunderDEV121. Never raisebudgets/retries,disableisolation,reducetestconcurrencyorweakenassertionstomasktimeouts. No realdatacleanup/serverrestartneeded.

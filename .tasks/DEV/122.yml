@@ -1,0 +1,7 @@
+title: Evaluate maintained YAML parser dependency with task-data compatibility proof
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-19T20:11:47.082804+00:00
+description: DEV-121 cargo audit fixes all four rustls vulnerabilities but retains RUSTSEC-2024-0449 unmaintained unsafe-libyaml0.2.11 through latest stable serde_yaml_ng0.10.0; both already latest. This is a maintenance warning, not one of the four release-blocking TLS advisories. Evaluate maintained compatible parser/fork paths before dependency replacement; do not add blanket ignores or use an unreviewed patch just to silence audit. Prove existing user YAML/custom JSON/typed refs/unknown extensions/null aliases and mutation roundtrip/no-op bytes semantics, canonical config parsing/persistence and task cache behavior. Analyze YAML tags/aliases and resource limits, licensing/MSRV and platform support. Separate assessed migration with rollback/data fixtures and full gates; no automatic data migration, release claim, or dependency substitution in DEV-121.

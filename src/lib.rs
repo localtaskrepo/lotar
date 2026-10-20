@@ -63,7 +63,7 @@ mod test_environment {
     /// Cleanup mirrors `tests/common`: destructors on regular exit, plus
     /// dead-owner sweeping because nextest kills finished test processes
     /// before their destructors run.
-    #[ctor::ctor]
+    #[ctor::ctor(unsafe)]
     unsafe fn isolate_tmpdir_under_owned_scratch() {
         scrub_repository_routing_env();
         if OWNED_SCRATCH.get().is_some() {

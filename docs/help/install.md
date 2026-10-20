@@ -74,7 +74,9 @@ directories.
 ## Build from source
 
 LoTaR is not published on crates.io: the binary embeds the web UI, which is built with Node first.
-You need the stable Rust toolchain and Node.js 24 or newer.
+Use the Rust toolchain pinned by `rust-toolchain.toml` and stable Node.js 24.15+ on
+the 24.x line, or Node.js 26+. Node 25 is not supported by the current build/test
+dependencies. Node is needed to build the web UI, not to run the release binary.
 
 ```bash
 git clone https://github.com/localtaskrepo/lotar
