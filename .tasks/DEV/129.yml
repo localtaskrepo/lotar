@@ -1,7 +1,47 @@
 title: Link from release page directly to LoTaR tickets
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-20T17:33:43.989522+00:00
+modified: 2026-10-20T22:46:32.575723+00:00
+comments:
+- date: 2026-10-20T22:23:37.944609+00:00
+  text: 'Confirmed surface is GitHub Release custom COMMITS block, not a Vue release page. Developer explicitly selected GitHub ticket snapshot at release revision (not main or local server). Plan: reuse existing subject ordering/100commitcap/quicklinks/markers, resolve immutable release commit and tracked .tasks subtree, link all bounded unambiguous known ticket mentions to existing regular YAML files at that revision. Missing/unknown/ambiguous remain plain text; protect existing links/code/URLs and safely render commit text. Optional snapshot-index failure warns and falls back without blocking existing release-page behavior. Checkout trusted tag to load small dependency-free helper; no current release update or publish/rerun. Add helper unit and actualworkflow mocked end-to-end/idempotence tests, wire CI/npm gates, document snapshot semantics. Preserve release assets/Docker/full changelog and user text; no new app/API route or custom protocol. No Git writes or real release modifications.'
+- date: 2026-10-20T22:37:47.609542+00:00
+  text: 'Progress: integrated dependency-free snapshot-link helper into existing GitHub release COMMITS renderer after trusted-tag checkout with persist-credentials false. Loader resolves actual release commit and SHA-addressed .tasks subtree, requires complete valid metadata, excludes symlinks/ambiguous canonical identities; missing/unavailable index preserves plain subjects and quicklinks via warning. Renderer handles bounded multiple/padded/hyphen/Unicode IDs, safe existing links/images/URLs/code and Markdown/HTML/marker escaping; idempotent marker replacement uses callbacks so literal dollar replacement tokens don''t corrupt bodies. No UI/app/API route introduced.24 helper+actualworkflow-mocked tests pass onNode26 andfloor24.15, including100subjectcap/sort/firstrelease/bodypreservation/failure paths. Initial fixtures corrected for actualGitHub mode040000 and literaltext expectations; semanticMarkdown tests found/fixed code entity rendering and optionaltitle links. Independent review found quadratic unmatched-bracket scan; replaced with one-pass delimiter index and early invaliddestination termination, adversarial tests pass. Follow-up review/full gates next. Read-only realhelper run against publishedv0.9.0 indexed125 tickets and emitted existingDEV125 immutablecommit URL; no realrelease body/tag/assets/publish or Git mutation. Added npm test:release/default+agent wiring and LinuxUI/WindowsCI steps; releaseguide documents future snapshot semantics.'
+- date: 2026-10-20T22:46:32.549717+00:00
+  text: |-
+    Outcome: future GitHub Release customChanges subjects now link bounded known ticket IDs to tracked YAML at the immutable release commit, per explicit developer snapshot choice. Existing appUI/customprotocol not introduced. Trusted-tag checkout loads dependency-free CJS helper; APIloader resolves commit/tree, reads onlycomplete.tasks subtree, validatesregularblobs/path/IDbounds, excludes symlinks and ambiguousaliases; unknown/missing/incomplete references remain plain escapedtext and optionalAPI failureswarn ratherthanblockdownloads. Preserves existingHTTP links/images/titles/URLs/code, safelyescapesHTML/Markdown/release markers, encodesURLsegments. Existing100subjectselection/sort andquicklinks/Docker/footer maintained; markerupdatesidempotent andcallbackreplacement preservesliteral$ tokens.22:13 discoveryclarifiedGitHub vsnonexistentVue releasepage beforeimplementing; no inventedlocalhostURL.
+    Evidence:24 helper/actualworkflow-mocked regressions pass onNode26.12 andsupportedfloorNode24.15 (annotatedtags/ambiguity/truncation/shapes/quotedlinks/code/renderedHTML/idempotence/failure/CIcheckout&lanes/100cap andadversarialbrackets/destinations). Initialtestfixtures correctedforGitHub040000mode/literalFix text/semanticHTML expectations; actualcodeentity/title bugs fixed. IndependentreviewP2quadraticunmatchedbrackets resolved via one-pass index andearlyinvaliddestination exits; follow-upreviewnoactionablefindings. Read-only realhelper run onpublishedv0.9.0 pinned a4ef8efa49b1d091520ceafa36ce36f67a530716, indexed125 tickets andproducedexistingDEV125 html_url verifiedbyGitHubmetadata. Newtest:release wired npmdefault/agent plusLinuxUI/WindowsCI. Final lint:agent passed vue-tsc/all-target/all-feature Clippy-Dwarnings/fmt; test:agent Rust1499/140binaries,frontend873/79files,release24passed. Initialfreshsmoke289passed1failed inunchanged live-file-soft-delete UIcase; targetedcasepassedunchanged, thenfullsamefreshartifact rerun290/70filespassed. No limits,retries,concurrency orassertionsrelaxed. git diff --check clean; only8 scopedfilesincludingtasktracking.
+    Remaining: publishedv0.9.0body/assets/tags notchanged; no realupdateRelease, Gitwrites, workflowrerun orpublication. ActualfutureGitHubActionsexecution/GitHubproductionMarkdownrenderer/nativeWindows notrunlocally; semanticMarkdown+mockworkflow andpublicread-onlyURL proof provided. ExistingroutineGitless45exclusions/smoke25skipsnotpasses andVueinjectwarningsunchanged. Release-linking conservativeaboutunsupportedmarkup; no arbitraryYAMLcontentparsingorprivateuntrackedtasklinks. Developerstagedimplementationduringwork; preservedindex. Finaldocclarification+trackingupdatesremainunstaged; allworkuncommitted.
+    Guidance: no durableinstructionfinding; relatedreleaseguideupdatedonly.
 description: It should be possible to link to the tickets directly in the git history related to the prefix. Let's see if we can build this into the release page.
+history:
+- at: 2026-10-20T22:23:37.905311+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T22:23:37.944609+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T22:37:47.609542+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T22:46:32.549717+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T22:46:32.575723+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

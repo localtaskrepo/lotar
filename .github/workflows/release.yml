@@ -294,11 +294,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release renderer
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
       - name: Add quick download links and commit list
         uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const { loadTicketSnapshot, linkTicketReferences } = require('./.github/scripts/release-ticket-links.cjs');
             const { owner, repo } = context.repo;
             const tag = process.env.GITHUB_REF_NAME;
             const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
@@ -332,7 +338,10 @@ jobs:
                 .map((c) => (c.commit?.message ?? '').split('\n')[0].trim() || '(no message)')
                 .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 
-              const lines = subjects.map((s) => `- ${s}`);
+              const snapshot = await loadTicketSnapshot({
+                github, owner, repo, tag, warn: (message) => core.warning(message),
+              });
+              const lines = subjects.map((s) => `- ${linkTicketReferences(s, snapshot)}`);
 
               const remaining = Math.max(0, commits.length - maxCommits);
               if (remaining > 0) {
@@ -383,13 +392,13 @@ jobs:
             const existingBody = release.data.body ?? '';
             const regex = new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}`);
             const nextBody = regex.test(existingBody)
-              ? existingBody.replace(regex, quickLinksSection)
+              ? existingBody.replace(regex, () => quickLinksSection)
               : `${quickLinksSection}\n\n${existingBody}`.trim();
 
             const commitsRegex = new RegExp(`${commitsMarkerStart}[\\s\\S]*?${commitsMarkerEnd}`);
             const nextBodyWithCommits = (() => {
               if (commitsRegex.test(nextBody)) {
-                return nextBody.replace(commitsRegex, commitsSection);
+                return nextBody.replace(commitsRegex, () => commitsSection);
               }
 
               const quickLinksEndIndex = nextBody.indexOf(markerEnd);

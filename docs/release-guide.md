@@ -14,6 +14,16 @@ guide summarizes the release automation and the manual checks to run after every
   - Scoop manifest update pushed to `localtaskrepo/scoop-lotar`.
 - **Quick-links**: The workflow edits the release notes to include clickable download
   shortcuts for macOS, Linux, and Windows assets.
+- **Ticket links**: Known ticket IDs in the custom `Changes:` commit list link to
+  their tracked YAML file on GitHub at the release's immutable commit, not `main`
+  or a local LoTaR server. For example, `DEV-129` links to `.tasks/DEV/129.yml`
+  as it existed for that release. Unknown, missing, or ambiguous IDs remain plain
+  text. Existing links, URLs, and inline code are not nested inside ticket links.
+  If the optional ticket snapshot cannot be read safely, the job warns and keeps
+  the commit list without ticket links; download links and other release text
+  are still maintained. Existing releases are not edited automatically.
+  Re-running a release job that already contains this renderer is idempotent;
+  re-running an older workflow definition does not add the new linking code.
 
 ## Pre-Release Checklist
 
@@ -38,7 +48,8 @@ guide summarizes the release automation and the manual checks to run after every
    ```
 2. Monitor the **Release** workflow in GitHub Actions. The important jobs are:
    - `build-and-release`: compiles, signs, and uploads release assets.
-   - `update-release-page`: injects quick download links into the release notes.
+   - `update-release-page`: injects quick download links and snapshot-linked
+     ticket references in the custom commit list.
    - `publish-docker-image`: builds/pushes the Docker image to Docker Hub.
    - `update-homebrew-tap`: refreshes the tap formula checksums and pushes to
      `homebrew-lotar` (uses `HOMEBREW_TAP_TOKEN`).

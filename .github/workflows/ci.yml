@@ -262,6 +262,9 @@ jobs:
     - name: Run compress-web unit tests
       run: node --test scripts/tests/compress-web.test.mjs
 
+    - name: Verify release ticket links and page rendering
+      run: npm run test:release
+
   smoke_tests:
     name: Smoke Tests
     runs-on: ubuntu-latest
@@ -531,6 +534,9 @@ jobs:
     # fixture run through this lane's real drive-letter script URL.
     - name: Run compress-web unit tests
       run: node --test scripts/tests/compress-web.test.mjs
+
+    - name: Verify release ticket links and page rendering
+      run: npm run test:release
 
   # Security audit (optimized with caching, runs in parallel)
   security:
