@@ -28,6 +28,7 @@ struct ServeChild {
     lines: mpsc::Receiver<String>,
     stdout_dump: Arc<Mutex<String>>,
     stderr_dump: Arc<Mutex<String>>,
+    output_done: mpsc::Receiver<()>,
 }
 
 /// Outcome of starting a serve child that may legitimately fail to start.
@@ -75,6 +76,8 @@ fn try_spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeStart {
     let stdout = child.stdout.take().expect("piped stdout");
     let stderr = child.stderr.take().expect("piped stderr");
     let (tx, rx) = mpsc::channel::<String>();
+    let (stdout_done, output_done) = mpsc::channel::<()>();
+    let stderr_done = stdout_done.clone();
     let stdout_dump = Arc::new(Mutex::new(String::new()));
     let stdout_sink = Arc::clone(&stdout_dump);
     thread::spawn(move || {
@@ -92,6 +95,7 @@ fn try_spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeStart {
                 Err(_) => break,
             }
         }
+        drop(stdout_done);
     });
     let stderr_dump = Arc::new(Mutex::new(String::new()));
     let stderr_sink = Arc::clone(&stderr_dump);
@@ -107,6 +111,7 @@ fn try_spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeStart {
             }
             chunk.clear();
         }
+        drop(stderr_done);
     });
 
     let mut serve = ServeChild {
@@ -116,23 +121,28 @@ fn try_spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeStart {
         lines: rx,
         stdout_dump,
         stderr_dump,
+        output_done,
     };
-    match serve.wait_for_banner() {
+    let deadline = Instant::now() + READY_TIMEOUT;
+    match serve.wait_for_banner(deadline) {
         Ok(()) => ServeStart::Ready(serve),
         Err(_) => match serve.child.take() {
-            Some(mut child) => ServeStart::Failed {
-                status: child.wait().expect("reap failed serve child"),
-                stdout: serve.stdout_snapshot(),
-                stderr: serve.stderr_snapshot(),
-            },
+            Some(mut child) => {
+                let status = child.wait().expect("reap failed serve child");
+                serve.finish_output_capture(deadline);
+                ServeStart::Failed {
+                    status,
+                    stdout: serve.stdout_snapshot(),
+                    stderr: serve.stderr_snapshot(),
+                }
+            }
             None => panic!("serve child ownership lost"),
         },
     }
 }
 
 impl ServeChild {
-    fn wait_for_banner(&mut self) -> Result<(), ()> {
-        let deadline = Instant::now() + READY_TIMEOUT;
+    fn wait_for_banner(&mut self, deadline: Instant) -> Result<(), ()> {
         let mut seen = String::new();
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
@@ -181,6 +191,18 @@ impl ServeChild {
             .lock()
             .map(|s| s.clone())
             .unwrap_or_default()
+    }
+
+    fn finish_output_capture(&self, deadline: Instant) {
+        // Each reader holds a sender until all its output is captured. Child
+        // exit or a stdout banner alone does not synchronize the stderr reader.
+        match self
+            .output_done
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+        {
+            Err(mpsc::RecvTimeoutError::Disconnected) => {}
+            result => self.fail_with_output(format!("output capture did not finish: {result:?}")),
+        }
     }
 
     fn fail_with_output(&self, message: String) -> ! {
@@ -265,16 +287,18 @@ impl ServeChild {
 
         let child = self.child.as_mut().expect("serve child ownership");
         let deadline = Instant::now() + STOP_TIMEOUT;
-        loop {
+        let status = loop {
             match child.try_wait().expect("poll serve child") {
-                Some(status) => return status,
+                Some(status) => break status,
                 None if Instant::now() >= deadline => {
                     child.kill().expect("kill serve child after stop timeout");
-                    return child.wait().expect("reap killed serve child");
+                    break child.wait().expect("reap killed serve child");
                 }
                 None => thread::sleep(Duration::from_millis(25)),
             }
-        }
+        };
+        self.finish_output_capture(deadline);
+        status
     }
 
     fn reap(&mut self) {
@@ -307,6 +331,37 @@ fn sorted_titles(payload: &serde_json::Value) -> Vec<String> {
         .collect();
     titles.sort();
     titles
+}
+
+#[test]
+fn completed_output_waits_for_stderr_after_stdout_readiness() {
+    let (stdout_done, output_done) = mpsc::channel();
+    let stderr_done = stdout_done.clone();
+    let (_lines_tx, lines) = mpsc::channel();
+    let stderr_dump = Arc::new(Mutex::new(String::new()));
+    let serve = ServeChild {
+        child: None,
+        host: String::new(),
+        port: 0,
+        lines,
+        stdout_dump: Arc::new(Mutex::new("ready\n".into())),
+        stderr_dump: Arc::clone(&stderr_dump),
+        output_done,
+    };
+    let (release, gate) = mpsc::channel();
+    let reader = thread::spawn(move || {
+        gate.recv().unwrap();
+        stderr_dump.lock().unwrap().push_str("late warning\n");
+        drop(stderr_done);
+    });
+    drop(stdout_done);
+    assert_eq!(serve.stdout_snapshot(), "ready\n");
+    assert!(serve.stderr_snapshot().is_empty());
+    assert_eq!(serve.output_done.try_recv(), Err(mpsc::TryRecvError::Empty));
+    release.send(()).unwrap();
+    serve.finish_output_capture(Instant::now() + STOP_TIMEOUT);
+    assert_eq!(serve.stderr_snapshot(), "late warning\n");
+    reader.join().unwrap();
 }
 
 #[test]
@@ -694,6 +749,8 @@ fn serve_implicit_default_port_falls_back_when_busy_and_serves_workspace() {
     let owned = holder.is_ok();
 
     let mut serve = spawn_serve(temp_dir, &["serve", "--host", "127.0.0.1"]);
+    let (status, body) = serve.get("/api/tasks/list");
+    let exit = serve.stop();
     let stderr = serve.stderr_snapshot();
     let stdout = serve.stdout_snapshot();
 
@@ -744,7 +801,6 @@ fn serve_implicit_default_port_falls_back_when_busy_and_serves_workspace() {
         "piped stdout must not contain ANSI escapes: {stdout}"
     );
 
-    let (status, body) = serve.get("/api/tasks/list");
     assert_eq!(status, 200, "body: {}", String::from_utf8_lossy(&body));
     let payload: serde_json::Value = serde_json::from_slice(&body).expect("task list JSON payload");
     assert_eq!(
@@ -753,7 +809,7 @@ fn serve_implicit_default_port_falls_back_when_busy_and_serves_workspace() {
         "server on the fallback port must serve this workspace's tasks: {payload}"
     );
 
-    assert!(serve.stop().success());
+    assert!(exit.success());
     drop(holder);
 }
 

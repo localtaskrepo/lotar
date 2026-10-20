@@ -1,0 +1,41 @@
+title: Synchronize serve test output capture before fallback assertions
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-20T02:53:27.733066+00:00
+modified: 2026-10-20T03:04:09.926635+00:00
+comments:
+- date: 2026-10-20T02:55:10.842868+00:00
+  text: 'CI evidence confirms stdout-readiness versus detachedstderr-reader race: producerlogswarningbeforeURLbutstdinindependentreaderbufferslackcompletionprotocol. Originalfailingcase100stressiterationspassedlocallyso notclaimedlocallyreproduced; LinuxCIemptybufferfailureisconcreteevidence. PlanwaitforbothownedoutputreaderEOFsignalswithinexistingSTOP/READYdeadlinesandassertfallbackoutputsafterownedserverstop,keepingexactports/banner/APIchecks. Adddeterministicchannel-gatedcapturecompletionregression. No productionservebehavior,budget/retry/sleep/concurrencypolicychanges; noGitwrites. Windowslogsnotyetpublished(initial404whilejobrunning), revisitafterfix/fullgates.'
+- date: 2026-10-20T03:04:09.900277+00:00
+  text: |-
+    Outcome: fixed the Linux CI serve-output capture race in tests/cli_serve_features_test.rs only. Each stdout/stderr reader now retains a completion sender until its capture loop finishes; completion is channel disconnection after BOTH readers finish. Stop reaps the owned child and drains capture within the original absolute STOP deadline; early-exit diagnostics use the original READY deadline. The fallback case requests/asserts workspace data and stops before reading complete output, retaining every preferred/actual port, banner, ANSI, payload and exit assertion. Added a channel-gated regression proving stdout readiness/completion is not stderr completion. No production serve behavior or timeout/retry/concurrency/assertion/skip change.
+    Evidence: actual Linux failure QA39360390643/job118424967312 had an empty stderr snapshot at707; production warning precedes URL but independent reader scheduling races. Original100 stress iterations passed locally (not claimed locally reproduced). Fixed full serve suite15/15, then50 iterations of all15 cases passed (750 executions), zero retries. Independent read-only review SIGNOFF, no blockers. Final lint/frontend/all-target-all-feature Clippy-Dwarnings/fmt passed; full default AND all-feature Rust1454/138 binaries passed each, zero retries; frontend849/79 files passed; fresh-build smoke274/66 files passed. git diff --check clean.
+    Remaining:45 Git-required Rust exclusions and25 existing smoke skips are unverified locally, not passes; existing Vue inject warnings unchanged. Remote workflow completed with Windows/security/UI/build/smoke success and only Linux Rust Quality failure. The PATCH has not been committed/pushed/rerun remotely; no claim of green post-fix GitHub run. Worktree began clean at ebf329b and contains only this test file plus DEV-125 tracking. No user-server changes, Git writes or workflow/policy changes.
+    Guidance: no durable finding.
+description: QA39360390643 LinuxRust job118424967312 failed cli_serve_features_test::serve_implicit_default_port_falls_back_when_busy_and_serves_workspace at707 with empty stderr despite actual fallback port39815. Producer emits warning before stdout URL, but harness drains stdout/stderr on detached independent threads and reads stderr snapshot immediately at readiness. Reproduce where possible, synchronize EOF/completion before output assertions with existing READY/STOP budgets, preserve exact warning ports, banner/API/workspace and owned-child cleanup contracts. No sleeps/retries/budget/concurrency/skip/assertion weakening or production serve behavior changes. Check latestWindows job for distinct failures onceavailable; run focused stress and full lint/Rust/UI/freshsmoke gates. No Gitwrites/commit/push/CIreruns/user-server changes.
+history:
+- at: 2026-10-20T02:55:10.808398+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T02:55:10.842868+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T03:04:09.900277+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T03:04:09.926635+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
