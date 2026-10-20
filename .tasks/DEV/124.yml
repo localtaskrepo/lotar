@@ -1,7 +1,47 @@
 title: Ensure frontend mounted fixtures are cleaned up after failing tests
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-20T00:31:38.256935+00:00
+modified: 2026-10-20T19:27:16.560963+00:00
+comments:
+- date: 2026-10-20T19:17:12.807553+00:00
+  text: 'Plan: repair success-tail-only cleanup in TaskPanel.createSprints.spec.ts using scoped guaranteed teardown. Unmount components and remove owned mounted/teleported DOM before resetting reactive fixtures/mocks; preserve pending-request/focus/draft assertions and current timeouts/concurrency/isolation. Add deterministic failure-path regression that exercises failed async test-body cleanup and listener/scroll/focus restoration, including partial initialization if applicable. Inspect only nearby fixtures for the same issue, bounded follow-up rather than global test-setup behavior changes. Verify targeted UI tests then full lint/test/fresh smoke. This addresses observed failure cascades, not an unproven initiating slowdown or cross-run process leak; no Git writes/user-server/data operations.'
+- date: 2026-10-20T19:22:32.695419+00:00
+  text: 'Progress: deterministic regression reproduced the defect before fix: after simulated async body failure and registered cleanup, wrapper.exists remained true. Main suite now owns mount hosts, registers wrappers immediately after mount before helper awaits, reverse-drains unmounts before reactive fixture resets, flushes scheduled teardown and removes owned hosts. Removed10 success-tail-only unmounts without changing existing API/pending/focus/draft assertions. Failure regression catches exact sentinel (does not hide setup failures), drives same cleanup registered with afterEach, checks VM/teleport/host removal, every preferences listener unsubscribed, scroll value/priority and inertness restored, outside focus accepted and Escape no longer intercepted. Bounded adjacent fixes only attachmentPrefix and addCodeReference: registry/unmount before DOM clearing and original timer restoration; no global setup or production changes. All16 affected UI tests across3 files passed. Full gates and independent review next; no timeouts/retries/isolation/concurrency changed, no claim about initiating slowdown.'
+- date: 2026-10-20T19:27:16.535285+00:00
+  text: |-
+    Outcome: guaranteed scoped component teardown in TaskPanel.createSprints, attachmentPrefix and addCodeReference fixtures. Wrappers register immediately after mount before initialization awaits; reverse-drained afterEach unmounting runs before reactive resets, timer restoration and DOM removal. Main sprint fixture removes only its owned mount hosts after flushing teardown, retaining external nodes/state for restoration assertions. Removed only redundant successful-tail unmounts; existing pending-request/focus/draft/API assertions unchanged. No production component/global setup change, no test timeout/retry/concurrency/isolation adjustment.
+    Evidence: deterministic async-body sentinel regression failed before fix because wrapper.exists remained true after the same registered cleanup. Now proves wrapper/teleport/host removal, every captured preferences listener removed, scroll value+priority and preexisting inertness restored, outside focus no longer trapped and Escape not intercepted. Exact sentinel rejection prevents setup/cleanup assertions being masked as expected failure. All16 targeted UI tests/3files passed. Independent static review found no blockers. Full final lint:agent passed vue-tsc/all-target-all-feature Clippy-Dwarnings/fmt; test:agent passed Rust1483/139 binaries and frontend850/79 files. Fresh-build smoke284/68 files passed. git diff --check clean; scope only3 fixture files plus DEV124 tracking.
+    Remaining: this fixes the observed within-run failure cascade, not proof of the initiating slowdown or a cross-run leak. Regression directly drives the same cleanup registered with afterEach; it does not spawn an intentionally failed Vitest process. Already-guaranteed nearby registry patterns left unchanged; pendingDrops/deleted helper-initialization edge cases were identified but not broadened into this3-file fix, available for separately assigned follow-up. Routine baseline Rust gitless45 exclusions/smoke25 skips remain unverified, not passes; native Linux/Windows and remote CI not run. Existing Vue inject warnings unchanged. Changes unstaged/uncommitted; no Git writes, user-server restarts or real-data changes.
+    Guidance: no durable instruction finding; no guidance/documentation changes.
 description: DEV-121 release verification diagnosis found TaskPanel.createSprints.spec.ts mounts onto document.body and calls unmount only at successful test tails; afterEach resetsrefs butdoesnotguaranteecomponent/listenercleanup. TimeoutthenleavesmultipleVuecontainers andcauseslaterfocus/dialog assertioncascades (observedinNode26output). Adopt scoped guaranteed VueTestUtils teardown or equivalent correctlyorderedafterEach cleanup, preservependingrequest/focus/draft assertions andfixtures, adddeterministicfailure-pathcleanupcoverage. Checkanalogousfixturesinotherfilesinboundedfollowup. This is NOT proof of initiating frontend slowdown or a cross-run processleak; investigateperformance separatelyunderDEV121. Never raisebudgets/retries,disableisolation,reducetestconcurrencyorweakenassertionstomasktimeouts. No realdatacleanup/serverrestartneeded.
+history:
+- at: 2026-10-20T19:17:12.778432+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T19:17:12.807553+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T19:22:32.695419+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T19:27:16.535285+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T19:27:16.560963+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

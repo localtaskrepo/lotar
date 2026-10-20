@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import TaskPanel from '../components/TaskPanel.vue'
@@ -147,6 +147,8 @@ vi.mock('../composables/useConfig', () => {
     }
 })
 
+const wrappers: VueWrapper[] = []
+
 const mountTaskPanel = async () => {
     const wrapper = mount(TaskPanel, {
         props: {
@@ -160,6 +162,7 @@ const mountTaskPanel = async () => {
         },
         attachTo: document.body,
     })
+    wrappers.push(wrapper)
 
     await flushPromises()
     await nextTick()
@@ -173,6 +176,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+    for (const wrapper of wrappers.splice(0).reverse()) wrapper.unmount()
     document.body.innerHTML = ''
 })
 
@@ -190,8 +194,6 @@ describe('TaskPanel hyphenated-prefix attachments and config', () => {
         const hashedHref = attachmentLinks[1]!.attributes('href') ?? ''
         expect(hashedHref).toContain('/api/attachments/h/0123456789abcdef0123456789abcdef/')
         expect(hashedHref).toContain('project=ABC-OPS')
-
-        wrapper.unmount()
     })
 
     it('uses the full prefix on the references tab attachment links', async () => {
@@ -208,17 +210,13 @@ describe('TaskPanel hyphenated-prefix attachments and config', () => {
             const href = link.attributes('href') ?? ''
             expect(href).toContain('project=ABC-OPS')
         }
-
-        wrapper.unmount()
     })
 
     it('inspects config for the full prefix, never the first dash segment', async () => {
-        const wrapper = await mountTaskPanel()
+        await mountTaskPanel()
 
         const inspected = apiFixtures.inspectConfigMock.mock.calls.map((call) => call[0])
         expect(inspected).toContain('ABC-OPS')
         expect(inspected).not.toContain('ABC')
-
-        wrapper.unmount()
     })
 })

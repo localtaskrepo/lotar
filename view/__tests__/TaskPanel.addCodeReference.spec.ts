@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import TaskPanel from '../components/TaskPanel.vue'
@@ -262,6 +262,8 @@ vi.mock('../composables/useConfig', () => {
     }
 })
 
+const wrappers: VueWrapper[] = []
+
 const mountTaskPanel = async () => {
     const wrapper = mount(TaskPanel, {
         props: {
@@ -275,6 +277,7 @@ const mountTaskPanel = async () => {
         },
         attachTo: document.body,
     })
+    wrappers.push(wrapper)
 
     await flushPromises()
     await nextTick()
@@ -289,6 +292,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+    for (const wrapper of wrappers.splice(0).reverse()) wrapper.unmount()
     vi.useRealTimers()
     document.body.innerHTML = ''
 })

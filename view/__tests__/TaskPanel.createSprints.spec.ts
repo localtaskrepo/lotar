@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 
@@ -98,7 +98,14 @@ const defaultSprints = [
     { id: 103, label: 'Sprint 103', display_name: 'Sprint 103', state: 'active' },
 ]
 
+const mountedPanels: VueWrapper[] = []
+const mountHosts: HTMLElement[] = []
+
 async function mountCreatePanel(props: Record<string, any> = {}, options: { realTeleport?: boolean } = {}) {
+    const host = document.createElement('div')
+    host.dataset.testTaskPanelMount = ''
+    document.body.append(host)
+    mountHosts.push(host)
     const wrapper = mount(TaskPanel, {
         props: {
             open: true,
@@ -108,8 +115,9 @@ async function mountCreatePanel(props: Record<string, any> = {}, options: { real
         global: {
             stubs: options.realTeleport ? {} : { Teleport: true },
         },
-        attachTo: document.body,
+        attachTo: host,
     })
+    mountedPanels.push(wrapper)
 
     await flushPromises()
     await nextTick()
@@ -118,6 +126,15 @@ async function mountCreatePanel(props: Record<string, any> = {}, options: { real
 }
 
 type PanelWrapper = Awaited<ReturnType<typeof mountCreatePanel>>
+
+async function cleanupPanels() {
+    for (const wrapper of mountedPanels.splice(0).reverse()) wrapper.unmount()
+    await flushPromises()
+    for (const host of mountHosts.splice(0)) host.remove()
+    sprintsStore.sprints.value = []
+    sprintsStore.missingSprints.value = []
+    sprintsStore.active.value = []
+}
 
 async function submitCreate(wrapper: PanelWrapper) {
     ;(wrapper.vm as any).form.title = 'Sprint task'
@@ -148,10 +165,64 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         vi.mocked(showToast).mockClear()
     })
 
-    afterEach(() => {
-        sprintsStore.sprints.value = []
-        sprintsStore.missingSprints.value = []
-        sprintsStore.active.value = []
+    afterEach(cleanupPanels)
+
+    it('cleans mounted resources after an async test body throws', async () => {
+        const beforeOverflow = document.body.style.getPropertyValue('overflow')
+        const beforePriority = document.body.style.getPropertyPriority('overflow')
+        const outside = document.createElement('button')
+        const inertBefore = document.createElement('div')
+        inertBefore.setAttribute('inert', '')
+        document.body.append(outside, inertBefore)
+        document.body.style.setProperty('overflow', 'clip', 'important')
+        const added = vi.spyOn(window, 'addEventListener')
+        const removed = vi.spyOn(window, 'removeEventListener')
+        let wrapper: PanelWrapper | undefined
+        const failure = new Error('simulated async test failure')
+
+        try {
+            await expect((async () => {
+                try {
+                    wrapper = await mountCreatePanel({ initialSprint: 101 }, { realTeleport: true })
+                    document.querySelector<HTMLButtonElement>('button[aria-label="Assign sprint"]')!.click()
+                    await nextTick()
+                    await flushPromises()
+                    expect(findSprintModalDialog()).not.toBeNull()
+                    expect(document.body.style.overflow).toBe('hidden')
+                    expect(outside.hasAttribute('inert')).toBe(true)
+                    throw failure
+                } finally {
+                    // Exercise the same cleanup registered with afterEach.
+                    await cleanupPanels()
+                }
+            })()).rejects.toBe(failure)
+
+            expect(wrapper!.exists()).toBe(false)
+            expect(findSprintModalDialog()).toBeNull()
+            expect(document.querySelector('.ui-modal__overlay')).toBeNull()
+            expect(document.querySelector('.task-panel')).toBeNull()
+            expect(document.querySelector('[data-test-task-panel-mount]')).toBeNull()
+            expect(document.body.style.getPropertyValue('overflow')).toBe('clip')
+            expect(document.body.style.getPropertyPriority('overflow')).toBe('important')
+            expect(outside.hasAttribute('inert')).toBe(false)
+            expect(inertBefore.hasAttribute('inert')).toBe(true)
+            const preferencesListeners = added.mock.calls.filter(([name]) => name === 'lotar:preferences-changed')
+            expect(preferencesListeners.length).toBeGreaterThan(0)
+            for (const [, listener] of preferencesListeners) {
+                expect(removed).toHaveBeenCalledWith('lotar:preferences-changed', listener)
+            }
+            outside.focus()
+            expect(document.activeElement).toBe(outside)
+            expect(dialogKey(document.body, 'Escape').defaultPrevented).toBe(false)
+        } finally {
+            // Keep the regression isolated if lifecycle cleanup regresses.
+            if (wrapper?.exists()) wrapper.unmount()
+            outside.remove()
+            inertBefore.remove()
+            document.body.style.setProperty('overflow', beforeOverflow, beforePriority)
+            added.mockRestore()
+            removed.mockRestore()
+        }
     })
 
     it('prefills initialSprint into the draft and submits it in the atomic create payload', async () => {
@@ -166,7 +237,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         expect(api.addTask.mock.calls[0]![0]).toMatchObject({ sprints: [101] })
         expect(api.sprintAdd).not.toHaveBeenCalled()
         expect(wrapper.emitted('created')).toBeTruthy()
-        wrapper.unmount()
     })
 
     it('keeps the initial sprint destination when sprint metadata is missing or stale', async () => {
@@ -179,7 +249,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
 
         expect(api.addTask).toHaveBeenCalledTimes(1)
         expect(api.addTask.mock.calls[0]![0]).toMatchObject({ sprints: [555] })
-        wrapper.unmount()
     })
 
     it('edits draft sprint membership locally without any API calls', async () => {
@@ -214,7 +283,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
 
         await submitCreate(wrapper)
         expect(api.addTask.mock.calls[0]![0]).toMatchObject({ sprints: [103] })
-        wrapper.unmount()
     })
 
     it('enforces the closed-sprint opt-in for draft additions', async () => {
@@ -239,7 +307,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
 
         expect((wrapper.vm as any).form.sprints).toEqual([102])
         expect(api.sprintAdd).not.toHaveBeenCalled()
-        wrapper.unmount()
     })
 
     it('clears the prior sprint prefill across reopen sessions', async () => {
@@ -262,7 +329,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
 
         await submitCreate(wrapper)
         expect(api.addTask.mock.calls[0]![0].sprints).toBeUndefined()
-        wrapper.unmount()
     })
 
     it('keeps the global sprint destination when the draft project changes', async () => {
@@ -279,7 +345,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
 
         await submitCreate(wrapper)
         expect(api.addTask.mock.calls[0]![0]).toMatchObject({ project: 'OTHER', sprints: [101] })
-        wrapper.unmount()
     })
 
     it('keeps draft sprint edits made while project configuration is loading', async () => {
@@ -296,7 +361,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         expect((wrapper.vm as any).form.sprints).toEqual([])
         await submitCreate(wrapper)
         expect(api.addTask.mock.calls[0]![0].sprints).toBeUndefined()
-        wrapper.unmount()
     })
 
     it('closes the nested sprint dialog on Escape, restores the trigger focus and keeps the draft untouched', async () => {
@@ -332,7 +396,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         expect(api.sprintRemove).not.toHaveBeenCalled()
         expect(api.updateTask).not.toHaveBeenCalled()
         expect(api.addTask).not.toHaveBeenCalled()
-        wrapper.unmount()
     })
 
     it('contains Tab focus within the nested sprint dialog', async () => {
@@ -357,7 +420,6 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         expect(document.activeElement).toBe(first)
         expect(dialogKey(first, 'Tab', true).defaultPrevented).toBe(true)
         expect(document.activeElement).toBe(last)
-        wrapper.unmount()
     })
 
     it('keeps the nested sprint dialog open on Escape while a sprint request is pending', async () => {
@@ -387,6 +449,5 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         await flushPromises()
         await nextTick()
         expect(document.querySelector('.task-panel-dialog__form--sprint')).toBeNull()
-        wrapper.unmount()
     })
 })
