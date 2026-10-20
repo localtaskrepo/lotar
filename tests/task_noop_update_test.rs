@@ -19,6 +19,8 @@ use lotar::utils::paths;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+mod common;
+
 fn workspace(extra_config: &str) -> (tempfile::TempDir, PathBuf) {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
@@ -990,6 +992,231 @@ fn other_project_me_assignment_under_review_is_a_byte_exact_noop() {
     assert!(receipt.dto.history.is_empty());
     assert_eq!(std::fs::read(&task_path).unwrap(), bytes);
     assert_eq!(mtime(&task_path), modified);
+}
+
+#[test]
+fn configured_reviewers_resolve_agent_unknown_and_missing_reporters() {
+    for actor in ["reviewer-user", "reviewer@example.com"] {
+        for reporter in [
+            Some("bot"),
+            Some("departed-user"),
+            Some("@retired-agent"),
+            None,
+        ] {
+            let (_tmp, tasks_dir) = workspace(&format!(
+                "default.reporter: {actor}\nauto.identity: false\nauto.populate_members: false\nagents:\n  bot: command\n",
+            ));
+            seed_project_config(
+                &tasks_dir,
+                &format!(
+                    "project_name: TEST\nreview:\n  reviewers: [{}]\n",
+                    actor.to_ascii_uppercase()
+                ),
+            );
+            let raw = RAW_TASK.replace("status: Todo", "status: NeedsReview");
+            let raw = match reporter {
+                Some(reporter) => raw.replace(
+                    "reporter: alice",
+                    &format!("reporter: {}", serde_json::to_string(reporter).unwrap()),
+                ),
+                None => raw.replace("reporter: alice\n", ""),
+            };
+            let path = seed_task(&tasks_dir, "1.yml", &raw);
+            if reporter == Some("@retired-agent") {
+                let before = std::fs::read(&path).unwrap();
+                let stamp = set_old_mtime(&path);
+                noop_update(
+                    &mut Storage::new(&tasks_dir),
+                    "TEST-1",
+                    TaskUpdate {
+                        assignee: Some("alice".into()),
+                        ..Default::default()
+                    },
+                );
+                assert_eq!(std::fs::read(&path).unwrap(), before);
+                assert_eq!(mtime(&path), stamp);
+            }
+            let receipt = TaskService::update_with_receipt(
+                &mut Storage::new(&tasks_dir),
+                "TEST-1",
+                TaskUpdate {
+                    status: Some("Done".into()),
+                    ..Default::default()
+                },
+                TaskUpdateContext::default(),
+            )
+            .expect("configured reviewer must recover unavailable reporter reviews");
+            assert!(receipt.changed);
+            assert_eq!(receipt.dto.status.as_str(), "Done");
+            assert_eq!(receipt.dto.reporter.as_deref(), reporter);
+            assert_eq!(receipt.dto.history.len(), 1);
+            assert_eq!(receipt.dto.history[0].actor.as_deref(), Some(actor));
+            assert!(
+                receipt.dto.history[0]
+                    .changes
+                    .iter()
+                    .all(|change| change.field != "reporter")
+            );
+        }
+    }
+}
+
+#[test]
+fn configured_reviewer_can_reassign_review_without_changing_reporter() {
+    let (_tmp, tasks_dir) = workspace(
+        "default.reporter: reviewer-user\nauto.populate_members: false\nagents:\n  bot: command\n",
+    );
+    seed_project_config(
+        &tasks_dir,
+        "project_name: TEST\nreview.reviewers: [reviewer-user]\n",
+    );
+    let raw = RAW_TASK
+        .replace("status: Todo", "status: NeedsReview")
+        .replace("reporter: alice", "reporter: bot")
+        .replace("assignee: alice", "assignee: '@bot'");
+    seed_task(&tasks_dir, "1.yml", &raw);
+    let receipt = TaskService::update_with_receipt(
+        &mut Storage::new(&tasks_dir),
+        "TEST-1",
+        TaskUpdate {
+            assignee: Some("alice".into()),
+            ..Default::default()
+        },
+        TaskUpdateContext::default(),
+    )
+    .expect("reviewer may change the review assignment");
+    assert!(receipt.changed);
+    assert_eq!(receipt.dto.status.as_str(), "NeedsReview");
+    assert_eq!(receipt.dto.assignee.as_deref(), Some("alice"));
+    assert_eq!(receipt.dto.reporter.as_deref(), Some("bot"));
+    assert_eq!(
+        receipt.dto.history[0].actor.as_deref(),
+        Some("reviewer-user")
+    );
+}
+
+#[test]
+fn unlisted_review_actors_are_denied_with_recovery_help_and_no_writes() {
+    for reviewers in [
+        "",
+        "review.reviewers: []\n",
+        "review.reviewers: [someone-else]\n",
+        "review.reviewers: ['@me', '@reviewer-user', '*']\n",
+    ] {
+        let (_tmp, tasks_dir) =
+            workspace("default.reporter: reviewer-user\nreview.reviewers: [reviewer-user]\n");
+        seed_project_config(&tasks_dir, &format!("project_name: TEST\n{reviewers}"));
+        let raw = RAW_TASK
+            .replace("status: Todo", "status: NeedsReview")
+            .replace("reporter: alice", "reporter: departed-user");
+        let task = seed_task(&tasks_dir, "1.yml", &raw);
+        let stamp = set_old_mtime(&task);
+        let before = std::fs::read(&task).unwrap();
+        let error = TaskService::update_with_receipt(
+            &mut Storage::new(&tasks_dir),
+            "TEST-1",
+            TaskUpdate {
+                status: Some("Done".into()),
+                ..Default::default()
+            },
+            TaskUpdateContext::default(),
+        )
+        .expect_err("neither absent, empty, unrelated nor global reviewer settings grant access");
+        let message = error.to_string();
+        assert!(message.contains("departed-user"), "{message}");
+        assert!(message.contains("review.reviewers"), "{message}");
+        assert!(message.contains("TEST"), "{message}");
+        assert_eq!(std::fs::read(&task).unwrap(), before);
+        assert_eq!(mtime(&task), stamp);
+    }
+}
+
+#[test]
+fn reporter_retains_review_authority_with_no_delegates() {
+    for reviewers in [
+        "",
+        "review.reviewers: []\n",
+        "review.reviewers: [bob@example.com]\n",
+    ] {
+        let (_tmp, tasks_dir) =
+            workspace("default.reporter: alice\nauto.populate_members: false\n");
+        seed_project_config(&tasks_dir, &format!("project_name: TEST\n{reviewers}"));
+        seed_task(
+            &tasks_dir,
+            "1.yml",
+            &RAW_TASK.replace("status: Todo", "status: NeedsReview"),
+        );
+        let receipt = TaskService::update_with_receipt(
+            &mut Storage::new(&tasks_dir),
+            "TEST-1",
+            TaskUpdate {
+                status: Some("Done".into()),
+                ..Default::default()
+            },
+            TaskUpdateContext::default(),
+        )
+        .expect("reporter remains authorized by default");
+        assert!(receipt.changed);
+        assert_eq!(receipt.dto.reporter.as_deref(), Some("alice"));
+        assert_eq!(receipt.dto.history[0].actor.as_deref(), Some("alice"));
+    }
+}
+
+#[test]
+fn cli_configured_reviewer_can_resolve_an_agent_reported_review() {
+    let (tmp, tasks_dir) =
+        workspace("default.reporter: reviewer-user\nauto.populate_members: false\n");
+    let project = seed_project_config(&tasks_dir, "project_name: TEST\n");
+    let before = std::fs::read(&project).unwrap();
+    for dry_run in [true, false] {
+        let mut command = common::lotar_cmd().unwrap();
+        command
+            .current_dir(tmp.path())
+            .env("HOME", tmp.path())
+            .env_remove("LOTAR_DEFAULT_REPORTER")
+            .args([
+                "--tasks-dir",
+                tasks_dir.to_str().unwrap(),
+                "config",
+                "set",
+                "review.reviewers",
+                "reviewer-user",
+                "--project",
+                "TEST",
+            ]);
+        if dry_run {
+            command.arg("--dry-run");
+        }
+        command.assert().success();
+        if dry_run {
+            assert_eq!(std::fs::read(&project).unwrap(), before);
+        }
+    }
+    let task = seed_task(
+        &tasks_dir,
+        "1.yml",
+        &RAW_TASK
+            .replace("status: Todo", "status: NeedsReview")
+            .replace("reporter: alice", "reporter: bot"),
+    );
+    common::lotar_cmd()
+        .unwrap()
+        .current_dir(tmp.path())
+        .env("HOME", tmp.path())
+        .env_remove("LOTAR_DEFAULT_REPORTER")
+        .args([
+            "--tasks-dir",
+            tasks_dir.to_str().unwrap(),
+            "status",
+            "TEST-1",
+            "Done",
+        ])
+        .assert()
+        .success();
+    let persisted = parse_task_yaml_tolerant(&std::fs::read_to_string(task).unwrap()).unwrap();
+    assert_eq!(persisted.status.as_str(), "Done");
+    assert_eq!(persisted.reporter.as_deref(), Some("bot"));
+    assert_eq!(persisted.history[0].actor.as_deref(), Some("reviewer-user"));
 }
 
 #[test]

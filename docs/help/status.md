@@ -75,6 +75,33 @@ Changing a status follows these stages:
 
 The `lotar task status` alias builds the same arguments and reuses this workflow.
 
+## Review resolution
+
+While a task is in a review state such as `NeedsReview`, genuine status or
+assignee changes require the reporter's identity by default. A project can
+explicitly delegate resolution to additional named reviewers:
+
+```bash
+lotar config set review.reviewers alice,bob --project AUTH
+lotar whoami --project AUTH
+lotar status AUTH-42 Done
+```
+
+`review.reviewers` is project-only. Absent or empty lists retain reporter-only
+behavior, and another project's list never grants access. Names are matched
+case-insensitively as literals; `@me`, agent directives, and wildcards are not
+reviewer identities. The reporter remains authorized even when reviewers exist.
+
+A configured reviewer can recover tasks reported by agents, departed members,
+unknown identities, or no reporter, without changing the original reporter.
+History records the actual resolving actor. Rejection messages identify the
+allowed actors and the configuration path for recovery.
+
+The same guard is shared by CLI, REST, and MCP. Unchanged status/assignment
+requests remain no-ops, and reviewer membership does not bypass active agent-job
+locks or other validation. This is workflow policy based on resolved identity,
+not additional user authentication or operating-system access control.
+
 ## Status values
 
 Each project controls allowed statuses via `issue_states` and `default_status` in `.tasks/<PROJECT>/config.yml`. Common defaults:

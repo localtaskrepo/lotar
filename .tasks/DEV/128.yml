@@ -1,7 +1,47 @@
 title: Review guard can permanently lock tickets whose reporter cannot act
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-20T03:20:20.932424+00:00
+modified: 2026-10-20T19:13:36.744502+00:00
+comments:
+- date: 2026-10-20T18:48:59.990472+00:00
+  text: 'Approved policy: opt-in project-level named reviewer list; reporter remains authorized; absent/empty list keeps reporter-only behavior. Implement canonical review.reviewers (resolved review_reviewers), project-only with no workspace/home/env implicit inheritance or unrestricted force bypass. Named literal identities, no dynamic @me/@agent or wildcard authorization. Preserve original reporter and audit actual actor. Missing/inactive reporter tickets may be recovered only by explicitly listed reviewer; errors explain configuration path. Preserve effective no-op exemptions, agent/human assignment distinction, active-job guards and existing trusted contexts. Plan: config normalization/persistence/validation/inspect/dryrun/noop and synchronized resolved REST/TS/OpenAPI contracts; TaskService authorization and deterministic CLI/service regressions; REST/MCP smoke for agent/unknown reporters and denied actors/scopes; docs and full gates. Work in current clean checkout at3b431e5; no Git writes/user server restarts/release changes.'
+- date: 2026-10-20T19:06:15.910669+00:00
+  text: 'Progress: implemented project-only review.reviewers across normalized/serialized config, CSV and structured-list setters, full candidate validation/dryrun/noop, show/inspect/source metadata, and resolved Rust/TS/OpenAPI contracts. Rejects directives/wildcards/blank entries; global/home/env/inline-global cannot delegate authority. Guard authorizes reporter OR explicit literal reviewer, preserves no-op exemptions and active-job guard ordering, and errors identify project/recovery setting. Added6 config regressions +5 task/CLI tests (35 combined including existing suite), all passing with all features. Real pre-fix REST+MCP recovery cases both failed; after implementation all9 new rebuilt smoke cases pass, including public config_set, live revocation, missing/agent reporters, unrelated projects, effective noops, reporter authority and gated active-job blocking. Runtime smoke exposed preexisting ensure_task_defaults stripping an untouched historic @reporter on genuine edits; fixed by preserving unpatched reporter in both candidate/effective-existing comparison, leaving explicit patches normalized. New matrix covers agent, departed, missing, @retired-agent, username/email reviewers and historic no-op bytes/mtime. Initial test assumptions corrected (empty issue.states is valid project clear; MCP config_set failure uses result.isError); no production policy/limits relaxed. Two independent static reviews (full change + preservation delta) found no blockers. Related CLI/config/status/task/MCP docs updated; full gates next.'
+- date: 2026-10-20T19:13:36.719002+00:00
+  text: |-
+    Outcome: delivered approved opt-in project-only review.reviewers policy. Reporter OR explicitly listed named reviewer may change review status/assignee, including recovery of agent/departed/unknown/missing reporters. Empty/absent list keeps reporter-only. No global/home/env/inline-global inheritance, dynamic @ directives, wildcard authority or force bypass. Config setters support CSV/structured-list strings; trim/case-deduplicate names/emails; reject invalid values even forced; normalize nested/dotted/shipped-flat forms, canonical nested YAML, clear/remove/dryrun/noop/inspect/source paths. Resolved Rust API alias, TypeScript and OpenAPI contract aligned; config/CLI/status/task/MCP help updated. Untouched historic reporters are preserved through genuine updates and no-op comparisons; explicit reporter patches retain existing normalization. Audit actor, active-job restrictions, member validation and trusted contexts preserved. Error messages identify allowed actors and project recovery setting. No real DEV reviewer list enabled.
+    Evidence: two real pre-fix REST/MCP recovery cases failed as reporter-only. Final35 focused all-feature tests passed (6 new config +5 task/CLI regressions plus existing), matrices include username/email and registered/departed/missing/@historic reporter cases, unchanged writes/mtime, reporter authorization with unrelated nonempty reviewer list, CLI dryrun and public status. All9 new rebuilt smoke cases passed: REST/MCP public config_set + status/update, invalid/global rejection, live revocation, project isolation, preserved reporter/history, effective noops and real gated active-job blocking. Runtime tests identified and verified correction of preexisting @reporter normalization on unrelated genuine changes. Independent full policy/contract review and follow-up preservation review: no blockers. Final lint:agent passed vue-tsc, all-target/all-feature Clippy-Dwarnings and fmt (remaining required DTO fixture initialized, no type weakening). Full test:agent Rust1483/139 binaries and frontend849/79 files passed; separate all-feature Rust1483 passed. Fresh-build full smoke284/68 files passed. Existing OpenAPI contract/semantics tests parsed/validated updated spec; documented CLI set/dryrun/status forms exercised. git diff --check clean.
+    Remaining: routine baseline Rust gitless45 exclusions/smoke25 skips remain unverified, not passes; native Linux/Windows/remote CI not run. Strict member validation still applies to historic unknown reporter identities; delegation is not a membership bypass. Workflow guard uses resolved identity, not new authentication/OS access control. MCP active-job behavior relies on shared guard and existing suites; new real gated-job smoke uses REST. Existing Vue inject warnings unchanged. All changes unstaged/uncommitted; no Git writes, user-server restart, user config mutation or release changes.
+    Guidance: no durable instruction finding; product/API documentation updated only.
 description: 'Observed with lotar 0.8.0; logic in enforce_review_owner_transition (src/services/task_service.rs). In NeedsReview only the exact reporter may change status or assignee, with no override. When the reporter is an agent name (agents usually run under the same OS account, so they resolve to the human''s identity), a departed member, or any name no current identity matches, the ticket cannot leave review through CLI, REST, MCP or UI except by editing the reporter. Repro: identity alice; ''lotar add t --reporter bot -p PRJ''; ''lotar status PRJ-1 NeedsReview'' succeeds; ''lotar status PRJ-1 Done'' fails with ''Only reporter bot can change status or assignee until review is resolved''. Acceptance (design to choose): a configurable reviewer/owner set per project (or the project owner) may resolve reviews; or agent-reported tickets route review to a configured human; error text explains the path forward; tests for agent reporter and unknown reporter.'
+history:
+- at: 2026-10-20T18:48:59.956046+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T18:48:59.990472+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T19:06:15.910669+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T19:13:36.719002+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T19:13:36.744502+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

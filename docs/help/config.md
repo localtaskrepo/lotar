@@ -197,7 +197,7 @@ Notes:
  - Identity resolution uses the merged configuration from this precedence chain.
 
 ### Canonical YAML shape
-LoTaR accepts shipped flat fields (such as `default_project`, `default_assignee`, and `server_port`), dotted keys, and nested sections in YAML. Canonical nested/dotted fields take precedence over their flat equivalents regardless of YAML key order. Conflicting dotted and nested definitions of the same path are rejected. Internally, values are canonicalized to sections such as server, default, project, members, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.
+LoTaR accepts shipped flat fields (such as `default_project`, `default_assignee`, and `server_port`), dotted keys, and nested sections in YAML. Canonical nested/dotted fields take precedence over their flat equivalents regardless of YAML key order. Conflicting dotted and nested definitions of the same path are rejected. Internally, values are canonicalized to sections such as server, default, project, members, review, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.
 
 - Config roots must be mappings; empty or comment-only files still mean built-in defaults. Invalid recognized field types are errors, including invalid values shadowed by another representation. Init aborts before creating project files or rewriting an existing global config when these checks fail.
 - Canonical rewrites retain supported config fields, including `agent.context_extension`, `agent.logs_dir`, and the global-only `web_ui_path`. They are not lossless YAML edits: comments, formatting, and unknown keys (including unknown nested keys and fields unsupported in the selected scope) are not retained. Review the normalization preview before rewriting configs containing extensions.
@@ -287,9 +287,34 @@ Resolved configuration responses expose `effective_done_states`, `done_states_mo
 - `default.priority` - Default task priority
 - `default.status` - Default task status
 - `members` - Allowed members when `default.strict_members` is true
+- `review.reviewers` - Opt-in project-only list of named identities allowed to resolve review status/assignee changes alongside the reporter. Absent or empty means reporter-only. No workspace-global, home, environment, or inline-global override inheritance; use `--project` with config mutations. Entries are literal names/emails, not `@me`, agent directives, or `*`.
 - `default.strict_members` - Enforce member list for reporter/assignee fields
 - `custom_fields` - Custom field definitions
     
+For review recovery, for example when a reporter is an agent or has left the
+project:
+
+```bash
+lotar config set review.reviewers alice,bob --project AUTH --dry-run
+lotar config set review.reviewers alice,bob --project AUTH
+lotar config inspect --project AUTH
+# Return to reporter-only review resolution
+lotar config set review.reviewers "" --project AUTH
+```
+
+The canonical project YAML is:
+
+```yaml
+review:
+  reviewers: [alice, bob]
+```
+
+Matching is case-insensitive against the resolved identity in the task's project
+(`lotar whoami --project AUTH`). This delegates review resolution, not ownership:
+untouched reporter values are preserved and history records the acting identity.
+Explicit reporter edits retain their ordinary update semantics. See
+[status review policy](./status.md#review-resolution).
+
 Automation (defaults inherited from global):
 - `auto.populate_members` - Automatically add new assignees/reporters to the project member list when strict members are enabled (default: true)
 - `auto.set_reporter` - If true, set reporter automatically on create/update when missing

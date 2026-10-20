@@ -116,6 +116,18 @@ fn parse_optional_string(value: &str) -> Option<String> {
     }
 }
 
+fn parse_review_reviewers(value: &str) -> Result<Vec<String>, ConfigError> {
+    let trimmed = value.trim();
+    let values = if trimmed.starts_with('[') || trimmed.starts_with('{') {
+        serde_yaml_ng::from_str::<Vec<String>>(trimmed).map_err(|error| {
+            ConfigError::ParseError(format!("Invalid review.reviewers list: {error}"))
+        })?
+    } else {
+        value.split(',').map(str::to_string).collect()
+    };
+    crate::config::types::normalize_review_reviewers(&values)
+}
+
 fn parse_simple_csv(value: &str) -> Vec<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -813,6 +825,13 @@ pub fn apply_field_to_project_config(
                 Some(members)
             };
         }
+        "review_reviewers" => {
+            config.review_reviewers = if value.trim().is_empty() {
+                None
+            } else {
+                Some(parse_review_reviewers(value)?)
+            };
+        }
         "strict_members" => {
             config.strict_members = parse_optional_bool_flag(value, field)?;
         }
@@ -1144,6 +1163,7 @@ pub const GLOBAL_CONFIG_FIELDS: &[&str] = &[
 /// Fields settable in a project configuration override (canonical flat names).
 pub const PROJECT_CONFIG_FIELDS: &[&str] = &[
     "project_name",
+    "review_reviewers",
     "default_assignee",
     "default_reporter",
     "default_tags",
@@ -1277,6 +1297,11 @@ pub fn is_global_only_field_name(field: &str) -> Option<String> {
 /// Validate that a field value is valid for the given field
 pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError> {
     match field {
+        "review_reviewers" => {
+            if !value.trim().is_empty() {
+                parse_review_reviewers(value)?;
+            }
+        }
         "server_port" => {
             let port = value
                 .parse::<u16>()
@@ -1538,6 +1563,7 @@ pub fn clear_project_override_field(
         // List option fields
         "default_tags" => config.default_tags = None,
         "members" => config.members = None,
+        "review_reviewers" => config.review_reviewers = None,
         "strict_members" => config.strict_members = None,
         // Enum list overrides
         "issue_states" => config.issue_states = None,

@@ -13,6 +13,7 @@ use tempfile::TempDir;
 
 fn make_resolver() -> ProjectResolver {
     let cfg = ResolvedConfig {
+        review_reviewers: vec![],
         server_port: 8080,
         default_project: "TEST".to_string(),
         issue_states: ConfigurableField {

@@ -967,6 +967,7 @@ impl TaskService {
                 )));
             }
         }
+        let explicit_reporter = patch.reporter.is_some();
         let mut t = existing.clone();
         let mut changes: Vec<TaskChange> = Vec::new();
         let mut record_change = |field: &str, old: Option<String>, new: Option<String>| {
@@ -1196,6 +1197,11 @@ impl TaskService {
         // member spellings) through an effective no-op.
         let mut effective_existing = existing.clone();
         Self::ensure_task_defaults(&mut effective_existing, &config, false);
+        // Review recovery must not normalize or replace historic provenance.
+        if !explicit_reporter {
+            t.reporter.clone_from(&existing.reporter);
+            effective_existing.reporter.clone_from(&existing.reporter);
+        }
 
         let (config, config_yaml) =
             Self::plan_auto_populate_members(&storage.root_path, &derived, &t, config)?;
@@ -1450,7 +1456,7 @@ impl TaskService {
         // Assignment-aware identity (DEV-102): switching between a
         // registered agent directive ("@copilot") and the bare human
         // spelling ("copilot") is a real assignee change and must be
-        // authorized by the reporter like any other review transition.
+        // authorized by the reporter or a configured project reviewer.
         let is_agent = |name: &str| config.agent_profiles.contains_key(name);
         let assignee_changed = patch_assignee.is_some_and(|next| {
             let trimmed = next.trim();
@@ -1473,26 +1479,51 @@ impl TaskService {
             return Ok(());
         }
 
-        let Some(reporter) = existing.reporter.as_deref() else {
-            return Err(LoTaRError::ValidationError(format!(
-                "Ticket '{}' is awaiting review, but it has no reporter to authorize review transitions.",
-                id
-            )));
-        };
-
         let actor =
             resolve_current_user_for_project(Some(storage.root_path.as_path()), Some(project));
+        let reporter = existing.reporter.as_deref();
         let is_reporter = actor
             .as_deref()
-            .is_some_and(|current| current.eq_ignore_ascii_case(reporter));
+            .zip(reporter)
+            .is_some_and(|(current, reporter)| current.eq_ignore_ascii_case(reporter));
+        // Only literal identities delegate authority, even for hand-edited files.
+        let reviewers: Vec<&str> = config
+            .review_reviewers
+            .iter()
+            .map(|name| name.trim())
+            .filter(|name| !name.is_empty() && !name.starts_with('@') && *name != "*")
+            .collect();
+        let is_reviewer = actor.as_deref().is_some_and(|current| {
+            reviewers
+                .iter()
+                .any(|reviewer| current.trim().eq_ignore_ascii_case(reviewer))
+        });
 
-        if is_reporter {
+        if is_reporter || is_reviewer {
             return Ok(());
         }
 
+        let authority = match reporter {
+            Some(reporter) if reviewers.is_empty() => format!("Only reporter '{}'", reporter),
+            Some(reporter) => format!(
+                "Only reporter '{}' or configured reviewers [{}]",
+                reporter,
+                reviewers.join(", ")
+            ),
+            None if reviewers.is_empty() => {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Ticket '{}' is awaiting review, but it has no reporter to authorize review transitions. Configure review.reviewers for project '{}' to delegate review resolution.",
+                    id, project
+                )));
+            }
+            None => format!(
+                "Only configured reviewers [{}] (this ticket has no reporter)",
+                reviewers.join(", ")
+            ),
+        };
         Err(LoTaRError::ValidationError(format!(
-            "Ticket '{}' is awaiting review. Only reporter '{}' can change status or assignee until review is resolved.",
-            id, reporter
+            "Ticket '{}' is awaiting review. {} can change status or assignee until review is resolved. Configure review.reviewers for project '{}' to delegate review resolution.",
+            id, authority, project
         )))
     }
 

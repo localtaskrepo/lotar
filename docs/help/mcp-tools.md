@@ -167,6 +167,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `config_set`
 - **Params:** `values` map of key→string plus optional `global`/`project` selectors. Values must be strings — non-string values are rejected by the schema (silent coercion was removed).
+- **Review delegation:** `{"project":"AUTH","values":{"review.reviewers":"alice,bob"}}` opts that project into named reviewers. A JSON-array string is also accepted; an empty string clears delegation. The setting is project-only, rejects directives/wildcards, and never bypasses active-job locks. See [review resolution](./status.md#review-resolution).
 - **Response:** Text summary indicating success along with any validation warnings/info from the config service.
 
 ## Sync Tools

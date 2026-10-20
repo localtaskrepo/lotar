@@ -137,6 +137,7 @@ describe('ConfigView project creation propagation', () => {
             sync_write_reports: true,
             default_assignee: null,
             default_reporter: null,
+            review_reviewers: [],
             default_tags: [],
             default_priority: 'Medium',
             default_status: 'Todo',

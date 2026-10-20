@@ -752,6 +752,8 @@ export interface SyncAuthProfile {
 
 
 export interface ResolvedConfigDTO {
+  /** Project-only named reviewers; empty keeps reporter-only review authorization. */
+  review_reviewers: string[]
   server_port: number
   default_project: string
   attachments_dir: string
@@ -837,6 +839,8 @@ export interface GlobalConfigRaw {
 }
 
 export interface ProjectConfigRaw {
+  /** Project-only reviewer literals; absent/null means reporter-only. */
+  review_reviewers?: string[] | null
   project_name?: string
   attachments_dir?: string
   attachments_max_upload_mb?: number

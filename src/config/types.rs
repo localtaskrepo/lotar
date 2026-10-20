@@ -412,6 +412,8 @@ impl StringConfigField {
 pub struct ProjectConfig {
     pub project_name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub review_reviewers: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub issue_states: Option<ConfigurableField<TaskStatus>>,
     /// Explicit terminal states for this project. `None` inherits the
     /// effective global `issue.done_states`; when every layer is unset the
@@ -521,6 +523,7 @@ impl ProjectConfig {
     pub fn new(project_name: String) -> Self {
         Self {
             project_name,
+            review_reviewers: None,
             issue_states: None,
             issue_done_states: None,
             issue_types: None,
@@ -711,6 +714,8 @@ pub struct GlobalConfig {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResolvedConfig {
+    /// Project-only named reviewers; empty preserves reporter-only authorization.
+    pub review_reviewers: Vec<String>,
     pub server_port: u16,
     pub default_project: String,
     pub issue_states: ConfigurableField<TaskStatus>,
@@ -819,6 +824,25 @@ impl ResolvedConfig {
 
         Some(self.issue_types.values[0].clone())
     }
+}
+
+/// Review authority accepts named literals only, never identity directives or wildcards.
+pub fn normalize_review_reviewers(values: &[String]) -> Result<Vec<String>, ConfigError> {
+    let mut normalized = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for value in values {
+        let value = value.trim();
+        if value.is_empty() || value.starts_with('@') || value.contains('*') {
+            return Err(ConfigError::PolicyError(
+                "review.reviewers must contain nonblank named identities, not @ directives or wildcards"
+                    .to_string(),
+            ));
+        }
+        if seen.insert(value.to_lowercase()) {
+            normalized.push(value.to_string());
+        }
+    }
+    Ok(normalized)
 }
 
 #[derive(Debug)]

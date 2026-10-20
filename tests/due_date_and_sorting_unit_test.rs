@@ -4,6 +4,7 @@ use lotar::types::{Priority, TaskStatus, TaskType};
 
 fn cfg() -> ResolvedConfig {
     ResolvedConfig {
+        review_reviewers: vec![],
         server_port: 8080,
         default_project: "TEST".to_string(),
         issue_states: ConfigurableField {

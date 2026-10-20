@@ -45,6 +45,7 @@ const stubs = {
 
 function baseResolvedConfig(): ResolvedConfigDTO {
   return {
+    review_reviewers: [],
     server_port: 8080,
     default_project: 'TEST',
     attachments_dir: '@attachments',

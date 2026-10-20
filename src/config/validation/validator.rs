@@ -26,6 +26,14 @@ impl ConfigValidator {
 
         // Validate project name
         self.validate_project_name(&config.project_name, &mut result);
+        if let Some(reviewers) = &config.review_reviewers
+            && let Err(error) = crate::config::types::normalize_review_reviewers(reviewers)
+        {
+            result.add_error(ValidationError::error(
+                Some("review.reviewers".to_string()),
+                error.to_string(),
+            ));
+        }
 
         // Note: Project prefix validation is done separately as it's not stored in ProjectConfig
 

@@ -162,6 +162,7 @@ pub(crate) const CONFIG_PATHS: &[(&str, &str)] = &[
     ("default.tags", "default_tags"),
     ("default.members", "members"),
     ("members", "members"),
+    ("review.reviewers", "review_reviewers"),
     ("default.strict_members", "strict_members"),
     ("default.priority", "default_priority"),
     ("default.status", "default_status"),
@@ -302,11 +303,16 @@ pub fn parse_project_from_yaml_str(
     project_name: &str,
     content: &str,
 ) -> Result<ProjectConfig, ConfigError> {
-    parse_config(
+    let mut config: ProjectConfig = parse_config(
         content,
         serde_yaml_ng::to_value(ProjectConfig::new(project_name.into()))
             .map_err(|_| ConfigError::ParseError("Failed to serialize project defaults".into()))?,
-    )
+    )?;
+    if let Some(reviewers) = &config.review_reviewers {
+        config.review_reviewers =
+            Some(crate::config::types::normalize_review_reviewers(reviewers)?);
+    }
+    Ok(config)
 }
 
 /// Options for canonical global YAML rendering (server-port intent only;
@@ -713,6 +719,14 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
 pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     use serde_yaml_ng::Value as Y;
     let mut root = serde_yaml_ng::Mapping::new();
+    if let Some(reviewers) = &cfg.review_reviewers {
+        let mut review = serde_yaml_ng::Mapping::new();
+        review.insert(
+            Y::String("reviewers".into()),
+            serde_yaml_ng::to_value(reviewers).unwrap_or(Y::Null),
+        );
+        root.insert(Y::String("review".into()), Y::Mapping(review));
+    }
 
     // project
     if !cfg.project_name.trim().is_empty() {

@@ -86,6 +86,7 @@ function deferred<T>() {
 
 function baseResolvedConfig(overrides: Partial<ResolvedConfigDTO> = {}): ResolvedConfigDTO {
     return {
+        review_reviewers: [],
         server_port: 8080,
         default_project: '',
         attachments_dir: '@attachments',

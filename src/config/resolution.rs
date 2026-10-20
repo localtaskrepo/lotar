@@ -907,6 +907,12 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(members) = project_config.members {
         resolved.members = members;
     }
+    // Never inherit review authority, and fail closed for invalid programmatic overrides.
+    resolved.review_reviewers = project_config
+        .review_reviewers
+        .as_deref()
+        .and_then(|values| crate::config::types::normalize_review_reviewers(values).ok())
+        .unwrap_or_default();
     if let Some(strict_members) = project_config.strict_members {
         resolved.strict_members = strict_members;
     }
@@ -1121,6 +1127,7 @@ impl ResolvedConfig {
             default_reporter: global.default_reporter,
             default_tags: global.default_tags,
             members: global.members,
+            review_reviewers: Vec::new(),
             strict_members: global.strict_members,
             auto_populate_members: global.auto_populate_members,
             auto_set_reporter: global.auto_set_reporter,

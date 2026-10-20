@@ -610,7 +610,7 @@ fn redact_config(value: &mut serde_json::Value) {
 /// snapshot.
 fn insert_computed_completion_fields(
     value: &mut serde_json::Value,
-    resolved: &crate::config::types::ResolvedConfig,
+    resolved: &crate::api_types::ResolvedConfigDTO,
 ) {
     use crate::services::completion;
     let Some(map) = value.as_object_mut() else {

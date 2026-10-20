@@ -4,6 +4,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::config::types::SyncRemoteConfig;
 
+/// Configuration endpoints serialize this shared resolved contract, including
+/// project-only `review_reviewers` (empty for global resolution).
+pub type ResolvedConfigDTO = crate::config::types::ResolvedConfig;
+
 #[cfg(feature = "schema")]
 use schemars::JsonSchema;
 

@@ -28,6 +28,7 @@ pub const CONFIG_SOURCE_ENTRIES: &[ConfigSourceEntry] = &[
     entry("default.reporter", "default_reporter", "default_reporter"),
     entry("default.tags", "default_tags", "default_tags"),
     entry("members", "members", "members"),
+    entry("review.reviewers", "review_reviewers", "review_reviewers"),
     entry("default.strict-members", "strict_members", "strict_members"),
     entry("default.priority", "default_priority", "default_priority"),
     entry("default.status", "default_status", "default_status"),
@@ -621,6 +622,13 @@ fn source_label_for_project(
 
     match key {
         "default_project" => "project".to_string(),
+        "review_reviewers" => {
+            if project_cfg.is_some_and(|cfg| cfg.review_reviewers.is_some()) {
+                "project".to_string()
+            } else {
+                "default".to_string()
+            }
+        }
         "default_assignee" => {
             let has_override = project_cfg
                 .and_then(|pc| pc.default_assignee.as_ref())

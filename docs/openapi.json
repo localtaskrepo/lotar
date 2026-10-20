@@ -3486,6 +3486,11 @@
           {
             "type": "object",
             "properties": {
+              "review_reviewers": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Project-only named reviewers configured via review.reviewers. Empty by default and always empty in global resolution; the reporter remains authorized. Named literals only, never @ directives or wildcards."
+              },
               "effective_done_states": {
                 "type": "array",
                 "items": { "type": "string" },
@@ -3502,7 +3507,7 @@
                 "description": "Live server-local calendar day, not writable configuration or a permanently cached policy value."
               }
             },
-            "required": ["effective_done_states", "done_states_mode", "task_calendar_day"]
+            "required": ["effective_done_states", "done_states_mode", "task_calendar_day", "review_reviewers"]
           }
         ]
       },
@@ -3512,7 +3517,21 @@
           "effective": { "$ref": "#/components/schemas/ResolvedConfigCompletion" },
           "global_effective": { "$ref": "#/components/schemas/ResolvedConfigCompletion" },
           "global_raw": { "$ref": "#/components/schemas/DoneStatesConfig" },
-          "project_raw": { "$ref": "#/components/schemas/DoneStatesConfig" },
+          "project_raw": {
+            "allOf": [
+              { "$ref": "#/components/schemas/DoneStatesConfig" },
+              {
+                "type": "object",
+                "properties": {
+                  "review_reviewers": {
+                    "type": ["array", "null"],
+                    "items": { "type": "string" },
+                    "description": "Project-only named reviewer list. Absent/null means reporter-only; canonical YAML key is review.reviewers."
+                  }
+                }
+              }
+            ]
+          },
           "sources": {
             "type": "object",
             "additionalProperties": { "type": "string", "enum": ["project", "global", "built_in"] },
