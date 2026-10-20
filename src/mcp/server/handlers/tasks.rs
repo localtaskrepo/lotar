@@ -1914,7 +1914,10 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
             } else if trimmed.eq_ignore_ascii_case("@me") {
                 // Fail closed: an unresolvable identity must never widen the
                 // query to all tasks.
-                match identity::resolve_current_user(Some(resolver.path.as_path())) {
+                match identity::resolve_current_user_for_project(
+                    Some(resolver.path.as_path()),
+                    filter.project.as_deref(),
+                ) {
                     Some(user) => filter.assignee.push(user),
                     None => {
                         return err(

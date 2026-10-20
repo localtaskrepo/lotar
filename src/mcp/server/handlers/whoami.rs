@@ -10,7 +10,9 @@ pub(crate) fn handle_whoami(req: JsonRpcRequest) -> JsonRpcResponse {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let resolved = identity::resolve_current_user(None);
+    let resolver = crate::workspace::TasksDirectoryResolver::resolve(None, None).ok();
+    let tasks_root = resolver.as_ref().map(|resolver| resolver.path.as_path());
+    let resolved = identity::resolve_current_user(tasks_root);
 
     let mut payload = serde_json::Map::new();
     payload.insert("status".to_string(), Value::String("ok".to_string()));
@@ -20,7 +22,7 @@ pub(crate) fn handle_whoami(req: JsonRpcRequest) -> JsonRpcResponse {
     );
 
     if explain {
-        let detection = identity::resolve_current_user_explain(None);
+        let detection = identity::resolve_current_user_explain(tasks_root);
         let explain_payload = match detection {
             None => Value::Null,
             Some(det) => {

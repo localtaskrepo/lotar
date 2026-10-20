@@ -23,6 +23,63 @@ issue.priorities: [Low, Medium, High]
 }
 
 #[test]
+fn explicit_project_creation_and_me_filter_share_identity() {
+    let temp = TempDir::new().unwrap();
+    let tasks = temp.path().join("workspace/.tasks");
+    for (project, reporter) in [("TEST", "alice"), ("OTHER", "bob")] {
+        std::fs::create_dir_all(tasks.join(project)).unwrap();
+        std::fs::write(
+            tasks.join(project).join("config.yml"),
+            format!("default.reporter: {reporter}\n"),
+        )
+        .unwrap();
+    }
+    write_minimal_config(&tasks, "");
+    let mut create = common::lotar_cmd().unwrap();
+    create
+        .current_dir(temp.path())
+        .env("HOME", temp.path())
+        .env_remove("LOTAR_DEFAULT_REPORTER")
+        .args([
+            "--tasks-dir",
+            tasks.to_str().unwrap(),
+            "--project",
+            "OTHER",
+            "--format",
+            "json",
+            "add",
+            "Other project task",
+            "--assignee",
+            "@me",
+        ]);
+    let output = create.assert().success().get_output().stdout.clone();
+    let created: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(created["task"]["assignee"], "bob");
+    assert_eq!(created["task"]["reporter"], "bob");
+    let mut list = common::lotar_cmd().unwrap();
+    list.current_dir(temp.path())
+        .env("HOME", temp.path())
+        .env_remove("LOTAR_DEFAULT_REPORTER")
+        .args([
+            "--tasks-dir",
+            tasks.to_str().unwrap(),
+            "--project",
+            "OTHER",
+            "--format",
+            "json",
+            "list",
+            "--assignee",
+            "@me",
+        ]);
+    let output = list.assert().success().get_output().stdout.clone();
+    let listed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let rows = listed["tasks"].as_array().unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["title"], "Other project task");
+    assert_eq!(rows[0]["assignee"], "bob");
+}
+
+#[test]
 fn add_with_assignee_me_resolves_identity() {
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");

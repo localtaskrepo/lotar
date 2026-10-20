@@ -276,6 +276,24 @@ impl CommandHandler for AddHandler {
             validated_tags.push(validated_tag);
         }
 
+        let (project_for_storage, original_project_name) = if let Some(explicit_project) = project {
+            let prefix = resolve_project_input(explicit_project, resolver.path.as_path());
+            (prefix, Some(explicit_project.to_string()))
+        } else if let Some(ref detected) = detected_name {
+            let prefix = generate_project_prefix(detected);
+            (prefix, Some(detected.clone()))
+        } else if let Some(project_name) = effective_project.as_deref() {
+            let descriptive_name = if had_configured_default_project {
+                None
+            } else {
+                crate::project::detect_project_name()
+            };
+            (project_name.to_string(), descriptive_name)
+        } else {
+            let prefix = crate::project::get_effective_project_name(resolver);
+            (prefix, None)
+        };
+
         // Create the task
         let mut task = Task::new(resolver.path.clone(), args.title, validated_priority);
         renderer.log_debug("add: task object constructed");
@@ -297,7 +315,11 @@ impl CommandHandler for AddHandler {
         }
         // Resolve @me if present so previews and persisted task show actual identity
         task.assignee = validated_assignee.and_then(|a| {
-            crate::utils::identity::resolve_me_alias(&a, Some(resolver.path.as_path()))
+            crate::utils::identity::resolve_me_alias_for_project(
+                &a,
+                Some(resolver.path.as_path()),
+                Some(&project_for_storage),
+            )
         });
         task.due_date = validated_due_date;
         // Normalize effort on write to canonical form (e.g., hours with 2 decimals or Npt)
@@ -314,19 +336,30 @@ impl CommandHandler for AddHandler {
 
         // Determine reporter using explicit argument first, then config defaults and identity detection
         task.reporter = if let Some(reporter) = explicit_reporter {
-            crate::utils::identity::resolve_me_alias(&reporter, Some(resolver.path.as_path()))
+            crate::utils::identity::resolve_me_alias_for_project(
+                &reporter,
+                Some(resolver.path.as_path()),
+                Some(&project_for_storage),
+            )
         } else if config.auto_set_reporter {
             let from_config = config.default_reporter.as_deref().and_then(|raw| {
                 let trimmed = raw.trim();
                 if trimmed.is_empty() {
                     None
                 } else {
-                    crate::utils::identity::resolve_me_alias(trimmed, Some(resolver.path.as_path()))
+                    crate::utils::identity::resolve_me_alias_for_project(
+                        trimmed,
+                        Some(resolver.path.as_path()),
+                        Some(&project_for_storage),
+                    )
                 }
             });
 
             from_config.or_else(|| {
-                crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
+                crate::utils::identity::resolve_current_user_for_project(
+                    Some(resolver.path.as_path()),
+                    Some(&project_for_storage),
+                )
             })
         } else {
             None
@@ -351,26 +384,6 @@ impl CommandHandler for AddHandler {
 
         // Determine storage roots and project identifiers prior to any mutation of the config
         let write_root = resolver.path.clone();
-
-        let (project_for_storage, original_project_name) = if let Some(explicit_project) = project {
-            // If we have an explicit project from command line, resolve it to its prefix
-            let prefix = resolve_project_input(explicit_project, resolver.path.as_path());
-            (prefix, Some(explicit_project.to_string()))
-        } else if let Some(ref detected) = detected_name {
-            // Auto-detected project name - generate prefix but keep the human-readable name for config creation
-            let prefix = generate_project_prefix(detected);
-            (prefix, Some(detected.clone()))
-        } else if let Some(project_name) = effective_project.as_deref() {
-            let descriptive_name = if had_configured_default_project {
-                None
-            } else {
-                crate::project::detect_project_name()
-            };
-            (project_name.to_string(), descriptive_name)
-        } else {
-            let prefix = crate::project::get_effective_project_name(resolver);
-            (prefix, None)
-        };
 
         if original_project_name.is_some()
             && effective_project.as_deref() != Some(project_for_storage.as_str())

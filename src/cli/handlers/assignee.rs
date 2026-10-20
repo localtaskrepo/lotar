@@ -136,8 +136,11 @@ fn handle_set_assignee(
     let assignment_key = |value: &str| {
         crate::utils::member::member_for_assignment_comparison(value, is_agent_profile)
     };
-    let resolved_candidate =
-        crate::utils::identity::resolve_me_alias(validated.as_str(), Some(&ctx.storage.root_path));
+    let resolved_candidate = crate::utils::identity::resolve_me_alias_for_project(
+        validated.as_str(),
+        Some(&ctx.storage.root_path),
+        ctx.resolved_project_name(),
+    );
     let unchanged = resolved_candidate.as_deref().is_some_and(|next| {
         previous
             .as_deref()

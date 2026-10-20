@@ -40,6 +40,17 @@ pub struct IdentityDetection {
 #[derive(Clone, Debug)]
 pub struct DetectContext<'a> {
     pub tasks_root: Option<&'a Path>,
+    pub project: Option<&'a str>,
+}
+
+impl DetectContext<'_> {
+    fn config(&self) -> Option<crate::config::types::ResolvedConfig> {
+        let root = self
+            .tasks_root
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+        crate::config::resolution::config_for_project(&root, self.project).ok()
+    }
 }
 
 pub trait IdentityDetector {
@@ -51,11 +62,7 @@ pub struct ConfigDefaultReporterDetector;
 
 impl IdentityDetector for ConfigDefaultReporterDetector {
     fn detect(&self, ctx: &DetectContext) -> Option<IdentityDetection> {
-        let cfg = match ctx.tasks_root {
-            Some(root) => crate::config::resolution::load_and_merge_configs(Some(root)),
-            None => crate::config::resolution::load_and_merge_configs(None),
-        }
-        .ok()?;
+        let cfg = ctx.config()?;
 
         let rep = cfg.default_reporter.and_then(|s| {
             let t = s.trim().to_string();
@@ -67,11 +74,40 @@ impl IdentityDetector for ConfigDefaultReporterDetector {
             }
         })?;
 
+        let root = ctx
+            .tasks_root
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+        let project_reporter = ctx
+            .project
+            .and_then(|project| {
+                crate::config::persistence::load_project_config_from_dir(project, &root).ok()
+            })
+            .and_then(|config| config.default_reporter);
+        let scope = if crate::config::resolution::active_cli_reporter_override().is_some() {
+            "CLI".to_string()
+        } else if project_reporter.is_some() {
+            format!("project {}", ctx.project?)
+        } else if crate::config::env_overrides::capture_env_override_snapshot()
+            .global
+            .default_reporter
+            .is_some()
+        {
+            "environment".to_string()
+        } else if crate::config::persistence::load_home_config()
+            .ok()
+            .and_then(|config| config.default_reporter)
+            .is_some()
+        {
+            "home".to_string()
+        } else {
+            "workspace".to_string()
+        };
         Some(IdentityDetection {
             user: rep,
             source: IdentitySource::ConfigDefaultReporter,
             confidence: 100,
-            details: None,
+            details: Some(format!("{scope} configuration: default.reporter")),
         })
     }
 }
@@ -377,10 +413,7 @@ impl IdentityDetector for EnvUserDetector {
 /// Run detectors in priority order
 pub fn detect_identity(ctx: &DetectContext) -> Option<IdentityDetection> {
     // Respect smart toggles
-    let cfg = match ctx.tasks_root {
-        Some(root) => crate::config::resolution::load_and_merge_configs(Some(root)).ok(),
-        None => crate::config::resolution::load_and_merge_configs(None).ok(),
-    };
+    let cfg = ctx.config();
 
     if let Some(cfg) = cfg.clone()
         && !cfg.auto_identity

@@ -1,0 +1,7 @@
+title: Link from release page directly to LoTaR tickets
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-20T17:33:43.989522+00:00
+description: It should be possible to link to the tickets directly in the git history related to the prefix. Let's see if we can build this into the release page.

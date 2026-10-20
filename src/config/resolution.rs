@@ -211,6 +211,10 @@ pub(crate) fn active_cli_port_override() -> Option<u16> {
     active_cli_override_layer().and_then(|layer| layer.port_override)
 }
 
+pub(crate) fn active_cli_reporter_override() -> Option<String> {
+    active_cli_override_layer().and_then(|layer| layer.config.default_reporter)
+}
+
 /// Presence-aware server-port layers for the documented chain (server_port
 /// only; every other field keeps its existing merge semantics).
 ///

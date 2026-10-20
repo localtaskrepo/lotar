@@ -6,7 +6,7 @@ use crate::cli::handlers::task::mutation::{
 };
 use crate::cli::validation::CliValidator;
 use crate::types::custom_value_string;
-use crate::utils::identity::resolve_me_alias;
+use crate::utils::identity::resolve_me_alias_for_project;
 use crate::workspace::TasksDirectoryResolver;
 
 /// Handler for editing tasks
@@ -85,7 +85,11 @@ impl CommandHandler for EditHandler {
                 };
                 let validated =
                     validation.map_err(|e| format!("Reporter validation failed: {}", e))?;
-                let resolved = resolve_me_alias(&validated, Some(ctx.tasks_dir.path.as_path()));
+                let resolved = resolve_me_alias_for_project(
+                    &validated,
+                    Some(ctx.tasks_dir.path.as_path()),
+                    Some(&project_prefix),
+                );
                 task.reporter = resolved.clone();
                 patch.reporter = resolved;
             }
@@ -104,7 +108,11 @@ impl CommandHandler for EditHandler {
                 };
                 let validated =
                     validation.map_err(|e| format!("Assignee validation failed: {}", e))?;
-                let resolved = resolve_me_alias(&validated, Some(ctx.tasks_dir.path.as_path()));
+                let resolved = resolve_me_alias_for_project(
+                    &validated,
+                    Some(ctx.tasks_dir.path.as_path()),
+                    Some(&project_prefix),
+                );
                 task.assignee = resolved.clone();
                 patch.assignee = resolved;
             }

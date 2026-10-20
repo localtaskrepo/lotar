@@ -22,12 +22,12 @@ Notes:
 ## Identity resolution and @me
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. `src/utils/identity_detectors.rs` runs detectors in this order:
-1) Merged config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → home → project → global → defaults)
+1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → selected project → env vars like `LOTAR_DEFAULT_REPORTER` → home → global → defaults)
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
 
-`src/utils/identity.rs` caches these results per workspace so CLI/REST/MCP share the same answer. Set `auto.identity=false` to disable the git/manifest detectors (config and system user remain); set `auto.identity_git=false` to skip git-based fallbacks while still honoring env and manifest values. `lotar whoami --explain` surfaces the same order along with detector metadata.
+`src/utils/identity.rs` caches these results per workspace and effective project, so CLI/REST/MCP share the same answer for the same scope. Task operations use the task's project; unscoped identity lookups use configured `default.project` when present. Explicit CLI `whoami --project` accepts a name or prefix without initializing a project. Set `auto.identity=false` to disable the git/manifest detectors (config and system user remain); set `auto.identity_git=false` to skip git-based fallbacks while still honoring env and manifest values. `lotar whoami --explain` surfaces the same project-resolved toggles and configuration-tier details.
 
 ## Tasks directory resolution
 

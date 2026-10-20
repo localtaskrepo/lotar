@@ -32,8 +32,14 @@ impl CommandHandler for SearchHandler {
         let mut tasks: Vec<(String, Task)> =
             ctx.storage.search(&build.task_filter).into_iter().collect();
 
-        TaskPostFilters::new(&args, &ctx.config, resolver, build.where_filters)
-            .apply(&mut tasks)?;
+        TaskPostFilters::new(
+            &args,
+            &ctx.config,
+            resolver,
+            build.task_filter.project.as_deref(),
+            build.where_filters,
+        )
+        .apply(&mut tasks)?;
 
         let total_matching = tasks.len();
         Self::apply_sort(tasks.as_mut_slice(), &args, &ctx.config)?;
@@ -421,6 +427,7 @@ struct TaskPostFilters<'a> {
     args: &'a TaskSearchArgs,
     config: &'a ResolvedConfig,
     resolver: &'a TasksDirectoryResolver,
+    project: Option<&'a str>,
     where_filters: Vec<(String, String)>,
 }
 
@@ -429,12 +436,14 @@ impl<'a> TaskPostFilters<'a> {
         args: &'a TaskSearchArgs,
         config: &'a ResolvedConfig,
         resolver: &'a TasksDirectoryResolver,
+        project: Option<&'a str>,
         where_filters: Vec<(String, String)>,
     ) -> Self {
         Self {
             args,
             config,
             resolver,
+            project,
             where_filters,
         }
     }
@@ -456,7 +465,10 @@ impl<'a> TaskPostFilters<'a> {
     fn apply_assignee_filter(&self, tasks: &mut Vec<(String, Task)>) {
         if let Some(assignee) = self.args.assignee.as_ref() {
             let target = if assignee == "@me" {
-                crate::utils::identity::resolve_current_user(Some(self.resolver.path.as_path()))
+                crate::utils::identity::resolve_current_user_for_project(
+                    Some(self.resolver.path.as_path()),
+                    self.project,
+                )
             } else {
                 Some(assignee.clone())
             };
@@ -477,9 +489,10 @@ impl<'a> TaskPostFilters<'a> {
 
     fn apply_mine_filter(&self, tasks: &mut Vec<(String, Task)>) {
         if self.args.mine {
-            if let Some(me) =
-                crate::utils::identity::resolve_current_user(Some(self.resolver.path.as_path()))
-            {
+            if let Some(me) = crate::utils::identity::resolve_current_user_for_project(
+                Some(self.resolver.path.as_path()),
+                self.project,
+            ) {
                 let key = crate::utils::fuzzy_match::member_key(&me);
                 tasks.retain(|(_, task)| {
                     task.assignee

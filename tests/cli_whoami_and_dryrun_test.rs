@@ -28,6 +28,127 @@ issue.priorities: [Low, Medium, High]
 }
 
 #[test]
+fn whoami_honors_default_and_explicit_project_identity() {
+    let temp = TempDir::new().unwrap();
+    let tasks = temp.path().join("workspace/.tasks");
+    for project in ["TEST", "OTHER"] {
+        std::fs::create_dir_all(tasks.join(project)).unwrap();
+    }
+    write_minimal_config(&tasks, "");
+    std::fs::write(
+        tasks.join("TEST/config.yml"),
+        "project.name: Test Project\ndefault.reporter: alice\nauto.identity: false\n",
+    )
+    .unwrap();
+    std::fs::write(
+        tasks.join("OTHER/config.yml"),
+        "default.reporter: bob\nauto.identity_git: false\n",
+    )
+    .unwrap();
+    for (project, expected, identity, git) in [
+        (None, "alice", false, true),
+        (Some("Test Project"), "alice", false, true),
+        (Some("OTHER"), "bob", true, false),
+    ] {
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        cmd.current_dir(temp.path())
+            .env("HOME", temp.path())
+            .env("USER", "fallback-user")
+            .env_remove("LOTAR_DEFAULT_REPORTER")
+            .args([
+                "--tasks-dir",
+                tasks.to_str().unwrap(),
+                "whoami",
+                "--explain",
+                "--format",
+                "json",
+            ]);
+        if let Some(project) = project {
+            cmd.args(["--project", project]);
+        }
+        let output = cmd.assert().success().get_output().stdout.clone();
+        let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        assert_eq!(value["user"], expected);
+        assert_eq!(value["source"], "config.default_reporter");
+        assert_eq!(value["auto_identity"], identity);
+        assert_eq!(value["auto_identity_git"], git);
+        assert!(
+            value["details"]
+                .as_str()
+                .unwrap()
+                .contains(if expected == "alice" {
+                    "project TEST"
+                } else {
+                    "project OTHER"
+                })
+        );
+    }
+}
+
+#[test]
+fn project_identity_cache_is_scoped_and_precedence_is_preserved() {
+    use lotar::utils::identity::{
+        resolve_current_user, resolve_current_user_explain_for_project,
+        resolve_current_user_for_project,
+    };
+    let temp = TempDir::new().unwrap();
+    let _home = EnvVarGuard::set("HOME", temp.path().to_str().unwrap());
+    let _env = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "environment-user");
+    let _user = EnvVarGuard::set("USER", "fallback-user");
+    let tasks = temp.path().join("workspace/.tasks");
+    for (project, reporter) in [
+        ("TEST", "alice"),
+        ("OTHER", "bob"),
+        ("INHERIT", ""),
+        ("SELF", "\"@me\""),
+    ] {
+        std::fs::create_dir_all(tasks.join(project)).unwrap();
+        std::fs::write(
+            tasks.join(project).join("config.yml"),
+            if reporter.is_empty() {
+                String::new()
+            } else {
+                format!("default.reporter: {reporter}\nauto.identity: false\n")
+            },
+        )
+        .unwrap();
+    }
+    write_minimal_config(&tasks, "default.reporter: workspace-user\n");
+    assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("alice"));
+    for (project, expected) in [
+        ("OTHER", "bob"),
+        ("TEST", "alice"),
+        ("INHERIT", "environment-user"),
+        ("SELF", "fallback-user"),
+        ("OTHER", "bob"),
+    ] {
+        assert_eq!(
+            resolve_current_user_for_project(Some(&tasks), Some(project)).as_deref(),
+            Some(expected)
+        );
+    }
+    let second = temp.path().join("second/.tasks");
+    std::fs::create_dir_all(second.join("OTHER")).unwrap();
+    std::fs::write(second.join("OTHER/config.yml"), "default.reporter: carol\n").unwrap();
+    assert_eq!(
+        resolve_current_user_for_project(Some(&second), Some("OTHER")).as_deref(),
+        Some("carol")
+    );
+
+    lotar::config::resolution::configure_cli_overrides(&[(
+        "default.reporter".into(),
+        "cli-user".into(),
+    )])
+    .unwrap();
+    lotar::utils::identity::invalidate_identity_cache(Some(&tasks));
+    let found = resolve_current_user_explain_for_project(Some(&tasks), Some("OTHER"));
+    lotar::config::resolution::clear_cli_overrides();
+    let found = found.unwrap();
+    assert_eq!(found.user, "cli-user");
+    assert!(found.details.unwrap().contains("CLI configuration"));
+}
+
+#[test]
 fn whoami_uses_config_default_reporter() {
     // EnvVarGuard serializes the env var safely
 

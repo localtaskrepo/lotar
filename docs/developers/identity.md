@@ -5,7 +5,7 @@ Central reference for identity resolution and people fields.
 ## Sources and resolution order
 
 Used wherever a person is needed (assignee, reporter, default_reporter):
-1) Merged config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → home → project → global → defaults)
+1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → selected project → env vars like `LOTAR_DEFAULT_REPORTER` → home → global → defaults)
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
@@ -14,13 +14,17 @@ Automation toggles (under the `auto.*` namespace in config/env/CLI `config set`)
 - `auto.identity` (default: true) — when false, the git and manifest detectors are disabled; only `default_reporter` and the system user ($USER/$USERNAME) are considered.
 - `auto.identity_git` (default: true) — when false, git detectors are skipped but env and manifest fallbacks remain.
 
-Use `lotar whoami --explain` to see the chosen source, confidence, and toggle states.
+Use `lotar whoami --project <NAME_OR_PREFIX> --explain` to see the chosen source,
+configuration tier, confidence, and project-resolved toggle states. Without an
+explicit project, identity uses `default.project` when configured, or the base
+workspace configuration otherwise. Task operations use the task's project,
+even when it differs from the configured default.
 
 The special value `@me` resolves to the current user via the order above across CLI, REST, and MCP.
 Notes:
 - Project manifest detection is best-effort and reads only local files in your repo root (no external tools). For package.json it supports both string and object forms of `author`, and falls back to the first `contributors` entry.
 - For Cargo.toml we parse the first `authors` entry. For .csproj we read the `<Authors>` element.
-- Identity is cached per tasks directory. Updating configuration (`lotar config set default.reporter ...`) or editing manifests automatically invalidates the cache via the config persistence layer.
+- Identity is cached per tasks directory and effective project. A long-running process can retain a cached identity after configuration edits; restart it to refresh. Live configuration-driven identity invalidation is separate from project selection.
 
 ## Inspecting the resolved identity
 
@@ -28,6 +32,7 @@ Notes:
 
 ```bash
 lotar whoami
+lotar whoami --project AUTH --explain
 lotar whoami --explain --format=json
 ```
 
@@ -37,7 +42,7 @@ lotar whoami --explain --format=json
 
 ### REST / MCP
 
-- `GET /api/whoami` returns `{ "status": "ok", "user": "..." }` using the same resolver (`src/routes/whoami.rs`).
+- `GET /api/whoami` returns `{ "data": "..." }` using the same resolver and the workspace's default project (`src/routes/whoami.rs`). MCP `whoami` also uses that default project; neither endpoint adds an explicit project parameter.
 - MCP task operations (`src/mcp/server/handlers/tasks.rs`) and REST task mutations rely on the same helper, so `@me` aliases and default reporter fallbacks behave identically across interfaces.
 
 ## Reporter vs Assignee

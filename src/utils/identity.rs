@@ -5,7 +5,7 @@ use std::sync::{OnceLock, RwLock};
 use super::identity_detectors as detectors_mod;
 pub use detectors_mod::{DetectContext, IdentityDetection, IdentitySource};
 
-// Detection cache keyed by tasks_root + env + git HEAD/config mtimes.
+// Detection cache keyed by tasks_root + project + env + git HEAD/config mtimes.
 // A single cache backs both resolve_current_user and resolve_current_user_explain
 // so the two APIs can never disagree.
 static IDENTITY_CACHE: OnceLock<RwLock<HashMap<String, Option<IdentityDetection>>>> =
@@ -15,17 +15,15 @@ fn identity_cache() -> &'static RwLock<HashMap<String, Option<IdentityDetection>
     IDENTITY_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
-fn cache_key(tasks_root: Option<&Path>) -> String {
-    let root_str = match tasks_root {
-        Some(p) => p
-            .canonicalize()
-            .unwrap_or_else(|_| p.to_path_buf())
-            .to_string_lossy()
-            .to_string(),
-        None => crate::utils::paths::tasks_root_from(std::path::Path::new("."))
-            .to_string_lossy()
-            .to_string(),
-    };
+fn cache_key(tasks_root: Option<&Path>, project: Option<&str>) -> String {
+    let root = tasks_root
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+    let root_str = root
+        .canonicalize()
+        .unwrap_or(root)
+        .to_string_lossy()
+        .to_string();
     let env_def_reporter = std::env::var("LOTAR_DEFAULT_REPORTER").unwrap_or_default();
 
     // Include git config and HEAD mtimes so the key changes on updates/branch switches
@@ -41,8 +39,8 @@ fn cache_key(tasks_root: Option<&Path>) -> String {
     };
 
     format!(
-        "{}|DEF_REP={}|GIT={}",
-        root_str, env_def_reporter, git_stamp
+        "{}|PROJECT={:?}|DEF_REP={}|GIT={}",
+        root_str, project, env_def_reporter, git_stamp
     )
 }
 
@@ -69,21 +67,64 @@ pub(crate) fn git_cache_fingerprint(git_entry: &Path) -> String {
 /// Delegates to the shared detector chain (see `identity_detectors`), so the
 /// answer is always consistent with `resolve_current_user_explain`.
 pub fn resolve_current_user(tasks_root: Option<&Path>) -> Option<String> {
-    resolve_current_user_explain(tasks_root).map(|d| d.user)
+    resolve_current_user_for_project(tasks_root, None)
 }
 
 /// Resolve with explain - returns detection details instead of just the string.
 pub fn resolve_current_user_explain(tasks_root: Option<&Path>) -> Option<IdentityDetection> {
-    let key = cache_key(tasks_root);
+    resolve_current_user_explain_for_project(tasks_root, None)
+}
+
+/// Select an explicit project or the configured default, accepting names or prefixes.
+/// This lookup never initializes configuration or a project.
+pub fn effective_project(tasks_root: Option<&Path>, project: Option<&str>) -> Option<String> {
+    let selected = project
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(str::to_owned)
+        .or_else(|| {
+            let base = crate::config::resolution::load_and_merge_configs(tasks_root).ok()?;
+            let project = base.default_project.trim();
+            (!project.is_empty()).then(|| project.to_string())
+        })?;
+    let root = tasks_root
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+    Some(crate::utils::project::resolve_project_input(
+        &selected, &root,
+    ))
+}
+
+/// Resolve identity in an explicit project, or the configured default when omitted.
+pub fn resolve_current_user_for_project(
+    tasks_root: Option<&Path>,
+    project: Option<&str>,
+) -> Option<String> {
+    resolve_current_user_explain_for_project(tasks_root, project).map(|d| d.user)
+}
+
+/// Explain identity using the same effective project and cache as ordinary resolution.
+pub fn resolve_current_user_explain_for_project(
+    tasks_root: Option<&Path>,
+    project: Option<&str>,
+) -> Option<IdentityDetection> {
+    let project = effective_project(tasks_root, project);
+    let key = cache_key(tasks_root, project.as_deref());
     if let Ok(guard) = identity_cache().read()
         && let Some(cached) = guard.get(&key)
     {
         return cached.clone();
     }
 
-    let ctx = DetectContext { tasks_root };
+    let ctx = DetectContext {
+        tasks_root,
+        project: project.as_deref(),
+    };
     let found = detectors_mod::detect_identity(&ctx);
     if let Ok(mut guard) = identity_cache().write() {
+        if guard.len() >= 256 {
+            guard.clear();
+        }
         guard.insert(key, found.clone());
     }
     found
@@ -92,8 +133,17 @@ pub fn resolve_current_user_explain(tasks_root: Option<&Path>) -> Option<Identit
 /// Resolve "@me" alias to the actual current user if present, otherwise
 /// return the input unchanged. Returns None if resolving @me fails.
 pub fn resolve_me_alias(input: &str, tasks_root: Option<&Path>) -> Option<String> {
+    resolve_me_alias_for_project(input, tasks_root, None)
+}
+
+/// Expand @me in the same project scope as the task or query using it.
+pub fn resolve_me_alias_for_project(
+    input: &str,
+    tasks_root: Option<&Path>,
+    project: Option<&str>,
+) -> Option<String> {
     if input == "@me" {
-        resolve_current_user(tasks_root)
+        resolve_current_user_for_project(tasks_root, project)
     } else {
         Some(input.to_string())
     }

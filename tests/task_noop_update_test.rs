@@ -889,6 +889,109 @@ fn review_owner_guard_blocks_agent_identity_switches() {
     assert_eq!(receipt.dto.assignee.as_deref(), Some("@copilot"));
 }
 
+fn other_identity_workspace() -> (tempfile::TempDir, PathBuf) {
+    let (tmp, tasks_dir) = workspace("auto.identity: false\n");
+    seed_project_config(
+        &tasks_dir,
+        "project_name: TEST\ndefault.reporter: test-user\n",
+    );
+    std::fs::create_dir_all(tasks_dir.join("OTHER")).unwrap();
+    std::fs::write(
+        tasks_dir.join("OTHER/config.yml"),
+        "project_name: OTHER\ndefault.reporter: other-user\nauto.identity: false\n\
+issue.states: [Todo, InProgress, NeedsReview, Done]\nmembers: [alice, test-user, other-user]\n",
+    )
+    .unwrap();
+    assert_eq!(
+        lotar::utils::identity::resolve_current_user(Some(&tasks_dir)).as_deref(),
+        Some("test-user"),
+        "the default project must resolve a different identity from OTHER"
+    );
+    (tmp, tasks_dir)
+}
+
+#[test]
+fn other_project_review_owner_can_transition_despite_different_default_identity() {
+    let (_tmp, tasks_dir) = other_identity_workspace();
+    let raw = RAW_TASK
+        .replace("status: Todo", "status: NeedsReview")
+        .replace("reporter: alice", "reporter: other-user");
+    std::fs::write(tasks_dir.join("OTHER/1.yml"), raw).unwrap();
+
+    let receipt = TaskService::update_with_receipt(
+        &mut Storage::new(&tasks_dir),
+        "OTHER-1",
+        TaskUpdate {
+            status: Some("InProgress".to_string()),
+            ..TaskUpdate::default()
+        },
+        TaskUpdateContext::default(),
+    )
+    .expect("OTHER identity owns review, regardless of the configured default project");
+
+    assert!(receipt.changed);
+    assert_eq!(receipt.dto.status.as_str(), "InProgress");
+    assert_eq!(receipt.dto.history.len(), 1);
+    assert_eq!(receipt.dto.history[0].actor.as_deref(), Some("other-user"));
+}
+
+#[test]
+fn other_project_review_guard_does_not_authorize_default_project_identity() {
+    let (_tmp, tasks_dir) = other_identity_workspace();
+    let task_path = tasks_dir.join("OTHER/1.yml");
+    let raw = RAW_TASK
+        .replace("status: Todo", "status: NeedsReview")
+        .replace("reporter: alice", "reporter: test-user");
+    std::fs::write(&task_path, raw).unwrap();
+    let bytes = std::fs::read(&task_path).unwrap();
+    let modified = set_old_mtime(&task_path);
+
+    let error = TaskService::update_with_receipt(
+        &mut Storage::new(&tasks_dir),
+        "OTHER-1",
+        TaskUpdate {
+            status: Some("InProgress".to_string()),
+            ..TaskUpdate::default()
+        },
+        TaskUpdateContext::default(),
+    )
+    .expect_err("TEST identity must not impersonate the reporter for an OTHER task");
+
+    assert!(error.to_string().contains("awaiting review"), "{error}");
+    assert_eq!(std::fs::read(&task_path).unwrap(), bytes);
+    assert_eq!(mtime(&task_path), modified);
+}
+
+#[test]
+fn other_project_me_assignment_under_review_is_a_byte_exact_noop() {
+    let (_tmp, tasks_dir) = other_identity_workspace();
+    let task_path = tasks_dir.join("OTHER/1.yml");
+    let raw = RAW_TASK
+        .replace("status: Todo", "status: NeedsReview")
+        .replace("assignee: alice", "assignee: other-user");
+    std::fs::write(&task_path, raw).unwrap();
+    let bytes = std::fs::read(&task_path).unwrap();
+    let modified = set_old_mtime(&task_path);
+
+    // Neither project's identity owns this review. Resolving @me against
+    // OTHER must recognize the unchanged assignee before owner enforcement.
+    let receipt = noop_update(
+        &mut Storage::new(&tasks_dir),
+        "OTHER-1",
+        TaskUpdate {
+            assignee: Some("@me".to_string()),
+            ..TaskUpdate::default()
+        },
+    );
+
+    assert_eq!(receipt.dto.assignee.as_deref(), Some("other-user"));
+    assert_eq!(receipt.dto.status.as_str(), "NeedsReview");
+    assert_eq!(receipt.dto.modified, "2026-01-02T00:00:00Z");
+    assert!(receipt.dto.history.is_empty());
+    assert_eq!(std::fs::read(&task_path).unwrap(), bytes);
+    assert_eq!(mtime(&task_path), modified);
+}
+
 #[test]
 fn markdown_description_whitespace_changes_are_genuine() {
     let (_tmp, tasks_dir) = workspace("");

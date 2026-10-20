@@ -331,5 +331,8 @@ fn resolve_auto_assign_candidate(
         return Some(owner);
     }
 
-    crate::utils::identity::resolve_current_user(Some(ctx.tasks_dir.path.as_path()))
+    crate::utils::identity::resolve_current_user_for_project(
+        Some(ctx.tasks_dir.path.as_path()),
+        ctx.resolved_project_name(),
+    )
 }

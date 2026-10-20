@@ -17,7 +17,7 @@ use crate::storage::sprint::SprintTaskEntry;
 use crate::storage::task::Task;
 use crate::storage::transaction::MultiFileTransaction;
 use crate::types::{Priority, TaskChange, TaskChangeLogEntry, TaskStatus, TaskType};
-use crate::utils::identity::{resolve_current_user, resolve_me_alias};
+use crate::utils::identity::{resolve_current_user_for_project, resolve_me_alias_for_project};
 use crate::utils::project::generate_project_prefix;
 use crate::utils::tags::normalize_tags;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -233,7 +233,7 @@ impl TaskService {
             if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias(trimmed, Some(&storage.root_path))
+                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project))
             }
         });
         t.reporter = if let Some(rep) = explicit_reporter {
@@ -245,12 +245,12 @@ impl TaskService {
                 if trimmed.is_empty() {
                     None
                 } else {
-                    resolve_me_alias(trimmed, Some(&storage.root_path))
+                    resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project))
                 }
             }) {
                 Some(rep)
             } else {
-                resolve_current_user(Some(&storage.root_path))
+                resolve_current_user_for_project(Some(&storage.root_path), Some(&project))
             }
         } else {
             None
@@ -263,7 +263,7 @@ impl TaskService {
                 if trimmed.is_empty() {
                     None
                 } else {
-                    resolve_me_alias(trimmed, Some(&storage.root_path))
+                    resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project))
                 }
             })
             .or_else(|| {
@@ -272,7 +272,11 @@ impl TaskService {
                     if trimmed.is_empty() {
                         None
                     } else {
-                        resolve_me_alias(trimmed, Some(&storage.root_path))
+                        resolve_me_alias_for_project(
+                            trimmed,
+                            Some(&storage.root_path),
+                            Some(&project),
+                        )
                     }
                 })
             });
@@ -671,14 +675,14 @@ impl TaskService {
 
         let root_path = storage.root_path.clone();
         let canonical_guard = canonical.clone();
+        let identity_project = parsed.project.clone();
         let outcome = storage.mutate_task(&canonical, move |task| {
             // Lifecycle guard (DEV-92): no comments on a tombstone.
             Self::ensure_not_deleted(task, &canonical_guard)?;
             let now = chrono::Utc::now().to_rfc3339();
-            let actor = context
-                .actor_override
-                .clone()
-                .or_else(|| resolve_current_user(Some(root_path.as_path())));
+            let actor = context.actor_override.clone().or_else(|| {
+                resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project))
+            });
             task.comments.push(crate::types::TaskComment {
                 date: now.clone(),
                 text: text.to_string(),
@@ -745,6 +749,7 @@ impl TaskService {
 
         let root_path = storage.root_path.clone();
         let canonical_guard = canonical.clone();
+        let identity_project = parsed.project.clone();
         let outcome = storage.mutate_task(&canonical, move |task| {
             // Lifecycle guard (DEV-92): tombstones are read-only.
             Self::ensure_not_deleted(task, &canonical_guard)?;
@@ -762,7 +767,10 @@ impl TaskService {
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 at: now.clone(),
-                actor: resolve_current_user(Some(root_path.as_path())),
+                actor: resolve_current_user_for_project(
+                    Some(root_path.as_path()),
+                    Some(&identity_project),
+                ),
                 changes: vec![TaskChange {
                     field: format!("comment#{}", index + 1),
                     old: Some(previous),
@@ -902,6 +910,7 @@ impl TaskService {
         if context.enforce_review_owner {
             Self::enforce_review_owner_transition(
                 storage,
+                &derived,
                 id,
                 &existing,
                 parsed_status.as_ref(),
@@ -926,7 +935,7 @@ impl TaskService {
                 let next_value = if trimmed.is_empty() {
                     None
                 } else {
-                    resolve_me_alias(trimmed, Some(&storage.root_path))
+                    resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived))
                 };
                 // Assignment-aware identity (DEV-102): a registered agent
                 // directive ("@copilot") and the bare human spelling
@@ -1011,7 +1020,8 @@ impl TaskService {
             let is_first_change = effective_transition && t.assignee.is_none();
             if auto
                 && is_first_change
-                && let Some(me) = resolve_current_user(Some(&storage.root_path))
+                && let Some(me) =
+                    resolve_current_user_for_project(Some(&storage.root_path), Some(&derived))
             {
                 let previous_assignee = t.assignee.clone();
                 if previous_assignee.as_deref() != Some(me.as_str()) {
@@ -1039,11 +1049,13 @@ impl TaskService {
             let new_value = if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias(trimmed, Some(&storage.root_path)).map(|resolved| {
-                    crate::utils::member::normalize_member_value(&resolved, |name| {
-                        config.agent_profiles.contains_key(name)
-                    })
-                })
+                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived)).map(
+                    |resolved| {
+                        crate::utils::member::normalize_member_value(&resolved, |name| {
+                            config.agent_profiles.contains_key(name)
+                        })
+                    },
+                )
             };
             let previous = t.reporter.clone();
             if previous != new_value {
@@ -1056,11 +1068,13 @@ impl TaskService {
             let new_value = if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias(trimmed, Some(&storage.root_path)).map(|resolved| {
-                    crate::utils::member::normalize_member_value(&resolved, |name| {
-                        config.agent_profiles.contains_key(name)
-                    })
-                })
+                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived)).map(
+                    |resolved| {
+                        crate::utils::member::normalize_member_value(&resolved, |name| {
+                            config.agent_profiles.contains_key(name)
+                        })
+                    },
+                )
             };
             let previous = t.assignee.clone();
             if previous != new_value {
@@ -1218,7 +1232,8 @@ impl TaskService {
         t.modified = modified.clone();
 
         if !changes.is_empty() {
-            let history_actor = resolve_current_user(Some(&storage.root_path));
+            let history_actor =
+                resolve_current_user_for_project(Some(&storage.root_path), Some(&derived));
             t.history.push(TaskChangeLogEntry {
                 at: modified,
                 actor: history_actor,
@@ -1268,7 +1283,8 @@ impl TaskService {
         let dto = Self::to_dto(&canonical, t, Some(&sprint_lookup), &config, now);
 
         if context.emit_api_event {
-            let actor = resolve_current_user(Some(storage.root_path.as_path()));
+            let actor =
+                resolve_current_user_for_project(Some(storage.root_path.as_path()), Some(&derived));
             crate::api_events::emit_task_updated(&dto, actor.as_deref());
         }
 
@@ -1419,6 +1435,7 @@ impl TaskService {
 
     fn enforce_review_owner_transition(
         storage: &Storage,
+        project: &str,
         id: &str,
         existing: &Task,
         parsed_status: Option<&TaskStatus>,
@@ -1440,7 +1457,7 @@ impl TaskService {
             let next_value = if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias(trimmed, Some(&storage.root_path))
+                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(project))
             };
             match (&existing.assignee, &next_value) {
                 (Some(a), Some(b)) => {
@@ -1463,7 +1480,8 @@ impl TaskService {
             )));
         };
 
-        let actor = resolve_current_user(Some(storage.root_path.as_path()));
+        let actor =
+            resolve_current_user_for_project(Some(storage.root_path.as_path()), Some(project));
         let is_reporter = actor
             .as_deref()
             .is_some_and(|current| current.eq_ignore_ascii_case(reporter));
@@ -1619,7 +1637,7 @@ impl TaskService {
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 at: now.clone(),
-                actor: resolve_current_user(Some(root_path.as_path())),
+                actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
                 changes: vec![TaskChange {
                     field: "deleted".into(),
                     old: None,
@@ -1768,7 +1786,7 @@ impl TaskService {
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 at: now.clone(),
-                actor: resolve_current_user(Some(root_path.as_path())),
+                actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
                 changes: vec![TaskChange {
                     field: "restored".into(),
                     old: Some(deleted_at),

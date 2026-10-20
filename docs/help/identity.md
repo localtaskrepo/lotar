@@ -16,12 +16,17 @@ Automation toggles (under the `auto.*` namespace in config/env/CLI `config set`)
 - `auto.identity_git` (default: true) — when false, git detectors are skipped but env and manifest fallbacks remain.
 
 Use `lotar whoami --explain` to see the chosen source, confidence, and toggle states.
+Use `--project <NAME_OR_PREFIX>` to inspect a specific project. Otherwise identity
+uses configured `default.project`, or the base workspace configuration when no
+default exists. Task operations and scoped queries use their own project.
+Configuration identity details identify the winning tier; toggles are resolved
+in that same project scope.
 
 The special value `@me` resolves to the current user via the order above across CLI, REST, and MCP.
 Notes:
 - Project manifest detection is best-effort and reads only local files in your repo root (no external tools). For package.json it supports both string and object forms of `author`, and falls back to the first `contributors` entry.
 - For Cargo.toml we parse the first `authors` entry. For .csproj we read the `<Authors>` element.
-- Identity is cached per tasks directory. Configuration persistence invalidates affected caches; local detector caches also track their source files. This is not a filesystem-watcher guarantee for every external edit.
+- Identity is cached per tasks directory and effective project. A running process can retain a cached identity after configuration edits; restart it to refresh. Live configuration-driven identity invalidation is separate from project selection.
 - Git identity reads the local configuration from the repository's shared Git directory, including linked worktrees with relative or absolute `gitdir`/`commondir` metadata. Branch details use the checkout's own `HEAD`; remote details use the same shared local config. Missing or unreadable routing metadata skips this detector rather than borrowing another repository. This remains local-file detection, not a complete expansion of Git's global config, includes, or worktree-specific overrides.
 - The Git identity cache tracks resolved metadata paths and modification timestamps, so shared-config edits, worktree branch switches, and changed metadata targets refresh cached identity details.
 
@@ -31,6 +36,7 @@ Notes:
 
 ```bash
 lotar whoami
+lotar whoami --project AUTH --explain
 lotar whoami --explain --format=json
 ```
 
@@ -40,7 +46,7 @@ lotar whoami --explain --format=json
 
 ### REST / MCP
 
-- `GET /api/whoami` returns `{ "status": "ok", "user": "..." }` using the same resolver.
+- `GET /api/whoami` returns `{ "data": "..." }` using the workspace's configured default project. MCP `whoami` uses that same default; neither endpoint accepts an explicit project parameter.
 - MCP task operations and REST task mutations rely on the same helper, so `@me` aliases and default reporter fallbacks behave identically across interfaces.
 
 ## Reporter vs Assignee

@@ -307,7 +307,7 @@ pub(super) fn parse_task_query(
             filter.assignee_none = true;
         } else if !a.trim().is_empty() {
             let resolved = if a.trim().eq_ignore_ascii_case("@me") {
-                crate::utils::identity::resolve_current_user(Some(tasks_root)).ok_or_else(|| {
+                crate::utils::identity::resolve_current_user_for_project(Some(tasks_root), filter.project.as_deref()).ok_or_else(|| {
                     "Could not resolve @me: no identity configured (default_reporter, git user.name, or USER env)"
                         .to_string()
                 })?

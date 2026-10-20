@@ -35,7 +35,10 @@ fn build_filter_map(
         }
         let mut candidate = value.clone();
         if key.eq_ignore_ascii_case("assignee") && value.trim() == "@me" {
-            match crate::utils::identity::resolve_current_user(Some(resolver.path.as_path())) {
+            match crate::utils::identity::resolve_current_user_for_project(
+                Some(resolver.path.as_path()),
+                selection.filter.project.as_deref(),
+            ) {
                 Some(user) => candidate = user,
                 None => return Ok(None),
             }

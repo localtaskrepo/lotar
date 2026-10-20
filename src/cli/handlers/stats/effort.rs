@@ -353,7 +353,12 @@ pub(crate) fn run(
     for (k, v) in r#where.into_iter() {
         // Resolve '@me' to current username for assignee filter
         let filter_value = if k.eq_ignore_ascii_case("assignee") && v == "@me" {
-            crate::utils::identity::resolve_me_alias(&v, Some(resolver.path.as_path())).unwrap_or(v)
+            crate::utils::identity::resolve_me_alias_for_project(
+                &v,
+                Some(resolver.path.as_path()),
+                filter.project.as_deref(),
+            )
+            .unwrap_or(v)
         } else {
             v
         };

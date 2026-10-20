@@ -1,7 +1,47 @@
 title: Identity detection ignores project-level default.reporter
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-20T03:20:20.913445+00:00
+modified: 2026-10-20T17:44:14.827097+00:00
+comments:
+- date: 2026-10-20T17:27:39.404124+00:00
+  text: 'Plan: reproduce project-only default.reporter identity failure through public boundaries, then resolve identity using active/default project configuration with existing precedence. Preserve fallback toggles and @me handling, partition identity cache by project, and make whoami --explain identify the winning configuration tier without changing API shapes. Cover explicit/default projects, isolation/precedence and review-owner behavior. Keep DEV-127 live cache invalidation and DEV-128 review-policy redesign separate. Run targeted tests then full lint/tests/fresh smoke; no Git writes or release operations. Routine user summaries will omit unchanged baseline exclusions; verification details stay in this ticket.'
+- date: 2026-10-20T17:36:15.423565+00:00
+  text: 'Progress: reproduced on released binary in isolated PRJ fixture: workspace default.reporter workspace-user incorrectly won over PRJ reporter alice (whoami explain source config.default_reporter, details null). Added project-aware identity helpers selecting explicit name/prefix or merged configured default without creating projects; cache now partitions canonical workspace/project and bounds entries. Existing root-only APIs select configured default. Detector reporter and smart toggles resolve through shared config_for_project (CLI > project > env > home > workspace); explain retains source string and details names winning tier. CLI whoami toggles and project-aware task/alias/filter/actor paths now use matching context; review-owner policy itself unchanged. REST/MCP whoami retain current schemas and use default project in resolved workspace. Updated identity/precedence/whoami docs, including existing stale REST example and inaccurate auto-refresh statement. Focused34 tests passed across4 binaries, including project-only/default/name/explicit selection, project/env/CLI precedence, workspace/project cache isolation, @me fallback, allowed/denied cross-project review transitions and byte/mtime/history-exact @me no-op under review. Independent review and full gates next. DEV127 live invalidation and DEV128 policy remain separate.'
+- date: 2026-10-20T17:44:14.804479+00:00
+  text: |-
+    Outcome: project-level default.reporter now participates in identity detection. Shared identity APIs select explicit project name/prefix or configured default without initializing projects, read the existing effective config chain for both reporter and toggles, and partition/cache identity and explain by canonical workspace/effective project with bounded entries. Existing no-project entry points select the configured default. CLI whoami --project/explain, TaskService review/alias/assignment/history paths, CLI previews/filters and existing scoped REST/MCP/task-selection filters propagate their available project. Config source remains config.default_reporter; details identifies CLI/project/environment/home/workspace tier. REST/MCP whoami schemas are unchanged and use resolved workspace/default project. Review authorization, active-job checks and no-op semantics are unchanged.
+    Evidence: isolated released-binary repro selected workspace-user instead of project alice before implementation. Six new regressions cover explicit/default/named project selection and toggle explain parity; project/env/CLI precedence; same-process A/B/A and cross-workspace cache isolation; self-referential @me fallback; allowed/denied review transitions outside default project; exact byte/mtime/modified/history-preserving @me assignment; and end-to-end explicit-project CLI create plus @me list. Focused initial34 tests passed plus final2 alias tests. Full final lint:agent passed frontend types, all-target/all-feature Clippy-Dwarnings and fmt. test:agent passed Rust1466/138 binaries and frontend849/79 files; separate full all-feature Rust1466 passed. Fresh-build smoke274/66 files passed. Independent read-only review found no blockers. Related help/developer identity/precedence docs agree with implemented scope and current REST envelope; CLI examples are exercised by tests; existing relative links remain valid. git diff --check clean.
+    Remaining: DEV127 live configuration cache invalidation and DEV128 review-policy redesign remain separate; no cache TTL/watch/refresh policy or reviewer bypass added. Routine unchanged baseline coverage limits remain Rust gitless45 exclusions and smoke25 skips, not passes; native Linux/Windows and remote CI not run. Existing Vue inject warnings unchanged. Changes remain unstaged/uncommitted; unrelated new DEV129 left untouched. No user-server restarts, Git writes, publication/version changes or real-workspace identity configuration edits. Temporary isolated reproduction files removed.
+    Guidance: no durable instruction finding; corrected related product documentation only.
 description: 'Observed with lotar 0.8.0 (Homebrew) in a downstream workspace; code at a4ef8ef. A project config (.tasks/<PRJ>/config.yml) with default.reporter: alice does not affect identity: ''lotar --tasks-dir .tasks whoami --explain'' reports the OS user (source $USER, confidence 60). Only default.reporter in the global .tasks/config.yml is honoured (then source config.default_reporter). Repro: .tasks/config.yml {default: {project: PRJ}}; .tasks/PRJ/config.yml {default: {reporter: alice}}; run whoami. ConfigDefaultReporterDetector (src/utils/identity_detectors.rs) reads load_and_merge_configs(root) without the project layer. Impact: review-guarded transitions (enforce_review_owner_transition) compare the reporter with this identity, so a project that sets its owner only in project config locks its owner out of NeedsReview tickets. Acceptance: identity resolution follows the documented precedence including the project tier for the active/default project (or the docs state explicitly that it does not), whoami --explain names the tier used, and a regression test covers the project-only case.'
+history:
+- at: 2026-10-20T17:27:39.315408+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-20T17:27:39.404124+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T17:36:15.423565+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T17:44:14.804479+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-20T17:44:14.827097+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

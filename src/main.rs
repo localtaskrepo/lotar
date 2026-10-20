@@ -918,16 +918,23 @@ fn main() {
         }
         Commands::Whoami { explain } => {
             renderer.log_info("BEGIN WHOAMI");
+            let identity_project = lotar::utils::identity::effective_project(
+                Some(resolver.path.as_path()),
+                cli.project.as_deref(),
+            );
             // Try to resolve using detector framework (with explain)
-            let det =
-                lotar::utils::identity::resolve_current_user_explain(Some(resolver.path.as_path()));
+            let det = lotar::utils::identity::resolve_current_user_explain_for_project(
+                Some(resolver.path.as_path()),
+                identity_project.as_deref(),
+            );
             if let Some(info) = det {
                 if matches!(renderer.format, output::OutputFormat::Json) {
                     if explain {
                         // Augment with toggle states
-                        let cfg = lotar::config::resolution::load_and_merge_configs(Some(
+                        let cfg = lotar::config::resolution::config_for_project(
                             resolver.path.as_path(),
-                        ))
+                            identity_project.as_deref(),
+                        )
                         .ok();
                         renderer.emit_raw_stdout(
                             serde_json::json!({
@@ -958,9 +965,10 @@ fn main() {
                             msg.push_str(&d);
                         }
                         renderer.emit_info(&msg);
-                        let cfg = lotar::config::resolution::load_and_merge_configs(Some(
+                        let cfg = lotar::config::resolution::config_for_project(
                             resolver.path.as_path(),
-                        ))
+                            identity_project.as_deref(),
+                        )
                         .ok();
                         if let Some(cfg) = cfg {
                             if !cfg.auto_identity {
