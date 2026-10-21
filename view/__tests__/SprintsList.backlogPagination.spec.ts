@@ -937,3 +937,68 @@ describe('SprintsList pagination', () => {
         wrapper.unmount()
     })
 })
+
+// DEV-114: automatic sprint/backlog ordering follows the shared task sort
+// contract (view/utils/taskSort.ts, mirrored by the backend executor).
+describe('SprintsList automatic sorting', () => {
+    async function mountWith(sort: { key: string; dir: 'asc' | 'desc' }, tasks: TaskDTO[], sprints: number[] = []) {
+        routeState.query = {}
+        routeState.hash = ''
+        localStorage.clear()
+        localStorage.setItem('lotar.sprints.sort', JSON.stringify(sort))
+        sprintsRef.value = sprints.map(makeSprint)
+        const { api } = await import('../api/client')
+        vi.mocked(api.getBacklogOrder).mockReset().mockResolvedValue({ status: 'ok', tasks: [], changed: false })
+        ; (api.listTasks as any).mockReset().mockResolvedValue({
+            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        })
+        const wrapper = mount(SprintsList)
+        await flushPromises()
+        return wrapper
+    }
+
+    const backlogIds = (wrapper: ReturnType<typeof mount>) =>
+        wrapper.findAll('#backlog tbody tr.task-row').map(row => row.attributes('data-task-id'))
+
+    it('orders effort by parsed duration with missing values last in ascending order', async () => {
+        const tasks = [
+            { ...makeTask(1), effort: '1d' },
+            { ...makeTask(2), effort: null },
+            { ...makeTask(3), effort: '30m' },
+            { ...makeTask(4), effort: '2h' },
+        ]
+        let wrapper = await mountWith({ key: 'effort', dir: 'asc' }, tasks)
+        expect(backlogIds(wrapper)).toEqual(['PRJ-003', 'PRJ-004', 'PRJ-001', 'PRJ-002'])
+        wrapper.unmount()
+        wrapper = await mountWith({ key: 'effort', dir: 'desc' }, tasks)
+        expect(backlogIds(wrapper)).toEqual(['PRJ-002', 'PRJ-001', 'PRJ-004', 'PRJ-003'])
+    })
+
+    it('places missing due dates last when ascending and first when descending', async () => {
+        const tasks = [
+            { ...makeTask(1), due_date: null },
+            { ...makeTask(2), due_date: '2026-03-01' },
+            { ...makeTask(3), due_date: '2026-02-01' },
+        ]
+        let wrapper = await mountWith({ key: 'due_date', dir: 'asc' }, tasks)
+        expect(backlogIds(wrapper)).toEqual(['PRJ-003', 'PRJ-002', 'PRJ-001'])
+        wrapper.unmount()
+        wrapper = await mountWith({ key: 'due_date', dir: 'desc' }, tasks)
+        expect(backlogIds(wrapper)).toEqual(['PRJ-001', 'PRJ-002', 'PRJ-003'])
+    })
+
+    it('compares sprint memberships numerically', async () => {
+        const tasks = [makeTask(1, [2, 10]), makeTask(2, [2, 9])]
+        const wrapper = await mountWith({ key: 'sprints', dir: 'asc' }, tasks, [2, 9, 10])
+        expect(sprintTable(wrapper, 2).map(row => row.attributes('data-task-id'))).toEqual(['PRJ-002', 'PRJ-001'])
+    })
+
+    it('breaks ties by canonical task ID ascending in both directions', async () => {
+        const tasks = [makeTask(3), makeTask(1), makeTask(2)]
+        for (const dir of ['asc', 'desc'] as const) {
+            const wrapper = await mountWith({ key: 'priority', dir }, tasks)
+            expect(backlogIds(wrapper)).toEqual(['PRJ-001', 'PRJ-002', 'PRJ-003'])
+            wrapper.unmount()
+        }
+    })
+})

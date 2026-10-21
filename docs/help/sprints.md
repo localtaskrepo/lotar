@@ -93,7 +93,11 @@ In the web UI, first select that table's **Manual order** button, then drag a
 task row to the upper or lower half of another row to place it **before** or
 **after** that task. An insertion line shows the target. This works in both
 backlog and sprint tables. The selected mode survives reload. Column sorting
-exits that table's manual mode without discarding its saved order.
+exits that table's manual mode without discarding its saved order. Automatic
+column sorting uses the same rules as the Tasks page and `lotar list --sort-by`:
+effort compares parsed durations or points, missing due dates and efforts sort
+last when ascending, sprint memberships compare numerically, and ties fall back
+to the task ID.
 
 While automatic field sorting is active, attempts to reorder within the table
 are blocked with a tooltip explaining how to switch to Manual order. No saved

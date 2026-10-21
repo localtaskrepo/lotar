@@ -886,6 +886,7 @@ import { MS_PER_DAY, formatRelativeTime, fromDateTimeInputValue, parseTaskDate, 
 import { formatMember } from '../utils/member'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { numericOf, projectOf } from '../utils/text'
+import { colKeyToSortBy, sortTasks as sortTasksByContract } from '../utils/taskSort'
 import { storageGet, storageGetFlag, storageGetJson, storageSet, storageSetFlag, storageSetJson } from '../utils/storage'
 
 type ColumnKey = import('../composables/useColumns').ColKey
@@ -2757,35 +2758,16 @@ function countExclusiveSprintTasks(list: TaskDTO[] | undefined | null, sprintId:
   return total
 }
 
+// DEV-114: automatic ordering uses the shared task sort contract (the same
+// comparator as standalone task tables and the backend), including effort
+// units, missing-value placement, numeric sprint memberships and canonical ID
+// tie-breaks. Manual order is handled separately by the callers.
 function sortTasks(list: TaskDTO[] | undefined | null) {
   const arr = Array.isArray(list) ? [...list] : []
   if (!sort.key) return arr
-  const key = sort.key
-  const dir = sort.dir === 'asc' ? 1 : -1
-  arr.sort((a, b) => {
-    const av = (a as any)[key]
-    const bv = (b as any)[key]
-    if (av == null && bv == null) return 0
-    if (av == null) return -1 * dir
-    if (bv == null) return 1 * dir
-    if (key === 'sprints') {
-      const as = Array.isArray(av) && av.length ? av.join(',') : ''
-      const bs = Array.isArray(bv) && bv.length ? bv.join(',') : ''
-      return as.localeCompare(bs) * dir
-    }
-    if (key === 'tags') {
-      const as = Array.isArray(av) ? av.join(',') : String(av ?? '')
-      const bs = Array.isArray(bv) ? bv.join(',') : String(bv ?? '')
-      return as.localeCompare(bs) * dir
-    }
-    if (key === 'due_date' || key === 'created' || key === 'modified') {
-      const at = safeTimestamp(String(av)) ?? 0
-      const bt = safeTimestamp(String(bv)) ?? 0
-      return (at - bt) * dir
-    }
-    return String(av).localeCompare(String(bv)) * dir
-  })
-  return arr
+  const sortBy = colKeyToSortBy(sort.key)
+  if (!sortBy) return arr
+  return sortTasksByContract(arr, sortBy, sort.dir)
 }
 
 function getSortedTasksForSprint(id: number) {

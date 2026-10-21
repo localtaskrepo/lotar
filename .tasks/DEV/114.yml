@@ -1,7 +1,35 @@
 title: Align sprint task sorting with the shared task sort contract
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T00:46:59.778479+00:00
+modified: 2026-10-21T20:18:17.286141+00:00
+comments:
+- date: 2026-10-21T20:18:17.265691+00:00
+  text: |-
+    Outcome: SprintsList automatic ordering now maps the column via colKeyToSortBy and sorts with the shared view/utils/taskSort.ts sortTasks (backend contract). Characterized divergences fixed: effort compares parsed units (30m < 2h < 1d) instead of raw strings; missing effort/due sort last ascending and first descending (old: always first ascending); sprint memberships compare numerically ([2,9] < [2,10]); equal keys break by canonical ID ascending in both directions (old: input order). lotar.sprints.sort storage/column mapping, DEV-105 pager offset resets and DEV-109 manual order are unchanged. Sprint help documents the parity.
+    Evidence: view/__tests__/SprintsList.backlogPagination.spec.ts 'SprintsList automatic sorting' (4 cases, each contradicts the old comparator); all SprintsList specs (59) pass; new smoke/tests/ui.sprints-sort.smoke.spec.ts plus ui.backlog-order and ui.sprints smoke pass against a fresh build:smoke; lint:frontend clean.
+    Remaining: none; full gates run at end of batch.
+    Guidance: no durable finding.
 description: Deferred behavioral alignment after DEV-112. SprintsList private raw-string comparator differs from view/utils/taskSort.ts in effort, null dates, numeric memberships and ID ties. Characterize actual row orders and decide intended parity; use colKeyToSortBy/shared sortTasks only after acceptance cases. Preserve lotar.sprints.sort, column mappings and DEV-105 independent pager offset resets/clamps; do not change manual backlog ordering (DEV-109). Test parity for units/nulls/ties/custom keys and browser ordering. Not a silent move-only cleanup; no implementation in DEV-112.
+history:
+- at: 2026-10-21T20:18:17.228646+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-21T20:18:17.265691+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-21T20:18:17.286141+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
