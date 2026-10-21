@@ -1,7 +1,35 @@
 title: Consolidate provider-neutral sync push orchestration
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T00:46:59.867679+00:00
+modified: 2026-10-21T20:44:28.067711+00:00
+comments:
+- date: 2026-10-21T20:44:28.047847+00:00
+  text: |-
+    Outcome: perform_push in src/services/sync_service.rs now runs one provider-neutral orchestration for existing-issue updates and create/link; provider specifics live in thin adapters (PushPayload build/is_empty/field_names/diff_against_remote/send_update/create/apply_remote_state, PushTarget::for_reference, create_destination, provider_display_name). Preserved: build/filter/empty/dry-run decisions and messages, client-required and GitHub-reference errors, Jira status-only updates (transition without PUT), fetch-failure warnings, per-issue failure records/warnings, exact begin -> save_result -> attach -> finish journal order with indeterminate create failures, Jira transitions after update/create, GitHub close-after-create, targeted selection. No credential/schema change; no external network in fixtures. sync_service.rs: +347/-396.
+    Evidence: first added tests/common/sync_push_characterization.rs (scripted local remote logging every request, injectable 500s) and recorded traces of entries, warnings, request sequence and journal state from the pre-refactor code for both providers: update, update-no-diff (Jira status-only), fetch failure, partial update failure with later task continuing, dry-run update/create/foreign reference, create, create failure leaving an indeterminate pending link; traces stable over 5 runs and identical after the refactor. Existing retry-safety journal recovery/ambiguous/dry-run cases, all sync unit tests (40), dev67/dev94/sync_report_safety/mcp/web API suites (65), sync smoke (ui.sync-scope, ui.sync-empty-reports 9/9 on fresh build:smoke), clippy all-targets clean.
+    Remaining: none; full gates at end of batch.
+    Guidance: no durable finding.
 description: Deferred after DEV-112. Extract shared Jira/GitHub existing-update and create/link orchestration from sync_service.rs while keeping provider-specific payload/transition adapters thin. Preserve build/filter/empty/dry-run decisions, exact begin -> save_result -> attach -> finish pending-journal order, indeterminate failures, per-issue warnings/records and targeted selection. No external sync in fixtures or changed credentials/schema. Start with characterization of journal recovery and partial failures; full sync suites plus fresh smoke gates. Larger recovery-sensitive refactor, not part of first wave.
+history:
+- at: 2026-10-21T20:44:28.007448+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-21T20:44:28.047847+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-21T20:44:28.067711+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

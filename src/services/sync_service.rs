@@ -218,6 +218,10 @@ pub struct SyncService;
 #[path = "../../tests/common/sync_retry_cases.rs"]
 mod retry_safety_tests;
 
+#[cfg(test)]
+#[path = "../../tests/common/sync_push_characterization.rs"]
+mod push_characterization_tests;
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct PendingScope {
     provider: String,
@@ -1300,6 +1304,7 @@ fn perform_push(
     let mut failures = Vec::new();
     let mut jira_lookup = JiraLookupCache::default();
     let mut selected = HashSet::new();
+    let label = provider_display_name(remote.provider);
 
     for (_id, mut task) in tasks {
         let prefix = crate::storage::operations::StorageOperations::get_project_for_task(&task.id)
@@ -1309,252 +1314,108 @@ fn perform_push(
             continue;
         }
         let task = TaskService::get(&storage, &task.id, None)?;
+        let skipped = |recorder: &mut SyncReportRecorder, reference: &str, message: &str| {
+            recorder.record(
+                SyncEntryStatus::Skipped,
+                make_entry(
+                    SyncEntryStatus::Skipped,
+                    Some(task.id.clone()),
+                    Some(reference.to_string()),
+                    Some(task.title.clone()),
+                    Some(message.to_string()),
+                ),
+            );
+        };
         match determine_reference_state(remote, &task) {
             ReferenceState::Matching(reference) => {
-                let task_id = Some(task.id.clone());
-                let title = Some(task.title.clone());
-                let reference_value = Some(reference.clone());
-                let (updated, update_fields) = match remote.provider {
-                    SyncProvider::Jira => {
-                        if !dry_run {
-                            ensure_jira_issue_types(&mut jira_lookup, client, remote, warnings);
-                        }
-                        let mut payload = build_jira_payload(
-                            remote,
-                            &task,
-                            SyncOperation::Update,
-                            client,
-                            &mut jira_lookup,
-                            warnings,
-                        );
-                        let mut changed_fields = jira_payload_field_names(&payload);
-                        if payload.is_empty() {
-                            recorder.record(
-                                SyncEntryStatus::Skipped,
-                                make_entry(
-                                    SyncEntryStatus::Skipped,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    Some("No changes to push".to_string()),
-                                ),
-                            );
-                            continue;
-                        }
-                        if dry_run {
-                            recorder.record(
-                                SyncEntryStatus::Updated,
-                                make_entry_with_fields(
-                                    SyncEntryStatus::Updated,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    changed_fields.clone(),
-                                    Some("Dry run: would update".to_string()),
-                                ),
-                            );
-                            continue;
-                        }
-                        let client = client.ok_or_else(|| {
-                            LoTaRError::ValidationError(
-                                "Auth profile is required for sync operations".to_string(),
-                            )
-                        })?;
-                        if !payload.is_empty() {
-                            match jira_fetch_issue(client, &reference, &changed_fields) {
-                                Ok(issue) => {
-                                    changed_fields =
-                                        filter_jira_payload_against_issue(&issue, &mut payload);
-                                }
-                                Err(err) => {
-                                    warnings.push(format!(
-                                        "Jira issue {} fetch failed; skipping diff: {}",
-                                        reference, err
-                                    ));
-                                }
-                            }
-                        }
-                        if payload.is_empty() {
-                            recorder.record(
-                                SyncEntryStatus::Skipped,
-                                make_entry(
-                                    SyncEntryStatus::Skipped,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    Some("No changes to push".to_string()),
-                                ),
-                            );
-                            continue;
-                        }
-                        if !payload.fields.is_empty()
-                            && let Err(err) = jira_update_issue(client, &reference, &payload)
-                        {
-                            failures.push(format!(
-                                "Failed to update Jira issue {}: {}",
-                                reference, err
-                            ));
-                            recorder.record(
-                                SyncEntryStatus::Failed,
-                                make_entry(
-                                    SyncEntryStatus::Failed,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    Some(format!("Failed to update Jira issue: {}", err)),
-                                ),
-                            );
-                            continue;
-                        }
-                        if let Some(status) = payload.desired_status.as_deref()
-                            && let Err(err) = jira_transition_issue(client, &reference, status)
-                        {
-                            warnings.push(format!(
-                                "Jira status transition for {} failed: {}",
-                                reference, err
-                            ));
-                        }
-                        (true, changed_fields)
-                    }
-                    SyncProvider::Github => {
-                        let mut payload =
-                            build_github_payload(remote, &task, SyncOperation::Update);
-                        let mut changed_fields = github_payload_field_names(&payload);
-                        if payload.is_empty(true) {
-                            recorder.record(
-                                SyncEntryStatus::Skipped,
-                                make_entry(
-                                    SyncEntryStatus::Skipped,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    Some("No changes to push".to_string()),
-                                ),
-                            );
-                            continue;
-                        }
-                        if dry_run {
-                            recorder.record(
-                                SyncEntryStatus::Updated,
-                                make_entry_with_fields(
-                                    SyncEntryStatus::Updated,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    changed_fields.clone(),
-                                    Some("Dry run: would update".to_string()),
-                                ),
-                            );
-                            continue;
-                        }
-                        let client = client.ok_or_else(|| {
-                            LoTaRError::ValidationError(
-                                "Auth profile is required for sync operations".to_string(),
-                            )
-                        })?;
-                        let (repo, number) =
-                            parse_github_reference(&reference, remote.repo.as_deref()).ok_or_else(
-                                || {
-                                    LoTaRError::ValidationError(format!(
-                                        "Invalid GitHub reference '{}'",
-                                        reference
-                                    ))
-                                },
-                            )?;
-                        match github_fetch_issue(client, &repo, number) {
-                            Ok(issue) => {
-                                changed_fields =
-                                    filter_github_payload_against_issue(&issue, &mut payload);
-                            }
-                            Err(err) => {
-                                warnings.push(format!(
-                                    "GitHub issue {} fetch failed; skipping diff: {}",
-                                    reference, err
-                                ));
-                            }
-                        }
-                        if payload.is_empty(true) {
-                            recorder.record(
-                                SyncEntryStatus::Skipped,
-                                make_entry(
-                                    SyncEntryStatus::Skipped,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    Some("No changes to push".to_string()),
-                                ),
-                            );
-                            continue;
-                        }
-                        if let Err(err) = github_update_issue(client, &repo, number, &payload) {
-                            failures.push(format!(
-                                "Failed to update GitHub issue {}: {}",
-                                reference, err
-                            ));
-                            recorder.record(
-                                SyncEntryStatus::Failed,
-                                make_entry(
-                                    SyncEntryStatus::Failed,
-                                    task_id.clone(),
-                                    reference_value.clone(),
-                                    title.clone(),
-                                    Some(format!("Failed to update GitHub issue: {}", err)),
-                                ),
-                            );
-                            continue;
-                        }
-                        (true, changed_fields)
-                    }
-                };
-
-                if updated {
+                if remote.provider == SyncProvider::Jira && !dry_run {
+                    ensure_jira_issue_types(&mut jira_lookup, client, remote, warnings);
+                }
+                let mut payload = PushPayload::build(
+                    remote,
+                    &task,
+                    SyncOperation::Update,
+                    client,
+                    &mut jira_lookup,
+                    warnings,
+                );
+                let mut changed_fields = payload.field_names();
+                if payload.is_empty() {
+                    skipped(recorder, &reference, "No changes to push");
+                    continue;
+                }
+                if dry_run {
                     recorder.record(
                         SyncEntryStatus::Updated,
                         make_entry_with_fields(
                             SyncEntryStatus::Updated,
-                            task_id,
-                            reference_value,
-                            title,
-                            update_fields,
-                            None,
+                            Some(task.id.clone()),
+                            Some(reference.clone()),
+                            Some(task.title.clone()),
+                            changed_fields,
+                            Some("Dry run: would update".to_string()),
                         ),
                     );
+                    continue;
                 }
-            }
-            ReferenceState::ProviderOnly(reference) => {
+                let client = require_sync_client(client)?;
+                let target = PushTarget::for_reference(remote, &reference)?;
+                match payload.diff_against_remote(client, &target, &changed_fields) {
+                    Ok(fields) => changed_fields = fields,
+                    Err(err) => warnings.push(format!(
+                        "{} issue {} fetch failed; skipping diff: {}",
+                        label, reference, err
+                    )),
+                }
+                if payload.is_empty() {
+                    skipped(recorder, &reference, "No changes to push");
+                    continue;
+                }
+                if let Err(err) = payload.send_update(client, &target) {
+                    failures.push(format!(
+                        "Failed to update {} issue {}: {}",
+                        label, reference, err
+                    ));
+                    recorder.record(
+                        SyncEntryStatus::Failed,
+                        make_entry(
+                            SyncEntryStatus::Failed,
+                            Some(task.id.clone()),
+                            Some(reference.clone()),
+                            Some(task.title.clone()),
+                            Some(format!("Failed to update {} issue: {}", label, err)),
+                        ),
+                    );
+                    continue;
+                }
+                payload.apply_remote_state(client, &target, &reference, false, warnings);
                 recorder.record(
-                    SyncEntryStatus::Skipped,
-                    make_entry(
-                        SyncEntryStatus::Skipped,
+                    SyncEntryStatus::Updated,
+                    make_entry_with_fields(
+                        SyncEntryStatus::Updated,
                         Some(task.id.clone()),
                         Some(reference),
                         Some(task.title.clone()),
-                        Some("Reference does not match remote".to_string()),
+                        changed_fields,
+                        None,
                     ),
                 );
             }
+            ReferenceState::ProviderOnly(reference) => {
+                skipped(recorder, &reference, "Reference does not match remote");
+            }
             ReferenceState::None => {
                 if dry_run {
-                    let message = match remote.provider {
-                        SyncProvider::Jira => {
-                            let payload = build_jira_payload(
-                                remote,
-                                &task,
-                                SyncOperation::Create,
-                                client,
-                                &mut jira_lookup,
-                                warnings,
-                            );
-                            format_field_list(&jira_payload_field_names(&payload))
-                                .map(|fields| format!("Dry run: would create {}", fields))
-                        }
-                        SyncProvider::Github => {
-                            let payload =
-                                build_github_payload(remote, &task, SyncOperation::Create);
-                            format_field_list(&github_payload_field_names(&payload))
-                                .map(|fields| format!("Dry run: would create {}", fields))
-                        }
-                    };
+                    let payload = PushPayload::build(
+                        remote,
+                        &task,
+                        SyncOperation::Create,
+                        client,
+                        &mut jira_lookup,
+                        warnings,
+                    );
+                    let message = format_field_list(&payload.field_names())
+                        .map(|fields| format!("Dry run: would create {}", fields));
                     recorder.record(
                         SyncEntryStatus::Created,
                         make_entry(
@@ -1567,11 +1428,7 @@ fn perform_push(
                     );
                     continue;
                 }
-                let client = client.ok_or_else(|| {
-                    LoTaRError::ValidationError(
-                        "Auth profile is required for sync operations".to_string(),
-                    )
-                })?;
+                let client = require_sync_client(client)?;
                 let mut storage = Storage::new(&resolver.path.clone());
                 // Use the same identity prerequisites as the reference writer before
                 // issuing a non-idempotent remote request.
@@ -1594,184 +1451,278 @@ fn perform_push(
                         "Local task directory is read-only; cannot attach sync reference".into(),
                     ));
                 }
-                match remote.provider {
-                    SyncProvider::Jira => {
-                        ensure_jira_issue_types(&mut jira_lookup, Some(client), remote, warnings);
-                        let payload = build_jira_payload(
-                            remote,
-                            &task,
-                            SyncOperation::Create,
-                            Some(client),
-                            &mut jira_lookup,
-                            warnings,
-                        );
-                        let project = remote.project.as_deref().ok_or_else(|| {
-                            LoTaRError::ValidationError(
-                                "Jira remote must define project".to_string(),
-                            )
-                        })?;
-                        let pending = journal.begin(PendingLink {
-                            scope: pending_scope(remote, client),
-                            project: local_project,
-                            task_id: Some(task.id.clone()),
-                            reference: None,
-                        })?;
-                        let key = match jira_create_issue(client, project, &payload) {
-                            Ok(key) => key,
-                            Err(err) => {
-                                failures.push(format!(
-                                    "Failed to create Jira issue for {}: {}; {}",
-                                    task.id,
-                                    err,
-                                    journal.indeterminate()
-                                ));
-                                recorder.record(
-                                    SyncEntryStatus::Failed,
-                                    make_entry(
-                                        SyncEntryStatus::Failed,
-                                        Some(task.id.clone()),
-                                        None,
-                                        Some(task.title.clone()),
-                                        Some(format!("Failed to create Jira issue: {}", err)),
-                                    ),
-                                );
-                                continue;
-                            }
-                        };
-                        let reference = normalize_jira_reference(&key).unwrap_or(key);
-                        journal.links[pending].reference = Some(reference.clone());
-                        journal.save_result(pending)?;
-                        if let Err(err) =
-                            attach_sync_reference(&mut storage, &task.id, "jira", &reference)
-                        {
-                            failures.push(format!(
-                                "Failed to attach Jira reference for {}: {}",
-                                task.id, err
-                            ));
-                            recorder.record(
-                                SyncEntryStatus::Failed,
-                                make_entry(
-                                    SyncEntryStatus::Failed,
-                                    Some(task.id.clone()),
-                                    Some(reference.clone()),
-                                    Some(task.title.clone()),
-                                    Some(format!("Failed to attach Jira reference: {}", err)),
-                                ),
-                            );
-                            continue;
-                        }
-                        journal.finish(pending, resolver)?;
-                        if let Some(status) = payload.desired_status.as_deref()
-                            && let Err(err) = jira_transition_issue(client, &reference, status)
-                        {
-                            warnings.push(format!(
-                                "Jira status transition for {} failed: {}",
-                                reference, err
-                            ));
-                        }
-                        recorder.record(
-                            SyncEntryStatus::Created,
-                            make_entry(
-                                SyncEntryStatus::Created,
-                                Some(task.id.clone()),
-                                Some(reference),
-                                Some(task.title.clone()),
-                                format_field_list(&jira_payload_field_names(&payload))
-                                    .map(|fields| format!("Created fields: {}", fields)),
-                            ),
-                        );
-                    }
-                    SyncProvider::Github => {
-                        let payload = build_github_payload(remote, &task, SyncOperation::Create);
-                        let repo = remote.repo.as_deref().ok_or_else(|| {
-                            LoTaRError::ValidationError(
-                                "GitHub remote must define repo".to_string(),
-                            )
-                        })?;
-                        let pending = journal.begin(PendingLink {
-                            scope: pending_scope(remote, client),
-                            project: local_project,
-                            task_id: Some(task.id.clone()),
-                            reference: None,
-                        })?;
-                        let number = match github_create_issue(client, repo, &payload) {
-                            Ok(number) => number,
-                            Err(err) => {
-                                failures.push(format!(
-                                    "Failed to create GitHub issue for {}: {}; {}",
-                                    task.id,
-                                    err,
-                                    journal.indeterminate()
-                                ));
-                                recorder.record(
-                                    SyncEntryStatus::Failed,
-                                    make_entry(
-                                        SyncEntryStatus::Failed,
-                                        Some(task.id.clone()),
-                                        None,
-                                        Some(task.title.clone()),
-                                        Some(format!("Failed to create GitHub issue: {}", err)),
-                                    ),
-                                );
-                                continue;
-                            }
-                        };
-                        let reference = format!("{}#{}", normalize_github_repo(repo), number);
-                        journal.links[pending].reference = Some(reference.clone());
-                        journal.save_result(pending)?;
-                        if let Err(err) =
-                            attach_sync_reference(&mut storage, &task.id, "github", &reference)
-                        {
-                            failures.push(format!(
-                                "Failed to attach GitHub reference for {}: {}",
-                                task.id, err
-                            ));
-                            recorder.record(
-                                SyncEntryStatus::Failed,
-                                make_entry(
-                                    SyncEntryStatus::Failed,
-                                    Some(task.id.clone()),
-                                    Some(reference.clone()),
-                                    Some(task.title.clone()),
-                                    Some(format!("Failed to attach GitHub reference: {}", err)),
-                                ),
-                            );
-                            continue;
-                        }
-                        journal.finish(pending, resolver)?;
-                        if payload.state.as_deref() == Some("closed") {
-                            let close_payload = GithubIssuePayload {
-                                state: Some("closed".to_string()),
-                                ..Default::default()
-                            };
-                            if let Err(err) =
-                                github_update_issue(client, repo, number, &close_payload)
-                            {
-                                warnings.push(format!(
-                                    "Failed to close GitHub issue {}: {}",
-                                    reference, err
-                                ));
-                            }
-                        }
-                        recorder.record(
-                            SyncEntryStatus::Created,
-                            make_entry(
-                                SyncEntryStatus::Created,
-                                Some(task.id.clone()),
-                                Some(reference),
-                                Some(task.title.clone()),
-                                format_field_list(&github_payload_field_names(&payload))
-                                    .map(|fields| format!("Created fields: {}", fields)),
-                            ),
-                        );
-                    }
+                if remote.provider == SyncProvider::Jira {
+                    ensure_jira_issue_types(&mut jira_lookup, Some(client), remote, warnings);
                 }
+                let payload = PushPayload::build(
+                    remote,
+                    &task,
+                    SyncOperation::Create,
+                    Some(client),
+                    &mut jira_lookup,
+                    warnings,
+                );
+                let destination = create_destination(remote)?;
+                // Journal order is the recovery contract: begin before the
+                // non-idempotent create, save_result once the remote identity is
+                // known, attach the local reference, then finish.
+                let pending = journal.begin(PendingLink {
+                    scope: pending_scope(remote, client),
+                    project: local_project,
+                    task_id: Some(task.id.clone()),
+                    reference: None,
+                })?;
+                let (reference, target) = match payload.create(client, destination) {
+                    Ok(created) => created,
+                    Err(err) => {
+                        failures.push(format!(
+                            "Failed to create {} issue for {}: {}; {}",
+                            label,
+                            task.id,
+                            err,
+                            journal.indeterminate()
+                        ));
+                        recorder.record(
+                            SyncEntryStatus::Failed,
+                            make_entry(
+                                SyncEntryStatus::Failed,
+                                Some(task.id.clone()),
+                                None,
+                                Some(task.title.clone()),
+                                Some(format!("Failed to create {} issue: {}", label, err)),
+                            ),
+                        );
+                        continue;
+                    }
+                };
+                journal.links[pending].reference = Some(reference.clone());
+                journal.save_result(pending)?;
+                if let Err(err) = attach_sync_reference(
+                    &mut storage,
+                    &task.id,
+                    provider_label(&remote.provider),
+                    &reference,
+                ) {
+                    failures.push(format!(
+                        "Failed to attach {} reference for {}: {}",
+                        label, task.id, err
+                    ));
+                    recorder.record(
+                        SyncEntryStatus::Failed,
+                        make_entry(
+                            SyncEntryStatus::Failed,
+                            Some(task.id.clone()),
+                            Some(reference.clone()),
+                            Some(task.title.clone()),
+                            Some(format!("Failed to attach {} reference: {}", label, err)),
+                        ),
+                    );
+                    continue;
+                }
+                journal.finish(pending, resolver)?;
+                payload.apply_remote_state(client, &target, &reference, true, warnings);
+                recorder.record(
+                    SyncEntryStatus::Created,
+                    make_entry(
+                        SyncEntryStatus::Created,
+                        Some(task.id.clone()),
+                        Some(reference),
+                        Some(task.title.clone()),
+                        format_field_list(&payload.field_names())
+                            .map(|fields| format!("Created fields: {}", fields)),
+                    ),
+                );
             }
         }
     }
 
     append_failure_warnings(&failures, warnings);
     Ok(())
+}
+
+fn provider_display_name(provider: SyncProvider) -> &'static str {
+    match provider {
+        SyncProvider::Jira => "Jira",
+        SyncProvider::Github => "GitHub",
+    }
+}
+
+fn require_sync_client(client: Option<&SyncClient>) -> LoTaRResult<&SyncClient> {
+    client.ok_or_else(|| {
+        LoTaRError::ValidationError("Auth profile is required for sync operations".to_string())
+    })
+}
+
+/// Remote container new issues are created in (Jira project key or GitHub repo).
+fn create_destination(remote: &SyncRemoteConfig) -> LoTaRResult<&str> {
+    match remote.provider {
+        SyncProvider::Jira => remote.project.as_deref().ok_or_else(|| {
+            LoTaRError::ValidationError("Jira remote must define project".to_string())
+        }),
+        SyncProvider::Github => remote.repo.as_deref().ok_or_else(|| {
+            LoTaRError::ValidationError("GitHub remote must define repo".to_string())
+        }),
+    }
+}
+
+/// Remote issue addressed by a sync reference.
+enum PushTarget {
+    Jira { key: String },
+    Github { repo: String, number: u64 },
+}
+
+impl PushTarget {
+    fn for_reference(remote: &SyncRemoteConfig, reference: &str) -> LoTaRResult<Self> {
+        match remote.provider {
+            SyncProvider::Jira => Ok(PushTarget::Jira {
+                key: reference.to_string(),
+            }),
+            SyncProvider::Github => parse_github_reference(reference, remote.repo.as_deref())
+                .map(|(repo, number)| PushTarget::Github { repo, number })
+                .ok_or_else(|| {
+                    LoTaRError::ValidationError(format!("Invalid GitHub reference '{}'", reference))
+                }),
+        }
+    }
+}
+
+/// Provider payload for one push; the orchestration in `perform_push` is
+/// shared and these adapters only translate to provider requests (DEV-117).
+enum PushPayload {
+    Jira(JiraIssuePayload),
+    Github(GithubIssuePayload),
+}
+
+impl PushPayload {
+    fn build(
+        remote: &SyncRemoteConfig,
+        task: &TaskDTO,
+        op: SyncOperation,
+        client: Option<&SyncClient>,
+        lookup: &mut JiraLookupCache,
+        warnings: &mut Vec<String>,
+    ) -> Self {
+        match remote.provider {
+            SyncProvider::Jira => PushPayload::Jira(build_jira_payload(
+                remote, task, op, client, lookup, warnings,
+            )),
+            SyncProvider::Github => PushPayload::Github(build_github_payload(remote, task, op)),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            PushPayload::Jira(payload) => payload.is_empty(),
+            PushPayload::Github(payload) => payload.is_empty(true),
+        }
+    }
+
+    fn field_names(&self) -> Vec<String> {
+        match self {
+            PushPayload::Jira(payload) => jira_payload_field_names(payload),
+            PushPayload::Github(payload) => github_payload_field_names(payload),
+        }
+    }
+
+    /// Drop fields that already match the remote issue; returns the fields
+    /// still to push.
+    fn diff_against_remote(
+        &mut self,
+        client: &SyncClient,
+        target: &PushTarget,
+        changed_fields: &[String],
+    ) -> LoTaRResult<Vec<String>> {
+        match (self, target) {
+            (PushPayload::Jira(payload), PushTarget::Jira { key }) => {
+                let issue = jira_fetch_issue(client, key, changed_fields)?;
+                Ok(filter_jira_payload_against_issue(&issue, payload))
+            }
+            (PushPayload::Github(payload), PushTarget::Github { repo, number }) => {
+                let issue = github_fetch_issue(client, repo, *number)?;
+                Ok(filter_github_payload_against_issue(&issue, payload))
+            }
+            _ => unreachable!("payload and target are built for the same provider"),
+        }
+    }
+
+    fn send_update(&self, client: &SyncClient, target: &PushTarget) -> LoTaRResult<()> {
+        match (self, target) {
+            // A status-only Jira change is applied by the transition alone.
+            (PushPayload::Jira(payload), PushTarget::Jira { key }) => {
+                if payload.fields.is_empty() {
+                    Ok(())
+                } else {
+                    jira_update_issue(client, key, payload)
+                }
+            }
+            (PushPayload::Github(payload), PushTarget::Github { repo, number }) => {
+                github_update_issue(client, repo, *number, payload)
+            }
+            _ => unreachable!("payload and target are built for the same provider"),
+        }
+    }
+
+    /// Create the remote issue; returns the canonical reference and target.
+    fn create(&self, client: &SyncClient, destination: &str) -> LoTaRResult<(String, PushTarget)> {
+        match self {
+            PushPayload::Jira(payload) => {
+                let key = jira_create_issue(client, destination, payload)?;
+                let reference = normalize_jira_reference(&key).unwrap_or(key);
+                Ok((reference.clone(), PushTarget::Jira { key: reference }))
+            }
+            PushPayload::Github(payload) => {
+                let number = github_create_issue(client, destination, payload)?;
+                let reference = format!("{}#{}", normalize_github_repo(destination), number);
+                Ok((
+                    reference,
+                    PushTarget::Github {
+                        repo: destination.to_string(),
+                        number,
+                    },
+                ))
+            }
+        }
+    }
+
+    /// Workflow state that needs a separate request after the main write:
+    /// Jira status transitions (update and create) and closing a newly
+    /// created GitHub issue. Failures are warnings, never entry failures.
+    fn apply_remote_state(
+        &self,
+        client: &SyncClient,
+        target: &PushTarget,
+        reference: &str,
+        created: bool,
+        warnings: &mut Vec<String>,
+    ) {
+        match (self, target) {
+            (PushPayload::Jira(payload), PushTarget::Jira { key }) => {
+                if let Some(status) = payload.desired_status.as_deref()
+                    && let Err(err) = jira_transition_issue(client, key, status)
+                {
+                    warnings.push(format!(
+                        "Jira status transition for {} failed: {}",
+                        reference, err
+                    ));
+                }
+            }
+            (PushPayload::Github(payload), PushTarget::Github { repo, number }) => {
+                if created && payload.state.as_deref() == Some("closed") {
+                    let close_payload = GithubIssuePayload {
+                        state: Some("closed".to_string()),
+                        ..Default::default()
+                    };
+                    if let Err(err) = github_update_issue(client, repo, *number, &close_payload) {
+                        warnings.push(format!(
+                            "Failed to close GitHub issue {}: {}",
+                            reference, err
+                        ));
+                    }
+                }
+            }
+            _ => unreachable!("payload and target are built for the same provider"),
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
