@@ -1,7 +1,35 @@
 title: Extract TaskPanel attachment and link handling into scoped composables
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T00:46:59.837953+00:00
+modified: 2026-10-21T20:27:03.263830+00:00
+comments:
+- date: 2026-10-21T20:27:03.245106+00:00
+  text: |-
+    Outcome: Extracted TaskPanel's attachment/link subsystem in three slices: view/utils/taskAttachments.ts (pure URL/name/hover/URL-detection/drag-type/base64 helpers, now also used by TaskPanelReferencesTab instead of its identical copies), composables/task-panel/useTaskPanelReferenceMutations.ts (managed attachment upload/remove, link add/remove, auto-detected links; applyReferencesFromTaskResponse wholesale replacement and updated emits unchanged), and composables/task-panel/useTaskPanelAttachmentDrop.ts (attachment preferences, drag-depth overlay, drop routing, pending-drop buffering bound to the loading target with the same flush/swap/close invalidation watchers). Template bindings, toasts, permissions/soft-delete guards and repository-file vs managed-attachment separation are unchanged; TaskPanel.vue shrank from 3169 to ~2620 lines. Code references and their preview stay in TaskPanel/useTaskPanelState (not part of this subsystem).
+    Evidence: new view/__tests__/taskAttachments.spec.ts and 'TaskPanel drag overlay depth' cases in TaskPanel.pendingDrops.spec.ts; all TaskPanel specs incl. attachmentPrefix, pendingDrops, referenceKinds, integration (98) pass; ui.reference-kinds (real drop upload/view/download/remove + eager drop), ui.advanced, ui.soft-delete, ui.noop-mutations smoke 18/18 on fresh build:smoke; lint:frontend clean.
+    Remaining: none; full gates at end of batch.
+    Guidance: no durable finding.
 description: Deferred after DEV-112. Move cohesive file/URL/drag/drop/reference subsystem out of TaskPanel using existing composables/task-panel patterns, in small slices rather than one giant context object. Preserve task/draft generation checks, pending-drop batching, drag-depth reset, preferences, applyReferencesFromTaskResponse semantics, user-owned files versus managed attachments, permissions and modal focus. Tests TaskPanel.attachmentPrefix/pendingDrops plus reference detach/upload and browser drag behavior required. No frontend redesign or API/YAML compatibility loss. No implementation in DEV-112.
+history:
+- at: 2026-10-21T20:27:03.213725+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-21T20:27:03.245106+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-21T20:27:03.263830+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

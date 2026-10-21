@@ -390,3 +390,63 @@ describe('TaskPanel pending drop lifecycle (DEV-93)', () => {
         }
     })
 })
+
+// DEV-116: drag depth is tracked across nested children so the overlay stays
+// up until the pointer leaves the panel, and a drop always resets it.
+describe('TaskPanel drag overlay depth', () => {
+    const dragEvent = (wrapper: ReturnType<typeof mount>, kind: string) => {
+        const event = new Event(kind, { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'dataTransfer', {
+            value: { files: [], items: [{ kind: 'file' }], types: ['Files'], getData: () => '' },
+        })
+        wrapper.find('aside.task-panel').element.dispatchEvent(event)
+        return event
+    }
+    const overlay = (wrapper: ReturnType<typeof mount>) => wrapper.find('.task-panel__drop-overlay')
+
+    it('keeps the overlay through nested enter/leave pairs and resets on drop', async () => {
+        const wrapper = await mountPanel('TP-1')
+        try {
+            await drains()
+            expect(dragEvent(wrapper, 'dragenter').defaultPrevented).toBe(true)
+            dragEvent(wrapper, 'dragenter')
+            await nextTick()
+            expect(overlay(wrapper).exists()).toBe(true)
+
+            dragEvent(wrapper, 'dragleave')
+            await nextTick()
+            expect(overlay(wrapper).exists()).toBe(true)
+            dragEvent(wrapper, 'dragleave')
+            await nextTick()
+            expect(overlay(wrapper).exists()).toBe(false)
+
+            dragEvent(wrapper, 'dragenter')
+            dragEvent(wrapper, 'dragenter')
+            await nextTick()
+            await dispatchFileDrop(wrapper, [new File(['x'], 'depth.txt', { type: 'text/plain' })])
+            expect(overlay(wrapper).exists()).toBe(false)
+            // A fresh single enter/leave pair after the drop starts from depth zero.
+            dragEvent(wrapper, 'dragenter')
+            await nextTick()
+            expect(overlay(wrapper).exists()).toBe(true)
+            dragEvent(wrapper, 'dragleave')
+            await nextTick()
+            expect(overlay(wrapper).exists()).toBe(false)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('ignores drags entirely when attachments are hidden', async () => {
+        localStorage.setItem('lotar.preferences.taskPanel.showAttachments', 'false')
+        const wrapper = await mountPanel('TP-1')
+        try {
+            await drains()
+            expect(dragEvent(wrapper, 'dragenter').defaultPrevented).toBe(false)
+            await nextTick()
+            expect(overlay(wrapper).exists()).toBe(false)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})

@@ -389,6 +389,7 @@ import UiCard from '../UiCard.vue'
 import UiInput from '../UiInput.vue'
 import UiLoader from '../UiLoader.vue'
 import { projectPrefixOfTaskId } from '../../utils/text'
+import { attachmentDisplayName, attachmentHoverTitle as buildAttachmentHoverTitle, attachmentUrl as buildAttachmentUrl } from '../../utils/taskAttachments'
 import { showToast } from '../toast'
 
 type ReferenceEntry = {
@@ -1025,73 +1026,8 @@ async function removeReference(reference: ReferenceEntry) {
   }
 }
 
-function attachmentUrl(relPath: string): string {
-  const stored = (relPath || '').trim()
-  if (!stored) return '/api/attachments/get?path='
-
-  const taskId = (props.task?.id || '').trim()
-  const project = projectPrefixOfTaskId(taskId) || ''
-
-  const hash = extractAttachmentHash(stored)
-  const display = attachmentDisplayName(stored)
-  if (hash) {
-    const qs = project ? `?${new URLSearchParams({ project }).toString()}` : ''
-    return `/api/attachments/h/${encodeURIComponent(hash)}/${encodeURIComponent(display)}${qs}`
-  }
-
-  const params = new URLSearchParams({ path: stored })
-  if (project) params.set('project', project)
-  return `/api/attachments/get?${params.toString()}`
-}
-
-function extractAttachmentHash(relPath: string): string | null {
-  const cleaned = (relPath || '').trim()
-  if (!cleaned) return null
-  const parts = cleaned.split('/')
-  const leaf = parts[parts.length - 1] || cleaned
-
-  const lastDot = leaf.lastIndexOf('.')
-  const base = lastDot > 0 ? leaf.slice(0, lastDot) : leaf
-  const ext = lastDot > 0 ? leaf.slice(lastDot + 1) : ''
-
-  if (ext.length === 32 && /^[0-9a-f]{32}$/i.test(ext)) {
-    return ext
-  }
-
-  const m = base.match(/^(.*)[.-]([0-9a-f]{32})$/i)
-  return m ? (m[2] ?? null) : null
-}
-
-function attachmentDisplayName(relPath: string): string {
-  const cleaned = (relPath || '').trim()
-  if (!cleaned) return 'attachment'
-  const parts = cleaned.split('/')
-  const leaf = parts[parts.length - 1] || cleaned
-
-  const dot = leaf.lastIndexOf('.')
-  const stem = dot > 0 ? leaf.slice(0, dot) : leaf
-  const ext = dot > 0 ? leaf.slice(dot) : ''
-  const hashMatch = stem.match(/^(.*)[.-]([0-9a-f]{32})$/i)
-  if (hashMatch) {
-    const displayStem = (hashMatch[1] || '').trim()
-    return `${displayStem || 'attachment'}${ext}`
-  }
-  return leaf
-}
-
-function attachmentHoverTitle(relPath: string): string {
-  const cleaned = (relPath || '').trim()
-  if (!cleaned) return ''
-
-  const configured = (props.attachmentsDir || '').trim()
-  if (configured.startsWith('/')) {
-    return `${configured.replace(/\/+$/, '')}/${cleaned.replace(/^\/+/, '')}`
-  }
-
-  const dir = (configured || '@attachments').replace(/^\/+/, '').replace(/\/+$/, '')
-  const leaf = cleaned.replace(/^\/+/, '')
-  return `.tasks/${dir}/${leaf}`
-}
+const attachmentUrl = (relPath: string) => buildAttachmentUrl(relPath, props.task?.id)
+const attachmentHoverTitle = (relPath: string) => buildAttachmentHoverTitle(relPath, props.attachmentsDir)
 
 const previewTitle = computed(() => {
   if (props.hoveredReferenceSnippet?.path) {

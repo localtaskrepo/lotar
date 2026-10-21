@@ -624,16 +624,20 @@
 </template>
 
 <script setup lang="ts">
-import { Teleport, Transition, computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Teleport, Transition, computed, nextTick, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { ConfigInspectResult, SprintIntegrityDiagnostics, SyncRemoteConfig, SyncRequest, TaskDTO } from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
+import { useTaskPanelAttachmentDrop, useTaskPanelAttachmentPreferences } from '../composables/task-panel/useTaskPanelAttachmentDrop'
+import { useTaskPanelReferenceMutations } from '../composables/task-panel/useTaskPanelReferenceMutations'
 import {
-    onPreferencesChanged,
-    readTaskPanelAutoDetectLinksPreference,
-    readTaskPanelShowAttachmentsPreference,
-    readTaskPanelShowLinksInAttachmentsPreference,
-} from '../utils/preferences'
+    attachmentDisplayName,
+    attachmentHoverTitle as buildAttachmentHoverTitle,
+    attachmentUrl as buildAttachmentUrl,
+    extractUrlsFromText,
+    isImageAttachment,
+    linkDisplayName,
+} from '../utils/taskAttachments'
 import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../utils/text'
 import { useTaskStore } from '../composables/useTaskStore'
 import ChipListField from './ChipListField.vue'
@@ -919,43 +923,6 @@ const descriptionEditorRoot = ref<HTMLElement | null>(null)
 const descriptionTextarea = ref<HTMLTextAreaElement | null>(null)
 const descriptionFocusoutTick = ref(0)
 
-const attachmentsDragActive = ref(false)
-const attachmentsDragDepth = ref(0)
-const attachmentsUploading = ref(false)
-const removingAttachmentPath = ref<string | null>(null)
-// Drops that arrived while an edit-mode panel was still loading the task
-// (before `task.id` exists); flushed as soon as that task is ready. The
-// buffer is bound to the task target that was loading when the drop landed.
-const pendingDropFiles = ref<File[]>([])
-const pendingDropUrls = ref<string[]>([])
-let pendingDropTaskId: string | null = null
-
-function clearPendingDrops() {
-  pendingDropFiles.value = []
-  pendingDropUrls.value = []
-  pendingDropTaskId = null
-}
-
-const showAttachmentsPreference = ref(readTaskPanelShowAttachmentsPreference())
-const showLinksInAttachmentsPreference = ref(readTaskPanelShowLinksInAttachmentsPreference())
-const autoDetectLinksPreference = ref(readTaskPanelAutoDetectLinksPreference())
-
-let unsubscribePreferencesChanged: null | (() => void) = null
-
-onMounted(() => {
-  unsubscribePreferencesChanged = onPreferencesChanged(() => {
-    showAttachmentsPreference.value = readTaskPanelShowAttachmentsPreference()
-    showLinksInAttachmentsPreference.value = readTaskPanelShowLinksInAttachmentsPreference()
-    autoDetectLinksPreference.value = readTaskPanelAutoDetectLinksPreference()
-  })
-})
-
-onUnmounted(() => {
-  unsubscribePreferencesChanged?.()
-  unsubscribePreferencesChanged = null
-  clearPendingDrops()
-})
-
 async function loadSyncConfig(prefix: string | null) {
   if (!prefix) {
     syncConfigInspect.value = null
@@ -980,38 +947,48 @@ watch(
   { immediate: true },
 )
 
-const attachmentsDropLabel = computed(() => {
-  if (attachmentsUploading.value) return 'Uploading attachments'
-  if (addingLinkReferences.value) return 'Adding links'
-  if (mode.value !== 'edit' || !task.id) {
-    return showLinksInAttachmentsPreference.value
-      ? 'Save the task to attach files or links'
-      : 'Save the task to attach files'
-  }
-  if (showLinksInAttachmentsPreference.value) return 'Drop files or links to attach'
-  return 'Drop files to attach'
+const attachmentPreferences = useTaskPanelAttachmentPreferences()
+const {
+  showAttachments: showAttachmentsPreference,
+  showLinksInAttachments: showLinksInAttachmentsPreference,
+  autoDetectLinks: autoDetectLinksPreference,
+} = attachmentPreferences
+
+const referenceMutations = useTaskPanelReferenceMutations({
+  task,
+  mode,
+  rejectDeletedMutation,
+  emitUpdated: (updated) => emit('updated', updated),
 })
+const {
+  attachments,
+  linkReferences,
+  attachmentsUploading,
+  addingLinkReferences,
+  removingAttachmentPath,
+  removingLinkUrl,
+  applyReferencesFromTaskResponse,
+  removeAttachment,
+  removeLinkReference,
+} = referenceMutations
 
-// Managed attachments-store blobs. Repository-file references (`file`) are
-// intentionally excluded: they are never managed blobs (DEV-61).
-const attachments = computed(() => {
-  const list = Array.isArray(task.references) ? task.references : []
-  return list.filter((entry) => typeof entry?.attachment === 'string' && (entry.attachment || '').trim().length > 0)
+const {
+  attachmentsDragActive,
+  attachmentsDropLabel,
+  onAttachmentsDragEnter,
+  onAttachmentsDragOver,
+  onAttachmentsDragLeave,
+  onAttachmentsDrop,
+} = useTaskPanelAttachmentDrop({
+  task,
+  mode,
+  taskId,
+  isDeleted,
+  isOpen: () => props.open,
+  targetTaskId: () => props.taskId,
+  preferences: attachmentPreferences,
+  mutations: referenceMutations,
 })
-
-const linkReferences = computed(() => {
-  const list = Array.isArray(task.references) ? task.references : []
-  return list.filter((entry) => typeof entry?.link === 'string' && (entry.link || '').trim().length > 0)
-})
-
-const addingLinkReferences = ref(false)
-const removingLinkUrl = ref<string | null>(null)
-
-function applyReferencesFromTaskResponse(updated: Partial<TaskDTO> | null | undefined) {
-  task.references = Array.isArray(updated?.references)
-    ? updated!.references!.map((reference) => ({ ...reference }))
-    : []
-}
 
 function onReferencesUpdated(updated: TaskDTO) {
   applyTaskSnapshot(task, updated)
@@ -1019,513 +996,8 @@ function onReferencesUpdated(updated: TaskDTO) {
   emit('updated', updated)
 }
 
-function attachmentUrl(relPath: string): string {
-  const stored = (typeof relPath === 'string' ? relPath : '').trim()
-  if (!stored) return '/api/attachments/get?path='
-
-  const taskId = (task.id || '').trim()
-  const project = projectPrefixOfTaskId(taskId) || ''
-
-  const hash = extractAttachmentHash(stored)
-  const display = attachmentDisplayName(stored)
-  if (hash) {
-    const qs = project ? `?${new URLSearchParams({ project }).toString()}` : ''
-    return `/api/attachments/h/${encodeURIComponent(hash)}/${encodeURIComponent(display)}${qs}`
-  }
-
-  const params = new URLSearchParams({ path: stored })
-  if (project) params.set('project', project)
-  return `/api/attachments/get?${params.toString()}`
-}
-
-function extractAttachmentHash(relPath: string): string | null {
-  const cleaned = (relPath || '').trim()
-  if (!cleaned) return null
-  const parts = cleaned.split('/')
-  const leaf = parts[parts.length - 1] || cleaned
-
-  const lastDot = leaf.lastIndexOf('.')
-  const base = lastDot > 0 ? leaf.slice(0, lastDot) : leaf
-  const ext = lastDot > 0 ? leaf.slice(lastDot + 1) : ''
-
-  if (ext.length === 32 && /^[0-9a-f]{32}$/i.test(ext)) {
-    return ext
-  }
-
-  const m = base.match(/^(.*)[.-]([0-9a-f]{32})$/i)
-  return m ? (m[2] ?? null) : null
-}
-
-function attachmentDisplayName(relPath: string): string {
-  const cleaned = (relPath || '').trim()
-  if (!cleaned) return 'attachment'
-  const parts = cleaned.split('/')
-  const leaf = parts[parts.length - 1] || cleaned
-
-  const dot = leaf.lastIndexOf('.')
-  const stem = dot > 0 ? leaf.slice(0, dot) : leaf
-  const ext = dot > 0 ? leaf.slice(dot) : ''
-
-  const hashMatch = stem.match(/^(.*)[.-]([0-9a-f]{32})$/i)
-  if (hashMatch) {
-    const displayStem = (hashMatch[1] || '').trim()
-    return `${displayStem || 'attachment'}${ext}`
-  }
-
-  return leaf
-}
-
-function linkDisplayName(rawUrl: string): string {
-  const cleaned = (rawUrl || '').trim()
-  if (!cleaned) return 'link'
-  try {
-    const url = new URL(cleaned)
-    const suffix = `${url.pathname || ''}${url.search || ''}${url.hash || ''}`
-    return `${url.hostname}${suffix || ''}`
-  } catch {
-    return cleaned
-  }
-}
-
-async function removeAttachment(relPath: string) {
-  const path = (relPath || '').trim()
-  if (!path) return
-  if (attachmentsUploading.value) return
-  if (removingAttachmentPath.value) return
-  if (rejectDeletedMutation('removing attachments')) return
-
-  if (mode.value !== 'edit' || !task.id) {
-    showToast('Save the task before removing attachments')
-    return
-  }
-
-  removingAttachmentPath.value = path
-  try {
-    const response = await api.removeTaskAttachment({ id: task.id, stored_path: path })
-    Object.assign(task, response.task)
-    applyReferencesFromTaskResponse(response.task)
-    emit('updated', response.task)
-    if (response.deleted) {
-      showToast('Attachment removed')
-    } else if (response.still_referenced) {
-      showToast('Attachment removed (file kept: used by other tasks)')
-    } else {
-      showToast('Attachment removed (file may already be gone)')
-    }
-  } catch (error: any) {
-    console.warn('Failed to remove attachment', { path, error })
-    showToast('Failed to remove attachment')
-  } finally {
-    removingAttachmentPath.value = null
-  }
-}
-
-function attachmentHoverTitle(relPath: string): string {
-  const cleaned = (relPath || '').trim()
-  if (!cleaned) return ''
-
-  const configured = (attachmentsDir?.value || '').trim()
-  if (configured.startsWith('/')) {
-    return `${configured.replace(/\/+$/, '')}/${cleaned.replace(/^\/+/, '')}`
-  }
-
-  const dir = (configured || '@attachments').replace(/^\/+/, '').replace(/\/+$/, '')
-  const leaf = cleaned.replace(/^\/+/, '')
-  return `.tasks/${dir}/${leaf}`
-}
-
-function isImageAttachment(relPath: string): boolean {
-  const name = attachmentDisplayName(relPath).toLowerCase()
-  return (
-    name.endsWith('.png') ||
-    name.endsWith('.jpg') ||
-    name.endsWith('.jpeg') ||
-    name.endsWith('.gif') ||
-    name.endsWith('.webp') ||
-    name.endsWith('.svg')
-  )
-}
-
-function resetAttachmentsDragState() {
-  attachmentsDragDepth.value = 0
-  attachmentsDragActive.value = false
-}
-
-function isFileDrag(event: DragEvent): boolean {
-  const dt = event.dataTransfer
-  if (!dt) return false
-
-  const items = Array.from(dt.items ?? [])
-  if (items.some((item) => item.kind === 'file')) return true
-
-  const types = Array.from(dt.types ?? [])
-  return (
-    types.includes('Files') ||
-    types.includes('public.file-url') ||
-    types.includes('application/x-moz-file')
-  )
-}
-
-function isLinkDrag(event: DragEvent): boolean {
-  const dt = event.dataTransfer
-  if (!dt) return false
-  const types = Array.from(dt.types ?? [])
-  return (
-    types.includes('text/uri-list') ||
-    types.includes('text/x-moz-url') ||
-    // Safari sometimes exposes URL drags as plain text; we only treat as link on drop.
-    types.includes('public.url')
-  )
-}
-
-function isAttachmentDrag(event: DragEvent): boolean {
-  if (!showAttachmentsPreference.value) return false
-  if (isFileDrag(event)) return true
-  if (showLinksInAttachmentsPreference.value && isLinkDrag(event)) return true
-  return false
-}
-
-function onAttachmentsDragEnter(event: DragEvent) {
-  if (attachmentsUploading.value || addingLinkReferences.value) return
-  if (!isAttachmentDrag(event)) return
-  event.preventDefault()
-  attachmentsDragDepth.value += 1
-  attachmentsDragActive.value = true
-}
-
-function onAttachmentsDragOver(event: DragEvent) {
-  if (attachmentsUploading.value || addingLinkReferences.value) return
-  if (!isAttachmentDrag(event)) return
-  event.preventDefault()
-}
-
-function onAttachmentsDragLeave(event: DragEvent) {
-  if (attachmentsUploading.value || addingLinkReferences.value) return
-  if (!attachmentsDragActive.value) return
-  event.preventDefault()
-  attachmentsDragDepth.value = Math.max(0, attachmentsDragDepth.value - 1)
-  if (attachmentsDragDepth.value === 0) {
-    attachmentsDragActive.value = false
-  }
-}
-
-function normalizeUrlCandidate(candidate: string): string | null {
-  let value = (candidate || '').trim()
-  if (!value) return null
-
-  if ((value.startsWith('<') && value.endsWith('>')) || (value.startsWith('(') && value.endsWith(')'))) {
-    value = value.slice(1, -1).trim()
-  }
-
-  // Strip common trailing punctuation after paste.
-  value = value.replace(/[),.;!?]+$/, '')
-
-  if (!/^https?:\/\//i.test(value)) return null
-  try {
-    // eslint-disable-next-line no-new
-    new URL(value)
-  } catch {
-    return null
-  }
-  return value
-}
-
-function extractUrlsFromText(text: string): string[] {
-  const raw = (text || '').trim()
-  if (!raw) return []
-
-  const matches = raw.match(/https?:\/\/[^\s<>"]+/gi) ?? []
-  const out: string[] = []
-  const seen = new Set<string>()
-  for (const match of matches) {
-    const normalized = normalizeUrlCandidate(match)
-    if (!normalized) continue
-    const key = normalized.trim()
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(key)
-  }
-  return out
-}
-
-function extractDroppedUrls(event: DragEvent): string[] {
-  const dt = event.dataTransfer
-  if (!dt) return []
-
-  const candidates: string[] = []
-  const uriList = dt.getData('text/uri-list')
-  if (uriList) {
-    for (const line of uriList.split(/\r?\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      candidates.push(trimmed)
-    }
-  }
-
-  // Firefox can expose URL drags as a single string with a newline-separated title.
-  const moz = dt.getData('text/x-moz-url')
-  if (moz) {
-    const parts = moz.split(/\r?\n/).map((p) => p.trim()).filter(Boolean)
-    if (parts[0]) candidates.push(parts[0])
-  }
-
-  return candidates
-    .map((c) => normalizeUrlCandidate(c))
-    .filter((c): c is string => typeof c === 'string' && c.length > 0)
-}
-
-async function addLinkReference(url: string): Promise<'added' | 'skipped' | 'failed'> {
-  const normalized = normalizeUrlCandidate(url)
-  if (!normalized) return 'skipped'
-  if (mode.value !== 'edit' || !task.id) return 'failed'
-
-  const existing = new Set(
-    (Array.isArray(task.references) ? task.references : [])
-      .map((r) => (typeof r?.link === 'string' ? r.link.trim() : ''))
-      .filter(Boolean),
-  )
-  if (existing.has(normalized)) return 'skipped'
-
-  try {
-    const response = await api.addTaskLinkReference({ id: task.id, url: normalized })
-    Object.assign(task, response.task)
-    applyReferencesFromTaskResponse(response.task)
-    emit('updated', response.task)
-    return response.added ? 'added' : 'skipped'
-  } catch (error: any) {
-    console.warn('Failed to add link reference', { url: normalized, error })
-    return 'failed'
-  }
-}
-
-async function removeLinkReference(url: string) {
-  const normalized = normalizeUrlCandidate(url)
-  if (!normalized) return
-  if (attachmentsUploading.value) return
-  if (addingLinkReferences.value) return
-  if (removingLinkUrl.value) return
-  if (rejectDeletedMutation('removing links')) return
-
-  if (mode.value !== 'edit' || !task.id) {
-    showToast('Save the task before removing links')
-    return
-  }
-
-  removingLinkUrl.value = normalized
-  try {
-    const response = await api.removeTaskLinkReference({ id: task.id, url: normalized })
-    Object.assign(task, response.task)
-    applyReferencesFromTaskResponse(response.task)
-    emit('updated', response.task)
-    showToast(response.removed ? 'Link removed' : 'Link already removed')
-  } catch (error: any) {
-    console.warn('Failed to remove link reference', { url: normalized, error })
-    showToast('Failed to remove link')
-  } finally {
-    removingLinkUrl.value = null
-  }
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      const marker = 'base64,'
-      const idx = result.indexOf(marker)
-      if (idx >= 0) {
-        resolve(result.slice(idx + marker.length))
-        return
-      }
-      reject(new Error('Failed to encode file'))
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
-async function uploadDroppedFiles(files: File[]): Promise<void> {
-  attachmentsUploading.value = true
-  try {
-    let added = 0
-    let skipped = 0
-    let failed = 0
-
-    for (const file of files) {
-      try {
-        const base64 = await fileToBase64(file)
-        const response = await api.uploadTaskAttachment({
-          id: task.id,
-          filename: file.name,
-          content_base64: base64,
-        })
-
-        if (response.attached) {
-          added += 1
-        } else {
-          skipped += 1
-        }
-
-        Object.assign(task, response.task)
-        applyReferencesFromTaskResponse(response.task)
-        emit('updated', response.task)
-      } catch (error: any) {
-        failed += 1
-        console.warn('Failed to upload attachment', { file: file.name, error })
-      }
-    }
-
-    if (files.length === 1 && added === 0 && skipped === 1 && failed === 0) {
-      showToast('Attachment already attached')
-      return
-    }
-
-    if (added > 0 && skipped === 0 && failed === 0) {
-      showToast(added === 1 ? 'Attachment added' : 'Attachments added')
-    } else {
-      const parts = []
-      if (added > 0) parts.push(`${added} added`)
-      if (skipped > 0) parts.push(`${skipped} already attached`)
-      if (failed > 0) parts.push(`${failed} failed`)
-      showToast(parts.length ? `Attachments: ${parts.join(', ')}` : 'No attachments uploaded')
-    }
-  } finally {
-    attachmentsUploading.value = false
-    resetAttachmentsDragState()
-  }
-}
-
-async function addDroppedUrls(urls: string[]): Promise<void> {
-  addingLinkReferences.value = true
-  try {
-    let added = 0
-    let skipped = 0
-    let failed = 0
-
-    for (const url of urls) {
-      const outcome = await addLinkReference(url)
-      if (outcome === 'added') added += 1
-      else if (outcome === 'skipped') skipped += 1
-      else failed += 1
-    }
-
-    if (urls.length === 1 && added === 0 && skipped === 1 && failed === 0) {
-      showToast('Link already attached')
-      return
-    }
-
-    if (added > 0 && skipped === 0 && failed === 0) {
-      showToast(added === 1 ? 'Link added' : 'Links added')
-    } else {
-      const parts = []
-      if (added > 0) parts.push(`${added} added`)
-      if (skipped > 0) parts.push(`${skipped} already attached`)
-      if (failed > 0) parts.push(`${failed} failed`)
-      showToast(parts.length ? `Links: ${parts.join(', ')}` : 'No links added')
-    }
-  } finally {
-    addingLinkReferences.value = false
-    resetAttachmentsDragState()
-  }
-}
-
-async function onAttachmentsDrop(event: DragEvent) {
-  if (attachmentsUploading.value || addingLinkReferences.value) return
-
-  const hasFiles = isFileDrag(event)
-  const urls = showLinksInAttachmentsPreference.value ? extractDroppedUrls(event) : []
-  if (!hasFiles && urls.length === 0) return
-
-  event.preventDefault()
-  resetAttachmentsDragState()
-
-  if (isDeleted.value) {
-    showToast('Restore the task before attaching files or links')
-    return
-  }
-
-  if (mode.value !== 'edit') {
-    showToast(hasFiles ? 'Save the task before attaching files' : 'Save the task before attaching links')
-    return
-  }
-
-  if (!task.id) {
-    // The panel is still initializing this task: `task.id` is assigned only
-    // after the per-project config loads, so an eager drop would otherwise
-    // be discarded with a misleading "save the task" toast. Buffer the
-    // payload for the task target that is loading and flush it once that
-    // task is ready. A files-bearing event ignores link payloads, matching
-    // the direct drop path where files take priority.
-    if (hasFiles) {
-      const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
-      if (!files.length) return
-      pendingDropFiles.value = [...pendingDropFiles.value, ...files]
-      pendingDropTaskId = props.taskId ?? null
-      showToast('Task is still loading — attachments will upload when it is ready')
-      return
-    }
-    if (urls.length) {
-      pendingDropUrls.value = [...pendingDropUrls.value, ...urls]
-      pendingDropTaskId = props.taskId ?? null
-      showToast('Task is still loading — attachments will upload when it is ready')
-      return
-    }
-    return
-  }
-
-  if (hasFiles) {
-    const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
-    if (!files.length) return
-    await uploadDroppedFiles(files)
-    return
-  }
-
-  if (urls.length) {
-    await addDroppedUrls(urls)
-  }
-}
-
-// Flush drops buffered while the panel was still loading the task. `taskId`
-// becomes non-empty exactly when the loaded task fields are applied, and the
-// buffer only uploads when the panel still shows that same task target in
-// edit mode — a swap to another task, create mode, or a closed panel
-// invalidates the buffer instead of uploading into the wrong task.
-watch(taskId, (id) => {
-  if (!id) return
-  const files = pendingDropFiles.value
-  const urls = pendingDropUrls.value
-  if (!files.length && !urls.length) return
-  const belongsToLoadedTask =
-    props.open && mode.value === 'edit' && props.taskId === id && pendingDropTaskId === id
-  clearPendingDrops()
-  if (!belongsToLoadedTask) return
-  if (files.length) {
-    void uploadDroppedFiles(files)
-  } else {
-    void addDroppedUrls(urls)
-  }
-})
-
-// A task-target swap (the controller opens task B while task A is still
-// loading, or reopens the panel in create mode) invalidates drops buffered
-// for the previous target. Sync flush clears the buffer at the prop change,
-// before the new target's load can complete and arm the flush watcher.
-watch(
-  () => props.taskId,
-  () => {
-    clearPendingDrops()
-  },
-  { flush: 'sync' },
-)
-
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) {
-      clearPendingDrops()
-    }
-  },
-)
+const attachmentUrl = (relPath: string) => buildAttachmentUrl(relPath, task.id)
+const attachmentHoverTitle = (relPath: string) => buildAttachmentHoverTitle(relPath, attachmentsDir?.value)
 
 async function detectAndAttachLinksFromTaskText() {
   if (!autoDetectLinksPreference.value) return
@@ -1533,31 +1005,9 @@ async function detectAndAttachLinksFromTaskText() {
   if (mode.value !== 'edit' || !task.id) return
   if (attachmentsUploading.value || addingLinkReferences.value) return
 
-  const combined = `${form.title || ''}\n${form.description || ''}`
-  const urls = extractUrlsFromText(combined)
+  const urls = extractUrlsFromText(`${form.title || ''}\n${form.description || ''}`)
   if (!urls.length) return
-
-  addingLinkReferences.value = true
-  try {
-    let added = 0
-    let skipped = 0
-    let failed = 0
-    for (const url of urls) {
-      const outcome = await addLinkReference(url)
-      if (outcome === 'added') added += 1
-      else if (outcome === 'skipped') skipped += 1
-      else failed += 1
-    }
-    if (added > 0) {
-      const parts = []
-      parts.push(`${added} added`)
-      if (skipped > 0) parts.push(`${skipped} already attached`)
-      if (failed > 0) parts.push(`${failed} failed`)
-      showToast(`Links: ${parts.join(', ')}`)
-    }
-  } finally {
-    addingLinkReferences.value = false
-  }
+  await referenceMutations.attachLinksFromText(urls)
 }
 
 const handleFieldBlur = async (field: string) => {
