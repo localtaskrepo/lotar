@@ -26,7 +26,7 @@ function seedFiles(): Record<string, string> {
     return files;
 }
 
-describe.concurrent('UI sprint and backlog automatic sorting (DEV-114)', () => {
+describe.concurrent('UI sprint and backlog tables (DEV-114, DEV-115)', () => {
     it('orders backlog and sprint rows by the shared due-date contract in both directions', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({ name: 'ui-sprints-sort-', seedFiles: seedFiles() });
         try {
@@ -46,6 +46,14 @@ describe.concurrent('UI sprint and backlog automatic sorting (DEV-114)', () => {
 
                     await expect.poll(() => ids(backlog)).toEqual(['SORT-3', 'SORT-4', 'SORT-2', 'SORT-1']);
                     await expect.poll(() => ids(sprint)).toEqual(['SORT-7', 'SORT-6', 'SORT-5']);
+
+                    // DEV-115: the shared cell keeps the page's cell styling in both tables.
+                    for (const group of [backlog, sprint]) {
+                        const title = group.locator('tr.task-row').first().locator('.task-title');
+                        const status = group.locator('tr.task-row').first().locator('.status');
+                        expect(await title.evaluate(el => getComputedStyle(el).fontWeight)).toBe('600');
+                        expect(await status.evaluate(el => getComputedStyle(el).textTransform)).toBe('capitalize');
+                    }
 
                     await backlog.locator('th[data-column="due_date"] button').click();
                     await expect.poll(() => ids(backlog)).toEqual(['SORT-1', 'SORT-2', 'SORT-3', 'SORT-4']);

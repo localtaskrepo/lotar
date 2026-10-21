@@ -535,83 +535,18 @@
                       @dragend="onTaskDragEnd"
                       @click="onTaskRowClick(task, $event)"
                     >
-                      <td v-for="col in visibleColumns" :key="col" :class="['task-cell', `task-cell--${col}`]">
-                        <template v-if="col === 'id'">
-                          <span class="muted">{{ projectOf(task.id) }}</span>
-                          <strong>{{ numericOf(task.id) }}</strong>
-                        </template>
-                        <template v-else-if="col === 'title'">
-                          <span class="task-title">
-                            {{ task.title || 'Untitled task' }}
-                            <span
-                              v-if="highlightMultiSprint && multiSprintTaskIds.has(task.id)"
-                              class="task-title__badge badge badge--info"
-                              :title="multiSprintTooltip(task, sprint.id)"
-                              :aria-label="multiSprintTooltip(task, sprint.id)"
-                            >
-                              Multi
-                            </span>
-                          </span>
-                        </template>
-                        <template v-else-if="col === 'status'">
-                          <span class="status" :data-status="task.status">{{ task.status }}</span>
-                        </template>
-                        <template v-else-if="col === 'priority'">
-                          <span>{{ task.priority || '—' }}</span>
-                        </template>
-                        <template v-else-if="col === 'task_type'">
-                          <span>{{ task.task_type || '—' }}</span>
-                        </template>
-                        <template v-else-if="col === 'reporter'">
-                          <span v-if="task.reporter">{{ formatMember(task.reporter) }}</span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'assignee'">
-                          <span v-if="task.assignee">{{ formatMember(task.assignee) }}</span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'effort'">
-                          <span v-if="(task as any).effort">{{ (task as any).effort }}</span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'tags'">
-                          <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center;">
-                            <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="tag">{{ tag }}</span>
-                            <span v-if="!task.tags.length" class="muted">—</span>
-                          </div>
-                        </template>
-                        <template v-else-if="col === 'sprints'">
-                          <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center;">
-                            <span
-                              v-for="sprintId in task.sprints"
-                              :key="task.id + '-sprint-' + sprintId"
-                              class="chip small"
-                              :class="sprintStateClass(sprintId)"
-                            >
-                              {{ sprintLabel(sprintId) }}
-                            </span>
-                            <span v-if="!task.sprints.length" class="muted">—</span>
-                          </div>
-                        </template>
-                        <template v-else-if="col === 'due_date'">
-                          <span
-                            v-if="formatDue(task.due_date)"
-                            :class="{ 'text-overdue': isRowOverdue(task) }"
-                          >
-                            {{ formatDue(task.due_date) }}
-                          </span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'created'">
-                          <span :title="formatExact(task.created)">{{ formatRelative(task.created) }}</span>
-                        </template>
-                        <template v-else-if="col === 'modified'">
-                          <span :title="formatExact(task.modified)">{{ formatRelative(task.modified) }}</span>
-                        </template>
-                        <template v-else>
-                          <span>{{ (task as any)[col] ?? '—' }}</span>
-                        </template>
-                      </td>
+                      <SprintTaskCell
+                        v-for="col in visibleColumns"
+                        :key="col"
+                        :task="task"
+                        :col="col"
+                        :context-sprint-id="sprint.id"
+                        :multi-sprint="highlightMultiSprint && multiSprintTaskIds.has(task.id)"
+                        :overdue="isRowOverdue(task)"
+                        :multi-sprint-tooltip="multiSprintTooltip"
+                        :sprint-label="sprintLabel"
+                        :sprint-state-class="sprintStateClass"
+                      />
                     </tr>
                    </tbody>
                  </table>
@@ -747,73 +682,18 @@
                       @dragend="onTaskDragEnd"
                       @click="onTaskRowClick(task, $event)"
                     >
-                      <td v-for="col in visibleColumns" :key="col" :class="['task-cell', `task-cell--${col}`]">
-                        <template v-if="col === 'id'">
-                          <span class="muted">{{ projectOf(task.id) }}</span>
-                          <strong>{{ numericOf(task.id) }}</strong>
-                        </template>
-                        <template v-else-if="col === 'title'">
-                          <span class="task-title">
-                            {{ task.title || 'Untitled task' }}
-                            <span
-                              v-if="highlightMultiSprint && multiSprintTaskIds.has(task.id)"
-                              class="task-title__badge badge badge--info"
-                              :title="multiSprintTooltip(task, null)"
-                              :aria-label="multiSprintTooltip(task, null)"
-                            >
-                              Multi
-                            </span>
-                          </span>
-                        </template>
-                        <template v-else-if="col === 'status'">
-                          <span class="status" :data-status="task.status">{{ task.status }}</span>
-                        </template>
-                        <template v-else-if="col === 'priority'">
-                          <span>{{ task.priority || '—' }}</span>
-                        </template>
-                        <template v-else-if="col === 'task_type'">
-                          <span>{{ task.task_type || '—' }}</span>
-                        </template>
-                        <template v-else-if="col === 'reporter'">
-                          <span v-if="task.reporter">{{ formatMember(task.reporter) }}</span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'assignee'">
-                          <span v-if="task.assignee">{{ formatMember(task.assignee) }}</span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'effort'">
-                          <span v-if="(task as any).effort">{{ (task as any).effort }}</span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'tags'">
-                          <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center;">
-                            <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="tag">{{ tag }}</span>
-                            <span v-if="!task.tags.length" class="muted">—</span>
-                          </div>
-                        </template>
-                        <template v-else-if="col === 'sprints'">
-                          <span class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'due_date'">
-                          <span
-                            v-if="formatDue(task.due_date)"
-                            :class="{ 'text-overdue': isRowOverdue(task) }"
-                          >
-                            {{ formatDue(task.due_date) }}
-                          </span>
-                          <span v-else class="muted">—</span>
-                        </template>
-                        <template v-else-if="col === 'created'">
-                          <span :title="formatExact(task.created)">{{ formatRelative(task.created) }}</span>
-                        </template>
-                        <template v-else-if="col === 'modified'">
-                          <span :title="formatExact(task.modified)">{{ formatRelative(task.modified) }}</span>
-                        </template>
-                        <template v-else>
-                          <span>{{ (task as any)[col] ?? '—' }}</span>
-                        </template>
-                      </td>
+                      <SprintTaskCell
+                        v-for="col in visibleColumns"
+                        :key="col"
+                        :task="task"
+                        :col="col"
+                        :context-sprint-id="null"
+                        :multi-sprint="highlightMultiSprint && multiSprintTaskIds.has(task.id)"
+                        :overdue="isRowOverdue(task)"
+                        :multi-sprint-tooltip="multiSprintTooltip"
+                        :sprint-label="sprintLabel"
+                        :sprint-state-class="sprintStateClass"
+                      />
                     </tr>
                    </tbody>
                  </table>
@@ -859,6 +739,7 @@ import type {
 } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import SprintViewSettings from '../components/SprintViewSettings.vue'
+import SprintTaskCell from '../components/SprintTaskCell.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
@@ -883,9 +764,8 @@ import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useS
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { MS_PER_DAY, formatRelativeTime, fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
-import { formatMember } from '../utils/member'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
-import { numericOf, projectOf } from '../utils/text'
+import { projectOf } from '../utils/text'
 import { colKeyToSortBy, sortTasks as sortTasksByContract } from '../utils/taskSort'
 import { storageGet, storageGetFlag, storageGetJson, storageSet, storageSetFlag, storageSetJson } from '../utils/storage'
 
@@ -2793,17 +2673,6 @@ function parseNumberInput(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function formatDue(value?: string | null) {
-  if (!value) return ''
-  try {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleDateString()
-  } catch {
-    return value
-  }
-}
-
 function formatShortDate(value?: string | null) {
   if (!value) return ''
   try {
@@ -2824,14 +2693,6 @@ function badgeClass(state: string) {
 
 const formatRelative = (value?: string | null) => formatRelativeTime(value, { empty: '—' })
 
-function formatExact(value?: string | null) {
-  if (!value) return ''
-  try {
-    return new Date(value).toLocaleString()
-  } catch {
-    return value || ''
-  }
-}
 
 
 function sprintLabel(id: number) {
@@ -3671,27 +3532,6 @@ onUnmounted(() => {
   display: inline-flex;
   gap: 6px;
   align-items: baseline;
-}
-
-.task-title {
-  font-weight: 600;
-}
-
-.task-title__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 6px;
-  cursor: default;
-}
-
-.status[data-status] {
-  text-transform: capitalize;
-}
-
-.text-overdue {
-  color: var(--color-danger);
-  font-weight: 600;
 }
 
 .badge {

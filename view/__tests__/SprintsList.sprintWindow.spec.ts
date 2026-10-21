@@ -268,6 +268,35 @@ describe('SprintsList sprint window', () => {
         // The multi-sprint task appears in both sprint sections, each row badged.
         expect(badges).toHaveLength(2)
         expect(badges[0]!.text()).toContain('Multi')
+        // DEV-115: each sprint table names the OTHER memberships for its row.
+        const badgeIn = (sprintId: number) => wrapper.find(`[data-sprint-id="${sprintId}"] .task-title__badge`)
+        expect(badgeIn(1).attributes('title')).toBe('Also assigned to Sprint 2')
+        expect(badgeIn(2).attributes('title')).toBe('Also assigned to Sprint 1')
+        expect(badgeIn(1).attributes('aria-label')).toBe('Also assigned to Sprint 2')
+
+        wrapper.unmount()
+    })
+
+    it('renders sprint chips in sprint tables and a placeholder in the backlog (DEV-115)', async () => {
+        localStorage.setItem('lotar.sprints.columns', JSON.stringify(['id', 'title', 'sprints']))
+        sprintsState.sprintsRef!.value = [makeSprint(1), makeSprint(2)]
+        setSprintTasks([
+            makeTask(1, { sprints: [1, 2] }),
+            makeTask(2, { sprints: [] }),
+        ])
+
+        const wrapper = mount(SprintsList)
+        await flushPromises()
+
+        const sprintCell = wrapper.find('[data-sprint-id="1"] tr[data-task-id="PRJ-001"] td.task-cell--sprints')
+        expect(sprintCell.findAll('.chip').map(chip => chip.text())).toEqual(['Sprint 1', 'Sprint 2'])
+        const backlogCell = wrapper.find('#backlog tr[data-task-id="PRJ-002"] td.task-cell--sprints')
+        expect(backlogCell.find('.chip').exists()).toBe(false)
+        expect(backlogCell.text()).toBe('—')
+        // Both tables render the same column order through the shared cell.
+        const order = (selector: string) => wrapper.find(selector).findAll('td').map(td => td.classes().find(c => c.startsWith('task-cell--')))
+        expect(order('[data-sprint-id="1"] tr.task-row')).toEqual(['task-cell--id', 'task-cell--title', 'task-cell--sprints'])
+        expect(order('#backlog tr.task-row')).toEqual(['task-cell--id', 'task-cell--title', 'task-cell--sprints'])
 
         wrapper.unmount()
     })

@@ -1,7 +1,35 @@
 title: Share sprint and backlog task-cell rendering
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T00:46:59.808396+00:00
+modified: 2026-10-21T20:22:23.332837+00:00
+comments:
+- date: 2026-10-21T20:22:23.313193+00:00
+  text: |-
+    Outcome: New view/components/SprintTaskCell.vue renders one <td> per column for both sprint and backlog tables on the Sprints page (single-root td keeps the page's scoped td/column-width CSS; cell-content styles moved into the component). contextSprintId (sprint id vs null) drives the multi-sprint tooltip wording and sprint chips vs backlog placeholder; overdue styling still comes from the completion-aware isRowOverdue; column order, row selection/drag handlers and pagination stay in SprintsList. Removed the duplicated templates and cell-only helpers (formatDue/formatExact). No design or API change.
+    Evidence: SprintsList.sprintWindow.spec.ts asserts contextual tooltips per sprint table and chips vs placeholder with identical column order; all SprintsList specs (60) pass; Sprints UI smoke (sprints, responsive, backlog-order, sprint-task-create, sprint-analytics, sprints-sort with computed-style checks for moved CSS) 24/24 pass on a fresh build:smoke; lint:frontend clean.
+    Remaining: none; full gates at end of batch.
+    Guidance: no durable finding.
 description: Deferred after DEV-112. Replace near-identical SprintsList sprint-row and backlog-cell templates with one cohesive renderer. Preserve contextSprintId versus null tooltip behavior, sprint chips versus backlog placeholder, completion-aware overdue styling, accessible controls, shared column order and page selection/drag membership semantics. Reuse current formatting/columns helpers; no design or API change. Focused render/pagination/filter/add-task tests and browser table geometry required. No implementation in DEV-112.
+history:
+- at: 2026-10-21T20:22:23.263681+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-21T20:22:23.313193+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-21T20:22:23.332837+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
