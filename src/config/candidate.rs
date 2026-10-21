@@ -17,6 +17,10 @@
 //! override structs, not the resolved view: creating an explicit override
 //! equal to an inherited default is a genuine provenance change.
 
+// Per-field flags (`crate::config::fields`): only `resolved_relevant` fields
+// need per-project revalidation after a global change, and only
+// `task_conflict` fields can invalidate existing tasks.
+use crate::config::fields::{is_resolved_relevant, is_task_conflict_field};
 use crate::config::operations::{
     apply_field_to_global_config, apply_field_to_project_config, canonicalize_field_name,
     clear_project_override_field, validate_field_value,
@@ -60,29 +64,6 @@ pub struct ConfigSetResult {
     /// Canonical (flat) names of the fields this request covers.
     pub normalized_fields: Vec<String>,
 }
-
-/// Fields whose effective values can invalidate existing tasks when changed.
-const TASK_CONFLICT_FIELDS: &[&str] = &["issue_states", "issue_types", "issue_priorities"];
-
-/// Fields that participate in resolved-config validation. Global changes to
-/// these fields require per-project revalidation; other fields (server port,
-/// sprints, agent settings, ...) cannot introduce resolved errors or task
-/// conflicts, so project enumeration is skipped for them.
-const RESOLVED_RELEVANT_FIELDS: &[&str] = &[
-    "issue_states",
-    "issue_done_states",
-    "issue_types",
-    "issue_priorities",
-    "tags",
-    "default_tags",
-    "default_priority",
-    "default_status",
-    "members",
-    "strict_members",
-    "branch_type_aliases",
-    "branch_status_aliases",
-    "branch_priority_aliases",
-];
 
 /// Canonicalize request entries and reject ambiguous duplicates.
 ///
@@ -173,7 +154,7 @@ pub fn apply_config_set(
             let changed: Vec<&str> = canonical
                 .iter()
                 .map(|(field, _)| field.as_str())
-                .filter(|field| RESOLVED_RELEVANT_FIELDS.contains(field))
+                .filter(|field| is_resolved_relevant(field))
                 .collect();
             if !changed.is_empty() {
                 // Enumerate real projects fail-closed: a malformed project
@@ -272,7 +253,7 @@ pub fn apply_config_set(
             let changed: Vec<&str> = canonical
                 .iter()
                 .map(|(field, _)| field.as_str())
-                .filter(|field| RESOLVED_RELEVANT_FIELDS.contains(field))
+                .filter(|field| is_resolved_relevant(field))
                 .collect();
             if !changed.is_empty() {
                 collect_task_conflicts(
@@ -491,7 +472,7 @@ fn collect_task_conflicts(
     conflicts: &mut Vec<String>,
 ) -> Result<(), ConfigError> {
     let needs_tasks = fields.iter().any(|field| {
-        TASK_CONFLICT_FIELDS.contains(field)
+        is_task_conflict_field(field)
             && match *field {
                 "issue_states" => {
                     !status_lists_equal(&before.issue_states.values, &after.issue_states.values)
@@ -513,7 +494,7 @@ fn collect_task_conflicts(
     let tasks = enumerate_project_tasks(project_dir, prefix)?;
     for (id, task) in tasks {
         for field in fields {
-            if !TASK_CONFLICT_FIELDS.contains(field) {
+            if !is_task_conflict_field(field) {
                 continue;
             }
             let (was_valid, now_valid, kind, value) = match *field {

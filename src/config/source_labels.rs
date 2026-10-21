@@ -1,6 +1,7 @@
 use crate::config::env_overrides::capture_env_override_snapshot;
 use crate::config::types::{GlobalConfig, ProjectConfig, ResolvedConfig};
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ConfigSourceEntry {
@@ -9,208 +10,29 @@ pub struct ConfigSourceEntry {
     pub inspect_key: &'static str,
 }
 
-const fn entry(
-    path: &'static str,
-    label_key: &'static str,
-    inspect_key: &'static str,
-) -> ConfigSourceEntry {
-    ConfigSourceEntry {
-        path,
-        label_key,
-        inspect_key,
-    }
-}
+static CONFIG_SOURCE_ENTRIES: LazyLock<Vec<ConfigSourceEntry>> = LazyLock::new(|| {
+    crate::config::fields::CONFIG_FIELDS
+        .iter()
+        .filter_map(|meta| {
+            meta.source.map(|(path, label_key)| ConfigSourceEntry {
+                path,
+                label_key,
+                inspect_key: meta.flat,
+            })
+        })
+        .collect()
+});
 
-pub const CONFIG_SOURCE_ENTRIES: &[ConfigSourceEntry] = &[
-    entry("server.port", "server_port", "server_port"),
-    entry("default.project", "default_project", "default_project"),
-    entry("default.assignee", "default_assignee", "default_assignee"),
-    entry("default.reporter", "default_reporter", "default_reporter"),
-    entry("default.tags", "default_tags", "default_tags"),
-    entry("members", "members", "members"),
-    entry("review.reviewers", "review_reviewers", "review_reviewers"),
-    entry("default.strict-members", "strict_members", "strict_members"),
-    entry("default.priority", "default_priority", "default_priority"),
-    entry("default.status", "default_status", "default_status"),
-    entry("issue.states", "issue_states", "issue_states"),
-    entry(
-        "issue.done_states",
-        "issue_done_states",
-        "issue_done_states",
-    ),
-    entry("issue.types", "issue_types", "issue_types"),
-    entry("issue.priorities", "issue_priorities", "issue_priorities"),
-    entry("issue.tags", "issue_tags", "tags"),
-    entry("custom.fields", "custom_fields", "custom_fields"),
-    entry(
-        "scan.signal-words",
-        "scan_signal_words",
-        "scan_signal_words",
-    ),
-    entry(
-        "scan.ticket-patterns",
-        "scan_ticket_patterns",
-        "scan_ticket_patterns",
-    ),
-    entry(
-        "scan.enable-ticket-words",
-        "scan_enable_ticket_words",
-        "scan_enable_ticket_words",
-    ),
-    entry(
-        "scan.enable-mentions",
-        "scan_enable_mentions",
-        "scan_enable_mentions",
-    ),
-    entry(
-        "scan.strip-attributes",
-        "scan_strip_attributes",
-        "scan_strip_attributes",
-    ),
-    entry(
-        "auto.populate-members",
-        "auto_populate_members",
-        "auto_populate_members",
-    ),
-    entry(
-        "auto.set-reporter",
-        "auto_set_reporter",
-        "auto_set_reporter",
-    ),
-    entry(
-        "auto.assign-on-status",
-        "auto_assign_on_status",
-        "auto_assign_on_status",
-    ),
-    entry(
-        "auto.codeowners-assign",
-        "auto_codeowners_assign",
-        "auto_codeowners_assign",
-    ),
-    entry(
-        "auto.tags-from-path",
-        "auto_tags_from_path",
-        "auto_tags_from_path",
-    ),
-    entry(
-        "auto.branch-infer-type",
-        "auto_branch_infer_type",
-        "auto_branch_infer_type",
-    ),
-    entry(
-        "auto.branch-infer-status",
-        "auto_branch_infer_status",
-        "auto_branch_infer_status",
-    ),
-    entry(
-        "auto.branch-infer-priority",
-        "auto_branch_infer_priority",
-        "auto_branch_infer_priority",
-    ),
-    entry("auto.identity", "auto_identity", "auto_identity"),
-    entry(
-        "auto.identity-git",
-        "auto_identity_git",
-        "auto_identity_git",
-    ),
-    entry("attachments.dir", "attachments_dir", "attachments_dir"),
-    entry(
-        "attachments.max_upload_mb",
-        "attachments_max_upload_mb",
-        "attachments_max_upload_mb",
-    ),
-    entry(
-        "sprints.defaults.capacity_points",
-        "sprints_defaults_capacity_points",
-        "sprints_defaults_capacity_points",
-    ),
-    entry(
-        "sprints.defaults.capacity_hours",
-        "sprints_defaults_capacity_hours",
-        "sprints_defaults_capacity_hours",
-    ),
-    entry(
-        "sprints.defaults.length",
-        "sprints_defaults_length",
-        "sprints_defaults_length",
-    ),
-    entry(
-        "sprints.defaults.overdue_after",
-        "sprints_defaults_overdue_after",
-        "sprints_defaults_overdue_after",
-    ),
-    entry(
-        "sprints.notifications.enabled",
-        "sprints_notifications_enabled",
-        "sprints_notifications_enabled",
-    ),
-    entry(
-        "agent.context-enabled",
-        "agent_context_enabled",
-        "agent_context_enabled",
-    ),
-    entry(
-        "agent.instructions",
-        "agent_instructions",
-        "agent_instructions",
-    ),
-    entry(
-        "agent.worktree.enabled",
-        "agent_worktree_enabled",
-        "agent_worktree_enabled",
-    ),
-    entry(
-        "agent.worktree.dir",
-        "agent_worktree_dir",
-        "agent_worktree_dir",
-    ),
-    entry(
-        "agent.worktree.branch_prefix",
-        "agent_worktree_branch_prefix",
-        "agent_worktree_branch_prefix",
-    ),
-    entry(
-        "agent.worktree.cleanup_on_done",
-        "agent_worktree_cleanup_on_done",
-        "agent_worktree_cleanup_on_done",
-    ),
-    entry(
-        "agent.worktree.cleanup_on_failure",
-        "agent_worktree_cleanup_on_failure",
-        "agent_worktree_cleanup_on_failure",
-    ),
-    entry(
-        "agent.worktree.cleanup_on_cancel",
-        "agent_worktree_cleanup_on_cancel",
-        "agent_worktree_cleanup_on_cancel",
-    ),
-    entry(
-        "agent.worktree.cleanup_delete_branches",
-        "agent_worktree_cleanup_delete_branches",
-        "agent_worktree_cleanup_delete_branches",
-    ),
-    entry(
-        "branch.type-aliases",
-        "branch_type_aliases",
-        "branch_type_aliases",
-    ),
-    entry(
-        "branch.status-aliases",
-        "branch_status_aliases",
-        "branch_status_aliases",
-    ),
-    entry(
-        "branch.priority-aliases",
-        "branch_priority_aliases",
-        "branch_priority_aliases",
-    ),
-];
+/// Fields with a `config inspect` source label, derived from the field catalog.
+pub fn config_source_entries() -> &'static [ConfigSourceEntry] {
+    &CONFIG_SOURCE_ENTRIES
+}
 
 pub fn populate_source_labels<F>(labels: &mut HashMap<String, String>, mut resolver: F)
 where
     F: FnMut(&ConfigSourceEntry) -> String,
 {
-    for entry in CONFIG_SOURCE_ENTRIES {
+    for entry in config_source_entries() {
         labels.insert(entry.path.to_string(), resolver(entry));
     }
 }
@@ -894,13 +716,13 @@ mod tests {
             format!("src:{}", entry.label_key)
         });
 
-        assert_eq!(labels.len(), CONFIG_SOURCE_ENTRIES.len());
-        for entry in CONFIG_SOURCE_ENTRIES {
+        assert_eq!(labels.len(), config_source_entries().len());
+        for entry in config_source_entries() {
             let expected = format!("src:{}", entry.label_key);
             assert_eq!(labels.get(entry.path), Some(&expected));
         }
 
-        assert_eq!(seen.into_inner().len(), CONFIG_SOURCE_ENTRIES.len());
+        assert_eq!(seen.into_inner().len(), config_source_entries().len());
     }
 
     #[test]

@@ -149,61 +149,9 @@ pub fn parse_issue_states_tolerant(
     None
 }
 
-// Aliases are applied from legacy to canonical. Flat fields are the typed
-// schema itself, so newly shipped fields cannot silently disappear here.
-pub(crate) const CONFIG_PATHS: &[(&str, &str)] = &[
-    ("config.project_name", "project_name"),
-    ("project.id", "project_name"),
-    ("project.name", "project_name"),
-    ("server.port", "server_port"),
-    ("default.project", "default_project"),
-    ("default.assignee", "default_assignee"),
-    ("default.reporter", "default_reporter"),
-    ("default.tags", "default_tags"),
-    ("default.members", "members"),
-    ("members", "members"),
-    ("review.reviewers", "review_reviewers"),
-    ("default.strict_members", "strict_members"),
-    ("default.priority", "default_priority"),
-    ("default.status", "default_status"),
-    ("taxonomy.tags", "tags"),
-    ("issue.tags", "tags"),
-    ("issue.states", "issue_states"),
-    ("issue.done_states", "issue_done_states"),
-    ("issue.types", "issue_types"),
-    ("issue.priorities", "issue_priorities"),
-    ("custom.fields", "custom_fields"),
-    ("scan.signal_words", "scan_signal_words"),
-    ("scan.ticket_patterns", "scan_ticket_patterns"),
-    ("scan.enable_ticket_words", "scan_enable_ticket_words"),
-    ("scan.enable_mentions", "scan_enable_mentions"),
-    ("scan.strip_attributes", "scan_strip_attributes"),
-    ("auto.identity", "auto_identity"),
-    ("auto.identity_git", "auto_identity_git"),
-    ("auto.populate_members", "auto_populate_members"),
-    ("auto.set_reporter", "auto_set_reporter"),
-    ("auto.assign_on_status", "auto_assign_on_status"),
-    ("auto.codeowners_assign", "auto_codeowners_assign"),
-    ("auto.tags_from_path", "auto_tags_from_path"),
-    ("auto.branch_infer_type", "auto_branch_infer_type"),
-    ("auto.branch_infer_status", "auto_branch_infer_status"),
-    ("auto.branch_infer_priority", "auto_branch_infer_priority"),
-    ("branch.type_aliases", "branch_type_aliases"),
-    ("branch.status_aliases", "branch_status_aliases"),
-    ("branch.priority_aliases", "branch_priority_aliases"),
-    ("attachments.dir", "attachments_dir"),
-    ("attachments.max_upload_mb", "attachments_max_upload_mb"),
-    ("sync.reports_dir", "sync_reports_dir"),
-    ("sync.write_reports", "sync_write_reports"),
-    ("agent.context_enabled", "agent_context_enabled"),
-    ("agent.context_extension", "agent_context_extension"),
-    ("agent.logs_dir", "agent_logs_dir"),
-    ("agent.instructions", "agent_instructions"),
-    ("agent.automation", "agent_automation"),
-    ("agent.worktree", "agent_worktree"),
-    ("sync.remotes", "remotes"),
-    ("sync.auth_profiles", "auth_profiles"),
-];
+// Dotted aliases come from the field catalog (`crate::config::fields`) and
+// are applied from legacy to canonical. Flat fields are the typed schema
+// itself, so newly shipped fields cannot silently disappear here.
 
 fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T, ConfigError> {
     let raw: Value = serde_yaml_ng::from_str(content)
@@ -231,7 +179,7 @@ fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T
     // Do not expose deserializer messages: they may include credential values.
     serde_yaml_ng::from_value::<T>(Value::Mapping(flat.clone()))
         .map_err(|_| ConfigError::ParseError("Invalid type in flat config fields".into()))?;
-    for &(path, field) in CONFIG_PATHS {
+    for (path, field) in crate::config::fields::alias_paths() {
         let mut value = &data;
         let mut present = true;
         for part in path.split('.') {

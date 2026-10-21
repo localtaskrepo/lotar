@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Canonical configuration groups by scope, with types and effective built-in defaults. Canonical YAML only emits non-default values; a comment-only `.tasks/config.yml` still uses defaults. Inspect `lotar config show --full --format=json` for resolved flat fields under `.config`; this CLI envelope is not REST's `.data`. YAML/dotted names below are input names, not JSON response paths. Typed fields and aliases are defined in `src/config/types.rs` and `src/config/normalization.rs`.
+Canonical configuration groups by scope, with types and effective built-in defaults. Canonical YAML only emits non-default values; a comment-only `.tasks/config.yml` still uses defaults. Inspect `lotar config show --full --format=json` for resolved flat fields under `.config`; this CLI envelope is not REST's `.data`. YAML/dotted names below are input names, not JSON response paths. Typed fields are defined in `src/config/types.rs`; accepted dotted aliases, settable scopes and inspect labels are cataloged in `src/config/fields.rs`.
 
 ## Precedence
 CLI > project > env > home > global > defaults (commands without a project skip the project step). See [Resolution & Precedence](./precedence.md).

@@ -1,8 +1,8 @@
 use crate::api_types::ProjectDTO;
 use crate::config::manager::ConfigManager;
 use crate::config::source_labels::{
-    CONFIG_SOURCE_ENTRIES, build_global_source_labels_with_port,
-    build_project_source_labels_with_port, collapse_label_to_scope,
+    build_global_source_labels_with_port, build_project_source_labels_with_port,
+    collapse_label_to_scope, config_source_entries,
 };
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -119,7 +119,7 @@ impl ConfigService {
         let mut sources = serde_json::Map::new();
         let is_project_scope = project_prefix.is_some();
 
-        for entry in CONFIG_SOURCE_ENTRIES {
+        for entry in config_source_entries() {
             if is_project_scope && entry.inspect_key == "default_project" {
                 let scope = if has_global_file {
                     "global"

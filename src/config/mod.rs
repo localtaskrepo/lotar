@@ -11,6 +11,7 @@
 //! - `manager`: Main configuration management coordination
 //! - `operations`: CRUD operations for configuration data
 //! - `candidate`: one validated candidate per config-set operation (DEV-71)
+//! - `fields`: the single catalog of field scopes, aliases and inspect labels (DEV-113)
 //! - `persistence`: File I/O operations for configuration files
 //! - `resolution`: Configuration merging and resolution logic
 //! - `validation`: Configuration validation system
@@ -18,6 +19,7 @@
 pub mod bootstrap;
 pub mod candidate;
 pub mod env_overrides;
+pub mod fields;
 pub mod manager;
 pub mod normalization;
 pub mod operations;

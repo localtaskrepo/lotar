@@ -219,7 +219,7 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 | Automation engine | `src/services/automation_service.rs`, `src/services/automation_matching.rs` |
 | Automation types | `src/automation/types.rs`, `src/automation/persistence.rs`, `src/automation/template.rs` |
 | Config types | `src/config/types.rs` (agent profiles, automation config, worktree config) |
-| Config normalization | `src/config/normalization.rs` (parses `issue.states/types/priorities`) |
+| Config normalization | `src/config/normalization.rs` (parses dotted aliases such as `issue.states/types/priorities` listed in `src/config/fields.rs`) |
 | CLI args/handlers | `src/cli/args/agent.rs`, `src/cli/handlers/agent.rs`, `src/cli/handlers/mod.rs` |
 | REST routes | `src/routes/jobs.rs` (job endpoints), `src/routes/automation.rs` (automation endpoints) |
 | API DTOs | `src/api_types.rs` |

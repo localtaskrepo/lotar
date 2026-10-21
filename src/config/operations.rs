@@ -1096,135 +1096,9 @@ pub fn apply_field_to_project_config(
     Ok(())
 }
 
-/// Fields settable in the global configuration (canonical flat names).
-pub const GLOBAL_CONFIG_FIELDS: &[&str] = &[
-    "server_port",
-    "default_project",
-    "default_assignee",
-    "default_reporter",
-    "default_tags",
-    "members",
-    "strict_members",
-    "auto_populate_members",
-    "default_priority",
-    "default_status",
-    "tags",
-    "custom_fields",
-    "issue_states",
-    "issue_done_states",
-    "issue_types",
-    "issue_priorities",
-    "auto_set_reporter",
-    "auto_assign_on_status",
-    "auto_codeowners_assign",
-    "auto_tags_from_path",
-    "auto_branch_infer_type",
-    "auto_branch_infer_status",
-    "auto_branch_infer_priority",
-    "auto_identity",
-    "auto_identity_git",
-    "scan_signal_words",
-    "scan_ticket_patterns",
-    "scan_enable_ticket_words",
-    "scan_enable_mentions",
-    "scan_strip_attributes",
-    "branch_type_aliases",
-    "branch_status_aliases",
-    "branch_priority_aliases",
-    "attachments_dir",
-    "attachments_max_upload_mb",
-    "sync_reports_dir",
-    "sync_write_reports",
-    "agent_context_enabled",
-    "agent_context_extension",
-    "agent_logs_dir",
-    "agent_instructions",
-    "agent_instructions_file",
-    "agent_on_start_status",
-    "agent_on_success_status",
-    "agent_on_failure_status",
-    "agent_on_cancel_status",
-    "agent_on_start_reassign_to",
-    "agent_on_success_reassign_to",
-    "agent_on_failure_reassign_to",
-    "agent_on_cancel_reassign_to",
-    "agent_worktree_enabled",
-    "agent_worktree_dir",
-    "agent_worktree_branch_prefix",
-    "remotes",
-    "sprints_defaults_capacity_points",
-    "sprints_defaults_capacity_hours",
-    "sprints_defaults_length",
-    "sprints_defaults_overdue_after",
-    "sprints_notifications_enabled",
-    "web_ui_path",
-];
-
-/// Fields settable in a project configuration override (canonical flat names).
-pub const PROJECT_CONFIG_FIELDS: &[&str] = &[
-    "project_name",
-    "review_reviewers",
-    "default_assignee",
-    "default_reporter",
-    "default_tags",
-    "members",
-    "strict_members",
-    "auto_populate_members",
-    "default_priority",
-    "default_status",
-    "issue_states",
-    "issue_done_states",
-    "issue_types",
-    "issue_priorities",
-    "tags",
-    "custom_fields",
-    "auto_set_reporter",
-    "auto_assign_on_status",
-    "auto_codeowners_assign",
-    "auto_tags_from_path",
-    "auto_branch_infer_type",
-    "auto_branch_infer_status",
-    "auto_branch_infer_priority",
-    "auto_identity",
-    "auto_identity_git",
-    "scan_signal_words",
-    "scan_ticket_patterns",
-    "scan_enable_ticket_words",
-    "scan_enable_mentions",
-    "scan_strip_attributes",
-    "branch_type_aliases",
-    "branch_status_aliases",
-    "branch_priority_aliases",
-    "attachments_dir",
-    "attachments_max_upload_mb",
-    "sync_reports_dir",
-    "sync_write_reports",
-    "agent_context_enabled",
-    "agent_context_extension",
-    "agent_logs_dir",
-    "agent_instructions",
-    "agent_instructions_file",
-    "agent_on_start_status",
-    "agent_on_success_status",
-    "agent_on_failure_status",
-    "agent_on_cancel_status",
-    "agent_on_start_reassign_to",
-    "agent_on_success_reassign_to",
-    "agent_on_failure_reassign_to",
-    "agent_on_cancel_reassign_to",
-    "agent_worktree_enabled",
-    "agent_worktree_dir",
-    "agent_worktree_branch_prefix",
-    "remotes",
-];
-
-/// Valid canonical field names for the given scope.
+/// Valid canonical field names for the given scope (see [`crate::config::fields`]).
 pub fn valid_fields(is_global: bool) -> &'static [&'static str] {
-    if is_global {
-        GLOBAL_CONFIG_FIELDS
-    } else {
-        PROJECT_CONFIG_FIELDS
-    }
+    crate::config::fields::settable_fields(is_global)
 }
 
 /// Validate that a (canonical flat) field name is valid for the given scope.
@@ -1245,7 +1119,7 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
 /// Canonicalize a config-set field name for the given scope (DEV-71).
 ///
 /// Shipped flat names pass through unchanged. Documented dotted canonical
-/// names resolve through the authoritative [`CONFIG_PATHS`] table, including
+/// names resolve through the alias catalog in [`crate::config::fields`], including
 /// the exceptions (`default.strict_members` -> `strict_members`,
 /// `issue.tags` -> `tags`). Unknown names and aliases whose target is not
 /// settable in the requested scope are rejected.
@@ -1260,10 +1134,7 @@ pub fn canonicalize_field_name(field: &str, is_global: bool) -> Result<String, C
     if valid_fields.contains(&trimmed) {
         return Ok(trimmed.to_string());
     }
-    if let Some(&(_, flat)) = crate::config::normalization::CONFIG_PATHS
-        .iter()
-        .find(|&&(dotted, _)| dotted == trimmed)
-    {
+    if let Some(flat) = crate::config::fields::flat_for_alias(trimmed) {
         if valid_fields.contains(&flat) {
             return Ok(flat.to_string());
         }
@@ -1287,7 +1158,7 @@ pub fn canonicalize_field_name(field: &str, is_global: bool) -> Result<String, C
 /// friends to the global scope without requiring `--global`.
 pub fn is_global_only_field_name(field: &str) -> Option<String> {
     let canonical = canonicalize_field_name(field, true).ok()?;
-    if PROJECT_CONFIG_FIELDS.contains(&canonical.as_str()) {
+    if valid_fields(false).contains(&canonical.as_str()) {
         None
     } else {
         Some(canonical)

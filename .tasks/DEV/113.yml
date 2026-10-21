@@ -1,7 +1,35 @@
 title: Consolidate configuration field metadata without changing supported keys
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T00:46:59.748754+00:00
+modified: 2026-10-21T20:33:05.035660+00:00
+comments:
+- date: 2026-10-21T20:33:05.009542+00:00
+  text: |-
+    Outcome: New src/config/fields.rs holds one CONFIG_FIELDS catalog (per flat field: global/project settable scope, dotted aliases in load-application order, config-inspect source path/label key, resolved_relevant and task_conflict flags). operations.rs valid_fields/canonicalize_field_name/is_global_only_field_name, normalization.rs parse_config alias application, source_labels.rs/config_service inspect entries, and candidate.rs revalidation/task-conflict checks now derive from it; the four duplicated lists (GLOBAL/PROJECT_CONFIG_FIELDS, CONFIG_PATHS, CONFIG_SOURCE_ENTRIES, RESOLVED_RELEVANT/TASK_CONFLICT_FIELDS) are gone. Typed setters, accepted/rejected spellings (no new dotted aliases; hyphenated inspect paths stay display-only), provenance/source labels, empty-clear/inheritance, force and full-candidate validation are unchanged. Only visible difference: the project-scope 'Valid fields' error listing now puts tags/custom_fields in catalog order. Duration policy (DEV-111) untouched.
+    Evidence: fields.rs tests pin derived views to the exact pre-change literals (global list in order, project set, alias pairs incl. per-field order, source triples, revalidation/conflict sets), catalog invariants (unique fields/aliases/paths, conflict implies revalidation) and a catalog-driven config-set scope/alias/global-promotion check; full npm run test:rust:agent 1552/1552 pass incl. dev71 candidate, dev102 config no-op/dry-run and config inspect suites; clippy clean. Docs pointers updated (config-reference, agent-automation-tracker).
+    Remaining: none; final gates at end of batch.
+    Guidance: no durable finding.
 description: Deferred after DEV-112. Centralize field scope, aliases and inspect/source-label metadata duplicated in config/operations.rs GLOBAL/PROJECT_CONFIG_FIELDS, normalization.rs CONFIG_PATHS, source_labels.rs and candidate relevant-field sets. Keep typed setters and existing accepted/rejected key spellings, provenance, empty-clear/inheritance, force and full-candidate validation contracts unchanged. Do not union catalogs into silently newly accepted dotted aliases or replace typed config with a dynamic engine. Add completeness/invariant tests, alias/scope/dryrun/noop regression coverage; coordinate future duration policy DEV-111 separately. Work only when assigned; no implementation in DEV-112.
+history:
+- at: 2026-10-21T20:33:04.953796+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-21T20:33:05.009542+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-21T20:33:05.035660+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
