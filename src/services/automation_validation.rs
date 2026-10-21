@@ -4,6 +4,7 @@ use crate::automation::types::{
 };
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
+use crate::services::automation_service::{SetEnumField, SetPlan};
 use crate::types::{Priority, TaskStatus, TaskType};
 use std::time::Duration;
 
@@ -157,28 +158,16 @@ fn validate_action(
         return;
     };
     if let Some(set) = action.set.as_ref() {
-        if let Some(status) = set.status.as_ref()
-            && TaskStatus::parse_with_config(status, config).is_err()
-        {
+        let plan = SetPlan::parse(set, config, str::to_string);
+        for (field, value) in plan.rejected {
+            let label = match field {
+                SetEnumField::Status => "status",
+                SetEnumField::Priority => "priority",
+                SetEnumField::Type => "type",
+            };
             result.add_error(ValidationError::warning(
                 Some("automation".to_string()),
-                format!("Automation action sets unknown status '{}'.", status),
-            ));
-        }
-        if let Some(priority) = set.priority.as_ref()
-            && Priority::parse_with_config(priority, config).is_err()
-        {
-            result.add_error(ValidationError::warning(
-                Some("automation".to_string()),
-                format!("Automation action sets unknown priority '{}'.", priority),
-            ));
-        }
-        if let Some(task_type) = set.task_type.as_ref()
-            && TaskType::parse_with_config(task_type, config).is_err()
-        {
-            result.add_error(ValidationError::warning(
-                Some("automation".to_string()),
-                format!("Automation action sets unknown type '{}'.", task_type),
+                format!("Automation action sets unknown {} '{}'.", label, value),
             ));
         }
     }

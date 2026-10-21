@@ -705,34 +705,32 @@ fn simulate_action(
     let mut simulated = current.clone();
 
     if let Some(set) = action.set.as_ref() {
-        if let Some(value) = set.status.as_ref()
-            && let Ok(status) = TaskStatus::parse_with_config(value, config)
-        {
+        // Preview keeps its historical subset: no template expansion, raw
+        // assignee/reporter, `tags` only, and no due date, effort or custom
+        // fields. Defining full preview parity is a separate decision (DEV-118).
+        let plan = SetPlan::parse(set, config, str::to_string);
+        if let Some(status) = plan.status {
             simulated.status = status;
         }
-        if let Some(value) = set.priority.as_ref()
-            && let Ok(priority) = Priority::parse_with_config(value, config)
-        {
+        if let Some(priority) = plan.priority {
             simulated.priority = priority;
         }
-        if let Some(value) = set.task_type.as_ref()
-            && let Ok(task_type) = TaskType::parse_with_config(value, config)
-        {
+        if let Some(task_type) = plan.task_type {
             simulated.task_type = task_type;
         }
-        if let Some(value) = set.title.as_ref() {
-            simulated.title = value.clone();
+        if let Some(title) = plan.title {
+            simulated.title = title;
         }
-        if let Some(value) = set.description.as_ref() {
-            simulated.description = Some(value.clone());
+        if let Some(description) = plan.description {
+            simulated.description = Some(description);
         }
-        if let Some(value) = set.assignee.as_ref() {
-            simulated.assignee = Some(value.clone());
+        if let Some(assignee) = plan.assignee {
+            simulated.assignee = Some(assignee);
         }
-        if let Some(value) = set.reporter.as_ref() {
-            simulated.reporter = Some(value.clone());
+        if let Some(reporter) = plan.reporter {
+            simulated.reporter = Some(reporter);
         }
-        if let Some(values) = set.tags.as_ref().map(StringOrVec::as_vec) {
+        if let Some(values) = plan.tags {
             simulated.tags = normalize_tags(values);
         }
     }
@@ -1409,6 +1407,83 @@ fn apply_action(
     Ok(())
 }
 
+/// Enum fields of a `set` block, named as in automation YAML.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SetEnumField {
+    Status,
+    Priority,
+    Type,
+}
+
+/// Typed view of an action's `set` block, parsed once and shared by apply,
+/// preview (simulate) and validation so the supported fields and enum
+/// parsing cannot drift between them (DEV-118).
+///
+/// Text values are passed through `expand` (template expansion on apply,
+/// identity elsewhere). Enum values that do not parse against the project
+/// config are skipped and reported in `rejected`. Assignee and reporter stay
+/// raw: resolving aliases such as `@me` or agent profiles is the caller's job.
+#[derive(Debug, Default)]
+pub(crate) struct SetPlan<'a> {
+    pub status: Option<TaskStatus>,
+    pub priority: Option<Priority>,
+    pub task_type: Option<TaskType>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub due_date: Option<String>,
+    pub effort: Option<String>,
+    pub assignee: Option<String>,
+    pub reporter: Option<String>,
+    /// Values from `tags`.
+    pub tags: Option<Vec<String>>,
+    /// Values from the `labels`/`label` alias.
+    pub labels: Option<Vec<String>>,
+    pub custom_fields: Option<&'a HashMap<String, serde_yaml_ng::Value>>,
+    /// Enum inputs (after expansion) that did not parse.
+    pub rejected: Vec<(SetEnumField, String)>,
+}
+
+impl<'a> SetPlan<'a> {
+    pub(crate) fn parse(
+        set: &'a AutomationActionSet,
+        config: &ResolvedConfig,
+        expand: impl Fn(&str) -> String,
+    ) -> Self {
+        let mut plan = SetPlan::default();
+        if let Some(value) = set.status.as_ref() {
+            let value = expand(value);
+            match TaskStatus::parse_with_config(&value, config) {
+                Ok(status) => plan.status = Some(status),
+                Err(_) => plan.rejected.push((SetEnumField::Status, value)),
+            }
+        }
+        if let Some(value) = set.priority.as_ref() {
+            let value = expand(value);
+            match Priority::parse_with_config(&value, config) {
+                Ok(priority) => plan.priority = Some(priority),
+                Err(_) => plan.rejected.push((SetEnumField::Priority, value)),
+            }
+        }
+        if let Some(value) = set.task_type.as_ref() {
+            let value = expand(value);
+            match TaskType::parse_with_config(&value, config) {
+                Ok(task_type) => plan.task_type = Some(task_type),
+                Err(_) => plan.rejected.push((SetEnumField::Type, value)),
+            }
+        }
+        plan.title = set.title.as_deref().map(&expand);
+        plan.description = set.description.as_deref().map(&expand);
+        plan.due_date = set.due_date.as_deref().map(&expand);
+        plan.effort = set.effort.as_deref().map(&expand);
+        plan.assignee = set.assignee.as_deref().map(&expand);
+        plan.reporter = set.reporter.as_deref().map(&expand);
+        plan.tags = set.tags.as_ref().map(StringOrVec::as_vec);
+        plan.labels = set.labels.as_ref().map(StringOrVec::as_vec);
+        plan.custom_fields = set.custom_fields.as_ref();
+        plan
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn apply_set_action(
     set: &AutomationActionSet,
@@ -1421,50 +1496,41 @@ fn apply_set_action(
     tmpl: &TemplateContext,
 ) -> LoTaRResult<()> {
     let tasks_dir = storage.root_path.as_path();
-    if let Some(value) = set.status.as_ref()
-        && let Ok(status) = TaskStatus::parse_with_config(&tmpl.expand(value), config)
-    {
+    let plan = SetPlan::parse(set, config, |value| tmpl.expand(value));
+    if let Some(status) = plan.status {
         patch.status = Some(status.to_string());
     }
-    if let Some(value) = set.priority.as_ref()
-        && let Ok(priority) = Priority::parse_with_config(&tmpl.expand(value), config)
-    {
+    if let Some(priority) = plan.priority {
         patch.priority = Some(priority.to_string());
     }
-    if let Some(value) = set.task_type.as_ref()
-        && let Ok(task_type) = TaskType::parse_with_config(&tmpl.expand(value), config)
-    {
+    if let Some(task_type) = plan.task_type {
         patch.task_type = Some(task_type.to_string());
     }
-    if let Some(value) = set.title.as_ref() {
-        patch.title = Some(tmpl.expand(value));
+    if let Some(title) = plan.title {
+        patch.title = Some(title);
     }
-    if let Some(value) = set.description.as_ref() {
-        patch.description = Some(tmpl.expand(value));
+    if let Some(description) = plan.description {
+        patch.description = Some(description);
     }
-    if let Some(value) = set.due_date.as_ref() {
-        patch.due_date = Some(tmpl.expand(value));
+    if let Some(due_date) = plan.due_date {
+        patch.due_date = Some(due_date);
     }
-    if let Some(value) = set.effort.as_ref() {
-        patch.effort = Some(tmpl.expand(value));
+    if let Some(effort) = plan.effort {
+        patch.effort = Some(effort);
     }
-    if let Some(value) = set.assignee.as_ref() {
-        patch.assignee = resolve_assignee_value(&tmpl.expand(value), current, config, storage);
+    if let Some(value) = plan.assignee.as_deref() {
+        patch.assignee = resolve_assignee_value(value, current, config, storage);
     }
-    if let Some(value) = set.reporter.as_ref() {
-        patch.reporter = resolve_reporter_value(&tmpl.expand(value), current, tasks_dir);
+    if let Some(value) = plan.reporter.as_deref() {
+        patch.reporter = resolve_reporter_value(value, current, tasks_dir);
     }
 
-    if let Some(values) = set
-        .tags
-        .as_ref()
-        .map(StringOrVec::as_vec)
-        .or_else(|| set.labels.as_ref().map(StringOrVec::as_vec))
-    {
+    // `tags` wins over the `labels` alias when both are present.
+    if let Some(values) = plan.tags.or(plan.labels) {
         *updated_tags = normalize_tags(values);
     }
 
-    if let Some(map) = set.custom_fields.as_ref() {
+    if let Some(map) = plan.custom_fields {
         for (key, value) in map {
             let converted = convert_custom_field_value(value, key)?;
             custom_fields.insert(key.clone(), converted);

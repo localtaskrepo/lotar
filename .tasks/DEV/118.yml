@@ -4,4 +4,17 @@ priority: Low
 type: Chore
 reporter: mallox
 created: 2026-10-14T00:46:59.896906+00:00
+modified: 2026-10-21T20:36:59.823409+00:00
+comments:
+- date: 2026-10-21T20:36:59.823409+00:00
+  text: |-
+    Progress (step 1 of 2, move-only): Added SetPlan/SetEnumField in src/services/automation_service.rs, one typed parse of a set block (enum parsing with rejected inputs, text fields through an expander, raw assignee/reporter, tags and labels kept separate, custom_fields by reference). apply_set_action, simulate_action and automation_validation.rs now all consume it; mutation receipts, completion policy, recursion/no-op guards and every output are unchanged (apply: templates, tags-over-labels, assignee/reporter resolution, custom fields; preview: historical subset; validation: same three warning messages).
+    Evidence: tests/dev118_automation_set_plan_test.rs characterizes apply for every set field and the labels alias (incl. templates, tags-over-labels precedence, unknown enums skipped), the exact preview subset, and per-enum validation warnings (4/4); automation/agent/dev59/dev102/dev21 suites 185/185; clippy clean.
+    Remaining (needs product decision before step 2): define preview parity. Currently simulate does not expand templates, shows assignee/reporter raw (no @me/@reporter/agent resolution), ignores due_date, effort, custom_fields and the labels alias, and uses exact-match tag add/remove rather than apply's case-insensitive merge with labels. Options: (a) full parity using SetPlan with a template context from the task, plus resolved assignee/reporter; (b) parity for plain fields only, keep templates/aliases raw and labelled as unresolved; (c) keep the subset and document it. Once decided, apply the chosen mapping in simulate_action and flip the 'Not yet previewed' assertions in the DEV-118 test.
+    Guidance: no durable finding.
 description: Deferred after DEV-112. Apply and simulate independently enumerate set fields/parse enums; simulate currently omits due/effort/custom values and does not fully resolve templates/assignee. First extract shared pure supported-field/parse plan preserving current mutation receipts/completion policy; then explicitly define preview parity and template/resolver behavior before changing output. Test every set field and alias against apply/preview, recursion and no-op guards. Keep implicit feature additions separate from move-only cleanup. No implementation in DEV-112.
+history:
+- at: 2026-10-21T20:36:59.823409+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
