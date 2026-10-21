@@ -574,19 +574,8 @@ fn main() {
                 if let Some(repo_root) = maybe_repo {
                     // Compute tasks relative path
                     let tasks_abs = resolver.path.clone();
-                    let tasks_rel = if tasks_abs.starts_with(&repo_root) {
-                        tasks_abs
-                            .strip_prefix(&repo_root)
-                            .map(std::path::PathBuf::from)
-                            .map_err(|e| {
-                                format!(
-                                    "Failed to compute tasks directory relative to repo root: {}",
-                                    e
-                                )
-                            })?
-                    } else {
-                        tasks_abs
-                    };
+                    let tasks_rel = lotar::utils::git::repo_relative_path(&repo_root, &tasks_abs)
+                        .unwrap_or_else(|| tasks_abs.clone());
                     // Resolve project scoping
                     let project_filter: Option<String> = if global {
                         None

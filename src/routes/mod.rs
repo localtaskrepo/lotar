@@ -199,6 +199,21 @@ pub(super) fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
     json_response(status, v).unwrap_or_else(json_serialize_error)
 }
 
+/// Resolve the Git repository root and the tasks directory relative to it,
+/// for endpoints that read task history from Git. Symlinked paths resolve
+/// the same way as in the CLI (see `repo_relative_path`).
+pub(super) fn resolve_repo_tasks_paths()
+-> Result<(std::path::PathBuf, std::path::PathBuf), HttpResponse> {
+    let resolver = TasksDirectoryResolver::resolve(None, None)
+        .map_err(|e| internal(json!({"error": {"code": "INTERNAL", "message": e}})))?;
+    let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
+    let repo_root = crate::utils::git::find_repo_root(&cwd)
+        .ok_or_else(|| bad_request("Not inside a git repository".into()))?;
+    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &resolver.path)
+        .ok_or_else(|| bad_request("Tasks directory not inside repository".into()))?;
+    Ok((repo_root, tasks_rel))
+}
+
 /// Query keys with dedicated handling in the task list/export endpoints.
 pub(super) const TASK_LIST_KNOWN_KEYS: &[&str] = &[
     "project",

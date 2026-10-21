@@ -53,14 +53,8 @@ pub(crate) fn run_changed(
 
     // Compute tasks path relative to repo root
     let tasks_abs = resolver.path.clone();
-    let tasks_rel = if tasks_abs.starts_with(&repo_root) {
-        match tasks_abs.strip_prefix(&repo_root) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => tasks_abs.clone(),
-        }
-    } else {
-        tasks_abs.clone()
-    };
+    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
+        .unwrap_or_else(|| tasks_abs.clone());
 
     // Call audit service to list changed tasks
     let items = crate::services::audit_service::AuditService::list_changed_tasks(
@@ -169,20 +163,14 @@ pub(crate) fn run_churn(
         }
     };
     let tasks_abs = resolver.path.clone();
-    // Canonicalize both to avoid macOS /var vs /private/var mismatches
-    let repo_root_real = std::fs::canonicalize(&repo_root).unwrap_or(repo_root.clone());
-    let tasks_abs_real = std::fs::canonicalize(&tasks_abs).unwrap_or(tasks_abs.clone());
-    let tasks_rel = if tasks_abs_real.starts_with(&repo_root_real) {
-        tasks_abs_real
-            .strip_prefix(&repo_root_real)
-            .unwrap()
-            .to_path_buf()
-    } else {
-        tasks_abs
-            .file_name()
-            .map(std::path::PathBuf::from)
-            .unwrap_or(tasks_abs.clone())
-    };
+    // Fall back to the tasks directory name to stay repo-relative
+    let tasks_rel =
+        crate::utils::git::repo_relative_path(&repo_root, &tasks_abs).unwrap_or_else(|| {
+            tasks_abs
+                .file_name()
+                .map(std::path::PathBuf::from)
+                .unwrap_or(tasks_abs.clone())
+        });
 
     // If an inferred project path doesn't exist locally, widen to global to be forgiving in new repos/tests
     if let Some(ref p) = scope_project

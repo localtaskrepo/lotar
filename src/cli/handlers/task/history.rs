@@ -481,11 +481,8 @@ fn resolve_task_file(
     let repo_root = crate::utils::git::find_repo_root(&cwd)
         .ok_or_else(|| "Not in a git repository".to_string())?;
     let tasks_abs = resolver.path.clone();
-    let tasks_rel = if tasks_abs.starts_with(&repo_root) {
-        tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
-    } else {
-        tasks_abs
-    };
+    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
+        .unwrap_or_else(|| tasks_abs.clone());
     let file_rel_to_repo =
         tasks_rel.join(file_rel.strip_prefix(&resolver.path).unwrap_or(&file_rel));
 

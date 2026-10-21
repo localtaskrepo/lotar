@@ -1148,20 +1148,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return bad_request("Missing id".into()),
         };
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        // Find repo root and compute file rel path
-        let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
-        let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-            Some(r) => r,
-            None => return bad_request("Not inside a git repository".into()),
-        };
-        let tasks_abs = resolver.path.clone();
-        let tasks_rel = match tasks_abs.strip_prefix(&repo_root) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => return bad_request("Tasks directory not inside repository".into()),
+        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
+            Ok(paths) => paths,
+            Err(resp) => return resp,
         };
         // Derive project and numeric from the canonical ID parse
         let parsed = match crate::storage::TaskId::parse(&id) {
@@ -1198,19 +1187,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return bad_request("Missing commit".into()),
         };
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
-        let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-            Some(r) => r,
-            None => return bad_request("Not inside a git repository".into()),
-        };
-        let tasks_abs = resolver.path.clone();
-        let tasks_rel = match tasks_abs.strip_prefix(&repo_root) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => return bad_request("Tasks directory not inside repository".into()),
+        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
+            Ok(paths) => paths,
+            Err(resp) => return resp,
         };
         let parsed = match crate::storage::TaskId::parse(&id) {
             Ok(parsed) => parsed,

@@ -104,6 +104,24 @@ pub fn find_repo_root(start: &Path) -> Option<PathBuf> {
     }
 }
 
+/// Express `path` relative to `repo_root`, the form Git pathspecs expect.
+///
+/// The direct prefix is tried first. When either side goes through a symlink
+/// (for example macOS `/tmp` -> `/private/tmp`, or a symlinked workspace),
+/// both sides are canonicalized and compared again. Returns `None` when the
+/// path is not inside the repository.
+pub fn repo_relative_path(repo_root: &Path, path: &Path) -> Option<PathBuf> {
+    if let Ok(rel) = path.strip_prefix(repo_root) {
+        return Some(rel.to_path_buf());
+    }
+    let root_real = fs::canonicalize(repo_root).ok()?;
+    let path_real = fs::canonicalize(path).ok()?;
+    path_real
+        .strip_prefix(&root_real)
+        .ok()
+        .map(Path::to_path_buf)
+}
+
 /// Read the checkout's own HEAD, including gitdir-file linked worktrees.
 pub fn read_current_branch(repo_root: &Path) -> Option<String> {
     read_branch_at(&repo_root.join(".git"))

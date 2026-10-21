@@ -1,7 +1,35 @@
 title: Task commit history API fails when the tasks dir path goes through a symlink
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-02T18:15:52.399799+00:00
+modified: 2026-10-21T20:14:45.939226+00:00
+comments:
+- date: 2026-10-21T20:14:45.922214+00:00
+  text: |-
+    Outcome: Added utils::git::repo_relative_path (direct prefix, then canonicalize both sides) and routed all six REST history/activity handlers through routes::resolve_repo_tasks_paths. CLI task history, changelog and stats (activity, authors, stale, churn, effort, status) use the same helper with their existing fallbacks, so server and CLI resolve the repo-relative task path identically.
+    Evidence: tests/task_history_git_test.rs symlinked_workspace::git_required::rest_and_cli_history_agree_through_symlinked_tasks_dir (unix) reproduces the 400 'Tasks directory not inside repository' with the fallback disabled and passes with the fix; history/stats/changelog/web API suites (49 tests) pass; npm run lint:agent clean.
+    Remaining: none; full test/smoke gates run at end of the bug/chore batch.
+    Guidance: no durable finding.
 description: 'Found while capturing README screenshots (DEV-17). With the workspace at /tmp/... on macOS (/tmp -> /private/tmp), GET /api/tasks/history?id=X returns 400 ''Tasks directory not inside repository'' because the tasks dir is compared against the canonical git top-level without canonicalizing first. The CLI ''lotar task history'' works from the same path, so the web UI Commits tab shows ''No commits yet'' while the CLI shows history. Repro: create a git repo under /tmp, commit a task, run lotar serve with LOTAR_TASKS_DIR=/tmp/<repo>/.tasks and query /api/tasks/history. Acceptance: server and CLI resolve the repo-relative task path the same way (canonicalize both sides), with a regression test using a symlinked workspace path.'
+history:
+- at: 2026-10-21T20:14:45.889538+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-21T20:14:45.922214+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-21T20:14:45.939226+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -42,14 +42,8 @@ pub(crate) fn run(
         }
     };
     let tasks_abs = resolver.path.clone();
-    let tasks_rel = if tasks_abs.starts_with(&repo_root) {
-        tasks_abs
-            .strip_prefix(&repo_root)
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| tasks_abs.clone())
-    } else {
-        tasks_abs.clone()
-    };
+    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
+        .unwrap_or_else(|| tasks_abs.clone());
 
     let items = crate::services::audit_service::AuditService::list_authors_activity(
         &repo_root,

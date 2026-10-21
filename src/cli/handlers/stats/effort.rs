@@ -67,22 +67,18 @@ pub(crate) fn run(
                 );
             }
         }
-        // Canonicalize both to avoid /var vs /private/var mismatches on macOS and similar
         let tasks_abs = resolver.path.clone();
+        // Canonical forms avoid /var vs /private/var mismatches on macOS and similar
         let repo_root_real = std::fs::canonicalize(&repo_root).unwrap_or(repo_root.clone());
         let tasks_abs_real = std::fs::canonicalize(&tasks_abs).unwrap_or(tasks_abs.clone());
-        let tasks_rel = if tasks_abs_real.starts_with(&repo_root_real) {
-            tasks_abs_real
-                .strip_prefix(&repo_root_real)
-                .unwrap()
-                .to_path_buf()
-        } else {
-            // Fall back to just the tasks directory name to stay repo-relative
-            tasks_abs
-                .file_name()
-                .map(std::path::PathBuf::from)
-                .unwrap_or(tasks_abs.clone())
-        };
+        // Fall back to the tasks directory name to stay repo-relative
+        let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
+            .unwrap_or_else(|| {
+                tasks_abs
+                    .file_name()
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or(tasks_abs.clone())
+            });
         if std::env::var("LOTAR_DEBUG").is_ok() {
             use std::fs::OpenOptions;
             use std::io::Write;

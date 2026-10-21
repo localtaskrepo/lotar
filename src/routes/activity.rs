@@ -2,19 +2,9 @@ use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/activity/feed", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
-        let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-            Some(r) => r,
-            None => return bad_request("Not inside a git repository".into()),
-        };
-        let tasks_abs = resolver.path.clone();
-        let tasks_rel = match tasks_abs.strip_prefix(&repo_root) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => return bad_request("Tasks directory not inside repository".into()),
+        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
+            Ok(paths) => paths,
+            Err(resp) => return resp,
         };
         let now = chrono::Utc::now();
         let default_since = now - chrono::Duration::days(30);
@@ -52,20 +42,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/activity/series?group=author|day|week|project[&since=ISO][&until=ISO][&project=PREFIX]
 
     api_server.register_handler("GET", "/api/activity/series", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        // Repo root and tasks relative
-        let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
-        let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-            Some(r) => r,
-            None => return bad_request("Not inside a git repository".into()),
-        };
-        let tasks_abs = resolver.path.clone();
-        let tasks_rel = match tasks_abs.strip_prefix(&repo_root) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => return bad_request("Tasks directory not inside repository".into()),
+        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
+            Ok(paths) => paths,
+            Err(resp) => return resp,
         };
         // Parse group
         let gb = match req.query.get("group").map(|s| s.as_str()) {
@@ -107,19 +86,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/activity/authors[?since=ISO][&until=ISO][&project=PREFIX]
 
     api_server.register_handler("GET", "/api/activity/authors", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
-        let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-            Some(r) => r,
-            None => return bad_request("Not inside a git repository".into()),
-        };
-        let tasks_abs = resolver.path.clone();
-        let tasks_rel = match tasks_abs.strip_prefix(&repo_root) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => return bad_request("Tasks directory not inside repository".into()),
+        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
+            Ok(paths) => paths,
+            Err(resp) => return resp,
         };
         let now = chrono::Utc::now();
         let default_since = now - chrono::Duration::days(30);
@@ -152,19 +121,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/activity/changed_tasks[?since=ISO][&until=ISO][&author=str][&project=PREFIX]
 
     api_server.register_handler("GET", "/api/activity/changed_tasks", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
-        let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-            Some(r) => r,
-            None => return bad_request("Not inside a git repository".into()),
-        };
-        let tasks_abs = resolver.path.clone();
-        let tasks_rel = match tasks_abs.strip_prefix(&repo_root) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => return bad_request("Tasks directory not inside repository".into()),
+        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
+            Ok(paths) => paths,
+            Err(resp) => return resp,
         };
         let now = chrono::Utc::now();
         let default_since = now - chrono::Duration::days(30);
