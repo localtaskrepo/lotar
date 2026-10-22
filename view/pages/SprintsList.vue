@@ -523,7 +523,7 @@
                         'task-row--before': rowMarker?.task === task.id && rowMarker.sprint === sprint.id && rowMarker.position === 'before',
                         'task-row--after': rowMarker?.task === task.id && rowMarker.sprint === sprint.id && rowMarker.position === 'after',
                       }"
-                       :draggable="!busy"
+                       :draggable="!dragBlocked"
                        :title="isSprintManual(sprint.id) ? undefined : automaticOrderHint"
                        :aria-describedby="reorderHint?.sprint === sprint.id ? 'task-order-tooltip' : undefined"
                       :data-task-id="task.id"
@@ -670,7 +670,7 @@
                         'task-row--before': rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'before',
                         'task-row--after': rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'after',
                       }"
-                        :draggable="!busy"
+                        :draggable="!dragBlocked"
                         :title="backlogManualOrder ? undefined : automaticOrderHint"
                         :aria-describedby="reorderHint?.sprint === null ? 'task-order-tooltip' : undefined"
                       :data-task-id="task.id"
@@ -1447,6 +1447,11 @@ const filtersActive = computed(() => Object.entries(filter.value).some(([key, va
 const busy = computed(
   () => reordering.value || backlogOrderLoading.value || sprintsLoading.value || tasksLoading.value || Object.keys(lifecycleBusy).length > 0,
 )
+// DEV-132: dragging only waits for in-flight writes. Read-only refreshes
+// (usually the file-watcher echo of the previous reorder) are superseded by a
+// drop: reorders are anchored on task IDs, the server response is
+// authoritative, and generation counters discard the loads it replaces.
+const dragBlocked = computed(() => reordering.value || Object.keys(lifecycleBusy).length > 0)
 
 const sortedBacklogTasks = computed(() => {
   if (!backlogManualOrder.value) return sortTasks(backlogTasks.value)
@@ -2162,7 +2167,7 @@ function applyTaskOrder(sprint: number | null, ids: string[]) {
 }
 
 function onRowDragOver(event: DragEvent, task: string, sprint: number | null) {
-  if (!draggingTaskId.value || draggingCol.value || busy.value) return
+  if (!draggingTaskId.value || draggingCol.value || dragBlocked.value) return
   if (!isContainerManual(sprint)) {
     rowMarker.value = null
     if (draggingSourceSprint.value === sprint) {
@@ -2186,7 +2191,7 @@ async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null
   if (!draggingTaskId.value || draggingCol.value) return
   event.preventDefault()
   event.stopPropagation()
-  if (busy.value) { onTaskDragEnd(); return }
+  if (dragBlocked.value) { onTaskDragEnd(); return }
   const task = draggingTaskId.value
   const source = draggingSourceSprint.value
   const copyMode = resolveCopyModifier(event)
@@ -2222,6 +2227,8 @@ async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null
     const generation = advanceOrderGeneration(sprint)
     ++taskGeneration
     tasksLoading.value = false
+    // A superseded backlog-order load can no longer clear its own flag.
+    if (sprint === null) backlogOrderLoading.value = false
     const response = await api.reorderTasks({ task, sprint, [position]: anchor, ...(allowClosed.value ? { allow_closed: true } : {}) })
     if (disposed) return
     if (generation === orderGenerations.get(sprint)) applyTaskOrder(sprint, response.tasks)
@@ -2355,7 +2362,7 @@ async function removeTasksFromSprint(taskIds: string[], sprintId: number, option
 }
 
 function onTaskDragStart(event: DragEvent, taskId: string, sourceSprint: number | null) {
-  if (busy.value || draggingCol.value) { event.preventDefault(); return }
+  if (dragBlocked.value || draggingCol.value) { event.preventDefault(); return }
   const target = event.target as HTMLElement | null
   if (target && target.closest('button, a, input, textarea, select')) {
     event.preventDefault()

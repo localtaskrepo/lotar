@@ -657,12 +657,11 @@ describe('SprintsList pagination', () => {
         expect(sprintTable(wrapper, 1)).toHaveLength(2)
     })
 
-    it.each(['reload', 'order', 'lifecycle'] as const)('blocks row drags and drops while %s is pending', async operation => {
+    it('blocks row drags and drops while a sprint lifecycle change is pending', async () => {
         const { api } = await import('../api/client')
         sprintsRef.value = [makeSprint(1)]
         const tasks = [makeTask(1), makeTask(2), makeTask(3, [1])]
-        const response = { tasks, total: 3, count: 3, limit: 200, offset: 0 }
-        vi.mocked(api.listTasks).mockResolvedValue(response)
+        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 200, offset: 0 })
         let finish = () => { }
         const wrapper = mount(SprintsList)
         try {
@@ -671,20 +670,10 @@ describe('SprintsList pagination', () => {
             const rows = wrapper.findAll('#backlog tbody tr')
             const transfer = dragTransfer()
             dragEvent(rows[0]!.element, 'dragstart', transfer)
-            if (operation === 'reload') {
-                vi.mocked(api.listTasks).mockImplementationOnce(() => new Promise(resolve => { finish = () => resolve(response) }))
-                await wrapper.find('button.reload').trigger('click')
-            } else if (operation === 'order') {
-                vi.mocked(api.getBacklogOrder).mockImplementationOnce(() => new Promise(resolve => {
-                    finish = () => resolve({ status: 'ok', tasks: [], changed: false })
-                }))
-                await wrapper.find('button.reload').trigger('click')
-            } else {
-                vi.mocked(api.sprintUpdate).mockImplementationOnce(() => new Promise((_, reject) => {
-                    finish = () => reject(new Error('Lifecycle test finished'))
-                }))
-                await wrapper.findAll('[data-sprint-id="1"] button').find(button => button.text() === 'Start')!.trigger('click')
-            }
+            vi.mocked(api.sprintUpdate).mockImplementationOnce(() => new Promise((_, reject) => {
+                finish = () => reject(new Error('Lifecycle test finished'))
+            }))
+            await wrapper.findAll('[data-sprint-id="1"] button').find(button => button.text() === 'Start')!.trigger('click')
             await flushPromises()
             expect(rows[0]!.attributes('draggable')).toBe('false')
             dragEvent(rows[1]!.element, 'drop', transfer)
@@ -693,6 +682,52 @@ describe('SprintsList pagination', () => {
             expect(api.reorderTasks).not.toHaveBeenCalled()
             expect(api.sprintAdd).not.toHaveBeenCalled()
             expect(api.sprintRemove).not.toHaveBeenCalled()
+        } finally {
+            finish()
+            await flushPromises()
+        }
+    })
+
+    // DEV-132: a read-only refresh (typically the file-watcher echo of the
+    // previous reorder) never blocks the next drag; the drop supersedes it.
+    it.each(['reload', 'order'] as const)('accepts row drops while a %s is pending and supersedes it', async operation => {
+        const { api } = await import('../api/client')
+        const tasks = [makeTask(1), makeTask(2), makeTask(3)]
+        const response = { tasks, total: 3, count: 3, limit: 200, offset: 0 }
+        vi.mocked(api.listTasks).mockResolvedValue(response)
+        vi.mocked(api.reorderTasks).mockResolvedValue({ status: 'ok', tasks: ['PRJ-002', 'PRJ-001', 'PRJ-003'], changed: true })
+        let finish = () => { }
+        const wrapper = mount(SprintsList)
+        try {
+            await flushPromises()
+            await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
+            await flushPromises()
+            if (operation === 'reload') {
+                // A stale task list that would undo the reorder if it were applied.
+                vi.mocked(api.listTasks).mockImplementationOnce(() => new Promise(resolve => { finish = () => resolve({ ...response, tasks: [makeTask(3)] }) }))
+            } else {
+                vi.mocked(api.getBacklogOrder).mockImplementationOnce(() => new Promise(resolve => {
+                    finish = () => resolve({ status: 'ok', tasks: ['PRJ-003', 'PRJ-001', 'PRJ-002'], changed: false })
+                }))
+            }
+            await wrapper.find('button.reload').trigger('click')
+            await flushPromises()
+            const ids = () => wrapper.findAll('#backlog tbody tr').map(row => row.attributes('data-task-id'))
+            const rows = wrapper.findAll('#backlog tbody tr')
+            expect(rows[1]!.attributes('draggable')).toBe('true')
+            const transfer = dragTransfer()
+            expect(dragEvent(rows[1]!.element, 'dragstart', transfer).defaultPrevented).toBe(false)
+            expect(dragEvent(rows[0]!.element, 'dragover', transfer).defaultPrevented).toBe(true)
+            dragEvent(rows[0]!.element, 'drop', transfer)
+            await flushPromises()
+            expect(api.reorderTasks).toHaveBeenCalledWith({ task: 'PRJ-002', sprint: null, before: 'PRJ-001' })
+            expect(ids()).toEqual(['PRJ-002', 'PRJ-001', 'PRJ-003'])
+            // The superseded load finishing late changes nothing and leaves the page idle.
+            finish()
+            await flushPromises()
+            expect(ids()).toEqual(['PRJ-002', 'PRJ-001', 'PRJ-003'])
+            expect(wrapper.find('button.reload').attributes('disabled')).toBeUndefined()
+            expect(wrapper.findAll('#backlog tbody tr')[0]!.attributes('draggable')).toBe('true')
         } finally {
             finish()
             await flushPromises()

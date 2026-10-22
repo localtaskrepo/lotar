@@ -92,7 +92,7 @@ lotar sprint order AUTH-42 --before AUTH-9 --sprint 3
 In the web UI, first select that table's **Manual order** button, then drag a
 task row to the upper or lower half of another row to place it **before** or
 **after** that task. An insertion line shows the target. This works in both
-backlog and sprint tables. The selected mode survives reload. Column sorting
+backlog and sprint tables. Drags work right away, even while the page refreshes after the previous reorder; only a reorder or sprint lifecycle change that is still being saved makes rows wait. The selected mode survives reload. Column sorting
 exits that table's manual mode without discarding its saved order. Automatic
 column sorting uses the same rules as the Tasks page and `lotar list --sort-by`:
 effort compares parsed durations or points, missing due dates and efforts sort

@@ -1,0 +1,7 @@
+title: Investigate intermittent harness.server smoke failure when probing the loopback host
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-22T18:59:14.909075+00:00
+description: 'Seen once during DEV-132 verification: smoke/tests/harness.server.smoke.spec.ts ''smoke harness server bind resolution > probes the loopback host when no host or port is given'' failed in one full build-first smoke run (318/319), then passed 3/3 alone and in two further full runs (319/319). Failure output was not captured. Next step: run the full smoke suite repeatedly saving vitest output (and under extra CPU load, as in DEV-132) to capture the assertion, then fix the race rather than retrying.'

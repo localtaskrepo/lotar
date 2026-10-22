@@ -1,7 +1,43 @@
 title: Investigate intermittent ui.backlog-order smoke failure at 390px under full parallel smoke load
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-22T02:17:45.894551+00:00
+modified: 2026-10-22T20:13:30.317276+00:00
+comments:
+- date: 2026-10-22T18:59:14.984891+00:00
+  text: |-
+    Root cause: every backlog/sprint order write is echoed by the file watcher about 150-200ms later, which makes the Sprints page reload tasks and backlog order. While that reload is pending the page is busy, and by DEV-109 design rows refuse drags and drops (dragover returns early, so the browser never fires a usable drop). The spec only polled draggable once before dragging, so a drag started just before the echo reload landed in the busy window and sent no /api/sprints/order request; waitForResponse then timed out. Reproduced with a request trace under load: drag 2 started at 1358ms, echo reload ran 1400-1476ms, no POST. Seen at both 1440px and 390px; narrow viewport was incidental.
+    Fix (test only, DEV-109 behaviour kept): ui.backlog-order tracks the page's data loads and order writes and waits for a quiet period (nothing in flight, nothing started in the last 800ms; cleared on navigation) before every drag; the wait reports what it is waiting for if it ever times out. A product change allowing drops during read-only refreshes was tried and reverted because the DEV-109 unit tests intentionally block drags while reloads are pending.
+    Evidence: before: 3 of 18 concurrent runs failed under 4 extra CPU-bound processes (6 runs at a time). After: 48/48 runs (96 test executions) passed under the same load; spec ~6.7s per viewport; SprintsList unit specs 60/60; full smoke 318/319 once (unrelated harness.server probe, filed as DEV-136) then 319/319 twice; lint clean.
+    Guidance: no durable finding.
+- date: 2026-10-22T20:13:30.317276+00:00
+  text: |-
+    Follow-up (developer decision 2026-10-22): instead of making the test wait, rows now accept drags immediately. SprintsList uses dragBlocked (in-flight reorder or sprint lifecycle change only) for row draggable, dragstart, dragover and drop; read-only refreshes no longer block. A drop supersedes the refresh it interrupts: it bumps the task and order generations (existing behaviour) and now also clears backlogOrderLoading, which the superseded backlog-order load can no longer clear itself. busy still disables reload, pagination and the manual-order toggle. The smoke quiet-wait from the first fix was reverted so ui.backlog-order exercises immediate drags.
+    Evidence: SprintsList.backlogPagination.spec 'accepts row drops while a reload/order is pending and supersedes it' (fails on the old guard: rows not draggable) and lifecycle-still-blocks case; SprintsList specs 60/60; original un-hardened ui.backlog-order passed 48/48 concurrent runs under 4 extra CPU-bound processes (before: 3/18 failed); lint clean, UI 906/906, full smoke 319/319. Sprint help documents immediate drags.
 description: 'Seen once during DEV-130 final gates: smoke/tests/ui.backlog-order.smoke.spec.ts ''drags before/after in backlog and sprint without changing task files at 390px'' failed in a full build-first smoke run (1 of 319), then passed 3/3 alone and 319/319 on a full rerun. Failure details were not captured. Next step: run the full smoke suite repeatedly with the vitest reporter saving failure output, identify the waiting/race condition at the narrow viewport, and harden the wait (no retries-as-fix).'
+history:
+- at: 2026-10-22T18:46:58.622572+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T18:59:14.984891+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T18:59:15.003448+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-22T20:13:30.317276+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
