@@ -39,16 +39,20 @@ Use **Default page size** (25, 50, 100, or 200; default 50) for Tasks and the in
 
 Hide tabs you do not use to reduce clutter in the main navigation. Uncheck a tab on the Preferences page and it disappears from the nav immediately; the page itself stays reachable by URL. Preferences is always visible so you can restore tabs. The setting persists in `localStorage` (key `lotar.preferences.hiddenTabs`).
 
-## Board Filters
+## Board Columns
 
-Boards include a **Done column** popover next to the WIP controls (both live in the page header). Use it to keep the final columns readable without touching server data:
+The **Columns** button on a board opens one dialog that arranges the board for this project and browser without changing the workflow. It shows the columns side by side, like the board:
 
-- **Statuses** — pick which board columns count as “done.” Only the selected statuses are affected; everything else stays untouched.
-- **Hide cards older than (days)** — optionally drop cards whose most recent status-change timestamp is older than the provided window. The helper (`findLastStatusChangeAt`) scans each task’s history, so cards without history stay visible.
-- **Limit visible cards** — cap the number of done cards per column. Cards are sorted by `modified` before trimming so the newest ones stay on the board.
-- **Reset** — clears the per-project settings stored in `localStorage` (`lotar.doneFilters::<PROJECT>`), restoring the full column view.
+- **Reorder columns** — drag a column by its header (or focus its ⠿ grip and use the left/right arrow keys).
+- **Stack statuses** — drag a status onto another column (or onto a status to place it before that one), or use the status's **⋯** menu (**Move to …**). For example, put `WontDo` with `Done` or `QA` with `NeedsReview`. Each stacked status keeps its own section with a label, count, add button, and drop target, so dragging a card into a section sets exactly that status. Drop a status on **New column**, or choose **Own column** from its menu, to split it out again.
+- **Name columns** — click the pencil next to a column title to name it (for example "Closed"); Enter saves, Escape cancels. Unnamed columns show their statuses, such as `Done · WontDo`.
+- **Hide statuses** — the eye toggle hides a status; a note above the board lists hidden statuses and their task counts, with **Show all** to bring them back. Hidden tasks keep their status and still appear in lists, insights, and the CLI.
+- **WIP limit** — one limit per column, counting every status in it. The header shows `count / limit` and the column is outlined when it is over the limit.
+- **Hide after** (days) — hide cards whose most recent move into their status is older than this many days (based on task history; cards without history stay visible).
+- **Max cards** — show only the most recently updated cards, per status.
+- **Reset to defaults** — one column per configured status, nothing hidden, no limits.
 
-These preferences apply per project and per browser—other users or machines keep their own thresholds. The filtering happens client-side, so hidden cards still exist in the underlying tasks list and remain searchable via `lotar list` or the REST API.
+Changes apply when you press **Apply**. Swimlane grouping (assignee, priority, type) keeps per-status sections inside stacked columns, with a single header row. Settings are stored in `localStorage` (`lotar.boardColumns::<PROJECT>`); WIP limits, Done-column settings, and stacking saved by earlier versions are picked up automatically. Statuses that are renamed or removed are ignored, newly configured statuses appear next to their configured neighbour, and the presentation-only **Other** column for unknown statuses is never hidden or stacked. Card rules are client-side only: hidden cards still exist and remain searchable via `lotar list` or the REST API.
 
 ## Storage Notes
 

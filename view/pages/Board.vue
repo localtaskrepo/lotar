@@ -3,58 +3,10 @@
     <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
       <h1>Boards <span v-if="project" class="muted">— {{ project }}</span></h1>
       <div class="row board-controls">
-        <details ref="wipEditorRef" class="wip-editor" @toggle="handleWipToggle">
-          <summary class="btn">WIP limits</summary>
-          <div class="card col" style="gap:8px; min-width: 260px;">
-            <div class="row" v-for="st in columns" :key="st" style="gap:6px; align-items:center;">
-              <label style="min-width: 120px;">{{ st }}</label>
-              <input class="input" type="number" min="0" :value="wipLimits[st] ?? ''" @input="onWipInput(st, $event)" placeholder="—" style="max-width: 100px;" />
-            </div>
-            <small class="muted">Leave empty or 0 for no limit. Limits are saved locally per project.</small>
-          </div>
-        </details>
-        <details ref="filtersEditorRef" class="done-filter" @toggle="handleFiltersToggle">
-          <summary class="btn">Done column</summary>
-          <div class="card col done-filter__card">
-            <div class="col" style="gap:4px;">
-              <span class="muted">Statuses</span>
-              <div class="col done-filter__statuses">
-                <label v-for="label in columns" :key="`done-${label}`" class="row" style="gap:6px; align-items:center;">
-                  <input type="checkbox" :checked="doneStatusSelected(label)" @change="toggleDoneStatus(label)" />
-                  <span>{{ label }}</span>
-                </label>
-                <p v-if="!columns.length" class="muted">No statuses available yet.</p>
-              </div>
-            </div>
-            <label class="col" style="gap:4px;">
-              <span class="muted">Hide cards older than (days)</span>
-              <input
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                :value="doneFilters.maxAgeDays ?? ''"
-                placeholder="e.g. 14"
-                @input="onDoneMaxAgeInput"
-              />
-            </label>
-            <label class="col" style="gap:4px;">
-              <span class="muted">Limit visible cards</span>
-              <input
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                :value="doneFilters.maxVisible ?? ''"
-                placeholder="e.g. 20"
-                @input="onDoneMaxVisibleInput"
-              />
-            </label>
-            <div class="row" style="justify-content:flex-end; gap:8px;">
-              <UiButton variant="ghost" type="button" @click="resetDoneFilters">Reset</UiButton>
-            </div>
-          </div>
-        </details>
+        <UiButton class="board-columns-button" type="button" data-testid="board-columns-button" @click="columnsDialogOpen = true">
+          <IconGlyph name="columns" aria-hidden="true" />
+          <span>Columns</span>
+        </UiButton>
         <UiButton
           icon-only
           type="button"
@@ -125,6 +77,14 @@
       <UiButton variant="ghost" type="button" :disabled="loadingTasks" @click="refreshBoardTasks()">Retry</UiButton>
     </div>
 
+    <div v-if="project && !initialLoading && hiddenColumns.length" class="row board-hidden-note muted" data-testid="board-hidden-columns">
+      <span>
+        {{ hiddenColumns.length }} {{ hiddenColumns.length === 1 ? 'column' : 'columns' }} hidden
+        ({{ hiddenColumns.map((col) => col.label).join(', ') }}) · {{ hiddenTaskCount }} {{ hiddenTaskCount === 1 ? 'task' : 'tasks' }}
+      </span>
+      <UiButton class="board-hidden-note__action" variant="ghost" type="button" @click="boardLayout.showAll()">Show all</UiButton>
+    </div>
+
     <div v-if="initialLoading" style="margin: 12px 0;"><UiLoader>Loading board…</UiLoader></div>
 
     <div v-else-if="loadError && project && !items.length" style="margin: 12px 0;">
@@ -169,131 +129,196 @@
               <span class="muted swimlane-count">{{ groupTotalCount(group) }}</span>
             </button>
           </div>
-          <!-- Per-column tasks for this group -->
+          <!-- Per-lane tasks for this group; stacked lanes keep one labelled section per status -->
           <template v-if="!collapsedGroups.has(group)">
-            <div v-for="col in boardColumns" :key="`${group}::${col.key}`" class="col column-group-cell"
-                 :data-status="col.synthetic ? OTHER_COLUMN_KEY : col.label"
-                 :data-column-kind="col.synthetic ? 'other' : 'status'"
-                 :class="{ 'over-limit': overLimit(col) }"
+            <div v-for="lane in boardLanes" :key="`${group}::${lane.key}`" class="col column-group-cell"
+                 :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
+                 :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+                 :class="{ 'over-limit': laneOverLimit(lane), 'column-group-cell--stacked': lane.stacked }"
                  @dragover.prevent="onDragOver"
-                 @drop.prevent="onDrop(col)"
+                 @drop.prevent="onLaneDrop(lane, $event)"
             >
-              <TransitionGroup name="task-list" tag="div" class="col-cards">
-                <article v-for="task in groupedColumnTasks(col, group)" :key="task.id"
-                         class="card task"
-                         :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
-                         draggable="true"
-                         @dragstart="onDragStart(task)"
-                         @dblclick="openTask(task.id)"
-                         @click.exact="selectTask(task.id)"
-                         @keydown.enter.prevent="openTask(task.id)"
-                         tabindex="0">
-                  <header v-if="hasTaskHeader(task)" class="row task-header">
-                    <template v-if="hasTaskIdentity(task)">
-                      <div class="row task-header__left">
-                        <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                        <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
-                      </div>
-                      <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                    </template>
-                    <template v-else>
-                      <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                    </template>
-                  </header>
-                  <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
-                </article>
-                <div v-if="!groupedColumnTasks(col, group).length" key="__group-empty__" class="muted" style="padding: 4px 0; font-size: var(--text-xs, 0.75rem);">—</div>
-              </TransitionGroup>
+              <div v-for="col in lane.columns" :key="col.key" class="column-section"
+                   :class="{ 'column-section--stacked': lane.stacked }"
+                   :data-section-key="col.key"
+                   :data-status="lane.stacked ? statusAttr(col) : undefined"
+                   :data-column-kind="lane.stacked ? kindAttr(col) : undefined"
+              >
+                <div v-if="lane.stacked" class="column-section__label muted">{{ col.label }}</div>
+                <TransitionGroup name="task-list" tag="div" class="col-cards">
+                  <article v-for="task in groupedColumnTasks(col, group)" :key="task.id"
+                       class="card task"
+                       :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
+                       draggable="true"
+                       @dragstart="onDragStart(task)"
+                       @dblclick="openTask(task.id)"
+                       @click.exact="selectTask(task.id)"
+                       @keydown.enter.prevent="openTask(task.id)"
+                       tabindex="0">
+                <header v-if="hasTaskHeader(task)" class="row task-header">
+                  <template v-if="hasTaskIdentity(task)">
+                    <div class="row task-header__left">
+                      <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                      <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                    </div>
+                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  </template>
+                  <template v-else>
+                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  </template>
+                </header>
+                <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
+              </article>
+                  <div v-if="!groupedColumnTasks(col, group).length" key="__group-empty__" class="muted" style="padding: 4px 0; font-size: var(--text-xs, 0.75rem);">—</div>
+                </TransitionGroup>
+              </div>
             </div>
           </template>
         </template>
-        <!-- Column headers at the very top (rendered first via CSS order) -->
-        <div v-for="col in boardColumns" :key="`hdr-${col.key}`" class="col-header row board-col-header"
-              :data-status="col.synthetic ? OTHER_COLUMN_KEY : col.label"
-              :data-column-kind="col.synthetic ? 'other' : 'status'"
-              style="justify-content: space-between; align-items:center; gap:8px;">
-          <strong>{{ col.label }}</strong>
-          <span class="row" style="gap:6px; align-items:center;">
-            <UiButton
-              icon-only
-              variant="ghost"
-              class="board-col-add"
-              type="button"
-              :aria-label="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
-              :title="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
-              @click="col.synthetic ? openCreateInBoard() : openCreateInStatus(col.label)"
-            >
-              <IconGlyph name="plus" />
-            </UiButton>
-            <span class="muted" :class="{ warn: overLimit(col) }">
-              <template v-if="limitOf(col) > 0">{{ countOf(col) }} / {{ limitOf(col) }}</template>
-              <template v-else>{{ countOf(col) }}</template>
-            </span>
-          </span>
-        </div>
-      </template>
-      <template v-else>
-        <div v-for="col in boardColumns" :key="col.key" class="col column"
-             :data-status="col.synthetic ? OTHER_COLUMN_KEY : col.label"
-             :data-column-kind="col.synthetic ? 'other' : 'status'"
-             :class="{ 'over-limit': overLimit(col) }"
-             tabindex="0"
-             @dragover.prevent="onDragOver"
-             @drop.prevent="onDrop(col)"
-             @keydown.enter.prevent="onDrop(col)"
-        >
-          <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
-            <strong>{{ col.label }}</strong>
+        <!-- Lane headers at the very top (rendered first via CSS order) -->
+        <div v-for="lane in boardLanes" :key="`hdr-${lane.key}`" class="col-header row board-col-header lane-header"
+             :class="{ 'lane-header--stacked': lane.stacked }"
+             :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
+             :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+             style="justify-content: space-between; align-items:center; gap:8px;">
+            <strong class="lane-header__title" :title="lane.title">{{ lane.title }}</strong>
             <span class="row" style="gap:6px; align-items:center;">
               <UiButton
+                v-if="!lane.stacked"
                 icon-only
                 variant="ghost"
                 class="board-col-add"
                 type="button"
-                :aria-label="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
-                :title="col.synthetic ? 'Add task' : `Add task in ${col.label}`"
-                @click="col.synthetic ? openCreateInBoard() : openCreateInStatus(col.label)"
+                :aria-label="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
+                :title="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
+                @click="lane.columns[0]!.synthetic ? openCreateInBoard() : openCreateInStatus(lane.columns[0]!.label)"
               >
                 <IconGlyph name="plus" />
               </UiButton>
-              <span class="muted" :class="{ warn: overLimit(col) }">
-                <template v-if="limitOf(col) > 0">{{ countOf(col) }} / {{ limitOf(col) }}</template>
-                <template v-else>{{ countOf(col) }}</template>
+              <details v-else class="lane-add-menu" @keydown.escape="($event.currentTarget as HTMLDetailsElement).open = false">
+                <summary class="btn ghost icon-only board-col-add" :aria-label="`Add task in ${lane.title}`" :title="`Add task in ${lane.title}`">
+                  <IconGlyph name="plus" />
+                </summary>
+                <div class="card lane-add-menu__list">
+                  <button v-for="col in lane.columns" :key="col.key" type="button" class="lane-add-menu__item" @click="closeMenu($event); openCreateInStatus(col.label)">
+                    Add in {{ col.label }}
+                  </button>
+                </div>
+              </details>
+              <span class="muted lane-header__count" :class="{ warn: laneOverLimit(lane) }">
+                <template v-if="laneLimit(lane) > 0">{{ laneCount(lane) }} / {{ laneLimit(lane) }}</template>
+                <template v-else>{{ laneCount(lane) }}</template>
+              </span>
+            </span>
+        </div>
+      </template>
+      <template v-else>
+        <div v-for="lane in boardLanes" :key="lane.key" class="col column"
+             :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
+             :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+             :class="{ 'over-limit': laneOverLimit(lane), 'column--stacked': lane.stacked }"
+             :tabindex="lane.stacked ? undefined : 0"
+             @dragover.prevent="onDragOver"
+             @drop.prevent="onLaneDrop(lane, $event)"
+             @keydown.enter.prevent="!lane.stacked && onDrop(lane.columns[0]!)"
+        >
+          <div class="col-header row lane-header" :class="{ 'lane-header--stacked': lane.stacked }" style="justify-content: space-between; align-items:center; gap:8px;">
+            <strong class="lane-header__title" :title="lane.title">{{ lane.title }}</strong>
+            <span class="row" style="gap:6px; align-items:center;">
+              <UiButton
+                v-if="!lane.stacked"
+                icon-only
+                variant="ghost"
+                class="board-col-add"
+                type="button"
+                :aria-label="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
+                :title="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
+                @click="lane.columns[0]!.synthetic ? openCreateInBoard() : openCreateInStatus(lane.columns[0]!.label)"
+              >
+                <IconGlyph name="plus" />
+              </UiButton>
+              <details v-else class="lane-add-menu" @keydown.escape="($event.currentTarget as HTMLDetailsElement).open = false">
+                <summary class="btn ghost icon-only board-col-add" :aria-label="`Add task in ${lane.title}`" :title="`Add task in ${lane.title}`">
+                  <IconGlyph name="plus" />
+                </summary>
+                <div class="card lane-add-menu__list">
+                  <button v-for="col in lane.columns" :key="col.key" type="button" class="lane-add-menu__item" @click="closeMenu($event); openCreateInStatus(col.label)">
+                    Add in {{ col.label }}
+                  </button>
+                </div>
+              </details>
+              <span class="muted lane-header__count" :class="{ warn: laneOverLimit(lane) }">
+                <template v-if="laneLimit(lane) > 0">{{ laneCount(lane) }} / {{ laneLimit(lane) }}</template>
+                <template v-else>{{ laneCount(lane) }}</template>
               </span>
             </span>
           </div>
-          <TransitionGroup name="task-list" tag="div" class="col-cards">
-            <article v-for="task in visibleFlatTasks(col)" :key="task.id"
-                     class="card task"
-                     :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
-                     draggable="true"
-                     @dragstart="onDragStart(task)"
-                     @dblclick="openTask(task.id)"
-                     @click.exact="selectTask(task.id)"
-                     @keydown.enter.prevent="openTask(task.id)"
-                     tabindex="0">
-              <header v-if="hasTaskHeader(task)" class="row task-header">
-                <template v-if="hasTaskIdentity(task)">
-                  <div class="row task-header__left">
-                    <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                    <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
-                  </div>
-                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                </template>
-                <template v-else>
-                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                </template>
-              </header>
-              <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
-            </article>
-            <div v-if="!columnTasks(col).length" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
-          </TransitionGroup>
-          <button v-if="hiddenFlatCount(col) > 0" type="button" class="show-more-btn" @click="showMore(col.key)">
-            Show {{ hiddenFlatCount(col) }} more…
-          </button>
+          <!-- One section per status; a single-status lane renders its cards directly -->
+          <div v-for="col in lane.columns" :key="col.key" class="column-section"
+               :class="{ 'column-section--stacked': lane.stacked }"
+               :data-section-key="col.key"
+               :data-status="lane.stacked ? statusAttr(col) : undefined"
+               :data-column-kind="lane.stacked ? kindAttr(col) : undefined"
+               :tabindex="lane.stacked ? 0 : undefined"
+               @keydown.enter.self.prevent="lane.stacked && onDrop(col)"
+          >
+            <div v-if="lane.stacked" class="row column-section__head">
+              <span class="column-section__label muted">{{ col.label }}</span>
+              <span class="row" style="gap:4px; align-items:center;">
+                <UiButton
+                  icon-only
+                  variant="ghost"
+                  class="board-col-add"
+                  type="button"
+                  :aria-label="`Add task in ${col.label}`"
+                  :title="`Add task in ${col.label}`"
+                  @click="openCreateInStatus(col.label)"
+                >
+                  <IconGlyph name="plus" />
+                </UiButton>
+                <span class="muted column-section__count">{{ countOf(col) }}</span>
+              </span>
+            </div>
+            <TransitionGroup name="task-list" tag="div" class="col-cards">
+              <article v-for="task in visibleFlatTasks(col)" :key="task.id"
+                       class="card task"
+                       :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
+                       draggable="true"
+                       @dragstart="onDragStart(task)"
+                       @dblclick="openTask(task.id)"
+                       @click.exact="selectTask(task.id)"
+                       @keydown.enter.prevent="openTask(task.id)"
+                       tabindex="0">
+                <header v-if="hasTaskHeader(task)" class="row task-header">
+                  <template v-if="hasTaskIdentity(task)">
+                    <div class="row task-header__left">
+                      <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                      <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                    </div>
+                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  </template>
+                  <template v-else>
+                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  </template>
+                </header>
+                <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
+              </article>
+              <div v-if="!columnTasks(col).length" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
+            </TransitionGroup>
+            <button v-if="hiddenFlatCount(col) > 0" type="button" class="show-more-btn" @click="showMore(col.key)">
+              Show {{ hiddenFlatCount(col) }} more…
+            </button>
+          </div>
         </div>
       </template>
     </div>
+    <BoardColumnsDialog
+      :open="columnsDialogOpen"
+      :statuses="layoutStatuses"
+      :layout="boardLayout.layout.value"
+      @close="columnsDialogOpen = false"
+      @apply="applyColumnsLayout"
+    />
   </section>
 </template>
 
@@ -313,12 +338,14 @@ import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
-import { useCompletionPolicy, ensureCompletionPolicy, completionStatusKey, normalizeStatusKey } from '../composables/useCompletionPolicy'
+import { computeBoardLanes, useBoardLayout, type BoardLane, type BoardLayout } from '../composables/useBoardLayout'
+import BoardColumnsDialog from '../components/BoardColumnsDialog.vue'
+import { useCompletionPolicy, completionStatusKey, normalizeStatusKey } from '../composables/useCompletionPolicy'
 import { useConfig } from '../composables/useConfig'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { MS_PER_DAY } from '../utils/date'
-import { storageGet, storageGetJson, storageSet, storageSetJson } from '../utils/storage'
+import { storageGet, storageSet } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
@@ -363,8 +390,7 @@ const filterOptions = useFilterOptions(() => items.value, () => project.value, {
 const draggingId = ref<string>('')
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ clear?: () => void } | null>(null)
-const wipEditorRef = ref<HTMLDetailsElement | null>(null)
-const filtersEditorRef = ref<HTMLDetailsElement | null>(null)
+const columnsDialogOpen = ref(false)
 const fieldsMenuOpen = ref(false)
 const filterPayload = computed(() => ({
   ...filter.value,
@@ -428,34 +454,6 @@ function parseDateLike(value?: string | null) {
   return parseTaskDate(value)
 }
 
-function handleWipToggle() {
-  if (wipEditorRef.value?.open) {
-    if (filtersEditorRef.value?.open) {
-      filtersEditorRef.value.open = false
-    }
-  }
-}
-
-function handleFiltersToggle() {
-  if (filtersEditorRef.value?.open) {
-    if (wipEditorRef.value?.open) {
-      wipEditorRef.value.open = false
-    }
-  }
-}
-
-function handleBoardPopoverClick(event: MouseEvent) {
-  const target = event.target as Node | null
-  if (!target) return
-
-  if (wipEditorRef.value?.open && !wipEditorRef.value.contains(target)) {
-    wipEditorRef.value.open = false
-  }
-  if (filtersEditorRef.value?.open && !filtersEditorRef.value.contains(target)) {
-    filtersEditorRef.value.open = false
-  }
-}
-
 function priorityClass(value: string | undefined): string {
   const v = (value || '').trim().toLowerCase()
   if (v === 'critical') return 'priority--critical'
@@ -517,21 +515,13 @@ function hasTaskIdentity(task: TaskDTO): boolean {
   )
 }
 
-const hasDoneFilters = computed(() => {
-  const d = doneFilters.value
-  const hasLimits = (typeof d.maxAgeDays === 'number' && d.maxAgeDays > 0) || (typeof d.maxVisible === 'number' && d.maxVisible > 0)
-  // Seeded statuses alone don't filter anything (they only pre-check which
-  // columns the age/visible limits would apply to).
-  return d.statuses.length > 0 && hasLimits
-})
-const hasAnyFilters = computed(() => hasFilters.value || groupBy.value !== 'none' || hasDoneFilters.value)
+const hasAnyFilters = computed(() => hasFilters.value || groupBy.value !== 'none')
 
 function clearFilters() {
   clearFiltersAction(filterBarRef)
   groupBy.value = 'none'
   saveGroupBy()
   collapsedGroups.value = new Set()
-  resetDoneFilters()
 }
 
 async function refreshBoardTasks(snapshot?: Record<string, string>) {
@@ -577,6 +567,12 @@ const columnsData = computed(() => {
 
 const columns = computed(() => columnsData.value.map((item) => item.label))
 
+// DEV-130: per-project board layout (column order, stacked and hidden
+// statuses, per-column WIP limits and card rules).
+const layoutStatuses = computed(() => columnsData.value.map(({ label, norm }) => ({ key: norm, label })))
+const boardLayout = useBoardLayout(project, layoutStatuses)
+boardLayout.load()
+
 const columnLookup = computed(() => {
   const map = new Map<string, string>()
   columnsData.value.forEach(({ label, norm }) => {
@@ -610,37 +606,43 @@ const partitionedBoardTasks = computed<{ configured: Record<string, TaskDTO[]>; 
   return { configured, other }
 })
 
-const grouped = computed<Record<string, TaskDTO[]>>(() => applyDoneFilters(partitionedBoardTasks.value.configured))
+const grouped = computed<Record<string, TaskDTO[]>>(() => applyCardRules(partitionedBoardTasks.value.configured))
 
-function applyDoneFilters(groups: Record<string, TaskDTO[]>) {
-  const targetStatuses = doneFilters.value.statuses.filter((label) => label && groups[label])
-  const maxAgeDays = typeof doneFilters.value.maxAgeDays === 'number' && doneFilters.value.maxAgeDays > 0
-    ? doneFilters.value.maxAgeDays
-    : null
-  const maxVisible = typeof doneFilters.value.maxVisible === 'number' && doneFilters.value.maxVisible > 0
-    ? Math.floor(doneFilters.value.maxVisible)
-    : null
-  if (!targetStatuses.length || (!maxAgeDays && !maxVisible)) return groups
-  const statusSet = new Set(targetStatuses)
-  const ageMs = maxAgeDays ? maxAgeDays * MS_PER_DAY : null
+/**
+ * Per-column card rules from the board layout (DEV-130): hide cards whose
+ * latest move into their status is older than N days and/or keep only the N
+ * most recently modified cards. Rules apply to each status section of the
+ * column; hidden cards still exist and stay searchable.
+ */
+function applyCardRules(groups: Record<string, TaskDTO[]>) {
+  const configByLabel = new Map<string, { maxAgeDays?: number; maxVisible?: number }>()
+  for (const column of boardLayout.layout.value.columns) {
+    if (!column.maxAgeDays && !column.maxVisible) continue
+    for (const key of column.statuses) {
+      const label = columnLookup.value.get(key)
+      if (label) configByLabel.set(label, column)
+    }
+  }
+  if (!configByLabel.size) return groups
   const now = Date.now()
   const result: Record<string, TaskDTO[]> = {}
   Object.entries(groups).forEach(([label, tasks]) => {
-    if (!statusSet.has(label)) {
+    const rules = configByLabel.get(label)
+    if (!rules) {
       result[label] = tasks
       return
     }
     let filtered = Array.isArray(tasks) ? [...tasks] : []
-    if (ageMs) {
+    if (rules.maxAgeDays) {
+      const ageMs = rules.maxAgeDays * MS_PER_DAY
       filtered = filtered.filter((task) => {
         const ts = findLastStatusChangeAt(task, label)
-        if (ts === null) return true
-        return now - ts <= ageMs
+        return ts === null || now - ts <= ageMs
       })
     }
-    if (maxVisible) {
+    if (rules.maxVisible) {
       filtered.sort((a, b) => b.modified.localeCompare(a.modified))
-      filtered = filtered.slice(0, maxVisible)
+      filtered = filtered.slice(0, rules.maxVisible)
     }
     result[label] = filtered
   })
@@ -669,6 +671,44 @@ const boardColumns = computed<BoardColumnDescriptor[]>(() => {
   }
   return cols
 })
+
+// DEV-130: per-project column layout (hidden and stacked statuses). Lanes are
+// the visual columns; each lane holds one or more status columns, and every
+// status keeps its own section, counts, WIP limit and drop target.
+const boardLanes = computed<BoardLane<BoardColumnDescriptor>[]>(() => computeBoardLanes(boardColumns.value, boardLayout.layout.value))
+const hiddenColumns = computed(() => boardColumns.value.filter((col) => !col.synthetic && boardLayout.isHidden(col.key)))
+const hiddenTaskCount = computed(() => hiddenColumns.value.reduce((sum, col) => sum + (partitionedBoardTasks.value.configured[col.label]?.length ?? 0), 0))
+
+function closeMenu(event: Event) {
+  const menu = (event.currentTarget as HTMLElement | null)?.closest('details')
+  if (menu) menu.open = false
+}
+
+function applyColumnsLayout(next: BoardLayout) {
+  boardLayout.save(next)
+  columnsDialogOpen.value = false
+}
+
+function statusAttr(col: BoardColumnDescriptor): string {
+  return col.synthetic ? OTHER_COLUMN_KEY : col.label
+}
+
+function kindAttr(col: BoardColumnDescriptor): string {
+  return col.synthetic ? 'other' : 'status'
+}
+
+/** Drops on a stacked lane land in the status section under the pointer. */
+function onLaneDrop(lane: BoardLane<BoardColumnDescriptor>, event: DragEvent) {
+  if (!lane.stacked) {
+    void onDrop(lane.columns[0]!)
+    return
+  }
+  const target = event.target instanceof Element ? event.target.closest('[data-section-key]') : null
+  const key = target?.getAttribute('data-section-key')
+  const col = lane.columns.find((entry) => entry.key === key)
+  if (col) void onDrop(col)
+  else draggingId.value = ''
+}
 
 function columnTasks(col: BoardColumnDescriptor): TaskDTO[] {
   return col.synthetic ? partitionedBoardTasks.value.other : (grouped.value[col.label] || [])
@@ -735,102 +775,22 @@ function hiddenFlatCount(col: BoardColumnDescriptor): number {
 
 const gridStyle = computed(() => ({
   display: 'grid',
-  gridTemplateColumns: `repeat(${boardColumns.value.length}, minmax(260px, 1fr))`,
+  gridTemplateColumns: `repeat(${Math.max(boardLanes.value.length, 1)}, minmax(260px, 1fr))`,
   gap: '12px',
 }))
 
-// --- WIP limits (local-only per project) ---
-const wipLimits = ref<Record<string, number>>({})
-function wipKey(){ return project.value ? `lotar.wip::${project.value}` : 'lotar.wip' }
-function loadWip(){
-  const obj = storageGetJson<Record<string, number>>(wipKey())
-  wipLimits.value = (obj && typeof obj === 'object') ? obj : {}
+// --- WIP limits: one limit per board column, counting all of its statuses ---
+function laneCount(lane: BoardLane<BoardColumnDescriptor>): number {
+  return lane.columns.reduce((sum, col) => sum + columnTasks(col).length, 0)
 }
-function saveWip(){ storageSetJson(wipKey(), wipLimits.value || {}) }
-function limitOf(col: BoardColumnDescriptor): number { if (col.synthetic) return 0; const v = (wipLimits.value || {})[col.label]; return (typeof v === 'number' && v > 0) ? v : 0 }
+function laneLimit(lane: BoardLane<BoardColumnDescriptor>): number {
+  return lane.config.wipLimit ?? 0
+}
+function laneOverLimit(lane: BoardLane<BoardColumnDescriptor>): boolean {
+  const limit = laneLimit(lane)
+  return limit > 0 && laneCount(lane) > limit
+}
 function countOf(col: BoardColumnDescriptor): number { return columnTasks(col).length }
-function overLimit(col: BoardColumnDescriptor): boolean { const lim = limitOf(col); return lim > 0 && countOf(col) > lim }
-function onWipInput(st: string, ev: Event){
-  const val = parseInt((ev.target as HTMLInputElement).value, 10)
-  if (!isFinite(val) || val <= 0) { delete (wipLimits.value as any)[st] } else { (wipLimits.value as any)[st] = val }
-  saveWip()
-}
-
-type DoneFilterSettings = {
-  statuses: string[]
-  maxAgeDays: number | null
-  maxVisible: number | null
-}
-
-const doneFilters = ref<DoneFilterSettings>({ statuses: [], maxAgeDays: null, maxVisible: null })
-
-function doneFilterKey(){ return project.value ? `lotar.doneFilters::${project.value}` : 'lotar.doneFilters' }
-
-// Browser-local done-column defaults: seed the checked statuses from the
-// project's effective terminal policy (presentation only — semantics stay
-// server-owned). Stored preferences always win and are never overwritten by
-// reseeding.
-function defaultDoneFilterSettings(): DoneFilterSettings {
-  return { statuses: [...completion.doneLabelsFor(project.value)], maxAgeDays: null, maxVisible: null }
-}
-
-async function loadDoneFilters(){
-  const parsed = storageGetJson<{ statuses?: unknown; maxAgeDays?: unknown; maxVisible?: unknown }>(doneFilterKey())
-  if (!parsed) {
-    // Wait for the project's resolved policy so the seed matches the
-    // effective terminal statuses.
-    await ensureCompletionPolicy(project.value)
-    doneFilters.value = defaultDoneFilterSettings()
-    return
-  }
-  const statuses = Array.isArray(parsed?.statuses) ? parsed.statuses.filter((label: unknown) => typeof label === 'string') : []
-  const age = Number(parsed?.maxAgeDays)
-  const limit = Number(parsed?.maxVisible)
-  doneFilters.value = {
-    statuses,
-    maxAgeDays: Number.isFinite(age) && age > 0 ? age : null,
-    maxVisible: Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null,
-  }
-}
-
-function saveDoneFilters(){
-  storageSetJson(doneFilterKey(), doneFilters.value)
-}
-
-function doneStatusSelected(label: string){
-  return doneFilters.value.statuses.includes(label)
-}
-
-function toggleDoneStatus(label: string){
-  if (!label) return
-  const set = new Set(doneFilters.value.statuses)
-  if (set.has(label)) set.delete(label); else set.add(label)
-  doneFilters.value = { ...doneFilters.value, statuses: Array.from(set) }
-  saveDoneFilters()
-}
-
-function onDoneMaxAgeInput(ev: Event){
-  const value = Number((ev.target as HTMLInputElement).value)
-  doneFilters.value = {
-    ...doneFilters.value,
-    maxAgeDays: Number.isFinite(value) && value > 0 ? value : null,
-  }
-  saveDoneFilters()
-}
-
-function onDoneMaxVisibleInput(ev: Event){
-  const value = Number((ev.target as HTMLInputElement).value)
-  doneFilters.value = {
-    ...doneFilters.value,
-    maxVisible: Number.isFinite(value) && value > 0 ? Math.floor(value) : null,
-  }
-  saveDoneFilters()
-}
-
-function resetDoneFilters(){
-  doneFilters.value = defaultDoneFilterSettings()
-  saveDoneFilters()
-}
 
 watch(groupBy, () => { saveGroupBy() })
 
@@ -958,23 +918,17 @@ watch(filter, (value) => {
 }, { deep: true })
 
 onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    window.addEventListener('click', handleBoardPopoverClick)
-  }
   await refreshProjects()
   await refreshSprints(true)
   await refreshConfig(project.value)
   await refreshBoardTasks()
-  loadWip()
-  await loadDoneFilters()
 })
 
 watch(() => route.query, async (q) => {
   project.value = (q as any).project ? String((q as any).project) : ''
   await refreshConfig(project.value)
   await refreshBoardTasks()
-  loadWip()
-  await loadDoneFilters()
+  boardLayout.load()
   groupBy.value = loadGroupBy()
   collapsedGroups.value = new Set()
   resetExpansion()
@@ -989,9 +943,6 @@ onUnmounted(() => {
   activeQueryHandle = null
   activeQueryKey = ''
   boardQuery.value = null
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('click', handleBoardPopoverClick)
-  }
 })
 </script>
 
@@ -1064,60 +1015,6 @@ onUnmounted(() => {
   width: var(--control-height);
   height: var(--control-height);
 }
-.wip-editor {
-  position: relative;
-}
-.wip-editor > summary {
-  list-style: none;
-  cursor: pointer;
-}
-.wip-editor > summary::-webkit-details-marker {
-  display: none;
-}
-.wip-editor > .card {
-  display: none;
-}
-.wip-editor[open] > .card {
-  display: flex;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: var(--z-popover);
-  box-shadow: var(--shadow-popover);
-}
-
-.done-filter {
-  position: relative;
-}
-.done-filter > summary {
-  list-style: none;
-  cursor: pointer;
-}
-.done-filter > summary::-webkit-details-marker {
-  display: none;
-}
-.done-filter__card {
-  gap: 8px;
-  min-width: 280px;
-  display: none;
-}
-.done-filter[open] > .done-filter__card {
-  display: flex;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: var(--z-popover);
-  box-shadow: var(--shadow-popover);
-}
-.done-filter__statuses {
-  gap: 4px;
-  max-height: 220px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 6px;
-}
-
 .filter-card {
   display: flex;
   flex-direction: column;
@@ -1140,9 +1037,9 @@ onUnmounted(() => {
 
 .board-chips-row__groupby {
   font-size: var(--text-sm, 0.875rem);
-  padding: calc(var(--space-2, 0.5rem) - 2px) var(--space-4, 1rem);
-  height: auto;
-  min-height: 0;
+  padding: 0 var(--space-4, 1rem);
+  height: var(--control-height);
+  min-height: var(--control-height);
   line-height: var(--line-tight, 1.25);
 }
 
@@ -1289,6 +1186,74 @@ onUnmounted(() => {
 }
 
 .board-col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
+
+/* -- Column layout: lanes, stacked statuses, hidden notice (DEV-130) ----- */
+/* A single-status lane renders its cards inline, exactly like a plain column. */
+.column-section { display: contents; }
+.column-section--stacked { display: flex; flex-direction: column; }
+.column-section--stacked + .column-section--stacked { border-top: 1px solid var(--border); }
+.column-section--stacked:focus-visible { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: -2px; }
+.column-section__head {
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 0;
+}
+.column-section__head:hover .board-col-add { opacity: 1; }
+.column-section__label {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.column-section__count { font-size: var(--text-xs, 0.75rem); }
+.column-group-cell .column-section__label { display: block; padding: 6px 8px 0; }
+.column-group-cell .column-section--stacked + .column-section--stacked { border-top: 1px dashed var(--border); }
+.lane-header__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lane-header__count.warn { color: var(--color-danger-strong); font-weight: 600; }
+.column.over-limit > .lane-header,
+.board-col-header.lane-header:has(.warn) { box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--color-danger) 45%, transparent); }
+.lane-add-menu { position: relative; display: inline-flex; }
+.lane-add-menu > summary { list-style: none; display: inline-flex; box-sizing: border-box; align-items: center; justify-content: center; cursor: pointer; }
+.lane-add-menu > summary::-webkit-details-marker { display: none; }
+.lane-add-menu[open] > summary { opacity: 1; }
+.lane-add-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: var(--z-popover, 50);
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  gap: 2px;
+}
+.lane-add-menu__item {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  font: inherit;
+}
+.lane-add-menu__item:hover,
+.lane-add-menu__item:focus-visible { background: color-mix(in oklab, var(--fg) 8%, transparent); }
+.board-columns-button { gap: var(--space-2, 0.5rem); }
+.board-hidden-note {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: -8px;
+  font-size: var(--text-sm, 0.875rem);
+}
+.board-hidden-note__action { white-space: nowrap; }
 
 /* -- Refresh error banner ------------------------------------------------ */
 .refresh-error {

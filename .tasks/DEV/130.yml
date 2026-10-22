@@ -1,7 +1,55 @@
 title: Allow Board Columns to be stacked or hidden
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-21T22:04:31.156391+00:00
+modified: 2026-10-22T03:17:48.013116+00:00
+comments:
+- date: 2026-10-22T02:17:45.931052+00:00
+  text: |-
+    Outcome: Board column layout. New view/composables/useBoardLayout.ts (per-project layout in localStorage lotar.boardLayout::<PROJECT>: hidden + stacked normalized status keys; computeBoardLanes arranges configured columns into lanes in config order, stacked statuses join the previous visible lane, the synthetic Other column is never hidden/stacked, malformed storage tolerated). Board.vue renders lanes in flat and swimlane modes; every status keeps its own section (header, count, WIP limit, add button, drop target via data-section-key) and single-status lanes keep the previous DOM through display:contents sections. New Columns popover (Show / Stack with previous / Reset) next to WIP limits, popovers close each other, hidden-columns note with task count and Show all. Grid tracks follow lanes. Docs: preferences.md Board Columns, serve.md pointer.
+    Evidence: view/__tests__/boardLayout.spec.ts (lane computation) and 3 Board.spec.ts cases (stack + per-section drops + persistence; hide + note + Show all; priority swimlanes keep per-status sections and drops); all UI tests 895/895; new smoke ui.board-layout (stack/hide, real drop into stacked WontDo section writes status, reload persistence, priority swimlanes, Show all, no horizontal overflow at 1280px after the card move animation) plus existing board smoke 8/8; browser screenshots at 1440px grouped and 390px (no page overflow). Final gates: lint clean, Rust 1567/1567, UI 895/895, release 26/26, smoke 318/319 then 319/319 on rerun; the one intermittent failure (ui.backlog-order at 390px, unrelated page) is filed as a follow-up bug.
+    Remaining: none.
+    Guidance: no durable finding.
+- date: 2026-10-22T02:40:46.134917+00:00
+  text: |-
+    Redesign after developer review (2026-10-21): the Columns, WIP limits and Done column popovers are replaced by one Board columns dialog (view/components/BoardColumnsDialog.vue, draft + Apply/Cancel/Reset). Model (view/composables/useBoardLayout.ts, lotar.boardColumns::<PROJECT>, version 2): ordered columns, each with any set of statuses (non-adjacent stacking, reorder via Move to menu or drag onto column/status/new-column zone), optional name, WIP limit counted across the column's statuses, and card rules (hide after N days, max N cards per status); per-status hiding. Reconciliation drops unknown statuses and places new ones next to their configured neighbour; earlier per-status WIP limits, Done-column rules and DEV-130 v1 stacking migrate automatically without writing until Apply. Board: one compact lane header everywhere (title or name, count / limit, '+' or a status picker for stacked lanes), light per-status sub-sections, over-limit outline; grouped view has a single equal-height header row. Group-by select now matches control height.
+    Evidence: boardLayout.spec (reconcile, neighbour insertion, lanes, migration, parsing), BoardColumnsDialog.spec (hide, move/split, drag ordering, settings travel with column, reset), Board.spec dialog cases (non-adjacent stacking + section drops + add menu + persistence; reorder/name/hide/cancel/reset; column WIP across stacked statuses + card rules; grouped single header row) and migrated Done-rule test; smoke ui.board-layout rewritten (dialog flow, equal control/header heights, WIP over-limit, real drop, reload, priority lanes) plus board/done-states smoke; screenshots desktop/phone. Gates: lint clean, Rust 1567/1567, UI 899/899, release 26/26, full smoke 319/319.
+    Remaining: README board screenshot still shows the old toolbar (regenerate with npm run screenshots if wanted). Commit amended into the DEV-130 commit for a force push by the developer.
+    Guidance: no durable finding.
+- date: 2026-10-22T03:17:48.013116+00:00
+  text: |-
+    Dialog rework after second review (2026-10-21): BoardColumnsDialog now mirrors the board. Columns sit side by side (flex 180-240px, horizontal scroll for many columns) and are reordered by dragging their header (pointer half picks before/after, also over status rows) or with left/right arrow keys on the grip; the up/down buttons are gone. Column titles are plain text with a pencil for inline rename (Enter saves, Escape restores). Statuses are compact rows with drag (onto a column, before a status, or the New column target), an eye toggle, and a ⋯ menu (Own column / Move to …) positioned against the viewport so it is never clipped and stays attached while the column area scrolls. Per-column WIP limit / Hide after (days) / Max cards sit in a small footer per column. Initial focus goes to Apply instead of a text field.
+    Evidence: BoardColumnsDialog.spec (rename + escape, hide, menu moves/split, header drag + arrow keys, status drags, settings travel with column, reset) 6/6; Board.spec dialog cases updated; smoke ui.board-layout now drags column headers with the real mouse to both halves and uses the ⋯ menus; screenshots at 1440px (4 and 6 columns) and 390px. Gates: lint clean, Rust 1567/1567, UI 901/901, release 26/26, full smoke 319/319.
+    Remaining: README board screenshot still shows the old toolbar. Amended into the DEV-130 commit for the developer's force push.
+    Guidance: no durable finding.
 description: "When you have too many states, the board goes beyond the visible space even at max window width.\nWe should allow users to manage the visibility of the states better by:\n1. allowing stacking states like \"done\" and \"won't do\", or \"Needs Review\" and \"QA\", so that they appear in single column but with their own section headers. Watch out the we still distinguish and support e.g. grouping by priority\n2. allowing users to hide columns they don't want to see. "
+history:
+- at: 2026-10-22T02:07:05.853676+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T02:17:45.931052+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T02:17:45.949439+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-22T02:40:46.134917+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T03:17:48.013116+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

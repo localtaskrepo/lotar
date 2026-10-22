@@ -128,7 +128,7 @@ vi.mock('../components/UiButton.vue', () => ({
     default: {
         props: ['variant', 'iconOnly', 'disabled', 'type', 'ariaLabel', 'title'],
         emits: ['click'],
-        template: '<button type="button" class="btn" @click="$emit(\'click\', $event)"><slot /></button>',
+        template: '<button type="button" class="btn" :aria-label="ariaLabel" :title="title" :disabled="disabled" @click="$emit(\'click\', $event)"><slot /></button>',
     },
 }))
 
@@ -856,14 +856,8 @@ describe('Board grouping persistence', () => {
         await flushPromises()
         expect(wrapper.findAll('.swimlane-header').length).toBeGreaterThanOrEqual(1)
 
-        // Click the clear filters button (the UiButton mock renders as a plain <button class="btn">)
-        // It's the one between the group-by select and the reload button
-        const allBtns = wrapper.findAll('button.btn')
-        // The clear-filters button emits 'click' and is not the reload button
-        const clearBtn = allBtns.find(b => {
-          const inner = b.find('.icon')
-          return inner.exists()
-        })!
+        // Click the clear filters button
+        const clearBtn = wrapper.find('button[aria-label="Clear filters"]')
         await clearBtn.trigger('click')
         await flushPromises()
 
@@ -993,33 +987,22 @@ describe('Board overdue suppression for done tasks', () => {
         wrapper.unmount()
     })
 
-    it('seeds the done-column statuses from the effective policy but keeps stored preferences', async () => {
-        // No stored preference: seeded with the effective terminal labels.
+    it('turns earlier Done-column rules into per-column card rules without writing new settings', async () => {
+        window.localStorage.setItem('lotar.doneFilters::ACME', JSON.stringify({ statuses: ['Done'], maxVisible: 1 }))
+        taskMap.value = new Map([
+            baseTask({ id: 'ACME-1', status: 'Done', modified: '2026-01-02T10:00:00Z' }),
+            baseTask({ id: 'ACME-2', status: 'Done', modified: '2026-01-03T10:00:00Z' }),
+            baseTask({ id: 'ACME-3', status: 'Doing' }),
+        ].map(t => [t.id, t]))
+        taskVersion.value++
         const wrapper = mount(Board)
         await flushPromises()
+        const done = wrapper.find('.board.grid > .col.column[data-status="Done"]')
+        expect(done.findAll('article.card.task').map(c => c.find('.id').text())).toEqual(['ACME-2'])
+        expect(wrapper.find('.board.grid > .col.column[data-status="Doing"]').findAll('article.card.task')).toHaveLength(1)
+        // Reading earlier settings never freezes a new preference by itself.
+        expect(window.localStorage.getItem('lotar.boardColumns::ACME')).toBeNull()
         wrapper.unmount()
-
-        const stored = JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')
-        expect(stored).toBeNull() // seeding must not freeze a preference
-
-        // Explicitly toggling a non-terminal column persists the seeded
-        // terminal labels plus the user's choice.
-        const wrapper2 = mount(Board)
-        await flushPromises()
-        const doingToggle = wrapper2.findAll('.done-filter input[type="checkbox"]')
-            .find((input) => input.element.closest('label')?.textContent?.includes('Doing'))
-        expect(doingToggle).toBeTruthy()
-        await doingToggle!.setValue(true)
-        expect(JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')?.statuses).toEqual(['Done', 'Doing'])
-        wrapper2.unmount()
-
-        // A stored preference survives a remount even when the policy changes.
-        showConfigMock.mockImplementation(async () => policyConfig({ effective_done_states: ['Done', 'Closed'] }))
-        invalidateCompletionPolicies()
-        const wrapper3 = mount(Board)
-        await flushPromises()
-        expect(JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')?.statuses).toEqual(['Done', 'Doing'])
-        wrapper3.unmount()
     })
 
     it('shows a retry banner while retaining cards when a refresh fails with data', async () => {
@@ -1243,7 +1226,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         wrapper.unmount()
     })
 
-    it('keeps a configured Other status selectable in done filters while the synthetic column is not', async () => {
+    it('keeps a configured Other status configurable in the columns dialog while the synthetic column is not', async () => {
         configStore.statuses.value = ['Todo', 'Doing', 'Done', 'Other']
         showConfigMock.mockImplementation(async () => policyConfig({
             issue_states: ['Todo', 'Doing', 'Done', 'Other'],
@@ -1256,7 +1239,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         taskMap.value = new Map(tasks.map(t => [t.id, t]))
         taskVersion.value++
 
-        const wrapper = mount(Board)
+        const wrapper = mount(Board, { global: { stubs: { teleport: true } } })
         await flushPromises()
 
         // Configured "Other" is a real column; the synthetic fallback coexists.
@@ -1265,17 +1248,13 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         expect(configuredOther.find('article.card.task').text()).toContain('ACME-1')
         expect(wrapper.find('.board.grid > .col.column[data-column-kind="other"]').exists()).toBe(true)
 
-        // Done-column checkboxes list configured labels only — exactly once
+        // The columns dialog lists configured statuses only — exactly once
         // each, never the synthetic fallback.
-        const labels = wrapper.findAll('.done-filter input[type="checkbox"]')
-            .map(input => input.element.closest('label')?.textContent?.trim())
+        await wrapper.find('[data-testid="board-columns-button"]').trigger('click')
+        await flushPromises()
+        const labels = wrapper.findAll('[data-testid="board-columns-dialog"] [data-layout-status]')
+            .map(row => row.attributes('data-layout-status'))
         expect(labels).toEqual(['Todo', 'Doing', 'Done', 'Other'])
-
-        // Seeding and persistence stay untouched by unknown-status tasks.
-        const doingToggle = wrapper.findAll('.done-filter input[type="checkbox"]')
-            .find(input => input.element.closest('label')?.textContent?.includes('Doing'))
-        await doingToggle!.setValue(true)
-        expect(JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')?.statuses).toEqual(['Done', 'Doing'])
         wrapper.unmount()
     })
 
@@ -1609,5 +1588,191 @@ describe('Board no-op drop guards (DEV-102)', () => {
         } finally {
             wrapper.unmount()
         }
+    })
+})
+
+describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV-130)', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+        routeState.query = { project: 'ACME' }
+        boardQueryHandles.clear()
+        configStore.statuses.value = ['Todo', 'Doing', 'Review', 'Done', 'WontDo']
+        configStore.priorities.value = ['Low', 'Medium', 'High']
+        setStatusMock.mockClear()
+        openTaskPanelMock.mockClear()
+        invalidateCompletionPolicies()
+        if (typeof localStorage !== 'undefined' && localStorage.clear) localStorage.clear()
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Todo', priority: 'High' }),
+            baseTask({ id: 'ACME-2', status: 'Review', priority: 'High' }),
+            baseTask({ id: 'ACME-3', status: 'Done', priority: 'Low' }),
+            baseTask({ id: 'ACME-4', status: 'WontDo', priority: 'High' }),
+            baseTask({ id: 'ACME-5', status: 'WontDo', priority: 'Low' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+    })
+    afterEach(() => {
+        configStore.statuses.value = ['Todo', 'Doing', 'Done']
+        vi.useRealTimers()
+    })
+
+    const mountBoard = () => mount(Board, { global: { stubs: { teleport: true } } })
+    const laneTitles = (wrapper: ReturnType<typeof mount>) =>
+        wrapper.findAll('.board.grid > .col.column').map(lane => lane.find('.lane-header__title').text())
+    async function openDialog(wrapper: ReturnType<typeof mount>) {
+        await wrapper.find('[data-testid="board-columns-button"]').trigger('click')
+        await flushPromises()
+        return wrapper.find('[data-testid="board-columns-dialog"]')
+    }
+    const statusRow = (dialog: ReturnType<ReturnType<typeof mount>['find']>, status: string) =>
+        dialog.find(`[data-layout-status="${status}"]`)
+    async function apply(wrapper: ReturnType<typeof mount>) {
+        await wrapper.find('[data-testid="board-columns-apply"]').trigger('click')
+        await flushPromises()
+    }
+
+    it('stacks any statuses into one column, keeps per-status sections and drops, and persists', async () => {
+        const wrapper = mountBoard()
+        await flushPromises()
+        expect(laneTitles(wrapper)).toEqual(['Todo', 'Doing', 'Review', 'Done', 'WontDo'])
+
+        await openDialog(wrapper)
+        // Move WontDo in with Todo (not adjacent), and give Done + Review a shared column.
+        const menuMove = async (label: string, item: string) => {
+            const button = statusRow(wrapper.find('[data-testid="board-columns-dialog"]'), label)
+                .findAll('.board-columns-dialog__menu-item').find(b => b.text() === item)!
+            await button.trigger('click')
+        }
+        await menuMove('WontDo', 'Move to Todo')
+        await menuMove('Review', 'Move to Done')
+        await apply(wrapper)
+
+        expect(wrapper.find('[data-testid="board-columns-dialog"]').exists()).toBe(false)
+        expect(laneTitles(wrapper)).toEqual(['Todo · WontDo', 'Doing', 'Done · Review'])
+        expect(wrapper.find('.board.grid').attributes('style')).toContain('repeat(3')
+        const stacked = wrapper.find('.board.grid > .col.column.column--stacked')
+        expect(stacked.attributes('data-column-kind')).toBe('stack')
+        const sections = stacked.findAll('.column-section--stacked')
+        expect(sections.map(s => s.attributes('data-status'))).toEqual(['Todo', 'WontDo'])
+        expect(stacked.find('.lane-header__count').text()).toBe('3')
+        expect(sections[1]!.find('.column-section__count').text()).toBe('2')
+
+        const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-3'))!
+        await card.trigger('dragstart')
+        await sections[1]!.find('.col-cards').trigger('drop')
+        await flushPromises()
+        expect(setStatusMock).toHaveBeenLastCalledWith('ACME-3', 'WontDo')
+
+        // The stacked header's add menu offers each status.
+        const items = stacked.findAll('.lane-add-menu__item')
+        expect(items.map(i => i.text())).toEqual(['Add in Todo', 'Add in WontDo'])
+        await items[1]!.trigger('click')
+        expect(openTaskPanelMock).toHaveBeenLastCalledWith(expect.objectContaining({ initialStatus: 'WontDo' }))
+
+        const stored = JSON.parse(localStorage.getItem('lotar.boardColumns::ACME') || '{}')
+        expect(stored.version).toBe(2)
+        expect(stored.columns.map((c: { statuses: string[] }) => c.statuses.join('+'))).toEqual(['todo+wontdo', 'doing', 'done+review'])
+        wrapper.unmount()
+        const again = mountBoard()
+        await flushPromises()
+        expect(laneTitles(again)).toEqual(['Todo · WontDo', 'Doing', 'Done · Review'])
+        again.unmount()
+    })
+
+    it('reorders and names columns, hides statuses, and cancels without saving', async () => {
+        const wrapper = mountBoard()
+        await flushPromises()
+        // Re-query the dialog after every action: re-renders replace its element.
+        const dialog = () => wrapper.find('[data-testid="board-columns-dialog"]')
+        async function edit() {
+            await openDialog(wrapper)
+            // Done moves one column to the right (keyboard path of the column drag).
+            await dialog().findAll('.board-columns-dialog__grip')[3]!.trigger('keydown', { key: 'ArrowRight' })
+            await statusRow(dialog(), 'Doing').find('[aria-label="Hide Doing"]').trigger('click')
+            expect(statusRow(dialog(), 'Doing').find('[aria-label="Show Doing"]').exists()).toBe(true)
+            await dialog().find('[aria-label="Rename column Todo"]').trigger('click')
+            await dialog().find('input.board-columns-dialog__rename').setValue('Backlog')
+            await dialog().find('input.board-columns-dialog__rename').trigger('keydown', { key: 'Enter' })
+        }
+        await edit()
+        await dialog().findAll('button').find(b => b.text() === 'Cancel')!.trigger('click')
+        await flushPromises()
+        expect(laneTitles(wrapper)).toEqual(['Todo', 'Doing', 'Review', 'Done', 'WontDo'])
+
+        await edit()
+        await apply(wrapper)
+        expect(laneTitles(wrapper)).toEqual(['Backlog', 'Review', 'WontDo', 'Done'])
+        const note = wrapper.find('[data-testid="board-hidden-columns"]')
+        expect(note.text()).toContain('1 column hidden (Doing) · 0 tasks')
+        await note.find('button').trigger('click')
+        await flushPromises()
+        expect(laneTitles(wrapper)).toEqual(['Backlog', 'Doing', 'Review', 'WontDo', 'Done'])
+
+        await openDialog(wrapper)
+        await dialog().findAll('button').find(b => b.text() === 'Reset to defaults')!.trigger('click')
+        await apply(wrapper)
+        expect(laneTitles(wrapper)).toEqual(['Todo', 'Doing', 'Review', 'Done', 'WontDo'])
+        wrapper.unmount()
+    })
+
+    it('applies a column WIP limit across stacked statuses and per-column card rules', async () => {
+        localStorage.setItem('lotar.boardColumns::ACME', JSON.stringify({
+            version: 2,
+            columns: [
+                { statuses: ['todo'] }, { statuses: ['doing'] }, { statuses: ['review'] },
+                { statuses: ['done', 'wontdo'], name: 'Closed', wipLimit: 2, maxVisible: 1 },
+            ],
+            hidden: [],
+        }))
+        const wrapper = mountBoard()
+        await flushPromises()
+        const closed = wrapper.find('.board.grid > .col.column.column--stacked')
+        expect(closed.find('.lane-header__title').text()).toBe('Closed')
+        // Card rule keeps one card per status section; the limit counts both sections.
+        expect(closed.findAll('.column-section--stacked').map(s => s.findAll('article.card.task').length)).toEqual([1, 1])
+        expect(closed.find('.lane-header__count').text()).toBe('2 / 2')
+        expect(closed.classes()).not.toContain('over-limit')
+
+        await openDialog(wrapper)
+        const closedSettings = () => wrapper.findAll('[data-testid="board-columns-dialog"] .board-columns-dialog__column')[3]!.findAll('.board-columns-dialog__settings input')
+        await closedSettings()[0]!.setValue('1')
+        await closedSettings()[2]!.setValue('')
+        await apply(wrapper)
+        const updated = wrapper.find('.board.grid > .col.column.column--stacked')
+        expect(updated.find('.lane-header__count').text()).toBe('3 / 1')
+        expect(updated.classes()).toContain('over-limit')
+        wrapper.unmount()
+    })
+
+    it('keeps statuses distinct inside stacked lanes when grouped by priority, with one header row', async () => {
+        localStorage.setItem('lotar.boardColumns::ACME', JSON.stringify({
+            version: 2,
+            columns: [{ statuses: ['todo'] }, { statuses: ['review'] }, { statuses: ['done', 'wontdo'] }, { statuses: ['doing'] }],
+            hidden: ['doing'],
+        }))
+        localStorage.setItem('lotar.boardGroupBy::ACME', 'priority')
+        const wrapper = mountBoard()
+        await flushPromises()
+
+        const headers = wrapper.findAll('.board-col-header')
+        expect(headers.map(h => h.find('.lane-header__title').text())).toEqual(['Todo', 'Review', 'Done · WontDo'])
+        // One compact row per header, also for the stacked lane.
+        expect(headers[2]!.findAll('.lane-header__title')).toHaveLength(1)
+        expect(wrapper.find('.board.grid').attributes('style')).toContain('repeat(3')
+
+        const cells = wrapper.findAll('.column-group-cell--stacked')
+        expect(cells.length).toBe(2) // High and Low swimlanes
+        const high = cells[0]!.findAll('.column-section--stacked')
+        expect(high.map(s => s.find('.column-section__label').text())).toEqual(['Done', 'WontDo'])
+        expect(high[1]!.find('article.card.task').text()).toContain('ACME-4')
+
+        const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-2'))!
+        await card.trigger('dragstart')
+        await high[0]!.find('.col-cards').trigger('drop')
+        await flushPromises()
+        expect(setStatusMock).toHaveBeenLastCalledWith('ACME-2', 'Done')
+        wrapper.unmount()
     })
 })

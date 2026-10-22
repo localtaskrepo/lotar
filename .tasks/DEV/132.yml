@@ -1,0 +1,7 @@
+title: Investigate intermittent ui.backlog-order smoke failure at 390px under full parallel smoke load
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-22T02:17:45.894551+00:00
+description: 'Seen once during DEV-130 final gates: smoke/tests/ui.backlog-order.smoke.spec.ts ''drags before/after in backlog and sprint without changing task files at 390px'' failed in a full build-first smoke run (1 of 319), then passed 3/3 alone and 319/319 on a full rerun. Failure details were not captured. Next step: run the full smoke suite repeatedly with the vitest reporter saving failure output, identify the waiting/race condition at the narrow viewport, and harden the wait (no retries-as-fix).'
