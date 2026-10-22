@@ -210,6 +210,13 @@ Use `lotar automation simulate` to test what actions a rule change would produce
 lotar automation simulate --ticket PROJ-1
 ```
 
+The preview applies the matched action the same way a real run would, without writing anything: every `set` field (including due date, effort, custom fields and the `labels` alias), templates built from the ticket's current values, `@me`/`@reporter`/`@assignee`/`@assignee_or_reporter`/`@least_busy` assignees, and case-insensitive tag adds and removes. A few things can only be known when the rule actually runs; the preview lists them as warnings instead of guessing:
+
+- Template values from the triggering event (`${{previous.*}}`, `${{comment.text}}`, `${{agent.*}}`) stay unexpanded.
+- `@round_robin` and `@random` assignees are shown as the token (previewing round robin would advance the real rotation).
+- Unknown status, priority or type values are reported as skipped.
+- Sprint additions and removals, comments and run commands are listed as actions but not applied to the previewed task.
+
 ## Validation
 
 LoTaR validates status/type/priority values against the project config. Invalid values are skipped at runtime and reported as warnings when saving the automation file.

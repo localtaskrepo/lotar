@@ -2849,7 +2849,8 @@
                           "tags": [
                             "api"
                           ]
-                        }
+                        },
+                        "warnings": []
                       }
                     }
                   },
@@ -2873,7 +2874,8 @@
                             "api"
                           ]
                         },
-                        "task_after": null
+                        "task_after": null,
+                        "warnings": []
                       }
                     }
                   }
@@ -7169,6 +7171,13 @@
               }
             ],
             "description": "Simulated task state after the actions; null when no rule matched."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Preview parts only decided when the rule really runs: event-only template values (previous.*, comment.*, agent.*) shown unexpanded, @round_robin/@random assignees, unknown enum values that would be skipped, and sprint changes not reflected in task_after. Empty when nothing is uncertain."
           }
         },
         "required": [
@@ -7176,7 +7185,8 @@
           "rule_name",
           "actions",
           "task_before",
-          "task_after"
+          "task_after",
+          "warnings"
         ]
       },
       "AutomationSimulatedAction": {
@@ -7184,7 +7194,7 @@
         "properties": {
           "action": {
             "type": "string",
-            "description": "Action type, e.g. set_status, set_priority, set_type, set_assignee, set_reporter, add_tag."
+            "description": "Action type, e.g. set_status, set_priority, set_type, set_assignee, set_reporter, set_title, set_description, set_due_date, set_effort, set_tags, set_custom_field, add_tags, remove_tags, add_sprint, remove_sprint, add_comment, run_command, queue_agent."
           },
           "description": {
             "type": "string",

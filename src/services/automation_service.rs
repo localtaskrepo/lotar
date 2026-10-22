@@ -503,13 +503,15 @@ impl AutomationService {
                 continue;
             }
             if let Some(action) = resolve_action_for_event_with_fallback(&rule.on, event) {
-                let actions = describe_action(action, &task, &config);
-                let task_after = simulate_action(&task, action, &config);
+                let mut preview = PreviewContext::new(&task);
+                let actions = describe_action(action, &task, &config, &mut preview);
+                let task_after = simulate_action(&task, action, &config, &storage, &mut preview);
                 return Ok(SimulateResult {
                     matched: true,
                     rule_name: rule.name.clone(),
                     actions,
                     task_after: Some(task_after),
+                    warnings: preview.into_warnings(),
                 });
             }
         }
@@ -518,6 +520,7 @@ impl AutomationService {
             rule_name: None,
             actions: vec![],
             task_after: None,
+            warnings: vec![],
         })
     }
 }
@@ -528,6 +531,8 @@ pub struct SimulateResult {
     pub rule_name: Option<String>,
     pub actions: Vec<SimulatedAction>,
     pub task_after: Option<TaskDTO>,
+    /// Parts of the preview that cannot be known until the rule really runs.
+    pub warnings: Vec<String>,
 }
 
 /// A single simulated action
@@ -541,29 +546,41 @@ fn describe_action(
     action: &AutomationAction,
     current: &TaskDTO,
     config: &ResolvedConfig,
+    preview: &mut PreviewContext,
 ) -> Vec<SimulatedAction> {
     let mut actions = Vec::new();
+    fn push(actions: &mut Vec<SimulatedAction>, action: &str, description: String) {
+        actions.push(SimulatedAction {
+            action: action.to_string(),
+            description,
+        });
+    }
 
     if let Some(set) = action.set.as_ref() {
+        let expand = |preview: &mut PreviewContext, value: &String| preview.expand(value);
         if let Some(value) = set.status.as_ref() {
-            actions.push(SimulatedAction {
-                action: "set_status".to_string(),
-                description: format!("Set status to '{}'", value),
-            });
+            push(
+                &mut actions,
+                "set_status",
+                format!("Set status to '{}'", expand(preview, value)),
+            );
         }
         if let Some(value) = set.priority.as_ref() {
-            actions.push(SimulatedAction {
-                action: "set_priority".to_string(),
-                description: format!("Set priority to '{}'", value),
-            });
+            push(
+                &mut actions,
+                "set_priority",
+                format!("Set priority to '{}'", expand(preview, value)),
+            );
         }
         if let Some(value) = set.task_type.as_ref() {
-            actions.push(SimulatedAction {
-                action: "set_type".to_string(),
-                description: format!("Set type to '{}'", value),
-            });
+            push(
+                &mut actions,
+                "set_type",
+                format!("Set type to '{}'", expand(preview, value)),
+            );
         }
         if let Some(value) = set.assignee.as_ref() {
+            let value = expand(preview, value);
             let resolved = if value == "@me" {
                 "current user".to_string()
             } else if value == "@reporter" {
@@ -576,25 +593,77 @@ fn describe_action(
             } else {
                 value.clone()
             };
-            actions.push(SimulatedAction {
-                action: "set_assignee".to_string(),
-                description: format!("Set assignee to {}", resolved),
-            });
+            push(
+                &mut actions,
+                "set_assignee",
+                format!("Set assignee to {}", resolved),
+            );
         }
         if let Some(value) = set.reporter.as_ref() {
-            actions.push(SimulatedAction {
-                action: "set_reporter".to_string(),
-                description: format!("Set reporter to '{}'", value),
-            });
+            push(
+                &mut actions,
+                "set_reporter",
+                format!("Set reporter to '{}'", expand(preview, value)),
+            );
+        }
+        if let Some(value) = set.title.as_ref() {
+            push(
+                &mut actions,
+                "set_title",
+                format!("Set title to '{}'", expand(preview, value)),
+            );
+        }
+        if let Some(value) = set.description.as_ref() {
+            push(
+                &mut actions,
+                "set_description",
+                format!("Set description to '{}'", expand(preview, value)),
+            );
+        }
+        if let Some(value) = set.due_date.as_ref() {
+            push(
+                &mut actions,
+                "set_due_date",
+                format!("Set due date to '{}'", expand(preview, value)),
+            );
+        }
+        if let Some(value) = set.effort.as_ref() {
+            push(
+                &mut actions,
+                "set_effort",
+                format!("Set effort to '{}'", expand(preview, value)),
+            );
+        }
+        if let Some(values) = set
+            .tags
+            .as_ref()
+            .or(set.labels.as_ref())
+            .map(StringOrVec::as_vec)
+        {
+            push(
+                &mut actions,
+                "set_tags",
+                format!("Set tags: {}", values.join(", ")),
+            );
+        }
+        if let Some(map) = set.custom_fields.as_ref() {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            for key in keys {
+                let shown = convert_custom_field_value(&map[key], key)
+                    .map(|value| crate::types::custom_value_to_string(&value))
+                    .unwrap_or_default();
+                push(
+                    &mut actions,
+                    "set_custom_field",
+                    format!("Set custom field '{}' to '{}'", key, shown),
+                );
+            }
         }
     }
 
     if let Some(add) = action.add.as_ref() {
-        let tags: Vec<String> = add
-            .tags
-            .as_ref()
-            .map(StringOrVec::as_vec)
-            .unwrap_or_default();
+        let tags = tag_action_values(add);
         if !tags.is_empty() {
             actions.push(SimulatedAction {
                 action: "add_tags".to_string(),
@@ -622,11 +691,7 @@ fn describe_action(
     }
 
     if let Some(remove) = action.remove.as_ref() {
-        let tags: Vec<String> = remove
-            .tags
-            .as_ref()
-            .map(StringOrVec::as_vec)
-            .unwrap_or_default();
+        let tags = tag_action_values(remove);
         if !tags.is_empty() {
             actions.push(SimulatedAction {
                 action: "remove_tags".to_string(),
@@ -655,15 +720,19 @@ fn describe_action(
 
     if let Some(run) = action.run.as_ref() {
         let description = match run {
-            AutomationRunAction::Shell(command) => format!("Run command: {}", command),
+            AutomationRunAction::Shell(command) => {
+                format!("Run command: {}", preview.expand(command))
+            }
             AutomationRunAction::Command(command) => {
                 if command.args.is_empty() {
-                    format!("Run command: {}", command.command)
+                    format!("Run command: {}", preview.expand(&command.command))
                 } else {
+                    let args: Vec<String> =
+                        command.args.iter().map(|arg| preview.expand(arg)).collect();
                     format!(
                         "Run command: {} {}",
-                        command.command,
-                        command.args.join(" ")
+                        preview.expand(&command.command),
+                        args.join(" ")
                     )
                 }
             }
@@ -677,7 +746,7 @@ fn describe_action(
     if let Some(comment) = action.comment.as_ref() {
         actions.push(SimulatedAction {
             action: "add_comment".to_string(),
-            description: format!("Add comment: {}", comment),
+            description: format!("Add comment: {}", preview.expand(comment)),
         });
     }
 
@@ -696,19 +765,94 @@ fn describe_action(
     actions
 }
 
-/// Simulate what the task would look like after applying an action
+/// Tag values of an add/remove action, including the `labels` alias.
+fn tag_action_values(action: &AutomationTagAction) -> Vec<String> {
+    action
+        .tags
+        .as_ref()
+        .map(StringOrVec::as_vec)
+        .into_iter()
+        .flatten()
+        .chain(
+            action
+                .labels
+                .as_ref()
+                .map(StringOrVec::as_vec)
+                .into_iter()
+                .flatten(),
+        )
+        .collect()
+}
+
+/// Template expansion and warnings for one preview (DEV-118).
+struct PreviewContext {
+    tmpl: TemplateContext,
+    unresolved: Vec<String>,
+    warnings: Vec<String>,
+}
+
+impl PreviewContext {
+    fn new(task: &TaskDTO) -> Self {
+        Self {
+            tmpl: TemplateContext::from_task(task),
+            unresolved: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
+    fn expand(&mut self, input: &str) -> String {
+        self.tmpl.expand_preview(input, &mut self.unresolved)
+    }
+
+    fn warn(&mut self, message: String) {
+        if !self.warnings.contains(&message) {
+            self.warnings.push(message);
+        }
+    }
+
+    fn into_warnings(mut self) -> Vec<String> {
+        for key in std::mem::take(&mut self.unresolved) {
+            self.warnings.push(format!(
+                "Template value '${{{{{}}}}}' comes from the triggering event and is shown unexpanded",
+                key
+            ));
+        }
+        self.warnings
+    }
+}
+
+/// Assignee tokens whose result is only decided when the rule runs.
+/// `@round_robin` advances a shared counter, so previewing it would change
+/// the next real assignment.
+fn is_runtime_assignee(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "@round_robin" | "@random"
+    )
+}
+
+/// Preview what the task would look like after applying an action, with the
+/// same field coverage as `apply_action` (DEV-118). Nothing is written:
+/// sprint membership, comments and run commands are listed in the described
+/// actions but not applied to the preview.
 fn simulate_action(
     current: &TaskDTO,
     action: &AutomationAction,
     config: &ResolvedConfig,
+    storage: &Storage,
+    preview: &mut PreviewContext,
 ) -> TaskDTO {
     let mut simulated = current.clone();
 
     if let Some(set) = action.set.as_ref() {
-        // Preview keeps its historical subset: no template expansion, raw
-        // assignee/reporter, `tags` only, and no due date, effort or custom
-        // fields. Defining full preview parity is a separate decision (DEV-118).
-        let plan = SetPlan::parse(set, config, str::to_string);
+        let plan = SetPlan::parse(set, config, |value| preview.expand(value));
+        for (field, value) in &plan.rejected {
+            preview.warn(format!(
+                "Unknown {} '{}' would be skipped",
+                set_enum_label(*field),
+                value
+            ));
+        }
         if let Some(status) = plan.status {
             simulated.status = status;
         }
@@ -722,42 +866,70 @@ fn simulate_action(
             simulated.title = title;
         }
         if let Some(description) = plan.description {
-            simulated.description = Some(description);
+            simulated.description = (!description.is_empty()).then_some(description);
         }
-        if let Some(assignee) = plan.assignee {
-            simulated.assignee = Some(assignee);
+        if let Some(due_date) = plan.due_date {
+            simulated.due_date = (!due_date.trim().is_empty()).then_some(due_date);
         }
-        if let Some(reporter) = plan.reporter {
-            simulated.reporter = Some(reporter);
+        if let Some(effort) = plan.effort {
+            simulated.effort = if effort.is_empty() {
+                None
+            } else {
+                Some(
+                    crate::utils::effort::parse_effort(&effort)
+                        .map(|parsed| parsed.canonical)
+                        .unwrap_or(effort),
+                )
+            };
         }
-        if let Some(values) = plan.tags {
-            simulated.tags = normalize_tags(values);
-        }
-    }
-
-    if let Some(add) = action.add.as_ref() {
-        let tags: Vec<String> = add
-            .tags
-            .as_ref()
-            .map(StringOrVec::as_vec)
-            .unwrap_or_default();
-        for tag in normalize_tags(tags) {
-            if !simulated.tags.contains(&tag) {
-                simulated.tags.push(tag);
+        if let Some(value) = plan.assignee.as_deref() {
+            if is_runtime_assignee(value) {
+                preview.warn(format!(
+                    "Assignee '{}' is chosen when the rule runs; the preview shows the token",
+                    value.trim()
+                ));
+                simulated.assignee = Some(value.trim().to_string());
+            } else if let Some(resolved) = resolve_assignee_value(value, current, config, storage) {
+                simulated.assignee = Some(resolved);
             }
         }
-        apply_relationship_action(add, true, &mut simulated.relationships);
+        if let Some(value) = plan.reporter.as_deref()
+            && let Some(resolved) =
+                resolve_reporter_value(value, current, storage.root_path.as_path())
+        {
+            simulated.reporter = Some(resolved);
+        }
+        // `tags` wins over the `labels` alias, as on apply.
+        if let Some(values) = plan.tags.or(plan.labels) {
+            simulated.tags = normalize_tags(values);
+        }
+        if let Some(map) = plan.custom_fields {
+            for (key, value) in map {
+                match convert_custom_field_value(value, key) {
+                    Ok(converted) => {
+                        simulated.custom_fields.insert(key.clone(), converted);
+                    }
+                    Err(err) => preview.warn(format!(
+                        "Custom field '{}' would fail to apply: {}",
+                        key, err
+                    )),
+                }
+            }
+        }
     }
 
-    if let Some(remove) = action.remove.as_ref() {
-        let tags: Vec<String> = remove
-            .tags
-            .as_ref()
-            .map(StringOrVec::as_vec)
-            .unwrap_or_default();
-        let normalized = normalize_tags(tags);
-        simulated.tags.retain(|t| !normalized.contains(t));
-        apply_relationship_action(remove, false, &mut simulated.relationships);
+    for (tag_action, add) in [(action.add.as_ref(), true), (action.remove.as_ref(), false)] {
+        let Some(tag_action) = tag_action else {
+            continue;
+        };
+        apply_tag_action(tag_action, add, &mut simulated.tags);
+        apply_relationship_action(tag_action, add, &mut simulated.relationships);
+        if tag_action.sprint.is_some() {
+            preview.warn(
+                "Sprint membership changes are listed in actions but not reflected in task_after"
+                    .to_string(),
+            );
+        }
     }
 
     // The simulated state must reflect the projected completion/due
@@ -770,6 +942,14 @@ fn simulate_action(
     ));
 
     simulated
+}
+
+fn set_enum_label(field: SetEnumField) -> &'static str {
+    match field {
+        SetEnumField::Status => "status",
+        SetEnumField::Priority => "priority",
+        SetEnumField::Type => "type",
+    }
 }
 
 /// Look up the action for a specific task event from the `on` block.
@@ -1447,7 +1627,7 @@ impl<'a> SetPlan<'a> {
     pub(crate) fn parse(
         set: &'a AutomationActionSet,
         config: &ResolvedConfig,
-        expand: impl Fn(&str) -> String,
+        mut expand: impl FnMut(&str) -> String,
     ) -> Self {
         let mut plan = SetPlan::default();
         if let Some(value) = set.status.as_ref() {
@@ -1471,12 +1651,12 @@ impl<'a> SetPlan<'a> {
                 Err(_) => plan.rejected.push((SetEnumField::Type, value)),
             }
         }
-        plan.title = set.title.as_deref().map(&expand);
-        plan.description = set.description.as_deref().map(&expand);
-        plan.due_date = set.due_date.as_deref().map(&expand);
-        plan.effort = set.effort.as_deref().map(&expand);
-        plan.assignee = set.assignee.as_deref().map(&expand);
-        plan.reporter = set.reporter.as_deref().map(&expand);
+        plan.title = set.title.as_deref().map(&mut expand);
+        plan.description = set.description.as_deref().map(&mut expand);
+        plan.due_date = set.due_date.as_deref().map(&mut expand);
+        plan.effort = set.effort.as_deref().map(&mut expand);
+        plan.assignee = set.assignee.as_deref().map(&mut expand);
+        plan.reporter = set.reporter.as_deref().map(&mut expand);
         plan.tags = set.tags.as_ref().map(StringOrVec::as_vec);
         plan.labels = set.labels.as_ref().map(StringOrVec::as_vec);
         plan.custom_fields = set.custom_fields.as_ref();

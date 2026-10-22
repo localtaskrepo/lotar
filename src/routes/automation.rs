@@ -136,6 +136,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                             "actions": actions,
                             "task_before": task_before,
                             "task_after": result.task_after,
+                            "warnings": result.warnings,
                         }
                     }),
                 )

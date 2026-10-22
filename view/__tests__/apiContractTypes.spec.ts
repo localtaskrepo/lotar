@@ -65,13 +65,14 @@ describe('api contract type shapes', () => {
     expect(deleted.integrity?.auto_cleanup?.removed_references).toBe(3)
   })
 
-  it('simulate always carries all five keys', () => {
+  it('simulate always carries all six keys', () => {
     const unmatched: AutomationSimulateResponse = {
       matched: false,
       rule_name: null,
       actions: [],
       task_before: task,
       task_after: null,
+      warnings: [],
     }
     expect(unmatched.task_after).toBeNull()
   })

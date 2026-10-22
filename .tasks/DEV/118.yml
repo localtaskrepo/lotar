@@ -1,10 +1,11 @@
 title: Share automation set-action parsing and define simulate parity
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T00:46:59.896906+00:00
-modified: 2026-10-21T20:36:59.823409+00:00
+modified: 2026-10-22T01:21:35.965252+00:00
 comments:
 - date: 2026-10-21T20:36:59.823409+00:00
   text: |-
@@ -12,9 +13,39 @@ comments:
     Evidence: tests/dev118_automation_set_plan_test.rs characterizes apply for every set field and the labels alias (incl. templates, tags-over-labels precedence, unknown enums skipped), the exact preview subset, and per-enum validation warnings (4/4); automation/agent/dev59/dev102/dev21 suites 185/185; clippy clean.
     Remaining (needs product decision before step 2): define preview parity. Currently simulate does not expand templates, shows assignee/reporter raw (no @me/@reporter/agent resolution), ignores due_date, effort, custom_fields and the labels alias, and uses exact-match tag add/remove rather than apply's case-insensitive merge with labels. Options: (a) full parity using SetPlan with a template context from the task, plus resolved assignee/reporter; (b) parity for plain fields only, keep templates/aliases raw and labelled as unresolved; (c) keep the subset and document it. Once decided, apply the chosen mapping in simulate_action and flip the 'Not yet previewed' assertions in the DEV-118 test.
     Guidance: no durable finding.
+- date: 2026-10-22T01:15:11.085188+00:00
+  text: 'Decision (developer, 2026-10-21): full preview parity. Plan: simulate uses SetPlan with a preview template expander (ticket.* expanded; event-only previous./comment./agent. placeholders left literal with a warning), resolves @me/@reporter/@assignee/@assignee_or_reporter/@least_busy like apply, leaves @round_robin/@random raw with a ''chosen when the rule runs'' warning (round robin advances a shared counter), applies due date/effort (canonical)/custom fields/labels alias and apply''s case-insensitive tag add/remove, lists sprint changes, comments and runs without applying them. Additive ''warnings'' array on simulate responses (CLI JSON/text, REST, api_types, TS, OpenAPI, docs, Automation UI).'
+- date: 2026-10-22T01:21:35.927654+00:00
+  text: |-
+    Outcome (step 2): simulate now has full apply parity. PreviewContext expands templates from the ticket (TemplateContext::expand_preview keeps event-only previous./comment./agent. placeholders literal and reports them); simulate_action applies every SetPlan field (due date, canonical effort, custom fields, tags over labels), resolves assignee/reporter like apply except @round_robin/@random (token kept + warning; round robin would advance the shared rotation), uses apply's case-insensitive tag add/remove and relationship actions, and warns that sprint changes are listed but not reflected. describe_action covers set_title/description/due_date/effort/tags/custom_field with expanded values; add/remove tags include labels; comment/run descriptions are preview-expanded. Additive 'warnings' array on SimulateResult, REST data, CLI JSON and text output, api_types, view/api/types.ts, OpenAPI schema/examples, api-quick-reference and automation help; Automation simulator UI lists warnings and shows due/effort chips.
+    Evidence: tests/dev118_automation_set_plan_test.rs preview_matches_apply_for_every_set_field (preview vs real apply on twin workspaces, field by field) and preview_warns_about_values_only_known_at_run_time (stable @round_robin over two previews, literal event-only templates, case-insensitive tag add, skipped unknown enum, sprint warning) 5/5; dev82 contract + openapi suites 15/15; automation/agent/web/mcp suites pass; UI contract specs; api/cli automation smoke 27/27 and new ui.automation simulator smoke 7/7 on fresh build:smoke; clippy/fmt clean.
+    Remaining: none. Note: the UI simulator still offers only job lifecycle events (by design of that page); CLI/REST accept all events.
+    Guidance: no durable finding.
 description: Deferred after DEV-112. Apply and simulate independently enumerate set fields/parse enums; simulate currently omits due/effort/custom values and does not fully resolve templates/assignee. First extract shared pure supported-field/parse plan preserving current mutation receipts/completion policy; then explicitly define preview parity and template/resolver behavior before changing output. Test every set field and alias against apply/preview, recursion and no-op guards. Keep implicit feature additions separate from move-only cleanup. No implementation in DEV-112.
 history:
 - at: 2026-10-21T20:36:59.823409+00:00
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-22T01:15:11.039820+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T01:15:11.085188+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T01:21:35.927654+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T01:21:35.965252+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

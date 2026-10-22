@@ -148,6 +148,50 @@ describe.concurrent('UI Automation page smoke tests', () => {
         }
     });
 
+    it('simulator previews every set field and lists run-time warnings (DEV-118)', async () => {
+        const rules = `automation:
+  rules:
+    - name: Job start preview
+      on:
+        job_started:
+          set:
+            effort: 90m
+            due_date: "2026-12-01"
+            assignee: "@round_robin"
+            title: "Started \${{ticket.title}} after \${{previous.status}}"
+`;
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: { '.tasks/config.yml': BASE_CONFIG, '.tasks/automation.yml': rules },
+        });
+        try {
+            const task = await workspace.addTask('Preview target');
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/automations`, async (page) => {
+                    await page.waitForSelector('h1', { timeout: 15_000 });
+                    await page.click('.filter-tab:has-text("Simulator")');
+                    await page.selectOption('select[aria-label="Event type"]', 'job_start');
+                    await page.fill('input[placeholder*="PROJ-123"]', task.id);
+                    await page.click('button:has-text("Simulate")');
+                    const warnings = page.getByTestId('simulation-warnings');
+                    await warnings.waitFor({ timeout: 10_000 });
+                    const warningText = (await warnings.textContent()) ?? '';
+                    expect(warningText).toContain("Assignee '@round_robin' is chosen when the rule runs");
+                    expect(warningText).toContain('previous.status');
+                    const results = (await page.locator('.result-card').allTextContents()).join('\n');
+                    expect(results).toContain("Set effort to '90m'");
+                    expect(results).toContain('Started Preview target after ${{previous.status}}');
+                    expect(results).toContain('Due 2026-12-01');
+                    expect(results).toContain('1.50h');
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
     it('Rules and Simulator tabs toggle content', async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: {

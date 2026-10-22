@@ -158,6 +158,10 @@
               </p>
             </div>
           </div>
+
+          <ul v-if="simResult.warnings?.length" class="simulation-warnings" data-testid="simulation-warnings">
+            <li v-for="(warning, idx) in simResult.warnings" :key="idx">{{ warning }}</li>
+          </ul>
         </UiCard>
 
         <UiCard v-if="simResult.task_after" class="result-card">
@@ -168,6 +172,8 @@
               <span class="chip">{{ simResult.task_after.status }}</span>
               <span v-if="simResult.task_after.priority" class="chip">{{ simResult.task_after.priority }}</span>
               <span v-if="simResult.task_after.assignee" class="chip">{{ simResult.task_after.assignee }}</span>
+              <span v-if="simResult.task_after.due_date" class="chip">Due {{ simResult.task_after.due_date }}</span>
+              <span v-if="simResult.task_after.effort" class="chip">{{ simResult.task_after.effort }}</span>
             </div>
             <p v-if="simResult.task_after.title" style="margin: 8px 0 0 0;">
               {{ simResult.task_after.title }}
@@ -407,6 +413,13 @@ onUnmounted(() => { generation += 1 })
 
 .rule-ref {
   font-weight: 500;
+}
+
+.simulation-warnings {
+  margin: 12px 0 0 0;
+  padding-left: 18px;
+  color: var(--color-warning, var(--color-muted));
+  font-size: var(--text-sm, 0.875rem);
 }
 
 .action-description {

@@ -103,6 +103,36 @@ impl TemplateContext {
         self.expand_inner(input, true)
     }
 
+    /// Preview expansion (DEV-118): like `expand`, but placeholders that only
+    /// exist during a real event (`previous.*`, `comment.*`, `agent.*`) and
+    /// are not in this context stay literal and are reported in `unresolved`
+    /// instead of silently expanding to an empty string.
+    pub fn expand_preview(&self, input: &str, unresolved: &mut Vec<String>) -> String {
+        let mut result = String::with_capacity(input.len());
+        let mut rest = input;
+        while let Some(start) = rest.find("${{") {
+            result.push_str(&rest[..start]);
+            let after_open = &rest[start + 3..];
+            let Some(end) = after_open.find("}}") else {
+                result.push_str("${{");
+                rest = after_open;
+                continue;
+            };
+            let key = after_open[..end].trim();
+            if let Some(value) = self.vars.get(key) {
+                result.push_str(value);
+            } else if is_event_only_key(key) {
+                result.push_str(&rest[start..start + 3 + end + 2]);
+                if !unresolved.iter().any(|k| k == key) {
+                    unresolved.push(key.to_string());
+                }
+            }
+            rest = &after_open[end + 2..];
+        }
+        result.push_str(rest);
+        result
+    }
+
     fn expand_inner(&self, input: &str, shell_escape: bool) -> String {
         let mut result = String::with_capacity(input.len());
         let mut rest = input;
@@ -168,6 +198,13 @@ fn custom_field_to_string(value: &crate::types::CustomFieldValue) -> String {
         serde_json::Value::Null => String::new(),
         other => other.to_string(),
     }
+}
+
+/// Template keys provided by the triggering event rather than the task.
+fn is_event_only_key(key: &str) -> bool {
+    ["previous.", "comment.", "agent."]
+        .iter()
+        .any(|prefix| key.starts_with(prefix))
 }
 
 #[cfg(test)]

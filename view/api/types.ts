@@ -1203,9 +1203,10 @@ export interface AutomationSimulatedAction {
 }
 
 /**
- * The server always serializes all five keys (hand-built JSON):
+ * The server always serializes all six keys (hand-built JSON):
  * `rule_name` is `null` when no rule matched and `task_after` is `null`
- * when no rule matched; `task_before` is always a task object.
+ * when no rule matched; `task_before` is always a task object; `warnings`
+ * lists preview parts only decided when the rule runs (may be empty).
  */
 export interface AutomationSimulateResponse {
   matched: boolean
@@ -1213,4 +1214,5 @@ export interface AutomationSimulateResponse {
   actions: AutomationSimulatedAction[]
   task_before: TaskDTO
   task_after: TaskDTO | null
+  warnings: string[]
 }

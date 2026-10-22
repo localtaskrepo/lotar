@@ -35,6 +35,7 @@ impl AutomationHandler {
                     "description": a.description,
                 })).collect::<Vec<_>>(),
                 "task_after": result.task_after,
+                "warnings": result.warnings,
             }));
             return Ok(());
         }
@@ -60,6 +61,9 @@ impl AutomationHandler {
             for action in &result.actions {
                 renderer.emit_info(format_args!("  {} — {}", action.action, action.description));
             }
+        }
+        for warning in &result.warnings {
+            renderer.emit_warning(format_args!("{}", warning));
         }
 
         Ok(())

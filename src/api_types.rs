@@ -375,6 +375,10 @@ pub struct AutomationSimulateResponse {
     pub task_before: Option<TaskDTO>,
     /// Simulated task state (after automation)
     pub task_after: Option<TaskDTO>,
+    /// Parts of the preview that are only decided when the rule really runs
+    /// (event-only template values, runtime assignee tokens, sprint changes).
+    #[serde(default)]
+    pub warnings: Vec<String>,
 }
 
 /// A single action that would be performed by automation

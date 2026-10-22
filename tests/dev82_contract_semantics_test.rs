@@ -693,7 +693,8 @@ fn validator_catches_contract_drift() {
                 "task_before": {"id": "QA-1", "title": "t", "status": "Todo",
                                 "priority": "Medium", "task_type": "Feature",
                                 "created": "x", "modified": "y"},
-                "task_after": "not-a-task"
+                "task_after": "not-a-task",
+                "warnings": []
             }),
         )
         .unwrap_err();
@@ -732,7 +733,8 @@ fn validator_catches_contract_drift() {
             "task_before": {"id": "QA-1", "title": "t", "status": "Todo",
                             "priority": "Medium", "task_type": "Feature",
                             "created": "x", "modified": "y"},
-            "task_after": null
+            "task_after": null,
+            "warnings": []
         }),
         "nullable simulate response",
     );
@@ -1300,7 +1302,7 @@ fn actual_automation_simulate_responses_match_declared_contract() {
     let simulate_examples = response_examples(&spec, "post", "/api/automation/simulate", "200");
     let ticket = create_task(&api, "QA", "Simulate contract target");
 
-    // No rules configured: all five keys present as explicit nulls/empty.
+    // No rules configured: all six keys present as explicit nulls/empty.
     let mut example = request_examples(&spec, "post", "/api/automation/simulate")
         .into_iter()
         .find(|(name, _)| name == "canonicalEvent")
@@ -1321,9 +1323,10 @@ fn actual_automation_simulate_responses_match_declared_contract() {
             "matched",
             "rule_name",
             "task_after",
-            "task_before"
+            "task_before",
+            "warnings"
         ],
-        "simulate response must always carry exactly the five contract keys"
+        "simulate response must always carry exactly the six contract keys"
     );
     assert_eq!(body["data"]["matched"], json!(false));
     assert_eq!(body["data"]["rule_name"], json!(null));
