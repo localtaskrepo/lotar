@@ -220,6 +220,7 @@ pub fn refresh_code_reference(
     references: &mut Vec<crate::types::ReferenceEntry>,
     code_ref: &str,
     live_refs: &[String],
+    history: &[crate::types::TaskChangeLogEntry],
 ) -> bool {
     let file = code_ref
         .rsplit_once('#')
@@ -238,6 +239,8 @@ pub fn refresh_code_reference(
             && let Ok(old_line) = anchor.parse::<usize>()
             && code != code_ref
             && !live_refs.contains(code)
+            // References a person attached on purpose stay where they point.
+            && !crate::services::scan_anchor_service::is_user_attached(history, code)
         {
             // Do not collapse a moved mention into an already-live anchor.
             // Mixed entries sharing one old anchor must relocate together.
@@ -775,7 +778,8 @@ mod scan_utils_tests {
         assert!(super::refresh_code_reference(
             &mut references,
             "main.rs#1",
-            &live
+            &live,
+            &[]
         ));
         assert_eq!(references.len(), 3);
         assert_eq!(references[0].code.as_deref(), Some("main.rs#1"));
@@ -790,7 +794,8 @@ mod scan_utils_tests {
         assert!(!super::refresh_code_reference(
             &mut references,
             "main.rs#4",
-            &live
+            &live,
+            &[]
         ));
         assert_eq!(references, before);
     }

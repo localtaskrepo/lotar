@@ -486,3 +486,67 @@ fn reanchor_with_paths_only_touches_anchors_under_those_paths() {
         .collect();
     assert_eq!(codes, vec!["other/b.rs#3".to_string()]);
 }
+
+#[test]
+fn reanchor_never_moves_or_removes_user_attached_code_references() {
+    let tf = TestFixtures::new();
+    common::cargo_bin_in(&tf)
+        .args(["add", "Manual references"])
+        .assert()
+        .success();
+    let root = tf.get_temp_path().to_path_buf();
+    let (project, task_file) = project_and_task_paths(&root);
+    let id = format!("{project}-1");
+    // notes.rs mentions the ID on line 3 only; the manual references point elsewhere.
+    fs::write(
+        root.join("notes.rs"),
+        format!("fn a() {{}}\nfn b() {{}}\n// {id} mentioned here\nfn c() {{}}\nfn d() {{}}\n"),
+    )
+    .unwrap();
+    fs::write(root.join("plain.rs"), "fn unrelated() {}\n").unwrap();
+    let mut task: lotar::storage::task::Task =
+        serde_yaml_ng::from_slice(&fs::read(&task_file).unwrap()).unwrap();
+    task.references = vec![
+        code("plain.rs#1"),   // single line, attached by hand (history below)
+        code("notes.rs#4-5"), // range: scan never creates these
+        code("missing.rs"),   // path-only
+        code("notes.rs#5"),   // single line, attached by hand next to a mention
+        code("gone.rs#7"),    // scan anchor into a deleted file: still cleaned up
+    ];
+    task.history.push(lotar::types::TaskChangeLogEntry {
+        at: "2026-10-01T00:00:00Z".into(),
+        actor: Some("someone".into()),
+        changes: ["plain.rs#1", "notes.rs#5"]
+            .iter()
+            .map(|value| lotar::types::TaskChange {
+                field: "reference_added".into(),
+                old: None,
+                new: Some(format!("code:{value}")),
+            })
+            .collect(),
+    });
+    fs::write(&task_file, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+
+    common::cargo_bin_in(&tf)
+        .args(["scan", "--reanchor"])
+        .assert()
+        .success();
+    let codes: Vec<String> = read_references(&task_file)
+        .into_iter()
+        .filter_map(|r| r.code)
+        .collect();
+    // The hand-attached references stay exactly as written (nothing moved
+    // onto the line-3 mention, nothing pruned); the scan finding adds its
+    // own anchor and the scan anchor into the deleted file is removed.
+    assert_eq!(
+        codes,
+        vec![
+            "plain.rs#1",
+            "notes.rs#4-5",
+            "missing.rs",
+            "notes.rs#5",
+            "notes.rs#3"
+        ]
+    );
+    assert!(!codes.contains(&"gone.rs#7".to_string()), "{codes:?}");
+}

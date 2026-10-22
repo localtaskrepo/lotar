@@ -11,6 +11,9 @@
 //!   no longer mentions the ID anywhere, is removed. Anchors at live mentions,
 //!   in any file, are kept, and links, repository files, attachments and
 //!   Jira/GitHub references are never touched.
+//! - Code references a person attached on purpose (ranges, path-only, or any
+//!   reference with a `reference_added` history record) are never moved or
+//!   removed; only scan-managed `path#N` anchors are maintained.
 //!
 //! When scan targets specific paths, only anchors under those paths are
 //! considered, so a narrow scan never edits tasks anchored elsewhere.
@@ -103,6 +106,11 @@ pub fn run_anchor_pass(
                 continue;
             };
             if plan.iter().any(|(old, _)| *old == code_ref) {
+                continue;
+            }
+            // Only scan-managed anchors are maintained; references a person
+            // attached on purpose are never moved or removed (DEV-119).
+            if is_user_attached(&task.history, &code_ref) {
                 continue;
             }
             let (path_str, orig_line) = parse_code_ref(&code_ref);
@@ -239,6 +247,29 @@ fn apply_plan(references: &mut Vec<ReferenceEntry>, plan: &[(String, AnchorChang
     }
     *references = kept;
     changed
+}
+
+/// Whether a code reference was attached by a person rather than by scan.
+/// Scan only ever writes single-line `path#N` anchors and records no history
+/// for them, while explicit attachments (CLI, REST, MCP, UI) record a
+/// `reference_added` entry. Path-only and ranged references (`path#A-B`)
+/// therefore always count as user-attached.
+pub(crate) fn is_user_attached(
+    history: &[crate::types::TaskChangeLogEntry],
+    code_ref: &str,
+) -> bool {
+    let Some((_, anchor)) = code_ref.rsplit_once('#') else {
+        return true;
+    };
+    if anchor.parse::<usize>().is_err() {
+        return true;
+    }
+    let recorded = format!("code:{code_ref}");
+    history.iter().any(|entry| {
+        entry.changes.iter().any(|change| {
+            change.field == "reference_added" && change.new.as_deref() == Some(recorded.as_str())
+        })
+    })
 }
 
 fn is_under_any(path: &Path, roots: &[PathBuf]) -> bool {

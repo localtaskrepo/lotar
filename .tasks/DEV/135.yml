@@ -1,0 +1,28 @@
+title: Scan moves or removes hand-attached code references
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-22T18:26:49.541391+00:00
+modified: 2026-10-22T18:30:45.085709+00:00
+comments:
+- date: 2026-10-22T18:30:45.066682+00:00
+  text: |-
+    Outcome: scan only maintains scan-managed anchors. New scan_anchor_service::is_user_attached: path-only and ranged code references, and single-line references with a matching 'reference_added' history record (written by every explicit attach path, never by scan), count as user-attached. The --reanchor pass skips them for both relocation and pruning, and utils::scan::refresh_code_reference (per-mention refresh in CLI and REST scans) now takes the task history and leaves them alone. Scan help documents the rule.
+    Evidence: tests/mentions_toggle_and_reanchor_test.rs reanchor_never_moves_or_removes_user_attached_code_references (single-line manual ref with history, ranged ref, path-only ref to a missing file, manual ref next to a mention all unchanged; scan anchor into a deleted file still removed); scan suites 80/80; Atlas demo: --reanchor no longer lists ATLS-21/ATLS-26, and a real refactor relocated ATLS-18 #29->#32 then removed it once the comment was deleted while ATLS-26's range in the same file stayed. Full gates green.
+    Remaining: references attached by hand before history recording existed and that are single-line still look like scan anchors; explicit provenance on ReferenceEntry would remove the heuristic if ever needed.
+description: 'Found in the DEV-133 feature run on the Atlas demo: scan anchors and code references attached on purpose (UI/CLI/REST/MCP ''add code reference'') are both stored as code: path#N, so ''lotar scan --reanchor'' (DEV-119) planned to delete ATLS-21 ''api/src/routes/notes.rs#3-7'' and ATLS-26 ''web/src/sync/queue.ts#20-33'' because those files do not mention the task ID, and the per-mention refresh during any scan rewrote a hand-attached single-line reference in a file that mentions the ID onto the mention line. Only scan-managed anchors should be maintained.'
+history:
+- at: 2026-10-22T18:30:45.066682+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T18:30:45.085709+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

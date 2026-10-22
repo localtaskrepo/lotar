@@ -297,7 +297,12 @@ impl CommandHandler for ScanHandler {
                                 if let Err(err) =
                                     edit_task_with_context(_resolver, &task_id, None, |task| {
                                         let code_ref = format!("{}#{}", rel, line_number);
-                                        refresh_code_reference(&mut task.references, &code_ref, &[])
+                                        refresh_code_reference(
+                                            &mut task.references,
+                                            &code_ref,
+                                            &[],
+                                            &task.history,
+                                        )
                                     })
                                 {
                                     return Err(rollback_created_task(_resolver, &task_id, err));
@@ -402,6 +407,7 @@ impl CommandHandler for ScanHandler {
                                         &mut task.references,
                                         &code_ref,
                                         &live_refs,
+                                        &task.history,
                                     )
                                 })?;
                             }
@@ -509,7 +515,7 @@ impl ScanHandler {
                 .map(|line| format!("{}#{}", rel, line))
                 .collect();
             edit_task_with_context(resolver, task_id, None, |task| {
-                refresh_code_reference(&mut task.references, &code_ref, &live_refs)
+                refresh_code_reference(&mut task.references, &code_ref, &live_refs, &task.history)
             })?;
             anchored += 1;
         }

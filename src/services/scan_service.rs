@@ -651,7 +651,8 @@ fn update_task_code_reference(
         .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
     let outcome = storage.mutate_task(task_id, |fresh| {
-        let changed = refresh_code_reference(&mut fresh.references, code_ref, live_refs);
+        let changed =
+            refresh_code_reference(&mut fresh.references, code_ref, live_refs, &fresh.history);
         if changed {
             fresh.modified = Utc::now().to_rfc3339();
         }
