@@ -42,7 +42,7 @@ impl ScanService {
     ) -> LoTaRResult<ScanResponse> {
         let dry_run = request.dry_run;
         let warnings = Vec::new();
-        let info = Vec::new();
+        let mut info = Vec::new();
         let mut summary = ScanSummary::default();
 
         let default_root = resolver
@@ -51,6 +51,10 @@ impl ScanService {
             .map(|p| p.to_path_buf())
             .or_else(crate::project::get_project_path)
             .unwrap_or_else(|| PathBuf::from("."));
+        let reanchor = request.reanchor;
+        // DEV-119: anchor pruning only covers explicitly requested paths;
+        // a request without paths covers the whole workspace.
+        let anchor_scope: Vec<PathBuf> = request.paths.iter().map(PathBuf::from).collect();
         let roots: Vec<PathBuf> = if request.paths.is_empty() {
             vec![default_root]
         } else {
@@ -541,6 +545,30 @@ impl ScanService {
             entries.push(scan_entry);
         }
 
+        // `reanchor` is an explicit opt-in: relocate drifted anchors and
+        // remove dead ones within the requested paths. Without it the REST
+        // scan only refreshes anchors at the findings it processed.
+        if reanchor {
+            use crate::services::scan_anchor_service::{
+                AnchorPassOptions, DEFAULT_RELOCATION_WINDOW, run_anchor_pass,
+            };
+            let mut anchor_storage = Storage::new(&resolver.path.clone());
+            let repo_root = crate::utils::git::find_repo_root(&resolver.path);
+            let report = run_anchor_pass(
+                &mut anchor_storage,
+                &line_scanner,
+                repo_root.as_deref(),
+                &AnchorPassOptions {
+                    scope: &anchor_scope,
+                    prune_dead: true,
+                    dry_run,
+                    window: DEFAULT_RELOCATION_WINDOW,
+                },
+                |_| Ok(()),
+            )?;
+            info.extend(report.messages(dry_run));
+        }
+
         let status = if summary.failed > 0 { "partial" } else { "ok" };
 
         Ok(ScanResponse {
@@ -786,6 +814,64 @@ mod scan_service_tests {
                 targets: Vec::<ScanTarget>::new(),
             }
         }
+    }
+
+    /// DEV-119: REST `reanchor` runs the shared anchor pass only on request,
+    /// limited to the requested paths, and reports through `info`.
+    #[test]
+    fn scan_service_reanchor_prunes_dead_anchors_within_paths_only() {
+        let fixture = BareMentionFixture::new("// SAFE-1 bare mention without signal word");
+        fixture.create_task("SAFE");
+        let root = fixture.temp.path();
+        let live = format!("{}#1", fixture.file_path.display());
+        let dead_inside = format!("{}#2", root.join("src/gone.rs").display());
+        let dead_outside = format!("{}#3", root.join("other/gone.rs").display());
+        let mut storage = Storage::new(&fixture.tasks_dir());
+        let mut task = storage.get("SAFE-1", "SAFE").unwrap();
+        task.references = [&live, &dead_inside, &dead_outside]
+            .into_iter()
+            .map(|code| crate::types::ReferenceEntry {
+                code: Some(code.clone()),
+                ..Default::default()
+            })
+            .collect();
+        storage.edit("SAFE-1", &task).unwrap();
+        let codes = || -> Vec<String> {
+            Storage::new(&fixture.tasks_dir())
+                .get("SAFE-1", "SAFE")
+                .unwrap()
+                .references
+                .into_iter()
+                .filter_map(|r| r.code)
+                .collect()
+        };
+        let src_request = |dry_run: bool, reanchor: bool| ScanRequest {
+            paths: vec![root.join("src").to_string_lossy().to_string()],
+            reanchor,
+            ..fixture.request(dry_run)
+        };
+
+        // Without the flag nothing is pruned.
+        let response = ScanService::run(&fixture.resolver, src_request(false, false)).unwrap();
+        assert!(response.info.is_empty(), "{:?}", response.info);
+        assert_eq!(codes().len(), 3);
+
+        // Dry run reports and writes nothing.
+        let response = ScanService::run(&fixture.resolver, src_request(true, true)).unwrap();
+        assert_eq!(
+            response.info,
+            vec![format!(
+                "Would remove dead anchor {dead_inside} from SAFE-1."
+            )]
+        );
+        assert_eq!(codes().len(), 3);
+
+        let response = ScanService::run(&fixture.resolver, src_request(false, true)).unwrap();
+        assert_eq!(
+            response.info,
+            vec![format!("Removed dead anchor {dead_inside} from SAFE-1.")]
+        );
+        assert_eq!(codes(), vec![live.clone(), dead_outside.clone()]);
     }
 
     #[test]

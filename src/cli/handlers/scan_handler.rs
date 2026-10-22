@@ -60,6 +60,14 @@ impl CommandHandler for ScanHandler {
             args.paths.iter().map(PathBuf::from).collect()
         };
 
+        // DEV-119: anchor maintenance only touches anchors under explicitly
+        // scanned paths; a scan without paths covers the whole workspace.
+        let anchor_scope: Vec<PathBuf> = if args.paths.is_empty() {
+            Vec::new()
+        } else {
+            roots.clone()
+        };
+
         // Validate all roots exist
         for root in &roots {
             if !root.exists() {
@@ -169,9 +177,7 @@ impl CommandHandler for ScanHandler {
                 renderer.emit_success("No TODO comments found.");
             }
             // Even if we didn't find TODO comments, we can still try to relocate anchors for existing tasks
-            if !args.dry_run {
-                Self::reanchor_existing_references(_resolver, renderer, None)?;
-            }
+            Self::maintain_anchors(_resolver, renderer, &args, &anchor_scope)?;
         } else {
             renderer.emit_info(format_args!("Found {} TODO comment(s):", all_results.len()));
             // When applying, we'll need a storage context for creating tasks
@@ -404,10 +410,8 @@ impl CommandHandler for ScanHandler {
                 }
                 // Apply path (and dry-run preview) prints patch above when changes occur; lines with existing keys are left untouched
             }
-            if !args.dry_run {
-                // Do not mutate existing tasks before new source edits have succeeded.
-                Self::reanchor_existing_references(_resolver, renderer, Some(7))?;
-            }
+            // Do not mutate existing tasks before new source edits have succeeded.
+            Self::maintain_anchors(_resolver, renderer, &args, &anchor_scope)?;
             if !args.dry_run && applied > 0 && !json {
                 renderer.emit_success(format_args!("Applied {} update(s).", applied));
             }
@@ -515,245 +519,74 @@ impl ScanHandler {
         Ok(())
     }
 
-    /// Re-anchor existing task references by searching for their key occurrences
-    /// near the previous anchor line, with a fallback to a full-file search.
-    /// If `window_hint` is None, a default small window will be used.
-    fn reanchor_existing_references(
-        _resolver: &crate::workspace::TasksDirectoryResolver,
+    /// Anchor maintenance after a scan (DEV-119): relocation runs on every
+    /// non-dry-run scan; `--reanchor` additionally removes dead anchors and
+    /// also previews its changes during `--dry-run`.
+    fn maintain_anchors(
+        resolver: &crate::workspace::TasksDirectoryResolver,
         renderer: &crate::output::OutputRenderer,
-        window_hint: Option<usize>,
+        args: &ScanArgs,
+        scope: &[PathBuf],
     ) -> Result<(), String> {
-        Self::reanchor_with_before_apply(_resolver, renderer, window_hint, |_| Ok(()))
+        if args.dry_run && !args.reanchor {
+            return Ok(());
+        }
+        Self::reanchor_with_before_apply(
+            resolver,
+            renderer,
+            scope,
+            args.reanchor,
+            args.dry_run,
+            |_| Ok(()),
+        )
     }
 
-    /// Same re-anchor pass with a seam fired after planning and immediately
-    /// before each task write, mirroring `write_source_with_prepared`: the
-    /// callback can simulate a concurrent editor landing between the search
-    /// snapshot and the publication of updated references.
+    /// Same anchor pass with a seam fired after planning and immediately
+    /// before each task write: the callback can simulate a concurrent editor
+    /// landing between the search snapshot and the updated references.
     fn reanchor_with_before_apply(
-        _resolver: &crate::workspace::TasksDirectoryResolver,
+        resolver: &crate::workspace::TasksDirectoryResolver,
         renderer: &crate::output::OutputRenderer,
-        window_hint: Option<usize>,
-        mut before_apply: impl FnMut(&str) -> Result<(), String>,
+        scope: &[PathBuf],
+        prune_dead: bool,
+        dry_run: bool,
+        before_apply: impl FnMut(&str) -> Result<(), String>,
     ) -> Result<(), String> {
-        let window = window_hint.unwrap_or(7);
-        let mut ctx = match TaskCommandContext::new_read_only(_resolver, None, None) {
+        use crate::services::scan_anchor_service::{
+            AnchorPassOptions, DEFAULT_RELOCATION_WINDOW, run_anchor_pass,
+        };
+        let mut ctx = match TaskCommandContext::new_read_only(resolver, None, None) {
             Ok(ctx) => ctx,
             Err(_) => return Ok(()),
         };
-
-        // Load all tasks (all projects)
-        let filter = crate::storage::TaskFilter::default();
-        let mut tasks = ctx.storage.search(&filter);
-        if tasks.is_empty() {
-            return Ok(());
-        }
-
-        let mut updates = 0usize;
         let line_scanner = configured_line_scanner(
             ctx.config.scan_ticket_patterns.as_deref(),
             ctx.config.scan_enable_ticket_words,
             &[],
         );
-        // Compute repo root once for this pass
         let repo_root = std::env::current_dir()
             .ok()
             .and_then(|cwd| crate::utils::git::find_repo_root(&cwd));
-        // Best-effort git rename map if inside a repo
-        let rename_map = if let Some(root) = &repo_root {
-            Self::git_rename_map(root)
-        } else {
-            std::collections::HashMap::new()
-        };
-
-        for (task_id, task) in tasks.drain(..) {
-            // Skip tasks without references
-            if task.references.is_empty() {
-                continue;
-            }
-
-            // Planned old -> new anchors computed from the snapshot. All source
-            // I/O stays in this planning pass; the plan is applied later to the
-            // freshest task state under the project task lock so concurrent
-            // comments, references, custom fields, and extensions survive.
-            let mut plan: Vec<(String, String)> = Vec::new();
-
-            for r in task.references.iter() {
-                // Avoid borrowing r.code across mutations by cloning it first
-                let code_ref_opt = r.code.clone();
-                let Some(code_ref) = code_ref_opt else {
-                    continue;
-                };
-                let (path_str, orig_line_opt) = Self::parse_code_ref(&code_ref);
-                if path_str.is_empty() {
-                    continue;
-                }
-
-                // Resolve absolute file path if possible
-                let abs_path = if let Some(root) = &repo_root {
-                    root.join(&path_str)
-                } else {
-                    std::path::PathBuf::from(&path_str)
-                };
-
-                let abs_path = if abs_path.exists() {
-                    abs_path
-                } else {
-                    // File may have been renamed; try git rename map using repo-relative key
-                    let rel_key = &path_str;
-                    if let Some(new_rel) = rename_map.get(rel_key) {
-                        if let Some(root) = &repo_root {
-                            let candidate = root.join(new_rel);
-                            if candidate.exists() {
-                                candidate
-                            } else {
-                                // Fall back to skipping if new file also doesn't exist
-                                continue;
-                            }
-                        } else {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                };
-
-                // Determine the search key token for this task
-                let key = task_id.clone();
-
-                // Load file and gather lines
-                let Ok(content) = std::fs::read_to_string(&abs_path) else {
-                    continue;
-                };
-                let candidates = line_scanner.key_mention_lines(&abs_path, &content, &key);
-
-                // If the original line still contains the key marker, nothing to do
-                if let Some(orig_line) = orig_line_opt
-                    && candidates.contains(&orig_line)
-                {
-                    // Ensure canonical formatting of code ref
-                    let rel = crate::utils::paths::repo_relative_display(&abs_path);
-                    let new_code = format!("{}#{}", rel, orig_line);
-                    if r.code.as_deref() != Some(&new_code) {
-                        plan.push((code_ref, new_code));
-                    }
-                    continue;
-                }
-
-                let best_line = if let Some(orig_line) = orig_line_opt {
-                    candidates
-                        .iter()
-                        .copied()
-                        .filter(|line| line.abs_diff(orig_line) <= window)
-                        .min_by_key(|line| line.abs_diff(orig_line))
-                        .or_else(|| {
-                            candidates
-                                .iter()
-                                .copied()
-                                .min_by_key(|line| line.abs_diff(orig_line))
-                        })
-                } else {
-                    candidates.first().copied()
-                };
-
-                if let Some(new_line) = best_line {
-                    let rel = crate::utils::paths::repo_relative_display(&abs_path);
-                    let new_code = format!("{}#{}", rel, new_line);
-                    if r.code.as_deref() != Some(&new_code) {
-                        renderer.log_debug(format_args!("reanchor: {} -> {}", code_ref, new_code));
-                        plan.push((code_ref, new_code));
-                    }
-                }
-            }
-
-            if !plan.is_empty() {
-                before_apply(&task_id)?;
-                let outcome = ctx
-                    .storage
-                    .mutate_task(&task_id, |fresh| {
-                        // Apply each planned anchor only where the old code is
-                        // still present in the fresh state: references a
-                        // concurrent editor added, changed, or removed are left
-                        // exactly as written.
-                        let mut changed = false;
-                        for reference in fresh.references.iter_mut() {
-                            let Some(code) = reference.code.clone() else {
-                                continue;
-                            };
-                            if let Some((_, new_code)) = plan.iter().find(|(old, _)| *old == code) {
-                                reference.code = Some(new_code.clone());
-                                changed = true;
-                            }
-                        }
-                        if changed {
-                            fresh.modified = chrono::Utc::now().to_rfc3339();
-                        }
-                        Ok(changed)
-                    })
-                    .map_err(TaskStorageAction::Update.map_err(&task_id))?;
-                if outcome.changed {
-                    updates += 1;
-                }
-            }
+        let report = run_anchor_pass(
+            &mut ctx.storage,
+            &line_scanner,
+            repo_root.as_deref(),
+            &AnchorPassOptions {
+                scope,
+                prune_dead,
+                dry_run,
+                window: DEFAULT_RELOCATION_WINDOW,
+            },
+            before_apply,
+        )
+        .map_err(|err| err.to_string())?;
+        for (task, old, new) in &report.relocated {
+            renderer.log_debug(format_args!("reanchor: {task} {old} -> {new}"));
         }
-
-        if updates > 0 {
-            renderer.emit_info(format_args!("Re-anchored {} task(s).", updates));
+        for message in report.messages(dry_run) {
+            renderer.emit_info(format_args!("{}", message));
         }
         Ok(())
-    }
-
-    fn parse_code_ref(code: &str) -> (String, Option<usize>) {
-        if let Some((path, anchor)) = code.split_once('#') {
-            let mut buffer = String::new();
-            let mut found = false;
-            for ch in anchor.chars() {
-                if ch.is_ascii_digit() {
-                    buffer.push(ch);
-                    found = true;
-                    continue;
-                }
-                if found {
-                    break;
-                }
-            }
-            let line = buffer.parse::<usize>().ok();
-            (path.to_string(), line)
-        } else {
-            (code.to_string(), None)
-        }
-    }
-
-    fn git_rename_map(repo_root: &std::path::Path) -> std::collections::HashMap<String, String> {
-        use std::process::Command;
-        let mut map = std::collections::HashMap::new();
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
-            .arg("status")
-            .arg("--porcelain")
-            .output();
-        let Ok(o) = out else {
-            return map;
-        };
-        if !o.status.success() {
-            return map;
-        }
-        let s = String::from_utf8_lossy(&o.stdout);
-        for line in s.lines() {
-            if line.len() < 4 {
-                continue;
-            }
-            let status = &line[..2];
-            if status.contains('R')
-                && let Some(pos) = line.find(" -> ")
-            {
-                let old = line[3..pos].trim().to_string();
-                let newp = line[pos + 4..].trim().to_string();
-                map.insert(old, newp);
-            }
-        }
-        map
     }
 }
 
@@ -815,7 +648,9 @@ mod reanchor_tests {
             let result = ScanHandler::reanchor_with_before_apply(
                 &self.resolver,
                 &renderer,
-                None,
+                &[],
+                false,
+                false,
                 before_apply,
             );
             std::env::set_current_dir(&original_cwd).unwrap();

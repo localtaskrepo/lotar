@@ -31,7 +31,7 @@ modified-only, strip attributes, and re-anchor), but lets you pick individual fi
 | Need to… | Command | Notes |
 | --- | --- | --- |
 | Turn TODO comments into LoTaR tasks | `lotar scan src` | Writes tasks, inserts IDs beside the comments, and adds code references to the task file. |
-| Refresh anchors after refactors | `lotar scan --reanchor` | Repairs stale anchors while preserving repeated live locations and unrelated references. |
+| Clean up anchors after refactors | `lotar scan --reanchor` | Also removes dead anchors whose file is gone or no longer mentions the ID; preview with `--dry-run`. |
 | Limit noise to active work | `lotar scan --modified-only` | Uses `git status` to choose files; automatically falls back to full scan outside a repo. |
 | Feed results into tooling | `lotar --format json scan --include rs` | JSON entries provide `file`, `line`, `title`, `uuid`, and captured attributes. |
 | Work in another workspace | `lotar scan --tasks-dir /path/to/.tasks ...` | Shares precedence with other commands plus `LOTAR_TASKS_DIR`. |
@@ -73,7 +73,8 @@ tests/integration.rs:56
 - `--strip-attributes[=<bool>]` overrides `scan.strip_attributes` to decide whether parsed `[key=value]` blocks stay in the matched comment after LoTaR injects the new ID. Brackets in surrounding source syntax are not metadata and are preserved.
 - Each task receives a bidirectional reference entry: `code` anchors look like `path/to/file.rs#118`. Existing anchors are refreshed whenever scan spots a known ID, even if no new TODOs are added.
 - With `scan.enable_mentions` on (the default), bare known-ID mentions in comments — lines carrying an existing ticket key without any signal word — are tracked through the same anchor refresh. Mentions never create tasks: unknown or external ticket keys are skipped, mention tracking never rewrites source text, and keys inside quoted strings or executable code do not count because discovery shares the same quote-aware comment recognizer.
-- Anchor refresh replaces stale locations only within the intended file, retaining repeated live hits, other-file references, links, and metadata on mixed reference entries. Without `--reanchor`, LoTaR still repairs drifted anchors during non-dry-run scans.
+- Anchor refresh replaces stale locations only within the intended file, retaining repeated live hits, other-file references, links, and metadata on mixed reference entries. Every non-dry-run CLI scan repairs drifted anchors (moved lines, simple git renames); when scan paths are given, only anchors under those paths are touched.
+- `--reanchor` additionally removes dead anchors: the anchored file no longer exists (and was not renamed) or no longer mentions the task ID in any comment. Anchors at live mentions in any file are kept, and links, repository files, attachments and Jira/GitHub references are never removed; on a mixed reference entry only the `code` value is cleared. With `--dry-run`, scan lists what it would re-anchor or remove without writing. The REST scan (`POST /api/scan`) applies the same pass only when `reanchor: true`.
 - Source edits are validated before creating a task and written by atomic replacement, preserving file permissions. Read-only files and symlinks are rejected. If a source write or reverse-reference update fails, scan reports failure and attempts to remove the newly created task; rollback failures are included in the error. Completed earlier entries are not rolled back, and task-creation side effects such as configuration or automation are not transactional.
 - Replacements are fully prepared before a final source-content check and rename. Cooperating scans serialize that check and rename: Unix uses source/replacement inode locks and reopens stale inodes after a concurrent rename; other platforms use persistent per-path locks in the user cache. Source locks are separate from task-storage locks, and scan removes only its own staging file. A non-locking editor can still write in the small interval between the final comparison and rename; this is not an atomic compare-and-swap against arbitrary editors.
 - Bare relative file paths such as `lotar scan main.rs` work like `lotar scan ./main.rs`.
@@ -132,7 +133,7 @@ scan:
 | --- | --- |
 | Comments are ignored | Confirm the extension is supported or add it via `--include`. When in doubt, add the comment token to the line (`// TODO`). |
 | Nothing shows up in JSON output | Ensure you passed `lotar --format json scan …` (format flag comes before the subcommand). |
-| Anchors stay stale after refactors | Run `lotar scan --reanchor` from the repo root so LoTaR can locate renamed files. |
+| Anchors stay stale after refactors | Run `lotar scan --reanchor` from the repo root so LoTaR can locate renamed files and drop anchors that no longer point at a mention. |
 | Inline attributes remain in code | Set `--strip-attributes=true` or enable `scan.strip_attributes` in config. |
 | Scan feels slow on huge monorepos | Provide explicit paths (e.g., `lotar scan packages/auth`) and keep the default limit of languages by pairing `--include` filters with `.lotarignore`. |
 

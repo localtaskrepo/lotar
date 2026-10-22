@@ -59,7 +59,7 @@
             </div>
             <div class="scan-field scan-field--checkbox">
               <input id="scan-reanchor" v-model="reanchor" type="checkbox" />
-              <label for="scan-reanchor">Keep only newest reference</label>
+              <label for="scan-reanchor">Remove dead anchors</label>
               <button
                 type="button"
                 class="scan-info"
@@ -183,6 +183,11 @@
               <p class="muted">Warnings:</p>
               <ul>
                 <li v-for="warning in scanResponse.warnings" :key="warning">{{ warning }}</li>
+              </ul>
+            </div>
+            <div v-if="scanResponse.info?.length" class="scan-warnings scan-info-list" data-testid="scan-info">
+              <ul>
+                <li v-for="message in scanResponse.info" :key="message">{{ message }}</li>
               </ul>
             </div>
 
@@ -320,7 +325,7 @@ const reanchor = ref(false)
 
 const helpStrip = 'When inserting a new ticket reference into your code, remove any inline attribute blocks like [priority=high] or [assignee=me]. These attributes are parsed and applied to the task, so they don\'t need to stay in the comment.'
 const helpModified = 'Only scan files that have uncommitted git changes. Useful for large repos where you only want to process newly touched files rather than the entire codebase.'
-const helpReanchor = 'By default, the scanner keeps existing code references from other files (useful when a task spans multiple files). Enable this to remove all other code references and keep only the currently scanned line. Use with caution: this can drop intentional multi-file links.'
+const helpReanchor = 'Also clean up code anchors within the scanned paths: anchors that drifted move to the nearest mention, and anchors whose file is gone or no longer mentions the task ID are removed. Live mentions in any file, links, files and attachments are kept. A preview lists the changes without writing them.'
 
 function showHelp(key: 'strip' | 'modified' | 'reanchor') {
   const messages: Record<typeof key, string> = {

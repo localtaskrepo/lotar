@@ -122,7 +122,7 @@ cutting a new version or when exercising the Scoop/Homebrew verification workflo
 - TODO comment detection with optional ticket key extraction
 - Multiple comment styles: //, #, --, ;, %, /* */ and <!-- -->
 - Recursive directory scanning with .lotarignore and .gitignore support
-- When creating a task from a TODO, LoTaR writes back the task key into the comment and stores a minimal code anchor under `references` in the task (no code snippets are stored). If a TODO already has a key, LoTaR ensures a code anchor exists and prunes older anchors for the same file, keeping only the latest line for that file. Use `lotar scan --reanchor` to prune cross-file anchors and keep only the newest anchor. On subsequent scans, existing anchors are automatically re-anchored when code moves (nearby-window search) and are updated across simple git renames using `git status` information.
+- When creating a task from a TODO, LoTaR writes back the task key into the comment and stores a minimal code anchor under `references` in the task (no code snippets are stored). If a TODO already has a key, LoTaR ensures a code anchor exists and prunes older anchors for the same file, keeping only the latest line for that file. Use `lotar scan --reanchor` to also remove dead anchors (the file is gone or no longer mentions the task ID); live mentions in any file and non-code references are kept. On subsequent scans, existing anchors are automatically re-anchored when code moves (nearby-window search) and are updated across simple git renames using `git status` information.
 
 ### Web Interface & API
 - **Built-in Web Server** with embedded Vue frontend (built via Vite into `target/web`)

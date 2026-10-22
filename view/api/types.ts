@@ -957,6 +957,7 @@ export interface ScanRequest {
   project?: string
   dry_run?: boolean
   strip_attributes?: boolean
+  /** Relocate drifted anchors and remove dead ones within `paths`; reported in `info`. */
   reanchor?: boolean
   modified_only?: boolean
   targets?: ScanTarget[]

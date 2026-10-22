@@ -1,7 +1,43 @@
 title: Reconcile scanner reanchor flag behavior across CLI and API
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-14T01:10:45.252994+00:00
+modified: 2026-10-22T01:29:39.593+00:00
+comments:
+- date: 2026-10-21T20:47:48.897298+00:00
+  text: |-
+    Investigation 2026-10-21, decision needed before implementation. History: until commit 72ce80d (DEV-53 security pass) args.reanchor/request.reanchor made scan prune ALL references of a task except the new code anchor (retain(code == code_ref)), i.e. it also deleted links, files, attachments and other-file anchors; DEV-53 removed that path and replaced it with the live-refs refresh, leaving the flag unread. Current behavior: every non-dry-run CLI scan runs reanchor_existing_references over ALL tasks (including target-filtered scans, which can touch tasks outside the scanned paths), REST ScanRequest.reanchor is ignored, and docs disagree: README/clap help say --reanchor prunes cross-file anchors keeping only the newest, docs/help/scan.md says it repairs stale anchors while preserving other-file references and that repairs happen without the flag anyway.
+    Options: (a) make the flag a documented compatibility no-op (deprecate in CLI help, README, scan.md, OpenAPI/TS descriptions) and scope the automatic repair pass to scanned paths; (b) restore a SAFE opt-in pruning: only code anchors for the scanned key in other files are dropped, never links/files/attachments, CLI and REST honor the flag equally, default off; (c) make the automatic repair itself opt-in behind --reanchor (behavior change for existing users). Recommendation: (b) plus scoping the default pass to the scanned targets. Characterization through CLI/REST for true/false/default is the first step once chosen.
+- date: 2026-10-22T01:29:39.567029+00:00
+  text: |-
+    Decision (developer, 2026-10-21): option (b) plus scoping. Outcome: new src/services/scan_anchor_service.rs (run_anchor_pass) shared by CLI and REST. Relocation of drifted anchors (nearest mention in the same file, git renames via the routing-safe git_command) runs on every non-dry-run CLI scan as before, but when scan paths are given only anchors under those paths are touched. reanchor (CLI --reanchor, REST reanchor:true) additionally removes dead anchors: file gone and not renamed, or file no longer mentions the ID in any comment (key_mention_lines: signal and bare comment mentions, independent of the mentions toggle); unreadable files are left alone. Live mentions in any file are kept; links/files/attachments/jira/github are never removed; mixed entries only lose their code value. Dry run previews ('Would re-anchor N task(s).', 'Would remove dead anchor X from ID.') without writing; CLI prints the lines, REST returns them in info (no shape change). REST default (reanchor false) is unchanged: no global pass, so target-filtered UI applies never re-anchor the workspace accidentally. Writes keep the fresh-state/locked mutate_task application. Updated clap help, docs/README.md, docs/help/scan.md, OpenAPI reanchor description, view/api/types.ts, Scan page label ('Remove dead anchors'), help text, and the page now shows scan info messages.
+    Evidence: tests/mentions_toggle_and_reanchor_test.rs reanchor_removes_dead_anchors_and_keeps_live_and_non_code_references (plain scan keeps all, dry-run lists and writes nothing, apply keeps live/link/mixed-link) and reanchor_with_paths_only_touches_anchors_under_those_paths; scan_service_reanchor_prunes_dead_anchors_within_paths_only (flag off/dry/apply, outside-path anchor kept); existing reanchor concurrency/no-op tests and all scan tests (70) pass; new smoke ui.scan-reanchor plus ui.scan-storage 4/4 on fresh build:smoke; UI 886/886; clippy clean.
+    Remaining: none.
+    Guidance: no durable finding.
 description: DEV-112 independent review found CLI args.reanchor and service request.reanchor defined/documented but not used. Current CLI runs reanchor during non-dry-run scans regardless of flag; REST request flag is ignored. Diff review confirms current cleanup did not remove a previously read flag, but historical snapshots show older behavior, so do not label contract drift intentional without decision. Define intended semantics then align CLI/API/help/OpenAPI/TS shapes as required, preserving default scanning/known mentions/no-create/dryrun and source safety. Characterize flag true/false/default through public boundaries, no accidental full-workspace reanchor on target-filtered requests. Separate behavior-changing follow-up, not implemented in DEV-112.
+history:
+- at: 2026-10-21T20:47:48.897298+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T01:22:04.442332+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T01:29:39.567029+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T01:29:39.593+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

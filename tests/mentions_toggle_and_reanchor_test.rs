@@ -334,3 +334,155 @@ fn scan_reanchor_flag_preserves_cross_file_anchors() {
     assert!(yaml2.contains("code: a.rs#1"));
     assert!(yaml2.contains("code: nested/b.rs#1"));
 }
+
+// --- DEV-119: `--reanchor` removes dead anchors only ---------------------
+
+fn set_references(task_file: &std::path::Path, refs: Vec<lotar::types::ReferenceEntry>) {
+    let mut task: lotar::storage::task::Task =
+        serde_yaml_ng::from_slice(&fs::read(task_file).unwrap()).unwrap();
+    task.references = refs;
+    fs::write(task_file, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+}
+
+fn read_references(task_file: &std::path::Path) -> Vec<lotar::types::ReferenceEntry> {
+    let task: lotar::storage::task::Task =
+        serde_yaml_ng::from_slice(&fs::read(task_file).unwrap()).unwrap();
+    task.references
+}
+
+fn code(value: &str) -> lotar::types::ReferenceEntry {
+    lotar::types::ReferenceEntry {
+        code: Some(value.to_string()),
+        ..Default::default()
+    }
+}
+
+/// Task with: a live anchor, an anchor into a deleted file, an anchor into a
+/// file that no longer mentions the ID, a link, and a mixed entry whose code
+/// part is dead.
+fn dead_anchor_fixture() -> (TestFixtures, String, std::path::PathBuf) {
+    let tf = TestFixtures::new();
+    common::cargo_bin_in(&tf)
+        .args(["add", "Anchored task"])
+        .assert()
+        .success();
+    let root = tf.get_temp_path().to_path_buf();
+    let (project, task_file) = project_and_task_paths(&root);
+    let id = format!("{project}-1");
+    fs::write(root.join("live.rs"), format!("// TODO {id}: still here\n")).unwrap();
+    fs::write(root.join("quiet.rs"), "fn unrelated() {}\n").unwrap();
+    set_references(
+        &task_file,
+        vec![
+            code("live.rs#1"),
+            code("gone.rs#3"),
+            code("quiet.rs#1"),
+            lotar::types::ReferenceEntry {
+                link: Some("https://example.com/spec".into()),
+                ..Default::default()
+            },
+            lotar::types::ReferenceEntry {
+                code: Some("gone.rs#9".into()),
+                link: Some("https://example.com/mixed".into()),
+                ..Default::default()
+            },
+        ],
+    );
+    (tf, id, task_file)
+}
+
+#[test]
+fn reanchor_removes_dead_anchors_and_keeps_live_and_non_code_references() {
+    let (tf, id, task_file) = dead_anchor_fixture();
+
+    // A plain scan never removes anything.
+    common::cargo_bin_in(&tf).arg("scan").assert().success();
+    assert_eq!(read_references(&task_file).len(), 5);
+
+    // Dry run lists removals without writing.
+    let before = fs::read(&task_file).unwrap();
+    let output = common::cargo_bin_in(&tf)
+        .args(["scan", "--reanchor", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let text = String::from_utf8_lossy(&output.stdout).to_string()
+        + &String::from_utf8_lossy(&output.stderr);
+    for expected in [
+        format!("Would remove dead anchor gone.rs#3 from {id}."),
+        format!("Would remove dead anchor quiet.rs#1 from {id}."),
+        format!("Would remove dead anchor gone.rs#9 from {id}."),
+    ] {
+        assert!(text.contains(&expected), "missing {expected:?} in {text}");
+    }
+    assert_eq!(
+        fs::read(&task_file).unwrap(),
+        before,
+        "dry run must not write"
+    );
+
+    common::cargo_bin_in(&tf)
+        .args(["scan", "--reanchor"])
+        .assert()
+        .success();
+    let refs = read_references(&task_file);
+    let codes: Vec<_> = refs.iter().filter_map(|r| r.code.as_deref()).collect();
+    assert_eq!(codes, vec!["live.rs#1"]);
+    assert!(
+        refs.iter()
+            .any(|r| r.link.as_deref() == Some("https://example.com/spec"))
+    );
+    // Mixed entry keeps its link, loses only the dead code part.
+    assert!(
+        refs.iter()
+            .any(|r| r.link.as_deref() == Some("https://example.com/mixed") && r.code.is_none())
+    );
+    assert_eq!(refs.len(), 3);
+}
+
+#[test]
+fn reanchor_with_paths_only_touches_anchors_under_those_paths() {
+    let tf = TestFixtures::new();
+    common::cargo_bin_in(&tf)
+        .args(["add", "Scoped task"])
+        .assert()
+        .success();
+    let root = tf.get_temp_path().to_path_buf();
+    let (project, task_file) = project_and_task_paths(&root);
+    let id = format!("{project}-1");
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir_all(root.join("other")).unwrap();
+    fs::write(root.join("src/a.rs"), "fn nothing() {}\n").unwrap();
+    // Drifted anchor outside the scanned path: the mention moved to line 3.
+    fs::write(
+        root.join("other/b.rs"),
+        format!("// filler\n// filler\n// TODO {id}: moved\n"),
+    )
+    .unwrap();
+    set_references(
+        &task_file,
+        vec![
+            code("src/a.rs#1"),
+            code("other/b.rs#1"),
+            code("src/gone.rs#2"),
+        ],
+    );
+
+    common::cargo_bin_in(&tf)
+        .args(["scan", "src", "--reanchor"])
+        .assert()
+        .success();
+    let codes: Vec<String> = read_references(&task_file)
+        .into_iter()
+        .filter_map(|r| r.code)
+        .collect();
+    assert_eq!(codes, vec!["other/b.rs#1".to_string()]);
+
+    // A whole-workspace scan then relocates the drifted anchor.
+    common::cargo_bin_in(&tf).arg("scan").assert().success();
+    let codes: Vec<String> = read_references(&task_file)
+        .into_iter()
+        .filter_map(|r| r.code)
+        .collect();
+    assert_eq!(codes, vec!["other/b.rs#3".to_string()]);
+}

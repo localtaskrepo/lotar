@@ -6472,7 +6472,8 @@
             "nullable": true
           },
           "reanchor": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Opt-in anchor maintenance after the scan: relocate drifted code anchors and remove dead ones (file gone or no longer mentioning the task ID), limited to `paths` when given. Live mentions and non-code references are kept. Results are reported in `info`; with `dry_run` nothing is written."
           },
           "modified_only": {
             "type": "boolean"

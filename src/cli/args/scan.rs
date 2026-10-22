@@ -29,8 +29,9 @@ pub struct ScanArgs {
     #[arg(long)]
     pub strip_attributes: Option<bool>,
 
-    /// Re-anchor mode: when adding code references for existing keys, prune anchors across files
-    /// keeping only the newest location. Default is false (conservative).
+    /// Also remove dead code anchors: anchors whose file is gone or no longer mentions the
+    /// task ID. Live mentions in any file, links, files and attachments are kept. Limited to
+    /// the scanned paths; with --dry-run, lists what would be removed.
     #[arg(long)]
     pub reanchor: bool,
 
