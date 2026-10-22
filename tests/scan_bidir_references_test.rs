@@ -314,7 +314,15 @@ fn cli_and_service_reanchor_preserve_mixed_and_repeated_references() {
         }
         let updated = tf.create_storage().get(&id, "SAFE").unwrap();
         assert_eq!(updated.references.len(), 5);
-        assert_eq!(&updated.references[..4], &task.references[..4]);
+        let mut expected = task.references[..4].to_vec();
+        if !service {
+            // DEV-119: a whole-workspace `--reanchor` clears the dead anchor
+            // into the missing `elsewhere.rs` but keeps the GitHub reference
+            // on that entry. The REST request only scans `main.rs`, so the
+            // anchor is outside its scope and stays.
+            expected[1].code = None;
+        }
+        assert_eq!(&updated.references[..4], &expected[..]);
         assert_eq!(
             updated.references[4].code.as_deref(),
             Some(format!("{file}#1").as_str())

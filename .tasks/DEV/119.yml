@@ -5,7 +5,7 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-10-14T01:10:45.252994+00:00
-modified: 2026-10-22T01:29:39.593+00:00
+modified: 2026-10-22T01:37:23.598287+00:00
 comments:
 - date: 2026-10-21T20:47:48.897298+00:00
   text: |-
@@ -17,6 +17,8 @@ comments:
     Evidence: tests/mentions_toggle_and_reanchor_test.rs reanchor_removes_dead_anchors_and_keeps_live_and_non_code_references (plain scan keeps all, dry-run lists and writes nothing, apply keeps live/link/mixed-link) and reanchor_with_paths_only_touches_anchors_under_those_paths; scan_service_reanchor_prunes_dead_anchors_within_paths_only (flag off/dry/apply, outside-path anchor kept); existing reanchor concurrency/no-op tests and all scan tests (70) pass; new smoke ui.scan-reanchor plus ui.scan-storage 4/4 on fresh build:smoke; UI 886/886; clippy clean.
     Remaining: none.
     Guidance: no durable finding.
+- date: 2026-10-22T01:37:23.598287+00:00
+  text: 'Follow-up: tests/scan_bidir_references_test.rs cli_and_service_reanchor_preserve_mixed_and_repeated_references encoded the old ''never touch other files'' rule; a whole-workspace CLI --reanchor now clears the dead elsewhere.rs anchor while keeping the GitHub reference on that entry (agreed behavior), and the REST request stays scoped to main.rs. Final gates: lint clean, Rust 1567/1567, UI 886/886, release 24/24, full smoke 318/318.'
 description: DEV-112 independent review found CLI args.reanchor and service request.reanchor defined/documented but not used. Current CLI runs reanchor during non-dry-run scans regardless of flag; REST request flag is ignored. Diff review confirms current cleanup did not remove a previously read flag, but historical snapshots show older behavior, so do not label contract drift intentional without decision. Define intended semantics then align CLI/API/help/OpenAPI/TS shapes as required, preserving default scanning/known mentions/no-create/dryrun and source safety. Characterize flag true/false/default through public boundaries, no accidental full-workspace reanchor on target-filtered requests. Separate behavior-changing follow-up, not implemented in DEV-112.
 history:
 - at: 2026-10-21T20:47:48.897298+00:00
@@ -41,3 +43,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-22T01:37:23.598287+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
