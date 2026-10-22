@@ -304,7 +304,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const { loadTicketSnapshot, linkTicketReferences } = require('./.github/scripts/release-ticket-links.cjs');
+            const { loadTicketSnapshot, linkTicketReferences, releaseCommitSubjects } = require('./.github/scripts/release-ticket-links.cjs');
             const { owner, repo } = context.repo;
             const tag = process.env.GITHUB_REF_NAME;
             const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
@@ -331,19 +331,13 @@ jobs:
                 head: tag,
               });
 
-              const commits = comparison.data.commits ?? [];
-              const maxCommits = 100;
-              const subjects = commits
-                .slice(0, maxCommits)
-                .map((c) => (c.commit?.message ?? '').split('\n')[0].trim() || '(no message)')
-                .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+              const { subjects, remaining } = releaseCommitSubjects(comparison.data.commits ?? [], 100);
 
               const snapshot = await loadTicketSnapshot({
                 github, owner, repo, tag, warn: (message) => core.warning(message),
               });
               const lines = subjects.map((s) => `- ${linkTicketReferences(s, snapshot)}`);
 
-              const remaining = Math.max(0, commits.length - maxCommits);
               if (remaining > 0) {
                 lines.push(`- …and ${remaining} more`);
               }

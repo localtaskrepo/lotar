@@ -198,4 +198,21 @@ function linkTicketReferences(subject, snapshot) {
   return result + ordinary(text.slice(plainStart), plainStart);
 }
 
-module.exports = { loadTicketSnapshot, linkTicketReferences };
+/**
+ * Commit subjects for the release page: first line of each message (up to
+ * `maxCommits` commits), identical subjects collapsed into one line (follow-up
+ * commits reuse their ticket's "DEV-N Title" subject), sorted
+ * case-insensitively. `remaining` counts commits beyond `maxCommits`.
+ */
+function releaseCommitSubjects(commits, maxCommits = 100) {
+  const list = Array.isArray(commits) ? commits : [];
+  const unique = new Set(
+    list
+      .slice(0, maxCommits)
+      .map((c) => (c?.commit?.message ?? '').split('\n')[0].trim() || '(no message)'),
+  );
+  const subjects = [...unique].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  return { subjects, remaining: Math.max(0, list.length - maxCommits) };
+}
+
+module.exports = { loadTicketSnapshot, linkTicketReferences, releaseCommitSubjects };

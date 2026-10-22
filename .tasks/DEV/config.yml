@@ -2,3 +2,10 @@ project:
   name: DEV
 members:
 - mallox
+issue:
+  states:
+  - Todo
+  - InProgress
+  - Blocked
+  - NeedsReview
+  - Done

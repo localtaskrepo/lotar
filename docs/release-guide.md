@@ -14,6 +14,9 @@ guide summarizes the release automation and the manual checks to run after every
   - Scoop manifest update pushed to `localtaskrepo/scoop-lotar`.
 - **Quick-links**: The workflow edits the release notes to include clickable download
   shortcuts for macOS, Linux, and Windows assets.
+- **Commit list**: The custom `Changes:` list shows each commit's subject line,
+  sorted alphabetically. Identical subjects (for example follow-up commits that
+  reuse their ticket's `DEV-N Title` subject) appear once.
 - **Ticket links**: Known ticket IDs in the custom `Changes:` commit list link to
   their tracked YAML file on GitHub at the release's immutable commit, not `main`
   or a local LoTaR server. For example, `DEV-129` links to `.tasks/DEV/129.yml`

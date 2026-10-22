@@ -1,0 +1,35 @@
+title: Deduplicate repeated commit subjects on the release page
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-22T02:05:56.824593+00:00
+modified: 2026-10-22T02:06:54.070744+00:00
+comments:
+- date: 2026-10-22T02:06:54.046781+00:00
+  text: |-
+    Outcome: releaseCommitSubjects(commits, maxCommits) in .github/scripts/release-ticket-links.cjs extracts trimmed first lines, collapses identical subjects, sorts case-insensitively as before and returns the overflow count by commits; release.yml uses it instead of the inline map/sort. Release guide documents the commit list. Exact-text dedupe only (different spellings stay separate).
+    Evidence: npm run test:release 26/26 incl. new unit test (dedupe, sort, '(no message)', overflow) and workflow test rendering three DEV-118 commits as one line with links.
+    Remaining: none. Also commits the DEV project's new Blocked state and DEV-123/DEV-130 ticket updates from the previous step, as requested.
+    Guidance: no durable finding.
+description: Several commits for the same ticket use the same 'DEV-N Title' subject (follow-up commits), so the release page lists the line multiple times. Collapse identical subjects into one line while keeping sort order, ticket linking and the '…and N more' count. Move commit-subject extraction from the inline workflow script into .github/scripts/release-ticket-links.cjs with tests.
+history:
+- at: 2026-10-22T02:06:27.403006+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T02:06:54.046781+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T02:06:54.070744+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -1,0 +1,7 @@
+title: Allow Board Columns to be stacked or hidden
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-21T22:04:31.156391+00:00
+description: "When you have too many states, the board goes beyond the visible space even at max window width.\nWe should allow users to manage the visibility of the states better by:\n1. allowing stacking states like \"done\" and \"won't do\", or \"Needs Review\" and \"QA\", so that they appear in single column but with their own section headers. Watch out the we still distinguish and support e.g. grouping by priority\n2. allowing users to hide columns they don't want to see. "

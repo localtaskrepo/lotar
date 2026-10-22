@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { micromark } from 'micromark';
 
 const require = createRequire(import.meta.url);
-const { loadTicketSnapshot, linkTicketReferences } = require('../../.github/scripts/release-ticket-links.cjs');
+const { loadTicketSnapshot, linkTicketReferences, releaseCommitSubjects } = require('../../.github/scripts/release-ticket-links.cjs');
 const revision = 'a'.repeat(40);
 const rootSha = 'b'.repeat(40);
 const tasksSha = 'c'.repeat(40);
@@ -200,4 +200,15 @@ test('API errors and incomplete or invalid trees fail closed with one constant w
   }
   assert.equal(new Set(warnings).size, 1);
   assert.ok(!warnings[0].includes('private error'));
+});
+
+test('release commit subjects dedupe identical first lines, sort, and count overflow', () => {
+  const commits = ['DEV-2 b\nbody', 'dev-1 a', 'DEV-2 b', '', 'DEV-2 b ', 'DEV-3 c'].map((message) => ({ commit: { message } }));
+  assert.deepEqual(releaseCommitSubjects(commits), {
+    subjects: ['(no message)', 'dev-1 a', 'DEV-2 b', 'DEV-3 c'],
+    remaining: 0,
+  });
+  // Different text stays separate; overflow counts commits, not unique subjects.
+  assert.deepEqual(releaseCommitSubjects(commits, 3), { subjects: ['dev-1 a', 'DEV-2 b'], remaining: 3 });
+  assert.deepEqual(releaseCommitSubjects(undefined), { subjects: [], remaining: 0 });
 });

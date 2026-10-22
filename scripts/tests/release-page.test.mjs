@@ -121,6 +121,18 @@ test('workflow updates markers idempotently and treats replacement tokens as lit
     }
 });
 
+test('repeated commit subjects appear once on the release page (DEV-131)', async () => {
+    const sample = fixture({ subjects: [
+        'DEV-118 Share automation parsing\n\nStep 1 only.',
+        'DEV-62 Fix protocol',
+        'DEV-118 Share automation parsing',
+        'DEV-118 Share automation parsing  \nFollow-up body',
+    ] });
+    const body = await sample.render();
+    assert.equal(body.split('Share automation parsing').length - 1, 1, body);
+    assert.ok(body.indexOf('- [DEV-118]') < body.indexOf('- [DEV-62]'));
+});
+
 test('missing previous tag preserves first-release behavior without reading ticket files', async () => {
     const sample = fixture({ previous: false, body: 'Initial release highlights.' });
     const body = await sample.render();
