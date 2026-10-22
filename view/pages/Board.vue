@@ -354,7 +354,7 @@ import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
 import { sortTasks } from '../utils/taskSort'
 import { formatMember, memberColor, memberInitials } from '../utils/member'
-import { findLastStatusChangeAt } from '../utils/taskHistory'
+import { statusEnteredAt } from '../utils/taskHistory'
 
 const route = useRoute()
 const { projects, refresh: refreshProjects, loading: loadingProjects } = useProjects()
@@ -609,8 +609,8 @@ const partitionedBoardTasks = computed<{ configured: Record<string, TaskDTO[]>; 
 const grouped = computed<Record<string, TaskDTO[]>>(() => applyCardRules(partitionedBoardTasks.value.configured))
 
 /**
- * Per-column card rules from the board layout (DEV-130): hide cards whose
- * latest move into their status is older than N days and/or keep only the N
+ * Per-column card rules from the board layout (DEV-130): hide cards that
+ * entered their status more than N days ago (see statusEnteredAt) and/or keep only the N
  * most recently modified cards. Rules apply to each status section of the
  * column; hidden cards still exist and stay searchable.
  */
@@ -636,7 +636,7 @@ function applyCardRules(groups: Record<string, TaskDTO[]>) {
     if (rules.maxAgeDays) {
       const ageMs = rules.maxAgeDays * MS_PER_DAY
       filtered = filtered.filter((task) => {
-        const ts = findLastStatusChangeAt(task, label)
+        const ts = statusEnteredAt(task, label)
         return ts === null || now - ts <= ageMs
       })
     }

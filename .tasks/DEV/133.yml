@@ -1,0 +1,40 @@
+title: Board shows tickets older than limit
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-22T18:13:43.787710+00:00
+modified: 2026-10-22T18:30:44.933320+00:00
+comments:
+- date: 2026-10-22T18:17:47.233454+00:00
+  text: |-
+    Root cause: the Board's 'Hide after (days)' rule dated cards with findLastStatusChangeAt(task, label), which only accepted an exact-case history entry whose new value equals the column label and returned null otherwise; null meant 'keep visible'. Tasks created directly in their status (9 of 110 Done tasks in DEV, e.g. DEV-43..51) never have such an entry, and status values recorded with different case/separators (e.g. 'done', 'in_progress') never matched, so those cards stayed forever while others were filtered.
+    Fix: new statusEnteredAt(task, status) in view/utils/taskHistory.ts: latest change into the status (normalized like board columns), else creation time when the task never changed status, else the latest recorded status change; null only when nothing can be dated. Board applyCardRules uses it. Help text updated.
+    Evidence: taskHistory.spec statusEnteredAt cases (normalized match, never-moved -> created, renamed label -> latest change, undatable -> null) and Board.spec 'hides cards that entered their status before the age limit, including cards created in it' (fails with the old helper: ACME-1 created as Done in January stayed); UI 59/59 for those suites; lint:frontend clean.
+- date: 2026-10-22T18:30:44.903024+00:00
+  text: 'Verified on the seeded Atlas demo (npm run seed:test-tasks --demo): with ''Hide after 2 days'' on the Done column set through the Columns dialog, only ATLS-22 (1.2 days in Done) stays, matching an independent calculation from the task files for all 15 Done tasks. Final gates: lint clean, Rust 1569/1569, UI 906/906, release 26/26, full smoke 319/319.'
+description: The filter for the board that is supposed to hide tickets older than x days in the status is not working properly. Some tickets are being filtered, but there are others that stay persistent in the column without being removed.
+history:
+- at: 2026-10-22T18:15:42.772149+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T18:17:47.233454+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T18:30:44.903024+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T18:30:44.933320+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

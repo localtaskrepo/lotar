@@ -48,7 +48,7 @@ The **Columns** button on a board opens one dialog that arranges the board for t
 - **Name columns** — click the pencil next to a column title to name it (for example "Closed"); Enter saves, Escape cancels. Unnamed columns show their statuses, such as `Done · WontDo`.
 - **Hide statuses** — the eye toggle hides a status; a note above the board lists hidden statuses and their task counts, with **Show all** to bring them back. Hidden tasks keep their status and still appear in lists, insights, and the CLI.
 - **WIP limit** — one limit per column, counting every status in it. The header shows `count / limit` and the column is outlined when it is over the limit.
-- **Hide after** (days) — hide cards whose most recent move into their status is older than this many days (based on task history; cards without history stay visible).
+- **Hide after** (days) — hide cards that entered their current status more than this many days ago. The entry time comes from the task history (status names compared without regard to case or separators); a task that never changed status counts from its creation time. Cards that cannot be dated at all stay visible.
 - **Max cards** — show only the most recently updated cards, per status.
 - **Reset to defaults** — one column per configured status, nothing hidden, no limits.
 

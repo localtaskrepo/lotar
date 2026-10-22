@@ -1746,6 +1746,34 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
         wrapper.unmount()
     })
 
+    it('hides cards that entered their status before the age limit, including cards created in it (DEV-133)', async () => {
+        vi.setSystemTime(new Date('2026-03-01T12:00:00Z'))
+        localStorage.setItem('lotar.boardColumns::ACME', JSON.stringify({
+            version: 2,
+            columns: [{ statuses: ['todo'] }, { statuses: ['doing'] }, { statuses: ['review'] }, { statuses: ['done'], maxAgeDays: 7 }, { statuses: ['wontdo'] }],
+            hidden: [],
+        }))
+        const statusChange = (at: string, value: string) => ({ at, changes: [{ field: 'status', old: 'Doing', new: value }] })
+        taskMap.value = new Map([
+            // Created directly as Done long ago, never moved: previously stayed forever.
+            baseTask({ id: 'ACME-1', status: 'Done', created: '2026-01-01T00:00:00Z', modified: '2026-02-28T00:00:00Z', history: [] }),
+            // Moved into Done recently, recorded in lower case.
+            baseTask({ id: 'ACME-2', status: 'Done', created: '2026-01-01T00:00:00Z', history: [statusChange('2026-02-27T00:00:00Z', 'done')] as any }),
+            // Moved into Done a month ago.
+            baseTask({ id: 'ACME-3', status: 'Done', created: '2026-01-01T00:00:00Z', history: [statusChange('2026-01-30T00:00:00Z', 'Done')] as any }),
+            // Recently created as Done.
+            baseTask({ id: 'ACME-4', status: 'Done', created: '2026-02-28T00:00:00Z', history: [] }),
+            // Undatable cards stay visible.
+            baseTask({ id: 'ACME-5', status: 'Done', created: 'unknown', history: [] }),
+        ].map(t => [t.id, t]))
+        taskVersion.value++
+        const wrapper = mountBoard()
+        await flushPromises()
+        const done = wrapper.find('.board.grid > .col.column[data-status="Done"]')
+        expect(done.findAll('article.card.task').map(c => c.find('.id').text()).sort()).toEqual(['ACME-2', 'ACME-4', 'ACME-5'])
+        wrapper.unmount()
+    })
+
     it('keeps statuses distinct inside stacked lanes when grouped by priority, with one header row', async () => {
         localStorage.setItem('lotar.boardColumns::ACME', JSON.stringify({
             version: 2,
