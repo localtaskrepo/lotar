@@ -114,6 +114,19 @@ impl ConfigHandler {
             return Ok(());
         }
 
+        if !result.updated {
+            // DEV-134: no-op requests skip the write; say so instead of
+            // claiming an update.
+            renderer.emit_info(format_args!(
+                "{} is already set to {}; nothing changed",
+                canonical, value
+            ));
+            for warning in &warnings {
+                renderer.emit_warning(warning);
+            }
+            return Ok(());
+        }
+
         if matches!(scope, ConfigScope::Project(_))
             && Self::check_matches_global_default(&canonical, value, &resolver.path)
         {

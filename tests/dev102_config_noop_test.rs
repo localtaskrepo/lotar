@@ -579,3 +579,28 @@ fn dev102_mcp_same_value_preserves_bytes_and_mtime() {
     assert_eq!(before.0, after.0, "MCP no-op preserves bytes");
     assert_eq!(before.1, after.1, "MCP no-op preserves mtime");
 }
+
+/// DEV-134: a repeated identical `config set` reports that nothing changed
+/// instead of claiming an update, and still skips the write.
+#[test]
+fn dev134_cli_same_value_reports_no_change() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let tasks_dir = ensure_tasks_dir(tmp.path());
+    let (ok, first) = run_cli(tmp.path(), &["config", "set", "server.port", "9123"]);
+    assert!(ok, "{first}");
+    assert!(
+        first.contains("Successfully updated server_port"),
+        "{first}"
+    );
+    let path = tasks_dir.join("config.yml");
+    let before = file_state(&path);
+
+    let (ok, second) = run_cli(tmp.path(), &["config", "set", "server_port", "9123"]);
+    assert!(ok, "{second}");
+    assert!(
+        second.contains("server_port is already set to 9123; nothing changed"),
+        "{second}"
+    );
+    assert!(!second.contains("Successfully updated"), "{second}");
+    assert_eq!(file_state(&path), before, "no-op must not rewrite the file");
+}

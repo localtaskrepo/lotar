@@ -1,0 +1,27 @@
+title: config set reports Successfully updated when nothing changed
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-22T18:26:49.502480+00:00
+modified: 2026-10-22T18:30:45.024792+00:00
+comments:
+- date: 2026-10-22T18:30:45.001073+00:00
+  text: |-
+    Outcome: src/cli/handlers/config/set.rs now checks ConfigSetResult.updated; a no-op prints '<field> is already set to <value>; nothing changed' (still surfacing validation warnings) instead of 'Successfully updated'. Write skipping was already correct.
+    Evidence: tests/dev102_config_noop_test.rs dev134_cli_same_value_reports_no_change (message + unchanged bytes/mtime); config suites 35/35; full gates green (Rust 1569, UI 906, smoke 319).
+description: 'Found in the DEV-133 feature run: repeating an identical ''lotar config set <field> <value>'' correctly skips the write (DEV-102: file bytes and mtime unchanged) but the CLI still prints ''Successfully updated <field>'' (also in JSON). It should say nothing changed, like ''lotar status'' does for no-ops.'
+history:
+- at: 2026-10-22T18:30:45.001073+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T18:30:45.024792+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
