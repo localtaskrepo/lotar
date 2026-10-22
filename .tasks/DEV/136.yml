@@ -1,7 +1,36 @@
 title: Investigate intermittent harness.server smoke failure when probing the loopback host
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-22T18:59:14.909075+00:00
+modified: 2026-10-22T20:21:17.567226+00:00
+comments:
+- date: 2026-10-22T20:21:17.544281+00:00
+  text: |-
+    Root cause (structural; the single failure's output was not captured): the harness bind tests used probe-then-bind. resolveServerBind asks get-port for a free port, which binds port 0 and releases it; 'probes the loopback host when no host or port is given' (and the ::1 variant) then re-bound that port to verify it, and 'accepts an explicit free port' started the server on it. Nothing reserves the port in between, and a full smoke run opens thousands of ephemeral sockets (servers on port 0, browser and fetch connections), so another socket can take the released port first. Targeted reproduction attempts (40 runs with listener churn, 48 with outgoing-connection churn) did not hit the narrow window, so the fix removes the race rather than relying on a reproduction.
+    Fix (smoke/tests/harness.server.smoke.spec.ts): the probe tests assert that resolveServerBind returns exactly the port get-port probed on the requested host (get-port owns availability) instead of re-binding it; the explicit-port test probes a fresh port and retries only on a genuine 'Failed to bind' (max 3 attempts), since an external collision is environmental and the test's purpose is that explicit ports are honoured and reported. The harness's own startLotarServer already binds port 0 and was not affected.
+    Also in this commit (developer request): RUSTSEC-2026-0382 (rustls-webpki 0.103.15 -> 0.103.16) and RUSTSEC-2026-0381 (webpki-roots 1.0.9 -> 1.0.10), precise Cargo.lock updates only, both via ureq; cargo-audit is not installed locally, so the audit itself was not re-run here.
+    Evidence: harness spec 17/17 x3; full smoke 319/319 x3 before the dependency update and 319/319 build-first after it; lint clean; Rust 1569/1569; UI 906/906; release 26/26.
+    Guidance: no durable finding.
 description: 'Seen once during DEV-132 verification: smoke/tests/harness.server.smoke.spec.ts ''smoke harness server bind resolution > probes the loopback host when no host or port is given'' failed in one full build-first smoke run (318/319), then passed 3/3 alone and in two further full runs (319/319). Failure output was not captured. Next step: run the full smoke suite repeatedly saving vitest output (and under extra CPU load, as in DEV-132) to capture the assertion, then fix the race rather than retrying.'
+history:
+- at: 2026-10-22T20:13:36.935849+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T20:21:17.544281+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T20:21:17.567226+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
