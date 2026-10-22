@@ -1,7 +1,48 @@
 title: Evaluate maintained YAML parser dependency with task-data compatibility proof
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-19T20:11:47.082804+00:00
+modified: 2026-10-22T01:30:13.681767+00:00
+comments:
+- date: 2026-10-21T20:47:48.854852+00:00
+  text: |-
+    Evaluation 2026-10-21 (no dependency change committed). Usage: serde_yaml_ng appears in 58 files and the dynamic API is load-bearing (Value 56x incl. persisted CustomFields, Mapping::new 34x, to_value 46x, from_str 90x, from_value, from_slice, Error). RUSTSEC-2024-0449 (issued 2026-10-12) is informational/unmaintained for unsafe-libyaml 0.2.11 (archived, not unsound); it recommends safe-Rust parsers saphyr/serde-saphyr or noyalib.
+    Options: (A) serde_norway 0.9.42 (MIT OR Apache-2.0, MSRV 1.71.1, maintained serde_yaml fork on unsafe-libyaml-norway 0.2.15; no RustSec advisories listed). Experiment: Cargo alias serde_yaml_ng = { package = "serde_norway" } compiled all targets with zero code changes and the full Rust suite passed 1563/1563 (incl. no-op byte preservation, YAML tolerance, config normalization, task format tests); reverted afterwards. Still a c2rust translation (unsafe), so it removes the unmaintained warning but not the advisory's safe-Rust recommendation. (B) serde-saphyr 2.0.0 (MIT OR Apache-2.0, MSRV 1.89, safe Rust, anchors/aliases, merge-key policy, parser budgets/resource limits, serializer) but no dynamic Value/Mapping type: CustomFields and config normalization would move to serde_json::Value or an own type, a larger migration needing mapping-order, number/bool/null, tag and byte-roundtrip fixtures. (C) noyalib 0.0.58 (pre-1.0, MSRV 1.89): too young to adopt. (D) Keep serde_yaml_ng and track the informational warning.
+    Decision needed: A (quick, proven drop-in) vs B (safe parser, bigger migration) vs D. Next step after decision: for A, apply the alias or rename imports, run full gates plus smoke and a user-YAML fixture roundtrip; for B, start with a Value abstraction behind a crate-local module and data fixtures before switching parsers. Smoke was not run during the A experiment.
+- date: 2026-10-21T21:31:56.691007+00:00
+  text: 'Correction to the evaluation above: serde_norway is not actively maintained. Last release 0.9.42 on 2024-12-21, last repo push 2025-08-04, 11 open issues; unsafe-libyaml-norway last release/push 2024-12-21. It is a dormant fork of the same c2rust libyaml lineage and could get its own unmaintained advisory. By contrast serde-saphyr (2.0.0 on 2026-10-13, repo pushed 2026-10-21) and saphyr-parser (0.2.2 on 2026-10-15) are active but young and moving fast (1.x to 2.0 within months). Rough serde-saphyr migration estimate: 3-5 focused days. 13 src files use the dynamic Value/Mapping (normalization.rs 37 uses, types.rs/storage/task.rs 11 each, sync 9, task_order 8, automation matching 7), plus 18 src and 27 test files with simple from_str/to_string. Main risk is emitter output drift rewriting user task files on first save, so golden byte fixtures come first.'
+- date: 2026-10-22T01:30:13.662187+00:00
+  text: 'Decision (developer, 2026-10-21): won''t do. Stay on serde_yaml_ng: RUSTSEC-2024-0449 is informational (unmaintained, not unsound) and neither the dormant serde_norway fork nor a serde-saphyr migration is worth it now. If YAML handling ever needs heavy customization (for example byte-for-byte output control), revisit a purpose-built approach then. No code or dependency change.'
 description: DEV-121 cargo audit fixes all four rustls vulnerabilities but retains RUSTSEC-2024-0449 unmaintained unsafe-libyaml0.2.11 through latest stable serde_yaml_ng0.10.0; both already latest. This is a maintenance warning, not one of the four release-blocking TLS advisories. Evaluate maintained compatible parser/fork paths before dependency replacement; do not add blanket ignores or use an unreviewed patch just to silence audit. Prove existing user YAML/custom JSON/typed refs/unknown extensions/null aliases and mutation roundtrip/no-op bytes semantics, canonical config parsing/persistence and task cache behavior. Analyze YAML tags/aliases and resource limits, licensing/MSRV and platform support. Separate assessed migration with rollback/data fixtures and full gates; no automatic data migration, release claim, or dependency substitution in DEV-121.
+tags:
+- won't do
+history:
+- at: 2026-10-21T20:47:48.854852+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-21T21:31:56.691007+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T01:30:13.628593+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: ''
+    new: won't do
+- at: 2026-10-22T01:30:13.662187+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T01:30:13.681767+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
