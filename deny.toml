@@ -1,0 +1,48 @@
+# cargo-deny policy (DEV-163): advisories, licenses, banned/duplicate crates
+# and allowed sources. Run locally with `cargo deny check`; CI runs it in the
+# Security Audit job.
+
+[graph]
+all-features = true
+
+[advisories]
+# RustSec advisories fail the check. Add an `ignore` entry (with the
+# advisory ID and a reason) only for an advisory that cannot affect LoTaR.
+yanked = "warn"
+ignore = [
+    # unsafe-libyaml (via serde_yaml_ng) is unmaintained, not unsound.
+    # Accepted in DEV-122 (2026-10-21); revisit if YAML handling changes.
+    { id = "RUSTSEC-2024-0449", reason = "informational; accepted in DEV-122" },
+]
+
+[licenses]
+# Every license currently in the dependency tree; a new license needs an
+# explicit decision here.
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "0BSD",
+    "ISC",
+    "Zlib",
+    "Unlicense",
+    "CC0-1.0",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "MPL-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Duplicate versions are common in transitive dependencies; report them
+# without failing so they can be cleaned up deliberately.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

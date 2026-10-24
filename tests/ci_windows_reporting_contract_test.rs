@@ -138,13 +138,13 @@ fn ci_uses_the_pinned_toolchain_and_keeps_profile_caches_independent() {
     assert_eq!(workflow["env"]["RUST_TOOLCHAIN"].as_str(), Some(channel));
     for job in workflow["jobs"].as_mapping().unwrap().values() {
         for step in job["steps"].as_sequence().unwrap() {
-            if step["uses"].as_str() == Some("dtolnay/rust-toolchain@stable") {
+            if action(step) == Some("dtolnay/rust-toolchain") {
                 assert_eq!(
                     step["with"]["toolchain"].as_str(),
                     Some("${{ env.RUST_TOOLCHAIN }}")
                 );
             }
-            if step["uses"].as_str() == Some("Swatinem/rust-cache@v2") {
+            if action(step) == Some("Swatinem/rust-cache") {
                 assert!(
                     step["with"]["shared-key"]
                         .as_str()
@@ -199,7 +199,7 @@ fn smoke_job_caches_the_headless_browser_per_playwright_version() {
             .unwrap_or_else(|| panic!("smoke_tests is missing step {name:?}"))
     };
     let cache = step("Restore Playwright browsers");
-    assert_eq!(cache["uses"].as_str(), Some("actions/cache/restore@v5"));
+    assert_eq!(action(cache), Some("actions/cache/restore"));
     assert_eq!(
         cache["with"]["path"].as_str(),
         Some("~/.cache/ms-playwright")
@@ -212,7 +212,7 @@ fn smoke_job_caches_the_headless_browser_per_playwright_version() {
     );
     // Saved right after the download, so a failing smoke run keeps the cache.
     let save = step("Save Playwright browsers");
-    assert_eq!(save["uses"].as_str(), Some("actions/cache/save@v5"));
+    assert_eq!(action(save), Some("actions/cache/save"));
     assert_eq!(
         save["with"]["key"].as_str(),
         Some("${{ steps.playwright_cache.outputs.cache-primary-key }}")
@@ -253,5 +253,57 @@ fn ui_job_typechecks_lints_and_format_checks_the_frontend() {
             runs.iter().any(|run| run.contains(script)),
             "ui_tests must run {purpose}: {runs:?}"
         );
+    }
+}
+
+/// Action name of a step's `uses:` reference, without the pinned revision.
+fn action(step: &serde_yaml_ng::Value) -> Option<&str> {
+    step["uses"]
+        .as_str()
+        .and_then(|uses| uses.split('@').next())
+}
+
+#[test]
+fn every_workflow_action_is_pinned_to_a_commit_sha() {
+    let workflows = [
+        ("ci.yml", include_str!("../.github/workflows/ci.yml")),
+        (
+            "codeql.yml",
+            include_str!("../.github/workflows/codeql.yml"),
+        ),
+        (
+            "homebrew-verify.yml",
+            include_str!("../.github/workflows/homebrew-verify.yml"),
+        ),
+        (
+            "performance.yml",
+            include_str!("../.github/workflows/performance.yml"),
+        ),
+        (
+            "release.yml",
+            include_str!("../.github/workflows/release.yml"),
+        ),
+        (
+            "scoop-verify.yml",
+            include_str!("../.github/workflows/scoop-verify.yml"),
+        ),
+    ];
+    for (name, source) in workflows {
+        let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(source).unwrap();
+        for (job_name, job) in workflow["jobs"].as_mapping().unwrap() {
+            for step in job["steps"].as_sequence().into_iter().flatten() {
+                let Some(uses) = step["uses"].as_str() else {
+                    continue;
+                };
+                if uses.starts_with("./") {
+                    continue;
+                }
+                let revision = uses.split_once('@').map(|(_, rev)| rev).unwrap_or("");
+                assert!(
+                    revision.len() == 40 && revision.chars().all(|c| c.is_ascii_hexdigit()),
+                    "{name} job {job_name:?}: {uses} must be pinned to a full commit SHA"
+                );
+            }
+        }
     }
 }

@@ -1,0 +1,31 @@
+title: Broaden dependency and supply-chain checks
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:44:19.810056+00:00
+modified: 2026-10-24T23:29:44.243631+00:00
+comments:
+- date: 2026-10-24T23:29:44.199784+00:00
+  text: 'Outcome: deny.toml + cargo-deny replace the ad-hoc cargo audit. Policy: RustSec advisories fail (RUSTSEC-2024-0449 unsafe-libyaml/unmaintained ignored with a reason, matching the DEV-122 ''won''t do'' decision of 2026-10-21); licenses limited to an explicit allow-list of the 14 licenses currently in the tree (all permissive or MPL-2.0); wildcards denied; duplicate versions reported as warnings (windows-sys/windows-targets family, syn); only crates.io allowed as source. CI Security Audit job now installs cargo-deny via taiki-e/install-action and runs ''cargo deny check'' (~1s locally after index fetch); npm run check:deps runs it locally. Dependabot now covers cargo, npm and github-actions weekly, with minor/patch grouped per ecosystem (security updates stay ungrouped). All 69 action references across the six workflows are pinned to commit SHAs with the tag kept as a comment (resolved via the GitHub API on 2026-10-24); the contract tests compare action names, and a new contract test fails if any workflow action is not pinned to a 40-char SHA. Evidence: cargo deny check passes (exit 0); contract binary 5/5; test:release 26/26 (its workflow lookups are prefix-based); all workflow YAML parses. Remaining: first CI run validates cargo-deny install and pinned SHAs; Dependabot behavior visible on its next weekly run. Docs: developers/testing.md (dependency policy row, npm test row). Guidance: no durable finding.'
+description: Dependabot only watches cargo; actions are pinned by mutable tags; cargo audit is installed ad hoc in CI and non-blocking in pre-push. Add npm and github-actions to Dependabot with grouped minor/patch updates, replace the cargo audit job with cargo-deny (advisories, licenses, bans, sources) plus deny.toml, and pin workflow actions to commit SHAs with version comments.
+history:
+- at: 2026-10-24T23:27:32.732185+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T23:29:44.199784+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:29:44.243631+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

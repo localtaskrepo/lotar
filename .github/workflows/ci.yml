@@ -30,27 +30,27 @@ jobs:
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
     - name: Setup Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
 
     - name: Rust cache
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       with:
         cache-on-failure: true
         shared-key: ci-${{ github.job }}-${{ runner.os }}
         save-if: true
 
     - name: Install sccache
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
       with:
         tool: sccache
 
     - name: Cache sccache
-      uses: actions/cache@v5
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
@@ -67,7 +67,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -102,7 +102,7 @@ jobs:
         fi
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
       with:
         name: lotar-build-artifacts
         path: ci-artifacts/
@@ -122,28 +122,28 @@ jobs:
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
         components: rustfmt, clippy
         
     - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       with:
         cache-on-failure: true
         shared-key: ci-${{ github.job }}-${{ runner.os }}
         save-if: true
 
     - name: Install sccache
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
       with:
         tool: sccache
 
     - name: Cache sccache
-      uses: actions/cache@v5
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
@@ -153,7 +153,7 @@ jobs:
           sccache-${{ runner.os }}-
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
       with:
         tool: nextest
 
@@ -170,7 +170,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -216,7 +216,7 @@ jobs:
 
     - name: Upload nextest report
       if: always()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
       with:
         name: nextest-report
         path: |
@@ -230,7 +230,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
     - name: Determine Node version
       id: node_version
@@ -240,7 +240,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -287,10 +287,10 @@ jobs:
     needs: [build_artifacts]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
       with:
         name: lotar-build-artifacts
         path: artifact-cache
@@ -320,7 +320,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -342,7 +342,7 @@ jobs:
     # stores the cache (actions/cache only saves when the job succeeds).
     - name: Restore Playwright browsers
       id: playwright_cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ steps.playwright_version.outputs.version }}-chromium-headless-shell
@@ -353,7 +353,7 @@ jobs:
 
     - name: Save Playwright browsers
       if: steps.playwright_cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: ~/.cache/ms-playwright
         key: ${{ steps.playwright_cache.outputs.cache-primary-key }}
@@ -387,20 +387,20 @@ jobs:
       RUSTC_WRAPPER: sccache
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
 
     - name: Install sccache
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
       with:
         tool: sccache
 
     - name: Cache sccache
-      uses: actions/cache@v5
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
@@ -410,7 +410,7 @@ jobs:
           sccache-${{ runner.os }}-
 
     - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       with:
         cache-on-failure: true
         shared-key: ci-${{ github.job }}-${{ runner.os }}
@@ -429,7 +429,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -481,7 +481,7 @@ jobs:
         Pop-Location
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
       with:
         tool: nextest
 
@@ -521,7 +521,7 @@ jobs:
 
     - name: Upload Windows nextest report
       if: always()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
       with:
         name: windows-nextest-report
         path: |
@@ -566,7 +566,7 @@ jobs:
     # missing-artifact failure for a selection that was never attempted.
     - name: Upload Windows portable smoke report
       if: always() && steps.portable_agent_smoke.outcome != 'skipped' && steps.portable_agent_smoke.outcome != ''
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
       with:
         name: windows-portable-smoke-report
         path: target/smoke-report/
@@ -588,33 +588,24 @@ jobs:
     - name: Verify release ticket links and page rendering
       run: npm run test:release
 
-  # Security audit (optimized with caching, runs in parallel)
+  # Supply-chain checks with cargo-deny (runs in parallel)
   security:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
       
-    - name: Cache cargo-audit
-      uses: actions/cache@v5
+    - name: Install cargo-deny
+      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
       with:
-        path: ~/.cargo/bin/cargo-audit
-        key: cargo-audit-${{ runner.os }}
-        
-    - name: Install cargo-audit (if not cached)
-      run: |
-        if ! command -v cargo-audit >/dev/null 2>&1; then
-          echo "Installing cargo-audit..."
-          cargo install cargo-audit --locked
-        else
-          echo "Using cached cargo-audit"
-        fi
-      
-    - name: Run security audit
-      run: cargo audit
+        tool: cargo-deny
+
+    # Advisories, licenses, banned crates and sources (deny.toml, DEV-163).
+    - name: Run cargo-deny
+      run: cargo deny check

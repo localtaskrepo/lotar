@@ -1,11 +1,30 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
+# Dependency updates (DEV-163). Minor and patch updates are grouped into one
+# PR per ecosystem; major updates arrive individually for review. Security
+# updates are not grouped and arrive as soon as an advisory is published.
 version: 2
 updates:
-  - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "cargo"
+    directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Workflow actions are pinned to commit SHAs with the tag as a comment;
+  # Dependabot updates both.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]

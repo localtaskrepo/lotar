@@ -39,7 +39,8 @@
     "screenshots": "npm run build:smoke && node scripts/screenshots.mjs",
     "clean": "cargo clean && rm -rf node_modules",
     "hooks:install": "git config core.hooksPath .githooks",
-    "test:hooks": "node --test scripts/tests/git-hooks.test.mjs"
+    "test:hooks": "node --test scripts/tests/git-hooks.test.mjs",
+    "check:deps": "cargo deny check"
   },
   "keywords": [
     "local",
