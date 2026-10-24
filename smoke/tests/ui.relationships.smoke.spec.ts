@@ -174,6 +174,52 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
         });
     }
 
+    // DEV-147: a suggestion whose title wraps used to inherit the centered
+    // .btn layout, so some searches showed centered rows.
+    it('left-aligns wrapped relationship suggestions as full-width rows', async ({ expect }) => {
+        const { workspace, source } = await fixture();
+        try {
+            const long = await workspace.addTask(
+                'Wrapped suggestion fixture with a title long enough to need several lines inside a phone width panel',
+            );
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage('about:blank', async page => {
+                    await page.setViewportSize({ width: 390, height: 844 });
+                    await page.goto(`${server.url}/task/${source.id}`);
+                    await page.getByRole('tab', { name: 'Relationships', exact: true }).click();
+                    const depends = page.getByRole('region', { name: 'Depends on', exact: true });
+                    await depends.getByRole('button', { name: 'Add depends on', exact: true }).click();
+                    await depends.getByRole('combobox', { name: 'Add depends on', exact: true }).fill('fixture');
+                    const option = depends.getByRole('option').filter({ hasText: long.id });
+                    await option.waitFor();
+                    const layout = await option.evaluate(item => {
+                        const button = item.querySelector('button')!;
+                        const style = getComputedStyle(button);
+                        const range = document.createRange();
+                        range.selectNodeContents(button);
+                        const lines = Array.from(range.getClientRects());
+                        return {
+                            itemWidth: item.getBoundingClientRect().width,
+                            buttonWidth: button.getBoundingClientRect().width,
+                            textAlign: style.textAlign,
+                            lineLefts: [...new Set(lines.map(rect => Math.round(rect.left)))],
+                            lineCount: new Set(lines.map(rect => Math.round(rect.top))).size,
+                        };
+                    });
+                    expect(layout.lineCount).toBeGreaterThan(1);
+                    expect(layout.textAlign).toBe('left');
+                    expect(Math.abs(layout.buttonWidth - layout.itemWidth)).toBeLessThan(1);
+                    expect(layout.lineLefts).toHaveLength(1);
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
     it('previews safe reciprocal repair without writes and applies only after confirmation', async ({ expect }) => {
         const { workspace, source, target } = await fixture();
         try {

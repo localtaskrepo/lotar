@@ -1,7 +1,31 @@
 title: Some relationships inputs cause centered auto complete text
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-23T17:20:57.499789+00:00
+modified: 2026-10-24T03:24:53.736628+00:00
+comments:
+- date: 2026-10-24T03:24:53.717209+00:00
+  text: 'Outcome: root cause is not the result count but wrapping. Relationship suggestions render as .btn ghost buttons (inline-flex, justify-content:center, default button text-align:center); any suggestion whose ''ID title'' is long enough to wrap became a centered multi-line block, so searches that happen to include a long title looked centered. Added .relationship-suggestion (width:100%, justify-content:flex-start, text-align:left) in TaskPanelRelationshipsTab.vue so every row is a full-width, left-aligned option. Evidence: reproduced with a long-title task in a seeded workspace (screenshots before/after at 1280 and 390); new smoke case ''left-aligns wrapped relationship suggestions as full-width rows'' in smoke/tests/ui.relationships.smoke.spec.ts passes and fails without the CSS (expected ''center'' to be ''left''). Remaining: none; full gates at end of batch. Guidance: no durable finding.'
 description: When adding a task as a relationship, some inputs case the auto-complete to be centered instead of left aligned. This doesn't happen for all searches. In the example I was searching "config" and it was centered, searching for "configs" aligned it left. My guess is that the former had more results and thus broke something.
+history:
+- at: 2026-10-24T03:22:02.560038+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T03:24:53.717209+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:24:53.736628+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

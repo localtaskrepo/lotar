@@ -33,7 +33,7 @@
         <ul v-if="suggestions[category.key]?.length" :id="`${editorId}-${category.key}-suggestions`" role="listbox" :aria-label="`${category.label} suggestions`">
           <li v-for="(item, index) in suggestions[category.key]" :id="`${editorId}-${category.key}-option-${index}`"
             :key="item.id" role="option" :aria-selected="index === (activeIndex[category.key] || 0)">
-            <button class="btn ghost" type="button" @mousedown.prevent @click="choose(category.key, item.id)">{{ item.id }} {{ item.title }}</button>
+            <button class="btn ghost relationship-suggestion" type="button" @mousedown.prevent @click="choose(category.key, item.id)">{{ item.id }} {{ item.title }}</button>
           </li>
         </ul>
       </div>
@@ -234,6 +234,8 @@ function onDrop(event: DragEvent, kind: RelationshipCategory) {
 .relationship-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .relationship-add input { box-sizing: border-box; min-width: 0; max-width: 100%; flex: 1; min-height: var(--control-height); height: var(--control-height); }
 .relationship-add ul { flex-basis: 100%; list-style: none; padding: 0; }
+/* Full-width, left-aligned rows: a wrapped title must not inherit the centered .btn layout. */
+.relationship-suggestion { width: 100%; justify-content: flex-start; text-align: left; }
 .relationship-add [aria-selected="true"] { background: var(--surface-contrast); outline: 1px solid var(--accent); }
 .relationship-confirm { position: sticky; bottom: 0; padding: 16px; background: var(--surface, var(--bg)); border: 2px solid var(--border); border-radius: var(--radius-sm); z-index: 2; }
 .relationship-confirm button + button { margin-left: 8px; }
