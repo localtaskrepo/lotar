@@ -45,8 +45,11 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        # No explicit toolchain input: the action installs the toolchain pinned
-        # in rust-toolchain.toml so CI and local development stay identical.
+        # The input is required once the action is pinned to a SHA; cargo
+        # still uses the compiler pinned in rust-toolchain.toml, so CI and
+        # local development stay identical.
+        with:
+          toolchain: stable
 
       - name: Rust cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2

@@ -303,6 +303,14 @@ fn every_workflow_action_is_pinned_to_a_commit_sha() {
                     revision.len() == 40 && revision.chars().all(|c| c.is_ascii_hexdigit()),
                     "{name} job {job_name:?}: {uses} must be pinned to a full commit SHA"
                 );
+                // dtolnay/rust-toolchain derives the toolchain from its ref;
+                // pinned to a SHA it needs the input explicitly.
+                if action(step) == Some("dtolnay/rust-toolchain") {
+                    assert!(
+                        step["with"]["toolchain"].as_str().is_some(),
+                        "{name} job {job_name:?}: pinned rust-toolchain needs a toolchain input"
+                    );
+                }
             }
         }
     }
