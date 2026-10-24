@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { callTool, expectProtocolError, expectToolFailure, extractToolPayload, withMcpClient } from '../helpers/mcp-harness.js';
+import {
+    callTool,
+    expectProtocolError,
+    expectToolFailure,
+    extractToolPayload,
+    withMcpClient,
+} from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 const CONFIG_WITH_AGENT = `default:

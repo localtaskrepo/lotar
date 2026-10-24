@@ -61,7 +61,7 @@ export class SmokeWorkspace {
     private constructor(
         private readonly temporary: DirectoryResult,
         private readonly options: WorkspaceOptions,
-    ) { }
+    ) {}
 
     get root(): string {
         return this.temporary.path;

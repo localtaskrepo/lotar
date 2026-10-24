@@ -48,14 +48,20 @@ describe.concurrent('UI Automation page smoke tests', () => {
                     await page.locator('textarea:not([readonly])').fill(`${SEED_RULES}\n# unsaved global edit\n`);
                     expect(await page.getByRole('button', { name: 'Save rules', exact: true }).isEnabled()).toBe(true);
                     let release!: () => void;
-                    const pending = new Promise<void>(resolve => { release = resolve; });
+                    const pending = new Promise<void>((resolve) => {
+                        release = resolve;
+                    });
                     const writes: string[] = [];
-                    page.on('request', request => {
+                    page.on('request', (request) => {
                         if (request.url().includes('/api/automation/set')) writes.push(request.postData() || '');
                     });
-                    await page.route('**/api/automation/show?*', async route => {
+                    await page.route('**/api/automation/show?*', async (route) => {
                         await pending;
-                        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Scope unavailable' }) });
+                        await route.fulfill({
+                            status: 500,
+                            contentType: 'application/json',
+                            body: JSON.stringify({ error: 'Scope unavailable' }),
+                        });
                     });
                     await page.selectOption('select[aria-label="Project scope"]', 'UIAUT');
                     await page.getByText('Loading configuration', { exact: false }).waitFor();
@@ -91,9 +97,7 @@ describe.concurrent('UI Automation page smoke tests', () => {
 
                     // Rules should be rendered
                     await page.waitForSelector('.rule-card', { timeout: 10_000 });
-                    const ruleNames = await page.$$eval('.rule-name', (els) =>
-                        els.map((el) => el.textContent?.trim()),
-                    );
+                    const ruleNames = await page.$$eval('.rule-name', (els) => els.map((el) => el.textContent?.trim()));
                     expect(ruleNames).toContain('Auto-tag bugs');
                     expect(ruleNames).toContain('Review notification');
                 });
@@ -278,9 +282,7 @@ describe.concurrent('UI Automation page smoke tests', () => {
 
                     // Dialog should close and the new rule card should appear
                     await page.waitForSelector('.rule-card', { timeout: 5_000 });
-                    const ruleNames = await page.$$eval('.rule-name', (els) =>
-                        els.map((el) => el.textContent?.trim()),
-                    );
+                    const ruleNames = await page.$$eval('.rule-name', (els) => els.map((el) => el.textContent?.trim()));
                     expect(ruleNames).toContain('Deploy complete');
 
                     // Save button should be enabled (dirty state)
@@ -295,7 +297,9 @@ describe.concurrent('UI Automation page smoke tests', () => {
                     // Wait for save to complete — save button should become disabled again
                     await page.waitForFunction(
                         () => {
-                            const btn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Save rules'));
+                            const btn = [...document.querySelectorAll('button')].find((b) =>
+                                b.textContent?.includes('Save rules'),
+                            );
                             return btn?.hasAttribute('disabled');
                         },
                         { timeout: 10_000 },

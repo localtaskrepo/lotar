@@ -1,6 +1,6 @@
-import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 
 const routeState = vi.hoisted(() => ({ query: {} as Record<string, any>, hash: '' }))
 const sprintsState = vi.hoisted(() => ({
@@ -24,8 +24,16 @@ vi.mock('../composables/useSse', () => ({
 
 vi.mock('../api/client', () => ({
     api: {
-        getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
-        reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
+        getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+            status: 'ok',
+            tasks: [],
+            changed: false,
+        })),
+        reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+            status: 'ok',
+            tasks: [],
+            changed: false,
+        })),
         listTasks: vi.fn(),
         showConfig: vi.fn(async () => ({})),
     },
@@ -62,7 +70,8 @@ vi.mock('../components/UiSelect.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue'],
-        template: '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
+        template:
+            '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
     },
 }))
 
@@ -70,7 +79,8 @@ vi.mock('../components/UiInput.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue'],
-        template: '<input class="input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+        template:
+            '<input class="input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
     },
 }))
 
@@ -93,7 +103,8 @@ vi.mock('../components/ColumnsMenu.vue', () => ({
     default: {
         props: ['open', 'options', 'isVisible', 'setVisible', 'label'],
         emits: ['update:open', 'reset'],
-        template: '<div class="columns-menu"><slot name="trigger" :open="open" :toggle="() => $emit(\'update:open\', !open)" /></div>',
+        template:
+            '<div class="columns-menu"><slot name="trigger" :open="open" :toggle="() => $emit(\'update:open\', !open)" /></div>',
     },
 }))
 
@@ -109,7 +120,7 @@ vi.mock('../composables/useSprints', async () => {
         useSprints: () => ({
             sprints: sprintsState.sprintsRef!,
             loading: vue.ref(false),
-            refresh: vi.fn(async () => { }),
+            refresh: vi.fn(async () => {}),
             missingSprints: vue.ref<any[]>([]),
             hasMissing: vue.ref(false),
         }),
@@ -125,13 +136,15 @@ vi.mock('../composables/useTaskPanelController', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['open', 'done']),
         priorities: ref<string[]>(['low', 'med', 'high']),
         types: ref<string[]>(['task']),
         customFields: ref<string[]>([]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
@@ -147,10 +160,10 @@ vi.mock('../composables/useSprintAnalytics', () => ({
         isSummaryLoading: vi.fn(() => false),
         isBurndownLoading: vi.fn(() => false),
         isVelocityLoading: vi.fn(() => false),
-        loadSummary: vi.fn(async () => { }),
-        loadBurndown: vi.fn(async () => { }),
-        loadVelocity: vi.fn(async () => { }),
-        fetchSprintAnalytics: vi.fn(async () => { }),
+        loadSummary: vi.fn(async () => {}),
+        loadBurndown: vi.fn(async () => {}),
+        loadVelocity: vi.fn(async () => {}),
+        fetchSprintAnalytics: vi.fn(async () => {}),
     }),
 }))
 
@@ -164,7 +177,7 @@ vi.mock('../composables/useCopyModifier', () => ({
     }),
 }))
 
-import SprintsList from '../pages/SprintsList.vue';
+import SprintsList from '../pages/SprintsList.vue'
 
 function makeTask(idNum: number, overrides: Record<string, any> = {}) {
     const padded = String(idNum).padStart(3, '0')
@@ -231,15 +244,8 @@ describe('SprintsList sprint window', () => {
     })
 
     it('renders one section per sprint with its assigned tasks', async () => {
-        sprintsState.sprintsRef!.value = [
-            makeSprint(1),
-            makeSprint(2),
-        ]
-        setSprintTasks([
-            makeTask(1, { sprints: [1] }),
-            makeTask(2, { sprints: [1] }),
-            makeTask(3, { sprints: [2] }),
-        ])
+        sprintsState.sprintsRef!.value = [makeSprint(1), makeSprint(2)]
+        setSprintTasks([makeTask(1, { sprints: [1] }), makeTask(2, { sprints: [1] }), makeTask(3, { sprints: [2] })])
 
         const wrapper = mount(SprintsList)
         await flushPromises()
@@ -256,10 +262,7 @@ describe('SprintsList sprint window', () => {
     it('badges tasks that belong to multiple sprints when the preference is enabled', async () => {
         localStorage.setItem('lotar.sprints.highlightMultiSprint', 'true')
         sprintsState.sprintsRef!.value = [makeSprint(1), makeSprint(2)]
-        setSprintTasks([
-            makeTask(1, { sprints: [1, 2] }),
-            makeTask(2, { sprints: [1] }),
-        ])
+        setSprintTasks([makeTask(1, { sprints: [1, 2] }), makeTask(2, { sprints: [1] })])
 
         const wrapper = mount(SprintsList)
         await flushPromises()
@@ -280,22 +283,27 @@ describe('SprintsList sprint window', () => {
     it('renders sprint chips in sprint tables and a placeholder in the backlog (DEV-115)', async () => {
         localStorage.setItem('lotar.sprints.columns', JSON.stringify(['id', 'title', 'sprints']))
         sprintsState.sprintsRef!.value = [makeSprint(1), makeSprint(2)]
-        setSprintTasks([
-            makeTask(1, { sprints: [1, 2] }),
-            makeTask(2, { sprints: [] }),
-        ])
+        setSprintTasks([makeTask(1, { sprints: [1, 2] }), makeTask(2, { sprints: [] })])
 
         const wrapper = mount(SprintsList)
         await flushPromises()
 
         const sprintCell = wrapper.find('[data-sprint-id="1"] tr[data-task-id="PRJ-001"] td.task-cell--sprints')
-        expect(sprintCell.findAll('.chip').map(chip => chip.text())).toEqual(['Sprint 1', 'Sprint 2'])
+        expect(sprintCell.findAll('.chip').map((chip) => chip.text())).toEqual(['Sprint 1', 'Sprint 2'])
         const backlogCell = wrapper.find('#backlog tr[data-task-id="PRJ-002"] td.task-cell--sprints')
         expect(backlogCell.find('.chip').exists()).toBe(false)
         expect(backlogCell.text()).toBe('—')
         // Both tables render the same column order through the shared cell.
-        const order = (selector: string) => wrapper.find(selector).findAll('td').map(td => td.classes().find(c => c.startsWith('task-cell--')))
-        expect(order('[data-sprint-id="1"] tr.task-row')).toEqual(['task-cell--id', 'task-cell--title', 'task-cell--sprints'])
+        const order = (selector: string) =>
+            wrapper
+                .find(selector)
+                .findAll('td')
+                .map((td) => td.classes().find((c) => c.startsWith('task-cell--')))
+        expect(order('[data-sprint-id="1"] tr.task-row')).toEqual([
+            'task-cell--id',
+            'task-cell--title',
+            'task-cell--sprints',
+        ])
         expect(order('#backlog tr.task-row')).toEqual(['task-cell--id', 'task-cell--title', 'task-cell--sprints'])
 
         wrapper.unmount()
@@ -308,10 +316,7 @@ describe('SprintsList sprint window', () => {
             makeSprint(1, { state: 'complete', actual_end: old }),
             makeSprint(2, { state: 'active' }),
         ]
-        setSprintTasks([
-            makeTask(1, { sprints: [1] }),
-            makeTask(2, { sprints: [2] }),
-        ])
+        setSprintTasks([makeTask(1, { sprints: [1] }), makeTask(2, { sprints: [2] })])
 
         const wrapper = mount(SprintsList)
         await flushPromises()
@@ -334,10 +339,7 @@ describe('SprintsList sprint window', () => {
             makeSprint(1, { state: 'complete', actual_end: old }),
             makeSprint(2, { state: 'active' }),
         ]
-        setSprintTasks([
-            makeTask(1, { sprints: [1] }),
-            makeTask(2, { sprints: [2] }),
-        ])
+        setSprintTasks([makeTask(1, { sprints: [1] }), makeTask(2, { sprints: [2] })])
 
         const wrapper = mount(SprintsList)
         await flushPromises()
@@ -350,10 +352,7 @@ describe('SprintsList sprint window', () => {
 
     it('renders unassigned tasks in the backlog group', async () => {
         sprintsState.sprintsRef!.value = [makeSprint(1)]
-        setSprintTasks([
-            makeTask(1, { sprints: [1] }),
-            makeTask(2, { sprints: [] }),
-        ])
+        setSprintTasks([makeTask(1, { sprints: [1] }), makeTask(2, { sprints: [] })])
 
         const wrapper = mount(SprintsList)
         await flushPromises()

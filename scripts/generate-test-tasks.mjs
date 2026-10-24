@@ -98,10 +98,26 @@ issue:
 
 const VERBS = ['Add', 'Fix', 'Refactor', 'Improve', 'Support', 'Document', 'Wire up', 'Tune', 'Extend', 'Rework'];
 const NOUNS = [
-    'search filters', 'board drag-and-drop', 'SSE reconnect', 'config validation', 'sprint burndown',
-    'MCP task_list pagination', 'automation cooldown', 'sync report diff', 'scan re-anchoring',
-    'custom field editor', 'tag color picker', 'dependency graph', 'keyboard shortcuts', 'dark mode polish',
-    'effort rollup', 'activity drawer', 'project switcher', 'CLI aliases', 'OpenAPI examples', 'smoke harness',
+    'search filters',
+    'board drag-and-drop',
+    'SSE reconnect',
+    'config validation',
+    'sprint burndown',
+    'MCP task_list pagination',
+    'automation cooldown',
+    'sync report diff',
+    'scan re-anchoring',
+    'custom field editor',
+    'tag color picker',
+    'dependency graph',
+    'keyboard shortcuts',
+    'dark mode polish',
+    'effort rollup',
+    'activity drawer',
+    'project switcher',
+    'CLI aliases',
+    'OpenAPI examples',
+    'smoke harness',
 ];
 const AREAS = ['cli', 'api', 'ui', 'storage', 'mcp', 'automation', 'sync', 'scanner'];
 const ASSIGNEES = ['alice', 'bob', 'carol', 'dave', 'erin', ''];
@@ -124,24 +140,35 @@ function main() {
     const opts = parseArgs(process.argv.slice(2));
     const bin = resolveBinary();
     if (!existsSync(bin)) {
-        console.error(`LoTaR binary not found at ${bin}. Run \`npm run build\` (or \`npm run build:smoke\`) first, or set LOTAR_BINARY_PATH.`);
+        console.error(
+            `LoTaR binary not found at ${bin}. Run \`npm run build\` (or \`npm run build:smoke\`) first, or set LOTAR_BINARY_PATH.`,
+        );
         process.exit(1);
     }
 
     const dir = opts.dir || path.join(os.tmpdir(), `lotar-demo-${process.pid}`);
     if (opts.demo) {
         const demo = seedDemoWorkspace({ dir: path.resolve(dir), bin });
-        console.log(`\nSeeded the Atlas demo (${Object.keys(demo.ids).length} tasks, git history, 4 sprints) into: ${demo.dir}`);
+        console.log(
+            `\nSeeded the Atlas demo (${Object.keys(demo.ids).length} tasks, git history, 4 sprints) into: ${demo.dir}`,
+        );
         console.log(`  cd "${demo.dir}" && lotar list --format table`);
         console.log(`  cd "${demo.dir}" && lotar serve --open   # assign a task to @claude to run the stub agent`);
         if (opts.serve) {
-            spawnSync(bin, ['serve', '--port', '8080'], { cwd: demo.dir, env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' }, stdio: 'inherit' });
+            spawnSync(bin, ['serve', '--port', '8080'], {
+                cwd: demo.dir,
+                env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' },
+                stdio: 'inherit',
+            });
         }
         return;
     }
     if (opts.dir && !opts.keep && existsSync(dir)) rmSync(dir, { recursive: true, force: true });
     mkdirSync(path.join(dir, '.tasks'), { recursive: true });
-    writeFileSync(path.join(dir, '.tasks', 'config.yml'), CONFIG_YAML.replace('project: DEMO', `project: ${opts.project}`));
+    writeFileSync(
+        path.join(dir, '.tasks', 'config.yml'),
+        CONFIG_YAML.replace('project: DEMO', `project: ${opts.project}`),
+    );
 
     const rng = makeRng((opts.count * 2654435761) >>> 0);
     let created = 0;
@@ -150,10 +177,14 @@ function main() {
     for (let i = 0; i < opts.count; i += 1) {
         const title = `${pick(VERBS, rng)} ${pick(NOUNS, rng)}`;
         const res = run(bin, dir, [
-            'add', title,
-            '-p', opts.project,
-            '--type', pick(TYPES, rng),
-            '--priority', pick(PRIORITIES, rng),
+            'add',
+            title,
+            '-p',
+            opts.project,
+            '--type',
+            pick(TYPES, rng),
+            '--priority',
+            pick(PRIORITIES, rng),
         ]);
         const m = res.stdout && res.stdout.match(/Created task:\s*([A-Z0-9_-]+)/i);
         if (!m) {
@@ -196,7 +227,11 @@ function main() {
 
     if (opts.serve) {
         console.log(`\nStarting lotar serve against ${dir} ... (Ctrl-C to stop)`);
-        spawnSync(bin, ['serve', '--port', '8080'], { cwd: dir, env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' }, stdio: 'inherit' });
+        spawnSync(bin, ['serve', '--port', '8080'], {
+            cwd: dir,
+            env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' },
+            stdio: 'inherit',
+        });
     }
 }
 

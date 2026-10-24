@@ -124,9 +124,10 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     function readStoredSort(): { key: ColKey | null; dir: 'asc' | 'desc' } {
-        return storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(sortKey())
-            ?? storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(SORT_KEY)
-            ?? { key: null, dir: 'desc' }
+        return (
+            storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(sortKey()) ??
+            storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(SORT_KEY) ?? { key: null, dir: 'desc' }
+        )
     }
 
     // Internal sort state (standalone usage). When the page passes the
@@ -237,7 +238,9 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     )
 
     const visibleIds = computed(() => sorted.value.map((task) => task.id))
-    const allSelected = computed(() => visibleIds.value.length > 0 && visibleIds.value.every((id) => selected.value.includes(id)))
+    const allSelected = computed(
+        () => visibleIds.value.length > 0 && visibleIds.value.every((id) => selected.value.includes(id)),
+    )
     const selectAllRef = ref<HTMLInputElement | null>(null)
 
     const indeterminate = computed(() => {
@@ -287,7 +290,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         emit('update:bulk', (event.target as HTMLInputElement).checked)
     }
 
-
     function fmtDate(value: string) {
         const formatted = formatTaskDate(value)
         if (formatted) return formatted
@@ -301,7 +303,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
             return value
         }
     }
-
 
     function touchBadge(touch: TaskTouch) {
         switch (touch.kind) {

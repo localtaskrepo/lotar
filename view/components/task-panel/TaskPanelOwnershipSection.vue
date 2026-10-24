@@ -28,7 +28,8 @@
             type="button"
             class="task-panel__ownership-reset"
             @click="emit('resetReporterSelection')"
-          >Use list</UiButton>
+            >Use list</UiButton
+          >
         </div>
       </div>
       <div class="task-panel__ownership-column">
@@ -57,30 +58,22 @@
             type="button"
             class="task-panel__ownership-reset"
             @click="emit('resetAssigneeSelection')"
-          >Use list</UiButton>
+            >Use list</UiButton
+          >
         </div>
       </div>
     </div>
     <div class="task-panel__row">
-      <UiInput
-        v-model="form.due_date"
-        type="date"
-        placeholder="Due date"
-        @blur="emitFieldBlur('due_date')"
-      />
-      <UiInput
-        v-model="form.effort"
-        placeholder="Effort (e.g., 3d, 5h)"
-        @blur="emitFieldBlur('effort')"
-      />
+      <UiInput v-model="form.due_date" type="date" placeholder="Due date" @blur="emitFieldBlur('due_date')" />
+      <UiInput v-model="form.effort" placeholder="Effort (e.g., 3d, 5h)" @blur="emitFieldBlur('effort')" />
     </div>
   </fieldset>
 </template>
 
 <script setup lang="ts">
-import UiButton from '../UiButton.vue';
-import UiInput from '../UiInput.vue';
-import UiSelect from '../UiSelect.vue';
+import UiButton from '../UiButton.vue'
+import UiInput from '../UiInput.vue'
+import UiSelect from '../UiSelect.vue'
 
 const props = defineProps<{
   form: Record<string, any>
@@ -110,5 +103,3 @@ function emitFieldBlur(field: string) {
   emit('fieldBlur', field)
 }
 </script>
-
-

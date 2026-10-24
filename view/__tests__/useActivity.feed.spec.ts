@@ -9,7 +9,10 @@ vi.mock('../api/client', () => ({
 function deferred<T>() {
     let resolve!: (value: T) => void
     let reject!: (error: Error) => void
-    const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+    const promise = new Promise<T>((yes, no) => {
+        resolve = yes
+        reject = no
+    })
     return { promise, resolve, reject }
 }
 
@@ -28,8 +31,8 @@ function feedItem(id: string, task: string): any {
 
 describe('useActivity keyed feed queries', () => {
     let feedMock: Mock
-    let useActivity: typeof import('../composables/useActivity')['useActivity']
-    let _resetActivityStore: typeof import('../composables/useActivity')['_resetActivityStore']
+    let useActivity: (typeof import('../composables/useActivity'))['useActivity']
+    let _resetActivityStore: (typeof import('../composables/useActivity'))['_resetActivityStore']
 
     beforeEach(async () => {
         vi.resetModules()
@@ -60,7 +63,9 @@ describe('useActivity keyed feed queries', () => {
         expect(params.limit).toBe(50)
         expect(String(params.since)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
         expect(String(params.until)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
-        expect(new Date(params.since as string).getTime()).toBeLessThanOrEqual(new Date(params.until as string).getTime())
+        expect(new Date(params.since as string).getTime()).toBeLessThanOrEqual(
+            new Date(params.until as string).getTime(),
+        )
         expect(handle.items.value).toHaveLength(1)
         expect(handle.items.value[0]!.task_id).toBe('T-1')
         expect(handle.error.value).toBeNull()
@@ -108,12 +113,12 @@ describe('useActivity keyed feed queries', () => {
 
         second.resolve([feedItem('new', 'T-2')])
         await pendingSecond
-        expect(handle.items.value.map(item => item.commit)).toEqual(['sha-new'])
+        expect(handle.items.value.map((item) => item.commit)).toEqual(['sha-new'])
         expect(handle.loading.value).toBe(false)
 
         first.resolve([feedItem('old', 'T-1')])
         await pendingFirst
-        expect(handle.items.value.map(item => item.commit)).toEqual(['sha-new'])
+        expect(handle.items.value.map((item) => item.commit)).toEqual(['sha-new'])
         expect(handle.loading.value).toBe(false)
         handle.release()
     })
@@ -131,7 +136,7 @@ describe('useActivity keyed feed queries', () => {
         first.reject(new Error('old request failed'))
         await pendingFirst
 
-        expect(handle.items.value.map(item => item.commit)).toEqual(['sha-new'])
+        expect(handle.items.value.map((item) => item.commit)).toEqual(['sha-new'])
         expect(handle.error.value).toBeNull()
         expect(handle.loading.value).toBe(false)
         handle.release()
@@ -141,7 +146,8 @@ describe('useActivity keyed feed queries', () => {
         const drawerRequest = deferred<any[]>()
         const insightsRequest = deferred<any[]>()
         feedMock.mockImplementation((params: Record<string, unknown>) =>
-            params.limit === 200 ? drawerRequest.promise : insightsRequest.promise)
+            params.limit === 200 ? drawerRequest.promise : insightsRequest.promise,
+        )
 
         const drawer = useActivity().getFeedQuery({ windowDays: 30, limit: 200 })
         const insights = useActivity().getFeedQuery({ project: 'DEV', windowDays: 60, limit: 400 })
@@ -159,7 +165,7 @@ describe('useActivity keyed feed queries', () => {
         drawerRequest.resolve([feedItem('d', 'T-9')])
         await pendingDrawer
         expect(drawer.items.value).toHaveLength(1)
-        expect(insights.items.value.map(item => item.task_id)).toEqual(['DEV-1'])
+        expect(insights.items.value.map((item) => item.task_id)).toEqual(['DEV-1'])
         drawer.release()
         insights.release()
     })

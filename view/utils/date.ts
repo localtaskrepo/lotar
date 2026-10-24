@@ -107,10 +107,7 @@ export function fromDateTimeInputValue(value: unknown): string | null {
  * Unparseable string values are returned unchanged; empty values yield
  * `opts.empty` (default '').
  */
-export function formatDateTime(
-    value?: string | Date | null,
-    opts?: { empty?: string; mediumShort?: boolean },
-): string {
+export function formatDateTime(value?: string | Date | null, opts?: { empty?: string; mediumShort?: boolean }): string {
     if (value === null || value === undefined || value === '') return opts?.empty ?? ''
     const date = typeof value === 'string' ? new Date(value) : value
     if (Number.isNaN(date.getTime())) return typeof value === 'string' ? value : String(value)
@@ -140,10 +137,7 @@ const relativeUnits: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = 
  * Unparseable values are returned unchanged; empty values yield `opts.empty`
  * (default '').
  */
-export function formatRelativeTime(
-    value?: string | null,
-    opts?: { empty?: string },
-): string {
+export function formatRelativeTime(value?: string | null, opts?: { empty?: string }): string {
     if (!value) return opts?.empty ?? ''
     const timestamp = safeTimestamp(value)
     if (timestamp === null) return value

@@ -1,13 +1,7 @@
 <template>
   <fieldset class="task-panel__group">
     <legend>Summary</legend>
-    <UiInput
-      v-model="form.title"
-      placeholder="Title"
-      required
-      aria-required="true"
-      @blur="emitFieldBlur('title')"
-    />
+    <UiInput v-model="form.title" placeholder="Title" required aria-required="true" @blur="emitFieldBlur('title')" />
     <div class="task-panel__row">
       <UiSelect
         v-model="form.project"
@@ -40,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, isRef, type PropType, type Ref } from 'vue'
+import { computed, isRef, type PropType, type Ref } from 'vue'
 import UiInput from '../UiInput.vue'
 import UiSelect from '../UiSelect.vue'
 
@@ -49,32 +43,32 @@ interface ProjectOption {
   name?: string | null
 }
 
-  const props = defineProps({
-    form: { type: Object as PropType<Record<string, any>>, required: true },
-    mode: { type: String as PropType<'create' | 'edit'>, required: true },
-    projects: {
-      type: [Array, Object] as PropType<ProjectOption[] | Ref<ProjectOption[]>>,
-      default: () => [],
-    },
-    projectLabel: { type: Function as PropType<(project: ProjectOption) => string>, required: true },
-    types: {
-      type: [Array, Object] as PropType<string[] | Ref<string[]>>,
-      default: () => [],
-    },
-    statuses: {
-      type: [Array, Object] as PropType<string[] | Ref<string[]>>,
-      default: () => [],
-    },
-    priorities: {
-      type: [Array, Object] as PropType<string[] | Ref<string[]>>,
-      default: () => [],
-    },
-  })
+const props = defineProps({
+  form: { type: Object as PropType<Record<string, any>>, required: true },
+  mode: { type: String as PropType<'create' | 'edit'>, required: true },
+  projects: {
+    type: [Array, Object] as PropType<ProjectOption[] | Ref<ProjectOption[]>>,
+    default: () => [],
+  },
+  projectLabel: { type: Function as PropType<(project: ProjectOption) => string>, required: true },
+  types: {
+    type: [Array, Object] as PropType<string[] | Ref<string[]>>,
+    default: () => [],
+  },
+  statuses: {
+    type: [Array, Object] as PropType<string[] | Ref<string[]>>,
+    default: () => [],
+  },
+  priorities: {
+    type: [Array, Object] as PropType<string[] | Ref<string[]>>,
+    default: () => [],
+  },
+})
 
-  const projectOptions = computed(() => toArray<ProjectOption>(props.projects))
-  const typeOptions = computed(() => toArray<string>(props.types))
-  const statusOptions = computed(() => toArray<string>(props.statuses))
-  const priorityOptions = computed(() => toArray<string>(props.priorities))
+const projectOptions = computed(() => toArray<ProjectOption>(props.projects))
+const typeOptions = computed(() => toArray<string>(props.types))
+const statusOptions = computed(() => toArray<string>(props.statuses))
+const priorityOptions = computed(() => toArray<string>(props.priorities))
 
 const emit = defineEmits<{
   (e: 'fieldBlur', field: string): void
@@ -94,11 +88,11 @@ function emitStatusChange() {
   emit('updateStatus', props.form.status)
 }
 
-  function toArray<T>(value: T[] | Ref<T[]> | undefined | null): T[] {
-    if (isRef(value)) {
-      const inner = value.value
-      return Array.isArray(inner) ? inner : []
-    }
-    return Array.isArray(value) ? value : []
+function toArray<T>(value: T[] | Ref<T[]> | undefined | null): T[] {
+  if (isRef(value)) {
+    const inner = value.value
+    return Array.isArray(inner) ? inner : []
   }
+  return Array.isArray(value) ? value : []
+}
 </script>

@@ -4,35 +4,50 @@ import type { TaskListFilter } from '../api/types'
 import { normalizeSortBy, normalizeSortOrder } from '../utils/taskSort'
 
 const BUILTIN_QUERY_KEYS = new Set([
-  'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs', 'sprints', 'sort_by', 'order', 'deletion',
+    'q',
+    'project',
+    'status',
+    'priority',
+    'type',
+    'assignee',
+    'tags',
+    'due',
+    'recent',
+    'needs',
+    'sprints',
+    'sort_by',
+    'order',
+    'deletion',
 ])
 
-
 export function listFromCsv(value: string): string[] {
-  return value.split(',').map((entry) => entry.trim()).filter(Boolean)
+    return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
 }
 
 export function normalizeFilter(raw: Record<string, string>) {
-  const normalized: Record<string, string> = {}
-  const extras: Record<string, string> = Object.create(null)
-  const source = raw || {}
-  for (const [key, value] of Object.entries(source)) {
-    if (!value || key === 'order') continue
-    if (key === 'sort_by') {
-      // Round-trip the raw value: valid keys normalize on the wire, invalid
-      // ones are forwarded so the server's strict parser surfaces the error
-      // instead of the UI silently re-sorting by default.
-      normalized.sort_by = value.trim()
-      continue
+    const normalized: Record<string, string> = {}
+    const extras: Record<string, string> = Object.create(null)
+    const source = raw || {}
+    for (const [key, value] of Object.entries(source)) {
+        if (!value || key === 'order') continue
+        if (key === 'sort_by') {
+            // Round-trip the raw value: valid keys normalize on the wire, invalid
+            // ones are forwarded so the server's strict parser surfaces the error
+            // instead of the UI silently re-sorting by default.
+            normalized.sort_by = value.trim()
+            continue
+        }
+        if (BUILTIN_QUERY_KEYS.has(key)) {
+            normalized[key] = value
+        } else {
+            extras[key] = value
+        }
     }
-    if (BUILTIN_QUERY_KEYS.has(key)) {
-      normalized[key] = value
-    } else {
-      extras[key] = value
-    }
-  }
-  normalized.order = source.order && source.order.trim() ? source.order : 'desc'
-  return { normalized, extras }
+    normalized.order = source.order && source.order.trim() ? source.order : 'desc'
+    return { normalized, extras }
 }
 
 export function buildServerFilter(
@@ -55,14 +70,14 @@ export function buildServerFilter(
     if (normalized.assignee) serverFilter.assignee = normalized.assignee
     if (normalized.tags) serverFilter.tags = listFromCsv(normalized.tags)
     if (normalized.sprints) {
-      // Strict sprints CSV (backend rejects invalid entries): forward parsed
-      // ids only when EVERY token is a positive integer; otherwise pass the
-      // raw value through so the API rejects the query instead of the UI
-      // silently widening it by dropping bad tokens.
-      const tokens = listFromCsv(normalized.sprints)
-      const ids = tokens.map((token) => Number(token))
-      const allValid = tokens.length > 0 && tokens.every((token, i) => /^\d+$/.test(token) && ids[i]! > 0)
-      serverFilter.sprints = allValid ? ids : normalized.sprints
+        // Strict sprints CSV (backend rejects invalid entries): forward parsed
+        // ids only when EVERY token is a positive integer; otherwise pass the
+        // raw value through so the API rejects the query instead of the UI
+        // silently widening it by dropping bad tokens.
+        const tokens = listFromCsv(normalized.sprints)
+        const ids = tokens.map((token) => Number(token))
+        const allValid = tokens.length > 0 && tokens.every((token, i) => /^\d+$/.test(token) && ids[i]! > 0)
+        serverFilter.sprints = allValid ? ids : normalized.sprints
     }
     if (normalized.due) serverFilter.due = normalized.due
     if (normalized.recent) serverFilter.recent = normalized.recent
@@ -82,82 +97,82 @@ export function buildServerFilter(
 }
 
 export function useProjectFilterSync(
-  projectRef: Ref<string>,
-  filterRef: Ref<Record<string, string>>,
-  options?: {
-    onProjectChange?: (project: string) => void
-    /** When set (and no onProjectChange), keep ?project= in the URL in sync on this path. */
-    routePath?: string
-  },
+    projectRef: Ref<string>,
+    filterRef: Ref<Record<string, string>>,
+    options?: {
+        onProjectChange?: (project: string) => void
+        /** When set (and no onProjectChange), keep ?project= in the URL in sync on this path. */
+        routePath?: string
+    },
 ) {
-  const hasFilters = computed(() =>
-    Object.entries(filterRef.value).some(([key, value]) => key !== 'order' && !!value),
-  )
+    const hasFilters = computed(() =>
+        Object.entries(filterRef.value).some(([key, value]) => key !== 'order' && !!value),
+    )
 
-  const route = useRoute()
-  const router = useRouter()
+    const route = useRoute()
+    const router = useRouter()
 
-  function syncProjectRoute(nextProject: string) {
-    const desired = nextProject || ''
-    const current = typeof route.query.project === 'string' ? route.query.project : ''
-    if (current === desired) return
-    router.push({ path: options?.routePath ?? route.path, query: desired ? { project: desired } : {} })
-  }
-
-  function resolveProjectSelection(requested: string | undefined) {
-    return (requested || '').trim()
-  }
-
-  function sanitizeFilterInput(payload: Record<string, string>) {
-    const next: Record<string, string> = Object.create(null)
-    const hasProjectKey = payload && Object.prototype.hasOwnProperty.call(payload, 'project')
-    if (hasProjectKey) {
-      const nextProject = resolveProjectSelection(payload.project)
-      if (nextProject !== projectRef.value) {
-        projectRef.value = nextProject
-      }
+    function syncProjectRoute(nextProject: string) {
+        const desired = nextProject || ''
+        const current = typeof route.query.project === 'string' ? route.query.project : ''
+        if (current === desired) return
+        router.push({ path: options?.routePath ?? route.path, query: desired ? { project: desired } : {} })
     }
-    Object.entries(payload || {}).forEach(([key, value]) => {
-      if (key === 'project') return
-      if (value === undefined || value === null) return
-      next[key] = value
-    })
-    const prev = filterRef.value
-    const sameSize = Object.keys(next).length === Object.keys(prev).length
-    if (sameSize) {
-      const unchanged = Object.entries(next).every(([key, value]) => prev[key] === value)
-      if (unchanged) return prev
+
+    function resolveProjectSelection(requested: string | undefined) {
+        return (requested || '').trim()
     }
-    return next
-  }
 
-  function onFilterUpdate(v: Record<string, string>) {
-    const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
-    if (hasProjectKey) {
-      const nextProject = (v.project || '').trim()
-      if (options?.onProjectChange) {
-        options.onProjectChange(nextProject)
-      } else if (options?.routePath) {
-        syncProjectRoute(nextProject)
-      }
+    function sanitizeFilterInput(payload: Record<string, string>) {
+        const next: Record<string, string> = Object.create(null)
+        const hasProjectKey = payload && Object.prototype.hasOwnProperty.call(payload, 'project')
+        if (hasProjectKey) {
+            const nextProject = resolveProjectSelection(payload.project)
+            if (nextProject !== projectRef.value) {
+                projectRef.value = nextProject
+            }
+        }
+        Object.entries(payload || {}).forEach(([key, value]) => {
+            if (key === 'project') return
+            if (value === undefined || value === null) return
+            next[key] = value
+        })
+        const prev = filterRef.value
+        const sameSize = Object.keys(next).length === Object.keys(prev).length
+        if (sameSize) {
+            const unchanged = Object.entries(next).every(([key, value]) => prev[key] === value)
+            if (unchanged) return prev
+        }
+        return next
     }
-    filterRef.value = sanitizeFilterInput(v)
-  }
 
-  function clearFilters(filterBarRef: Ref<{ clear?: () => void } | null>) {
-    filterRef.value = {}
-    filterBarRef.value?.clear?.()
-  }
+    function onFilterUpdate(v: Record<string, string>) {
+        const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
+        if (hasProjectKey) {
+            const nextProject = (v.project || '').trim()
+            if (options?.onProjectChange) {
+                options.onProjectChange(nextProject)
+            } else if (options?.routePath) {
+                syncProjectRoute(nextProject)
+            }
+        }
+        filterRef.value = sanitizeFilterInput(v)
+    }
 
-  return { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters }
+    function clearFilters(filterBarRef: Ref<{ clear?: () => void } | null>) {
+        filterRef.value = {}
+        filterBarRef.value?.clear?.()
+    }
+
+    return { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters }
 }
 
 export function useCustomFilterPresets(customFieldNames: Ref<string[]>) {
-  return computed(() => {
-    const names = (customFieldNames.value || []).filter((name) => name !== '*')
-    return names.slice(0, 6).map((name) => ({
-      label: name,
-      expression: `field:${name}=`,
-    }))
-  })
+    return computed(() => {
+        const names = (customFieldNames.value || []).filter((name) => name !== '*')
+        return names.slice(0, 6).map((name) => ({
+            label: name,
+            expression: `field:${name}=`,
+        }))
+    })
 }

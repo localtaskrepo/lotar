@@ -76,9 +76,7 @@
               <IconGlyph name="search" />
               Dry run
             </UiButton>
-            <UiButton type="button" @click="confirmRun" :disabled="loading">
-              Run
-            </UiButton>
+            <UiButton type="button" @click="confirmRun" :disabled="loading"> Run </UiButton>
           </div>
         </UiCard>
 
@@ -122,17 +120,11 @@
             </label>
             <label class="scan-field">
               <span class="scan-field__label muted">Signal words</span>
-              <UiInput
-                v-model="editSignalWords"
-                placeholder="TODO, FIXME, HACK"
-              />
+              <UiInput v-model="editSignalWords" placeholder="TODO, FIXME, HACK" />
             </label>
             <label class="scan-field">
               <span class="scan-field__label muted">Ticket patterns</span>
-              <UiInput
-                v-model="editTicketPatterns"
-                placeholder="[A-Z]+-\\d+"
-              />
+              <UiInput v-model="editTicketPatterns" placeholder="[A-Z]+-\\d+" />
             </label>
             <div class="scan-field scan-field--checkbox">
               <input id="scan-mentions" v-model="editEnableMentions" type="checkbox" />
@@ -229,17 +221,14 @@
                   <div v-if="entry.existing_key" class="scan-entry__hint muted">
                     Existing key: {{ entry.existing_key }}
                   </div>
-                  <div v-if="entry.task_id" class="scan-entry__hint muted">
-                    Created: {{ entry.task_id }}
-                  </div>
-                  <div
-                    v-if="entry.updated_line && entry.updated_line !== entry.original_line"
-                    class="scan-entry__diff"
-                  >
+                  <div v-if="entry.task_id" class="scan-entry__hint muted">Created: {{ entry.task_id }}</div>
+                  <div v-if="entry.updated_line && entry.updated_line !== entry.original_line" class="scan-entry__diff">
                     <div class="scan-entry__diff-line">- {{ entry.original_line }}</div>
                     <div class="scan-entry__diff-line scan-entry__diff-line--add">+ {{ entry.updated_line }}</div>
                   </div>
-                  <div v-if="entry.message && !isDryRunMessage(entry)" class="scan-entry__message">{{ entry.message }}</div>
+                  <div v-if="entry.message && !isDryRunMessage(entry)" class="scan-entry__message">
+                    {{ entry.message }}
+                  </div>
                 </div>
 
                 <div v-if="isSnippetOpen(entry)" class="scan-entry__snippet">
@@ -248,7 +237,11 @@
                   <div v-else-if="snippetState(entry).snippet" class="scan-snippet">
                     <div class="scan-snippet__header">
                       <strong>{{ snippetState(entry).snippet?.path }}</strong>
-                      <span class="muted">Lines {{ snippetState(entry).snippet?.start_line }}–{{ snippetState(entry).snippet?.end_line }}</span>
+                      <span class="muted"
+                        >Lines {{ snippetState(entry).snippet?.start_line }}–{{
+                          snippetState(entry).snippet?.end_line
+                        }}</span
+                      >
                     </div>
                     <div class="scan-snippet__lines">
                       <div
@@ -299,7 +292,15 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
-import type { ConfigInspectResult, ProjectDTO, ReferenceSnippet, ScanEntry, ScanRequest, ScanResponse, ScanTarget } from '../api/types'
+import type {
+  ConfigInspectResult,
+  ProjectDTO,
+  ReferenceSnippet,
+  ScanEntry,
+  ScanRequest,
+  ScanResponse,
+  ScanTarget,
+} from '../api/types'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import UiButton from '../components/UiButton.vue'
@@ -323,9 +324,12 @@ const stripAttributes = ref<'inherit' | 'true' | 'false'>('inherit')
 const modifiedOnly = ref(false)
 const reanchor = ref(false)
 
-const helpStrip = 'When inserting a new ticket reference into your code, remove any inline attribute blocks like [priority=high] or [assignee=me]. These attributes are parsed and applied to the task, so they don\'t need to stay in the comment.'
-const helpModified = 'Only scan files that have uncommitted git changes. Useful for large repos where you only want to process newly touched files rather than the entire codebase.'
-const helpReanchor = 'Also clean up code anchors within the scanned paths: anchors that drifted move to the nearest mention, and anchors whose file is gone or no longer mentions the task ID are removed. Live mentions in any file, links, files and attachments are kept. A preview lists the changes without writing them.'
+const helpStrip =
+  "When inserting a new ticket reference into your code, remove any inline attribute blocks like [priority=high] or [assignee=me]. These attributes are parsed and applied to the task, so they don't need to stay in the comment."
+const helpModified =
+  'Only scan files that have uncommitted git changes. Useful for large repos where you only want to process newly touched files rather than the entire codebase.'
+const helpReanchor =
+  'Also clean up code anchors within the scanned paths: anchors that drifted move to the nearest mention, and anchors whose file is gone or no longer mentions the task ID are removed. Live mentions in any file, links, files and attachments are kept. A preview lists the changes without writing them.'
 
 function showHelp(key: 'strip' | 'modified' | 'reanchor') {
   const messages: Record<typeof key, string> = {
@@ -355,7 +359,9 @@ const SKIP_RUN_CONFIRM_KEY = 'scan-skip-run-confirm'
 const showRunConfirmDialog = ref(false)
 const skipFutureConfirm = ref(false)
 
-const snippetMap = reactive<Record<string, { open: boolean; loading: boolean; error: string | null; snippet: ReferenceSnippet | null }>>({})
+const snippetMap = reactive<
+  Record<string, { open: boolean; loading: boolean; error: string | null; snippet: ReferenceSnippet | null }>
+>({})
 
 const scanSummary = computed(() => {
   return scanResponse.value?.summary ?? { created: 0, updated: 0, skipped: 0, failed: 0 }
@@ -377,7 +383,9 @@ const settingsChanged = computed(() => {
   )
 })
 
-const scanEntries = computed(() => Array.isArray(scanResponse.value?.entries) ? scanResponse.value?.entries ?? [] : [])
+const scanEntries = computed(() =>
+  Array.isArray(scanResponse.value?.entries) ? (scanResponse.value?.entries ?? []) : [],
+)
 
 function formatProjectLabel(entry: ProjectDTO) {
   return entry.name ? `${entry.name} (${entry.prefix})` : entry.prefix
@@ -385,20 +393,29 @@ function formatProjectLabel(entry: ProjectDTO) {
 
 function formatStatus(status: string) {
   switch (status) {
-    case 'created': return 'Create'
-    case 'updated': return 'Update'
-    case 'failed': return 'Failed'
-    case 'skipped': return 'Skipped'
-    default: return status
+    case 'created':
+      return 'Create'
+    case 'updated':
+      return 'Update'
+    case 'failed':
+      return 'Failed'
+    case 'skipped':
+      return 'Skipped'
+    default:
+      return status
   }
 }
 
 function formatAction(action: string) {
   switch (action) {
-    case 'create': return 'Create task'
-    case 'refresh': return 'Refresh reference'
-    case 'skip': return 'No action'
-    default: return action
+    case 'create':
+      return 'Create task'
+    case 'refresh':
+      return 'Refresh reference'
+    case 'skip':
+      return 'No action'
+    default:
+      return action
   }
 }
 
@@ -426,9 +443,7 @@ function parseList(raw: string) {
 }
 
 function buildRequest(dryRun: boolean, targets?: ScanTarget[]): ScanRequest {
-  const stripValue = stripAttributes.value === 'inherit'
-    ? undefined
-    : stripAttributes.value === 'true'
+  const stripValue = stripAttributes.value === 'inherit' ? undefined : stripAttributes.value === 'true'
   return {
     paths: parseList(pathsInput.value),
     include: parseList(includeInput.value),

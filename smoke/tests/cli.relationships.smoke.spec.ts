@@ -64,7 +64,9 @@ describe.concurrent('CLI task relationships smoke', () => {
 
             const target = await workspace.addTask('Dependency target');
 
-            await workspace.write('.tasks/automation.yml', `automation:
+            await workspace.write(
+                '.tasks/automation.yml',
+                `automation:
   rules:
     - name: Auto add dependency
       when:
@@ -73,7 +75,8 @@ describe.concurrent('CLI task relationships smoke', () => {
         created:
           add:
             depends_on: ["${target.id}"]
-`);
+`,
+            );
 
             const source = await workspace.addTask('Auto dep source', {
                 args: ['--priority', 'High'],
@@ -105,7 +108,9 @@ describe.concurrent('CLI task relationships smoke', () => {
             let yaml = parse(await workspace.readTaskYaml(source.id)) as Record<string, any>;
             expect(yaml.relationships?.depends_on ?? []).toContain(target.id);
 
-            await workspace.write('.tasks/automation.yml', `automation:
+            await workspace.write(
+                '.tasks/automation.yml',
+                `automation:
   rules:
     - name: Remove dep on Done
       when:
@@ -114,7 +119,8 @@ describe.concurrent('CLI task relationships smoke', () => {
         updated:
           remove:
             depends_on: ["${target.id}"]
-`);
+`,
+            );
 
             await workspace.runLotar(['status', source.id, 'Done']);
 
@@ -133,9 +139,7 @@ describe.concurrent('CLI task relationships smoke', () => {
             await workspace.write('.tasks/config.yml', BASE_CONFIG);
 
             const task = await workspace.addTask('Reference target');
-            await workspace.runLotar([
-                'task', 'reference', 'add', 'link', task.id, 'https://example.com/issue/123',
-            ]);
+            await workspace.runLotar(['task', 'reference', 'add', 'link', task.id, 'https://example.com/issue/123']);
 
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
             const refs = Array.isArray(yaml.references) ? yaml.references : [];

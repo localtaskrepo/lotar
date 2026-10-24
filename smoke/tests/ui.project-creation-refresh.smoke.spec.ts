@@ -19,7 +19,7 @@ describe('UI project creation refresh', () => {
 
             const server = await startLotarServer(workspace);
             try {
-                await withPage(server.url, async page => {
+                await withPage(server.url, async (page) => {
                     // Completion tracking for list hydrations: a pending
                     // /api/tasks/list response is not a finished hydration.
                     // The store replaces its map when a clear-hydrate
@@ -29,7 +29,7 @@ describe('UI project creation refresh', () => {
                     const pendingLists = new Set<unknown>();
                     let seenLists = 0;
                     const listUrls: string[] = [];
-                    page.on('request', request => {
+                    page.on('request', (request) => {
                         if (new URL(request.url()).pathname === '/api/tasks/list') {
                             seenLists += 1;
                             pendingLists.add(request);
@@ -42,12 +42,12 @@ describe('UI project creation refresh', () => {
                             .catch(() => {})
                             .finally(() => pendingLists.delete(response.request()));
                     };
-                    page.on('response', response => {
+                    page.on('response', (response) => {
                         if (new URL(response.url()).pathname === '/api/tasks/list') {
                             trackResponse(response);
                         }
                     });
-                    page.on('requestfailed', request => pendingLists.delete(request));
+                    page.on('requestfailed', (request) => pendingLists.delete(request));
 
                     await page.waitForSelector('text=DEV25 seed task', { timeout: 20_000 });
 
@@ -96,9 +96,7 @@ describe('UI project creation refresh', () => {
                     await panel.locator('input[placeholder="Title"]').fill('DEV25 task in fresh project');
                     // Readiness gate: no list hydration may still be in
                     // flight when the create commits.
-                    await expect
-                        .poll(() => pendingLists.size === 0 && seenLists > 0, { timeout: 10_000 })
-                        .toBe(true);
+                    await expect.poll(() => pendingLists.size === 0 && seenLists > 0, { timeout: 10_000 }).toBe(true);
                     await create.click();
                     await panel.waitFor({ state: 'hidden', timeout: 10_000 });
 
@@ -124,17 +122,17 @@ describe('UI project creation refresh', () => {
                         .poll(
                             () =>
                                 pendingLists.size === 0 &&
-                                listUrls.some(url => new URL(url).searchParams.get('project') === 'FRESH'),
+                                listUrls.some((url) => new URL(url).searchParams.get('project') === 'FRESH'),
                             { timeout: 10_000 },
                         )
                         .toBe(true);
-                    await expect
-                        .poll(() => page.locator('tbody tr', { hasText: 'DEV25 seed task' }).count())
-                        .toBe(0);
+                    await expect.poll(() => page.locator('tbody tr', { hasText: 'DEV25 seed task' }).count()).toBe(0);
                     expect(await page.evaluate(() => (window as any).__dev25NoReload)).toBe(true);
 
                     await expect
-                        .poll(async () => (await workspace.listTaskFiles()).some(file => file.includes('FRESH')), { timeout: 10_000 })
+                        .poll(async () => (await workspace.listTaskFiles()).some((file) => file.includes('FRESH')), {
+                            timeout: 10_000,
+                        })
                         .toBe(true);
                 });
             } finally {

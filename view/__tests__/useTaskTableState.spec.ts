@@ -5,8 +5,36 @@ import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../c
 import type { ColKey } from '../composables/useColumns'
 
 const sampleTasks = [
-    { id: 'ACME-1', title: 'Alpha', status: 'open', priority: 'med', task_type: 'task', reporter: 'lee', assignee: 'sam', created: '2024-01-01T10:00:00Z', modified: '2024-01-01T11:00:00Z', tags: ['a'], relationships: {}, comments: [], custom_fields: {} },
-    { id: 'ACME-2', title: 'Beta', status: 'done', priority: 'low', task_type: 'task', reporter: 'jam', assignee: 'kai', created: '2024-01-02T10:00:00Z', modified: '2024-01-02T11:00:00Z', tags: ['b'], relationships: {}, comments: [], custom_fields: {} },
+    {
+        id: 'ACME-1',
+        title: 'Alpha',
+        status: 'open',
+        priority: 'med',
+        task_type: 'task',
+        reporter: 'lee',
+        assignee: 'sam',
+        created: '2024-01-01T10:00:00Z',
+        modified: '2024-01-01T11:00:00Z',
+        tags: ['a'],
+        relationships: {},
+        comments: [],
+        custom_fields: {},
+    },
+    {
+        id: 'ACME-2',
+        title: 'Beta',
+        status: 'done',
+        priority: 'low',
+        task_type: 'task',
+        reporter: 'jam',
+        assignee: 'kai',
+        created: '2024-01-02T10:00:00Z',
+        modified: '2024-01-02T11:00:00Z',
+        tags: ['b'],
+        relationships: {},
+        comments: [],
+        custom_fields: {},
+    },
 ]
 
 describe('useTaskTableState', () => {
@@ -122,7 +150,10 @@ describe('useTaskTableState', () => {
         const calls: any[] = []
         const emit = ((...args: any[]) => calls.push(args)) as TaskTableEmit
         const component = defineComponent({
-            props: { tasks: { type: Array, default: () => customTasks }, projectKey: { type: String, default: 'ACME' } },
+            props: {
+                tasks: { type: Array, default: () => customTasks },
+                projectKey: { type: String, default: 'ACME' },
+            },
             setup(componentProps) {
                 return useTaskTableState(componentProps as TaskTableProps, emit)
             },
@@ -144,7 +175,10 @@ describe('useTaskTableState', () => {
         const { wrapper } = mountHarness()
         wrapper.vm.setSort('status', 'asc')
         await nextTick()
-        expect(JSON.parse(localStorage.getItem('lotar.taskTable.sort::ACME') || 'null')).toEqual({ key: 'status', dir: 'asc' })
+        expect(JSON.parse(localStorage.getItem('lotar.taskTable.sort::ACME') || 'null')).toEqual({
+            key: 'status',
+            dir: 'asc',
+        })
         localStorage.setItem('lotar.taskTable.sort::OTHER', JSON.stringify({ key: 'priority', dir: 'desc' }))
         await wrapper.setProps({ projectKey: 'OTHER' })
         await nextTick()
@@ -157,7 +191,10 @@ describe('useTaskTableState', () => {
         expect(wrapper.vm.sort.key).toBe(null)
         expect(wrapper.vm.sort.dir).toBe('desc')
         // The reload must not have overwritten OTHER's stored value.
-        expect(JSON.parse(localStorage.getItem('lotar.taskTable.sort::OTHER') || 'null')).toEqual({ key: 'priority', dir: 'desc' })
+        expect(JSON.parse(localStorage.getItem('lotar.taskTable.sort::OTHER') || 'null')).toEqual({
+            key: 'priority',
+            dir: 'desc',
+        })
     })
 
     it('sorts custom-field columns through the shared contract in standalone mode', async () => {
@@ -168,7 +205,10 @@ describe('useTaskTableState', () => {
         const calls: any[] = []
         const emit = ((...args: any[]) => calls.push(args)) as TaskTableEmit
         const component = defineComponent({
-            props: { tasks: { type: Array, default: () => customTasks }, projectKey: { type: String, default: 'ACME' } },
+            props: {
+                tasks: { type: Array, default: () => customTasks },
+                projectKey: { type: String, default: 'ACME' },
+            },
             setup(componentProps) {
                 return useTaskTableState(componentProps as TaskTableProps, emit)
             },

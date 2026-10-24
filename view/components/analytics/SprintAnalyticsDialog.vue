@@ -140,7 +140,8 @@
                 />
               </div>
               <p v-else class="sprint-analytics__empty">
-                We need at least one completed sprint to build a velocity trend. Completed sprints will appear here automatically after refresh.
+                We need at least one completed sprint to build a velocity trend. Completed sprints will appear here
+                automatically after refresh.
               </p>
             </div>
           </template>
@@ -149,7 +150,11 @@
             <div class="sprint-analytics__section">
               <ol v-if="historyEvents.length" class="sprint-analytics__timeline" aria-label="Sprint history">
                 <li v-for="event in historyEvents" :key="event.id" class="timeline-item">
-                  <span class="timeline-item__dot" :class="`timeline-item__dot--${event.kind}`" aria-hidden="true"></span>
+                  <span
+                    class="timeline-item__dot"
+                    :class="`timeline-item__dot--${event.kind}`"
+                    aria-hidden="true"
+                  ></span>
                   <div class="timeline-item__content">
                     <p class="timeline-item__label">
                       {{ event.label }}
@@ -171,11 +176,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, toRefs, watch } from 'vue'
 import type {
-    SprintBurndownResponse,
-    SprintListItem,
-    SprintSummaryReportResponse,
-    SprintVelocityEntryPayload,
-    SprintVelocityResponse,
+  SprintBurndownResponse,
+  SprintListItem,
+  SprintSummaryReportResponse,
+  SprintVelocityEntryPayload,
+  SprintVelocityResponse,
 } from '../../api/types'
 import IconGlyph from '../IconGlyph.vue'
 import ReloadButton from '../ReloadButton.vue'
@@ -204,38 +209,41 @@ type HistoryEvent = {
   kind: 'plan' | 'actual' | 'projected' | 'warning'
 }
 
-const props = withDefaults(defineProps<{
-  open: boolean
-  sprints: SprintListItem[]
-  selectedSprintId: number | null
-  summary?: SprintSummaryReportResponse
-  summaryLoading: boolean
-  summaryError: string | null
-  burndown?: SprintBurndownResponse
-  velocity?: SprintVelocityResponse
-  loading: boolean
-  error: string | null
-  velocityLoading: boolean
-  velocityError: string | null
-  activeTab: TabKey
-  burndownMetric: SprintMetric
-  velocityMetric: SprintMetric
-  velocityWindowSize?: number
-  velocityFocusSprintIds?: number[]
-}>(), {
-  sprints: () => [],
-  loading: false,
-  error: null,
-  velocityLoading: false,
-  velocityError: null,
-  summary: undefined,
-  summaryLoading: false,
-  summaryError: null,
-  burndown: undefined,
-  velocity: undefined,
-  velocityWindowSize: 8,
-  velocityFocusSprintIds: () => [],
-})
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    sprints: SprintListItem[]
+    selectedSprintId: number | null
+    summary?: SprintSummaryReportResponse
+    summaryLoading: boolean
+    summaryError: string | null
+    burndown?: SprintBurndownResponse
+    velocity?: SprintVelocityResponse
+    loading: boolean
+    error: string | null
+    velocityLoading: boolean
+    velocityError: string | null
+    activeTab: TabKey
+    burndownMetric: SprintMetric
+    velocityMetric: SprintMetric
+    velocityWindowSize?: number
+    velocityFocusSprintIds?: number[]
+  }>(),
+  {
+    sprints: () => [],
+    loading: false,
+    error: null,
+    velocityLoading: false,
+    velocityError: null,
+    summary: undefined,
+    summaryLoading: false,
+    summaryError: null,
+    burndown: undefined,
+    velocity: undefined,
+    velocityWindowSize: 8,
+    velocityFocusSprintIds: () => [],
+  },
+)
 
 const { summaryLoading, summaryError } = toRefs(props)
 const hasSelection = computed(() => !!props.selectedSprintId)
@@ -281,8 +289,7 @@ const filteredVelocity = computed<SprintVelocityResponse | undefined>(() => {
   }
   const focusSet = new Set(normalizedVelocityFocusIds.value)
   const entries = (payload.entries ?? []).filter(
-    (entry): entry is SprintVelocityEntryPayload =>
-      Boolean(entry?.summary) && focusSet.has(entry!.summary.id),
+    (entry): entry is SprintVelocityEntryPayload => Boolean(entry?.summary) && focusSet.has(entry!.summary.id),
   )
   const averageVelocity = computeAverageVelocity(entries)
   const averageCompletion = computeAverageCompletion(entries)
@@ -308,12 +315,15 @@ watch(
         if (value === 'tasks') return true
         const totals = value === 'points' ? payload.totals.points : payload.totals.hours
         if (typeof totals === 'number') return true
-        return payload.series?.some((point) => {
-          const metricValue = value === 'points'
-            ? point.remaining_points ?? point.ideal_points
-            : point.remaining_hours ?? point.ideal_hours
-          return typeof metricValue === 'number' && Number.isFinite(metricValue)
-        }) ?? false
+        return (
+          payload.series?.some((point) => {
+            const metricValue =
+              value === 'points'
+                ? (point.remaining_points ?? point.ideal_points)
+                : (point.remaining_hours ?? point.ideal_hours)
+            return typeof metricValue === 'number' && Number.isFinite(metricValue)
+          }) ?? false
+        )
       })(),
     }))
     burndownMetricOptions.value = options
@@ -391,9 +401,7 @@ const historyEvents = computed<HistoryEvent[]>(() => {
     })
   }
 
-  return events
-    .sort((a, b) => a.order - b.order)
-    .map(({ order, ...rest }) => rest)
+  return events.sort((a, b) => a.order - b.order).map(({ order, ...rest }) => rest)
 })
 
 const historyEmptyMessage = computed(() => {
@@ -473,11 +481,12 @@ function formatFullDate(value?: string | null) {
 function burndownSeriesHasMetric(series: SprintBurndownResponse['series'], metric: SprintMetric) {
   if (!Array.isArray(series) || !series.length) return false
   return series.some((point) => {
-    const values = metric === 'points'
-      ? [point.remaining_points, point.ideal_points]
-      : metric === 'hours'
-        ? [point.remaining_hours, point.ideal_hours]
-        : [point.remaining_tasks, point.ideal_tasks]
+    const values =
+      metric === 'points'
+        ? [point.remaining_points, point.ideal_points]
+        : metric === 'hours'
+          ? [point.remaining_hours, point.ideal_hours]
+          : [point.remaining_tasks, point.ideal_tasks]
     return values.some((value) => typeof value === 'number' && Number.isFinite(value))
   })
 }
@@ -702,10 +711,18 @@ onUnmounted(() => {
   background: var(--color-border);
 }
 
-.timeline-item__dot--actual { background: color-mix(in oklab, var(--color-accent) 85%, var(--color-bg)); }
-.timeline-item__dot--projected { background: color-mix(in oklab, var(--color-info) 70%, var(--color-bg)); }
-.timeline-item__dot--warning { background: color-mix(in oklab, var(--color-danger) 85%, var(--color-bg)); }
-.timeline-item__dot--plan { background: color-mix(in oklab, var(--color-muted) 70%, var(--color-bg)); }
+.timeline-item__dot--actual {
+  background: color-mix(in oklab, var(--color-accent) 85%, var(--color-bg));
+}
+.timeline-item__dot--projected {
+  background: color-mix(in oklab, var(--color-info) 70%, var(--color-bg));
+}
+.timeline-item__dot--warning {
+  background: color-mix(in oklab, var(--color-danger) 85%, var(--color-bg));
+}
+.timeline-item__dot--plan {
+  background: color-mix(in oklab, var(--color-muted) 70%, var(--color-bg));
+}
 
 .timeline-item__content {
   flex: 1;

@@ -20,7 +20,18 @@
 // Set PLAYWRIGHT_BROWSERS_PATH if your Chromium lives outside Playwright's default cache.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    realpathSync,
+    rmSync,
+    statSync,
+    unlinkSync,
+    writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -38,18 +49,38 @@ const THEMES = ['light', 'dark'];
 const PAGE_DEFAULTS = { locale: 'en-US', timezoneId: 'UTC' };
 
 function parseArgs(argv) {
-    const opts = { out: path.join(ROOT, 'docs', 'assets', 'screenshots'), only: null, hero: true, terminal: true, social: true, keep: false, gitHistory: true };
+    const opts = {
+        out: path.join(ROOT, 'docs', 'assets', 'screenshots'),
+        only: null,
+        hero: true,
+        terminal: true,
+        social: true,
+        keep: false,
+        gitHistory: true,
+    };
     for (let i = 0; i < argv.length; i += 1) {
         const a = argv[i];
         if (a === '--out') opts.out = path.resolve(argv[++i]);
-        else if (a === '--only') opts.only = new Set(argv[++i].split(',').map((s) => s.trim()).filter(Boolean));
+        else if (a === '--only')
+            opts.only = new Set(
+                argv[++i]
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+            );
         else if (a === '--skip-hero') opts.hero = false;
         else if (a === '--skip-terminal') opts.terminal = false;
         else if (a === '--skip-social') opts.social = false;
         else if (a === '--keep') opts.keep = true;
         else if (a === '--no-git') opts.gitHistory = false;
         else if (a === '-h' || a === '--help') {
-            console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 20).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+            console.log(
+                readFileSync(fileURLToPath(import.meta.url), 'utf8')
+                    .split('\n')
+                    .slice(1, 20)
+                    .map((l) => l.replace(/^\/\/ ?/, ''))
+                    .join('\n'),
+            );
             process.exit(0);
         } else {
             throw new Error(`Unknown argument: ${a}`);
@@ -61,10 +92,15 @@ function parseArgs(argv) {
 function resolveBinary() {
     const explicit = process.env.LOTAR_BINARY_PATH || process.env.LOTAR_BIN;
     if (explicit) return explicit;
-    for (const candidate of [path.join(ROOT, 'target', 'smoke', BIN_NAME), path.join(ROOT, 'target', 'release', BIN_NAME)]) {
+    for (const candidate of [
+        path.join(ROOT, 'target', 'smoke', BIN_NAME),
+        path.join(ROOT, 'target', 'release', BIN_NAME),
+    ]) {
         if (existsSync(candidate)) return candidate;
     }
-    throw new Error('No lotar binary found. Run `npm run build:smoke` (or use `npm run screenshots`, which builds first) or set LOTAR_BINARY_PATH.');
+    throw new Error(
+        'No lotar binary found. Run `npm run build:smoke` (or use `npm run screenshots`, which builds first) or set LOTAR_BINARY_PATH.',
+    );
 }
 
 function hasTool(name) {
@@ -91,7 +127,9 @@ async function startServer(bin, dir) {
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';
-    child.stderr.on('data', (d) => { output += d; });
+    child.stderr.on('data', (d) => {
+        output += d;
+    });
     const base = await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error(`lotar serve did not start:\n${output}`)), 20_000);
         child.stdout.on('data', (d) => {
@@ -108,9 +146,12 @@ async function startServer(bin, dir) {
 }
 
 async function api(base, route, body) {
-    const res = await fetch(`${base}${route}`, body
-        ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
-        : undefined);
+    const res = await fetch(
+        `${base}${route}`,
+        body
+            ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+            : undefined,
+    );
     if (!res.ok) throw new Error(`${route} -> ${res.status} ${await res.text()}`);
     return (await res.json()).data;
 }
@@ -173,13 +214,22 @@ function defineShots(demo) {
         { name: 'tasks', path: `/?project=${demo.project}` },
         { name: 'board', path: `/boards?project=${demo.project}` },
         {
-            name: 'sprints', path: `/sprints?project=${demo.project}`,
+            name: 'sprints',
+            path: `/sprints?project=${demo.project}`,
             async prepare(page) {
                 // Open the active sprint's insights to show the burndown.
                 const insights = page.getByRole('button', { name: 'Insights' }).first();
                 await insights.click();
-                await page.getByRole('tab', { name: 'Burndown' }).or(page.getByRole('button', { name: 'Burndown' })).first().click();
-                await page.locator('canvas').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+                await page
+                    .getByRole('tab', { name: 'Burndown' })
+                    .or(page.getByRole('button', { name: 'Burndown' }))
+                    .first()
+                    .click();
+                await page
+                    .locator('canvas')
+                    .first()
+                    .waitFor({ state: 'visible', timeout: 10_000 })
+                    .catch(() => {});
                 await settle(page, 900);
             },
         },
@@ -187,7 +237,8 @@ function defineShots(demo) {
         { name: 'calendar', path: `/calendar?project=${demo.project}` },
         { name: 'automations', path: '/automations' },
         {
-            name: 'sync', path: '/sync',
+            name: 'sync',
+            path: '/sync',
             async prepare(page) {
                 const scope = page.locator('select').first();
                 await scope.selectOption({ label: /ATLS/ }).catch(async () => {
@@ -199,15 +250,20 @@ function defineShots(demo) {
             },
         },
         {
-            name: 'scan', path: '/scan',
+            name: 'scan',
+            path: '/scan',
             async prepare(page) {
                 await page.getByRole('button', { name: /Dry run/ }).click();
-                await page.getByText(/Toolbar\.tsx|EditorView\.swift|notes\.rs/).first().waitFor({ timeout: 15_000 });
+                await page
+                    .getByText(/Toolbar\.tsx|EditorView\.swift|notes\.rs/)
+                    .first()
+                    .waitFor({ timeout: 15_000 });
                 await settle(page, 600);
             },
         },
         {
-            name: 'task-details', path: `/boards?project=${demo.project}`,
+            name: 'task-details',
+            path: `/boards?project=${demo.project}`,
             async prepare(page) {
                 await openTaskFromBoard(page, demo.byKey.offline.title);
                 await showActivityTab(page, 'Comments');
@@ -216,7 +272,8 @@ function defineShots(demo) {
             },
         },
         {
-            name: 'task-commits', path: `/boards?project=${demo.project}`,
+            name: 'task-commits',
+            path: `/boards?project=${demo.project}`,
             async prepare(page) {
                 await openTaskFromBoard(page, demo.byKey.offline.title);
                 await showActivityTab(page, 'Commits');
@@ -233,16 +290,19 @@ function defineShots(demo) {
 // ---------------------------------------------------------------------------
 
 async function toWebp(encoderPage, png, quality = WEBP_QUALITY) {
-    const dataUrl = await encoderPage.evaluate(async ({ b64, q }) => {
-        const img = new Image();
-        img.src = `data:image/png;base64,${b64}`;
-        await img.decode();
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        return canvas.toDataURL('image/webp', q);
-    }, { b64: png.toString('base64'), q: quality });
+    const dataUrl = await encoderPage.evaluate(
+        async ({ b64, q }) => {
+            const img = new Image();
+            img.src = `data:image/png;base64,${b64}`;
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            return canvas.toDataURL('image/webp', q);
+        },
+        { b64: png.toString('base64'), q: quality },
+    );
     return Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
 }
 
@@ -255,8 +315,16 @@ function kb(file) {
 // ---------------------------------------------------------------------------
 
 async function captureShots(browser, server, demo, opts) {
-    const shots = defineShots(demo).filter((s) => (!opts.only || opts.only.has(s.name)) && (opts.gitHistory || s.name !== 'task-commits'));
-    const context = await browser.newContext({ ...PAGE_DEFAULTS, viewport: VIEWPORT, deviceScaleFactor: SCALE, colorScheme: THEMES[0], reducedMotion: 'reduce' });
+    const shots = defineShots(demo).filter(
+        (s) => (!opts.only || opts.only.has(s.name)) && (opts.gitHistory || s.name !== 'task-commits'),
+    );
+    const context = await browser.newContext({
+        ...PAGE_DEFAULTS,
+        viewport: VIEWPORT,
+        deviceScaleFactor: SCALE,
+        colorScheme: THEMES[0],
+        reducedMotion: 'reduce',
+    });
     await context.addInitScript(() => {
         if (location.protocol === 'http:' || location.protocol === 'https:') {
             localStorage.clear();
@@ -288,14 +356,23 @@ async function captureAgents(browser, server, demo, opts) {
     writeFileSync(demo.holdFile, 'hold');
     try {
         await assignToAgent(server, demo.ids.encrypt);
-        await waitFor(async () => {
-            const jobs = await api(server.base, '/api/jobs').catch(() => null);
-            const list = Array.isArray(jobs) ? jobs : jobs?.jobs ?? [];
-            return list.some((j) => j.ticket_id === demo.ids.encrypt && j.status === 'running');
-        }, { label: 'running agent job' });
+        await waitFor(
+            async () => {
+                const jobs = await api(server.base, '/api/jobs').catch(() => null);
+                const list = Array.isArray(jobs) ? jobs : (jobs?.jobs ?? []);
+                return list.some((j) => j.ticket_id === demo.ids.encrypt && j.status === 'running');
+            },
+            { label: 'running agent job' },
+        );
         await sleep(5_500);
         for (const theme of THEMES) {
-            const context = await browser.newContext({ ...PAGE_DEFAULTS, viewport: VIEWPORT, deviceScaleFactor: SCALE, colorScheme: theme, reducedMotion: 'reduce' });
+            const context = await browser.newContext({
+                ...PAGE_DEFAULTS,
+                viewport: VIEWPORT,
+                deviceScaleFactor: SCALE,
+                colorScheme: theme,
+                reducedMotion: 'reduce',
+            });
             const page = await newCapturePage(context);
             await page.goto(`${server.base}/agents`);
             await settle(page, 600);
@@ -315,12 +392,20 @@ async function captureAgents(browser, server, demo, opts) {
 
 function backoffTitle(demo) {
     const file = path.join(demo.dir, '.tasks', demo.project, `${demo.ids.backoff.split('-')[1]}.yml`);
-    return readFileSync(file, 'utf8').match(/^title:\s*(.+)$/m)[1].trim();
+    return readFileSync(file, 'utf8')
+        .match(/^title:\s*(.+)$/m)[1]
+        .trim();
 }
 
 async function recordHero(browser, server, demo, opts, tmp) {
     const videoDir = path.join(tmp, 'video');
-    const context = await browser.newContext({ ...PAGE_DEFAULTS, viewport: VIEWPORT, deviceScaleFactor: 1, colorScheme: 'light', recordVideo: { dir: videoDir, size: VIEWPORT } });
+    const context = await browser.newContext({
+        ...PAGE_DEFAULTS,
+        viewport: VIEWPORT,
+        deviceScaleFactor: 1,
+        colorScheme: 'light',
+        recordVideo: { dir: videoDir, size: VIEWPORT },
+    });
     const page = await newCapturePage(context);
     const t0 = Date.now();
     await page.goto(`${server.base}/boards?project=${demo.project}`);
@@ -351,7 +436,10 @@ async function recordHero(browser, server, demo, opts, tmp) {
     const card = page.locator('.job-card').first();
     await card.waitFor();
     await card.getByRole('button', { name: 'Show logs' }).click();
-    await waitFor(async () => (await page.locator('.job-card.job-completed').count()) > 0, { timeout: 40_000, label: 'hero job completion' });
+    await waitFor(async () => (await page.locator('.job-card.job-completed').count()) > 0, {
+        timeout: 40_000,
+        label: 'hero job completion',
+    });
     await sleep(1500);
     await page.goto(`${server.base}/boards?project=${demo.project}`);
     await settle(page, 600);
@@ -373,19 +461,58 @@ function encodeAnimation(video, startAt, endAt, outBase, tmp) {
     if (hasTool('ffmpeg') && hasTool('img2webp')) {
         const frames = path.join(tmp, 'frames');
         mkdirSync(frames, { recursive: true });
-        const ff = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', startAt.toFixed(2), '-t', duration.toFixed(2), '-i', video,
-            '-vf', `fps=${fps},scale=${width}:-1:flags=lanczos`, path.join(frames, 'f%04d.png')], { stdio: 'inherit' });
+        const ff = spawnSync(
+            'ffmpeg',
+            [
+                '-y',
+                '-loglevel',
+                'error',
+                '-ss',
+                startAt.toFixed(2),
+                '-t',
+                duration.toFixed(2),
+                '-i',
+                video,
+                '-vf',
+                `fps=${fps},scale=${width}:-1:flags=lanczos`,
+                path.join(frames, 'f%04d.png'),
+            ],
+            { stdio: 'inherit' },
+        );
         if (ff.status !== 0) throw new Error('ffmpeg frame extraction failed');
-        const list = readdirSync(frames).filter((f) => f.endsWith('.png')).sort().map((f) => path.join(frames, f));
+        const list = readdirSync(frames)
+            .filter((f) => f.endsWith('.png'))
+            .sort()
+            .map((f) => path.join(frames, f));
         const out = `${outBase}.webp`;
-        const enc = spawnSync('img2webp', ['-loop', '0', '-lossy', '-q', '55', '-m', '4', '-d', String(Math.round(1000 / fps)), ...list, '-o', out], { stdio: ['ignore', 'ignore', 'inherit'] });
+        const enc = spawnSync(
+            'img2webp',
+            ['-loop', '0', '-lossy', '-q', '55', '-m', '4', '-d', String(Math.round(1000 / fps)), ...list, '-o', out],
+            { stdio: ['ignore', 'ignore', 'inherit'] },
+        );
         if (enc.status !== 0) throw new Error('img2webp failed');
         return out;
     }
     if (hasTool('ffmpeg')) {
         const out = `${outBase}.gif`;
-        const ff = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', startAt.toFixed(2), '-t', duration.toFixed(2), '-i', video,
-            '-vf', `fps=${fps},scale=${width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`, out], { stdio: 'inherit' });
+        const ff = spawnSync(
+            'ffmpeg',
+            [
+                '-y',
+                '-loglevel',
+                'error',
+                '-ss',
+                startAt.toFixed(2),
+                '-t',
+                duration.toFixed(2),
+                '-i',
+                video,
+                '-vf',
+                `fps=${fps},scale=${width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`,
+                out,
+            ],
+            { stdio: 'inherit' },
+        );
         if (ff.status !== 0) throw new Error('ffmpeg GIF encoding failed');
         return out;
     }
@@ -455,12 +582,15 @@ async function main() {
 
     console.log(`Seeding demo workspace in ${dir}`);
     const demo = seedDemoWorkspace({ dir, bin, gitHistory: opts.gitHistory });
-    if (!opts.gitHistory) console.warn('Git-free capture: preserving existing agent, hero, commit-history and terminal media.');
+    if (!opts.gitHistory)
+        console.warn('Git-free capture: preserving existing agent, hero, commit-history and terminal media.');
 
     // The terminal recording mutates tasks; run it on its own copy of the workspace.
     const server = await startServer(bin, dir);
     console.log(`Serving ${server.base}`);
-    const browser = await chromium.launch({ args: (process.env.LOTAR_SCREENSHOT_CHROMIUM_ARGS || '').split(',').filter(Boolean) });
+    const browser = await chromium.launch({
+        args: (process.env.LOTAR_SCREENSHOT_CHROMIUM_ARGS || '').split(',').filter(Boolean),
+    });
     try {
         console.log('Screenshots');
         const page = await captureShots(browser, server, demo, opts);

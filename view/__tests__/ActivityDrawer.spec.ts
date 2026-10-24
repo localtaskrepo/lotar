@@ -24,9 +24,9 @@ function feedItem(id: string, task: string, message: string): any {
 }
 
 describe('ActivityDrawer', () => {
-    let ActivityDrawer: typeof import('../components/ActivityDrawer.vue')['default']
+    let ActivityDrawer: (typeof import('../components/ActivityDrawer.vue'))['default']
     let feedMock: Mock
-    let _resetActivityStore: typeof import('../composables/useActivity')['_resetActivityStore']
+    let _resetActivityStore: (typeof import('../composables/useActivity'))['_resetActivityStore']
 
     beforeEach(async () => {
         const client = await import('../api/client')

@@ -7,7 +7,10 @@ import {
     type BoardColumnConfig,
 } from '../composables/useBoardLayout'
 
-const STATUSES = ['Todo', 'Doing', 'Review', 'QA', 'Done', 'WontDo'].map((label) => ({ key: label.toLowerCase(), label }))
+const STATUSES = ['Todo', 'Doing', 'Review', 'QA', 'Done', 'WontDo'].map((label) => ({
+    key: label.toLowerCase(),
+    label,
+}))
 const col = (key: string, synthetic = false) => ({ key, label: key, synthetic })
 const keys = (columns: BoardColumnConfig[]) => columns.map((column) => column.statuses.join('+'))
 
@@ -27,8 +30,18 @@ describe('board layout model (DEV-130)', () => {
     })
 
     it('places a newly configured status next to its configured neighbour', () => {
-        const stored: BoardColumnConfig[] = [{ statuses: ['todo'] }, { statuses: ['review', 'doing'] }, { statuses: ['done'] }]
-        const withBlocked = [STATUSES[0]!, STATUSES[1]!, { key: 'blocked', label: 'Blocked' }, STATUSES[2]!, STATUSES[4]!]
+        const stored: BoardColumnConfig[] = [
+            { statuses: ['todo'] },
+            { statuses: ['review', 'doing'] },
+            { statuses: ['done'] },
+        ]
+        const withBlocked = [
+            STATUSES[0]!,
+            STATUSES[1]!,
+            { key: 'blocked', label: 'Blocked' },
+            STATUSES[2]!,
+            STATUSES[4]!,
+        ]
         expect(keys(reconcileColumns(stored, withBlocked))).toEqual(['todo', 'review+doing', 'blocked', 'done'])
     })
 
@@ -67,10 +80,16 @@ describe('board layout model (DEV-130)', () => {
     it('only accepts the current storage format and cleans malformed values', () => {
         expect(parseBoardLayout(null)).toBeNull()
         expect(parseBoardLayout({ hidden: [], stacked: ['qa'] })).toBeNull()
-        expect(parseBoardLayout({
-            version: 2,
-            columns: [{ statuses: ['done', 3, ''], name: '  ', wipLimit: -1, maxVisible: '4' }, { statuses: [] }, 'bad'],
-            hidden: 'qa',
-        })).toEqual({ columns: [{ statuses: ['done'], maxVisible: 4 }], hidden: [] })
+        expect(
+            parseBoardLayout({
+                version: 2,
+                columns: [
+                    { statuses: ['done', 3, ''], name: '  ', wipLimit: -1, maxVisible: '4' },
+                    { statuses: [] },
+                    'bad',
+                ],
+                hidden: 'qa',
+            }),
+        ).toEqual({ columns: [{ statuses: ['done'], maxVisible: 4 }], hidden: [] })
     })
 })

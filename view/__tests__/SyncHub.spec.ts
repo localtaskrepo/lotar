@@ -1,14 +1,23 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import type { ConfigInspectResult, GlobalConfigRaw, ProjectConfigRaw, ResolvedConfigDTO, SyncRemoteConfig, SyncReportEntry, SyncReportMeta, SyncResponse } from '../api/types'
+import type {
+    ConfigInspectResult,
+    GlobalConfigRaw,
+    ProjectConfigRaw,
+    ResolvedConfigDTO,
+    SyncRemoteConfig,
+    SyncReportEntry,
+    SyncReportMeta,
+    SyncResponse,
+} from '../api/types'
 import SyncHub from '../pages/SyncHub.vue'
 
 const sseCalls: Array<{
-  params: Record<string, string>
-  handlers: Map<string, Set<(ev: { data: string }) => void>>
-  opts: { onReconnect?: () => void }
-  close: ReturnType<typeof vi.fn>
+    params: Record<string, string>
+    handlers: Map<string, Set<(ev: { data: string }) => void>>
+    opts: { onReconnect?: () => void }
+    close: ReturnType<typeof vi.fn>
 }> = []
 const toastMessages: string[] = []
 
@@ -59,7 +68,8 @@ const stubs = {
         emits: ['update:modelValue'],
     },
     UiSelect: {
-        template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
+        template:
+            '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
         props: ['modelValue'],
         emits: ['update:modelValue'],
     },
@@ -224,10 +234,22 @@ function jiraRemote(project = 'DEMO', filter: string | null = null): SyncRemoteC
 }
 
 function reportEntry(taskId = 'ALPHA-1'): SyncReportEntry {
-    return { status: 'created', at: new Date().toISOString(), task_id: taskId, reference: null, title: null, message: null }
+    return {
+        status: 'created',
+        at: new Date().toISOString(),
+        task_id: taskId,
+        reference: null,
+        title: null,
+        message: null,
+    }
 }
 
-function reportMeta(id: string, remote: string, project: string | null, overrides: Partial<SyncReportMeta> = {}): SyncReportMeta {
+function reportMeta(
+    id: string,
+    remote: string,
+    project: string | null,
+    overrides: Partial<SyncReportMeta> = {},
+): SyncReportMeta {
     return {
         id,
         created_at: new Date().toISOString(),
@@ -246,7 +268,12 @@ function reportMeta(id: string, remote: string, project: string | null, override
     }
 }
 
-function syncResponse(runId: string, remote: string, project: string | null, overrides: Partial<SyncResponse> = {}): SyncResponse {
+function syncResponse(
+    runId: string,
+    remote: string,
+    project: string | null,
+    overrides: Partial<SyncResponse> = {},
+): SyncResponse {
     return {
         status: 'ok',
         direction: 'pull',
@@ -276,7 +303,9 @@ function currentSse() {
 
 function emitSse(kind: string, payload: unknown) {
     const ev = { data: JSON.stringify(payload) }
-    currentSse().handlers.get(kind)?.forEach((handler) => handler(ev))
+    currentSse()
+        .handlers.get(kind)
+        ?.forEach((handler) => handler(ev))
 }
 
 function triggerReconnect() {
@@ -594,7 +623,9 @@ describe('SyncHub scope isolation', () => {
         expect(wrapper.text()).toContain('gvremote')
 
         failNext = true
-        const reload = wrapper.findAll('button').find((b) => b.text() === 'Reload' && b.element.closest('.sync-card--reports') !== null)!
+        const reload = wrapper
+            .findAll('button')
+            .find((b) => b.text() === 'Reload' && b.element.closest('.sync-card--reports') !== null)!
         await reload.trigger('click')
         await flushPromises()
         expect(wrapper.text()).toContain('gvremote')
@@ -833,7 +864,7 @@ describe('SyncHub remote editor', () => {
         await wrapper.find('input[placeholder="jira-home"]').setValue('taken')
         await submitDialog(wrapper)
         expect(api.setConfig).not.toHaveBeenCalled()
-        expect(wrapper.find('[data-testid="remote-dialog-error"]').text()).toContain("already exists in Global config")
+        expect(wrapper.find('[data-testid="remote-dialog-error"]').text()).toContain('already exists in Global config')
         wrapper.unmount()
     })
 
@@ -867,7 +898,13 @@ describe('SyncHub remote editor', () => {
         await dialogButton(wrapper, 'Cancel').trigger('click')
         await dialogButton(wrapper, 'Add remote').trigger('click')
         await flushPromises()
-        validate.resolve({ status: 'ok', provider: 'jira', remote: 'g1', checked_at: new Date().toISOString(), warnings: [] })
+        validate.resolve({
+            status: 'ok',
+            provider: 'jira',
+            remote: 'g1',
+            checked_at: new Date().toISOString(),
+            warnings: [],
+        })
         await flushPromises()
         expect(wrapper.text()).not.toContain('Validated')
         wrapper.unmount()
@@ -1011,7 +1048,13 @@ describe('SyncHub remote dialog migration (DEV-69)', () => {
         await flushPromises()
         expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
 
-        validate.resolve({ status: 'ok', provider: 'jira', remote: 'g1', checked_at: new Date().toISOString(), warnings: [] })
+        validate.resolve({
+            status: 'ok',
+            provider: 'jira',
+            remote: 'g1',
+            checked_at: new Date().toISOString(),
+            warnings: [],
+        })
         await flushPromises()
         wrapper.unmount()
     })
@@ -1121,7 +1164,9 @@ describe('SyncHub scope validity (B1)', () => {
 
         const failed = deferred<any>()
         ;(api.inspectConfig as any).mockReturnValue(failed.promise)
-        const reloadButton = wrapper.findAll('button').find((b) => b.text() === 'Reload' && b.element.closest('.page-header') !== null)!
+        const reloadButton = wrapper
+            .findAll('button')
+            .find((b) => b.text() === 'Reload' && b.element.closest('.page-header') !== null)!
         await reloadButton.trigger('click')
         await flushPromises()
         failed.reject(new Error('transient failure'))
@@ -1145,7 +1190,11 @@ describe('SyncHub default-project preflight (B2)', () => {
 
         expect(api.syncPull).not.toHaveBeenCalled()
         expect(remoteRow(wrapper, 'shared').text()).not.toContain('Running')
-        expect(toastMessages.some((m) => m.includes('overridden in default project ALPHA') && m.includes('Switch to ALPHA'))).toBe(true)
+        expect(
+            toastMessages.some(
+                (m) => m.includes('overridden in default project ALPHA') && m.includes('Switch to ALPHA'),
+            ),
+        ).toBe(true)
         wrapper.unmount()
     })
 
@@ -1299,7 +1348,9 @@ describe('SyncHub external runs and field attribution (B3)', () => {
         })
         await flushPromises()
 
-        const liveItem = wrapper.findAll('.report-item').find((el) => el.text().includes('shared') && el.text().includes('External'))!
+        const liveItem = wrapper
+            .findAll('.report-item')
+            .find((el) => el.text().includes('shared') && el.text().includes('External'))!
         await liveItem.trigger('click')
         await flushPromises()
         // Entries accumulated before completion remain inspectable.

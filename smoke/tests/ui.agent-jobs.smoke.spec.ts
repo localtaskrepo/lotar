@@ -62,11 +62,7 @@ async function writeReviewedTemplateWorkflow(workspace: SmokeWorkspace, mockLaun
     await workspace.write('.tasks/automation.yml', stringify({ automation: template.automation }));
 }
 
-async function waitUntil(
-    description: string,
-    timeoutMs: number,
-    condition: () => Promise<boolean>,
-): Promise<void> {
+async function waitUntil(description: string, timeoutMs: number, condition: () => Promise<boolean>): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
         if (await condition()) {
@@ -150,9 +146,10 @@ async function createTaskViaApi(serverUrl: string, title: string, project: strin
     const payload = (await response.json()) as {
         data?: { id?: string } | { task?: { id?: string } };
     };
-    const taskId = 'task' in (payload.data ?? {})
-        ? (payload.data as { task?: { id?: string } }).task?.id
-        : (payload.data as { id?: string } | undefined)?.id;
+    const taskId =
+        'task' in (payload.data ?? {})
+            ? (payload.data as { task?: { id?: string } }).task?.id
+            : (payload.data as { id?: string } | undefined)?.id;
     expect(taskId).toBeTruthy();
     return taskId as string;
 }
@@ -227,10 +224,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
     });
 
     it('shows a completed job in the job list', async () => {
-        const agents = await createFixtureAgents(
-            { mock: {} },
-            'lotar-smoke-agents-completed-',
-        );
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-completed-');
 
         try {
             const workspace = await SmokeWorkspace.create({
@@ -294,9 +288,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     await withPage(`${server.url}/agents`, async (page) => {
                         await page.waitForSelector('.filter-tab', { timeout: 15_000 });
 
-                        const tabs = await page.$$eval('.filter-tab', (els) =>
-                            els.map((el) => el.textContent?.trim()),
-                        );
+                        const tabs = await page.$$eval('.filter-tab', (els) => els.map((el) => el.textContent?.trim()));
                         expect(tabs.some((t) => t?.includes('All'))).toBe(true);
                         expect(tabs.some((t) => t?.includes('Running'))).toBe(true);
                         expect(tabs.some((t) => t?.includes('Completed'))).toBe(true);
@@ -380,17 +372,28 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     try {
                         await waitForJobStatusViaApi(server.url, task.id, 'running');
                     } catch (error) {
-                        throw new Error(`${(error as Error).message}; start=${startReturnedAfterMs}ms card=${cardObservedAfterMs}ms logs=${logsOpenedAfterMs}ms phase=${phaseObservedAfterMs}ms; ${gate.diagnostics('stream')}; jobs=${JSON.stringify(await fetchJobsViaApi(server.url, task.id))}`);
+                        throw new Error(
+                            `${(error as Error).message}; start=${startReturnedAfterMs}ms card=${cardObservedAfterMs}ms logs=${logsOpenedAfterMs}ms phase=${phaseObservedAfterMs}ms; ${gate.diagnostics('stream')}; jobs=${JSON.stringify(await fetchJobsViaApi(server.url, task.id))}`,
+                        );
                     }
 
-                    const logSnapshot = await fetch(`${server.url}/api/jobs/logs?id=${encodeURIComponent((await fetchJobsViaApi(server.url, task.id))[0]!.id)}`);
+                    const logSnapshot = await fetch(
+                        `${server.url}/api/jobs/logs?id=${encodeURIComponent((await fetchJobsViaApi(server.url, task.id))[0]!.id)}`,
+                    );
                     expect(logSnapshot.ok).toBe(true);
-                    const events = (await logSnapshot.json()).data.events as Array<{ sequence: number; at: string; kind: string; message?: string | null }>;
-                    const sequences = events.map(event => event.sequence);
-                    expect(sequences.every(sequence => Number.isSafeInteger(sequence) && sequence > 0)).toBe(true);
-                    expect(sequences.every((sequence, index) => index === 0 || sequence > sequences[index - 1]!)).toBe(true);
-                    expect(events.every(event => typeof event.at === 'string' && event.at.length > 0)).toBe(true);
-                    expect(events.filter(event => event.message === 'phase one')).toHaveLength(1);
+                    const events = (await logSnapshot.json()).data.events as Array<{
+                        sequence: number;
+                        at: string;
+                        kind: string;
+                        message?: string | null;
+                    }>;
+                    const sequences = events.map((event) => event.sequence);
+                    expect(sequences.every((sequence) => Number.isSafeInteger(sequence) && sequence > 0)).toBe(true);
+                    expect(sequences.every((sequence, index) => index === 0 || sequence > sequences[index - 1]!)).toBe(
+                        true,
+                    );
+                    expect(events.every((event) => typeof event.at === 'string' && event.at.length > 0)).toBe(true);
+                    expect(events.filter((event) => event.message === 'phase one')).toHaveLength(1);
 
                     await gate.release();
 
@@ -398,12 +401,21 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     expect(completedLogText).toContain('phase one / phase two done');
                     await waitForJobStatusViaApi(server.url, task.id, 'completed');
                     await page.getByRole('button', { name: 'Hide logs', exact: true }).click();
-                    const reopenedSnapshot = page.waitForResponse(response => new URL(response.url()).pathname === '/api/jobs/logs');
+                    const reopenedSnapshot = page.waitForResponse(
+                        (response) => new URL(response.url()).pathname === '/api/jobs/logs',
+                    );
                     await page.getByRole('button', { name: 'Show logs', exact: true }).click();
                     expect((await reopenedSnapshot).ok()).toBe(true);
                     await waitForText(page, '.log-panel', 'phase one / phase two done');
-                    expect(await page.locator('.log-message').filter({ hasText: 'phase one / phase two done' }).count()).toBe(1);
-                    expect(await page.locator('.log-message').filter({ hasText: /^Job started$/ }).count()).toBe(1);
+                    expect(
+                        await page.locator('.log-message').filter({ hasText: 'phase one / phase two done' }).count(),
+                    ).toBe(1);
+                    expect(
+                        await page
+                            .locator('.log-message')
+                            .filter({ hasText: /^Job started$/ })
+                            .count(),
+                    ).toBe(1);
                 });
 
                 // Worker finalization is awaited before any teardown.
@@ -428,10 +440,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
     });
 
     it('groups multiple jobs for the same ticket into one card', { retry: 2 }, async () => {
-        const agents = await createFixtureAgents(
-            { mock: {} },
-            'lotar-smoke-agents-grouped-',
-        );
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-grouped-');
 
         try {
             const workspace = await SmokeWorkspace.create({
@@ -465,10 +474,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
     });
 
     it.skipIf(!gitAvailable())('advances the reviewed template workflow live without reloads', async () => {
-        const agents = await createFixtureAgents(
-            { mock: {} },
-            'lotar-smoke-agents-reviewed-',
-        );
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-reviewed-');
 
         try {
             const workspace = await SmokeWorkspace.create();
@@ -482,7 +488,6 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
                 try {
                     await withPage(`${server.url}/`, async (tasksPage) => {
-
                         const taskId = await createTaskViaApi(server.url, taskTitle, 'UIAG', 'tester');
                         await tasksPage.waitForSelector(`text=${taskTitle}`, { timeout: 15_000 });
                         await updateTaskViaApi(server.url, { id: taskId, assignee: '@implement' });
@@ -537,38 +542,42 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
                 // Deterministic precondition: with max_parallel_jobs 1 exactly
                 // one job runs while the other stays queued.
-                await waitUntil(
-                    'exactly one running and one queued job',
-                    20_000,
-                    async () => {
-                        const jobs = await fetchJobsViaApi(server.url);
-                        return (
-                            jobs.filter((job) => job.status === 'running').length === 1 &&
-                            jobs.filter((job) => job.status === 'queued').length === 1
-                        );
-                    },
-                );
+                await waitUntil('exactly one running and one queued job', 20_000, async () => {
+                    const jobs = await fetchJobsViaApi(server.url);
+                    return (
+                        jobs.filter((job) => job.status === 'running').length === 1 &&
+                        jobs.filter((job) => job.status === 'queued').length === 1
+                    );
+                });
 
                 await withPage(`${server.url}/agents`, async (page) => {
                     let cancelRequests = 0;
-                    page.on('request', request => {
-                        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/jobs/cancel-all') cancelRequests += 1;
+                    page.on('request', (request) => {
+                        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/jobs/cancel-all')
+                            cancelRequests += 1;
                     });
                     const trigger = page.getByRole('button', { name: 'Stop all', exact: true });
-                    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+                    for (const viewport of [
+                        { width: 1280, height: 900 },
+                        { width: 390, height: 844 },
+                    ]) {
                         await page.setViewportSize(viewport);
                         await trigger.click();
                         const dialog = page.getByRole('dialog', { name: 'Stop all agent jobs', exact: true });
                         await dialog.waitFor({ state: 'visible' });
-                        expect(await dialog.getByRole('button', { name: 'Cancel', exact: true }).evaluate(el => el === document.activeElement)).toBe(true);
+                        expect(
+                            await dialog
+                                .getByRole('button', { name: 'Cancel', exact: true })
+                                .evaluate((el) => el === document.activeElement),
+                        ).toBe(true);
                         expect(await dialog.ariaSnapshot()).toContain('Stop all queued and running agent jobs?');
                         await page.keyboard.press('Shift+Tab');
-                        expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+                        expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
                         await page.keyboard.press('Tab');
                         await page.keyboard.press('Enter');
                         await dialog.waitFor({ state: 'detached' });
                         expect(cancelRequests).toBe(0);
-                        expect(await trigger.evaluate(el => el === document.activeElement)).toBe(true);
+                        expect(await trigger.evaluate((el) => el === document.activeElement)).toBe(true);
 
                         await trigger.click();
                         await dialog.waitFor({ state: 'visible' });
@@ -583,17 +592,15 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     }
 
                     await trigger.click();
-                    await page.getByRole('dialog', { name: 'Stop all agent jobs', exact: true })
-                        .getByRole('button', { name: 'Stop all', exact: true }).click();
+                    await page
+                        .getByRole('dialog', { name: 'Stop all agent jobs', exact: true })
+                        .getByRole('button', { name: 'Stop all', exact: true })
+                        .click();
 
-                    await waitUntil(
-                        'stop-all to cancel every job',
-                        20_000,
-                        async () => {
-                            const jobs = await fetchJobsViaApi(server.url);
-                            return jobs.length === 2 && jobs.every((job) => job.status === 'cancelled');
-                        },
-                    );
+                    await waitUntil('stop-all to cancel every job', 20_000, async () => {
+                        const jobs = await fetchJobsViaApi(server.url);
+                        return jobs.length === 2 && jobs.every((job) => job.status === 'cancelled');
+                    });
                     expect(cancelRequests).toBe(1);
                 });
             } finally {

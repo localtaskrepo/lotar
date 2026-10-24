@@ -124,9 +124,12 @@ describe('UI strict member smoke scenarios', () => {
 
                     await page.getByRole('button', { name: 'Create task' }).click();
 
-                    await page.waitForSelector(`.card:has-text("Assignee 'intruder@example.com' is not in configured members")`, {
-                        timeout: 20_000,
-                    });
+                    await page.waitForSelector(
+                        `.card:has-text("Assignee 'intruder@example.com' is not in configured members")`,
+                        {
+                            timeout: 20_000,
+                        },
+                    );
 
                     await page.getByRole('button', { name: 'Use list' }).click();
                     await assigneeSelect.selectOption({ value: 'allowed@example.com' });
@@ -252,8 +255,8 @@ describe('UI strict member smoke scenarios', () => {
             const members = Array.isArray(projectConfig?.members)
                 ? (projectConfig.members as string[])
                 : Array.isArray(projectConfig?.default?.members)
-                    ? (projectConfig.default.members as string[])
-                    : [];
+                  ? (projectConfig.default.members as string[])
+                  : [];
             expect(members).toContain('allowed@example.com');
             expect(members).toContain('ui-autopop@example.com');
         } finally {

@@ -53,5 +53,3 @@ defineProps<{
 
 defineEmits<{ (e: 'refresh'): void }>()
 </script>
-
-

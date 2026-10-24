@@ -32,205 +32,232 @@
 
     <div v-else class="sync-dashboard">
       <UiCard class="sync-card sync-card--remotes">
-          <div class="card-header">
-            <div>
-              <h3>Remotes & actions</h3>
-            </div>
-            <div class="card-actions">
-              <UiButton type="button" variant="primary" :disabled="!scopeValid" @click="openAddRemoteDialog">Add remote</UiButton>
-              <label class="option-row option-row--inline">
-                <input v-model="writeReport" type="checkbox" />
-                <span>Write report to disk</span>
-                <span class="muted option-row__hint">{{ reportsDirLabel }}</span>
-              </label>
-            </div>
+        <div class="card-header">
+          <div>
+            <h3>Remotes & actions</h3>
           </div>
+          <div class="card-actions">
+            <UiButton type="button" variant="primary" :disabled="!scopeValid" @click="openAddRemoteDialog"
+              >Add remote</UiButton
+            >
+            <label class="option-row option-row--inline">
+              <input v-model="writeReport" type="checkbox" />
+              <span>Write report to disk</span>
+              <span class="muted option-row__hint">{{ reportsDirLabel }}</span>
+            </label>
+          </div>
+        </div>
 
-          <div class="card-body">
-            <p v-if="!scopeValid" class="muted" data-testid="scope-unavailable">{{ scopeUnavailableHint }}</p>
-            <p v-else-if="!remoteEntries.length" class="muted">No remotes configured for this scope.</p>
-            <div v-else class="remote-stack">
-              <div v-for="entry in remoteEntries" :key="entry.name" class="remote-row">
-                <div class="remote-main">
-                  <div class="remote-title">
-                    <strong>{{ entry.name }}</strong>
-                    <span
-                      v-if="project && entry.origin === 'global'"
-                      class="pill pill--muted remote-origin-chip"
-                      title="Defined in the Global config; inherited by this project"
-                    >inherited</span>
-                    <span class="remote-provider">
-                      <IconGlyph :name="remoteProviderIcon(entry.remote)" />
-                      <span>{{ remoteProviderLabel(entry.remote) }}</span>
-                    </span>
-                    <span
-                      v-if="runStatus(entry.name)"
-                      :class="['pill', runStatusClass(entry.name), 'pill--interactive']"
-                      role="button"
-                      tabindex="0"
-                      @click.stop="openLatestTaskByRemote(entry.name)"
-                      @keydown.enter.prevent="openLatestTaskByRemote(entry.name)"
-                      @keydown.space.prevent="openLatestTaskByRemote(entry.name)"
-                    >
-                      {{ runStatusLabel(entry.name) }}
-                    </span>
-                  </div>
-                  <div
-                    v-if="hasValue(entry.remote.auth_profile) || hasValue(entry.remote.filter)"
-                    class="remote-meta"
+        <div class="card-body">
+          <p v-if="!scopeValid" class="muted" data-testid="scope-unavailable">{{ scopeUnavailableHint }}</p>
+          <p v-else-if="!remoteEntries.length" class="muted">No remotes configured for this scope.</p>
+          <div v-else class="remote-stack">
+            <div v-for="entry in remoteEntries" :key="entry.name" class="remote-row">
+              <div class="remote-main">
+                <div class="remote-title">
+                  <strong>{{ entry.name }}</strong>
+                  <span
+                    v-if="project && entry.origin === 'global'"
+                    class="pill pill--muted remote-origin-chip"
+                    title="Defined in the Global config; inherited by this project"
+                    >inherited</span
                   >
-                    <span v-if="hasValue(entry.remote.auth_profile)" class="remote-meta__item">
-                      <span class="remote-meta__label muted">Auth</span>
-                      <span class="remote-meta__value">{{ entry.remote.auth_profile }}</span>
-                    </span>
-                    <span v-if="hasValue(entry.remote.filter)" class="remote-meta__item">
-                      <span class="remote-meta__label muted">Filter</span>
-                      <span class="remote-meta__value">{{ entry.remote.filter }}</span>
-                    </span>
-                  </div>
+                  <span class="remote-provider">
+                    <IconGlyph :name="remoteProviderIcon(entry.remote)" />
+                    <span>{{ remoteProviderLabel(entry.remote) }}</span>
+                  </span>
+                  <span
+                    v-if="runStatus(entry.name)"
+                    :class="['pill', runStatusClass(entry.name), 'pill--interactive']"
+                    role="button"
+                    tabindex="0"
+                    @click.stop="openLatestTaskByRemote(entry.name)"
+                    @keydown.enter.prevent="openLatestTaskByRemote(entry.name)"
+                    @keydown.space.prevent="openLatestTaskByRemote(entry.name)"
+                  >
+                    {{ runStatusLabel(entry.name) }}
+                  </span>
                 </div>
-                <div class="remote-actions">
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="runSync('pull', entry)">Pull</UiButton>
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="runSync('push', entry)">Push</UiButton>
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="runSync('check', entry)">Check</UiButton>
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="openEditRemoteDialog(entry)">Edit</UiButton>
+                <div v-if="hasValue(entry.remote.auth_profile) || hasValue(entry.remote.filter)" class="remote-meta">
+                  <span v-if="hasValue(entry.remote.auth_profile)" class="remote-meta__item">
+                    <span class="remote-meta__label muted">Auth</span>
+                    <span class="remote-meta__value">{{ entry.remote.auth_profile }}</span>
+                  </span>
+                  <span v-if="hasValue(entry.remote.filter)" class="remote-meta__item">
+                    <span class="remote-meta__label muted">Filter</span>
+                    <span class="remote-meta__value">{{ entry.remote.filter }}</span>
+                  </span>
                 </div>
+              </div>
+              <div class="remote-actions">
+                <UiButton
+                  class="remote-action"
+                  type="button"
+                  :disabled="isRemoteNameBusy(entry.name)"
+                  @click="runSync('pull', entry)"
+                  >Pull</UiButton
+                >
+                <UiButton
+                  class="remote-action"
+                  type="button"
+                  :disabled="isRemoteNameBusy(entry.name)"
+                  @click="runSync('push', entry)"
+                  >Push</UiButton
+                >
+                <UiButton
+                  class="remote-action"
+                  type="button"
+                  :disabled="isRemoteNameBusy(entry.name)"
+                  @click="runSync('check', entry)"
+                  >Check</UiButton
+                >
+                <UiButton
+                  class="remote-action"
+                  type="button"
+                  :disabled="isRemoteNameBusy(entry.name)"
+                  @click="openEditRemoteDialog(entry)"
+                  >Edit</UiButton
+                >
               </div>
             </div>
           </div>
+        </div>
       </UiCard>
 
       <UiCard class="sync-card sync-card--reports">
-          <div class="card-header">
-            <div>
-              <h3>Sync reports</h3>
-            </div>
-            <ReloadButton
-              :loading="reportsLoading"
-              label="Reload reports"
-              title="Reload reports"
-              @click="loadReports"
-            />
+        <div class="card-header">
+          <div>
+            <h3>Sync reports</h3>
           </div>
-          <div class="card-body">
-            <p v-if="reportsError" class="sync-error">{{ reportsError }}</p>
-            <div class="reports-toolbar">
-              <label class="reports-filter reports-filter--range">
-                <span class="muted">Report range</span>
-                <div class="reports-range">
-                  <UiInput v-model="reportRangeStart" type="datetime-local" />
-                  <span class="muted">to</span>
-                  <UiInput v-model="reportRangeEnd" type="datetime-local" />
-                </div>
-              </label>
-              <label class="reports-filter reports-filter--status">
-                <span class="muted">Entry status</span>
-                <UiSelect v-model="reportEntryFilter">
-                  <option value="all">All</option>
-                  <option value="created">Created</option>
-                  <option value="updated">Updated</option>
-                  <option value="skipped">Skipped</option>
-                  <option value="failed">Failed</option>
-                </UiSelect>
-              </label>
-              <label class="reports-filter reports-filter--search">
-                <span class="muted">Search</span>
-                <UiInput v-model="reportEntrySearch" placeholder="Task ID, reference, or message" />
-              </label>
-            </div>
-            <p v-if="reportsLoading && !reportListItems.length" class="muted">Loading reports…</p>
-            <p v-else-if="!reportListItems.length" class="muted">No reports yet.</p>
-            <p v-else-if="!filteredReportItems.length" class="muted">No reports match the selected range.</p>
-            <div v-else class="reports-grid">
-              <div class="reports-list">
-                <button
-                  v-for="report in filteredReportItems"
-                  :key="report.id"
-                  type="button"
-                  class="report-item"
-                  :class="{ active: selectedReport?.id === report.id }"
-                  @click="openReportItem(report)"
-                >
-                  <div class="report-item__row report-item__row--top">
-                    <div class="report-item__chips">
-                      <span class="pill pill--muted report-item__action-chip">
-                        {{ reportActionLabel(report) }}
-                      </span>
-                      <span
-                        v-if="report.status"
-                        :class="['pill', 'report-item__status-chip', reportStatusClass(report.status)]"
-                      >
-                        {{ reportStatusLabel(report.status) }}
-                      </span>
-                      <span v-if="report.source === 'external'" class="pill pill--muted report-item__status-chip">External</span>
-                      <span v-else-if="!project && report.project" class="pill pill--muted report-item__status-chip">{{ report.project }}</span>
-                    </div>
-                    <span class="muted report-item__date">{{ formatTimestamp(report.created_at) }}</span>
-                  </div>
-                  <div class="report-item__row report-item__row--name">
-                    <strong>{{ report.remote }}</strong>
-                    <span class="report-summary">{{ reportSummaryLabel(report) }}</span>
-                  </div>
-                </button>
+          <ReloadButton :loading="reportsLoading" label="Reload reports" title="Reload reports" @click="loadReports" />
+        </div>
+        <div class="card-body">
+          <p v-if="reportsError" class="sync-error">{{ reportsError }}</p>
+          <div class="reports-toolbar">
+            <label class="reports-filter reports-filter--range">
+              <span class="muted">Report range</span>
+              <div class="reports-range">
+                <UiInput v-model="reportRangeStart" type="datetime-local" />
+                <span class="muted">to</span>
+                <UiInput v-model="reportRangeEnd" type="datetime-local" />
               </div>
-              <div class="reports-detail">
-                <p v-if="!selectedReport" class="muted">Select a report to review itemized changes.</p>
-                <div v-else>
-                  <div class="report-header">
-                    <div class="report-header__main">
-                      <strong>Report details</strong>
-                      <div
-                        v-if="selectedReportPath"
-                        class="report-path"
-                        :title="`${reportsDirLabel}/${selectedReportPath}`"
-                      >
-                        <IconGlyph name="file" />
-                        <span class="report-path__label">Path</span>
-                        <span class="report-path__value">{{ reportsDirLabel }}/{{ selectedReportPath }}</span>
-                      </div>
-                    </div>
-                    <div v-if="selectedReport.dry_run" class="report-header__status">
-                      <span class="pill pill--muted">Dry run</span>
+            </label>
+            <label class="reports-filter reports-filter--status">
+              <span class="muted">Entry status</span>
+              <UiSelect v-model="reportEntryFilter">
+                <option value="all">All</option>
+                <option value="created">Created</option>
+                <option value="updated">Updated</option>
+                <option value="skipped">Skipped</option>
+                <option value="failed">Failed</option>
+              </UiSelect>
+            </label>
+            <label class="reports-filter reports-filter--search">
+              <span class="muted">Search</span>
+              <UiInput v-model="reportEntrySearch" placeholder="Task ID, reference, or message" />
+            </label>
+          </div>
+          <p v-if="reportsLoading && !reportListItems.length" class="muted">Loading reports…</p>
+          <p v-else-if="!reportListItems.length" class="muted">No reports yet.</p>
+          <p v-else-if="!filteredReportItems.length" class="muted">No reports match the selected range.</p>
+          <div v-else class="reports-grid">
+            <div class="reports-list">
+              <button
+                v-for="report in filteredReportItems"
+                :key="report.id"
+                type="button"
+                class="report-item"
+                :class="{ active: selectedReport?.id === report.id }"
+                @click="openReportItem(report)"
+              >
+                <div class="report-item__row report-item__row--top">
+                  <div class="report-item__chips">
+                    <span class="pill pill--muted report-item__action-chip">
+                      {{ reportActionLabel(report) }}
+                    </span>
+                    <span
+                      v-if="report.status"
+                      :class="['pill', 'report-item__status-chip', reportStatusClass(report.status)]"
+                    >
+                      {{ reportStatusLabel(report.status) }}
+                    </span>
+                    <span v-if="report.source === 'external'" class="pill pill--muted report-item__status-chip"
+                      >External</span
+                    >
+                    <span v-else-if="!project && report.project" class="pill pill--muted report-item__status-chip">{{
+                      report.project
+                    }}</span>
+                  </div>
+                  <span class="muted report-item__date">{{ formatTimestamp(report.created_at) }}</span>
+                </div>
+                <div class="report-item__row report-item__row--name">
+                  <strong>{{ report.remote }}</strong>
+                  <span class="report-summary">{{ reportSummaryLabel(report) }}</span>
+                </div>
+              </button>
+            </div>
+            <div class="reports-detail">
+              <p v-if="!selectedReport" class="muted">Select a report to review itemized changes.</p>
+              <div v-else>
+                <div class="report-header">
+                  <div class="report-header__main">
+                    <strong>Report details</strong>
+                    <div
+                      v-if="selectedReportPath"
+                      class="report-path"
+                      :title="`${reportsDirLabel}/${selectedReportPath}`"
+                    >
+                      <IconGlyph name="file" />
+                      <span class="report-path__label">Path</span>
+                      <span class="report-path__value">{{ reportsDirLabel }}/{{ selectedReportPath }}</span>
                     </div>
                   </div>
-                  <div v-if="selectedReportFields.length" class="report-fields">
-                    <div class="muted report-fields__label">Fields synced</div>
-                    <div class="report-fields__list">
-                      <span v-for="field in selectedReportFields" :key="field" class="field-chip">
-                        {{ field }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="reports-entries">
-                    <p v-if="!filteredReportEntries.length" class="muted">No entries match the current filter.</p>
-                    <div v-else class="list-stack">
-                      <div
-                        v-for="entry in filteredReportEntries"
-                        :key="`${entry.at}-${entry.task_id || entry.reference || entry.title}`"
-                        class="list-item report-entry"
-                        :class="{ interactive: !!entry.task_id }"
-                        role="button"
-                        :tabindex="entry.task_id ? 0 : -1"
-                        @click="openTaskFromEntry(entry)"
-                        @keydown.enter.prevent="openTaskFromEntry(entry)"
-                        @keydown.space.prevent="openTaskFromEntry(entry)"
-                      >
-                        <div class="report-entry__row">
-                          <strong>{{ entry.task_id || entry.reference || entry.title || 'Item' }}</strong>
-                          <span class="muted report-entry__date">{{ formatTimestamp(entry.at) }}</span>
-                        </div>
-                        <div class="list-item__details">
-                          <div class="detail"><span class="muted">Status</span>{{ entry.status }}</div>
-                          <div v-if="entry.fields?.length" class="detail"><span class="muted">Fields</span>{{ entry.fields.join(', ') }}</div>
-                          <div v-if="entry.message" class="detail"><span class="muted">Note</span>{{ entry.message }}</div>
-                        </div>
-                      </div>
-                    </div>
+                  <div v-if="selectedReport.dry_run" class="report-header__status">
+                    <span class="pill pill--muted">Dry run</span>
                   </div>
                 </div>
+                <div v-if="selectedReportFields.length" class="report-fields">
+                  <div class="muted report-fields__label">Fields synced</div>
+                  <div class="report-fields__list">
+                    <span v-for="field in selectedReportFields" :key="field" class="field-chip">
+                      {{ field }}
+                    </span>
+                  </div>
+                </div>
+                <div class="reports-entries">
+                  <p v-if="!filteredReportEntries.length" class="muted">No entries match the current filter.</p>
+                  <div v-else class="list-stack">
+                    <div
+                      v-for="entry in filteredReportEntries"
+                      :key="`${entry.at}-${entry.task_id || entry.reference || entry.title}`"
+                      class="list-item report-entry"
+                      :class="{ interactive: !!entry.task_id }"
+                      role="button"
+                      :tabindex="entry.task_id ? 0 : -1"
+                      @click="openTaskFromEntry(entry)"
+                      @keydown.enter.prevent="openTaskFromEntry(entry)"
+                      @keydown.space.prevent="openTaskFromEntry(entry)"
+                    >
+                      <div class="report-entry__row">
+                        <strong>{{ entry.task_id || entry.reference || entry.title || 'Item' }}</strong>
+                        <span class="muted report-entry__date">{{ formatTimestamp(entry.at) }}</span>
+                      </div>
+                      <div class="list-item__details">
+                        <div class="detail"><span class="muted">Status</span>{{ entry.status }}</div>
+                        <div v-if="entry.fields?.length" class="detail">
+                          <span class="muted">Fields</span>{{ entry.fields.join(', ') }}
+                        </div>
+                        <div v-if="entry.message" class="detail">
+                          <span class="muted">Note</span>{{ entry.message }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        </div>
       </UiCard>
     </div>
   </section>
@@ -244,133 +271,167 @@
     @close="closeRemoteDialog"
   >
     <form class="sync-remote-dialog__form" @submit.prevent="submitRemoteDialog">
-          <header class="sync-remote-dialog__header">
-            <h2 :id="remoteDialogHeadingId">{{ remoteDialogTitle }}</h2>
-            <UiButton
-              variant="ghost"
-              icon-only
-              type="button"
-              :disabled="remoteDialogSubmitting || remoteDialogDeleting"
-              aria-label="Close dialog"
-              title="Close dialog"
-              @click="closeRemoteDialog"
-            >
-              <IconGlyph name="close" />
-            </UiButton>
-          </header>
+      <header class="sync-remote-dialog__header">
+        <h2 :id="remoteDialogHeadingId">{{ remoteDialogTitle }}</h2>
+        <UiButton
+          variant="ghost"
+          icon-only
+          type="button"
+          :disabled="remoteDialogSubmitting || remoteDialogDeleting"
+          aria-label="Close dialog"
+          title="Close dialog"
+          @click="closeRemoteDialog"
+        >
+          <IconGlyph name="close" />
+        </UiButton>
+      </header>
 
-          <p :id="remoteDialogTargetId" class="sync-remote-dialog__target" data-testid="remote-dialog-target">{{ dialogTargetBanner }}</p>
+      <p :id="remoteDialogTargetId" class="sync-remote-dialog__target" data-testid="remote-dialog-target">
+        {{ dialogTargetBanner }}
+      </p>
 
-          <div v-if="dialogNeedsTargetChoice" class="sync-remote-dialog__choice" data-testid="remote-dialog-choice">
-            <p class="muted">This remote is inherited from the Global config. Choose where your changes apply:</p>
-            <div class="sync-remote-dialog__choice-buttons">
-              <UiButton type="button" variant="primary" @click="chooseDialogTarget('override-project')">
-                Override in project {{ project }}
-              </UiButton>
-              <UiButton type="button" @click="chooseDialogTarget('inherit-global')">Edit in Global scope</UiButton>
-            </div>
-          </div>
+      <div v-if="dialogNeedsTargetChoice" class="sync-remote-dialog__choice" data-testid="remote-dialog-choice">
+        <p class="muted">This remote is inherited from the Global config. Choose where your changes apply:</p>
+        <div class="sync-remote-dialog__choice-buttons">
+          <UiButton type="button" variant="primary" @click="chooseDialogTarget('override-project')">
+            Override in project {{ project }}
+          </UiButton>
+          <UiButton type="button" @click="chooseDialogTarget('inherit-global')">Edit in Global scope</UiButton>
+        </div>
+      </div>
 
-          <fieldset
-            class="sync-remote-dialog__fieldset"
-            :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice"
+      <fieldset
+        class="sync-remote-dialog__fieldset"
+        :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice"
+      >
+        <div class="form-grid">
+          <label class="sync-remote-dialog__field">
+            <span class="muted">Name</span>
+            <UiInput v-model="remoteForm.name" placeholder="jira-home" />
+          </label>
+          <label class="sync-remote-dialog__field">
+            <span class="muted">Provider</span>
+            <UiSelect v-model="remoteForm.provider">
+              <option value="jira">Jira</option>
+              <option value="github">GitHub</option>
+            </UiSelect>
+          </label>
+          <label v-if="remoteForm.provider === 'jira'" class="sync-remote-dialog__field">
+            <span class="muted">Project key</span>
+            <UiInput v-model="remoteForm.project" placeholder="DEMO" />
+          </label>
+          <label v-else class="sync-remote-dialog__field">
+            <span class="muted">Repository</span>
+            <UiInput v-model="remoteForm.repo" placeholder="owner/repo" />
+          </label>
+          <label class="sync-remote-dialog__field">
+            <span class="muted">Auth profile</span>
+            <UiInput
+              v-model="remoteForm.auth_profile"
+              :placeholder="authProfilePlaceholder"
+              list="sync-auth-profile-options"
+            />
+          </label>
+          <label class="sync-remote-dialog__field">
+            <span class="sync-remote-dialog__label">
+              <span class="muted">Filter</span>
+              <button
+                type="button"
+                class="sync-remote-dialog__help"
+                :aria-expanded="filterHelpOpen"
+                aria-label="Filter format help"
+                @click="filterHelpOpen = !filterHelpOpen"
+              >
+                <IconGlyph name="help" />
+              </button>
+            </span>
+            <UiInput v-model="remoteForm.filter" placeholder="Optional filter" />
+            <p v-if="filterHelpOpen" class="muted sync-remote-dialog__hint">
+              {{ filterHelpText }}
+            </p>
+          </label>
+        </div>
+
+        <label class="sync-remote-dialog__field">
+          <span class="muted">Mapping (YAML)</span>
+          <textarea
+            v-model="remoteForm.mapping"
+            class="input sync-textarea"
+            :rows="mappingRows"
+            placeholder="title: summary\nstatus:\n  field: status\n  values:\n    Todo: 'To Do'\n    InProgress: 'In Progress'"
+          ></textarea>
+        </label>
+      </fieldset>
+      <p class="muted sync-remote-dialog__hint">
+        Saved to {{ dialogTargetLabel }} as YAML. Mapping is required to sync fields.
+      </p>
+      <p v-if="mappingErrorPreview.length" class="error">{{ mappingErrorPreview.join(' ') }}</p>
+      <p v-if="remoteFormError" class="error" data-testid="remote-dialog-error">{{ remoteFormError }}</p>
+
+      <footer class="form-actions">
+        <div class="form-actions__group">
+          <UiButton
+            variant="primary"
+            type="submit"
+            :disabled="
+              remoteDialogSubmitting ||
+              remoteDialogValidating ||
+              remoteDialogDeleting ||
+              dialogNeedsTargetChoice ||
+              editorBlocked ||
+              dialogTargetInvalid
+            "
           >
-            <div class="form-grid">
-              <label class="sync-remote-dialog__field">
-                <span class="muted">Name</span>
-                <UiInput v-model="remoteForm.name" placeholder="jira-home" />
-              </label>
-              <label class="sync-remote-dialog__field">
-                <span class="muted">Provider</span>
-                <UiSelect v-model="remoteForm.provider">
-                  <option value="jira">Jira</option>
-                  <option value="github">GitHub</option>
-                </UiSelect>
-              </label>
-              <label v-if="remoteForm.provider === 'jira'" class="sync-remote-dialog__field">
-                <span class="muted">Project key</span>
-                <UiInput v-model="remoteForm.project" placeholder="DEMO" />
-              </label>
-              <label v-else class="sync-remote-dialog__field">
-                <span class="muted">Repository</span>
-                <UiInput v-model="remoteForm.repo" placeholder="owner/repo" />
-              </label>
-              <label class="sync-remote-dialog__field">
-                <span class="muted">Auth profile</span>
-                <UiInput v-model="remoteForm.auth_profile" :placeholder="authProfilePlaceholder" list="sync-auth-profile-options" />
-              </label>
-              <label class="sync-remote-dialog__field">
-                <span class="sync-remote-dialog__label">
-                  <span class="muted">Filter</span>
-                  <button
-                    type="button"
-                    class="sync-remote-dialog__help"
-                    :aria-expanded="filterHelpOpen"
-                    aria-label="Filter format help"
-                    @click="filterHelpOpen = !filterHelpOpen"
-                  >
-                    <IconGlyph name="help" />
-                  </button>
-                </span>
-                <UiInput v-model="remoteForm.filter" placeholder="Optional filter" />
-                <p v-if="filterHelpOpen" class="muted sync-remote-dialog__hint">
-                  {{ filterHelpText }}
-                </p>
-              </label>
-            </div>
-
-            <label class="sync-remote-dialog__field">
-              <span class="muted">Mapping (YAML)</span>
-              <textarea
-                v-model="remoteForm.mapping"
-                class="input sync-textarea"
-                :rows="mappingRows"
-                placeholder="title: summary\nstatus:\n  field: status\n  values:\n    Todo: 'To Do'\n    InProgress: 'In Progress'"
-              ></textarea>
-            </label>
-          </fieldset>
-          <p class="muted sync-remote-dialog__hint">Saved to {{ dialogTargetLabel }} as YAML. Mapping is required to sync fields.</p>
-          <p v-if="mappingErrorPreview.length" class="error">{{ mappingErrorPreview.join(' ') }}</p>
-          <p v-if="remoteFormError" class="error" data-testid="remote-dialog-error">{{ remoteFormError }}</p>
-
-          <footer class="form-actions">
-            <div class="form-actions__group">
-              <UiButton
-                variant="primary"
-                type="submit"
-                :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice || editorBlocked || dialogTargetInvalid"
-              >
-                {{ remoteDialogSubmitting ? 'Saving…' : remoteDialogMode === 'add' ? 'Add remote' : 'Save remote' }}
-              </UiButton>
-              <UiButton
-                variant="ghost"
-                type="button"
-                :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice || editorBlocked || dialogTargetInvalid"
-                @click="validateRemoteDialog"
-              >
-                {{ remoteDialogValidating ? 'Validating…' : 'Validate' }}
-              </UiButton>
-              <span v-if="remoteDialogValidationMessage" :class="['validation-status', remoteDialogValidationClass]">
-                <IconGlyph name="check" />
-                {{ remoteDialogValidationMessage }}
-              </span>
-            </div>
-            <div class="form-actions__group">
-              <UiButton
-                v-if="remoteDialogMode === 'edit' && dialogTargetScope === dialogDefOriginScope"
-                variant="ghost"
-                type="button"
-                class="sync-remote-dialog__delete"
-                :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice || editorBlocked || dialogTargetInvalid"
-                @click="deleteRemoteDialog"
-              >
-                {{ remoteDialogDeleting ? 'Removing…' : `Remove from ${dialogTargetLabel}` }}
-              </UiButton>
-              <UiButton variant="ghost" type="button" :disabled="remoteDialogSubmitting || remoteDialogDeleting" @click="closeRemoteDialog">
-                Cancel
-              </UiButton>
-            </div>
-          </footer>
+            {{ remoteDialogSubmitting ? 'Saving…' : remoteDialogMode === 'add' ? 'Add remote' : 'Save remote' }}
+          </UiButton>
+          <UiButton
+            variant="ghost"
+            type="button"
+            :disabled="
+              remoteDialogSubmitting ||
+              remoteDialogValidating ||
+              remoteDialogDeleting ||
+              dialogNeedsTargetChoice ||
+              editorBlocked ||
+              dialogTargetInvalid
+            "
+            @click="validateRemoteDialog"
+          >
+            {{ remoteDialogValidating ? 'Validating…' : 'Validate' }}
+          </UiButton>
+          <span v-if="remoteDialogValidationMessage" :class="['validation-status', remoteDialogValidationClass]">
+            <IconGlyph name="check" />
+            {{ remoteDialogValidationMessage }}
+          </span>
+        </div>
+        <div class="form-actions__group">
+          <UiButton
+            v-if="remoteDialogMode === 'edit' && dialogTargetScope === dialogDefOriginScope"
+            variant="ghost"
+            type="button"
+            class="sync-remote-dialog__delete"
+            :disabled="
+              remoteDialogSubmitting ||
+              remoteDialogValidating ||
+              remoteDialogDeleting ||
+              dialogNeedsTargetChoice ||
+              editorBlocked ||
+              dialogTargetInvalid
+            "
+            @click="deleteRemoteDialog"
+          >
+            {{ remoteDialogDeleting ? 'Removing…' : `Remove from ${dialogTargetLabel}` }}
+          </UiButton>
+          <UiButton
+            variant="ghost"
+            type="button"
+            :disabled="remoteDialogSubmitting || remoteDialogDeleting"
+            @click="closeRemoteDialog"
+          >
+            Cancel
+          </UiButton>
+        </div>
+      </footer>
     </form>
     <datalist id="sync-auth-profile-options">
       <option v-for="profile in authProfileOptions" :key="profile" :value="profile" />
@@ -555,10 +616,7 @@ const remoteDialogValidationClass = computed(() => {
 watch(
   () => remoteForm.value.provider,
   () => {
-    if (
-      remoteForm.value.auth_profile &&
-      !authProfileOptions.value.includes(remoteForm.value.auth_profile)
-    ) {
+    if (remoteForm.value.auth_profile && !authProfileOptions.value.includes(remoteForm.value.auth_profile)) {
       remoteForm.value.auth_profile = ''
     }
     filterHelpOpen.value = false
@@ -574,9 +632,7 @@ watch(
   { deep: true },
 )
 
-const remoteDialogTitle = computed(() =>
-  remoteDialogMode.value === 'add' ? 'Add remote' : 'Edit remote',
-)
+const remoteDialogTitle = computed(() => (remoteDialogMode.value === 'add' ? 'Add remote' : 'Edit remote'))
 
 /** Stable ids binding the dialog's accessible name/description to its heading and target banner. */
 const remoteDialogHeadingId = useId()
@@ -1620,7 +1676,12 @@ function clearPreflightBusy(key: string) {
  * divergence with an actionable message instead of executing the wrong
  * remote. Failures fail closed; navigation away aborts.
  */
-async function verifyDefaultProjectRemote(action: SyncAction, remoteName: string, displayedRemote: SyncRemoteConfig, originScope: SyncScope): Promise<boolean> {
+async function verifyDefaultProjectRemote(
+  action: SyncAction,
+  remoteName: string,
+  displayedRemote: SyncRemoteConfig,
+  originScope: SyncScope,
+): Promise<boolean> {
   const defaultProject = String(scopedInspect.value?.global_effective?.default_project ?? '').trim()
   if (!defaultProject) return true
 
@@ -1697,7 +1758,14 @@ async function runSync(action: SyncAction, entry: { name: string; remote: SyncRe
   const context = computeRunContext(action, originScope, entry.remote)
   const run = startRun({ action, remote: remoteName, context })
 
-  const payload: { remote: string; project?: string; dry_run?: boolean; include_report?: boolean; write_report?: boolean; client_run_id?: string } = {
+  const payload: {
+    remote: string
+    project?: string
+    dry_run?: boolean
+    include_report?: boolean
+    write_report?: boolean
+    client_run_id?: string
+  } = {
     remote: remoteName,
     project: originScope || undefined,
   }
@@ -1709,9 +1777,7 @@ async function runSync(action: SyncAction, entry: { name: string; remote: SyncRe
   payload.client_run_id = run.id
 
   try {
-    const result = action === 'push'
-      ? await api.syncPush(payload)
-      : await api.syncPull(payload)
+    const result = action === 'push' ? await api.syncPush(payload) : await api.syncPull(payload)
     if (!alive) return
     const outcome = settleRunFromResponse(run.id, result)
     if (outcome.finalized === 'now' && shouldAutoSelectRunReport(run)) {
@@ -1837,7 +1903,7 @@ async function handleReload() {
 .sync-dashboard {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(420px, 2fr);
-  grid-template-areas: "remotes reports";
+  grid-template-areas: 'remotes reports';
   gap: 16px;
   align-items: start;
 }
@@ -2137,7 +2203,9 @@ async function handleReload() {
 
 .list-item.interactive {
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
 
 .list-item.interactive:hover {
@@ -2215,7 +2283,6 @@ async function handleReload() {
   align-items: center;
   gap: 8px;
 }
-
 
 @media (max-width: 900px) {
   .reports-toolbar {
@@ -2498,8 +2565,8 @@ async function handleReload() {
   .sync-dashboard {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "remotes"
-      "reports";
+      'remotes'
+      'reports';
   }
 }
 

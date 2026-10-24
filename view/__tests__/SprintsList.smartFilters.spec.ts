@@ -21,8 +21,16 @@ vi.mock('../composables/useSse', () => ({
 
 vi.mock('../api/client', () => ({
     api: {
-        getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
-        reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
+        getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+            status: 'ok',
+            tasks: [],
+            changed: false,
+        })),
+        reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+            status: 'ok',
+            tasks: [],
+            changed: false,
+        })),
         listTasks: vi.fn(),
         showConfig: showConfigMock,
     },
@@ -59,7 +67,8 @@ vi.mock('../components/UiSelect.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue'],
-        template: '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
+        template:
+            '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
     },
 }))
 
@@ -93,7 +102,10 @@ vi.mock('../components/ColumnsMenu.vue', () => ({
 }))
 
 vi.mock('../components/SprintViewSettings.vue', () => ({
-    default: { props: ['timeRange', 'choices', 'showAllowClosed', 'allowClosed', 'highlightMultiSprint'], template: '<div class="view-settings" />' },
+    default: {
+        props: ['timeRange', 'choices', 'showAllowClosed', 'allowClosed', 'highlightMultiSprint'],
+        template: '<div class="view-settings" />',
+    },
 }))
 
 vi.mock('../composables/useSprints', () => ({
@@ -101,7 +113,7 @@ vi.mock('../composables/useSprints', () => ({
     useSprints: () => ({
         sprints: ref<any[]>([]),
         loading: ref(false),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
         missingSprints: ref<any[]>([]),
         hasMissing: ref(false),
     }),
@@ -109,7 +121,10 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useProjects', () => ({
     useProjects: () => ({
-        projects: ref([{ prefix: 'PRJ', name: 'Project' }, { prefix: 'ACME', name: 'Acme Co' }]),
+        projects: ref([
+            { prefix: 'PRJ', name: 'Project' },
+            { prefix: 'ACME', name: 'Acme Co' },
+        ]),
         refresh: vi.fn(async () => {}),
     }),
 }))
@@ -123,13 +138,15 @@ vi.mock('../composables/useTaskPanelController', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['Todo', 'Doing', 'Done', 'Closed']),
         priorities: ref<string[]>(['Low', 'Med', 'High']),
         types: ref<string[]>(['task']),
         customFields: ref<string[]>([]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
@@ -145,9 +162,9 @@ vi.mock('../composables/useSprintAnalytics', () => ({
         isSummaryLoading: vi.fn(() => false),
         isBurndownLoading: vi.fn(() => false),
         isVelocityLoading: vi.fn(() => false),
-        loadSummary: vi.fn(async () => { }),
-        loadBurndown: vi.fn(async () => { }),
-        loadVelocity: vi.fn(async () => { }),
+        loadSummary: vi.fn(async () => {}),
+        loadBurndown: vi.fn(async () => {}),
+        loadVelocity: vi.fn(async () => {}),
     }),
 }))
 
@@ -215,38 +232,53 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
         vi.useRealTimers()
     })
 
-    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])('hydrates real FilterBar results with route precedence: %j', async query => {
-        routeState.query = query
-        localStorage.setItem('lotar.sprints.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
-        vi.mocked(api.listTasks).mockResolvedValue({ status: 'ok', count: 0, total: 0, tasks: [], limit: 200, offset: 0 } as any)
-        const { default: RealFilterBar } = await vi.importActual<typeof import('../components/FilterBar.vue')>('../components/FilterBar.vue')
-        const wrapper = mount(SprintsList, { global: { stubs: { FilterBar: RealFilterBar } } })
-        try {
-            await flushPromises()
-            await vi.advanceTimersByTimeAsync(400)
-            await flushPromises()
-            const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
-            const bar = wrapper.getComponent(RealFilterBar)
-            expect((bar.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
-            expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
-            expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
-            if (!Object.keys(query).length) expect(vi.mocked(api.listTasks).mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
-            if (expectedQuery) expect(vi.mocked(api.listTasks).mock.lastCall?.[0]).toMatchObject({ q: expectedQuery })
-            else expect(vi.mocked(api.listTasks).mock.lastCall?.[0]?.q).toBeUndefined()
-            const emissions = (bar.emitted('update:value') || []).length
-            await vi.advanceTimersByTimeAsync(400)
-            await flushPromises()
-            expect((bar.emitted('update:value') || []).length).toBe(emissions)
-            expect(emissions).toBeLessThanOrEqual(1)
-        } finally { wrapper.unmount() }
-    })
+    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])(
+        'hydrates real FilterBar results with route precedence: %j',
+        async (query) => {
+            routeState.query = query
+            localStorage.setItem('lotar.sprints.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
+            vi.mocked(api.listTasks).mockResolvedValue({
+                status: 'ok',
+                count: 0,
+                total: 0,
+                tasks: [],
+                limit: 200,
+                offset: 0,
+            } as any)
+            const { default: RealFilterBar } =
+                await vi.importActual<typeof import('../components/FilterBar.vue')>('../components/FilterBar.vue')
+            const wrapper = mount(SprintsList, { global: { stubs: { FilterBar: RealFilterBar } } })
+            try {
+                await flushPromises()
+                await vi.advanceTimersByTimeAsync(400)
+                await flushPromises()
+                const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
+                const bar = wrapper.getComponent(RealFilterBar)
+                expect((bar.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
+                expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
+                expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
+                if (!Object.keys(query).length)
+                    expect(vi.mocked(api.listTasks).mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
+                if (expectedQuery)
+                    expect(vi.mocked(api.listTasks).mock.lastCall?.[0]).toMatchObject({ q: expectedQuery })
+                else expect(vi.mocked(api.listTasks).mock.lastCall?.[0]?.q).toBeUndefined()
+                const emissions = (bar.emitted('update:value') || []).length
+                await vi.advanceTimersByTimeAsync(400)
+                await flushPromises()
+                expect((bar.emitted('update:value') || []).length).toBe(emissions)
+                expect(emissions).toBeLessThanOrEqual(1)
+            } finally {
+                wrapper.unmount()
+            }
+        },
+    )
 
     it('the overdue filter excludes terminal tasks and styles only real overdue rows', async () => {
         const tasks = [
             makeTask('PRJ-001', { status: 'Todo', due_date: '2025-12-01' }),
-            makeTask('PRJ-002', { status: 'Done', due_date: '2025-12-01' }),   // terminal past due: excluded
+            makeTask('PRJ-002', { status: 'Done', due_date: '2025-12-01' }), // terminal past due: excluded
             makeTask('PRJ-003', { status: 'Closed', due_date: '2025-12-01' }), // custom terminal: excluded
-            makeTask('PRJ-004', { status: 'Todo', due_date: '2026-01-05' }),   // due today: not overdue
+            makeTask('PRJ-004', { status: 'Todo', due_date: '2026-01-05' }), // due today: not overdue
         ]
         vi.mocked(api.listTasks).mockResolvedValue({
             status: 'ok',
@@ -262,9 +294,9 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
         // No due filter: all rows render; only the open past-due row is red.
         let rows = wrapper.findAll('#backlog tbody tr.task-row')
         expect(rows).toHaveLength(4)
-        const overdueCell = rows.find(r => r.text().includes('PRJ-001'))!.find('.text-overdue')
+        const overdueCell = rows.find((r) => r.text().includes('PRJ-001'))!.find('.text-overdue')
         expect(overdueCell.exists()).toBe(true)
-        const doneCell = rows.find(r => r.text().includes('PRJ-002'))!.find('.text-overdue')
+        const doneCell = rows.find((r) => r.text().includes('PRJ-002'))!.find('.text-overdue')
         expect(doneCell.exists()).toBe(false)
 
         // Switch the due filter to overdue through the FilterBar contract.
@@ -306,8 +338,16 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
     it('renders without a resolved policy (fail closed) using task_state metadata', async () => {
         showConfigMock.mockResolvedValue({})
         const tasks = [
-            makeTask('PRJ-001', { status: 'Done', due_date: '2025-12-01', task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' } }),
-            makeTask('PRJ-002', { status: 'Todo', due_date: '2025-12-01', task_state: { is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-05' } }),
+            makeTask('PRJ-001', {
+                status: 'Done',
+                due_date: '2025-12-01',
+                task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
+            }),
+            makeTask('PRJ-002', {
+                status: 'Todo',
+                due_date: '2025-12-01',
+                task_state: { is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-05' },
+            }),
         ]
         vi.mocked(api.listTasks).mockResolvedValue({
             status: 'ok',
@@ -321,8 +361,18 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
         const wrapper = await mountSprints()
 
         const rows = wrapper.findAll('#backlog tbody tr.task-row')
-        expect(rows.find(r => r.text().includes('PRJ-001'))!.find('.text-overdue').exists()).toBe(false)
-        expect(rows.find(r => r.text().includes('PRJ-002'))!.find('.text-overdue').exists()).toBe(true)
+        expect(
+            rows
+                .find((r) => r.text().includes('PRJ-001'))!
+                .find('.text-overdue')
+                .exists(),
+        ).toBe(false)
+        expect(
+            rows
+                .find((r) => r.text().includes('PRJ-002'))!
+                .find('.text-overdue')
+                .exists(),
+        ).toBe(true)
         wrapper.unmount()
     })
 })

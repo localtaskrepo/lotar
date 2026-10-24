@@ -111,10 +111,13 @@ async function mountAt(path: string) {
     await router.push(path)
     await router.isReady()
     // Rendered through RouterView like the app, so route-leave guards apply.
-    const wrapper = mount({ template: '<RouterView />' }, {
-        attachTo: document.body,
-        global: { plugins: [router] },
-    })
+    const wrapper = mount(
+        { template: '<RouterView />' },
+        {
+            attachTo: document.body,
+            global: { plugins: [router] },
+        },
+    )
     await flushPromises()
     const vm = () => wrapper.findComponent(ConfigView).vm as any
     return { wrapper, router, vm }
@@ -150,11 +153,21 @@ describe('Config section map (DEV-19)', () => {
 describe('ConfigView sections (DEV-19)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-            ; (api.listProjects as any).mockResolvedValue({ total: 1, limit: 50, offset: 0, projects: [{ name: 'App', prefix: 'APP' }] })
-            ; (api.inspectConfig as any).mockImplementation(async (project?: string) =>
-                inspect(project ? { project_name: 'App' } : null),
-            )
-            ; (api.inspectAutomation as any).mockResolvedValue({ source: 'global', scope_exists: true, scope_yaml: '', effective_yaml: '' })
+        ;(api.listProjects as any).mockResolvedValue({
+            total: 1,
+            limit: 50,
+            offset: 0,
+            projects: [{ name: 'App', prefix: 'APP' }],
+        })
+        ;(api.inspectConfig as any).mockImplementation(async (project?: string) =>
+            inspect(project ? { project_name: 'App' } : null),
+        )
+        ;(api.inspectAutomation as any).mockResolvedValue({
+            source: 'global',
+            scope_exists: true,
+            scope_yaml: '',
+            effective_yaml: '',
+        })
     })
 
     it('routes the visible section through ?section= and keeps edits across sections', async () => {
@@ -209,7 +222,10 @@ describe('ConfigView sections (DEV-19)', () => {
         const dialog = () => wrapper.find('[data-testid="config-discard-dialog"]')
         expect(dialog().exists()).toBe(true)
 
-        await dialog().findAll('button').find((b) => b.text() === 'Keep editing')!.trigger('click')
+        await dialog()
+            .findAll('button')
+            .find((b) => b.text() === 'Keep editing')!
+            .trigger('click')
         await flushPromises()
         expect(router.currentRoute.value.query.project).toBeUndefined()
         expect(vm.project).toBe('')
@@ -219,13 +235,19 @@ describe('ConfigView sections (DEV-19)', () => {
         const leaving = router.push('/other')
         await flushPromises()
         expect(dialog().exists()).toBe(true)
-        await dialog().findAll('button').find((b) => b.text() === 'Keep editing')!.trigger('click')
+        await dialog()
+            .findAll('button')
+            .find((b) => b.text() === 'Keep editing')!
+            .trigger('click')
         await leaving
         expect(router.currentRoute.value.path).toBe('/config')
 
         await wrapper.get('select[aria-label="Project scope"]').setValue('APP')
         await flushPromises()
-        await dialog().findAll('button').find((b) => b.text() === 'Discard changes')!.trigger('click')
+        await dialog()
+            .findAll('button')
+            .find((b) => b.text() === 'Discard changes')!
+            .trigger('click')
         await flushPromises()
         expect(router.currentRoute.value.query).toMatchObject({ project: 'APP', section: 'defaults' })
         expect(vm.form.defaultAssignee).toBe('')

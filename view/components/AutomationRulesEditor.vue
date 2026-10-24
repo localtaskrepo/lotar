@@ -1,7 +1,7 @@
 <template>
   <div class="automation-builder">
     <div class="automation-builder__toolbar">
-      <div class="col" style="gap: 4px;">
+      <div class="col" style="gap: 4px">
         <h3 class="automation-builder__title">Rule builder</h3>
         <p class="muted automation-builder__subtitle">
           Start with the outcome you want, then choose the trigger and any optional filters.
@@ -18,7 +18,7 @@
       </UiButton>
     </div>
 
-    <div class="automation-builder__meta row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+    <div class="automation-builder__meta row" style="gap: 8px; align-items: center; flex-wrap: wrap">
       <span v-if="sourceLabel" class="muted">Effective source: {{ sourceLabel }}</span>
       <span v-if="sourceLabel && scopeHint" class="muted" aria-hidden="true">·</span>
       <span v-if="scopeHint" class="muted">{{ scopeHint }}</span>
@@ -38,13 +38,15 @@
     <div v-else class="automation-builder__rule-list">
       <UiCard v-for="(entry, index) in builderRules" :key="entry.id" class="automation-builder__rule-card rule-card">
         <div class="automation-builder__rule-head">
-          <div class="col" style="gap: 10px; flex: 1 1 auto;">
-            <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+          <div class="col" style="gap: 10px; flex: 1 1 auto">
+            <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
               <strong class="rule-name">{{ formatAutomationRuleLabel(entry.summary, index) }}</strong>
               <span v-for="event in entry.summary.events" :key="event" class="automation-builder__event-chip">
                 {{ event }}
               </span>
-              <span v-if="entry.rule.cooldown" class="automation-builder__meta-chip">Cooldown {{ entry.rule.cooldown }}</span>
+              <span v-if="entry.rule.cooldown" class="automation-builder__meta-chip"
+                >Cooldown {{ entry.rule.cooldown }}</span
+              >
               <span v-if="entry.unsupportedReasons.length" class="automation-builder__warning-chip">YAML-only</span>
             </div>
 
@@ -55,7 +57,11 @@
             <div v-if="entry.summary.conditions.length" class="automation-builder__summary-block">
               <span class="muted">Filters</span>
               <div class="automation-builder__summary-list">
-                <span v-for="condition in entry.summary.conditions.slice(0, 3)" :key="condition" class="automation-builder__summary-chip">
+                <span
+                  v-for="condition in entry.summary.conditions.slice(0, 3)"
+                  :key="condition"
+                  class="automation-builder__summary-chip"
+                >
                   {{ condition }}
                 </span>
                 <span v-if="entry.summary.conditions.length > 3" class="automation-builder__summary-chip">
@@ -67,10 +73,17 @@
             <div class="automation-builder__summary-block">
               <span class="muted">Results</span>
               <div class="automation-builder__summary-list">
-                <span v-for="action in entry.summary.actions.slice(0, 3)" :key="action" class="automation-builder__summary-chip automation-builder__summary-chip--action">
+                <span
+                  v-for="action in entry.summary.actions.slice(0, 3)"
+                  :key="action"
+                  class="automation-builder__summary-chip automation-builder__summary-chip--action"
+                >
                   {{ action }}
                 </span>
-                <span v-if="entry.summary.actions.length > 3" class="automation-builder__summary-chip automation-builder__summary-chip--action">
+                <span
+                  v-if="entry.summary.actions.length > 3"
+                  class="automation-builder__summary-chip automation-builder__summary-chip--action"
+                >
                   +{{ entry.summary.actions.length - 3 }} more
                 </span>
               </div>
@@ -97,7 +110,12 @@
             <UiButton variant="ghost" type="button" :disabled="!editable || index === 0" @click="moveRule(index, -1)">
               Up
             </UiButton>
-            <UiButton variant="ghost" type="button" :disabled="!editable || index === builderRules.length - 1" @click="moveRule(index, 1)">
+            <UiButton
+              variant="ghost"
+              type="button"
+              :disabled="!editable || index === builderRules.length - 1"
+              @click="moveRule(index, 1)"
+            >
               Down
             </UiButton>
             <UiButton variant="danger" type="button" :disabled="!editable" @click="deleteRule(index)">
@@ -142,7 +160,12 @@
           <label class="field-label">
             <span>Effective rules (read-only)</span>
           </label>
-          <textarea class="automation-builder__yaml automation-builder__yaml--readonly" rows="10" :value="effectiveYaml" readonly></textarea>
+          <textarea
+            class="automation-builder__yaml automation-builder__yaml--readonly"
+            rows="10"
+            :value="effectiveYaml"
+            readonly
+          ></textarea>
         </div>
       </div>
     </details>
@@ -158,10 +181,21 @@
       <div class="automation-builder__dialog">
         <header class="automation-builder__dialog-header">
           <div>
-            <h2 :id="ruleDialogTitleId">{{ editingIndex === null ? 'Create automation rule' : 'Edit automation rule' }}</h2>
-            <p :id="ruleDialogDescId" class="muted">Focus on the common path first. Use Custom only when you really need multiple triggers or mixed actions.</p>
+            <h2 :id="ruleDialogTitleId">
+              {{ editingIndex === null ? 'Create automation rule' : 'Edit automation rule' }}
+            </h2>
+            <p :id="ruleDialogDescId" class="muted">
+              Focus on the common path first. Use Custom only when you really need multiple triggers or mixed actions.
+            </p>
           </div>
-          <UiButton variant="ghost" icon-only type="button" aria-label="Close dialog" title="Close dialog" @click="closeDialog">
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            @click="closeDialog"
+          >
             <IconGlyph name="close" />
           </UiButton>
         </header>
@@ -182,10 +216,12 @@
         </div>
 
         <div class="automation-builder__dialog-body">
-          <section v-if="dialogStep === 0" class="col" style="gap: 18px;">
+          <section v-if="dialogStep === 0" class="col" style="gap: 18px">
             <div class="automation-builder__guide-block">
               <h3>What should this rule do?</h3>
-              <p class="muted">Most rules have one primary job. Pick that first and the rest of the dialog will stay focused.</p>
+              <p class="muted">
+                Most rules have one primary job. Pick that first and the rest of the dialog will stay focused.
+              </p>
             </div>
 
             <div class="automation-builder__recipe-grid">
@@ -217,10 +253,12 @@
             </div>
           </section>
 
-          <section v-else-if="dialogStep === 1" class="col" style="gap: 18px;">
+          <section v-else-if="dialogStep === 1" class="col" style="gap: 18px">
             <div class="automation-builder__guide-block">
               <h3>When should it run?</h3>
-              <p class="muted">Choose the trigger first, then add filters only if the rule should apply to a subset of tasks.</p>
+              <p class="muted">
+                Choose the trigger first, then add filters only if the rule should apply to a subset of tasks.
+              </p>
             </div>
 
             <div v-if="dialogRecipe === 'custom'" class="field">
@@ -263,14 +301,26 @@
               <label class="field-label">Optional filters</label>
               <p class="field-hint">Leave these empty if the rule should always run when the trigger fires.</p>
 
-              <div v-if="!visibleConditions.length && !visibleChangeConditions.length" class="automation-builder__inline-empty">
+              <div
+                v-if="!visibleConditions.length && !visibleChangeConditions.length"
+                class="automation-builder__inline-empty"
+              >
                 No extra filters yet.
               </div>
 
               <div v-if="visibleConditions.length" class="automation-builder__rows">
-                <div v-for="row in visibleConditions" :key="row.id" class="automation-builder__row automation-builder__row--condition">
-                  <UiSelect :model-value="getConditionFieldSelection(row)" @update:modelValue="(value) => handleConditionFieldChange(row, value as any)">
-                    <option v-for="option in automationConditionFieldOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                <div
+                  v-for="row in visibleConditions"
+                  :key="row.id"
+                  class="automation-builder__row automation-builder__row--condition"
+                >
+                  <UiSelect
+                    :model-value="getConditionFieldSelection(row)"
+                    @update:modelValue="(value) => handleConditionFieldChange(row, value as any)"
+                  >
+                    <option v-for="option in automationConditionFieldOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
                   </UiSelect>
                   <UiInput
                     v-if="row.scope === 'custom_field'"
@@ -285,7 +335,13 @@
                     placeholder="Field name"
                   />
                   <UiSelect v-model="row.operator">
-                    <option v-for="option in automationConditionOperatorOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    <option
+                      v-for="option in automationConditionOperatorOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
                   </UiSelect>
                   <UiSelect v-if="row.operator === 'exists'" v-model="row.value">
                     <option value="true">Exists</option>
@@ -305,8 +361,16 @@
                 </div>
               </div>
 
-              <div v-if="canUseChangeConditions && visibleChangeConditions.length" class="automation-builder__rows" style="margin-top: 10px;">
-                <div v-for="row in visibleChangeConditions" :key="row.id" class="automation-builder__row automation-builder__row--change">
+              <div
+                v-if="canUseChangeConditions && visibleChangeConditions.length"
+                class="automation-builder__rows"
+                style="margin-top: 10px"
+              >
+                <div
+                  v-for="row in visibleChangeConditions"
+                  :key="row.id"
+                  class="automation-builder__row automation-builder__row--change"
+                >
                   <UiInput v-model="row.field" maxlength="80" placeholder="Field name" />
                   <UiInput v-model="row.from" maxlength="120" placeholder="From value" />
                   <UiInput v-model="row.to" maxlength="120" placeholder="To value" />
@@ -314,17 +378,22 @@
                 </div>
               </div>
 
-              <div class="row" style="gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+              <div class="row" style="gap: 8px; margin-top: 12px; flex-wrap: wrap">
                 <UiButton variant="ghost" type="button" @click="addCondition">Add filter</UiButton>
-                <UiButton v-if="canUseChangeConditions" variant="ghost" type="button" @click="addChangeCondition">Watch a field change</UiButton>
+                <UiButton v-if="canUseChangeConditions" variant="ghost" type="button" @click="addChangeCondition"
+                  >Watch a field change</UiButton
+                >
               </div>
             </div>
           </section>
 
-          <section v-else-if="dialogStep === 2" class="col" style="gap: 18px;">
+          <section v-else-if="dialogStep === 2" class="col" style="gap: 18px">
             <div class="automation-builder__guide-block">
               <h3>What should happen?</h3>
-              <p class="muted">Only the controls for the selected goal are shown here. Use Custom if you need a more complex combination.</p>
+              <p class="muted">
+                Only the controls for the selected goal are shown here. Use Custom if you need a more complex
+                combination.
+              </p>
             </div>
 
             <UiEmptyState
@@ -343,11 +412,22 @@
               <div class="field-grid">
                 <div class="field">
                   <label class="field-label">Set status to</label>
-                  <UiInput v-model="simpleStatusValue" maxlength="120" placeholder="Done" list="automation-status-suggestions" />
+                  <UiInput
+                    v-model="simpleStatusValue"
+                    maxlength="120"
+                    placeholder="Done"
+                    list="automation-status-suggestions"
+                  />
                   <datalist v-if="props.availableStatuses.length" id="automation-status-suggestions">
                     <option v-for="s in props.availableStatuses" :key="s" :value="s" />
                   </datalist>
-                  <p class="field-hint">{{ props.availableStatuses.length ? 'Choose from your configured statuses or type a custom value.' : 'Example: InProgress, Review, Done.' }}</p>
+                  <p class="field-hint">
+                    {{
+                      props.availableStatuses.length
+                        ? 'Choose from your configured statuses or type a custom value.'
+                        : 'Example: InProgress, Review, Done.'
+                    }}
+                  </p>
                 </div>
               </div>
             </template>
@@ -363,11 +443,20 @@
                 </div>
                 <div class="field">
                   <label class="field-label">Value</label>
-                  <UiInput v-model="simpleAssignmentValue" maxlength="160" placeholder="@assignee_or_reporter" list="automation-member-suggestions" />
+                  <UiInput
+                    v-model="simpleAssignmentValue"
+                    maxlength="160"
+                    placeholder="@assignee_or_reporter"
+                    list="automation-member-suggestions"
+                  />
                   <datalist v-if="memberSuggestions.length" id="automation-member-suggestions">
                     <option v-for="m in memberSuggestions" :key="m" :value="m" />
                   </datalist>
-                  <p class="field-hint">Tokens like @assignee, @reporter, @assignee_or_reporter, and @me are supported.{{ props.availableMembers.length ? ' Or choose a team member.' : '' }}</p>
+                  <p class="field-hint">
+                    Tokens like @assignee, @reporter, @assignee_or_reporter, and @me are supported.{{
+                      props.availableMembers.length ? ' Or choose a team member.' : ''
+                    }}
+                  </p>
                 </div>
               </div>
             </template>
@@ -399,8 +488,15 @@
             <template v-else-if="dialogRecipe === 'comment'">
               <div class="field">
                 <label class="field-label">Comment</label>
-                <textarea v-model="simpleCommentValue" class="automation-builder__textarea" rows="5" placeholder="Ready for review"></textarea>
-                <p class="field-hint">Template variables such as ${ticket.status} and ${previous.status} are supported.</p>
+                <textarea
+                  v-model="simpleCommentValue"
+                  class="automation-builder__textarea"
+                  rows="5"
+                  placeholder="Ready for review"
+                ></textarea>
+                <p class="field-hint">
+                  Template variables such as ${ticket.status} and ${previous.status} are supported.
+                </p>
               </div>
             </template>
 
@@ -417,11 +513,19 @@
 
               <div v-if="simpleCommandMode === 'shell'" class="field">
                 <label class="field-label">Shell command</label>
-                <textarea v-model="simpleCommandShell" class="automation-builder__textarea" rows="4" placeholder="sh -c 'echo $LOTAR_TICKET_ID'"></textarea>
-                <p class="field-hint">Use this for the common case. Structured mode is only needed when you want args, cwd, or extra environment variables.</p>
+                <textarea
+                  v-model="simpleCommandShell"
+                  class="automation-builder__textarea"
+                  rows="4"
+                  placeholder="sh -c 'echo $LOTAR_TICKET_ID'"
+                ></textarea>
+                <p class="field-hint">
+                  Use this for the common case. Structured mode is only needed when you want args, cwd, or extra
+                  environment variables.
+                </p>
               </div>
 
-              <div v-else class="col" style="gap: 14px;">
+              <div v-else class="col" style="gap: 14px">
                 <div class="field-grid">
                   <div class="field">
                     <label class="field-label">Command</label>
@@ -438,20 +542,24 @@
                 </div>
 
                 <div class="automation-builder__checkbox-row">
-                  <label><input v-model="simpleCommandSpec.wait" type="checkbox"> Wait for command</label>
-                  <label><input v-model="simpleCommandSpec.ignoreFailure" type="checkbox"> Ignore failures</label>
+                  <label><input v-model="simpleCommandSpec.wait" type="checkbox" /> Wait for command</label>
+                  <label><input v-model="simpleCommandSpec.ignoreFailure" type="checkbox" /> Ignore failures</label>
                 </div>
 
                 <div class="field">
                   <label class="field-label">Extra environment</label>
                   <div class="automation-builder__rows">
-                    <div v-for="env in simpleCommandSpec.env" :key="env.id" class="automation-builder__row automation-builder__row--env">
+                    <div
+                      v-for="env in simpleCommandSpec.env"
+                      :key="env.id"
+                      class="automation-builder__row automation-builder__row--env"
+                    >
                       <UiInput v-model="env.key" maxlength="80" placeholder="ENV_NAME" />
                       <UiInput v-model="env.value" maxlength="240" placeholder="Value" />
                       <UiButton variant="danger" type="button" @click="removeSimpleCommandEnv(env.id)">Remove</UiButton>
                     </div>
                   </div>
-                  <div class="row" style="gap: 8px; margin-top: 10px;">
+                  <div class="row" style="gap: 8px; margin-top: 10px">
                     <UiButton variant="ghost" type="button" @click="addSimpleCommandEnv">Add env var</UiButton>
                   </div>
                 </div>
@@ -477,8 +585,11 @@
               </div>
 
               <UiCard v-if="activeCustomAction" class="automation-builder__event-card">
-                <div class="col" style="gap: 14px;">
-                  <div class="row" style="justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div class="col" style="gap: 14px">
+                  <div
+                    class="row"
+                    style="justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap"
+                  >
                     <strong>{{ getAutomationEventLabel(activeCustomAction.event) }}</strong>
                     <span class="automation-builder__event-chip">{{ activeCustomAction.event }}</span>
                   </div>
@@ -486,11 +597,25 @@
                   <div class="field">
                     <label class="field-label">Set fields</label>
                     <div class="automation-builder__rows">
-                      <div v-for="row in activeCustomAction.setFields" :key="row.id" class="automation-builder__row automation-builder__row--set">
-                        <UiSelect :model-value="getSetFieldSelection(row)" @update:modelValue="(value) => handleSetFieldChange(row, value as any)">
-                          <option v-for="option in automationSetFieldOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                      <div
+                        v-for="row in activeCustomAction.setFields"
+                        :key="row.id"
+                        class="automation-builder__row automation-builder__row--set"
+                      >
+                        <UiSelect
+                          :model-value="getSetFieldSelection(row)"
+                          @update:modelValue="(value) => handleSetFieldChange(row, value as any)"
+                        >
+                          <option v-for="option in automationSetFieldOptions" :key="option.value" :value="option.value">
+                            {{ option.label }}
+                          </option>
                         </UiSelect>
-                        <UiInput v-if="row.scope === 'custom_field'" v-model="row.customFieldKey" maxlength="80" placeholder="Custom field key" />
+                        <UiInput
+                          v-if="row.scope === 'custom_field'"
+                          v-model="row.customFieldKey"
+                          maxlength="80"
+                          placeholder="Custom field key"
+                        />
                         <UiInput
                           v-model="row.value"
                           maxlength="240"
@@ -500,11 +625,18 @@
                         <datalist v-if="setFieldValueSuggestions(row).length" :id="`set-suggestions-${row.id}`">
                           <option v-for="s in setFieldValueSuggestions(row)" :key="s" :value="s" />
                         </datalist>
-                        <UiButton variant="danger" type="button" @click="removeSetField(activeCustomAction.event, row.id)">Remove</UiButton>
+                        <UiButton
+                          variant="danger"
+                          type="button"
+                          @click="removeSetField(activeCustomAction.event, row.id)"
+                          >Remove</UiButton
+                        >
                       </div>
                     </div>
-                    <div class="row" style="gap: 8px; margin-top: 10px;">
-                      <UiButton variant="ghost" type="button" @click="addSetField(activeCustomAction.event)">Add set field</UiButton>
+                    <div class="row" style="gap: 8px; margin-top: 10px">
+                      <UiButton variant="ghost" type="button" @click="addSetField(activeCustomAction.event)"
+                        >Add set field</UiButton
+                      >
                     </div>
                   </div>
 
@@ -512,39 +644,81 @@
                     <div class="field">
                       <label class="field-label">Add values</label>
                       <div class="automation-builder__rows">
-                        <div v-for="row in activeCustomAction.addFields" :key="row.id" class="automation-builder__row automation-builder__row--list">
+                        <div
+                          v-for="row in activeCustomAction.addFields"
+                          :key="row.id"
+                          class="automation-builder__row automation-builder__row--list"
+                        >
                           <UiSelect v-model="row.field">
-                            <option v-for="option in automationListFieldOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                            <option
+                              v-for="option in automationListFieldOptions"
+                              :key="option.value"
+                              :value="option.value"
+                            >
+                              {{ option.label }}
+                            </option>
                           </UiSelect>
                           <UiInput v-model="row.value" maxlength="240" :placeholder="listFieldPlaceholder(row.field)" />
-                          <UiButton variant="danger" type="button" @click="removeListField(activeCustomAction.event, 'add', row.id)">Remove</UiButton>
+                          <UiButton
+                            variant="danger"
+                            type="button"
+                            @click="removeListField(activeCustomAction.event, 'add', row.id)"
+                            >Remove</UiButton
+                          >
                         </div>
                       </div>
-                      <div class="row" style="gap: 8px; margin-top: 10px;">
-                        <UiButton variant="ghost" type="button" @click="addListField(activeCustomAction.event, 'add')">Add add-row</UiButton>
+                      <div class="row" style="gap: 8px; margin-top: 10px">
+                        <UiButton variant="ghost" type="button" @click="addListField(activeCustomAction.event, 'add')"
+                          >Add add-row</UiButton
+                        >
                       </div>
                     </div>
 
                     <div class="field">
                       <label class="field-label">Remove values</label>
                       <div class="automation-builder__rows">
-                        <div v-for="row in activeCustomAction.removeFields" :key="row.id" class="automation-builder__row automation-builder__row--list">
+                        <div
+                          v-for="row in activeCustomAction.removeFields"
+                          :key="row.id"
+                          class="automation-builder__row automation-builder__row--list"
+                        >
                           <UiSelect v-model="row.field">
-                            <option v-for="option in automationListFieldOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                            <option
+                              v-for="option in automationListFieldOptions"
+                              :key="option.value"
+                              :value="option.value"
+                            >
+                              {{ option.label }}
+                            </option>
                           </UiSelect>
                           <UiInput v-model="row.value" maxlength="240" :placeholder="listFieldPlaceholder(row.field)" />
-                          <UiButton variant="danger" type="button" @click="removeListField(activeCustomAction.event, 'remove', row.id)">Remove</UiButton>
+                          <UiButton
+                            variant="danger"
+                            type="button"
+                            @click="removeListField(activeCustomAction.event, 'remove', row.id)"
+                            >Remove</UiButton
+                          >
                         </div>
                       </div>
-                      <div class="row" style="gap: 8px; margin-top: 10px;">
-                        <UiButton variant="ghost" type="button" @click="addListField(activeCustomAction.event, 'remove')">Add remove-row</UiButton>
+                      <div class="row" style="gap: 8px; margin-top: 10px">
+                        <UiButton
+                          variant="ghost"
+                          type="button"
+                          @click="addListField(activeCustomAction.event, 'remove')"
+                          >Add remove-row</UiButton
+                        >
                       </div>
                     </div>
                   </div>
 
                   <div class="field">
                     <label class="field-label">Comment</label>
-                    <textarea v-model="activeCustomAction.comment" class="automation-builder__textarea" rows="3" placeholder="Optional comment template"></textarea>
+                    <textarea
+                      v-model="activeCustomAction.comment"
+                      class="automation-builder__textarea"
+                      rows="3"
+                      placeholder="Optional comment template"
+                    ></textarea>
                   </div>
 
                   <div class="field">
@@ -558,10 +732,15 @@
 
                   <div v-if="activeCustomAction.runMode === 'shell'" class="field">
                     <label class="field-label">Shell command</label>
-                    <textarea v-model="activeCustomAction.runShell" class="automation-builder__textarea" rows="3" placeholder="sh -c 'echo $LOTAR_TICKET_ID'"></textarea>
+                    <textarea
+                      v-model="activeCustomAction.runShell"
+                      class="automation-builder__textarea"
+                      rows="3"
+                      placeholder="sh -c 'echo $LOTAR_TICKET_ID'"
+                    ></textarea>
                   </div>
 
-                  <div v-if="activeCustomAction.runMode === 'command'" class="col" style="gap: 14px;">
+                  <div v-if="activeCustomAction.runMode === 'command'" class="col" style="gap: 14px">
                     <div class="field-grid">
                       <div class="field">
                         <label class="field-label">Command</label>
@@ -569,7 +748,11 @@
                       </div>
                       <div class="field">
                         <label class="field-label">Args</label>
-                        <UiInput v-model="activeCustomAction.runArgs" maxlength="240" placeholder="Comma separated args" />
+                        <UiInput
+                          v-model="activeCustomAction.runArgs"
+                          maxlength="240"
+                          placeholder="Comma separated args"
+                        />
                       </div>
                       <div class="field">
                         <label class="field-label">Working directory</label>
@@ -577,20 +760,33 @@
                       </div>
                     </div>
                     <div class="automation-builder__checkbox-row">
-                      <label><input v-model="activeCustomAction.runWait" type="checkbox"> Wait for command</label>
-                      <label><input v-model="activeCustomAction.runIgnoreFailure" type="checkbox"> Ignore failures</label>
+                      <label><input v-model="activeCustomAction.runWait" type="checkbox" /> Wait for command</label>
+                      <label
+                        ><input v-model="activeCustomAction.runIgnoreFailure" type="checkbox" /> Ignore failures</label
+                      >
                     </div>
                     <div class="field">
                       <label class="field-label">Extra environment</label>
                       <div class="automation-builder__rows">
-                        <div v-for="env in activeCustomAction.runEnv" :key="env.id" class="automation-builder__row automation-builder__row--env">
+                        <div
+                          v-for="env in activeCustomAction.runEnv"
+                          :key="env.id"
+                          class="automation-builder__row automation-builder__row--env"
+                        >
                           <UiInput v-model="env.key" maxlength="80" placeholder="ENV_NAME" />
                           <UiInput v-model="env.value" maxlength="240" placeholder="Value" />
-                          <UiButton variant="danger" type="button" @click="removeRunEnv(activeCustomAction.event, env.id)">Remove</UiButton>
+                          <UiButton
+                            variant="danger"
+                            type="button"
+                            @click="removeRunEnv(activeCustomAction.event, env.id)"
+                            >Remove</UiButton
+                          >
                         </div>
                       </div>
-                      <div class="row" style="gap: 8px; margin-top: 10px;">
-                        <UiButton variant="ghost" type="button" @click="addRunEnv(activeCustomAction.event)">Add env var</UiButton>
+                      <div class="row" style="gap: 8px; margin-top: 10px">
+                        <UiButton variant="ghost" type="button" @click="addRunEnv(activeCustomAction.event)"
+                          >Add env var</UiButton
+                        >
                       </div>
                     </div>
                   </div>
@@ -599,24 +795,39 @@
             </template>
           </section>
 
-          <section v-else class="col" style="gap: 16px;">
+          <section v-else class="col" style="gap: 16px">
             <UiCard>
-              <div class="col" style="gap: 12px;">
-                <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+              <div class="col" style="gap: 12px">
+                <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
                   <strong>{{ dialogPreviewSummary.name || 'New rule' }}</strong>
-                  <span v-for="event in dialogPreviewSummary.events" :key="event" class="automation-builder__event-chip">{{ event }}</span>
+                  <span
+                    v-for="event in dialogPreviewSummary.events"
+                    :key="event"
+                    class="automation-builder__event-chip"
+                    >{{ event }}</span
+                  >
                 </div>
                 <p class="automation-builder__review-sentence">{{ dialogReviewSentence }}</p>
                 <div class="automation-builder__summary-block" v-if="dialogPreviewSummary.conditions.length">
                   <span class="muted">Filters</span>
                   <div class="automation-builder__summary-list">
-                    <span v-for="condition in dialogPreviewSummary.conditions" :key="condition" class="automation-builder__summary-chip">{{ condition }}</span>
+                    <span
+                      v-for="condition in dialogPreviewSummary.conditions"
+                      :key="condition"
+                      class="automation-builder__summary-chip"
+                      >{{ condition }}</span
+                    >
                   </div>
                 </div>
                 <div class="automation-builder__summary-block">
                   <span class="muted">Results</span>
                   <div class="automation-builder__summary-list">
-                    <span v-for="action in dialogPreviewSummary.actions" :key="action" class="automation-builder__summary-chip automation-builder__summary-chip--action">{{ action }}</span>
+                    <span
+                      v-for="action in dialogPreviewSummary.actions"
+                      :key="action"
+                      class="automation-builder__summary-chip automation-builder__summary-chip--action"
+                      >{{ action }}</span
+                    >
                   </div>
                 </div>
               </div>
@@ -624,19 +835,39 @@
 
             <details class="automation-builder__preview-yaml">
               <summary>Generated YAML</summary>
-              <div class="automation-builder__advanced-body" style="padding-top: 12px;">
-                <textarea class="automation-builder__yaml automation-builder__yaml--readonly" rows="14" :value="dialogPreviewYaml" readonly></textarea>
+              <div class="automation-builder__advanced-body" style="padding-top: 12px">
+                <textarea
+                  class="automation-builder__yaml automation-builder__yaml--readonly"
+                  rows="14"
+                  :value="dialogPreviewYaml"
+                  readonly
+                ></textarea>
               </div>
             </details>
           </section>
         </div>
 
         <footer class="automation-builder__dialog-actions">
-          <UiButton variant="ghost" type="button" @click="dialogStep = Math.max(0, dialogStep - 1)" :disabled="dialogStep === 0">Back</UiButton>
+          <UiButton
+            variant="ghost"
+            type="button"
+            @click="dialogStep = Math.max(0, dialogStep - 1)"
+            :disabled="dialogStep === 0"
+            >Back</UiButton
+          >
           <div class="automation-builder__dialog-actions-right">
             <UiButton variant="ghost" type="button" @click="closeDialog">Cancel</UiButton>
-            <UiButton v-if="dialogStep < stepLabels.length - 1" variant="primary" type="button" :disabled="!canAdvanceDialog" @click="advanceDialog">Next</UiButton>
-            <UiButton v-else variant="primary" type="button" :disabled="!dialogCanSave" @click="commitDialogRule">{{ editingIndex === null ? 'Create rule' : 'Save rule' }}</UiButton>
+            <UiButton
+              v-if="dialogStep < stepLabels.length - 1"
+              variant="primary"
+              type="button"
+              :disabled="!canAdvanceDialog"
+              @click="advanceDialog"
+              >Next</UiButton
+            >
+            <UiButton v-else variant="primary" type="button" :disabled="!dialogCanSave" @click="commitDialogRule">{{
+              editingIndex === null ? 'Create rule' : 'Save rule'
+            }}</UiButton>
           </div>
         </footer>
       </div>
@@ -648,33 +879,33 @@
 import { computed, ref, useId, watch } from 'vue'
 import { listFromCsv } from '../composables/useFilterBuilder'
 import {
-    automationConditionFieldOptions,
-    automationConditionOperatorOptions,
-    automationEventOptions,
-    automationListFieldOptions,
-    automationSetFieldOptions,
-    buildAutomationRuleFromDraft,
-    buildAutomationYamlDocument,
-    createChangeDraft,
-    createEmptyRuleDraft,
-    createListFieldDraft,
-    createRunEnvDraft,
-    createSetFieldDraft,
-    formatAutomationRuleLabel,
-    getAutomationEventLabel,
-    getConditionFieldSelection,
-    getEditableRuleState,
-    getSetFieldSelection,
-    normalizeConditionFieldSelection,
-    normalizeSetFieldSelection,
-    parseAutomationYamlDocument,
-    summarizeAutomationRule,
-    type AutomationConditionDraft,
-    type AutomationEventActionDraft,
-    type AutomationEventKey,
-    type AutomationRuleDraft,
-    type AutomationRunEnvDraft,
-    type AutomationSetFieldDraft,
+  automationConditionFieldOptions,
+  automationConditionOperatorOptions,
+  automationEventOptions,
+  automationListFieldOptions,
+  automationSetFieldOptions,
+  buildAutomationRuleFromDraft,
+  buildAutomationYamlDocument,
+  createChangeDraft,
+  createEmptyRuleDraft,
+  createListFieldDraft,
+  createRunEnvDraft,
+  createSetFieldDraft,
+  formatAutomationRuleLabel,
+  getAutomationEventLabel,
+  getConditionFieldSelection,
+  getEditableRuleState,
+  getSetFieldSelection,
+  normalizeConditionFieldSelection,
+  normalizeSetFieldSelection,
+  parseAutomationYamlDocument,
+  summarizeAutomationRule,
+  type AutomationConditionDraft,
+  type AutomationEventActionDraft,
+  type AutomationEventKey,
+  type AutomationRuleDraft,
+  type AutomationRunEnvDraft,
+  type AutomationSetFieldDraft,
 } from '../utils/automationRules'
 import ChipListField from './ChipListField.vue'
 import IconGlyph from './IconGlyph.vue'
@@ -751,32 +982,35 @@ const eventDetails: Record<AutomationEventKey, string> = {
 
 const taskChangeEvents = new Set<AutomationEventKey>(['start', 'updated', 'assigned', 'sprint_changed'])
 
-const props = withDefaults(defineProps<{
-  modelValue: string
-  effectiveYaml?: string
-  loading?: boolean
-  error?: string | null
-  sourceLabel?: string
-  scopeHint?: string
-  editable?: boolean
-  availableStatuses?: string[]
-  availablePriorities?: string[]
-  availableTypes?: string[]
-  availableTags?: string[]
-  availableMembers?: string[]
-}>(), {
-  effectiveYaml: '',
-  loading: false,
-  error: null,
-  sourceLabel: '',
-  scopeHint: '',
-  editable: true,
-  availableStatuses: () => [],
-  availablePriorities: () => [],
-  availableTypes: () => [],
-  availableTags: () => [],
-  availableMembers: () => [],
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    effectiveYaml?: string
+    loading?: boolean
+    error?: string | null
+    sourceLabel?: string
+    scopeHint?: string
+    editable?: boolean
+    availableStatuses?: string[]
+    availablePriorities?: string[]
+    availableTypes?: string[]
+    availableTags?: string[]
+    availableMembers?: string[]
+  }>(),
+  {
+    effectiveYaml: '',
+    loading: false,
+    error: null,
+    sourceLabel: '',
+    scopeHint: '',
+    editable: true,
+    availableStatuses: () => [],
+    availablePriorities: () => [],
+    availableTypes: () => [],
+    availableTags: () => [],
+    availableMembers: () => [],
+  },
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
@@ -785,17 +1019,19 @@ const emit = defineEmits<{
 const parsedDocument = computed(() => parseAutomationYamlDocument(props.modelValue))
 const hasParseError = computed(() => Boolean(parsedDocument.value.parseError))
 
-const builderRules = computed(() => parsedDocument.value.rules.map((rule, index) => {
-  const editableState = getEditableRuleState(rule)
-  return {
-    id: `${index}-${rule.name || 'rule'}`,
-    index,
-    rule,
-    summary: summarizeAutomationRule(rule),
-    draft: editableState.draft,
-    unsupportedReasons: editableState.unsupportedReasons,
-  }
-}))
+const builderRules = computed(() =>
+  parsedDocument.value.rules.map((rule, index) => {
+    const editableState = getEditableRuleState(rule)
+    return {
+      id: `${index}-${rule.name || 'rule'}`,
+      index,
+      rule,
+      summary: summarizeAutomationRule(rule),
+      draft: editableState.draft,
+      unsupportedReasons: editableState.unsupportedReasons,
+    }
+  }),
+)
 
 const maxIterationsInput = computed(() => parsedDocument.value.maxIterations)
 
@@ -831,7 +1067,9 @@ const memberSuggestions = computed(() => {
 })
 
 const visibleConditions = computed(() => dialogDraft.value.conditions.filter((row) => hasConditionContent(row)))
-const visibleChangeConditions = computed(() => dialogDraft.value.changeConditions.filter((row) => hasChangeContent(row)))
+const visibleChangeConditions = computed(() =>
+  dialogDraft.value.changeConditions.filter((row) => hasChangeContent(row)),
+)
 const customEnabledEventActions = computed(() => dialogDraft.value.eventActions.filter((entry) => entry.enabled))
 const activeCustomAction = computed(() => {
   if (dialogRecipe.value !== 'custom' || !activeCustomEvent.value) return null
@@ -849,7 +1087,9 @@ const dialogPreviewRule = computed(() => {
   if (!dialogRecipe.value) return {}
   return buildAutomationRuleFromDraft(workingDraft.value)
 })
-const dialogPreviewYaml = computed(() => buildAutomationYamlDocument(Object.keys(dialogPreviewRule.value).length ? [dialogPreviewRule.value] : []))
+const dialogPreviewYaml = computed(() =>
+  buildAutomationYamlDocument(Object.keys(dialogPreviewRule.value).length ? [dialogPreviewRule.value] : []),
+)
 const dialogPreviewSummary = computed(() => summarizeAutomationRule(dialogPreviewRule.value))
 const dialogCanSave = computed(() => {
   if (!dialogRecipe.value) return false
@@ -882,16 +1122,20 @@ const dialogReviewSentence = computed(() => {
   return `When ${trigger}${conditions}, ${action}.`
 })
 
-watch(customEnabledEventActions, (entries) => {
-  if (dialogRecipe.value !== 'custom') return
-  if (!entries.length) {
-    activeCustomEvent.value = null
-    return
-  }
-  if (!activeCustomEvent.value || !entries.some((entry) => entry.event === activeCustomEvent.value)) {
-    activeCustomEvent.value = entries[0]?.event ?? null
-  }
-}, { deep: true })
+watch(
+  customEnabledEventActions,
+  (entries) => {
+    if (dialogRecipe.value !== 'custom') return
+    if (!entries.length) {
+      activeCustomEvent.value = null
+      return
+    }
+    if (!activeCustomEvent.value || !entries.some((entry) => entry.event === activeCustomEvent.value)) {
+      activeCustomEvent.value = entries[0]?.event ?? null
+    }
+  },
+  { deep: true },
+)
 
 function updateYaml(value: string) {
   emit('update:modelValue', value)
@@ -978,7 +1222,8 @@ function selectRecipe(recipe: GuidedRecipe) {
   }
   dialogRecipe.value = recipe
   if (recipe === 'custom') {
-    activeCustomEvent.value = dialogDraft.value.eventActions.find((entry) => entry.enabled)?.event ?? activeCustomEvent.value
+    activeCustomEvent.value =
+      dialogDraft.value.eventActions.find((entry) => entry.enabled)?.event ?? activeCustomEvent.value
     return
   }
   if (selectedSimpleEvent.value == null) {
@@ -1098,7 +1343,9 @@ function firstDialogActionLine() {
   if (dialogRecipe.value === 'command') {
     return simpleCommandMode.value === 'shell'
       ? 'run a shell command'
-      : (simpleCommandSpec.value.command.trim() ? `run ${simpleCommandSpec.value.command.trim()}` : 'run a command')
+      : simpleCommandSpec.value.command.trim()
+        ? `run ${simpleCommandSpec.value.command.trim()}`
+        : 'run a command'
   }
   return stripLeadingEvent(dialogPreviewSummary.value.actions[0]) || 'apply the configured actions'
 }
@@ -1185,38 +1432,40 @@ function inferRecipe(draft: AutomationRuleDraft): GuidedRecipe {
   const addFields = entry.addFields.filter((row) => row.value.trim())
   const removeFields = entry.removeFields.filter((row) => row.value.trim())
   const hasComment = Boolean(entry.comment.trim())
-  const hasRun = (entry.runMode === 'shell' && Boolean(entry.runShell.trim())) || (entry.runMode === 'command' && Boolean(entry.runCommand.trim()))
+  const hasRun =
+    (entry.runMode === 'shell' && Boolean(entry.runShell.trim())) ||
+    (entry.runMode === 'command' && Boolean(entry.runCommand.trim()))
 
   if (hasComment && !setFields.length && !addFields.length && !removeFields.length && !hasRun) return 'comment'
   if (hasRun && !setFields.length && !addFields.length && !removeFields.length && !hasComment) return 'command'
   if (
-    setFields.length === 1
-    && !addFields.length
-    && !removeFields.length
-    && !hasComment
-    && !hasRun
-    && setFields[0]?.scope === 'field'
-    && setFields[0]?.field === 'status'
+    setFields.length === 1 &&
+    !addFields.length &&
+    !removeFields.length &&
+    !hasComment &&
+    !hasRun &&
+    setFields[0]?.scope === 'field' &&
+    setFields[0]?.field === 'status'
   ) {
     return 'status'
   }
   if (
-    setFields.length === 1
-    && !addFields.length
-    && !removeFields.length
-    && !hasComment
-    && !hasRun
-    && setFields[0]?.scope === 'field'
-    && (setFields[0]?.field === 'assignee' || setFields[0]?.field === 'reporter')
+    setFields.length === 1 &&
+    !addFields.length &&
+    !removeFields.length &&
+    !hasComment &&
+    !hasRun &&
+    setFields[0]?.scope === 'field' &&
+    (setFields[0]?.field === 'assignee' || setFields[0]?.field === 'reporter')
   ) {
     return 'assignment'
   }
   if (
-    !setFields.length
-    && !hasComment
-    && !hasRun
-    && addFields.concat(removeFields).every((row) => row.field === 'tags')
-    && addFields.concat(removeFields).length > 0
+    !setFields.length &&
+    !hasComment &&
+    !hasRun &&
+    addFields.concat(removeFields).every((row) => row.field === 'tags') &&
+    addFields.concat(removeFields).length > 0
   ) {
     return 'tags'
   }
@@ -1244,7 +1493,8 @@ function populateSimpleStateFromDraft(draft: AutomationRuleDraft, recipe: Guided
   }
 
   if (recipe === 'tags') {
-    const source = entry.addFields.find((row) => row.field === 'tags') ?? entry.removeFields.find((row) => row.field === 'tags')
+    const source =
+      entry.addFields.find((row) => row.field === 'tags') ?? entry.removeFields.find((row) => row.field === 'tags')
     simpleTagMode.value = entry.addFields.some((row) => row.field === 'tags' && row.value.trim()) ? 'add' : 'remove'
     simpleTagValues.value = listFromCsv(source?.value ?? '')
     return
@@ -1336,12 +1586,12 @@ function hasDraftActionContent(draft: AutomationRuleDraft) {
   return draft.eventActions.some((entry) => {
     if (!entry.enabled) return false
     return Boolean(
-      entry.comment.trim()
-      || entry.setFields.some((row) => row.value.trim())
-      || entry.addFields.some((row) => row.value.trim())
-      || entry.removeFields.some((row) => row.value.trim())
-      || (entry.runMode === 'shell' && entry.runShell.trim())
-      || (entry.runMode === 'command' && entry.runCommand.trim()),
+      entry.comment.trim() ||
+      entry.setFields.some((row) => row.value.trim()) ||
+      entry.addFields.some((row) => row.value.trim()) ||
+      entry.removeFields.some((row) => row.value.trim()) ||
+      (entry.runMode === 'shell' && entry.runShell.trim()) ||
+      (entry.runMode === 'command' && entry.runCommand.trim()),
     )
   })
 }
@@ -1385,25 +1635,36 @@ function conditionValuePlaceholder(operator: string) {
 function conditionValueSuggestions(row: AutomationConditionDraft): string[] {
   if (row.scope === 'custom_field') return []
   switch (row.field) {
-    case 'status': return props.availableStatuses
-    case 'priority': return props.availablePriorities
-    case 'type': return props.availableTypes
-    case 'tags': return props.availableTags
+    case 'status':
+      return props.availableStatuses
+    case 'priority':
+      return props.availablePriorities
+    case 'type':
+      return props.availableTypes
+    case 'tags':
+      return props.availableTags
     case 'assignee':
-    case 'reporter': return props.availableMembers
-    default: return []
+    case 'reporter':
+      return props.availableMembers
+    default:
+      return []
   }
 }
 
 function setFieldValueSuggestions(row: AutomationSetFieldDraft): string[] {
   if (row.scope === 'custom_field') return []
   switch (row.field) {
-    case 'status': return props.availableStatuses
-    case 'priority': return props.availablePriorities
-    case 'type': return props.availableTypes
+    case 'status':
+      return props.availableStatuses
+    case 'priority':
+      return props.availablePriorities
+    case 'type':
+      return props.availableTypes
     case 'assignee':
-    case 'reporter': return memberSuggestions.value
-    default: return []
+    case 'reporter':
+      return memberSuggestions.value
+    default:
+      return []
   }
 }
 
@@ -1421,7 +1682,6 @@ function hasConditionContent(row: AutomationConditionDraft) {
 function hasChangeContent(row: { field: string; from: string; to: string }) {
   return Boolean(row.field.trim() || row.from.trim() || row.to.trim())
 }
-
 
 function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
   return JSON.parse(JSON.stringify(draft)) as AutomationRuleDraft

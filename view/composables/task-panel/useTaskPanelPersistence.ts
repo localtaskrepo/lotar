@@ -107,13 +107,23 @@ interface SaveQueueState {
 export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions): TaskPanelPersistenceApi {
     let loadGeneration = 0
     let createGeneration = 0
-    watch(() => options.form.project, () => { createGeneration += 1 }, { flush: 'sync' })
+    watch(
+        () => options.form.project,
+        () => {
+            createGeneration += 1
+        },
+        { flush: 'sync' },
+    )
     // DEV-92: a soft-deleted task is read-only — every field mutation
     // (including status patches and queued autosaves) stops here. The
     // server also rejects mutations on deleted tasks ("restore it first").
-    const canEdit = () => options.mode.value === 'edit' && options.ready.value && !options.loading.value &&
+    const canEdit = () =>
+        options.mode.value === 'edit' &&
+        options.ready.value &&
+        !options.loading.value &&
         !isDeletedTask(options.task) &&
-        options.task.id === options.getTaskId() && options.form.id === options.task.id
+        options.task.id === options.getTaskId() &&
+        options.form.id === options.task.id
 
     const saveQueues = new Map<string, SaveQueueState>()
 
@@ -258,23 +268,36 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
     /** Value the panel would send for `field` right now, or undefined if unknown. */
     function currentIntentFor(field: string): unknown {
         switch (field) {
-            case 'title': return options.form.title.trim()
-            case 'status': return options.form.status
-            case 'priority': return options.form.priority
-            case 'task_type': return options.form.task_type
-            case 'reporter': return (options.form.reporter ?? '').trim() || null
-            case 'assignee': return (options.form.assignee ?? '').trim() || null
-            case 'due_date': return fromDateInputValue(options.form.due_date)
-            case 'effort': return options.form.effort || null
-            case 'description': return options.form.description || null
+            case 'title':
+                return options.form.title.trim()
+            case 'status':
+                return options.form.status
+            case 'priority':
+                return options.form.priority
+            case 'task_type':
+                return options.form.task_type
+            case 'reporter':
+                return (options.form.reporter ?? '').trim() || null
+            case 'assignee':
+                return (options.form.assignee ?? '').trim() || null
+            case 'due_date':
+                return fromDateInputValue(options.form.due_date)
+            case 'effort':
+                return options.form.effort || null
+            case 'description':
+                return options.form.description || null
             case 'tags': {
                 const tags = (options.form.tags || []).map((tag) => (tag || '').trim()).filter((tag) => tag.length > 0)
                 return tags
             }
-            case 'sprints': return normalizeSprints(options.form.sprints)
-            case 'custom_fields': return options.buildCustomFields()
-            case 'relationships': return options.buildRelationships()
-            default: return undefined
+            case 'sprints':
+                return normalizeSprints(options.form.sprints)
+            case 'custom_fields':
+                return options.buildCustomFields()
+            case 'relationships':
+                return options.buildRelationships()
+            default:
+                return undefined
         }
     }
 
@@ -292,9 +315,14 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         if (a && b && typeof a === 'object' && typeof b === 'object') {
             const aKeys = Object.keys(a as Record<string, unknown>)
             const bKeys = Object.keys(b as Record<string, unknown>)
-            return aKeys.length === bKeys.length &&
-                aKeys.every((key) => key in (b as Record<string, unknown>) &&
-                    valuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
+            return (
+                aKeys.length === bKeys.length &&
+                aKeys.every(
+                    (key) =>
+                        key in (b as Record<string, unknown>) &&
+                        valuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+                )
+            )
         }
         return false
     }
@@ -310,24 +338,47 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
 
     function applyServerFieldToForm(field: string, server: TaskDTO) {
         switch (field) {
-            case 'title': options.form.title = server.title; break
-            case 'status': options.form.status = server.status; break
-            case 'priority': options.form.priority = server.priority; break
-            case 'task_type': options.form.task_type = server.task_type; break
-            case 'reporter': options.form.reporter = server.reporter || ''; break
-            case 'assignee': options.form.assignee = server.assignee || ''; break
-            case 'due_date': options.form.due_date = toDateInputValue(server.due_date); break
-            case 'effort': options.form.effort = server.effort || ''; break
-            case 'description': options.form.description = server.description || ''; break
-            case 'tags': options.form.tags = [...(server.tags || [])]; break
-            case 'sprints': options.form.sprints = [...(server.sprints || [])]; break
+            case 'title':
+                options.form.title = server.title
+                break
+            case 'status':
+                options.form.status = server.status
+                break
+            case 'priority':
+                options.form.priority = server.priority
+                break
+            case 'task_type':
+                options.form.task_type = server.task_type
+                break
+            case 'reporter':
+                options.form.reporter = server.reporter || ''
+                break
+            case 'assignee':
+                options.form.assignee = server.assignee || ''
+                break
+            case 'due_date':
+                options.form.due_date = toDateInputValue(server.due_date)
+                break
+            case 'effort':
+                options.form.effort = server.effort || ''
+                break
+            case 'description':
+                options.form.description = server.description || ''
+                break
+            case 'tags':
+                options.form.tags = [...(server.tags || [])]
+                break
+            case 'sprints':
+                options.form.sprints = [...(server.sprints || [])]
+                break
             case 'custom_fields':
                 options.applyTaskCustomFields((server.custom_fields || {}) as Record<string, unknown>)
                 break
             case 'relationships':
                 options.applyRelationshipsFromTask(server)
                 break
-            default: break
+            default:
+                break
         }
     }
 
@@ -377,10 +428,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 patch.effort = options.form.effort || null
                 break
             case 'description':
-                if (
-                    !((options.form.description ?? '').trim()) &&
-                    !((options.task.description ?? '').trim())
-                ) {
+                if (!(options.form.description ?? '').trim() && !(options.task.description ?? '').trim()) {
                     return
                 }
                 if ((options.form.description ?? '') === (options.task.description ?? '')) {
@@ -474,7 +522,8 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
     const loadTask = async (id: string): Promise<TaskDTO | undefined> => {
         const scope = options.panelGeneration.value
         const request = ++loadGeneration
-        const current = () => scope === options.panelGeneration.value && request === loadGeneration && id === options.getTaskId()
+        const current = () =>
+            scope === options.panelGeneration.value && request === loadGeneration && id === options.getTaskId()
         if (!current()) return undefined
         options.ready.value = false
         options.loading.value = true

@@ -1,5 +1,9 @@
 <template>
-  <select class="input ui-select" :value="modelValue" @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)">
+  <select
+    class="input ui-select"
+    :value="modelValue"
+    @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
+  >
     <slot />
   </select>
 </template>
@@ -12,7 +16,8 @@ defineEmits<{ (e: 'update:modelValue', v: string): void }>()
   position: relative;
   appearance: none;
   min-height: 32px;
-  padding: calc(var(--space-2, 0.5rem) - 4px) calc(var(--space-3, 0.75rem) + 16px) calc(var(--space-2, 0.5rem) - 4px) var(--space-3, 0.75rem);
+  padding: calc(var(--space-2, 0.5rem) - 4px) calc(var(--space-3, 0.75rem) + 16px) calc(var(--space-2, 0.5rem) - 4px)
+    var(--space-3, 0.75rem);
   background: inherit;
   color: inherit;
   line-height: var(--line-tight, 1.25);

@@ -33,7 +33,7 @@
             :key="referenceStableKey(reference) || index"
             :class="[
               'task-panel__reference-item',
-              { 'task-panel__reference-item--interactive': !!referencePreviewKey(reference) }
+              { 'task-panel__reference-item--interactive': !!referencePreviewKey(reference) },
             ]"
             :tabindex="referencePreviewKey(reference) ? 0 : undefined"
             @mouseenter="handleReferenceEnter(referencePreviewKey(reference), $event)"
@@ -43,7 +43,21 @@
           >
             <span
               class="task-panel__reference-kind"
-              :title="reference.attachment ? 'Attachment reference' : reference.file ? 'Repository file reference' : reference.link ? 'Link reference' : reference.github ? 'GitHub reference' : reference.jira ? 'Jira reference' : reference.code ? 'Code reference' : 'Reference'"
+              :title="
+                reference.attachment
+                  ? 'Attachment reference'
+                  : reference.file
+                    ? 'Repository file reference'
+                    : reference.link
+                      ? 'Link reference'
+                      : reference.github
+                        ? 'GitHub reference'
+                        : reference.jira
+                          ? 'Jira reference'
+                          : reference.code
+                            ? 'Code reference'
+                            : 'Reference'
+              "
               aria-hidden="true"
             >
               <IconGlyph :name="referenceIcon(reference)" />
@@ -83,10 +97,7 @@
             >
               {{ reference.github }}
             </a>
-            <span
-              v-else-if="reference.github"
-              class="task-panel__reference-text"
-            >
+            <span v-else-if="reference.github" class="task-panel__reference-text">
               {{ reference.github }}
             </span>
             <a
@@ -98,16 +109,10 @@
             >
               {{ reference.jira }}
             </a>
-            <span
-              v-else-if="reference.jira"
-              class="task-panel__reference-text"
-            >
+            <span v-else-if="reference.jira" class="task-panel__reference-text">
               {{ reference.jira }}
             </span>
-            <span
-              v-else-if="reference.code"
-              class="task-panel__reference-text"
-            >
+            <span v-else-if="reference.code" class="task-panel__reference-text">
               {{ reference.code }}
             </span>
             <span v-else class="task-panel__reference-text muted" aria-hidden="true">—</span>
@@ -117,8 +122,36 @@
               variant="ghost"
               icon-only
               type="button"
-              :aria-label="reference.link ? 'Remove link' : reference.attachment ? 'Remove attachment' : reference.file ? 'Remove repository file' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
-              :title="reference.link ? 'Remove link' : reference.attachment ? 'Remove attachment' : reference.file ? 'Remove repository file' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
+              :aria-label="
+                reference.link
+                  ? 'Remove link'
+                  : reference.attachment
+                    ? 'Remove attachment'
+                    : reference.file
+                      ? 'Remove repository file'
+                      : reference.github
+                        ? 'Remove GitHub reference'
+                        : reference.jira
+                          ? 'Remove Jira reference'
+                          : reference.code
+                            ? 'Remove code reference'
+                            : 'Remove reference'
+              "
+              :title="
+                reference.link
+                  ? 'Remove link'
+                  : reference.attachment
+                    ? 'Remove attachment'
+                    : reference.file
+                      ? 'Remove repository file'
+                      : reference.github
+                        ? 'Remove GitHub reference'
+                        : reference.jira
+                          ? 'Remove Jira reference'
+                          : reference.code
+                            ? 'Remove code reference'
+                            : 'Remove reference'
+              "
               :disabled="!taskId || removingReferenceKey === referenceStableKey(reference)"
               @click.prevent.stop="removeReference(reference)"
             >
@@ -198,8 +231,7 @@
             'task-panel__references-dialog',
             `task-panel__references-dialog--${addReferenceTab}`,
             {
-              'task-panel__references-dialog--has-preview':
-                addReferenceTab === 'code' && !!addCodePreviewSnippet,
+              'task-panel__references-dialog--has-preview': addReferenceTab === 'code' && !!addCodePreviewSnippet,
             },
           ]"
           role="dialog"
@@ -363,9 +395,22 @@
                   type="submit"
                   :disabled="addReferenceSubmitting || !addReferencePayloadReady"
                 >
-                  {{ addReferenceSubmitting ? 'Adding…' : addReferenceTab === 'code' ? 'Add code' : addReferenceTab === 'file' ? 'Add file' : 'Add link' }}
+                  {{
+                    addReferenceSubmitting
+                      ? 'Adding…'
+                      : addReferenceTab === 'code'
+                        ? 'Add code'
+                        : addReferenceTab === 'file'
+                          ? 'Add file'
+                          : 'Add link'
+                  }}
                 </UiButton>
-                <UiButton variant="ghost" type="button" :disabled="addReferenceSubmitting" @click="closeAddReferenceDialog">
+                <UiButton
+                  variant="ghost"
+                  type="button"
+                  :disabled="addReferenceSubmitting"
+                  @click="closeAddReferenceDialog"
+                >
                   Cancel
                 </UiButton>
               </footer>
@@ -389,7 +434,11 @@ import UiCard from '../UiCard.vue'
 import UiInput from '../UiInput.vue'
 import UiLoader from '../UiLoader.vue'
 import { projectPrefixOfTaskId } from '../../utils/text'
-import { attachmentDisplayName, attachmentHoverTitle as buildAttachmentHoverTitle, attachmentUrl as buildAttachmentUrl } from '../../utils/taskAttachments'
+import {
+  attachmentDisplayName,
+  attachmentHoverTitle as buildAttachmentHoverTitle,
+  attachmentUrl as buildAttachmentUrl,
+} from '../../utils/taskAttachments'
 import { showToast } from '../toast'
 
 type ReferenceEntry = {
@@ -435,7 +484,12 @@ const references = computed(() =>
   (props.task?.references || []).filter((reference) =>
     Boolean(
       reference &&
-        (reference.code || reference.link || reference.attachment || reference.file || reference.github || reference.jira),
+      (reference.code ||
+        reference.link ||
+        reference.attachment ||
+        reference.file ||
+        reference.github ||
+        reference.jira),
     ),
   ),
 )
@@ -490,10 +544,14 @@ async function loadConfigInspect(prefix: string | null) {
   }
 }
 
-watch(taskId, (value) => {
-  const prefix = projectPrefixOfTaskId(value)
-  loadConfigInspect(prefix)
-}, { immediate: true })
+watch(
+  taskId,
+  (value) => {
+    const prefix = projectPrefixOfTaskId(value)
+    loadConfigInspect(prefix)
+  },
+  { immediate: true },
+)
 
 function resetAddReferenceForm() {
   addLinkUrl.value = ''
@@ -620,8 +678,7 @@ function scrollAddCodePreviewToFocusedLine(focus: 'start' | 'end') {
   if (!target) return
 
   const card = snippetContainer.closest('.task-panel-dialog__card') as HTMLElement | null
-  const scrollContainer =
-    snippetContainer.scrollHeight > snippetContainer.clientHeight + 2 ? snippetContainer : card
+  const scrollContainer = snippetContainer.scrollHeight > snippetContainer.clientHeight + 2 ? snippetContainer : card
   if (!scrollContainer) return
 
   const containerRect = scrollContainer.getBoundingClientRect()
@@ -1089,5 +1146,3 @@ function setPreviewElement(refValue: Element | ComponentPublicInstance | null) {
   previewElement.value = element || null
 }
 </script>
-
-

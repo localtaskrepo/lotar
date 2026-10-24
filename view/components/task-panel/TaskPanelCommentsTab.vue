@@ -26,7 +26,8 @@
                   type="button"
                   class="task-panel__comment-action"
                   @click="$emit('startEdit', commentIndex)"
-                >Edit</UiButton>
+                  >Edit</UiButton
+                >
               </template>
               <template v-else>
                 <UiButton
@@ -35,14 +36,16 @@
                   class="task-panel__comment-action"
                   :disabled="editingCommentSubmitting || !editingCommentText.trim()"
                   @click="$emit('saveEdit', commentIndex)"
-                >Save</UiButton>
+                  >Save</UiButton
+                >
                 <UiButton
                   variant="ghost"
                   type="button"
                   class="task-panel__comment-action"
                   :disabled="editingCommentSubmitting"
                   @click="$emit('cancelEdit')"
-                >Cancel</UiButton>
+                  >Cancel</UiButton
+                >
               </template>
             </div>
           </div>
@@ -62,12 +65,7 @@
         <li v-if="!(task.comments && task.comments.length)" class="muted">No comments yet</li>
       </ul>
       <div class="task-panel__comment-editor">
-        <textarea
-          :value="newComment"
-          rows="3"
-          placeholder="Add a comment…"
-          @input="onNewCommentInput"
-        ></textarea>
+        <textarea :value="newComment" rows="3" placeholder="Add a comment…" @input="onNewCommentInput"></textarea>
         <UiButton
           class="task-panel__comment-submit"
           variant="primary"
@@ -86,11 +84,11 @@
 </template>
 
 <script setup lang="ts">
-import type { ComponentPublicInstance } from 'vue';
-import IconGlyph from '../IconGlyph.vue';
-import MarkdownContent from '../MarkdownContent.vue';
-import ReloadButton from '../ReloadButton.vue';
-import UiButton from '../UiButton.vue';
+import type { ComponentPublicInstance } from 'vue'
+import IconGlyph from '../IconGlyph.vue'
+import MarkdownContent from '../MarkdownContent.vue'
+import ReloadButton from '../ReloadButton.vue'
+import UiButton from '../UiButton.vue'
 
 interface TaskComment {
   date: string
@@ -109,7 +107,15 @@ const props = defineProps<{
   setEditingTextarea: (el: HTMLTextAreaElement | null) => void
 }>()
 
-const emit = defineEmits<{ (e: 'reload'): void; (e: 'startEdit', index: number): void; (e: 'saveEdit', index: number): void; (e: 'cancelEdit'): void; (e: 'addComment'): void; (e: 'update:newComment', value: string): void; (e: 'update:editingCommentText', value: string): void }>()
+const emit = defineEmits<{
+  (e: 'reload'): void
+  (e: 'startEdit', index: number): void
+  (e: 'saveEdit', index: number): void
+  (e: 'cancelEdit'): void
+  (e: 'addComment'): void
+  (e: 'update:newComment', value: string): void
+  (e: 'update:editingCommentText', value: string): void
+}>()
 
 function onEditingTextInput(event: Event) {
   emit('update:editingCommentText', (event.target as HTMLTextAreaElement).value)

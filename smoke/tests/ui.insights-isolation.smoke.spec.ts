@@ -95,14 +95,10 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
                 return urls.filter((url) => new URL(url).searchParams.get(param) === null).length;
             },
             async settle(minTotal: number) {
-                await expect
-                    .poll(() => pending.size === 0 && urls.length >= minTotal, { timeout: 15_000 })
-                    .toBe(true);
+                await expect.poll(() => pending.size === 0 && urls.length >= minTotal, { timeout: 15_000 }).toBe(true);
             },
             async waitForNextRequest(afterCount: number) {
-                await expect
-                    .poll(() => urls.length, { timeout: 15_000 })
-                    .toBeGreaterThan(afterCount);
+                await expect.poll(() => urls.length, { timeout: 15_000 }).toBeGreaterThan(afterCount);
                 await this.settle(urls.length);
             },
         };
@@ -241,9 +237,7 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
     }
 
     function distributionRow(page: Page, heading: string, label: string) {
-        return page.locator(
-            `xpath=//h3[normalize-space()="${heading}"]/following::table[1]//tbody/tr[th="${label}"]`,
-        );
+        return page.locator(`xpath=//h3[normalize-space()="${heading}"]/following::table[1]//tbody/tr[th="${label}"]`);
     }
 
     async function distributionCount(page: Page, heading: string, label: string): Promise<string> {
@@ -298,9 +292,7 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
                         await page.getByRole('button', { name: 'Activity', exact: true }).click();
                         const drawer = page.locator('[role="dialog"]');
                         await drawer.waitFor({ state: 'visible', timeout: 10_000 });
-                        await expect
-                            .poll(() => feeds.countUnscoped('project'), { timeout: 10_000 })
-                            .toBeGreaterThan(0);
+                        await expect.poll(() => feeds.countUnscoped('project'), { timeout: 10_000 }).toBeGreaterThan(0);
                         await feeds.settle(feeds.urls.length);
                         // The drawer really rendered the mocked global feed…
                         await expect.poll(() => drawer.locator('.feed-item').count()).toBeGreaterThan(0);
@@ -348,8 +340,16 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
     it('rapid project and window switches settle on the latest selection despite held late responses (mocked feed)', async () => {
         const workspace = await SmokeWorkspace.create();
         try {
-            const baseSeed = await seedTask(workspace, { project: 'BASE', title: 'Dev66 switch base anchor', status: 'Todo' });
-            const freshSeed = await seedTask(workspace, { project: 'FRESH', title: 'Dev66 switch fresh anchor', status: 'Todo' });
+            const baseSeed = await seedTask(workspace, {
+                project: 'BASE',
+                title: 'Dev66 switch base anchor',
+                status: 'Todo',
+            });
+            const freshSeed = await seedTask(workspace, {
+                project: 'FRESH',
+                title: 'Dev66 switch fresh anchor',
+                status: 'Todo',
+            });
             const basePrefix = baseSeed.project;
             const freshPrefix = freshSeed.project;
 
@@ -461,9 +461,17 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
     it('Reload after a REST mutation updates the Projects overview totals, not just task-derived tiles (actual backend)', async () => {
         const workspace = await SmokeWorkspace.create();
         try {
-            const baseTask = await seedTask(workspace, { project: 'BASE', title: 'Dev66 reload base one', status: 'Todo' });
+            const baseTask = await seedTask(workspace, {
+                project: 'BASE',
+                title: 'Dev66 reload base one',
+                status: 'Todo',
+            });
             await seedTask(workspace, { project: 'BASE', title: 'Dev66 reload base two', status: 'Todo' });
-            const freshSeed = await seedTask(workspace, { project: 'FRESH', title: 'Dev66 reload fresh one', status: 'Todo' });
+            const freshSeed = await seedTask(workspace, {
+                project: 'FRESH',
+                title: 'Dev66 reload fresh one',
+                status: 'Todo',
+            });
             const basePrefix = baseTask.project;
             const freshPrefix = freshSeed.project;
 
@@ -520,8 +528,17 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
     it('Insights requests stay explicitly project-scoped with cross-project data isolation (actual backend)', async () => {
         const workspace = await SmokeWorkspace.create();
         try {
-            await seedTask(workspace, { project: 'BASE', title: 'Dev66 scope base todo', tags: ['alpha'], status: 'Todo' });
-            const freshSeed = await seedTask(workspace, { project: 'FRESH', title: 'Dev66 scope fresh done', status: 'Done' });
+            await seedTask(workspace, {
+                project: 'BASE',
+                title: 'Dev66 scope base todo',
+                tags: ['alpha'],
+                status: 'Todo',
+            });
+            const freshSeed = await seedTask(workspace, {
+                project: 'FRESH',
+                title: 'Dev66 scope fresh done',
+                status: 'Done',
+            });
             const freshPrefix = freshSeed.project;
 
             const server = await startLotarServer(workspace, {
@@ -562,9 +579,7 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
                     // Switching to All projects legitimately broadens scope:
                     // the FRESH task appears through a fresh unscoped query.
                     const projectSelect = page.locator('.insights-controls select.ui-select');
-                    await expect
-                        .poll(() => projectSelect.locator('option[value=""]').count())
-                        .toBeGreaterThan(0);
+                    await expect.poll(() => projectSelect.locator('option[value=""]').count()).toBeGreaterThan(0);
                     await projectSelect.selectOption('');
                     await expect.poll(() => tileValue(page, 'Total tasks')).toBe('2');
                     await expect.poll(() => distributionCount(page, 'Status distribution', 'Done')).toBe('1');
@@ -585,7 +600,12 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
     it('empty tag matches keep the activity average at zero and untagged-only excludes tagged tasks (mocked feed, real task queries)', async () => {
         const workspace = await SmokeWorkspace.create();
         try {
-            const tagged = await seedTask(workspace, { project: 'BASE', title: 'Dev66 tag tagged', tags: ['red'], status: 'Todo' });
+            const tagged = await seedTask(workspace, {
+                project: 'BASE',
+                title: 'Dev66 tag tagged',
+                tags: ['red'],
+                status: 'Todo',
+            });
             await seedTask(workspace, { project: 'BASE', title: 'Dev66 tag untagged', status: 'Todo' });
             const basePrefix = tagged.project;
 

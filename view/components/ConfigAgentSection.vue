@@ -29,11 +29,18 @@
       <div class="field">
         <label class="field-label" :for="`${uid}-instructions-mode`">
           <span>Source</span>
-          <span v-if="sourceFor('agent_instructions')" :class="['provenance', provenanceClass(sourceFor('agent_instructions'))]">
+          <span
+            v-if="sourceFor('agent_instructions')"
+            :class="['provenance', provenanceClass(sourceFor('agent_instructions'))]"
+          >
             {{ provenanceLabel(sourceFor('agent_instructions')) }}
           </span>
         </label>
-        <UiSelect :id="`${uid}-instructions-mode`" v-model="instructionsMode" @change="emit('validate', 'agent_instructions')">
+        <UiSelect
+          :id="`${uid}-instructions-mode`"
+          v-model="instructionsMode"
+          @change="emit('validate', 'agent_instructions')"
+        >
           <option v-if="!isGlobal" value="inherit">Inherit global</option>
           <option value="builtin">Built-in instructions</option>
           <option value="inline">Custom text</option>
@@ -61,7 +68,9 @@
           @blur="emit('validate', 'agent_instructions')"
         />
       </div>
-      <p class="field-hint field--full">Prepended to every agent prompt. File paths may be absolute or relative to the tasks directory.</p>
+      <p class="field-hint field--full">
+        Prepended to every agent prompt. File paths may be absolute or relative to the tasks directory.
+      </p>
       <p v-if="errors.agent_instructions" class="field-error field--full">{{ errors.agent_instructions }}</p>
 
       <h3 class="cfg-group-heading field--full">Logs</h3>
@@ -73,7 +82,10 @@
           maxlength="512"
           :placeholder="isGlobal ? 'Not saved (kept in memory only)' : inheritPlaceholder(globalLogsDir)"
         />
-        <p class="field-hint">When set, job events are also written to &lt;folder&gt;/&lt;JOB_ID&gt;.jsonl so status and logs survive restarts.</p>
+        <p class="field-hint">
+          When set, job events are also written to &lt;folder&gt;/&lt;JOB_ID&gt;.jsonl so status and logs survive
+          restarts.
+        </p>
       </div>
 
       <h3 class="cfg-group-heading field--full">Worktrees</h3>
@@ -169,6 +181,4 @@ const uid = useId()
 function inheritPlaceholder(value: string) {
   return value ? `Inherit global (${value})` : 'Inherit global'
 }
-
 </script>
-

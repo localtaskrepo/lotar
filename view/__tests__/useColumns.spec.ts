@@ -76,10 +76,7 @@ describe('useColumns', () => {
     })
 
     it('restores saved custom columns once custom fields become known', async () => {
-        localStorage.setItem(
-            'lotar.taskTable.columns',
-            JSON.stringify(['id', 'title', 'custom:sprint']),
-        )
+        localStorage.setItem('lotar.taskTable.columns', JSON.stringify(['id', 'title', 'custom:sprint']))
         const { wrapper } = mountHarness()
         await nextTick()
         // Config loads async in real usage: customs become known only after the store exists.

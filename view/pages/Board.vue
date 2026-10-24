@@ -1,9 +1,16 @@
 <template>
-  <section class="col" style="gap:16px;">
-    <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-      <h1>Boards <span v-if="project" class="muted">— {{ project }}</span></h1>
+  <section class="col" style="gap: 16px">
+    <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px">
+      <h1>
+        Boards <span v-if="project" class="muted">— {{ project }}</span>
+      </h1>
       <div class="row board-controls">
-        <UiButton class="board-columns-button" type="button" data-testid="board-columns-button" @click="columnsDialogOpen = true">
+        <UiButton
+          class="board-columns-button"
+          type="button"
+          data-testid="board-columns-button"
+          @click="columnsDialogOpen = true"
+        >
           <IconGlyph name="columns" aria-hidden="true" />
           <span>Columns</span>
         </UiButton>
@@ -56,13 +63,25 @@
             @reset="boardFields.resetColumns"
           >
             <template #trigger="{ open, toggle }">
-              <UiButton class="responsive-action" type="button" aria-label="Configure card fields" title="Choose which fields appear on cards" :aria-expanded="open" @click="toggle">
+              <UiButton
+                class="responsive-action"
+                type="button"
+                aria-label="Configure card fields"
+                title="Choose which fields appear on cards"
+                :aria-expanded="open"
+                @click="toggle"
+              >
                 <IconGlyph name="columns" aria-hidden="true" />
                 <span class="responsive-action__label">Fields</span>
               </UiButton>
             </template>
           </ColumnsMenu>
-          <select v-model="groupBy" class="input board-chips-row__groupby" aria-label="Group cards by" data-testid="board-groupby">
+          <select
+            v-model="groupBy"
+            class="input board-chips-row__groupby"
+            aria-label="Group cards by"
+            data-testid="board-groupby"
+          >
             <option value="none">No grouping</option>
             <option value="assignee">Group by assignee</option>
             <option value="priority">Group by priority</option>
@@ -77,17 +96,24 @@
       <UiButton variant="ghost" type="button" :disabled="loadingTasks" @click="refreshBoardTasks()">Retry</UiButton>
     </div>
 
-    <div v-if="project && !initialLoading && hiddenColumns.length" class="row board-hidden-note muted" data-testid="board-hidden-columns">
+    <div
+      v-if="project && !initialLoading && hiddenColumns.length"
+      class="row board-hidden-note muted"
+      data-testid="board-hidden-columns"
+    >
       <span>
-        {{ hiddenColumns.length }} {{ hiddenColumns.length === 1 ? 'column' : 'columns' }} hidden
-        ({{ hiddenColumns.map((col) => col.label).join(', ') }}) · {{ hiddenTaskCount }} {{ hiddenTaskCount === 1 ? 'task' : 'tasks' }}
+        {{ hiddenColumns.length }} {{ hiddenColumns.length === 1 ? 'column' : 'columns' }} hidden ({{
+          hiddenColumns.map((col) => col.label).join(', ')
+        }}) · {{ hiddenTaskCount }} {{ hiddenTaskCount === 1 ? 'task' : 'tasks' }}
       </span>
-      <UiButton class="board-hidden-note__action" variant="ghost" type="button" @click="boardLayout.showAll()">Show all</UiButton>
+      <UiButton class="board-hidden-note__action" variant="ghost" type="button" @click="boardLayout.showAll()"
+        >Show all</UiButton
+      >
     </div>
 
-    <div v-if="initialLoading" style="margin: 12px 0;"><UiLoader>Loading board…</UiLoader></div>
+    <div v-if="initialLoading" style="margin: 12px 0"><UiLoader>Loading board…</UiLoader></div>
 
-    <div v-else-if="loadError && project && !items.length" style="margin: 12px 0;">
+    <div v-else-if="loadError && project && !items.length" style="margin: 12px 0">
       <UiEmptyState
         title="We couldn't load board tasks"
         :description="loadError"
@@ -99,7 +125,7 @@
     <div v-else-if="!project">
       <UiEmptyState title="Pick a project" description="Choose a project below to open its board.">
         <template #actions>
-          <div class="col" style="gap:4px; width:320px; max-width:100%;">
+          <div class="col" style="gap: 4px; width: 320px; max-width: 100%">
             <label for="board-project-select">Project</label>
             <UiSelect
               id="board-project-select"
@@ -107,7 +133,11 @@
               :disabled="loadingProjects || !projects.length"
               @update:model-value="onFilterUpdate({ ...filter, project: $event })"
             >
-              <option value="" disabled>{{ loadingProjects ? 'Loading projects…' : projects.length ? 'Choose a project' : 'No projects available' }}</option>
+              <option value="" disabled>
+                {{
+                  loadingProjects ? 'Loading projects…' : projects.length ? 'Choose a project' : 'No projects available'
+                }}
+              </option>
               <option v-for="item in projects" :key="item.prefix" :value="item.prefix">
                 {{ item.name && item.name !== item.prefix ? `${item.name} (${item.prefix})` : item.prefix }}
               </option>
@@ -122,109 +152,186 @@
         <template v-for="group in allGroupLabels" :key="group">
           <!-- Swimlane header spans all columns -->
           <div class="swimlane-row" :style="{ gridColumn: `1 / -1` }">
-            <button type="button" class="swimlane-header" :class="{ collapsed: collapsedGroups.has(group) }" @click="toggleGroup(group)">
+            <button
+              type="button"
+              class="swimlane-header"
+              :class="{ collapsed: collapsedGroups.has(group) }"
+              @click="toggleGroup(group)"
+            >
               <span class="swimlane-chevron" :class="{ open: !collapsedGroups.has(group) }">▶</span>
-              <span v-if="groupBy === 'assignee'" class="member-badge" :style="{ background: memberColor(group === '(none)' ? '' : group) }" :title="group">{{ memberInitials(group === '(none)' ? '' : group) }}</span>
+              <span
+                v-if="groupBy === 'assignee'"
+                class="member-badge"
+                :style="{ background: memberColor(group === '(none)' ? '' : group) }"
+                :title="group"
+                >{{ memberInitials(group === '(none)' ? '' : group) }}</span
+              >
               <span class="swimlane-label">{{ group }}</span>
               <span class="muted swimlane-count">{{ groupTotalCount(group) }}</span>
             </button>
           </div>
           <!-- Per-lane tasks for this group; stacked lanes keep one labelled section per status -->
           <template v-if="!collapsedGroups.has(group)">
-            <div v-for="lane in boardLanes" :key="`${group}::${lane.key}`" class="col column-group-cell"
-                 :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
-                 :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
-                 :class="{ 'over-limit': laneOverLimit(lane), 'column-group-cell--stacked': lane.stacked }"
-                 @dragover.prevent="onDragOver"
-                 @drop.prevent="onLaneDrop(lane, $event)"
+            <div
+              v-for="lane in boardLanes"
+              :key="`${group}::${lane.key}`"
+              class="col column-group-cell"
+              :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
+              :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+              :class="{ 'over-limit': laneOverLimit(lane), 'column-group-cell--stacked': lane.stacked }"
+              @dragover.prevent="onDragOver"
+              @drop.prevent="onLaneDrop(lane, $event)"
             >
-              <div v-for="col in lane.columns" :key="col.key" class="column-section"
-                   :class="{ 'column-section--stacked': lane.stacked }"
-                   :data-section-key="col.key"
-                   :data-status="lane.stacked ? statusAttr(col) : undefined"
-                   :data-column-kind="lane.stacked ? kindAttr(col) : undefined"
+              <div
+                v-for="col in lane.columns"
+                :key="col.key"
+                class="column-section"
+                :class="{ 'column-section--stacked': lane.stacked }"
+                :data-section-key="col.key"
+                :data-status="lane.stacked ? statusAttr(col) : undefined"
+                :data-column-kind="lane.stacked ? kindAttr(col) : undefined"
               >
                 <div v-if="lane.stacked" class="column-section__label muted">{{ col.label }}</div>
                 <TransitionGroup name="task-list" tag="div" class="col-cards">
-                  <article v-for="task in groupedColumnTasks(col, group)" :key="task.id"
-                       class="card task"
-                       :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
-                       draggable="true"
-                       @dragstart="onDragStart(task)"
-                       @dblclick="openTask(task.id)"
-                       @click.exact="selectTask(task.id)"
-                       @keydown.enter.prevent="openTask(task.id)"
-                       tabindex="0">
-                <header v-if="hasTaskHeader(task)" class="row task-header">
-                  <template v-if="hasTaskIdentity(task)">
-                    <div class="row task-header__left">
-                      <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                      <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
-                    </div>
-                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                  </template>
-                  <template v-else>
-                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
-                  </template>
-                </header>
-                <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
-              </article>
-                  <div v-if="!groupedColumnTasks(col, group).length" key="__group-empty__" class="muted" style="padding: 4px 0; font-size: var(--text-xs, 0.75rem);">—</div>
+                  <article
+                    v-for="task in groupedColumnTasks(col, group)"
+                    :key="task.id"
+                    class="card task"
+                    :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
+                    draggable="true"
+                    @dragstart="onDragStart(task)"
+                    @dblclick="openTask(task.id)"
+                    @click.exact="selectTask(task.id)"
+                    @keydown.enter.prevent="openTask(task.id)"
+                    tabindex="0"
+                  >
+                    <header v-if="hasTaskHeader(task)" class="row task-header">
+                      <template v-if="hasTaskIdentity(task)">
+                        <div class="row task-header__left">
+                          <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{
+                            task.id
+                          }}</span>
+                          <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{
+                            task.title
+                          }}</strong>
+                        </div>
+                        <span
+                          v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
+                          class="priority"
+                          :class="priorityClass(task.priority)"
+                          >{{ task.priority }}</span
+                        >
+                      </template>
+                      <template v-else>
+                        <span
+                          v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
+                          class="priority"
+                          :class="priorityClass(task.priority)"
+                          >{{ task.priority }}</span
+                        >
+                      </template>
+                    </header>
+                    <BoardCardMeta
+                      :task="task"
+                      :has-header="hasTaskHeader(task)"
+                      :due-info="taskDueInfo(task)"
+                      :modified-info="taskModifiedInfo(task)"
+                      :sprint="boardSprintHelpers"
+                    />
+                  </article>
+                  <div
+                    v-if="!groupedColumnTasks(col, group).length"
+                    key="__group-empty__"
+                    class="muted"
+                    style="padding: 4px 0; font-size: var(--text-xs, 0.75rem)"
+                  >
+                    —
+                  </div>
                 </TransitionGroup>
               </div>
             </div>
           </template>
         </template>
         <!-- Lane headers at the very top (rendered first via CSS order) -->
-        <div v-for="lane in boardLanes" :key="`hdr-${lane.key}`" class="col-header row board-col-header lane-header"
-             :class="{ 'lane-header--stacked': lane.stacked }"
-             :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
-             :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
-             style="justify-content: space-between; align-items:center; gap:8px;">
-            <strong class="lane-header__title" :title="lane.title">{{ lane.title }}</strong>
-            <span class="row" style="gap:6px; align-items:center;">
-              <UiButton
-                v-if="!lane.stacked"
-                icon-only
-                variant="ghost"
-                class="board-col-add"
-                type="button"
-                :aria-label="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
-                :title="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
-                @click="lane.columns[0]!.synthetic ? openCreateInBoard() : openCreateInStatus(lane.columns[0]!.label)"
+        <div
+          v-for="lane in boardLanes"
+          :key="`hdr-${lane.key}`"
+          class="col-header row board-col-header lane-header"
+          :class="{ 'lane-header--stacked': lane.stacked }"
+          :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
+          :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+          style="justify-content: space-between; align-items: center; gap: 8px"
+        >
+          <strong class="lane-header__title" :title="lane.title">{{ lane.title }}</strong>
+          <span class="row" style="gap: 6px; align-items: center">
+            <UiButton
+              v-if="!lane.stacked"
+              icon-only
+              variant="ghost"
+              class="board-col-add"
+              type="button"
+              :aria-label="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
+              :title="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
+              @click="lane.columns[0]!.synthetic ? openCreateInBoard() : openCreateInStatus(lane.columns[0]!.label)"
+            >
+              <IconGlyph name="plus" />
+            </UiButton>
+            <details
+              v-else
+              class="lane-add-menu"
+              @keydown.escape="($event.currentTarget as HTMLDetailsElement).open = false"
+            >
+              <summary
+                class="btn ghost icon-only board-col-add"
+                :aria-label="`Add task in ${lane.title}`"
+                :title="`Add task in ${lane.title}`"
               >
                 <IconGlyph name="plus" />
-              </UiButton>
-              <details v-else class="lane-add-menu" @keydown.escape="($event.currentTarget as HTMLDetailsElement).open = false">
-                <summary class="btn ghost icon-only board-col-add" :aria-label="`Add task in ${lane.title}`" :title="`Add task in ${lane.title}`">
-                  <IconGlyph name="plus" />
-                </summary>
-                <div class="card lane-add-menu__list">
-                  <button v-for="col in lane.columns" :key="col.key" type="button" class="lane-add-menu__item" @click="closeMenu($event); openCreateInStatus(col.label)">
-                    Add in {{ col.label }}
-                  </button>
-                </div>
-              </details>
-              <span class="muted lane-header__count" :class="{ warn: laneOverLimit(lane) }">
-                <template v-if="laneLimit(lane) > 0">{{ laneCount(lane) }} / {{ laneLimit(lane) }}</template>
-                <template v-else>{{ laneCount(lane) }}</template>
-              </span>
+              </summary>
+              <div class="card lane-add-menu__list">
+                <button
+                  v-for="col in lane.columns"
+                  :key="col.key"
+                  type="button"
+                  class="lane-add-menu__item"
+                  @click="
+                    ($event) => {
+                      closeMenu($event)
+                      openCreateInStatus(col.label)
+                    }
+                  "
+                >
+                  Add in {{ col.label }}
+                </button>
+              </div>
+            </details>
+            <span class="muted lane-header__count" :class="{ warn: laneOverLimit(lane) }">
+              <template v-if="laneLimit(lane) > 0">{{ laneCount(lane) }} / {{ laneLimit(lane) }}</template>
+              <template v-else>{{ laneCount(lane) }}</template>
             </span>
+          </span>
         </div>
       </template>
       <template v-else>
-        <div v-for="lane in boardLanes" :key="lane.key" class="col column"
-             :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
-             :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
-             :class="{ 'over-limit': laneOverLimit(lane), 'column--stacked': lane.stacked }"
-             :tabindex="lane.stacked ? undefined : 0"
-             @dragover.prevent="onDragOver"
-             @drop.prevent="onLaneDrop(lane, $event)"
-             @keydown.enter.prevent="!lane.stacked && onDrop(lane.columns[0]!)"
+        <div
+          v-for="lane in boardLanes"
+          :key="lane.key"
+          class="col column"
+          :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
+          :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+          :class="{ 'over-limit': laneOverLimit(lane), 'column--stacked': lane.stacked }"
+          :tabindex="lane.stacked ? undefined : 0"
+          @dragover.prevent="onDragOver"
+          @drop.prevent="onLaneDrop(lane, $event)"
+          @keydown.enter.prevent="!lane.stacked && onDrop(lane.columns[0]!)"
         >
-          <div class="col-header row lane-header" :class="{ 'lane-header--stacked': lane.stacked }" style="justify-content: space-between; align-items:center; gap:8px;">
+          <div
+            class="col-header row lane-header"
+            :class="{ 'lane-header--stacked': lane.stacked }"
+            style="justify-content: space-between; align-items: center; gap: 8px"
+          >
             <strong class="lane-header__title" :title="lane.title">{{ lane.title }}</strong>
-            <span class="row" style="gap:6px; align-items:center;">
+            <span class="row" style="gap: 6px; align-items: center">
               <UiButton
                 v-if="!lane.stacked"
                 icon-only
@@ -237,12 +344,31 @@
               >
                 <IconGlyph name="plus" />
               </UiButton>
-              <details v-else class="lane-add-menu" @keydown.escape="($event.currentTarget as HTMLDetailsElement).open = false">
-                <summary class="btn ghost icon-only board-col-add" :aria-label="`Add task in ${lane.title}`" :title="`Add task in ${lane.title}`">
+              <details
+                v-else
+                class="lane-add-menu"
+                @keydown.escape="($event.currentTarget as HTMLDetailsElement).open = false"
+              >
+                <summary
+                  class="btn ghost icon-only board-col-add"
+                  :aria-label="`Add task in ${lane.title}`"
+                  :title="`Add task in ${lane.title}`"
+                >
                   <IconGlyph name="plus" />
                 </summary>
                 <div class="card lane-add-menu__list">
-                  <button v-for="col in lane.columns" :key="col.key" type="button" class="lane-add-menu__item" @click="closeMenu($event); openCreateInStatus(col.label)">
+                  <button
+                    v-for="col in lane.columns"
+                    :key="col.key"
+                    type="button"
+                    class="lane-add-menu__item"
+                    @click="
+                      ($event) => {
+                        closeMenu($event)
+                        openCreateInStatus(col.label)
+                      }
+                    "
+                  >
                     Add in {{ col.label }}
                   </button>
                 </div>
@@ -254,17 +380,20 @@
             </span>
           </div>
           <!-- One section per status; a single-status lane renders its cards directly -->
-          <div v-for="col in lane.columns" :key="col.key" class="column-section"
-               :class="{ 'column-section--stacked': lane.stacked }"
-               :data-section-key="col.key"
-               :data-status="lane.stacked ? statusAttr(col) : undefined"
-               :data-column-kind="lane.stacked ? kindAttr(col) : undefined"
-               :tabindex="lane.stacked ? 0 : undefined"
-               @keydown.enter.self.prevent="lane.stacked && onDrop(col)"
+          <div
+            v-for="col in lane.columns"
+            :key="col.key"
+            class="column-section"
+            :class="{ 'column-section--stacked': lane.stacked }"
+            :data-section-key="col.key"
+            :data-status="lane.stacked ? statusAttr(col) : undefined"
+            :data-column-kind="lane.stacked ? kindAttr(col) : undefined"
+            :tabindex="lane.stacked ? 0 : undefined"
+            @keydown.enter.self.prevent="lane.stacked && onDrop(col)"
           >
             <div v-if="lane.stacked" class="row column-section__head">
               <span class="column-section__label muted">{{ col.label }}</span>
-              <span class="row" style="gap:4px; align-items:center;">
+              <span class="row" style="gap: 4px; align-items: center">
                 <UiButton
                   icon-only
                   variant="ghost"
@@ -280,30 +409,53 @@
               </span>
             </div>
             <TransitionGroup name="task-list" tag="div" class="col-cards">
-              <article v-for="task in visibleFlatTasks(col)" :key="task.id"
-                       class="card task"
-                       :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
-                       draggable="true"
-                       @dragstart="onDragStart(task)"
-                       @dblclick="openTask(task.id)"
-                       @click.exact="selectTask(task.id)"
-                       @keydown.enter.prevent="openTask(task.id)"
-                       tabindex="0">
+              <article
+                v-for="task in visibleFlatTasks(col)"
+                :key="task.id"
+                class="card task"
+                :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
+                draggable="true"
+                @dragstart="onDragStart(task)"
+                @dblclick="openTask(task.id)"
+                @click.exact="selectTask(task.id)"
+                @keydown.enter.prevent="openTask(task.id)"
+                tabindex="0"
+              >
                 <header v-if="hasTaskHeader(task)" class="row task-header">
                   <template v-if="hasTaskIdentity(task)">
                     <div class="row task-header__left">
-                      <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                      <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                      <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{
+                        task.id
+                      }}</span>
+                      <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{
+                        task.title
+                      }}</strong>
                     </div>
-                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                    <span
+                      v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
+                      class="priority"
+                      :class="priorityClass(task.priority)"
+                      >{{ task.priority }}</span
+                    >
                   </template>
                   <template v-else>
-                    <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                    <span
+                      v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
+                      class="priority"
+                      :class="priorityClass(task.priority)"
+                      >{{ task.priority }}</span
+                    >
                   </template>
                 </header>
-                <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
+                <BoardCardMeta
+                  :task="task"
+                  :has-header="hasTaskHeader(task)"
+                  :due-info="taskDueInfo(task)"
+                  :modified-info="taskModifiedInfo(task)"
+                  :sprint="boardSprintHelpers"
+                />
               </article>
-              <div v-if="!columnTasks(col).length" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
+              <div v-if="!columnTasks(col).length" key="__empty__" class="muted" style="padding: 8px">No tasks</div>
             </TransitionGroup>
             <button v-if="hiddenFlatCount(col) > 0" type="button" class="show-more-btn" @click="showMore(col.key)">
               Show {{ hiddenFlatCount(col) }} more…
@@ -358,7 +510,17 @@ import { statusEnteredAt } from '../utils/taskHistory'
 
 const route = useRoute()
 const { projects, refresh: refreshProjects, loading: loadingProjects } = useProjects()
-const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, loading: loadingConfig, scope: configScope, tags: configuredTags, members } = useConfig()
+const {
+  statuses,
+  priorities,
+  types,
+  customFields: availableCustomFields,
+  refresh: refreshConfig,
+  loading: loadingConfig,
+  scope: configScope,
+  tags: configuredTags,
+  members,
+} = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const store = useTaskStore()
 // DEV-65: read the board's keyed query so other consumers (panel, routes in
@@ -384,9 +546,15 @@ const completion = useCompletionPolicy({ tasks: () => items.value })
 const { openTaskPanel } = useTaskPanelController()
 
 const project = ref<string>(route.query.project ? String(route.query.project) : '')
-const filterOptions = useFilterOptions(() => items.value, () => project.value, {
-  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
-})
+const filterOptions = useFilterOptions(
+  () => items.value,
+  () => project.value,
+  {
+    scope: () => configScope.value,
+    tags: () => configuredTags.value,
+    members: () => members.value,
+  },
+)
 const draggingId = ref<string>('')
 const filter = ref<Record<string, string>>(typeof route.query.q === 'string' ? { q: route.query.q } : {})
 const filterBarRef = ref<{ clear?: () => void } | null>(null)
@@ -396,7 +564,12 @@ const filterPayload = computed(() => ({
   ...filter.value,
   ...(project.value || Object.prototype.hasOwnProperty.call(route.query, 'project') ? { project: project.value } : {}),
 }))
-const { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
+const {
+  hasFilters,
+  sanitizeFilterInput,
+  onFilterUpdate,
+  clearFilters: clearFiltersAction,
+} = useProjectFilterSync(project, filter, {
   routePath: '/boards',
 })
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
@@ -407,14 +580,18 @@ const sprintFilterOptions = useSprintFilterOptions(sprints)
 
 // -- Swimlane group-by (persisted per project) ----------------------------
 type GroupByMode = 'none' | 'assignee' | 'priority' | 'type'
-function groupByKey() { return project.value ? `lotar.boardGroupBy::${project.value}` : 'lotar.boardGroupBy' }
+function groupByKey() {
+  return project.value ? `lotar.boardGroupBy::${project.value}` : 'lotar.boardGroupBy'
+}
 function loadGroupBy(): GroupByMode {
   const v = storageGet(groupByKey())
   if (v === 'assignee' || v === 'priority' || v === 'type') return v
   return 'none'
 }
 const groupBy = ref<GroupByMode>(loadGroupBy())
-function saveGroupBy() { storageSet(groupByKey(), groupBy.value) }
+function saveGroupBy() {
+  storageSet(groupByKey(), groupBy.value)
+}
 
 // -- Initial loading --------------------------------------------------------
 // Per-current-handle first load: the loader covers the loading, queued-idle,
@@ -428,23 +605,31 @@ const initialLoading = computed(() => {
 
 // -- Ticket highlight on single click -------------------------------------
 const selectedTaskId = ref('')
-function selectTask(id: string) { selectedTaskId.value = selectedTaskId.value === id ? '' : id }
+function selectTask(id: string) {
+  selectedTaskId.value = selectedTaskId.value === id ? '' : id
+}
 
 // -- Collapsible groups ---------------------------------------------------
 const collapsedGroups = ref<Set<string>>(new Set())
 function toggleGroup(label: string) {
   const next = new Set(collapsedGroups.value)
-  if (next.has(label)) next.delete(label); else next.add(label)
+  if (next.has(label)) next.delete(label)
+  else next.add(label)
   collapsedGroups.value = next
 }
 
 // -- Progressive disclosure (virtual scrolling) ---------------------------
 const COLUMN_PAGE_SIZE = 30
 const columnExpansion = ref<Record<string, number>>({})
-function visibleLimit(st: string): number { return columnExpansion.value[st] || COLUMN_PAGE_SIZE }
-function showMore(st: string) { columnExpansion.value = { ...columnExpansion.value, [st]: visibleLimit(st) + COLUMN_PAGE_SIZE } }
-function resetExpansion() { columnExpansion.value = {} }
-
+function visibleLimit(st: string): number {
+  return columnExpansion.value[st] || COLUMN_PAGE_SIZE
+}
+function showMore(st: string) {
+  columnExpansion.value = { ...columnExpansion.value, [st]: visibleLimit(st) + COLUMN_PAGE_SIZE }
+}
+function resetExpansion() {
+  columnExpansion.value = {}
+}
 
 function startOfDay(date: Date) {
   return startOfLocalDay(date)
@@ -472,7 +657,11 @@ function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
   const due = startOfDay(parsed)
   const diffDays = Math.round((due.getTime() - today.getTime()) / MS_PER_DAY)
   const sameYear = parsed.getFullYear() === today.getFullYear()
-  const dateLabel = parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
+  const dateLabel = parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: sameYear ? undefined : 'numeric',
+  })
   if (diffDays < 0) {
     // Shared server-basis predicate (terminal tasks are never overdue;
     // stale authoritative buckets follow the server day, not this local
@@ -496,22 +685,26 @@ function taskModifiedInfo(task: TaskDTO): string {
   if (!parsed) return `Updated ${raw}`
   const now = new Date()
   const sameYear = parsed.getFullYear() === now.getFullYear()
-  const dateLabel = parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
+  const dateLabel = parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: sameYear ? undefined : 'numeric',
+  })
   return `Updated ${dateLabel}`
 }
 
 function hasTaskHeader(task: TaskDTO): boolean {
   return Boolean(
-    (boardFields.isVisible('id') && (task.id || '').trim())
-    || (boardFields.isVisible('title') && (task.title || '').trim())
-    || (boardFields.isVisible('priority') && (task.priority || '').trim())
+    (boardFields.isVisible('id') && (task.id || '').trim()) ||
+    (boardFields.isVisible('title') && (task.title || '').trim()) ||
+    (boardFields.isVisible('priority') && (task.priority || '').trim()),
   )
 }
 
 function hasTaskIdentity(task: TaskDTO): boolean {
   return Boolean(
-    (boardFields.isVisible('id') && (task.id || '').trim())
-    || (boardFields.isVisible('title') && (task.title || '').trim())
+    (boardFields.isVisible('id') && (task.id || '').trim()) ||
+    (boardFields.isVisible('title') && (task.title || '').trim()),
   )
 }
 
@@ -665,7 +858,12 @@ type BoardColumnDescriptor = {
 }
 
 const boardColumns = computed<BoardColumnDescriptor[]>(() => {
-  const cols: BoardColumnDescriptor[] = columnsData.value.map(({ label, norm }) => ({ key: norm, label, norm, synthetic: false }))
+  const cols: BoardColumnDescriptor[] = columnsData.value.map(({ label, norm }) => ({
+    key: norm,
+    label,
+    norm,
+    synthetic: false,
+  }))
   if (partitionedBoardTasks.value.other.length) {
     cols.push({ key: OTHER_COLUMN_KEY, label: 'Other', norm: OTHER_COLUMN_KEY, synthetic: true })
   }
@@ -675,9 +873,15 @@ const boardColumns = computed<BoardColumnDescriptor[]>(() => {
 // DEV-130: per-project column layout (hidden and stacked statuses). Lanes are
 // the visual columns; each lane holds one or more status columns, and every
 // status keeps its own section, counts, WIP limit and drop target.
-const boardLanes = computed<BoardLane<BoardColumnDescriptor>[]>(() => computeBoardLanes(boardColumns.value, boardLayout.layout.value))
-const hiddenColumns = computed(() => boardColumns.value.filter((col) => !col.synthetic && boardLayout.isHidden(col.key)))
-const hiddenTaskCount = computed(() => hiddenColumns.value.reduce((sum, col) => sum + (partitionedBoardTasks.value.configured[col.label]?.length ?? 0), 0))
+const boardLanes = computed<BoardLane<BoardColumnDescriptor>[]>(() =>
+  computeBoardLanes(boardColumns.value, boardLayout.layout.value),
+)
+const hiddenColumns = computed(() =>
+  boardColumns.value.filter((col) => !col.synthetic && boardLayout.isHidden(col.key)),
+)
+const hiddenTaskCount = computed(() =>
+  hiddenColumns.value.reduce((sum, col) => sum + (partitionedBoardTasks.value.configured[col.label]?.length ?? 0), 0),
+)
 
 function closeMenu(event: Event) {
   const menu = (event.currentTarget as HTMLElement | null)?.closest('details')
@@ -711,7 +915,7 @@ function onLaneDrop(lane: BoardLane<BoardColumnDescriptor>, event: DragEvent) {
 }
 
 function columnTasks(col: BoardColumnDescriptor): TaskDTO[] {
-  return col.synthetic ? partitionedBoardTasks.value.other : (grouped.value[col.label] || [])
+  return col.synthetic ? partitionedBoardTasks.value.other : grouped.value[col.label] || []
 }
 
 // -- Aligned swimlane group-by ---------------------------------------------
@@ -730,7 +934,11 @@ const allGroupLabels = computed<string[]>(() => {
   }
   const source = groupBy.value === 'priority' ? priorities.value : groupBy.value === 'type' ? types.value : []
   // Match the server's enum keys without folding distinct non-ASCII labels.
-  const keyFor = (label: string) => label.trim().replace(/[A-Z]/g, char => char.toLowerCase()).replace(/[ _-]/g, '')
+  const keyFor = (label: string) =>
+    label
+      .trim()
+      .replace(/[A-Z]/g, (char) => char.toLowerCase())
+      .replace(/[ _-]/g, '')
   const ranks = new Map<string, number>()
   source.forEach((label, index) => {
     const key = keyFor(label)
@@ -749,13 +957,13 @@ const allGroupLabels = computed<string[]>(() => {
 })
 
 function groupedColumnTasks(col: BoardColumnDescriptor, group: string): TaskDTO[] {
-  return columnTasks(col).filter(t => groupKeyFor(t) === group)
+  return columnTasks(col).filter((t) => groupKeyFor(t) === group)
 }
 
 function groupTotalCount(group: string): number {
   let count = 0
   for (const col of boardColumns.value) {
-    count += columnTasks(col).filter(t => groupKeyFor(t) === group).length
+    count += columnTasks(col).filter((t) => groupKeyFor(t) === group).length
   }
   return count
 }
@@ -790,9 +998,13 @@ function laneOverLimit(lane: BoardLane<BoardColumnDescriptor>): boolean {
   const limit = laneLimit(lane)
   return limit > 0 && laneCount(lane) > limit
 }
-function countOf(col: BoardColumnDescriptor): number { return columnTasks(col).length }
+function countOf(col: BoardColumnDescriptor): number {
+  return columnTasks(col).length
+}
 
-watch(groupBy, () => { saveGroupBy() })
+watch(groupBy, () => {
+  saveGroupBy()
+})
 
 const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
   id: true,
@@ -825,18 +1037,16 @@ const boardSprintHelpers = {
   tooltip: sprintTooltip,
 }
 
-watch(
-  availableCustomFields,
-  (keys) => boardFields.setCustomFieldKeys(keys),
-  { immediate: true },
-)
+watch(availableCustomFields, (keys) => boardFields.setCustomFieldKeys(keys), { immediate: true })
 
 watch(project, (next) => boardFields.setProjectKey(next), { immediate: true })
 
 function onDragStart(t: any) {
   draggingId.value = t.id
 }
-function onDragOver(ev: DragEvent) { ev.preventDefault() }
+function onDragOver(ev: DragEvent) {
+  ev.preventDefault()
+}
 async function onDrop(target: BoardColumnDescriptor) {
   const id = draggingId.value
   if (!id) return
@@ -847,7 +1057,7 @@ async function onDrop(target: BoardColumnDescriptor) {
   // writing its real status value.
   if (target.synthetic) return
   const targetStatus = target.label
-  const existing = items.value.find(t => t.id === id)
+  const existing = items.value.find((t) => t.id === id)
   // DEV-102: dropping a card on the column its effective status already
   // occupies is a pure no-op — no optimistic upsert, no status POST, no
   // toast, no refresh. The comparison mirrors the server's ASCII
@@ -885,7 +1095,9 @@ function openCreateInStatus(status: string) {
     taskId: 'new',
     initialProject: project.value || null,
     initialStatus: status,
-    onCreated: () => { refreshAll() },
+    onCreated: () => {
+      refreshAll()
+    },
   })
 }
 
@@ -893,7 +1105,9 @@ function openCreateInBoard() {
   openTaskPanel({
     taskId: 'new',
     initialProject: project.value || null,
-    onCreated: () => { refreshAll() },
+    onCreated: () => {
+      refreshAll()
+    },
   })
 }
 
@@ -906,16 +1120,20 @@ async function refreshAll() {
 
 let filterDebounce: ReturnType<typeof setTimeout> | null = null
 
-watch(filter, (value) => {
-  if (filterDebounce) clearTimeout(filterDebounce)
-  resetExpansion()
-  const snapshot = { ...value }
-  filterDebounce = setTimeout(() => {
-    refreshBoardTasks(snapshot).catch((err) => {
-      console.warn('Failed to refresh board after filter change', err)
-    })
-  }, 150)
-}, { deep: true })
+watch(
+  filter,
+  (value) => {
+    if (filterDebounce) clearTimeout(filterDebounce)
+    resetExpansion()
+    const snapshot = { ...value }
+    filterDebounce = setTimeout(() => {
+      refreshBoardTasks(snapshot).catch((err) => {
+        console.warn('Failed to refresh board after filter change', err)
+      })
+    }, 150)
+  },
+  { deep: true },
+)
 
 onMounted(async () => {
   await refreshProjects()
@@ -924,15 +1142,18 @@ onMounted(async () => {
   await refreshBoardTasks()
 })
 
-watch(() => route.query.project, async (value) => {
-  project.value = value ? String(value) : ''
-  await refreshConfig(project.value)
-  await refreshBoardTasks()
-  boardLayout.load()
-  groupBy.value = loadGroupBy()
-  collapsedGroups.value = new Set()
-  resetExpansion()
-})
+watch(
+  () => route.query.project,
+  async (value) => {
+    project.value = value ? String(value) : ''
+    await refreshConfig(project.value)
+    await refreshBoardTasks()
+    boardLayout.load()
+    groupBy.value = loadGroupBy()
+    collapsedGroups.value = new Set()
+    resetExpansion()
+  },
+)
 
 onUnmounted(() => {
   if (filterDebounce) {
@@ -955,8 +1176,17 @@ onUnmounted(() => {
   max-width: 100%;
   padding-bottom: 4px;
 }
-.column { border: 1px solid var(--border); border-radius: var(--radius-base); background: var(--bg); min-height: 200px; display: flex; flex-direction: column; }
-.column.over-limit { border-color: color-mix(in oklab, var(--color-danger) 40%, var(--border)); }
+.column {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-base);
+  background: var(--bg);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+.column.over-limit {
+  border-color: color-mix(in oklab, var(--color-danger) 40%, var(--border));
+}
 .board-col-add {
   min-width: var(--control-height);
   min-height: var(--control-height);
@@ -970,14 +1200,42 @@ onUnmounted(() => {
 }
 
 @media (hover: none) {
-  .board-col-add { opacity: 1; }
+  .board-col-add {
+    opacity: 1;
+  }
 }
 
-.col-header { position: sticky; top: 0; background: var(--bg); padding: 8px; border-bottom: 1px solid var(--border); border-top-left-radius: var(--radius-base); border-top-right-radius: var(--radius-base); z-index: var(--z-sticky); }
-.col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
-.col-cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; position: relative; }
-.task { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-base); cursor: grab; user-select: none; }
-.task:active { cursor: grabbing; }
+.col-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  border-top-left-radius: var(--radius-base);
+  border-top-right-radius: var(--radius-base);
+  z-index: var(--z-sticky);
+}
+.col-header .warn {
+  color: var(--color-danger-strong);
+  font-weight: 600;
+}
+.col-cards {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+.task {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-base);
+  cursor: grab;
+  user-select: none;
+}
+.task:active {
+  cursor: grabbing;
+}
 .task .id {
   font-family: var(--font-mono);
   margin-right: 6px;
@@ -994,13 +1252,33 @@ onUnmounted(() => {
   word-break: break-word;
   line-height: 1.35;
 }
-.priority { font-size: 12px; color: var(--muted); flex: 0 0 auto; white-space: nowrap; }
-.priority.priority--critical { color: var(--danger, #d93025); font-weight: 600; }
-.priority.priority--high { color: var(--warning, #e8710a); font-weight: 600; }
-.priority.priority--low { opacity: 0.6; }
-.task.priority--critical { border-left: 3px solid var(--danger, #d93025); }
-.task.priority--high { border-left: 3px solid var(--warning, #e8710a); }
-.column:focus { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: 2px; }
+.priority {
+  font-size: 12px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.priority.priority--critical {
+  color: var(--danger, #d93025);
+  font-weight: 600;
+}
+.priority.priority--high {
+  color: var(--warning, #e8710a);
+  font-weight: 600;
+}
+.priority.priority--low {
+  opacity: 0.6;
+}
+.task.priority--critical {
+  border-left: 3px solid var(--danger, #d93025);
+}
+.task.priority--high {
+  border-left: 3px solid var(--warning, #e8710a);
+}
+.column:focus {
+  outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent);
+  outline-offset: 2px;
+}
 .board-controls {
   gap: 8px;
   align-items: center;
@@ -1164,8 +1442,17 @@ onUnmounted(() => {
   transform: rotate(90deg);
 }
 
-.swimlane-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.swimlane-count { font-weight: 400; font-size: var(--text-xs, 0.75rem); }
+.swimlane-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swimlane-count {
+  font-weight: 400;
+  font-size: var(--text-xs, 0.75rem);
+}
 
 /* -- Column group cells (grouped mode) ---------------------------------- */
 .column-group-cell {
@@ -1185,43 +1472,84 @@ onUnmounted(() => {
   order: -1;
 }
 
-.board-col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
+.board-col-header .warn {
+  color: var(--color-danger-strong);
+  font-weight: 600;
+}
 
 /* -- Column layout: lanes, stacked statuses, hidden notice (DEV-130) ----- */
 /* A single-status lane renders its cards inline, exactly like a plain column. */
-.column-section { display: contents; }
-.column-section--stacked { display: flex; flex-direction: column; }
-.column-section--stacked + .column-section--stacked { border-top: 1px solid var(--border); }
-.column-section--stacked:focus-visible { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: -2px; }
+.column-section {
+  display: contents;
+}
+.column-section--stacked {
+  display: flex;
+  flex-direction: column;
+}
+.column-section--stacked + .column-section--stacked {
+  border-top: 1px solid var(--border);
+}
+.column-section--stacked:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent);
+  outline-offset: -2px;
+}
 .column-section__head {
   justify-content: space-between;
   align-items: center;
   gap: 6px;
   padding: 6px 8px 0;
 }
-.column-section__head:hover .board-col-add { opacity: 1; }
+.column-section__head:hover .board-col-add {
+  opacity: 1;
+}
 .column-section__label {
   font-size: var(--text-xs, 0.75rem);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.column-section__count { font-size: var(--text-xs, 0.75rem); }
-.column-group-cell .column-section__label { display: block; padding: 6px 8px 0; }
-.column-group-cell .column-section--stacked + .column-section--stacked { border-top: 1px dashed var(--border); }
+.column-section__count {
+  font-size: var(--text-xs, 0.75rem);
+}
+.column-group-cell .column-section__label {
+  display: block;
+  padding: 6px 8px 0;
+}
+.column-group-cell .column-section--stacked + .column-section--stacked {
+  border-top: 1px dashed var(--border);
+}
 .lane-header__title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.lane-header__count.warn { color: var(--color-danger-strong); font-weight: 600; }
+.lane-header__count.warn {
+  color: var(--color-danger-strong);
+  font-weight: 600;
+}
 .column.over-limit > .lane-header,
-.board-col-header.lane-header:has(.warn) { box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--color-danger) 45%, transparent); }
-.lane-add-menu { position: relative; display: inline-flex; }
-.lane-add-menu > summary { list-style: none; display: inline-flex; box-sizing: border-box; align-items: center; justify-content: center; cursor: pointer; }
-.lane-add-menu > summary::-webkit-details-marker { display: none; }
-.lane-add-menu[open] > summary { opacity: 1; }
+.board-col-header.lane-header:has(.warn) {
+  box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--color-danger) 45%, transparent);
+}
+.lane-add-menu {
+  position: relative;
+  display: inline-flex;
+}
+.lane-add-menu > summary {
+  list-style: none;
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.lane-add-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.lane-add-menu[open] > summary {
+  opacity: 1;
+}
 .lane-add-menu__list {
   position: absolute;
   right: 0;
@@ -1244,8 +1572,12 @@ onUnmounted(() => {
   font: inherit;
 }
 .lane-add-menu__item:hover,
-.lane-add-menu__item:focus-visible { background: color-mix(in oklab, var(--fg) 8%, transparent); }
-.board-columns-button { gap: var(--space-2, 0.5rem); }
+.lane-add-menu__item:focus-visible {
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
+.board-columns-button {
+  gap: var(--space-2, 0.5rem);
+}
 .board-hidden-note {
   flex-wrap: wrap;
   align-items: center;
@@ -1253,7 +1585,9 @@ onUnmounted(() => {
   margin-top: -8px;
   font-size: var(--text-sm, 0.875rem);
 }
-.board-hidden-note__action { white-space: nowrap; }
+.board-hidden-note__action {
+  white-space: nowrap;
+}
 
 /* -- Refresh error banner ------------------------------------------------ */
 .refresh-error {

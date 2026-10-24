@@ -27,9 +27,7 @@ async function expectBackendSupportsSortBy(serverUrl: string, fixtureIds: string
     const payload = response.ok ? ((await response.json()) as ListPayload) : undefined;
     const served = payload?.data?.tasks?.[0]?.id;
     expect(
-        response.ok
-            && payload?.data?.total === fixtureIds.length
-            && fixtureIds.includes(served ?? ''),
+        response.ok && payload?.data?.total === fixtureIds.length && fixtureIds.includes(served ?? ''),
         `backend must serve the seeded fixtures through a sort_by query (status=${response.status}, total=${payload?.data?.total ?? 'n/a'}, first=${served ?? 'n/a'})`,
     ).toBe(true);
 }
@@ -64,7 +62,10 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
 
             const server = await startLotarServer(workspace);
             try {
-                await expectBackendSupportsSortBy(server.url, seeded.map((task) => task.id));
+                await expectBackendSupportsSortBy(
+                    server.url,
+                    seeded.map((task) => task.id),
+                );
 
                 await withBrowser({}, async (browserContext) => {
                     await browserContext.addInitScript(() => {
@@ -76,20 +77,16 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
                     });
 
                     await page.waitForSelector('tbody tr td:first-child strong', { timeout: 20_000 });
-                    await page.waitForFunction(
-                        () => document.querySelectorAll('tbody tr').length === 25,
-                        undefined,
-                        { timeout: 20_000 },
-                    );
+                    await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 25, undefined, {
+                        timeout: 20_000,
+                    });
                     const pageOne = await rowNumericIds(page);
                     expect(pageOne).toEqual(Array.from({ length: 25 }, (_, i) => String(i + 1)));
 
                     await page.click('button[aria-label="Next page"]');
-                    await page.waitForFunction(
-                        () => document.querySelectorAll('tbody tr').length === 5,
-                        undefined,
-                        { timeout: 20_000 },
-                    );
+                    await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 5, undefined, {
+                        timeout: 20_000,
+                    });
                     const pageTwo = await rowNumericIds(page);
                     expect(pageTwo).toEqual(['26', '27', '28', '29', '30']);
                     await page.close();
@@ -161,16 +158,14 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
 
                     // Sort the frontend project by priority (asc) via the header.
                     await page.click('th:has-text("Priority") button.header-button');
-                    await page.waitForFunction(
-                        () => window.location.search.includes('sort_by=priority'),
-                        undefined,
-                        { timeout: 20_000 },
-                    );
+                    await page.waitForFunction(() => window.location.search.includes('sort_by=priority'), undefined, {
+                        timeout: 20_000,
+                    });
                     const expectedFirst = String(Number(frontendHigh.id.split('-').pop()));
                     await page.waitForFunction(
                         (first: string) => {
-                            const cell = document.querySelector('tbody tr td:first-child strong')
-                            return cell?.textContent === first
+                            const cell = document.querySelector('tbody tr td:first-child strong');
+                            return cell?.textContent === first;
                         },
                         expectedFirst,
                         { timeout: 20_000 },
@@ -197,11 +192,9 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
 
                     // Switching back restores the saved sort.
                     await projectSelect.selectOption(frontendHigh.project);
-                    await page.waitForFunction(
-                        () => window.location.search.includes('sort_by=priority'),
-                        undefined,
-                        { timeout: 20_000 },
-                    );
+                    await page.waitForFunction(() => window.location.search.includes('sort_by=priority'), undefined, {
+                        timeout: 20_000,
+                    });
                     await page.waitForFunction(
                         (excluded: string) => !document.body.innerText.includes(excluded),
                         'API unrelated task',
@@ -306,7 +299,10 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
 
             const server = await startLotarServer(workspace);
             try {
-                await expectBackendSupportsSortBy(server.url, seeded.map((task) => task.id));
+                await expectBackendSupportsSortBy(
+                    server.url,
+                    seeded.map((task) => task.id),
+                );
 
                 await withBrowser({}, async (browserContext) => {
                     await browserContext.addInitScript(() => {
@@ -318,19 +314,15 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
                     });
 
                     await page.waitForSelector('tbody tr td:first-child strong', { timeout: 20_000 });
-                    await page.waitForFunction(
-                        () => document.querySelectorAll('tbody tr').length === 25,
-                        undefined,
-                        { timeout: 20_000 },
-                    );
+                    await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 25, undefined, {
+                        timeout: 20_000,
+                    });
                     const pageOneIds = await rowNumericIds(page);
 
                     await page.click('button[aria-label="Next page"]');
-                    await page.waitForFunction(
-                        () => document.querySelectorAll('tbody tr').length === 5,
-                        undefined,
-                        { timeout: 20_000 },
-                    );
+                    await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 5, undefined, {
+                        timeout: 20_000,
+                    });
                     const pageTwoIds = await rowNumericIds(page);
 
                     // The Export button must be enabled for the settled query.
@@ -344,9 +336,9 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
                     // the protocol level while the UI click path stays real.
                     const exportBodies: string[] = [];
                     await browserContext.route('**/api/tasks/export*', async (route) => {
-                        const response = await route.fetch()
-                        exportBodies.push(await response.text())
-                        await route.fulfill({ response })
+                        const response = await route.fetch();
+                        exportBodies.push(await response.text());
+                        await route.fulfill({ response });
                     });
 
                     const [download] = await Promise.all([
@@ -355,10 +347,10 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
                     ]);
                     expect(download.suggestedFilename()).toMatch(/^lotar-tasks-\d{4}-\d{2}-\d{2}\.csv$/);
                     for (let i = 0; i < 50 && exportBodies.length === 0; i += 1) {
-                        await page.waitForTimeout(100)
+                        await page.waitForTimeout(100);
                     }
                     const csv = exportBodies[0] ?? '';
-                    expect(csv).toContain('id,title')
+                    expect(csv).toContain('id,title');
                     const csvIds = csv
                         .trim()
                         .split('\n')

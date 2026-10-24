@@ -44,7 +44,10 @@ const source = {
     statuses: ['Todo', 'In Progress', 'Done'],
     priorities: ['Low', 'Medium', 'High'],
     types: ['Bug', 'Feature'],
-    sprints: [{ id: 1, label: 'Sprint 1' }, { id: 2, label: 'Sprint 2' }],
+    sprints: [
+        { id: 1, label: 'Sprint 1' },
+        { id: 2, label: 'Sprint 2' },
+    ],
     projects: [{ prefix: 'DEV' }, { prefix: 'LOTA' }],
     customFields: ['sprint', 'iteration'],
     tags: ['ui', 'ops', 'ux'],
@@ -513,7 +516,12 @@ describe('suggestForFragment', () => {
 
 describe('suggestForFragment fixed value enums (backend-strict)', () => {
     it('suggests exactly the backend-valid due buckets', () => {
-        expect(suggestForFragment('due:', source).map((s) => s.insert)).toEqual(['due:today', 'due:soon', 'due:later', 'due:overdue'])
+        expect(suggestForFragment('due:', source).map((s) => s.insert)).toEqual([
+            'due:today',
+            'due:soon',
+            'due:later',
+            'due:overdue',
+        ])
     })
 
     it('suggests 7d as the only recent window', () => {
@@ -610,7 +618,9 @@ describe('suggestForFragment CSV fragments', () => {
     })
 
     it('quotes the whole csv value when an entry contains spaces', () => {
-        expect(suggestForFragment('status:"In Progress",to', source).map((s) => s.insert)).toEqual(['status:"In Progress,Todo"'])
+        expect(suggestForFragment('status:"In Progress",to', source).map((s) => s.insert)).toEqual([
+            'status:"In Progress,Todo"',
+        ])
         expect(parseFilterQuery('status:"In Progress,Todo"').filters.status).toBe('In Progress,Todo')
         expect(chipsForFilterValue({ status: 'In Progress,Todo' }, source)).toHaveLength(2)
     })
@@ -642,11 +652,17 @@ describe('suggestForFragment equality completions', () => {
 
     it('suggests the assignment-only key prefixes', () => {
         expect(suggestForFragment('del', source).map((s) => s.insert)).toEqual(['deletion='])
-        expect(suggestForFragment('', source).map((s) => s.insert)).toEqual(expect.arrayContaining(['deletion=', 'order=', 'sort_by=', 'q=']))
+        expect(suggestForFragment('', source).map((s) => s.insert)).toEqual(
+            expect.arrayContaining(['deletion=', 'order=', 'sort_by=', 'q=']),
+        )
     })
 
     it('suggests deletion and order values', () => {
-        expect(suggestForFragment('deletion=', source).map((s) => s.insert)).toEqual(['deletion=active', 'deletion=deleted', 'deletion=all'])
+        expect(suggestForFragment('deletion=', source).map((s) => s.insert)).toEqual([
+            'deletion=active',
+            'deletion=deleted',
+            'deletion=all',
+        ])
         expect(suggestForFragment('order=a', source).map((s) => s.insert)).toEqual(['order=asc'])
     })
 
@@ -656,7 +672,10 @@ describe('suggestForFragment equality completions', () => {
         expect(inserts).toContain('sort_by=due-date')
         expect(inserts).toContain('sort_by=sprints')
         expect(inserts).toContain('sort_by=custom:sprint')
-        expect(suggestForFragment('sort_by=custom:', source).map((s) => s.insert)).toEqual(['sort_by=custom:sprint', 'sort_by=custom:iteration'])
+        expect(suggestForFragment('sort_by=custom:', source).map((s) => s.insert)).toEqual([
+            'sort_by=custom:sprint',
+            'sort_by=custom:iteration',
+        ])
     })
 
     it('offers no colon or q= value suggestions for assignment-only keys', () => {
@@ -668,12 +687,18 @@ describe('suggestForFragment equality completions', () => {
 describe('suggestForFragment field: value completions', () => {
     it('suggests builtin values after explicit field: aliases preserving the typed form', () => {
         expect(suggestForFragment('field:STATE=T', source).map((s) => s.insert)).toEqual(['field:STATE=Todo'])
-        expect(suggestForFragment('field:sprint=', source).map((s) => s.insert)).toEqual(['field:sprint=1', 'field:sprint=2'])
+        expect(suggestForFragment('field:sprint=', source).map((s) => s.insert)).toEqual([
+            'field:sprint=1',
+            'field:sprint=2',
+        ])
     })
 
     it('suggests known custom field values case-insensitively', () => {
         expect(suggestForFragment('field:iteration=b', source).map((s) => s.insert)).toEqual(['field:iteration=beta'])
-        expect(suggestForFragment('field:Iteration=', source).map((s) => s.insert)).toEqual(['field:Iteration=beta', 'field:Iteration=ga'])
+        expect(suggestForFragment('field:Iteration=', source).map((s) => s.insert)).toEqual([
+            'field:Iteration=beta',
+            'field:Iteration=ga',
+        ])
     })
 
     it('respects quoted reserved literal names with their known values', () => {
@@ -693,8 +718,12 @@ describe('suggestForFragment field: value completions', () => {
 
     it('uses own-property safety for literal constructor/__proto__ value lookups', () => {
         const ownOnly = JSON.parse('{"constructor": ["own-ctor"], "__proto__": ["proto-own"]}')
-        expect(suggestForFragment('field:constructor=o', { customFieldValues: ownOnly }).map((s) => s.insert)).toEqual(['field:constructor=own-ctor'])
-        expect(suggestForFragment('field:__proto__=p', { customFieldValues: ownOnly }).map((s) => s.insert)).toEqual(['field:__proto__=proto-own'])
+        expect(suggestForFragment('field:constructor=o', { customFieldValues: ownOnly }).map((s) => s.insert)).toEqual([
+            'field:constructor=own-ctor',
+        ])
+        expect(suggestForFragment('field:__proto__=p', { customFieldValues: ownOnly }).map((s) => s.insert)).toEqual([
+            'field:__proto__=proto-own',
+        ])
         const parsed = parseFilterQuery('field:__proto__=proto-own')
         expect(Object.prototype.hasOwnProperty.call(parsed.filters, 'field:__proto__')).toBe(true)
         expect(parsed.filters['field:__proto__']).toBe('proto-own')
@@ -709,7 +738,10 @@ describe('suggestForFragment field: value completions', () => {
         const mixed = { customFieldValues: { Iteration: ['Beta', 'GA'] } }
         expect(suggestForFragment('field:iteration=b', mixed).map((s) => s.insert)).toEqual(['field:iteration=Beta'])
         expect(suggestForFragment('field:Iteration=b', mixed).map((s) => s.insert)).toEqual(['field:Iteration=Beta'])
-        expect(suggestForFragment('field:ITERATION=', mixed).map((s) => s.insert)).toEqual(['field:ITERATION=Beta', 'field:ITERATION=GA'])
+        expect(suggestForFragment('field:ITERATION=', mixed).map((s) => s.insert)).toEqual([
+            'field:ITERATION=Beta',
+            'field:ITERATION=GA',
+        ])
         expect(parseFilterQuery('field:ITERATION=Beta').filters).toEqual({ 'field:iteration': 'Beta' })
     })
 })

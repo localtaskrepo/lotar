@@ -46,7 +46,12 @@ function topModal() {
 }
 
 function eligible(element: HTMLElement): boolean {
-  if (!element.isConnected || element.matches(':disabled') || element.closest('[hidden], [inert], [aria-hidden="true"]')) return false
+  if (
+    !element.isConnected ||
+    element.matches(':disabled') ||
+    element.closest('[hidden], [inert], [aria-hidden="true"]')
+  )
+    return false
   for (let parent: HTMLElement | null = element; parent; parent = parent.parentElement) {
     const style = getComputedStyle(parent)
     if (style.display === 'none' || style.visibility === 'hidden') return false
@@ -55,15 +60,16 @@ function eligible(element: HTMLElement): boolean {
 }
 
 function focusable(dialog: HTMLElement): HTMLElement[] {
-  return Array.from(dialog.querySelectorAll<HTMLElement>(
-    'button, input:not([type="hidden"]), select, textarea, a[href], [contenteditable="true"], [tabindex]',
-  )).filter(element => element.tabIndex >= 0 && eligible(element))
+  return Array.from(
+    dialog.querySelectorAll<HTMLElement>(
+      'button, input:not([type="hidden"]), select, textarea, a[href], [contenteditable="true"], [tabindex]',
+    ),
+  ).filter((element) => element.tabIndex >= 0 && eligible(element))
 }
 
 function focusEntry(entry: ModalEntry) {
-  const target = entry.lastFocus && eligible(entry.lastFocus)
-    ? entry.lastFocus
-    : focusable(entry.dialog)[0] || entry.dialog
+  const target =
+    entry.lastFocus && eligible(entry.lastFocus) ? entry.lastFocus : focusable(entry.dialog)[0] || entry.dialog
   target.focus({ preventScroll: true })
 }
 
@@ -89,7 +95,11 @@ function handleModalKeydown(event: KeyboardEvent) {
     const first = controls[0] || entry.dialog
     const last = controls[controls.length - 1] || entry.dialog
     const active = document.activeElement
-    if (!controls.length || !controls.includes(active as HTMLElement) || (event.shiftKey ? active === first : active === last)) {
+    if (
+      !controls.length ||
+      !controls.includes(active as HTMLElement) ||
+      (event.shiftKey ? active === first : active === last)
+    ) {
       event.preventDefault()
       ;(event.shiftKey ? last : first).focus({ preventScroll: true })
     }
@@ -118,15 +128,18 @@ function refreshModalEnvironment() {
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-const props = withDefaults(defineProps<{
-  open: boolean
-  ariaLabel?: string
-  ariaLabelledby?: string
-  ariaDescribedby?: string
-  dismissible?: boolean
-  initialFocus?: string
-  size?: 'sm' | 'md' | 'lg' | 'xl'
-}>(), { dismissible: true })
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    ariaLabel?: string
+    ariaLabelledby?: string
+    ariaDescribedby?: string
+    dismissible?: boolean
+    initialFocus?: string
+    size?: 'sm' | 'md' | 'lg' | 'xl'
+  }>(),
+  { dismissible: true },
+)
 
 const emit = defineEmits<{
   close: []
@@ -164,7 +177,10 @@ function activate() {
     close: requestClose,
   }
   if (!modalStack.length) {
-    bodyOverflow = { value: document.body.style.getPropertyValue('overflow'), priority: document.body.style.getPropertyPriority('overflow') }
+    bodyOverflow = {
+      value: document.body.style.getPropertyValue('overflow'),
+      priority: document.body.style.getPropertyPriority('overflow'),
+    }
     document.body.style.setProperty('overflow', 'hidden')
     document.addEventListener('focusin', handleModalFocus, true)
     document.addEventListener('keydown', handleModalKeydown)
@@ -177,10 +193,13 @@ function activate() {
   activeEntry.focusObserver = new MutationObserver(() => {
     if (topModal() !== activeEntry || !activeEntry.dialog.isConnected) return
     const focused = document.activeElement
-    if (!(focused instanceof HTMLElement) || !activeEntry.dialog.contains(focused) || !eligible(focused)) focusEntry(activeEntry)
+    if (!(focused instanceof HTMLElement) || !activeEntry.dialog.contains(focused) || !eligible(focused))
+      focusEntry(activeEntry)
   })
   activeEntry.focusObserver.observe(activeEntry.dialog, {
-    childList: true, subtree: true, attributes: true,
+    childList: true,
+    subtree: true,
+    attributes: true,
     attributeFilter: ['disabled', 'hidden', 'inert', 'style', 'class', 'tabindex', 'aria-hidden'],
   })
   const preferred = entry.dialog.querySelector<HTMLElement>(props.initialFocus || '[autofocus], [data-autofocus]')
@@ -220,16 +239,26 @@ function deactivate() {
   }
 }
 
-watch(() => props.open, open => open ? activate() : deactivate(), { flush: 'post' })
-onMounted(() => { if (props.open) activate() })
+watch(
+  () => props.open,
+  (open) => (open ? activate() : deactivate()),
+  { flush: 'post' },
+)
+onMounted(() => {
+  if (props.open) activate()
+})
 onBeforeUnmount(deactivate)
 
 const sizeClass = computed(() => {
   switch (props.size) {
-    case 'sm': return 'ui-modal__card--sm'
-    case 'lg': return 'ui-modal__card--lg'
-    case 'xl': return 'ui-modal__card--xl'
-    default: return 'ui-modal__card--md'
+    case 'sm':
+      return 'ui-modal__card--sm'
+    case 'lg':
+      return 'ui-modal__card--lg'
+    case 'xl':
+      return 'ui-modal__card--xl'
+    default:
+      return 'ui-modal__card--md'
   }
 })
 </script>

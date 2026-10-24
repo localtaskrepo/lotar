@@ -39,7 +39,7 @@
       <span v-else class="muted">—</span>
     </template>
     <template v-else-if="col === 'tags'">
-      <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center;">
+      <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center">
         <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="tag">{{ tag }}</span>
         <span v-if="!task.tags.length" class="muted">—</span>
       </div>
@@ -47,7 +47,7 @@
     <template v-else-if="col === 'sprints'">
       <!-- Backlog rows have no sprint membership to show. -->
       <span v-if="contextSprintId === null" class="muted">—</span>
-      <div v-else class="row" style="gap: 6px; flex-wrap: wrap; align-items: center;">
+      <div v-else class="row" style="gap: 6px; flex-wrap: wrap; align-items: center">
         <span
           v-for="sprintId in task.sprints"
           :key="task.id + '-sprint-' + sprintId"

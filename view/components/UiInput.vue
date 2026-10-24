@@ -8,7 +8,7 @@
   />
 </template>
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from 'vue'
 
 defineProps<{ modelValue?: string }>()
 defineEmits<{ (e: 'update:modelValue', v: string): void }>()
@@ -21,5 +21,4 @@ function focus() {
 
 defineExpose({ focus })
 </script>
-<style scoped>
-</style>
+<style scoped></style>

@@ -26,13 +26,11 @@
       </div>
       <div class="field field--full">
         <label class="field-label" for="config-web-ui-path">Web UI folder</label>
-        <UiInput
-          id="config-web-ui-path"
-          v-model="webUiPath"
-          maxlength="512"
-          placeholder="Built-in web UI"
-        />
-        <p class="field-hint">Serve web UI files from this folder first, falling back to the built-in UI. Leave empty for the built-in UI only.</p>
+        <UiInput id="config-web-ui-path" v-model="webUiPath" maxlength="512" placeholder="Built-in web UI" />
+        <p class="field-hint">
+          Serve web UI files from this folder first, falling back to the built-in UI. Leave empty for the built-in UI
+          only.
+        </p>
       </div>
     </div>
   </ConfigGroup>

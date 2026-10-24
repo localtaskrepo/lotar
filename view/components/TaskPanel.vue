@@ -22,12 +22,11 @@
                 class="badge task-panel__status-badge"
                 :class="statusBadgeClass"
                 data-testid="task-panel-status-badge"
-              >{{ form.status }}</span>
-              <span
-                v-if="isDeleted"
-                class="badge task-panel__deleted-badge"
-                data-testid="task-panel-deleted-badge"
-              >Deleted</span>
+                >{{ form.status }}</span
+              >
+              <span v-if="isDeleted" class="badge task-panel__deleted-badge" data-testid="task-panel-deleted-badge"
+                >Deleted</span
+              >
             </div>
             <div class="task-panel__header-actions">
               <UiButton
@@ -87,350 +86,355 @@
                    every nested form control in one place. Mutations are also
                    rejected server-side ("restore it first"). -->
               <fieldset class="task-panel__form-fieldset" :disabled="isDeleted">
-              <TaskPanelSummarySection
-                :form="form"
-                :mode="mode"
-                :projects="projects"
-                :project-label="projectLabel"
-                :types="typeOptions"
-                :statuses="statusOptions"
-                :priorities="priorityOptions"
-                @fieldBlur="handleFieldBlur"
-                @projectChange="onProjectChange"
-                @updateStatus="updateStatus"
-              />
+                <TaskPanelSummarySection
+                  :form="form"
+                  :mode="mode"
+                  :projects="projects"
+                  :project-label="projectLabel"
+                  :types="typeOptions"
+                  :statuses="statusOptions"
+                  :priorities="priorityOptions"
+                  @fieldBlur="handleFieldBlur"
+                  @projectChange="onProjectChange"
+                  @updateStatus="updateStatus"
+                />
 
-              <fieldset class="task-panel__group">
-                <legend>Details</legend>
-                <div
-                  ref="descriptionEditorRoot"
-                  class="task-panel__description"
-                  @focusout="onDescriptionFocusOut"
-                >
-                  <div
-                    v-if="!editingDescription"
-                    class="task-panel__description-display"
-                    tabindex="0"
-                    role="button"
-                    aria-label="Edit description"
-                    @pointerdown.prevent="startEditingDescription"
-                    @click="startEditingDescription"
-                    @keydown.enter.prevent="startEditingDescription"
-                    @keydown.space.prevent="startEditingDescription"
-                  >
-                    <MarkdownContent v-if="(form.description || '').trim()" :source="form.description || ''" />
-                    <span v-else class="muted">Click to add a description…</span>
-                  </div>
+                <fieldset class="task-panel__group">
+                  <legend>Details</legend>
+                  <div ref="descriptionEditorRoot" class="task-panel__description" @focusout="onDescriptionFocusOut">
+                    <div
+                      v-if="!editingDescription"
+                      class="task-panel__description-display"
+                      tabindex="0"
+                      role="button"
+                      aria-label="Edit description"
+                      @pointerdown.prevent="startEditingDescription"
+                      @click="startEditingDescription"
+                      @keydown.enter.prevent="startEditingDescription"
+                      @keydown.space.prevent="startEditingDescription"
+                    >
+                      <MarkdownContent v-if="(form.description || '').trim()" :source="form.description || ''" />
+                      <span v-else class="muted">Click to add a description…</span>
+                    </div>
 
-                  <div v-else class="task-panel__description-editor">
-                    <div class="task-panel__description-body">
-                      <textarea
-                        v-if="!descriptionPreview"
-                        ref="descriptionTextarea"
-                        v-model="form.description"
-                        rows="5"
-                        placeholder="Description"
-                        @input="onDescriptionInput"
-                      ></textarea>
-                      <div
-                        v-else
-                        class="task-panel__description-preview"
-                        tabindex="0"
-                      >
-                        <MarkdownContent :source="form.description || ''" />
+                    <div v-else class="task-panel__description-editor">
+                      <div class="task-panel__description-body">
+                        <textarea
+                          v-if="!descriptionPreview"
+                          ref="descriptionTextarea"
+                          v-model="form.description"
+                          rows="5"
+                          placeholder="Description"
+                          @input="onDescriptionInput"
+                        ></textarea>
+                        <div v-else class="task-panel__description-preview" tabindex="0">
+                          <MarkdownContent :source="form.description || ''" />
+                        </div>
                       </div>
-                    </div>
-                    <div class="task-panel__description-controls">
-                      <UiButton
-                        variant="ghost"
-                        type="button"
-                        class="task-panel__description-preview-toggle"
-                        data-testid="description-preview-toggle"
-                        @click="descriptionPreview = !descriptionPreview"
-                      >
-                        {{ descriptionPreview ? 'Hide preview' : 'Preview' }}
-                      </UiButton>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  v-if="showAttachmentsPreference && (attachments.length || attachmentsUploading || (showLinksInAttachmentsPreference && (linkReferences.length || addingLinkReferences)))"
-                  class="task-panel__attachments"
-                >
-                  <div class="task-panel__attachments-header">
-                    <span>Attachments</span>
-                    <span v-if="attachmentsUploading" class="muted">Uploading…</span>
-                  </div>
-
-                  <ul class="task-panel__attachments-list">
-                    <li v-for="entry in attachments" :key="entry.attachment || ''" class="task-panel__attachment">
-                      <div class="task-panel__attachment-chip">
-                        <a
-                          class="task-panel__attachment-link"
-                          :href="attachmentUrl(entry.attachment || '')"
-                          target="_blank"
-                          rel="noopener"
-                          :title="attachmentHoverTitle(entry.attachment || '')"
-                        >
-                          <span class="task-panel__attachment-icon" aria-hidden="true">
-                            <img
-                              v-if="isImageAttachment(entry.attachment || '')"
-                              class="task-panel__attachment-thumb"
-                              :src="attachmentUrl(entry.attachment || '')"
-                              alt=""
-                              loading="lazy"
-                            />
-                            <IconGlyph v-else name="download" />
-                          </span>
-                          <span class="task-panel__attachment-name">{{ attachmentDisplayName(entry.attachment || '') }}</span>
-                        </a>
+                      <div class="task-panel__description-controls">
                         <UiButton
                           variant="ghost"
-                          icon-only
                           type="button"
-                          class="task-panel__attachment-remove"
-                          aria-label="Remove attachment"
-                          title="Remove attachment"
-                          :disabled="attachmentsUploading || removingAttachmentPath === (entry.attachment || '')"
-                          @click.prevent.stop="removeAttachment(entry.attachment || '')"
+                          class="task-panel__description-preview-toggle"
+                          data-testid="description-preview-toggle"
+                          @click="descriptionPreview = !descriptionPreview"
                         >
-                          <IconGlyph name="close" />
+                          {{ descriptionPreview ? 'Hide preview' : 'Preview' }}
                         </UiButton>
                       </div>
-                    </li>
-                  </ul>
+                    </div>
+                  </div>
 
-                  <div v-if="showLinksInAttachmentsPreference && (linkReferences.length || addingLinkReferences)">
+                  <div
+                    v-if="
+                      showAttachmentsPreference &&
+                      (attachments.length ||
+                        attachmentsUploading ||
+                        (showLinksInAttachmentsPreference && (linkReferences.length || addingLinkReferences)))
+                    "
+                    class="task-panel__attachments"
+                  >
                     <div class="task-panel__attachments-header">
-                      <span>Links</span>
-                      <span v-if="addingLinkReferences" class="muted">Adding…</span>
+                      <span>Attachments</span>
+                      <span v-if="attachmentsUploading" class="muted">Uploading…</span>
                     </div>
 
                     <ul class="task-panel__attachments-list">
-                      <li v-for="entry in linkReferences" :key="entry.link || ''" class="task-panel__attachment">
+                      <li v-for="entry in attachments" :key="entry.attachment || ''" class="task-panel__attachment">
                         <div class="task-panel__attachment-chip">
                           <a
                             class="task-panel__attachment-link"
-                            :href="(entry.link || '').trim()"
+                            :href="attachmentUrl(entry.attachment || '')"
                             target="_blank"
                             rel="noopener"
-                            :title="(entry.link || '').trim()"
+                            :title="attachmentHoverTitle(entry.attachment || '')"
                           >
                             <span class="task-panel__attachment-icon" aria-hidden="true">
-                              <IconGlyph name="chevron-right" />
+                              <img
+                                v-if="isImageAttachment(entry.attachment || '')"
+                                class="task-panel__attachment-thumb"
+                                :src="attachmentUrl(entry.attachment || '')"
+                                alt=""
+                                loading="lazy"
+                              />
+                              <IconGlyph v-else name="download" />
                             </span>
-                            <span class="task-panel__attachment-name">{{ linkDisplayName(entry.link || '') }}</span>
+                            <span class="task-panel__attachment-name">{{
+                              attachmentDisplayName(entry.attachment || '')
+                            }}</span>
                           </a>
                           <UiButton
                             variant="ghost"
                             icon-only
                             type="button"
                             class="task-panel__attachment-remove"
-                            aria-label="Remove link"
-                            title="Remove link"
-                            :disabled="attachmentsUploading || addingLinkReferences || removingLinkUrl === (entry.link || '').trim()"
-                            @click.prevent.stop="removeLinkReference(entry.link || '')"
+                            aria-label="Remove attachment"
+                            title="Remove attachment"
+                            :disabled="attachmentsUploading || removingAttachmentPath === (entry.attachment || '')"
+                            @click.prevent.stop="removeAttachment(entry.attachment || '')"
                           >
                             <IconGlyph name="close" />
                           </UiButton>
                         </div>
                       </li>
                     </ul>
+
+                    <div v-if="showLinksInAttachmentsPreference && (linkReferences.length || addingLinkReferences)">
+                      <div class="task-panel__attachments-header">
+                        <span>Links</span>
+                        <span v-if="addingLinkReferences" class="muted">Adding…</span>
+                      </div>
+
+                      <ul class="task-panel__attachments-list">
+                        <li v-for="entry in linkReferences" :key="entry.link || ''" class="task-panel__attachment">
+                          <div class="task-panel__attachment-chip">
+                            <a
+                              class="task-panel__attachment-link"
+                              :href="(entry.link || '').trim()"
+                              target="_blank"
+                              rel="noopener"
+                              :title="(entry.link || '').trim()"
+                            >
+                              <span class="task-panel__attachment-icon" aria-hidden="true">
+                                <IconGlyph name="chevron-right" />
+                              </span>
+                              <span class="task-panel__attachment-name">{{ linkDisplayName(entry.link || '') }}</span>
+                            </a>
+                            <UiButton
+                              variant="ghost"
+                              icon-only
+                              type="button"
+                              class="task-panel__attachment-remove"
+                              aria-label="Remove link"
+                              title="Remove link"
+                              :disabled="
+                                attachmentsUploading ||
+                                addingLinkReferences ||
+                                removingLinkUrl === (entry.link || '').trim()
+                              "
+                              @click.prevent.stop="removeLinkReference(entry.link || '')"
+                            >
+                              <IconGlyph name="close" />
+                            </UiButton>
+                          </div>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
-                </div>
-                <TaskPanelTagEditor
-                  ref="tagEditorRef"
-                  :tags="form.tags"
-                  :configured-tags="configTagOptions"
-                  :known-tags="knownTags"
-                  :allow-custom-tags="allowCustomTags"
-                  @update:tags="setTags"
-                  @discoveredTags="mergeKnownTags"
+                  <TaskPanelTagEditor
+                    ref="tagEditorRef"
+                    :tags="form.tags"
+                    :configured-tags="configTagOptions"
+                    :known-tags="knownTags"
+                    :allow-custom-tags="allowCustomTags"
+                    @update:tags="setTags"
+                    @discoveredTags="mergeKnownTags"
+                  />
+                </fieldset>
+
+                <TaskPanelOwnershipSection
+                  :form="form"
+                  :ordered-known-users="orderedKnownUsers"
+                  :whoami="whoami"
+                  :reporter-selection="reporterSelection"
+                  :assignee-selection="assigneeSelection"
+                  :reporter-mode="reporterMode"
+                  :assignee-mode="assigneeMode"
+                  :reporter-custom="reporterCustom"
+                  :assignee-custom="assigneeCustom"
+                  @update:reporterSelection="setReporterSelection"
+                  @update:assigneeSelection="setAssigneeSelection"
+                  @update:reporterCustom="setReporterCustom"
+                  @update:assigneeCustom="setAssigneeCustom"
+                  @commitReporterCustom="commitReporterCustom"
+                  @commitAssigneeCustom="commitAssigneeCustom"
+                  @resetReporterSelection="resetReporterSelection"
+                  @resetAssigneeSelection="resetAssigneeSelection"
+                  @fieldBlur="handleFieldBlur"
                 />
-              </fieldset>
 
-              <TaskPanelOwnershipSection
-                :form="form"
-                :ordered-known-users="orderedKnownUsers"
-                :whoami="whoami"
-                :reporter-selection="reporterSelection"
-                :assignee-selection="assigneeSelection"
-                :reporter-mode="reporterMode"
-                :assignee-mode="assigneeMode"
-                :reporter-custom="reporterCustom"
-                :assignee-custom="assigneeCustom"
-                @update:reporterSelection="setReporterSelection"
-                @update:assigneeSelection="setAssigneeSelection"
-                @update:reporterCustom="setReporterCustom"
-                @update:assigneeCustom="setAssigneeCustom"
-                @commitReporterCustom="commitReporterCustom"
-                @commitAssigneeCustom="commitAssigneeCustom"
-                @resetReporterSelection="resetReporterSelection"
-                @resetAssigneeSelection="resetAssigneeSelection"
-                @fieldBlur="handleFieldBlur"
-              />
-
-              <fieldset v-if="sprintsLoading || hasSprints" class="task-panel__group">
-                <legend>Sprints</legend>
-                <div v-if="sprintsLoading" class="task-panel__sprints-loading">
-                  <UiLoader size="sm">Loading sprint info…</UiLoader>
-                </div>
-                <div v-else class="task-panel__sprint-area">
-                  <ChipListField
-                    class="task-panel__sprint-field"
-                    :model-value="sprintChipLabels"
-                    empty-label="Not assigned to a sprint."
-                    add-label="Assign sprint"
-                    add-behavior="external"
-                    :removable="false"
-                    :chip-class="null"
-                    @add-click="openSprintDialog('add')"
-                  >
-                    <template #chip="{ index }">
-                      <span
-                        v-if="assignedSprints[index]"
-                        :class="[
-                          'task-panel__sprint-chip',
-                          `task-panel__sprint-chip--${assignedSprints[index].state}`,
-                          { 'task-panel__sprint-chip--missing': assignedSprints[index].missing },
-                        ]"
-                      >
-                        {{ assignedSprints[index].label }}
-                        <button
-                          type="button"
-                          class="task-panel__sprint-chip-remove"
-                          :aria-label="`Remove ${assignedSprints[index].label}`"
-                          :title="`Remove ${assignedSprints[index].label}`"
-                          :disabled="removingSprintId === assignedSprints[index].id"
-                          @click.stop="removeSprintChip(assignedSprints[index].id)"
+                <fieldset v-if="sprintsLoading || hasSprints" class="task-panel__group">
+                  <legend>Sprints</legend>
+                  <div v-if="sprintsLoading" class="task-panel__sprints-loading">
+                    <UiLoader size="sm">Loading sprint info…</UiLoader>
+                  </div>
+                  <div v-else class="task-panel__sprint-area">
+                    <ChipListField
+                      class="task-panel__sprint-field"
+                      :model-value="sprintChipLabels"
+                      empty-label="Not assigned to a sprint."
+                      add-label="Assign sprint"
+                      add-behavior="external"
+                      :removable="false"
+                      :chip-class="null"
+                      @add-click="openSprintDialog('add')"
+                    >
+                      <template #chip="{ index }">
+                        <span
+                          v-if="assignedSprints[index]"
+                          :class="[
+                            'task-panel__sprint-chip',
+                            `task-panel__sprint-chip--${assignedSprints[index].state}`,
+                            { 'task-panel__sprint-chip--missing': assignedSprints[index].missing },
+                          ]"
                         >
-                          <IconGlyph name="close" />
-                        </button>
-                      </span>
-                    </template>
-                  </ChipListField>
-                  <p v-if="assignedSprintNotice" class="task-panel__sprint-warning">
-                    {{ assignedSprintNotice }}
-                  </p>
-                </div>
-              </fieldset>
+                          {{ assignedSprints[index].label }}
+                          <button
+                            type="button"
+                            class="task-panel__sprint-chip-remove"
+                            :aria-label="`Remove ${assignedSprints[index].label}`"
+                            :title="`Remove ${assignedSprints[index].label}`"
+                            :disabled="removingSprintId === assignedSprints[index].id"
+                            @click.stop="removeSprintChip(assignedSprints[index].id)"
+                          >
+                            <IconGlyph name="close" />
+                          </button>
+                        </span>
+                      </template>
+                    </ChipListField>
+                    <p v-if="assignedSprintNotice" class="task-panel__sprint-warning">
+                      {{ assignedSprintNotice }}
+                    </p>
+                  </div>
+                </fieldset>
 
-              <TaskPanelCustomFieldsSection
-                :custom-fields="customFields"
-                :custom-field-keys="customFieldKeys"
-                :new-field-key="newField.key"
-                :new-field-value="newField.value"
-                :allow-new-fields="allowNewCustomFields"
-                @updateCustomFieldKey="updateCustomFieldKey"
-                @updateCustomFieldValue="updateCustomFieldValue"
-                @updateNewFieldKey="updateNewFieldKey"
-                @updateNewFieldValue="updateNewFieldValue"
-                @addField="addField"
-                @removeField="removeField"
-                @commit="commitCustomFields"
-              />
+                <TaskPanelCustomFieldsSection
+                  :custom-fields="customFields"
+                  :custom-field-keys="customFieldKeys"
+                  :new-field-key="newField.key"
+                  :new-field-value="newField.value"
+                  :allow-new-fields="allowNewCustomFields"
+                  @updateCustomFieldKey="updateCustomFieldKey"
+                  @updateCustomFieldValue="updateCustomFieldValue"
+                  @updateNewFieldKey="updateNewFieldKey"
+                  @updateNewFieldValue="updateNewFieldValue"
+                  @addField="addField"
+                  @removeField="removeField"
+                  @commit="commitCustomFields"
+                />
 
-              <section class="task-panel__group task-panel__activity">
-                <div class="task-panel__tabs" role="tablist">
-                  <button
-                    v-for="tab in activityTabs"
-                    :key="tab.id"
-                    type="button"
-                    class="task-panel__tab"
-                    :class="{ 'task-panel__tab--active': activityTab === tab.id }"
-                    role="tab"
-                    :aria-selected="activityTab === tab.id"
-                    @click="activityTab = tab.id"
+                <section class="task-panel__group task-panel__activity">
+                  <div class="task-panel__tabs" role="tablist">
+                    <button
+                      v-for="tab in activityTabs"
+                      :key="tab.id"
+                      type="button"
+                      class="task-panel__tab"
+                      :class="{ 'task-panel__tab--active': activityTab === tab.id }"
+                      role="tab"
+                      :aria-selected="activityTab === tab.id"
+                      @click="activityTab = tab.id"
+                    >
+                      {{ tab.label }}
+                    </button>
+                  </div>
+
+                  <TaskPanelCommentsTab
+                    v-if="activityTab === 'comments'"
+                    :mode="mode"
+                    :task="task"
+                    :new-comment="newComment"
+                    :submitting="submitting"
+                    :editing-comment-index="editingCommentIndex"
+                    :editing-comment-text="editingCommentText"
+                    :editing-comment-submitting="editingCommentSubmitting"
+                    :format-date="formatDate"
+                    :set-editing-textarea="setEditingCommentTextarea"
+                    @reload="reloadTask"
+                    @startEdit="startEditComment"
+                    @saveEdit="saveCommentEdit"
+                    @cancelEdit="cancelEditComment"
+                    @addComment="addComment"
+                    @update:newComment="updateNewComment"
+                    @update:editingCommentText="updateEditingCommentText"
+                  />
+
+                  <TaskPanelRelationshipsTab
+                    v-else-if="activityTab === 'relationships'"
+                    :mode="mode"
+                    :relationships="relationships"
+                    :task-id="task.id"
+                    :project="form.project"
+                    :disabled="isDeleted || !ready"
+                    :mutate="mutateRelationship"
+                  />
+
+                  <TaskPanelHistoryTab
+                    v-else-if="activityTab === 'history'"
+                    :mode="mode"
+                    :change-log="changeLog"
+                    :format-date="formatDate"
+                    :format-field-name="formatFieldName"
+                    :format-change-value="formatChangeValue"
+                    @reload="reloadTask"
+                  />
+
+                  <TaskPanelCommitsTab
+                    v-else-if="activityTab === 'commits'"
+                    :mode="mode"
+                    :commit-history="commitHistory"
+                    :commits-loading="commitsLoading"
+                    :format-commit="formatCommit"
+                    :format-date="formatDate"
+                    @refresh="refreshCommits"
+                  />
+
+                  <TaskPanelReferencesTab
+                    v-else
+                    :mode="mode"
+                    :task="task"
+                    :attachments-dir="attachmentsDir"
+                    :hovered-reference-code="hoveredReferenceCode"
+                    :hovered-reference-style="hoveredReferenceStyle"
+                    :hovered-reference-loading="hoveredReferenceLoading"
+                    :hovered-reference-error="hoveredReferenceError"
+                    :hovered-reference-snippet="hoveredReferenceSnippet"
+                    :hovered-reference-can-expand="hoveredReferenceCanExpand"
+                    :hovered-reference-can-expand-before="hoveredReferenceCanExpandBefore"
+                    :hovered-reference-can-expand-after="hoveredReferenceCanExpandAfter"
+                    :on-reference-enter="onReferenceEnter"
+                    :on-reference-leave="onReferenceLeave"
+                    :on-reference-preview-enter="onReferencePreviewEnter"
+                    :on-reference-preview-leave="onReferencePreviewLeave"
+                    :expand-reference-snippet="expandReferenceSnippet"
+                    :is-reference-line-highlighted="isReferenceLineHighlighted"
+                    :set-reference-preview-element="setReferencePreviewElement"
+                    @reload="reloadTask"
+                    @updated="onReferencesUpdated"
+                  />
+                </section>
+
+                <footer class="task-panel__footer">
+                  <div v-if="Object.keys(errors).length" class="task-panel__errors">
+                    <p v-for="(message, field) in errors" :key="field">{{ message }}</p>
+                  </div>
+                  <UiButton v-if="mode === 'create' && errors.config" type="button" @click="onProjectChange"
+                    >Retry configuration</UiButton
                   >
-                    {{ tab.label }}
-                  </button>
-                </div>
-
-                <TaskPanelCommentsTab
-                  v-if="activityTab === 'comments'"
-                  :mode="mode"
-                  :task="task"
-                  :new-comment="newComment"
-                  :submitting="submitting"
-                  :editing-comment-index="editingCommentIndex"
-                  :editing-comment-text="editingCommentText"
-                  :editing-comment-submitting="editingCommentSubmitting"
-                  :format-date="formatDate"
-                  :set-editing-textarea="setEditingCommentTextarea"
-                  @reload="reloadTask"
-                  @startEdit="startEditComment"
-                  @saveEdit="saveCommentEdit"
-                  @cancelEdit="cancelEditComment"
-                  @addComment="addComment"
-                  @update:newComment="updateNewComment"
-                  @update:editingCommentText="updateEditingCommentText"
-                />
-
-                <TaskPanelRelationshipsTab
-                  v-else-if="activityTab === 'relationships'"
-                  :mode="mode"
-                  :relationships="relationships"
-                  :task-id="task.id"
-                  :project="form.project"
-                  :disabled="isDeleted || !ready"
-                  :mutate="mutateRelationship"
-                />
-
-                <TaskPanelHistoryTab
-                  v-else-if="activityTab === 'history'"
-                  :mode="mode"
-                  :change-log="changeLog"
-                  :format-date="formatDate"
-                  :format-field-name="formatFieldName"
-                  :format-change-value="formatChangeValue"
-                  @reload="reloadTask"
-                />
-
-                <TaskPanelCommitsTab
-                  v-else-if="activityTab === 'commits'"
-                  :mode="mode"
-                  :commit-history="commitHistory"
-                  :commits-loading="commitsLoading"
-                  :format-commit="formatCommit"
-                  :format-date="formatDate"
-                  @refresh="refreshCommits"
-                />
-
-                <TaskPanelReferencesTab
-                  v-else
-                  :mode="mode"
-                  :task="task"
-                  :attachments-dir="attachmentsDir"
-                  :hovered-reference-code="hoveredReferenceCode"
-                  :hovered-reference-style="hoveredReferenceStyle"
-                  :hovered-reference-loading="hoveredReferenceLoading"
-                  :hovered-reference-error="hoveredReferenceError"
-                  :hovered-reference-snippet="hoveredReferenceSnippet"
-                  :hovered-reference-can-expand="hoveredReferenceCanExpand"
-                  :hovered-reference-can-expand-before="hoveredReferenceCanExpandBefore"
-                  :hovered-reference-can-expand-after="hoveredReferenceCanExpandAfter"
-                  :on-reference-enter="onReferenceEnter"
-                  :on-reference-leave="onReferenceLeave"
-                  :on-reference-preview-enter="onReferencePreviewEnter"
-                  :on-reference-preview-leave="onReferencePreviewLeave"
-                  :expand-reference-snippet="expandReferenceSnippet"
-                  :is-reference-line-highlighted="isReferenceLineHighlighted"
-                  :set-reference-preview-element="setReferencePreviewElement"
-                  @reload="reloadTask"
-                  @updated="onReferencesUpdated"
-                />
-              </section>
-
-              <footer class="task-panel__footer">
-                <div v-if="Object.keys(errors).length" class="task-panel__errors">
-                  <p v-for="(message, field) in errors" :key="field">{{ message }}</p>
-                </div>
-                <UiButton v-if="mode === 'create' && errors.config" type="button" @click="onProjectChange">Retry configuration</UiButton>
-                <UiButton v-if="mode === 'create'" variant="primary" type="submit" :disabled="!canCreate">
-                  {{ submitting ? 'Creating…' : 'Create task' }}
-                </UiButton>
-              </footer>
+                  <UiButton v-if="mode === 'create'" variant="primary" type="submit" :disabled="!canCreate">
+                    {{ submitting ? 'Creating…' : 'Create task' }}
+                  </UiButton>
+                </footer>
               </fieldset>
             </form>
           </section>
@@ -530,11 +534,7 @@
 
           <label class="task-panel-dialog__field">
             <span class="muted">Remote</span>
-            <select
-              class="input"
-              v-model="syncDialogRemote"
-              :disabled="syncRemoteEntries.length <= 1"
-            >
+            <select class="input" v-model="syncDialogRemote" :disabled="syncRemoteEntries.length <= 1">
               <option v-for="entry in syncRemoteEntries" :key="entry.name" :value="entry.name">
                 {{ entry.name }} · {{ formatRemote(entry.remote) }}
               </option>
@@ -591,25 +591,26 @@
             </UiButton>
           </header>
           <p>
-            Permanently delete {{ task.id || 'this task' }}? The task file and its history are removed.
-            This cannot be undone.
+            Permanently delete {{ task.id || 'this task' }}? The task file and its history are removed. This cannot be
+            undone.
           </p>
           <p class="muted">
-            Attached repository files are kept; managed attachment blobs that are still referenced by
-            other tasks are retained and reported after deletion.
+            Attached repository files are kept; managed attachment blobs that are still referenced by other tasks are
+            retained and reported after deletion.
           </p>
           <label class="task-panel-dialog__checkbox">
             <input type="checkbox" v-model="hardDeleteConfirmed" /> I understand this cannot be undone
           </label>
           <footer class="task-panel-dialog__footer">
-            <UiButton
-              variant="danger"
-              type="submit"
-              :disabled="hardDeleteSubmitting || !hardDeleteConfirmed"
-            >
+            <UiButton variant="danger" type="submit" :disabled="hardDeleteSubmitting || !hardDeleteConfirmed">
               {{ hardDeleteSubmitting ? 'Deleting…' : 'Delete permanently' }}
             </UiButton>
-            <UiButton variant="ghost" type="button" :disabled="hardDeleteSubmitting" @click="hardDeleteDialogOpen = false">
+            <UiButton
+              variant="ghost"
+              type="button"
+              :disabled="hardDeleteSubmitting"
+              @click="hardDeleteDialogOpen = false"
+            >
               Cancel
             </UiButton>
           </footer>
@@ -622,17 +623,26 @@
 <script setup lang="ts">
 import { Teleport, Transition, computed, nextTick, ref, watch } from 'vue'
 import { api } from '../api/client'
-import type { ConfigInspectResult, SprintIntegrityDiagnostics, SyncRemoteConfig, SyncRequest, TaskDTO } from '../api/types'
+import type {
+  ConfigInspectResult,
+  SprintIntegrityDiagnostics,
+  SyncRemoteConfig,
+  SyncRequest,
+  TaskDTO,
+} from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
-import { useTaskPanelAttachmentDrop, useTaskPanelAttachmentPreferences } from '../composables/task-panel/useTaskPanelAttachmentDrop'
+import {
+  useTaskPanelAttachmentDrop,
+  useTaskPanelAttachmentPreferences,
+} from '../composables/task-panel/useTaskPanelAttachmentDrop'
 import { useTaskPanelReferenceMutations } from '../composables/task-panel/useTaskPanelReferenceMutations'
 import {
-    attachmentDisplayName,
-    attachmentHoverTitle as buildAttachmentHoverTitle,
-    attachmentUrl as buildAttachmentUrl,
-    extractUrlsFromText,
-    isImageAttachment,
-    linkDisplayName,
+  attachmentDisplayName,
+  attachmentHoverTitle as buildAttachmentHoverTitle,
+  attachmentUrl as buildAttachmentUrl,
+  extractUrlsFromText,
+  isImageAttachment,
+  linkDisplayName,
 } from '../utils/taskAttachments'
 import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../utils/text'
 import { useTaskStore } from '../composables/useTaskStore'
@@ -666,7 +676,12 @@ const props = defineProps<{
   /** DEV-92: bumped by TaskPanelHost on external lifecycle transitions. */
   lifecycleReload?: number
 }>()
-const emit = defineEmits<{ (e: 'close'): void; (e: 'created', task: TaskDTO): void; (e: 'updated', task: TaskDTO): void; (e: 'restored', task: TaskDTO): void }>()
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'created', task: TaskDTO): void
+  (e: 'updated', task: TaskDTO): void
+  (e: 'restored', task: TaskDTO): void
+}>()
 const taskStore = useTaskStore()
 
 const {
@@ -792,10 +807,10 @@ const deletedAtLabel = computed(() => {
 const restoreSubmitting = ref(false)
 
 async function restoreDeletedTask() {
-    if (!task.id || restoreSubmitting.value) return
-    const id = task.id
-    restoreSubmitting.value = true
-    try {
+  if (!task.id || restoreSubmitting.value) return
+  const id = task.id
+  restoreSubmitting.value = true
+  try {
     await taskStore.restore(id, projectPrefixOfTaskId(id) || undefined)
     if (!props.open || task.id !== id || props.taskId !== id) return
     const restored = taskStore._map.value.get(id)
@@ -1094,7 +1109,9 @@ function handleIntegrityFeedback(integrity?: SprintIntegrityDiagnostics | null) 
   if (!integrity) return
   const autoCleanup = integrity.auto_cleanup
   if (autoCleanup?.removed_references) {
-    showToast(`Automatically cleaned ${autoCleanup.removed_references} dangling sprint reference${autoCleanup.removed_references === 1 ? '' : 's'}.`)
+    showToast(
+      `Automatically cleaned ${autoCleanup.removed_references} dangling sprint reference${autoCleanup.removed_references === 1 ? '' : 's'}.`,
+    )
   }
   if (Array.isArray(integrity.missing_sprints) && integrity.missing_sprints.length) {
     const ids = integrity.missing_sprints.map((id) => `#${id}`).join(', ')
@@ -1145,11 +1162,7 @@ watch(
   { immediate: true },
 )
 
-const sprintDialogTitle = computed(() =>
-  sprintDialogMode.value === 'add'
-    ? 'Assign to sprint'
-    : 'Remove from sprint',
-)
+const sprintDialogTitle = computed(() => (sprintDialogMode.value === 'add' ? 'Assign to sprint' : 'Remove from sprint'))
 
 function openSprintDialog(mode: 'add' | 'remove') {
   if (rejectDeletedMutation('managing sprints')) return
@@ -1224,9 +1237,7 @@ async function submitSprintDialog() {
       payload.allow_closed = true
     }
     const response =
-      sprintDialogMode.value === 'add'
-        ? await api.sprintAdd(payload as any)
-        : await api.sprintRemove(payload as any)
+      sprintDialogMode.value === 'add' ? await api.sprintAdd(payload as any) : await api.sprintRemove(payload as any)
     const changed = response.modified.length
     const replacedCount = Array.isArray(response.replaced) ? response.replaced.length : 0
     const cleanedReferences = response.integrity?.auto_cleanup?.removed_references ?? 0
@@ -1241,11 +1252,7 @@ async function submitSprintDialog() {
     const messages = Array.isArray(response.messages) ? response.messages : []
     if (messages.length) {
       messages.forEach((message) => showToast(message))
-    } else if (
-      sprintDialogMode.value === 'add' &&
-      Array.isArray(response.replaced) &&
-      response.replaced.length
-    ) {
+    } else if (sprintDialogMode.value === 'add' && Array.isArray(response.replaced) && response.replaced.length) {
       response.replaced.forEach((entry) => {
         if (!entry?.previous?.length) return
         const prev = entry.previous.map((id) => `#${id}`).join(', ')
@@ -1261,7 +1268,9 @@ async function submitSprintDialog() {
     }
     closeSprintDialog(true)
   } catch (error: any) {
-    showToast(error?.message || (sprintDialogMode.value === 'add' ? 'Failed to assign sprint' : 'Failed to remove sprint'))
+    showToast(
+      error?.message || (sprintDialogMode.value === 'add' ? 'Failed to assign sprint' : 'Failed to remove sprint'),
+    )
   } finally {
     sprintDialogSubmitting.value = false
   }
@@ -1342,12 +1351,12 @@ async function submitSyncDialog() {
       include_report: true,
       write_report: syncDialogWriteReport.value,
     }
-    const response = syncDialogAction.value === 'pull'
-      ? await api.syncPull(request)
-      : await api.syncPush(request)
+    const response = syncDialogAction.value === 'pull' ? await api.syncPull(request) : await api.syncPush(request)
     const summary = response.summary
     if (summary) {
-      showToast(`Sync ${syncDialogAction.value} complete: ${summary.created} created, ${summary.updated} updated, ${summary.skipped} skipped, ${summary.failed} failed`)
+      showToast(
+        `Sync ${syncDialogAction.value} complete: ${summary.created} created, ${summary.updated} updated, ${summary.skipped} skipped, ${summary.failed} failed`,
+      )
     } else {
       showToast(`Sync ${syncDialogAction.value} complete`)
     }
@@ -1794,7 +1803,9 @@ details.task-panel__group:not([open]) {
   font-size: var(--text-sm, 0.875rem);
   text-align: left;
   cursor: pointer;
-  transition: background var(--duration-med) var(--ease-standard), color var(--duration-med) var(--ease-standard);
+  transition:
+    background var(--duration-med) var(--ease-standard),
+    color var(--duration-med) var(--ease-standard);
 }
 
 .task-panel__tag-suggestion:hover,
@@ -1869,7 +1880,9 @@ details.task-panel__group:not([open]) {
 }
 
 .task-panel__references-dialog .task-panel-dialog__card {
-  transition: width var(--duration-med) var(--ease-standard), max-height var(--duration-med) var(--ease-standard);
+  transition:
+    width var(--duration-med) var(--ease-standard),
+    max-height var(--duration-med) var(--ease-standard);
   will-change: width, max-height;
 }
 
@@ -1967,7 +1980,9 @@ details.task-panel__group:not([open]) {
   border-radius: var(--radius-pill);
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .task-panel__tab:hover {
@@ -2377,7 +2392,18 @@ textarea {
 }
 
 .task-panel__history-commit {
-  font-family: var(--font-mono, 'SFMono-Regular', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+  font-family: var(
+    --font-mono,
+    'SFMono-Regular',
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    'Liberation Mono',
+    'Courier New',
+    monospace
+  );
   letter-spacing: 0.02em;
 }
 
@@ -2532,7 +2558,18 @@ textarea {
   border-radius: var(--radius-md, 0.375rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 88%, transparent);
   border: 1px solid color-mix(in oklab, var(--color-border, var(--border)) 60%, transparent);
-  font-family: var(--font-mono, 'SFMono-Regular', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+  font-family: var(
+    --font-mono,
+    'SFMono-Regular',
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    'Liberation Mono',
+    'Courier New',
+    monospace
+  );
 }
 
 .task-panel__reference-actions {

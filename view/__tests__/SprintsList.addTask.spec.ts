@@ -13,8 +13,16 @@ vi.mock('vue-router', () => ({
 }))
 
 const api = vi.hoisted(() => ({
-    getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
-    reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
+    getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+        status: 'ok',
+        tasks: [],
+        changed: false,
+    })),
+    reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+        status: 'ok',
+        tasks: [],
+        changed: false,
+    })),
     listTasks: vi.fn(),
     sprintAdd: vi.fn(),
     sprintRemove: vi.fn(),
@@ -70,7 +78,8 @@ vi.mock('../components/UiSelect.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue'],
-        template: '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
+        template:
+            '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
     },
 }))
 
@@ -107,7 +116,7 @@ vi.mock('../components/analytics/SprintAnalyticsDialog.vue', () => ({
 const sprintsStore = {
     sprints: ref<any[]>([]),
     loading: ref(false),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     missingSprints: ref<any[]>([]),
     hasMissing: ref(false),
 }
@@ -119,13 +128,15 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['open', 'done']),
         priorities: ref<string[]>(['low', 'med', 'high']),
         types: ref<string[]>(['task']),
         customFields: ref<string[]>([]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
@@ -141,10 +152,10 @@ vi.mock('../composables/useSprintAnalytics', () => ({
         isSummaryLoading: vi.fn(() => false),
         isBurndownLoading: vi.fn(() => false),
         isVelocityLoading: vi.fn(() => false),
-        loadSummary: vi.fn(async () => { }),
-        loadBurndown: vi.fn(async () => { }),
-        loadVelocity: vi.fn(async () => { }),
-        fetchSprintAnalytics: vi.fn(async () => { }),
+        loadSummary: vi.fn(async () => {}),
+        loadBurndown: vi.fn(async () => {}),
+        loadVelocity: vi.fn(async () => {}),
+        fetchSprintAnalytics: vi.fn(async () => {}),
     }),
 }))
 
@@ -336,7 +347,11 @@ describe('SprintsList add-task controls (DEV-104)', () => {
         await wrapper.find('[data-testid="sprint-add-task"]').trigger('click')
         const onCreated = (openTaskPanel.mock.calls[0]![0] as Record<string, any>).onCreated as (task: any) => void
         let finishRefresh!: (response: ReturnType<typeof tasksResponse>) => void
-        api.listTasks.mockReturnValue(new Promise(resolve => { finishRefresh = resolve }))
+        api.listTasks.mockReturnValue(
+            new Promise((resolve) => {
+                finishRefresh = resolve
+            }),
+        )
         onCreated(makeTask('PRJ-009', [1]))
         await nextTick()
         expect(wrapper.findAll('tr.task-row[data-task-id="PRJ-009"]')).toHaveLength(0)

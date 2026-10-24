@@ -1,0 +1,9 @@
+# Formatting covers the TypeScript/Vue/JS sources listed in package.json
+# (fmt:js); everything else keeps its own conventions.
+node_modules/
+target/
+docs/
+.tasks/
+.history/
+.kilo/
+view/styles.css

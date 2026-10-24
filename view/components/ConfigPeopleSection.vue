@@ -17,7 +17,9 @@
           @update:modelValue="emit('validate', 'members')"
         />
         <p class="field-hint">
-          People who may report or be assigned tasks when "Only allow members" is on{{ isGlobal ? '' : '. Leave empty to inherit the global list' }}.
+          People who may report or be assigned tasks when "Only allow members" is on{{
+            isGlobal ? '' : '. Leave empty to inherit the global list'
+          }}.
         </p>
         <p v-if="membersError" class="field-error">{{ membersError }}</p>
       </div>
@@ -46,7 +48,10 @@
       <div v-if="!isGlobal" class="field field--full" data-testid="config-reviewers">
         <label class="field-label">
           <span>Reviewers</span>
-          <span v-if="sourceFor('review_reviewers')" :class="['provenance', provenanceClass(sourceFor('review_reviewers'))]">
+          <span
+            v-if="sourceFor('review_reviewers')"
+            :class="['provenance', provenanceClass(sourceFor('review_reviewers'))]"
+          >
             {{ provenanceLabel(sourceFor('review_reviewers')) }}
           </span>
         </label>
@@ -59,7 +64,10 @@
           empty-label="Reporter only"
           @update:modelValue="emit('validate', 'review_reviewers')"
         />
-        <p class="field-hint">Named people (not @me or *) who may resolve status or assignee changes on tasks in review, besides the reporter. Leave empty for reporter-only review.</p>
+        <p class="field-hint">
+          Named people (not @me or *) who may resolve status or assignee changes on tasks in review, besides the
+          reporter. Leave empty for reporter-only review.
+        </p>
         <p v-if="reviewReviewersError" class="field-error">{{ reviewReviewersError }}</p>
       </div>
     </div>
@@ -108,4 +116,3 @@ const emit = defineEmits<{
   (e: 'validate', field: 'members' | 'review_reviewers'): void
 }>()
 </script>
-

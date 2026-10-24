@@ -8,11 +8,7 @@ function frontendManifest(): string {
 }
 
 function apiManifest(): string {
-    return [
-        '[package]',
-        'name = "api-service"',
-        'version = "0.1.0"',
-    ].join('\n');
+    return ['[package]', 'name = "api-service"', 'version = "0.1.0"'].join('\n');
 }
 
 describe.concurrent.skipIf(!gitAvailable())('CLI multi-project smoke scenarios', () => {

@@ -50,9 +50,7 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
             .reverse()
             .map((entry) => ({
                 ...entry,
-                changes: Array.isArray(entry.changes)
-                    ? entry.changes.map((change) => ({ ...change }))
-                    : [],
+                changes: Array.isArray(entry.changes) ? entry.changes.map((change) => ({ ...change })) : [],
             }))
     }
 
@@ -77,7 +75,6 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
         if (!taskId) return
         await loadCommitHistory(taskId, limit)
     }
-
 
     const formatCommit = (value: string) => {
         if (!value) return ''

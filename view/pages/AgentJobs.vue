@@ -1,17 +1,12 @@
 <template>
-  <section class="col" style="gap: 16px;">
-    <header class="row" style="align-items: flex-start; justify-content: space-between;">
-      <div class="col" style="gap: 4px;">
-        <h1 style="margin: 0;">Agent jobs</h1>
-        <p class="muted" style="margin: 0;">Track active and recent agent runs grouped by ticket.</p>
+  <section class="col" style="gap: 16px">
+    <header class="row" style="align-items: flex-start; justify-content: space-between">
+      <div class="col" style="gap: 4px">
+        <h1 style="margin: 0">Agent jobs</h1>
+        <p class="muted" style="margin: 0">Track active and recent agent runs grouped by ticket.</p>
       </div>
-      <div class="row" style="gap: 8px;">
-        <UiButton
-          variant="danger"
-          type="button"
-          :disabled="loading || !hasCancelableJobs"
-          @click="cancelAll"
-        >
+      <div class="row" style="gap: 8px">
+        <UiButton variant="danger" type="button" :disabled="loading || !hasCancelableJobs" @click="cancelAll">
           Stop all
         </UiButton>
         <ReloadButton
@@ -27,7 +22,7 @@
 
     <!-- Queue Stats -->
     <UiCard v-if="queueStats" class="queue-stats-card">
-      <div class="row" style="gap: 24px; align-items: center; justify-content: flex-start;">
+      <div class="row" style="gap: 24px; align-items: center; justify-content: flex-start">
         <div class="stat-item">
           <span class="stat-value running">{{ queueStats.running }}</span>
           <span class="stat-label">Running</span>
@@ -48,7 +43,7 @@
     </UiCard>
 
     <!-- Filter tabs -->
-    <div class="row" style="gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap;">
+    <div class="row" style="gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap">
       <button
         v-for="tab in tabs"
         :key="tab.value"
@@ -62,61 +57,76 @@
       </button>
     </div>
 
-      <div v-if="loading && !jobs.length" class="muted">Loading jobs…</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-if="loading && !jobs.length" class="muted">Loading jobs…</div>
+    <div v-else-if="error" class="error">{{ error }}</div>
 
     <UiEmptyState
       v-else-if="!filteredJobs.length"
       title="No agent jobs yet"
-      :description="activeTab === 'all' ? 'Jobs are usually started from task automation or the CLI and appear here automatically.' : `No ${activeTab} jobs.`"
+      :description="
+        activeTab === 'all'
+          ? 'Jobs are usually started from task automation or the CLI and appear here automatically.'
+          : `No ${activeTab} jobs.`
+      "
     />
 
-    <div v-else class="col" style="gap: 12px;">
+    <div v-else class="col" style="gap: 12px">
       <UiCard v-for="group in groupedJobs" :key="group.ticketId" class="ticket-group-card">
-        <div class="ticket-group-card__header row" style="justify-content: space-between; align-items: flex-start; gap: 16px;">
-          <div class="col" style="gap: 6px; flex: 1 1 auto;">
-            <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+        <div
+          class="ticket-group-card__header row"
+          style="justify-content: space-between; align-items: flex-start; gap: 16px"
+        >
+          <div class="col" style="gap: 6px; flex: 1 1 auto">
+            <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
               <button class="chip" type="button" @click="openTask(group.ticketId)">
                 {{ group.ticketId }}
               </button>
               <span class="muted">{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
             </div>
-            <div class="muted" style="font-size: 12px;">
+            <div class="muted" style="font-size: 12px">
               <span>Latest {{ formatDate(group.latest!.created_at) }}</span>
               <span v-if="group.latest!.finished_at"> · {{ group.latest!.status }}</span>
             </div>
           </div>
-          <div class="row ticket-group-summary" style="gap: 8px; align-items: center; flex-wrap: wrap;">
-            <span v-if="group.counts.running" class="summary-chip summary-chip-running">{{ group.counts.running }} running</span>
-            <span v-if="group.counts.queued" class="summary-chip summary-chip-queued">{{ group.counts.queued }} queued</span>
-            <span v-if="group.counts.completed" class="summary-chip summary-chip-completed">{{ group.counts.completed }} completed</span>
-            <span v-if="group.counts.failed" class="summary-chip summary-chip-failed">{{ group.counts.failed }} failed</span>
+          <div class="row ticket-group-summary" style="gap: 8px; align-items: center; flex-wrap: wrap">
+            <span v-if="group.counts.running" class="summary-chip summary-chip-running"
+              >{{ group.counts.running }} running</span
+            >
+            <span v-if="group.counts.queued" class="summary-chip summary-chip-queued"
+              >{{ group.counts.queued }} queued</span
+            >
+            <span v-if="group.counts.completed" class="summary-chip summary-chip-completed"
+              >{{ group.counts.completed }} completed</span
+            >
+            <span v-if="group.counts.failed" class="summary-chip summary-chip-failed"
+              >{{ group.counts.failed }} failed</span
+            >
           </div>
         </div>
 
         <div class="ticket-group-jobs">
           <div v-for="job in group.jobs" :key="job.id" class="job-card" :class="`job-${job.status}`">
-            <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 16px;">
-              <div class="col" style="gap: 6px; flex: 1 1 auto;">
-                <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+            <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 16px">
+              <div class="col" style="gap: 6px; flex: 1 1 auto">
+                <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
                   <span class="status-chip" :class="`status-${job.status}`">{{ job.status }}</span>
                   <span v-if="job.agent" class="phase-chip">{{ job.agent }}</span>
                   <span class="muted">{{ job.runner }}</span>
                 </div>
-                <div class="muted" style="font-size: 12px;">
+                <div class="muted" style="font-size: 12px">
                   <span>Created {{ formatDate(job.created_at) }}</span>
                   <span v-if="job.started_at"> · Started {{ formatDate(job.started_at) }}</span>
                   <span v-if="job.finished_at"> · Finished {{ formatDate(job.finished_at) }}</span>
                 </div>
-                <div v-if="job.worktree_path" class="muted" style="font-size: 12px;">
+                <div v-if="job.worktree_path" class="muted" style="font-size: 12px">
                   <span>Worktree {{ job.worktree_path }}</span>
                   <span v-if="job.worktree_branch"> · {{ job.worktree_branch }}</span>
                 </div>
-                <p v-if="job.last_message" class="muted" style="margin: 0;">
+                <p v-if="job.last_message" class="muted" style="margin: 0">
                   {{ job.last_message }}
                 </p>
               </div>
-              <div class="row" style="gap: 8px; align-items: center;">
+              <div class="row" style="gap: 8px; align-items: center">
                 <UiButton variant="ghost" type="button" @click="toggleLogs(job.id)">
                   {{ isLogsOpen(job.id) ? 'Hide logs' : 'Show logs' }}
                 </UiButton>
@@ -134,22 +144,16 @@
             <div v-if="isLogsOpen(job.id)" class="log-panel">
               <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
               <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
-              <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">
-                No log entries yet.
-              </div>
+              <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
               <div v-else class="log-list">
-                <div
-                  v-for="entry in logsByJob[job.id] || []"
-                  :key="entry.sequence"
-                  class="log-row"
-                >
+                <div v-for="entry in logsByJob[job.id] || []" :key="entry.sequence" class="log-row">
                   <span class="log-kind">{{ entry.kind }}</span>
                   <span class="log-time">{{ formatDate(entry.at) }}</span>
                   <span class="log-message">{{ formatLogMessage(entry) }}</span>
                 </div>
               </div>
 
-              <div class="row" style="gap: 8px; margin-top: 12px;">
+              <div class="row" style="gap: 8px; margin-top: 12px">
                 <UiInput
                   :model-value="messageDrafts[job.id] || ''"
                   placeholder="Send a message to the agent"
@@ -184,7 +188,9 @@
     <div class="stop-all-dialog">
       <h2 :id="stopAllHeadingId" class="stop-all-dialog__title">Stop all agent jobs</h2>
       <p :id="stopAllBodyId" class="stop-all-dialog__message">Stop all queued and running agent jobs?</p>
-      <p v-if="stopAllError" class="error stop-all-dialog__error" data-testid="stop-all-dialog-error">{{ stopAllError }}</p>
+      <p v-if="stopAllError" class="error stop-all-dialog__error" data-testid="stop-all-dialog-error">
+        {{ stopAllError }}
+      </p>
       <div class="stop-all-dialog__actions">
         <UiButton
           variant="ghost"
@@ -195,12 +201,7 @@
         >
           Cancel
         </UiButton>
-        <UiButton
-          variant="danger"
-          type="button"
-          :disabled="stopAllSubmitting"
-          @click="confirmStopAll"
-        >
+        <UiButton variant="danger" type="button" :disabled="stopAllSubmitting" @click="confirmStopAll">
           {{ stopAllSubmitting ? 'Stopping…' : 'Stop all' }}
         </UiButton>
       </div>
@@ -236,16 +237,20 @@ const messageDrafts = ref<Record<string, string>>({})
 
 const tabs = computed(() => [
   { value: 'all' as const, label: 'All', count: jobs.value.length },
-  { value: 'running' as const, label: 'Running', count: jobs.value.filter(j => j.status === 'running').length },
-  { value: 'queued' as const, label: 'Queued', count: jobs.value.filter(j => j.status === 'queued').length },
-  { value: 'completed' as const, label: 'Completed', count: jobs.value.filter(j => j.status === 'completed').length },
-  { value: 'failed' as const, label: 'Failed', count: jobs.value.filter(j => j.status === 'failed' || j.status === 'cancelled').length },
+  { value: 'running' as const, label: 'Running', count: jobs.value.filter((j) => j.status === 'running').length },
+  { value: 'queued' as const, label: 'Queued', count: jobs.value.filter((j) => j.status === 'queued').length },
+  { value: 'completed' as const, label: 'Completed', count: jobs.value.filter((j) => j.status === 'completed').length },
+  {
+    value: 'failed' as const,
+    label: 'Failed',
+    count: jobs.value.filter((j) => j.status === 'failed' || j.status === 'cancelled').length,
+  },
 ])
 
 const filteredJobs = computed(() => {
   if (activeTab.value === 'all') return jobs.value
-  if (activeTab.value === 'failed') return jobs.value.filter(j => j.status === 'failed' || j.status === 'cancelled')
-  return jobs.value.filter(j => j.status === activeTab.value)
+  if (activeTab.value === 'failed') return jobs.value.filter((j) => j.status === 'failed' || j.status === 'cancelled')
+  return jobs.value.filter((j) => j.status === activeTab.value)
 })
 
 const groupedJobs = computed(() => {
@@ -266,17 +271,17 @@ const groupedJobs = computed(() => {
         latest,
         jobs,
         counts: {
-          running: ticketJobs.filter(job => job.status === 'running').length,
-          queued: ticketJobs.filter(job => job.status === 'queued').length,
-          completed: ticketJobs.filter(job => job.status === 'completed').length,
-          failed: ticketJobs.filter(job => job.status === 'failed' || job.status === 'cancelled').length,
+          running: ticketJobs.filter((job) => job.status === 'running').length,
+          queued: ticketJobs.filter((job) => job.status === 'queued').length,
+          completed: ticketJobs.filter((job) => job.status === 'completed').length,
+          failed: ticketJobs.filter((job) => job.status === 'failed' || job.status === 'cancelled').length,
         },
       }
     })
     .sort((a, b) => (b.latest?.created_at ?? '').localeCompare(a.latest?.created_at ?? ''))
 })
 
-const hasCancelableJobs = computed(() => jobs.value.some(job => job.status === 'running' || job.status === 'queued'))
+const hasCancelableJobs = computed(() => jobs.value.some((job) => job.status === 'running' || job.status === 'queued'))
 
 let sse: ReturnType<typeof useSse> | null = null
 const sseUnsubscribers: Array<() => void> = []
@@ -360,7 +365,12 @@ function updateFromEvent(payload: any, kind: string) {
   }
   // Update queue stats on job state changes
   if (['agent_job_started', 'agent_job_completed', 'agent_job_failed', 'agent_job_cancelled'].includes(kind)) {
-    api.listAgentJobs().then(r => { queueStats.value = r.queue_stats || null }).catch(() => {})
+    api
+      .listAgentJobs()
+      .then((r) => {
+        queueStats.value = r.queue_stats || null
+      })
+      .catch(() => {})
   }
 }
 
@@ -711,7 +721,7 @@ onBeforeUnmount(() => {
 }
 
 .filter-tab:hover {
-  background: var(--surface-alt, rgba(0,0,0,0.05));
+  background: var(--surface-alt, rgba(0, 0, 0, 0.05));
 }
 
 .filter-tab.active {
@@ -720,7 +730,7 @@ onBeforeUnmount(() => {
 }
 
 .tab-count {
-  background: var(--surface-alt, rgba(0,0,0,0.1));
+  background: var(--surface-alt, rgba(0, 0, 0, 0.1));
   padding: 2px 6px;
   border-radius: 10px;
   font-size: 11px;

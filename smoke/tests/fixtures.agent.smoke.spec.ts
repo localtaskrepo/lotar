@@ -157,10 +157,7 @@ describe('agent fixture behavior', () => {
     });
 
     it('portable launcher tolerates leading runner flags like the real spawn shape', async () => {
-        const fixtureAgents = await createFixtureAgents(
-            { mock: {} },
-            'fixture-agents-launcher-',
-        );
+        const fixtureAgents = await createFixtureAgents({ mock: {} }, 'fixture-agents-launcher-');
 
         try {
             const launcher = fixtureAgents.command('mock');
@@ -176,9 +173,10 @@ describe('agent fixture behavior', () => {
                 'stream-json',
                 'ignored prompt text',
             ];
-            const child = process.platform === 'win32'
-                ? startExecutable('cmd', ['/c', launcher, ...runnerArgs])
-                : startExecutable(launcher, runnerArgs);
+            const child =
+                process.platform === 'win32'
+                    ? startExecutable('cmd', ['/c', launcher, ...runnerArgs])
+                    : startExecutable(launcher, runnerArgs);
             const outcome = await child.outcome;
 
             expect(outcome.code).toBe(0);
@@ -202,25 +200,24 @@ describe('agent fixture behavior', () => {
         );
 
         try {
-        const agents = parse(fixtureAgents.yaml) as {
-            agents: Record<string, { runner: string; command: string; args?: string[]; description?: string }>;
-        };
+            const agents = parse(fixtureAgents.yaml) as {
+                agents: Record<string, { runner: string; command: string; args?: string[]; description?: string }>;
+            };
 
-        expect(agents.agents.ok?.runner).toBe('copilot');
-        expect(agents.agents.ok?.command).toBe(fixtureAgents.command('ok'));
-        expect(agents.agents.ok?.args).toBeUndefined();
-        expect(agents.agents.ok?.description).toBe('completes');
-        expect(agents.agents.broken?.args).toEqual(['--exit', '1']);
+            expect(agents.agents.ok?.runner).toBe('copilot');
+            expect(agents.agents.ok?.command).toBe(fixtureAgents.command('ok'));
+            expect(agents.agents.ok?.args).toBeUndefined();
+            expect(agents.agents.ok?.description).toBe('completes');
+            expect(agents.agents.broken?.args).toEqual(['--exit', '1']);
         } finally {
             await fixtureAgents.dispose();
         }
 
         const gate = await createGateFixture('fixture-gate-yaml-');
         try {
-            const runBlock = nodeRunActionYaml(
-                [gate.script, ...gate.agentArgs({ mode: 'plain', label: 'yaml' })],
-                { wait: false },
-            );
+            const runBlock = nodeRunActionYaml([gate.script, ...gate.agentArgs({ mode: 'plain', label: 'yaml' })], {
+                wait: false,
+            });
             const automation = parse(`automation:
   rules:
     - name: Rendered run

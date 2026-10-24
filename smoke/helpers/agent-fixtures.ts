@@ -39,8 +39,7 @@ export const HOSTILE_PROMPT = [
  * lotar binary resolved by the smoke harness.
  */
 export function agentWrapperPath(): string {
-    const name =
-        process.platform === 'win32' ? 'lotar-agent-wrapper.exe' : 'lotar-agent-wrapper';
+    const name = process.platform === 'win32' ? 'lotar-agent-wrapper.exe' : 'lotar-agent-wrapper';
     return path.join(path.dirname(resolveBinaryPath()), name);
 }
 
@@ -67,11 +66,7 @@ let launchCounter = 0;
  * a cmd forwarder (Windows) both satisfy that without bash/date/sleep, and
  * neither parses the runner flags — the fixtures read their own argv.
  */
-async function writeAgentLauncher(
-    dir: string,
-    script: string,
-    args: readonly string[],
-): Promise<string> {
+async function writeAgentLauncher(dir: string, script: string, args: readonly string[]): Promise<string> {
     launchCounter += 1;
     if (process.platform === 'win32') {
         const launcher = path.join(dir, `agent-launcher-${launchCounter}.cmd`);
@@ -83,11 +78,7 @@ async function writeAgentLauncher(
     // own optional shebang, and process.argv seen by the fixture is exactly
     // the launcher's argv (runner flags + fixture flags + prompt).
     const fixtureUrl = pathToFileURL(script).href;
-    await fs.writeFile(
-        launcher,
-        `#!${nodeExecutable()}\nawait import(${JSON.stringify(fixtureUrl)});\n`,
-        'utf8',
-    );
+    await fs.writeFile(launcher, `#!${nodeExecutable()}\nawait import(${JSON.stringify(fixtureUrl)});\n`, 'utf8');
     await fs.chmod(launcher, 0o755);
     return launcher;
 }
@@ -104,7 +95,9 @@ async function writeAgentLauncher(
 export function windowsLauncherContent(script: string, args: readonly string[]): string {
     for (const value of [nodeExecutable(), script, ...args]) {
         if (/["%\x00-\x1f\x7f]/.test(value) || value.endsWith('\\')) {
-            throw new Error('Windows fixture launcher values cannot contain quotes, percent signs, control characters, or a trailing backslash');
+            throw new Error(
+                'Windows fixture launcher values cannot contain quotes, percent signs, control characters, or a trailing backslash',
+            );
         }
     }
     const baked = args.map((arg) => `"${arg}"`).join(' ');
@@ -158,11 +151,7 @@ export async function createFixtureAgents(
         const args = spec.args ?? [];
         const launcher = await launcherFor(spec.script ?? MOCK_AGENT_SCRIPT, args);
         commands.set(name, launcher);
-        const lines = [
-            `  ${name}:`,
-            `    runner: "copilot"`,
-            `    command: ${JSON.stringify(launcher)}`,
-        ];
+        const lines = [`  ${name}:`, `    runner: "copilot"`, `    command: ${JSON.stringify(launcher)}`];
         if (args.length > 0) {
             lines.push(`    args:`);
             for (const arg of args) {
@@ -207,10 +196,7 @@ export function indentBlock(block: string, spaces: number): string {
  * command works identically on every supported platform. Values are quoted
  * as JSON strings to stay valid YAML double-quoted scalars.
  */
-export function nodeRunActionYaml(
-    scriptArgs: readonly string[],
-    options: { wait?: boolean } = {},
-): string {
+export function nodeRunActionYaml(scriptArgs: readonly string[], options: { wait?: boolean } = {}): string {
     const lines = [
         `run:`,
         `  command: ${JSON.stringify(nodeExecutable())}`,
@@ -337,13 +323,13 @@ export async function createGateFixture(prefix = 'lotar-smoke-gate-'): Promise<G
 
     const drain = async (timeoutMs = 10_000): Promise<readonly string[]> => {
         await release();
-        const pending = startedLabels().filter((label) => !fs.pathExistsSync(sentinelPath(`completed-${label}.sentinel`)));
+        const pending = startedLabels().filter(
+            (label) => !fs.pathExistsSync(sentinelPath(`completed-${label}.sentinel`)),
+        );
         if (pending.length === 0) {
             return [];
         }
-        const results = await Promise.allSettled(
-            pending.map((label) => waitForCompleted(label, timeoutMs)),
-        );
+        const results = await Promise.allSettled(pending.map((label) => waitForCompleted(label, timeoutMs)));
         return pending.filter((_, index) => results[index]?.status === 'rejected');
     };
 

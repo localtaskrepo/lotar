@@ -5,8 +5,8 @@
 </template>
 
 <script setup lang="ts">
-import { BarController, BarElement, CategoryScale, Chart, LinearScale, Tooltip } from 'chart.js';
-import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, watchEffect } from 'vue';
+import { BarController, BarElement, CategoryScale, Chart, LinearScale, Tooltip } from 'chart.js'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, watchEffect } from 'vue'
 import { titleCase } from '../utils/text'
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
@@ -17,15 +17,18 @@ type BarChartSeriesItem = {
   breakdown?: Record<string, number>
 }
 
-const props = withDefaults(defineProps<{
-  series: BarChartSeriesItem[]
-  width?: number
-  height?: number
-  color?: string
-  hoverColor?: string
-}>(), { width: 360, height: 160 })
+const props = withDefaults(
+  defineProps<{
+    series: BarChartSeriesItem[]
+    width?: number
+    height?: number
+    color?: string
+    hoverColor?: string
+  }>(),
+  { width: 360, height: 160 },
+)
 
-const emit = defineEmits<{ (e:'select', payload: { index: number; value: number }): void }>()
+const emit = defineEmits<{ (e: 'select', payload: { index: number; value: number }): void }>()
 
 const canvasEl = shallowRef<HTMLCanvasElement | null>(null)
 const chart = shallowRef<Chart<'bar'> | null>(null)
@@ -41,16 +44,25 @@ const paletteCssVars = [
   '--color-chart-8',
 ]
 
-const labels = computed(() => props.series.map(s => s.key))
-const isStacked = computed(() => props.series.some(item => item.breakdown && Object.keys(item.breakdown).some(key => (item.breakdown![key] ?? 0) !== 0)))
+const labels = computed(() => props.series.map((s) => s.key))
+const isStacked = computed(() =>
+  props.series.some(
+    (item) => item.breakdown && Object.keys(item.breakdown).some((key) => (item.breakdown![key] ?? 0) !== 0),
+  ),
+)
 
-const totals = computed(() => props.series.map((item) => {
-  if (item.breakdown && Object.keys(item.breakdown).length) {
-    return Object.values(item.breakdown).reduce((sum, value) => sum + (typeof value === 'number' ? value : Number(value) || 0), 0)
-  }
-  const base = typeof item.count === 'number' ? item.count : Number(item.count ?? 0)
-  return Number.isFinite(base) ? base : 0
-}))
+const totals = computed(() =>
+  props.series.map((item) => {
+    if (item.breakdown && Object.keys(item.breakdown).length) {
+      return Object.values(item.breakdown).reduce(
+        (sum, value) => sum + (typeof value === 'number' ? value : Number(value) || 0),
+        0,
+      )
+    }
+    const base = typeof item.count === 'number' ? item.count : Number(item.count ?? 0)
+    return Number.isFinite(base) ? base : 0
+  }),
+)
 
 const categories = computed(() => {
   const set = new Set<string>()

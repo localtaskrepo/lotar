@@ -13,8 +13,16 @@ vi.mock('vue-router', () => ({
 }))
 
 const api = vi.hoisted(() => ({
-    getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
-    reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
+    getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+        status: 'ok',
+        tasks: [],
+        changed: false,
+    })),
+    reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+        status: 'ok',
+        tasks: [],
+        changed: false,
+    })),
     listTasks: vi.fn(),
     sprintAdd: vi.fn(),
     sprintRemove: vi.fn(),
@@ -104,7 +112,7 @@ vi.mock('../components/analytics/SprintAnalyticsDialog.vue', () => ({
 const sprintsStore = {
     sprints: ref<any[]>([]),
     loading: ref(false),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     missingSprints: ref<any[]>([]),
     hasMissing: ref(false),
 }
@@ -116,13 +124,15 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['open', 'done']),
         priorities: ref<string[]>(['low', 'med', 'high']),
         types: ref<string[]>(['task']),
         customFields: ref<string[]>([]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
@@ -138,10 +148,10 @@ vi.mock('../composables/useSprintAnalytics', () => ({
         isSummaryLoading: vi.fn(() => false),
         isBurndownLoading: vi.fn(() => false),
         isVelocityLoading: vi.fn(() => false),
-        loadSummary: vi.fn(async () => { }),
-        loadBurndown: vi.fn(async () => { }),
-        loadVelocity: vi.fn(async () => { }),
-        fetchSprintAnalytics: vi.fn(async () => { }),
+        loadSummary: vi.fn(async () => {}),
+        loadBurndown: vi.fn(async () => {}),
+        loadVelocity: vi.fn(async () => {}),
+        fetchSprintAnalytics: vi.fn(async () => {}),
     }),
 }))
 
@@ -185,7 +195,9 @@ function makeDataTransfer() {
     const store: Record<string, string> = {}
     return {
         effectAllowed: 'none',
-        setData: (type: string, value: string) => { store[type] = value },
+        setData: (type: string, value: string) => {
+            store[type] = value
+        },
         getData: (type: string) => store[type] || '',
         __store: store,
     } as any
@@ -203,10 +215,7 @@ describe('SprintsList column drag reorder (DEV-112)', () => {
         ]
         sprintsStore.refresh.mockClear()
 
-        api.listTasks.mockReset().mockResolvedValue(tasksResponse([
-            makeTask('PRJ-001', [1]),
-            makeTask('PRJ-002', []),
-        ]))
+        api.listTasks.mockReset().mockResolvedValue(tasksResponse([makeTask('PRJ-001', [1]), makeTask('PRJ-002', [])]))
         sharedPanelState.open = false
     })
 
@@ -223,9 +232,7 @@ describe('SprintsList column drag reorder (DEV-112)', () => {
     }
 
     function sprintHeaders(wrapper: ReturnType<typeof mount>) {
-        return wrapper
-            .findAll('[data-sprint-id="1"] th[data-column]')
-            .map((th) => th.attributes('data-column'))
+        return wrapper.findAll('[data-sprint-id="1"] th[data-column]').map((th) => th.attributes('data-column'))
     }
 
     it('reorders sprint table columns via drag and drop and persists the order', async () => {
@@ -317,7 +324,10 @@ describe('SprintsList column drag reorder (DEV-112)', () => {
 
         vi.setSystemTime(new Date(Date.now() + 250))
         await priorityButton.trigger('click')
-        expect(JSON.parse(localStorage.getItem('lotar.sprints.sort') || 'null')).toEqual({ key: 'priority', dir: 'asc' })
+        expect(JSON.parse(localStorage.getItem('lotar.sprints.sort') || 'null')).toEqual({
+            key: 'priority',
+            dir: 'asc',
+        })
 
         wrapper.unmount()
     })

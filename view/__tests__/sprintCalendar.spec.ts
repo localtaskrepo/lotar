@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import type { SprintListItem } from '../api/types'
 import { toDateKey } from '../utils/date'
-import { __test_only_normalizeSprintWindow, __test_only_parsePlanLengthDays, buildSprintSchedule } from '../utils/sprintCalendar'
+import {
+    __test_only_normalizeSprintWindow,
+    __test_only_parsePlanLengthDays,
+    buildSprintSchedule,
+} from '../utils/sprintCalendar'
 
-const baseSprint = (overrides: Partial<SprintListItem>): SprintListItem => ({
-    id: 1,
-    display_name: 'Sprint 1',
-    state: 'active',
-    warnings: [],
-    ...overrides,
-} as SprintListItem)
+const baseSprint = (overrides: Partial<SprintListItem>): SprintListItem =>
+    ({
+        id: 1,
+        display_name: 'Sprint 1',
+        state: 'active',
+        warnings: [],
+        ...overrides,
+    }) as SprintListItem
 
 describe('sprint calendar helpers', () => {
     it('normalizes start/end with fallbacks', () => {
@@ -87,8 +92,14 @@ describe('sprint calendar helpers', () => {
         const window = __test_only_normalizeSprintWindow(sprint)
         expect(window).toBeTruthy()
         expect(window!.plannedEnd.getTime()).toBeGreaterThan(window!.plannedStart.getTime())
-        const schedule = buildSprintSchedule([sprint], new Date('2024-05-01T00:00:00Z'), new Date('2024-05-31T00:00:00Z'))
-        const entries = Object.values(schedule).flat().filter((entry) => entry.id === 404)
+        const schedule = buildSprintSchedule(
+            [sprint],
+            new Date('2024-05-01T00:00:00Z'),
+            new Date('2024-05-31T00:00:00Z'),
+        )
+        const entries = Object.values(schedule)
+            .flat()
+            .filter((entry) => entry.id === 404)
         expect(entries).toHaveLength(14)
         const lastDay = entries[entries.length - 1]
         expect(toDateKey(lastDay!.endDate)).toBe('2024-05-14')

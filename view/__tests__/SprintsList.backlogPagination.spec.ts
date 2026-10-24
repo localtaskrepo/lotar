@@ -1,7 +1,7 @@
-import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
-import type { TaskDTO } from '../api/types';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
+import type { TaskDTO } from '../api/types'
 
 enableAutoUnmount(afterEach)
 const orderEvents = vi.hoisted(() => ({ handlers: new Map<string, (event: MessageEvent) => void>(), close: vi.fn() }))
@@ -66,7 +66,8 @@ vi.mock('../components/UiSelect.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue'],
-        template: '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
+        template:
+            '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
     },
 }))
 
@@ -96,7 +97,7 @@ vi.mock('../composables/useSprints', () => ({
     useSprints: () => ({
         sprints: sprintsRef,
         loading: ref(false),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
         missingSprints: ref<any[]>([]),
         hasMissing: ref(false),
     }),
@@ -111,13 +112,15 @@ vi.mock('../composables/useTaskPanelController', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['open', 'done']),
         priorities: ref<string[]>(['low', 'med', 'high']),
         types: ref<string[]>(['task']),
         customFields: ref<string[]>([]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
@@ -133,14 +136,14 @@ vi.mock('../composables/useSprintAnalytics', () => ({
         isSummaryLoading: vi.fn(() => false),
         isBurndownLoading: vi.fn(() => false),
         isVelocityLoading: vi.fn(() => false),
-        loadSummary: vi.fn(async () => { }),
-        loadBurndown: vi.fn(async () => { }),
-        loadVelocity: vi.fn(async () => { }),
-        fetchSprintAnalytics: vi.fn(async () => { }),
+        loadSummary: vi.fn(async () => {}),
+        loadBurndown: vi.fn(async () => {}),
+        loadVelocity: vi.fn(async () => {}),
+        fetchSprintAnalytics: vi.fn(async () => {}),
     }),
 }))
 
-import SprintsList from '../pages/SprintsList.vue';
+import SprintsList from '../pages/SprintsList.vue'
 
 function makeTask(idNum: number, sprints: number[] = []) {
     const padded = String(idNum).padStart(3, '0')
@@ -193,18 +196,26 @@ function dragTransfer() {
     if (typeof DataTransfer === 'function') return new DataTransfer()
     const data = new Map<string, string>()
     return {
-        effectAllowed: 'uninitialized', dropEffect: 'none',
+        effectAllowed: 'uninitialized',
+        dropEffect: 'none',
         setData: (type: string, value: string) => data.set(type, value),
         getData: (type: string) => data.get(type) ?? '',
-        get types() { return [...data.keys()] },
+        get types() {
+            return [...data.keys()]
+        },
     } as unknown as DataTransfer
 }
 
 function dragEvent(element: Element, kind: string, transfer: DataTransfer, clientY = -1, ctrlKey = false) {
-    const event = typeof DragEvent === 'function'
-        ? new DragEvent(kind, { bubbles: true, cancelable: true, dataTransfer: transfer, clientY, ctrlKey })
-        : new Event(kind, { bubbles: true, cancelable: true })
-    Object.defineProperties(event, { dataTransfer: { value: transfer }, clientY: { value: clientY }, ctrlKey: { value: ctrlKey } })
+    const event =
+        typeof DragEvent === 'function'
+            ? new DragEvent(kind, { bubbles: true, cancelable: true, dataTransfer: transfer, clientY, ctrlKey })
+            : new Event(kind, { bubbles: true, cancelable: true })
+    Object.defineProperties(event, {
+        dataTransfer: { value: transfer },
+        clientY: { value: clientY },
+        ctrlKey: { value: ctrlKey },
+    })
     element.dispatchEvent(event)
     return event
 }
@@ -226,8 +237,8 @@ describe('SprintsList pagination', () => {
         vi.mocked(api.sprintRemove).mockReset()
         vi.mocked(api.sprintUpdate).mockReset()
         vi.mocked(api.updateTask).mockReset()
-            ; (api.listTasks as any).mockReset()
-        ; (api.listTasks as any).mockResolvedValue({
+        ;(api.listTasks as any).mockReset()
+        ;(api.listTasks as any).mockResolvedValue({
             status: 'ok',
             count: 120,
             total: 120,
@@ -257,9 +268,18 @@ describe('SprintsList pagination', () => {
             ...Array.from({ length: 120 }, (_, index) => makeTask(index + 1)),
             ...Array.from({ length: 60 }, (_, index) => makeTask(200 + index, [1])),
         ]
-        vi.mocked(api.getBacklogOrder).mockResolvedValue({ status: 'ok', tasks: ['PRJ-120', 'PRJ-118', 'PRJ-119'], changed: false })
-        ; (api.listTasks as any).mockResolvedValue({
-            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        vi.mocked(api.getBacklogOrder).mockResolvedValue({
+            status: 'ok',
+            tasks: ['PRJ-120', 'PRJ-118', 'PRJ-119'],
+            changed: false,
+        })
+        ;(api.listTasks as any).mockResolvedValue({
+            status: 'ok',
+            count: tasks.length,
+            total: tasks.length,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
         let wrapper = mount(SprintsList)
         try {
@@ -274,8 +294,11 @@ describe('SprintsList pagination', () => {
             await flushPromises()
             const rows = wrapper.findAll('#backlog tbody tr')
             expect(rows).toHaveLength(50)
-            expect(rows.slice(0, 4).map(row => row.attributes('data-task-id'))).toEqual([
-                'PRJ-120', 'PRJ-118', 'PRJ-119', 'PRJ-001',
+            expect(rows.slice(0, 4).map((row) => row.attributes('data-task-id'))).toEqual([
+                'PRJ-120',
+                'PRJ-118',
+                'PRJ-119',
+                'PRJ-001',
             ])
             expect(sprintTable(wrapper, 1)[0]!.attributes('data-task-id')).toBe('PRJ-250')
             expect(wrapper.find('#backlog th[data-column="id"]').attributes('aria-sort')).toBe('none')
@@ -303,38 +326,49 @@ describe('SprintsList pagination', () => {
             { ...makeTask(1), id: '\u{10400}-1' },
             { ...makeTask(2), id: '\u{F900}-2' },
         ]
-        ; (api.listTasks as any).mockResolvedValue({ status: 'ok', tasks, count: 2, total: 2, limit: 200, offset: 0 })
+        ;(api.listTasks as any).mockResolvedValue({ status: 'ok', tasks, count: 2, total: 2, limit: 200, offset: 0 })
         const wrapper = mount(SprintsList)
         try {
             await flushPromises()
             await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
             await flushPromises()
-            expect(wrapper.findAll('#backlog tbody tr').map(row => row.attributes('data-task-id'))).toEqual([
-                '\u{F900}-2', '\u{10400}-1',
+            expect(wrapper.findAll('#backlog tbody tr').map((row) => row.attributes('data-task-id'))).toEqual([
+                '\u{F900}-2',
+                '\u{10400}-1',
             ])
-        } finally { wrapper.unmount() }
+        } finally {
+            wrapper.unmount()
+        }
     })
 
     it('projects global order onto the current result and refreshes without mutating membership', async () => {
         const { api } = await import('../api/client')
-        const tasks: TaskDTO[] = [
-            makeTask(9),
-            makeTask(2),
-            makeTask(6),
-            makeTask(1, [1]),
-        ]
-        vi.mocked(api.getBacklogOrder).mockResolvedValue({ status: 'ok', tasks: ['HIDDEN-1', 'PRJ-002', 'PRJ-009'], changed: false })
-        ; (api.listTasks as any).mockResolvedValue({
-            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        const tasks: TaskDTO[] = [makeTask(9), makeTask(2), makeTask(6), makeTask(1, [1])]
+        vi.mocked(api.getBacklogOrder).mockResolvedValue({
+            status: 'ok',
+            tasks: ['HIDDEN-1', 'PRJ-002', 'PRJ-009'],
+            changed: false,
+        })
+        ;(api.listTasks as any).mockResolvedValue({
+            status: 'ok',
+            count: tasks.length,
+            total: tasks.length,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
         const wrapper = mount(SprintsList)
         try {
             await flushPromises()
             await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
             await flushPromises()
-            const ids = () => wrapper.findAll('#backlog tbody tr').map(row => row.attributes('data-task-id'))
+            const ids = () => wrapper.findAll('#backlog tbody tr').map((row) => row.attributes('data-task-id'))
             expect(ids()).toEqual(['PRJ-002', 'PRJ-009', 'PRJ-006'])
-            vi.mocked(api.getBacklogOrder).mockResolvedValue({ status: 'ok', tasks: ['PRJ-009', 'HIDDEN-1', 'PRJ-002'], changed: false })
+            vi.mocked(api.getBacklogOrder).mockResolvedValue({
+                status: 'ok',
+                tasks: ['PRJ-009', 'HIDDEN-1', 'PRJ-002'],
+                changed: false,
+            })
             await wrapper.find('button.reload').trigger('click')
             await flushPromises()
             expect(ids()).toEqual(['PRJ-009', 'PRJ-002', 'PRJ-006'])
@@ -344,115 +378,134 @@ describe('SprintsList pagination', () => {
         }
     })
 
-    it.each([null, 1])('blocks automatic same-list ordering without changing page or membership in container %s', async sprint => {
-        const { api } = await import('../api/client')
-        sprintsRef.value = sprint === null ? [] : [makeSprint(sprint)]
-        const tasks = Array.from({ length: 120 }, (_, index) => makeTask(index + 1, sprint === null ? [] : [sprint]))
-        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 120, limit: 200, offset: 0 })
-        const wrapper = mount(SprintsList)
-        await flushPromises()
-        const group = wrapper.find(sprint === null ? '#backlog' : `[data-sprint-id="${sprint}"]`)
-        await group.find('button[aria-label="Page 2"]').trigger('click')
-        const ids = () => group.findAll('tbody tr.task-row').map(row => row.attributes('data-task-id'))
-        const before = ids()
-        const mode = group.find(`[data-testid="${sprint === null ? 'backlog' : 'sprint'}-manual-order"]`)
-        const rows = group.findAll('tbody tr.task-row')
-        const message = 'Automatic sorting is on. Switch to Manual order to reorder tasks.'
-        expect(rows[0]!.attributes('draggable')).toBe('true')
-        expect(rows[0]!.attributes('title')).toBe(message)
-        const transfer = dragTransfer()
-        expect(dragEvent(rows[0]!.element, 'dragstart', transfer).defaultPrevented).toBe(false)
-        await flushPromises()
-        expect(rows[0]!.classes()).not.toContain('task-row--dragging')
-        expect(document.body.querySelector('#task-order-tooltip[role="tooltip"]')?.textContent).toBe(message)
-        await rows[0]!.trigger('mouseleave')
-        await flushPromises()
-        expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
-        dragEvent(rows[1]!.element, 'dragover', transfer)
-        await flushPromises()
-        expect(rows[1]!.classes()).not.toContain('task-row--before')
-        expect(rows[1]!.classes()).not.toContain('task-row--after')
-        expect(document.body.querySelector('#task-order-tooltip')?.textContent).toBe(message)
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-        await flushPromises()
-        expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
-        dragEvent(rows[1]!.element, 'drop', transfer)
-        await flushPromises()
-        expect(document.body.querySelector('#task-order-tooltip')?.textContent).toBe(message)
-        expect(ids()).toEqual(before)
-        expect(mode.attributes('aria-pressed')).toBe('false')
-        expect(api.reorderTasks).not.toHaveBeenCalled()
-        expect(api.sprintAdd).not.toHaveBeenCalled()
-        expect(api.sprintRemove).not.toHaveBeenCalled()
-        expect(api.updateTask).not.toHaveBeenCalled()
-        expect(tasks.every(task => JSON.stringify(task.sprints) === JSON.stringify(sprint === null ? [] : [sprint]))).toBe(true)
-        expect(mode.text()).toContain('Manual order')
-        expect(mode.find('.icon[name="list"]').exists()).toBe(true)
-        expect(mode.find('.icon[name="list"]').attributes('aria-hidden')).toBe('true')
-        await mode.trigger('click')
-        await flushPromises()
-        expect(mode.attributes('aria-pressed')).toBe('true')
-        expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
-        await mode.trigger('click')
-        dragEvent(group.find('tbody tr.task-row').element, 'dragstart', dragTransfer())
-        await flushPromises()
-        wrapper.unmount()
-        expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
-    })
+    it.each([null, 1])(
+        'blocks automatic same-list ordering without changing page or membership in container %s',
+        async (sprint) => {
+            const { api } = await import('../api/client')
+            sprintsRef.value = sprint === null ? [] : [makeSprint(sprint)]
+            const tasks = Array.from({ length: 120 }, (_, index) =>
+                makeTask(index + 1, sprint === null ? [] : [sprint]),
+            )
+            vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 120, limit: 200, offset: 0 })
+            const wrapper = mount(SprintsList)
+            await flushPromises()
+            const group = wrapper.find(sprint === null ? '#backlog' : `[data-sprint-id="${sprint}"]`)
+            await group.find('button[aria-label="Page 2"]').trigger('click')
+            const ids = () => group.findAll('tbody tr.task-row').map((row) => row.attributes('data-task-id'))
+            const before = ids()
+            const mode = group.find(`[data-testid="${sprint === null ? 'backlog' : 'sprint'}-manual-order"]`)
+            const rows = group.findAll('tbody tr.task-row')
+            const message = 'Automatic sorting is on. Switch to Manual order to reorder tasks.'
+            expect(rows[0]!.attributes('draggable')).toBe('true')
+            expect(rows[0]!.attributes('title')).toBe(message)
+            const transfer = dragTransfer()
+            expect(dragEvent(rows[0]!.element, 'dragstart', transfer).defaultPrevented).toBe(false)
+            await flushPromises()
+            expect(rows[0]!.classes()).not.toContain('task-row--dragging')
+            expect(document.body.querySelector('#task-order-tooltip[role="tooltip"]')?.textContent).toBe(message)
+            await rows[0]!.trigger('mouseleave')
+            await flushPromises()
+            expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
+            dragEvent(rows[1]!.element, 'dragover', transfer)
+            await flushPromises()
+            expect(rows[1]!.classes()).not.toContain('task-row--before')
+            expect(rows[1]!.classes()).not.toContain('task-row--after')
+            expect(document.body.querySelector('#task-order-tooltip')?.textContent).toBe(message)
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+            await flushPromises()
+            expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
+            dragEvent(rows[1]!.element, 'drop', transfer)
+            await flushPromises()
+            expect(document.body.querySelector('#task-order-tooltip')?.textContent).toBe(message)
+            expect(ids()).toEqual(before)
+            expect(mode.attributes('aria-pressed')).toBe('false')
+            expect(api.reorderTasks).not.toHaveBeenCalled()
+            expect(api.sprintAdd).not.toHaveBeenCalled()
+            expect(api.sprintRemove).not.toHaveBeenCalled()
+            expect(api.updateTask).not.toHaveBeenCalled()
+            expect(
+                tasks.every((task) => JSON.stringify(task.sprints) === JSON.stringify(sprint === null ? [] : [sprint])),
+            ).toBe(true)
+            expect(mode.text()).toContain('Manual order')
+            expect(mode.find('.icon[name="list"]').exists()).toBe(true)
+            expect(mode.find('.icon[name="list"]').attributes('aria-hidden')).toBe('true')
+            await mode.trigger('click')
+            await flushPromises()
+            expect(mode.attributes('aria-pressed')).toBe('true')
+            expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
+            await mode.trigger('click')
+            dragEvent(group.find('tbody tr.task-row').element, 'dragstart', dragTransfer())
+            await flushPromises()
+            wrapper.unmount()
+            expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
+        },
+    )
 
-    it.each([null, 1])('blocks automatic same-container background drops without collapsing memberships in container %s', async sprint => {
-        const { api } = await import('../api/client')
-        sprintsRef.value = [makeSprint(1), makeSprint(2)]
-        const tasks = [makeTask(1, [1, 2]), makeTask(2, [1]), makeTask(3)]
-        const tasksBefore = JSON.parse(JSON.stringify(tasks))
-        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 200, offset: 0 })
-        const wrapper = mount(SprintsList)
-        await flushPromises()
-        const group = wrapper.find(sprint === null ? '#backlog' : '[data-sprint-id="1"]')
-        const source = group.find(`[data-task-id="${sprint === null ? 'PRJ-003' : 'PRJ-001'}"]`)
-        const rowIds = () => ['#backlog', '[data-sprint-id="1"]', '[data-sprint-id="2"]'].map(selector =>
-            wrapper.findAll(`${selector} tbody tr.task-row`).map(row => row.attributes('data-task-id')))
-        const counts = () => ['#backlog', '[data-sprint-id="1"]', '[data-sprint-id="2"]'].map(selector =>
-            wrapper.find(`${selector} .group-count`).text())
-        const rowsBefore = rowIds()
-        const countsBefore = counts()
-        const transfer = dragTransfer()
-        expect(source.attributes('draggable')).toBe('true')
-        dragEvent(source.element, 'dragstart', transfer)
-        await flushPromises()
-        await source.trigger('mouseleave')
-        await flushPromises()
-        expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
+    it.each([null, 1])(
+        'blocks automatic same-container background drops without collapsing memberships in container %s',
+        async (sprint) => {
+            const { api } = await import('../api/client')
+            sprintsRef.value = [makeSprint(1), makeSprint(2)]
+            const tasks = [makeTask(1, [1, 2]), makeTask(2, [1]), makeTask(3)]
+            const tasksBefore = JSON.parse(JSON.stringify(tasks))
+            vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 200, offset: 0 })
+            const wrapper = mount(SprintsList)
+            await flushPromises()
+            const group = wrapper.find(sprint === null ? '#backlog' : '[data-sprint-id="1"]')
+            const source = group.find(`[data-task-id="${sprint === null ? 'PRJ-003' : 'PRJ-001'}"]`)
+            const rowIds = () =>
+                ['#backlog', '[data-sprint-id="1"]', '[data-sprint-id="2"]'].map((selector) =>
+                    wrapper.findAll(`${selector} tbody tr.task-row`).map((row) => row.attributes('data-task-id')),
+                )
+            const counts = () =>
+                ['#backlog', '[data-sprint-id="1"]', '[data-sprint-id="2"]'].map((selector) =>
+                    wrapper.find(`${selector} .group-count`).text(),
+                )
+            const rowsBefore = rowIds()
+            const countsBefore = counts()
+            const transfer = dragTransfer()
+            expect(source.attributes('draggable')).toBe('true')
+            dragEvent(source.element, 'dragstart', transfer)
+            await flushPromises()
+            await source.trigger('mouseleave')
+            await flushPromises()
+            expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
 
-        // Dispatch on the region itself, not a row insertion target.
-        dragEvent(group.element, 'drop', transfer, 42)
-        await flushPromises()
+            // Dispatch on the region itself, not a row insertion target.
+            dragEvent(group.element, 'drop', transfer, 42)
+            await flushPromises()
 
-        expect(document.body.querySelector('#task-order-tooltip[role="tooltip"]')?.textContent)
-            .toBe('Automatic sorting is on. Switch to Manual order to reorder tasks.')
-        expect(group.find(`[data-testid="${sprint === null ? 'backlog' : 'sprint'}-manual-order"]`).attributes('aria-pressed')).toBe('false')
-        expect(rowIds()).toEqual(rowsBefore)
-        expect(counts()).toEqual(countsBefore)
-        expect(tasks).toEqual(tasksBefore)
-        expect(tasks[0]!.sprints).toEqual([1, 2])
-        expect(sprintTable(wrapper, 1).map(row => row.attributes('data-task-id'))).toEqual(['PRJ-001', 'PRJ-002'])
-        expect(sprintTable(wrapper, 2).map(row => row.attributes('data-task-id'))).toEqual(['PRJ-001'])
-        expect(api.sprintAdd).not.toHaveBeenCalled()
-        expect(api.sprintRemove).not.toHaveBeenCalled()
-        expect(api.reorderTasks).not.toHaveBeenCalled()
-        expect(api.updateTask).not.toHaveBeenCalled()
-        await group.trigger('mouseleave')
-        await flushPromises()
-        expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
-        dragEvent(source.element, 'dragstart', transfer)
-        dragEvent(group.element, 'drop', transfer, 42)
-        await flushPromises()
-        expect(document.body.querySelector('#task-order-tooltip')).not.toBeNull()
-        wrapper.unmount()
-        expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
-    })
+            expect(document.body.querySelector('#task-order-tooltip[role="tooltip"]')?.textContent).toBe(
+                'Automatic sorting is on. Switch to Manual order to reorder tasks.',
+            )
+            expect(
+                group
+                    .find(`[data-testid="${sprint === null ? 'backlog' : 'sprint'}-manual-order"]`)
+                    .attributes('aria-pressed'),
+            ).toBe('false')
+            expect(rowIds()).toEqual(rowsBefore)
+            expect(counts()).toEqual(countsBefore)
+            expect(tasks).toEqual(tasksBefore)
+            expect(tasks[0]!.sprints).toEqual([1, 2])
+            expect(sprintTable(wrapper, 1).map((row) => row.attributes('data-task-id'))).toEqual(['PRJ-001', 'PRJ-002'])
+            expect(sprintTable(wrapper, 2).map((row) => row.attributes('data-task-id'))).toEqual(['PRJ-001'])
+            expect(api.sprintAdd).not.toHaveBeenCalled()
+            expect(api.sprintRemove).not.toHaveBeenCalled()
+            expect(api.reorderTasks).not.toHaveBeenCalled()
+            expect(api.updateTask).not.toHaveBeenCalled()
+            await group.trigger('mouseleave')
+            await flushPromises()
+            expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
+            dragEvent(source.element, 'dragstart', transfer)
+            dragEvent(group.element, 'drop', transfer, 42)
+            await flushPromises()
+            expect(document.body.querySelector('#task-order-tooltip')).not.toBeNull()
+            wrapper.unmount()
+            expect(document.body.querySelector('#task-order-tooltip')).toBeNull()
+        },
+    )
 
-    it.each([null, 1])('only changes membership when moving into automatic container %s', async destination => {
+    it.each([null, 1])('only changes membership when moving into automatic container %s', async (destination) => {
         const { api } = await import('../api/client')
         sprintsRef.value = [makeSprint(1)]
         const tasks = [makeTask(1), makeTask(2, [1])]
@@ -484,38 +537,57 @@ describe('SprintsList pagination', () => {
         expect(api.updateTask).not.toHaveBeenCalled()
         expect(wrapper.find('[data-testid="backlog-manual-order"]').attributes('aria-pressed')).toBe('false')
         expect(wrapper.find('[data-testid="sprint-manual-order"]').attributes('aria-pressed')).toBe('false')
-        expect(wrapper.findAll(destination === null ? '#backlog tbody tr.task-row' : '[data-sprint-id="1"] tbody tr.task-row')).toHaveLength(2)
+        expect(
+            wrapper.findAll(
+                destination === null ? '#backlog tbody tr.task-row' : '[data-sprint-id="1"] tbody tr.task-row',
+            ),
+        ).toHaveLength(2)
     })
 
-    it.each(['before', 'after'] as const)('drops %s a row using a server-relative anchor, not a visible permutation', async position => {
-        const { api } = await import('../api/client')
-        vi.mocked(api.getBacklogOrder).mockResolvedValue({ status: 'ok', tasks: ['HIDDEN-1', 'PRJ-052', 'HIDDEN-2', 'PRJ-051'], changed: false })
-        vi.mocked(api.reorderTasks).mockResolvedValue({ status: 'ok', tasks: ['HIDDEN-1', 'PRJ-052', 'PRJ-051', 'HIDDEN-2'], changed: true })
-        const wrapper = mount(SprintsList)
-        await flushPromises()
-        await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
-        await flushPromises()
-        await wrapper.find('#backlog button[aria-label="Page 2"]').trigger('click')
-        const source = wrapper.find('#backlog [data-task-id="PRJ-049"]')
-        const target = wrapper.find('#backlog [data-task-id="PRJ-050"]')
-        const transfer = dragTransfer()
-        dragEvent(source.element, 'dragstart', transfer)
-        const y = position === 'before' ? -1 : 1
-        dragEvent(target.element, 'dragover', transfer, y)
-        await flushPromises()
-        expect(target.classes()).toContain(`task-row--${position}`)
-        dragEvent(target.element, 'drop', transfer, y)
-        await flushPromises()
-        expect(api.reorderTasks).toHaveBeenCalledExactlyOnceWith({ task: 'PRJ-049', sprint: null, [position]: 'PRJ-050' })
-        expect(api.sprintAdd).not.toHaveBeenCalled()
-        expect(api.sprintRemove).not.toHaveBeenCalled()
-        expect(api.updateTask).not.toHaveBeenCalled()
-        expect(wrapper.find('[data-testid="backlog-manual-order"]').attributes('aria-pressed')).toBe('true')
-        expect(wrapper.find('#backlog th[data-column="id"]').attributes('aria-sort')).toBe('none')
-        expect(localStorage.getItem('lotar.sprints.sort')).toContain('"id"')
-    })
+    it.each(['before', 'after'] as const)(
+        'drops %s a row using a server-relative anchor, not a visible permutation',
+        async (position) => {
+            const { api } = await import('../api/client')
+            vi.mocked(api.getBacklogOrder).mockResolvedValue({
+                status: 'ok',
+                tasks: ['HIDDEN-1', 'PRJ-052', 'HIDDEN-2', 'PRJ-051'],
+                changed: false,
+            })
+            vi.mocked(api.reorderTasks).mockResolvedValue({
+                status: 'ok',
+                tasks: ['HIDDEN-1', 'PRJ-052', 'PRJ-051', 'HIDDEN-2'],
+                changed: true,
+            })
+            const wrapper = mount(SprintsList)
+            await flushPromises()
+            await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
+            await flushPromises()
+            await wrapper.find('#backlog button[aria-label="Page 2"]').trigger('click')
+            const source = wrapper.find('#backlog [data-task-id="PRJ-049"]')
+            const target = wrapper.find('#backlog [data-task-id="PRJ-050"]')
+            const transfer = dragTransfer()
+            dragEvent(source.element, 'dragstart', transfer)
+            const y = position === 'before' ? -1 : 1
+            dragEvent(target.element, 'dragover', transfer, y)
+            await flushPromises()
+            expect(target.classes()).toContain(`task-row--${position}`)
+            dragEvent(target.element, 'drop', transfer, y)
+            await flushPromises()
+            expect(api.reorderTasks).toHaveBeenCalledExactlyOnceWith({
+                task: 'PRJ-049',
+                sprint: null,
+                [position]: 'PRJ-050',
+            })
+            expect(api.sprintAdd).not.toHaveBeenCalled()
+            expect(api.sprintRemove).not.toHaveBeenCalled()
+            expect(api.updateTask).not.toHaveBeenCalled()
+            expect(wrapper.find('[data-testid="backlog-manual-order"]').attributes('aria-pressed')).toBe('true')
+            expect(wrapper.find('#backlog th[data-column="id"]').attributes('aria-sort')).toBe('none')
+            expect(localStorage.getItem('lotar.sprints.sort')).toContain('"id"')
+        },
+    )
 
-    it.each([null, 1])('does not reinterpret a copy gesture as a reorder within container %s', async sprint => {
+    it.each([null, 1])('does not reinterpret a copy gesture as a reorder within container %s', async (sprint) => {
         const { api } = await import('../api/client')
         const { showToast } = await import('../components/toast')
         sprintsRef.value = sprint === null ? [] : [makeSprint(sprint)]
@@ -523,7 +595,13 @@ describe('SprintsList pagination', () => {
         vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 200, offset: 0 })
         const wrapper = mount(SprintsList)
         await flushPromises()
-        await wrapper.find(sprint === null ? '[data-testid="backlog-manual-order"]' : `[data-sprint-id="${sprint}"] [data-testid="sprint-manual-order"]`).trigger('click')
+        await wrapper
+            .find(
+                sprint === null
+                    ? '[data-testid="backlog-manual-order"]'
+                    : `[data-sprint-id="${sprint}"] [data-testid="sprint-manual-order"]`,
+            )
+            .trigger('click')
         const rows = sprint === null ? wrapper.findAll('#backlog tbody tr') : sprintTable(wrapper, sprint)
         const transfer = dragTransfer()
         dragEvent(rows[0]!.element, 'dragstart', transfer, -1, true)
@@ -543,7 +621,12 @@ describe('SprintsList pagination', () => {
             { ...makeTask(2, [1, 2]), sprint_order: { 1: 2, 2: 1 } },
         ]
         vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 200, offset: 0 })
-        vi.mocked(api.reorderTasks).mockResolvedValue({ status: 'ok', tasks: ['PRJ-002', 'PRJ-001'], changed: true, sprint_id: 1 })
+        vi.mocked(api.reorderTasks).mockResolvedValue({
+            status: 'ok',
+            tasks: ['PRJ-002', 'PRJ-001'],
+            changed: true,
+            sprint_id: 1,
+        })
         const wrapper = mount(SprintsList)
         await flushPromises()
         await wrapper.find('[data-sprint-id="2"] [data-testid="sprint-manual-order"]').trigger('click')
@@ -553,9 +636,11 @@ describe('SprintsList pagination', () => {
         dragEvent(sprintTable(wrapper, 1)[0]!.element, 'drop', transfer)
         await flushPromises()
         expect(api.reorderTasks).toHaveBeenCalledExactlyOnceWith({ task: 'PRJ-002', sprint: 1, before: 'PRJ-001' })
-        expect(sprintTable(wrapper, 1).map(row => row.attributes('data-task-id'))).toEqual(['PRJ-002', 'PRJ-001'])
+        expect(sprintTable(wrapper, 1).map((row) => row.attributes('data-task-id'))).toEqual(['PRJ-002', 'PRJ-001'])
         expect(wrapper.find('[data-sprint-id="1"] .group-count').text()).toBe('2 tasks')
-        expect(wrapper.find('[data-sprint-id="2"] [data-testid="sprint-manual-order"]').attributes('aria-pressed')).toBe('true')
+        expect(
+            wrapper.find('[data-sprint-id="2"] [data-testid="sprint-manual-order"]').attributes('aria-pressed'),
+        ).toBe('true')
         expect(api.sprintAdd).not.toHaveBeenCalled()
         expect(api.sprintRemove).not.toHaveBeenCalled()
         expect(api.updateTask).not.toHaveBeenCalled()
@@ -591,7 +676,12 @@ describe('SprintsList pagination', () => {
     it('ignores late write responses after newer shared-stream ordering and blocks concurrent drags', async () => {
         const { api } = await import('../api/client')
         let finish!: (value: { status: 'ok'; tasks: string[]; changed: boolean }) => void
-        vi.mocked(api.reorderTasks).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+        vi.mocked(api.reorderTasks).mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finish = resolve
+                }),
+        )
         const wrapper = mount(SprintsList)
         await flushPromises()
         await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
@@ -602,10 +692,16 @@ describe('SprintsList pagination', () => {
         await flushPromises()
         expect(wrapper.find('#backlog tbody tr').attributes('draggable')).toBe('false')
         expect(dragEvent(rows[2]!.element, 'dragstart', transfer).defaultPrevented).toBe(true)
-        vi.mocked(api.getBacklogOrder).mockResolvedValue({ status: 'ok', tasks: ['PRJ-003', 'PRJ-002', 'PRJ-001'], changed: false })
-        orderEvents.handlers.get('task_order_changed')!(new MessageEvent('task_order_changed', {
-            data: JSON.stringify({ sprint_id: null, tasks: ['PRJ-003', 'PRJ-002', 'PRJ-001'] }),
-        }))
+        vi.mocked(api.getBacklogOrder).mockResolvedValue({
+            status: 'ok',
+            tasks: ['PRJ-003', 'PRJ-002', 'PRJ-001'],
+            changed: false,
+        })
+        orderEvents.handlers.get('task_order_changed')!(
+            new MessageEvent('task_order_changed', {
+                data: JSON.stringify({ sprint_id: null, tasks: ['PRJ-003', 'PRJ-002', 'PRJ-001'] }),
+            }),
+        )
         await flushPromises()
         finish({ status: 'ok', tasks: ['PRJ-001', 'PRJ-002'], changed: true })
         await flushPromises()
@@ -618,14 +714,22 @@ describe('SprintsList pagination', () => {
     it('reconciles current metadata despite a stale notification and an older GET finishing late', async () => {
         const { api } = await import('../api/client')
         let finish!: (value: { status: 'ok'; tasks: string[]; changed: boolean }) => void
-        vi.mocked(api.getBacklogOrder).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+        vi.mocked(api.getBacklogOrder)
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        finish = resolve
+                    }),
+            )
             .mockResolvedValue({ status: 'ok', tasks: ['PRJ-003', 'PRJ-002'], changed: false })
         localStorage.setItem('lotar.sprints.backlogManualOrder', 'true')
         const wrapper = mount(SprintsList)
         await flushPromises()
-        orderEvents.handlers.get('task_order_changed')!(new MessageEvent('task_order_changed', {
-            data: JSON.stringify({ sprint_id: null, tasks: ['PRJ-001', 'PRJ-002'] }),
-        }))
+        orderEvents.handlers.get('task_order_changed')!(
+            new MessageEvent('task_order_changed', {
+                data: JSON.stringify({ sprint_id: null, tasks: ['PRJ-001', 'PRJ-002'] }),
+            }),
+        )
         await flushPromises()
         finish({ status: 'ok', tasks: ['PRJ-001', 'PRJ-002'], changed: false })
         await flushPromises()
@@ -637,7 +741,14 @@ describe('SprintsList pagination', () => {
         const { showToast } = await import('../components/toast')
         sprintsRef.value = [makeSprint(1)]
         const tasks = [makeTask(1), makeTask(2, [1])]
-        vi.mocked(api.listTasks).mockImplementation(async () => ({ status: 'ok', tasks, total: 2, count: 2, limit: 200, offset: 0 }))
+        vi.mocked(api.listTasks).mockImplementation(async () => ({
+            status: 'ok',
+            tasks,
+            total: 2,
+            count: 2,
+            limit: 200,
+            offset: 0,
+        }))
         vi.mocked(api.sprintAdd).mockImplementation(async () => {
             tasks[0]!.sprints = [1]
             return { status: 'ok', modified: ['PRJ-001'], sprint_id: 1 } as any
@@ -662,7 +773,7 @@ describe('SprintsList pagination', () => {
         sprintsRef.value = [makeSprint(1)]
         const tasks = [makeTask(1), makeTask(2), makeTask(3, [1])]
         vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 200, offset: 0 })
-        let finish = () => { }
+        let finish = () => {}
         const wrapper = mount(SprintsList)
         try {
             await flushPromises()
@@ -670,10 +781,16 @@ describe('SprintsList pagination', () => {
             const rows = wrapper.findAll('#backlog tbody tr')
             const transfer = dragTransfer()
             dragEvent(rows[0]!.element, 'dragstart', transfer)
-            vi.mocked(api.sprintUpdate).mockImplementationOnce(() => new Promise((_, reject) => {
-                finish = () => reject(new Error('Lifecycle test finished'))
-            }))
-            await wrapper.findAll('[data-sprint-id="1"] button').find(button => button.text() === 'Start')!.trigger('click')
+            vi.mocked(api.sprintUpdate).mockImplementationOnce(
+                () =>
+                    new Promise((_, reject) => {
+                        finish = () => reject(new Error('Lifecycle test finished'))
+                    }),
+            )
+            await wrapper
+                .findAll('[data-sprint-id="1"] button')
+                .find((button) => button.text() === 'Start')!
+                .trigger('click')
             await flushPromises()
             expect(rows[0]!.attributes('draggable')).toBe('false')
             dragEvent(rows[1]!.element, 'drop', transfer)
@@ -690,49 +807,65 @@ describe('SprintsList pagination', () => {
 
     // DEV-132: a read-only refresh (typically the file-watcher echo of the
     // previous reorder) never blocks the next drag; the drop supersedes it.
-    it.each(['reload', 'order'] as const)('accepts row drops while a %s is pending and supersedes it', async operation => {
-        const { api } = await import('../api/client')
-        const tasks = [makeTask(1), makeTask(2), makeTask(3)]
-        const response = { tasks, total: 3, count: 3, limit: 200, offset: 0 }
-        vi.mocked(api.listTasks).mockResolvedValue(response)
-        vi.mocked(api.reorderTasks).mockResolvedValue({ status: 'ok', tasks: ['PRJ-002', 'PRJ-001', 'PRJ-003'], changed: true })
-        let finish = () => { }
-        const wrapper = mount(SprintsList)
-        try {
-            await flushPromises()
-            await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
-            await flushPromises()
-            if (operation === 'reload') {
-                // A stale task list that would undo the reorder if it were applied.
-                vi.mocked(api.listTasks).mockImplementationOnce(() => new Promise(resolve => { finish = () => resolve({ ...response, tasks: [makeTask(3)] }) }))
-            } else {
-                vi.mocked(api.getBacklogOrder).mockImplementationOnce(() => new Promise(resolve => {
-                    finish = () => resolve({ status: 'ok', tasks: ['PRJ-003', 'PRJ-001', 'PRJ-002'], changed: false })
-                }))
+    it.each(['reload', 'order'] as const)(
+        'accepts row drops while a %s is pending and supersedes it',
+        async (operation) => {
+            const { api } = await import('../api/client')
+            const tasks = [makeTask(1), makeTask(2), makeTask(3)]
+            const response = { tasks, total: 3, count: 3, limit: 200, offset: 0 }
+            vi.mocked(api.listTasks).mockResolvedValue(response)
+            vi.mocked(api.reorderTasks).mockResolvedValue({
+                status: 'ok',
+                tasks: ['PRJ-002', 'PRJ-001', 'PRJ-003'],
+                changed: true,
+            })
+            let finish = () => {}
+            const wrapper = mount(SprintsList)
+            try {
+                await flushPromises()
+                await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
+                await flushPromises()
+                if (operation === 'reload') {
+                    // A stale task list that would undo the reorder if it were applied.
+                    vi.mocked(api.listTasks).mockImplementationOnce(
+                        () =>
+                            new Promise((resolve) => {
+                                finish = () => resolve({ ...response, tasks: [makeTask(3)] })
+                            }),
+                    )
+                } else {
+                    vi.mocked(api.getBacklogOrder).mockImplementationOnce(
+                        () =>
+                            new Promise((resolve) => {
+                                finish = () =>
+                                    resolve({ status: 'ok', tasks: ['PRJ-003', 'PRJ-001', 'PRJ-002'], changed: false })
+                            }),
+                    )
+                }
+                await wrapper.find('button.reload').trigger('click')
+                await flushPromises()
+                const ids = () => wrapper.findAll('#backlog tbody tr').map((row) => row.attributes('data-task-id'))
+                const rows = wrapper.findAll('#backlog tbody tr')
+                expect(rows[1]!.attributes('draggable')).toBe('true')
+                const transfer = dragTransfer()
+                expect(dragEvent(rows[1]!.element, 'dragstart', transfer).defaultPrevented).toBe(false)
+                expect(dragEvent(rows[0]!.element, 'dragover', transfer).defaultPrevented).toBe(true)
+                dragEvent(rows[0]!.element, 'drop', transfer)
+                await flushPromises()
+                expect(api.reorderTasks).toHaveBeenCalledWith({ task: 'PRJ-002', sprint: null, before: 'PRJ-001' })
+                expect(ids()).toEqual(['PRJ-002', 'PRJ-001', 'PRJ-003'])
+                // The superseded load finishing late changes nothing and leaves the page idle.
+                finish()
+                await flushPromises()
+                expect(ids()).toEqual(['PRJ-002', 'PRJ-001', 'PRJ-003'])
+                expect(wrapper.find('button.reload').attributes('disabled')).toBeUndefined()
+                expect(wrapper.findAll('#backlog tbody tr')[0]!.attributes('draggable')).toBe('true')
+            } finally {
+                finish()
+                await flushPromises()
             }
-            await wrapper.find('button.reload').trigger('click')
-            await flushPromises()
-            const ids = () => wrapper.findAll('#backlog tbody tr').map(row => row.attributes('data-task-id'))
-            const rows = wrapper.findAll('#backlog tbody tr')
-            expect(rows[1]!.attributes('draggable')).toBe('true')
-            const transfer = dragTransfer()
-            expect(dragEvent(rows[1]!.element, 'dragstart', transfer).defaultPrevented).toBe(false)
-            expect(dragEvent(rows[0]!.element, 'dragover', transfer).defaultPrevented).toBe(true)
-            dragEvent(rows[0]!.element, 'drop', transfer)
-            await flushPromises()
-            expect(api.reorderTasks).toHaveBeenCalledWith({ task: 'PRJ-002', sprint: null, before: 'PRJ-001' })
-            expect(ids()).toEqual(['PRJ-002', 'PRJ-001', 'PRJ-003'])
-            // The superseded load finishing late changes nothing and leaves the page idle.
-            finish()
-            await flushPromises()
-            expect(ids()).toEqual(['PRJ-002', 'PRJ-001', 'PRJ-003'])
-            expect(wrapper.find('button.reload').attributes('disabled')).toBeUndefined()
-            expect(wrapper.findAll('#backlog tbody tr')[0]!.attributes('draggable')).toBe('true')
-        } finally {
-            finish()
-            await flushPromises()
-        }
-    })
+        },
+    )
 
     it('blocks row placement into closed sprints without making membership or order requests', async () => {
         const { api } = await import('../api/client')
@@ -796,8 +929,13 @@ describe('SprintsList pagination', () => {
             ...Array.from({ length: 60 }, (_, idx) => makeTask(200 + idx, [2])),
             ...Array.from({ length: 70 }, (_, idx) => makeTask(400 + idx, [])),
         ]
-        ; (api.listTasks as any).mockResolvedValue({
-            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        ;(api.listTasks as any).mockResolvedValue({
+            status: 'ok',
+            count: tasks.length,
+            total: tasks.length,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
 
         const wrapper = mount(SprintsList)
@@ -831,8 +969,13 @@ describe('SprintsList pagination', () => {
             makeTask(50, [1, 2]),
             ...Array.from({ length: 10 }, (_, idx) => makeTask(100 + idx, [2])),
         ]
-        ; (api.listTasks as any).mockResolvedValue({
-            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        ;(api.listTasks as any).mockResolvedValue({
+            status: 'ok',
+            count: tasks.length,
+            total: tasks.length,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
 
         const wrapper = mount(SprintsList)
@@ -862,7 +1005,9 @@ describe('SprintsList pagination', () => {
         expect((wrapper.vm as any).backlogOffset).toBe(25)
 
         localStorage.setItem('lotar.preferences.tasks.pageSize', '50')
-        window.dispatchEvent(new CustomEvent('lotar:preferences-changed', { detail: { key: 'lotar.preferences.tasks.pageSize' } }))
+        window.dispatchEvent(
+            new CustomEvent('lotar:preferences-changed', { detail: { key: 'lotar.preferences.tasks.pageSize' } }),
+        )
         await flushPromises()
 
         expect((wrapper.vm as any).tasksPageSize).toBe(50)
@@ -896,8 +1041,13 @@ describe('SprintsList pagination', () => {
             ...Array.from({ length: 120 }, (_, idx) => makeTask(idx + 1, [1])),
             ...Array.from({ length: 120 }, (_, idx) => makeTask(900 + idx, [])),
         ]
-        ; (api.listTasks as any).mockResolvedValue({
-            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        ;(api.listTasks as any).mockResolvedValue({
+            status: 'ok',
+            count: tasks.length,
+            total: tasks.length,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
 
         const wrapper = mount(SprintsList)
@@ -932,8 +1082,13 @@ describe('SprintsList pagination', () => {
             ...Array.from({ length: 120 }, (_, idx) => makeTask(idx + 1, [1])),
             ...Array.from({ length: 120 }, (_, idx) => makeTask(300 + idx, [2])),
         ]
-        ; (api.listTasks as any).mockResolvedValue({
-            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        ;(api.listTasks as any).mockResolvedValue({
+            status: 'ok',
+            count: tasks.length,
+            total: tasks.length,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
 
         const wrapper = mount(SprintsList)
@@ -955,18 +1110,23 @@ describe('SprintsList pagination', () => {
         sprintsRef.value = [makeSprint(1)]
         const { api } = await import('../api/client')
         const tasks = Array.from({ length: 120 }, (_, idx) => makeTask(idx + 1, [1]))
-        ; (api.listTasks as any).mockResolvedValue({
-            status: 'ok', count: 120, total: 120, limit: 200, offset: 0, tasks,
+        ;(api.listTasks as any).mockResolvedValue({
+            status: 'ok',
+            count: 120,
+            total: 120,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
 
         const wrapper = mount(SprintsList)
         await flushPromises()
-        ; (api.listTasks as any).mockClear()
+        ;(api.listTasks as any).mockClear()
 
         await sprintPager(wrapper, 1).find('button[aria-label="Page 2"]').trigger('click')
         await flushPromises()
 
-        expect((api.listTasks as any)).not.toHaveBeenCalled()
+        expect(api.listTasks as any).not.toHaveBeenCalled()
         expect(sprintTable(wrapper, 1)).toHaveLength(50)
         expect(sprintTable(wrapper, 1)[0]!.text()).toContain('051')
         wrapper.unmount()
@@ -984,8 +1144,13 @@ describe('SprintsList automatic sorting', () => {
         sprintsRef.value = sprints.map(makeSprint)
         const { api } = await import('../api/client')
         vi.mocked(api.getBacklogOrder).mockReset().mockResolvedValue({ status: 'ok', tasks: [], changed: false })
-        ; (api.listTasks as any).mockReset().mockResolvedValue({
-            status: 'ok', count: tasks.length, total: tasks.length, limit: 200, offset: 0, tasks,
+        ;(api.listTasks as any).mockReset().mockResolvedValue({
+            status: 'ok',
+            count: tasks.length,
+            total: tasks.length,
+            limit: 200,
+            offset: 0,
+            tasks,
         })
         const wrapper = mount(SprintsList)
         await flushPromises()
@@ -993,7 +1158,7 @@ describe('SprintsList automatic sorting', () => {
     }
 
     const backlogIds = (wrapper: ReturnType<typeof mount>) =>
-        wrapper.findAll('#backlog tbody tr.task-row').map(row => row.attributes('data-task-id'))
+        wrapper.findAll('#backlog tbody tr.task-row').map((row) => row.attributes('data-task-id'))
 
     it('orders effort by parsed duration with missing values last in ascending order', async () => {
         const tasks = [
@@ -1025,7 +1190,7 @@ describe('SprintsList automatic sorting', () => {
     it('compares sprint memberships numerically', async () => {
         const tasks = [makeTask(1, [2, 10]), makeTask(2, [2, 9])]
         const wrapper = await mountWith({ key: 'sprints', dir: 'asc' }, tasks, [2, 9, 10])
-        expect(sprintTable(wrapper, 2).map(row => row.attributes('data-task-id'))).toEqual(['PRJ-002', 'PRJ-001'])
+        expect(sprintTable(wrapper, 2).map((row) => row.attributes('data-task-id'))).toEqual(['PRJ-002', 'PRJ-001'])
     })
 
     it('breaks ties by canonical task ID ascending in both directions', async () => {

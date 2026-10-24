@@ -101,7 +101,13 @@ describe.concurrent('UI sprint analytics smoke scenarios', () => {
                 futureWindow.endsAt,
             ]);
 
-            const cliVelocity = await workspace.runLotar(['sprint', 'velocity', '--include-active', '--format', 'json']);
+            const cliVelocity = await workspace.runLotar([
+                'sprint',
+                'velocity',
+                '--include-active',
+                '--format',
+                'json',
+            ]);
             const cliPayload = normalizeVelocityPayload(JSON.parse(String(cliVelocity.stdout ?? '{}')));
             const cliEntryIds = velocityEntryIds(cliPayload);
             expect(cliEntryIds).toEqual(expect.arrayContaining([2, 3, 4, 5]));

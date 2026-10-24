@@ -2,12 +2,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-    assertGitSupport,
-    buildGitProbeEnv,
-    probeGit,
-    type GitProbeResult,
-} from '../helpers/git.js';
+import { assertGitSupport, buildGitProbeEnv, probeGit, type GitProbeResult } from '../helpers/git.js';
 
 const isUnix = process.platform !== 'win32';
 const fakeDirs: string[] = [];
@@ -124,9 +119,7 @@ describe('smoke git capability probe', () => {
         expect(env.USERPROFILE).toBe(ownedDir);
         expect(env.XDG_CONFIG_HOME).toBe(join(ownedDir, '.config'));
         for (const key of ownedEnvCaseKeys) {
-            expect(Object.keys(env).filter((entry) => entry.toUpperCase() === key)).toEqual([
-                key,
-            ]);
+            expect(Object.keys(env).filter((entry) => entry.toUpperCase() === key)).toEqual([key]);
         }
     });
 
@@ -174,13 +167,9 @@ describe('smoke git capability probe', () => {
             /lotar-git-probe-[^/]*\/gitconfig$/,
         );
         for (const key of ownedEnvCaseKeys) {
-            expect(lines.find((line) => line.startsWith(`${key}=`))).toMatch(
-                /lotar-git-probe-/,
-            );
+            expect(lines.find((line) => line.startsWith(`${key}=`))).toMatch(/lotar-git-probe-/);
         }
-        expect(lines.find((line) => line.startsWith('HOME='))).not.toBe(
-            `HOME=${process.env.HOME}`,
-        );
+        expect(lines.find((line) => line.startsWith('HOME='))).not.toBe(`HOME=${process.env.HOME}`);
         const allowedPrefixes = captureKeys.map((key) => `${key}=`);
         const unexpected = lines.filter(
             (line) =>

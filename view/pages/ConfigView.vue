@@ -3,19 +3,22 @@
     <header class="page-header card">
       <div class="page-headings">
         <h1>Configuration</h1>
-        <p class="muted">Compare global defaults with per-project overrides, edit safely, and see where each value comes from.</p>
+        <p class="muted">
+          Compare global defaults with per-project overrides, edit safely, and see where each value comes from.
+        </p>
       </div>
       <div class="page-actions">
-        <UiSelect :key="scopeSelectKey" :model-value="project" class="scope-select" aria-label="Project scope" @update:model-value="requestScope">
+        <UiSelect
+          :key="scopeSelectKey"
+          :model-value="project"
+          class="scope-select"
+          aria-label="Project scope"
+          @update:model-value="requestScope"
+        >
           <option value="">Global defaults</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
-        <UiButton
-          type="button"
-          class="new-project-button"
-          :disabled="loading"
-          @click="openCreateDialog"
-        >
+        <UiButton type="button" class="new-project-button" :disabled="loading" @click="openCreateDialog">
           <IconGlyph name="plus" aria-hidden="true" />
           <span>New project</span>
         </UiButton>
@@ -68,10 +71,18 @@
               @click.prevent="selectSection(entry.id)"
             >
               <span class="config-nav__label">{{ entry.label }}</span>
-              <span v-if="sectionErrorIds.has(entry.id)" class="config-nav__badge config-nav__badge--error" title="Has errors">
+              <span
+                v-if="sectionErrorIds.has(entry.id)"
+                class="config-nav__badge config-nav__badge--error"
+                title="Has errors"
+              >
                 !<span class="config-nav__sr">(has errors)</span>
               </span>
-              <span v-else-if="sectionDirtyIds.has(entry.id)" class="config-nav__badge config-nav__badge--dirty" title="Unsaved changes">
+              <span
+                v-else-if="sectionDirtyIds.has(entry.id)"
+                class="config-nav__badge config-nav__badge--dirty"
+                title="Unsaved changes"
+              >
                 <span class="config-nav__sr">(unsaved changes)</span>
               </span>
             </a>
@@ -98,13 +109,19 @@
               :field-source-class="serverPortSourceClass"
               @validate="validateField('server_port')"
             />
-                    </div>
+          </div>
           <div v-if="!isGlobal" class="config-section__item">
             <ConfigGroup title="Project" :description="projectOverviewDescription">
               <div class="field-grid">
                 <div class="field">
                   <label class="field-label" for="config-project-name">Project name</label>
-                  <UiInput id="config-project-name" v-model="form.projectName" maxlength="100" @blur="validateField('project_name')" :placeholder="currentProject?.name || 'Project display name'" />
+                  <UiInput
+                    id="config-project-name"
+                    v-model="form.projectName"
+                    maxlength="100"
+                    @blur="validateField('project_name')"
+                    :placeholder="currentProject?.name || 'Project display name'"
+                  />
                   <p v-if="errors.project_name" class="field-error">{{ errors.project_name }}</p>
                 </div>
               </div>
@@ -122,7 +139,11 @@
           <h2 class="config-nav__sr">{{ sectionLabel('defaults') }}</h2>
           <div class="config-section__item">
             <ConfigDefaultsSection
-              :description="isGlobal ? 'Applied when a task is created without these values.' : 'Override defaults for new tasks in this project; inherit keeps the global value.'"
+              :description="
+                isGlobal
+                  ? 'Applied when a task is created without these values.'
+                  : 'Override defaults for new tasks in this project; inherit keeps the global value.'
+              "
               :is-global="isGlobal"
               :errors="errors"
               v-model:default-project="form.defaultProject"
@@ -177,7 +198,7 @@
               :provenance-class="provenanceClass"
               @validate="validateField"
             />
-                    </div>
+          </div>
         </section>
 
         <section
@@ -206,7 +227,7 @@
               :provenance-class="provenanceClass"
               @validate="validateField"
             />
-                    </div>
+          </div>
         </section>
 
         <section
@@ -235,7 +256,7 @@
               :provenance-class="provenanceClass"
               @validate="validateField"
             />
-                    </div>
+          </div>
         </section>
 
         <section
@@ -266,7 +287,7 @@
               :provenance-class="provenanceClass"
               :source-for="sourceFor"
             />
-                    </div>
+          </div>
           <div class="config-section__item">
             <ConfigGroup title="Automation rules" :description="automationRulesDescription">
               <AutomationRulesEditor
@@ -275,10 +296,14 @@
                 :loading="automationLoading"
                 :error="automationError"
                 :source-label="automationSourceLabel"
-                :scope-hint="isGlobal ? 'Edit .tasks/automation.yml. Leave it empty to clear the scoped file.' : `Edit .tasks/${project}/automation.yml. Leave it empty to inherit from higher scopes.`"
+                :scope-hint="
+                  isGlobal
+                    ? 'Edit .tasks/automation.yml. Leave it empty to clear the scoped file.'
+                    : `Edit .tasks/${project}/automation.yml. Leave it empty to inherit from higher scopes.`
+                "
               />
             </ConfigGroup>
-                    </div>
+          </div>
         </section>
 
         <section
@@ -309,7 +334,7 @@
               :ticket-patterns-source="sourceFor('scan_ticket_patterns')"
               @validate="validateField"
             />
-                    </div>
+          </div>
           <div class="config-section__item">
             <ConfigBranchAliasSection
               :description="branchAliasDescription"
@@ -331,7 +356,7 @@
               @clear="clearAliasField"
               @validate="validateField"
             />
-                    </div>
+          </div>
         </section>
 
         <section
@@ -343,36 +368,93 @@
         >
           <h2 class="config-nav__sr">{{ sectionLabel('storage') }}</h2>
           <div class="config-section__item">
-            <ConfigGroup title="Attachments" :description="isGlobal ? 'Where uploaded files are stored and how large they may be.' : 'Override attachment storage for this project. Leave a field empty to inherit the global value.'">
+            <ConfigGroup
+              title="Attachments"
+              :description="
+                isGlobal
+                  ? 'Where uploaded files are stored and how large they may be.'
+                  : 'Override attachment storage for this project. Leave a field empty to inherit the global value.'
+              "
+            >
               <div class="field-grid" data-testid="config-attachments">
                 <div class="field field--full">
                   <label class="field-label" for="config-attachments-dir">
                     <span>Attachments folder</span>
-                    <span v-if="sourceFor('attachments_dir')" :class="['provenance', provenanceClass(sourceFor('attachments_dir'))]">{{ provenanceLabel(sourceFor('attachments_dir')) }}</span>
+                    <span
+                      v-if="sourceFor('attachments_dir')"
+                      :class="['provenance', provenanceClass(sourceFor('attachments_dir'))]"
+                      >{{ provenanceLabel(sourceFor('attachments_dir')) }}</span
+                    >
                   </label>
-                  <UiInput id="config-attachments-dir" v-model="form.attachmentsDir" maxlength="512" @blur="validateField('attachments_dir')" :placeholder="isGlobal ? '@attachments' : `Inherit global (${inspectData.global_effective?.attachments_dir || '@attachments'})`" />
+                  <UiInput
+                    id="config-attachments-dir"
+                    v-model="form.attachmentsDir"
+                    maxlength="512"
+                    @blur="validateField('attachments_dir')"
+                    :placeholder="
+                      isGlobal
+                        ? '@attachments'
+                        : `Inherit global (${inspectData.global_effective?.attachments_dir || '@attachments'})`
+                    "
+                  />
                   <p class="field-hint">Relative paths resolve under .tasks; absolute paths are allowed.</p>
                   <p v-if="errors.attachments_dir" class="field-error">{{ errors.attachments_dir }}</p>
                 </div>
                 <div class="field">
                   <label class="field-label" for="config-attachments-max">
                     <span>Max upload size (MiB)</span>
-                    <span v-if="sourceFor('attachments_max_upload_mb')" :class="['provenance', provenanceClass(sourceFor('attachments_max_upload_mb'))]">{{ provenanceLabel(sourceFor('attachments_max_upload_mb')) }}</span>
+                    <span
+                      v-if="sourceFor('attachments_max_upload_mb')"
+                      :class="['provenance', provenanceClass(sourceFor('attachments_max_upload_mb'))]"
+                      >{{ provenanceLabel(sourceFor('attachments_max_upload_mb')) }}</span
+                    >
                   </label>
-                  <UiInput id="config-attachments-max" v-model="form.attachmentsMaxUploadMb" type="number" min="-1" step="1" inputmode="numeric" @blur="validateField('attachments_max_upload_mb')" :placeholder="isGlobal ? '10' : `Inherit global (${inspectData.global_effective?.attachments_max_upload_mb ?? 10})`" />
+                  <UiInput
+                    id="config-attachments-max"
+                    v-model="form.attachmentsMaxUploadMb"
+                    type="number"
+                    min="-1"
+                    step="1"
+                    inputmode="numeric"
+                    @blur="validateField('attachments_max_upload_mb')"
+                    :placeholder="
+                      isGlobal
+                        ? '10'
+                        : `Inherit global (${inspectData.global_effective?.attachments_max_upload_mb ?? 10})`
+                    "
+                  />
                   <p class="field-hint">0 turns uploads off; -1 removes the limit.</p>
-                  <p v-if="errors.attachments_max_upload_mb" class="field-error">{{ errors.attachments_max_upload_mb }}</p>
+                  <p v-if="errors.attachments_max_upload_mb" class="field-error">
+                    {{ errors.attachments_max_upload_mb }}
+                  </p>
                 </div>
               </div>
             </ConfigGroup>
           </div>
 
           <div class="config-section__item">
-            <ConfigGroup title="Sync reports" :description="isGlobal ? 'Reports written after each sync run. Remotes and field mappings are managed on the Sync page.' : 'Override sync report settings for this project. Remotes and field mappings are managed on the Sync page.'">
+            <ConfigGroup
+              title="Sync reports"
+              :description="
+                isGlobal
+                  ? 'Reports written after each sync run. Remotes and field mappings are managed on the Sync page.'
+                  : 'Override sync report settings for this project. Remotes and field mappings are managed on the Sync page.'
+              "
+            >
               <div class="field-grid" data-testid="config-sync-reports">
                 <div class="field field--full">
                   <label class="field-label" for="config-sync-reports-dir">Reports folder</label>
-                  <UiInput id="config-sync-reports-dir" v-model="form.syncReportsDir" maxlength="512" @blur="validateField('sync_reports_dir')" :placeholder="isGlobal ? '@reports' : `Inherit global (${inspectData.global_effective?.sync_reports_dir || '@reports'})`" />
+                  <UiInput
+                    id="config-sync-reports-dir"
+                    v-model="form.syncReportsDir"
+                    maxlength="512"
+                    @blur="validateField('sync_reports_dir')"
+                    :placeholder="
+                      isGlobal
+                        ? '@reports'
+                        : `Inherit global (${inspectData.global_effective?.sync_reports_dir || '@reports'})`
+                    "
+                  />
                   <p class="field-hint">Relative paths resolve under .tasks. <a href="/sync">Open the Sync page</a></p>
                   <p v-if="errors.sync_reports_dir" class="field-error">{{ errors.sync_reports_dir }}</p>
                 </div>
@@ -387,7 +469,7 @@
                 </div>
               </div>
             </ConfigGroup>
-                    </div>
+          </div>
         </section>
 
         <section
@@ -400,7 +482,11 @@
           <h2 class="config-nav__sr">{{ sectionLabel('agents') }}</h2>
           <div class="config-section__item">
             <ConfigAgentSection
-              :description="isGlobal ? 'Defaults for agent jobs started from LoTaR.' : 'Override agent job settings for this project. Blank values and Inherit use the global settings.'"
+              :description="
+                isGlobal
+                  ? 'Defaults for agent jobs started from LoTaR.'
+                  : 'Override agent job settings for this project. Blank values and Inherit use the global settings.'
+              "
               :is-global="isGlobal"
               :errors="errors"
               v-model:context-enabled="form.agentContextEnabled"
@@ -423,10 +509,11 @@
               :provenance-class="provenanceClass"
               @validate="validateField"
             />
-                    </div>
+          </div>
         </section>
 
-        <section v-if="isGlobal"
+        <section
+          v-if="isGlobal"
           v-show="activeSection === 'sprints'"
           :id="`config-section-sprints`"
           class="config-section"
@@ -447,25 +534,17 @@
               :provenance-class="provenanceClass"
               @validate="validateField"
             />
-                    </div>
+          </div>
         </section>
-
       </div>
     </div>
 
-    <div
-      v-if="inspectData"
-      class="floating-actions"
-      role="region"
-      aria-label="Save controls"
-    >
+    <div v-if="inspectData" class="floating-actions" role="region" aria-label="Save controls">
       <div class="floating-actions__buttons">
         <UiButton variant="primary" type="button" @click="save" :disabled="saveDisabledCombined">
           Save changes
         </UiButton>
-        <UiButton variant="ghost" type="button" @click="resetAll" :disabled="resetDisabled">
-          Reset
-        </UiButton>
+        <UiButton variant="ghost" type="button" @click="resetAll" :disabled="resetDisabled"> Reset </UiButton>
       </div>
       <div class="floating-actions__meta" aria-live="polite">
         <span v-if="saving" class="muted">Saving…</span>
@@ -510,7 +589,13 @@
             </div>
             <div class="field">
               <label class="field-label" for="create-project-prefix">Project prefix</label>
-              <UiInput id="create-project-prefix" :modelValue="createPrefix" maxlength="20" @update:modelValue="handleCreatePrefixInput" placeholder="AUTO" />
+              <UiInput
+                id="create-project-prefix"
+                :modelValue="createPrefix"
+                maxlength="20"
+                @update:modelValue="handleCreatePrefixInput"
+                placeholder="AUTO"
+              />
               <p class="field-hint">Uppercase letters, numbers, hyphen or underscore.</p>
               <p v-if="createErrors.prefix" class="field-error">{{ createErrors.prefix }}</p>
             </div>
@@ -534,8 +619,12 @@
           </section>
 
           <footer class="dialog-actions">
-            <UiButton variant="ghost" type="button" @click="closeCreateDialog" :disabled="creatingProject">Cancel</UiButton>
-            <UiButton variant="primary" type="submit" :disabled="createDisabled">{{ creatingProject ? 'Creating…' : 'Create project' }}</UiButton>
+            <UiButton variant="ghost" type="button" @click="closeCreateDialog" :disabled="creatingProject"
+              >Cancel</UiButton
+            >
+            <UiButton variant="primary" type="submit" :disabled="createDisabled">{{
+              creatingProject ? 'Creating…' : 'Create project'
+            }}</UiButton>
           </footer>
         </form>
       </div>
@@ -624,9 +713,22 @@ import { useConfigForm } from '../composables/useConfigForm'
 import { refreshCompletionPoliciesForScope } from '../composables/useCompletionPolicy'
 import { useConfigScope } from '../composables/useConfigScope'
 import { notifyProjectsChanged } from '../composables/useProjects'
-import { CONFIG_SECTIONS, dirtySections, errorSections, resolveSection, sectionsForScope, type ConfigSectionId } from '../utils/configSections'
+import {
+  CONFIG_SECTIONS,
+  dirtySections,
+  errorSections,
+  resolveSection,
+  sectionsForScope,
+  type ConfigSectionId,
+} from '../utils/configSections'
 import { formatProjectLabel } from '../utils/projectLabels'
-import { detectPrefixConflict, normalizePrefixInput, suggestUniquePrefix, validateProjectName, validateProjectPrefix } from '../utils/projectPrefix'
+import {
+  detectPrefixConflict,
+  normalizePrefixInput,
+  suggestUniquePrefix,
+  validateProjectName,
+  validateProjectPrefix,
+} from '../utils/projectPrefix'
 
 const createTitleId = useId()
 const createDescId = useId()
@@ -962,7 +1064,6 @@ function sectionLabel(id: ConfigSectionId) {
   return CONFIG_SECTIONS.find((section) => section.id === id)?.label ?? id
 }
 
-
 function sectionHref(id: ConfigSectionId) {
   return router.resolve({ query: { ...route.query, section: id } }).href
 }
@@ -973,12 +1074,16 @@ function selectSection(id: ConfigSectionId) {
 }
 
 // Keep the active entry visible in the scrolling tab strip at phone width.
-watch([activeSection, () => !!inspectData.value], async ([id, ready]) => {
-  if (!ready) return
-  await nextTick()
-  const link = document.querySelector<HTMLElement>(`.config-nav [data-section-link="${id}"]`)
-  link?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
-}, { immediate: true })
+watch(
+  [activeSection, () => !!inspectData.value],
+  async ([id, ready]) => {
+    if (!ready) return
+    await nextTick()
+    const link = document.querySelector<HTMLElement>(`.config-nav [data-section-link="${id}"]`)
+    link?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  },
+  { immediate: true },
+)
 
 const sectionDirtyIds = computed(() => {
   const dirty = dirtySections(snapshotForm(), baseline.value)
@@ -1074,7 +1179,11 @@ async function save() {
   saveInfoMessages.value = []
   try {
     if (hasConfigChanges) {
-      const result = await api.setConfig({ values: payload, project: isGlobal.value ? undefined : project.value, global: isGlobal.value })
+      const result = await api.setConfig({
+        values: payload,
+        project: isGlobal.value ? undefined : project.value,
+        global: isGlobal.value,
+      })
       saveWarnings.value.push(...(result.warnings || []))
       saveInfoMessages.value.push(...(result.info || []))
 
@@ -1138,7 +1247,6 @@ watch(
   { immediate: true },
 )
 </script>
-
 
 <style scoped>
 .config-page {
@@ -1370,10 +1478,6 @@ watch(
   padding: calc(var(--space-2) - 4px) calc(var(--space-3) + 16px) calc(var(--space-2) - 4px) var(--space-3);
   box-sizing: border-box;
 }
-
-
-
-
 
 .dialog-form .field-grid {
   display: grid;

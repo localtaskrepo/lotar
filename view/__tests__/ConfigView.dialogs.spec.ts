@@ -41,7 +41,8 @@ const stubs = {
         emits: ['update:modelValue'],
     },
     UiSelect: {
-        template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
+        template:
+            '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
         props: ['modelValue'],
         emits: ['update:modelValue'],
     },
@@ -175,19 +176,19 @@ function openModal(wrapper: ReturnType<typeof mount>) {
 describe('ConfigView dialog migration', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-            ; (api.listProjects as any).mockResolvedValue({
-                total: 1,
-                limit: 50,
-                offset: 0,
-                projects: [{ name: 'App', prefix: 'APP' }],
-            })
-            ; (api.inspectConfig as any).mockResolvedValue(createInspectResult())
-            ; (api.inspectAutomation as any).mockResolvedValue({
-                source: 'global',
-                scope_exists: true,
-                scope_yaml: '',
-                effective_yaml: '',
-            })
+        ;(api.listProjects as any).mockResolvedValue({
+            total: 1,
+            limit: 50,
+            offset: 0,
+            projects: [{ name: 'App', prefix: 'APP' }],
+        })
+        ;(api.inspectConfig as any).mockResolvedValue(createInspectResult())
+        ;(api.inspectAutomation as any).mockResolvedValue({
+            source: 'global',
+            scope_exists: true,
+            scope_yaml: '',
+            effective_yaml: '',
+        })
     })
 
     it('renders the create dialog through UiModal with bound title and description ids', async () => {
@@ -224,7 +225,7 @@ describe('ConfigView dialog migration', () => {
     })
 
     it('keeps the create dialog open, non-dismissible, and single-submit while creating', async () => {
-        ; (api.createProject as any).mockImplementation(() => new Promise(() => {}))
+        ;(api.createProject as any).mockImplementation(() => new Promise(() => {}))
         const wrapper = await mountConfigView()
 
         const newProjectButton = wrapper.findAll('button').find((button) => button.text().includes('New project'))

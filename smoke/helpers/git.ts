@@ -128,11 +128,7 @@ export function gitAvailable(): boolean {
     return assertGitSupport(gitProbe());
 }
 
-export async function runGitCommand(
-    cwd: string,
-    args: readonly string[],
-    options: GitCommandOptions = {},
-) {
+export async function runGitCommand(cwd: string, args: readonly string[], options: GitCommandOptions = {}) {
     return execa('git', args as string[], {
         cwd,
         env: options.env,
@@ -142,10 +138,7 @@ export async function runGitCommand(
     });
 }
 
-export async function initGitRepository(
-    cwd: string,
-    options: GitInitOptions = {},
-): Promise<void> {
+export async function initGitRepository(cwd: string, options: GitInitOptions = {}): Promise<void> {
     // Pin the initial branch (default main) via the init flag so fixture
     // repositories are deterministic across runners regardless of the git
     // version, distribution default, or an inherited init.defaultBranch —

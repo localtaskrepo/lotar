@@ -7,7 +7,8 @@ vi.mock('../components/ChipListField.vue', () => ({
     default: {
         props: ['modelValue', 'suggestions', 'placeholder', 'addLabel', 'composerLabel', 'emptyLabel'],
         emits: ['update:modelValue'],
-        template: '<div class="chip-stub" :data-count="modelValue.length" @click="$emit(\'update:modelValue\', modelValue.length ? [] : [\'Closed\'])" />',
+        template:
+            '<div class="chip-stub" :data-count="modelValue.length" @click="$emit(\'update:modelValue\', modelValue.length ? [] : [\'Closed\'])" />',
     },
 }))
 

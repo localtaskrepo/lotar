@@ -26,7 +26,7 @@ function emitPreferencesChanged(key: string) {
 }
 
 export function onPreferencesChanged(handler: (key: string) => void): () => void {
-    if (typeof window === 'undefined') return () => { }
+    if (typeof window === 'undefined') return () => {}
     const listener = (event: Event) => {
         const detail = (event as CustomEvent<any>)?.detail
         const key = typeof detail?.key === 'string' ? detail.key : ''
@@ -48,7 +48,15 @@ const DESTINATION_PATHS: Record<FixedStartupDestination, string> = {
     config: '/config',
 }
 
-const VALID_DESTINATIONS: StartupDestination[] = ['tasks', 'sprints', 'boards', 'calendar', 'insights', 'config', 'remember']
+const VALID_DESTINATIONS: StartupDestination[] = [
+    'tasks',
+    'sprints',
+    'boards',
+    'calendar',
+    'insights',
+    'config',
+    'remember',
+]
 const STARTUP_PATH_CHOICES = new Set(Object.values(DESTINATION_PATHS))
 
 export const STARTUP_DESTINATION_OPTIONS: Array<{ value: StartupDestination; label: string }> = [

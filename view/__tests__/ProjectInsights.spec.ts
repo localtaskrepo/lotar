@@ -51,7 +51,10 @@ const PieChartStub = defineComponent({
 function deferred<T>() {
     let resolve!: (value: T) => void
     let reject!: (error: Error) => void
-    const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+    const promise = new Promise<T>((yes, no) => {
+        resolve = yes
+        reject = no
+    })
     return { promise, resolve, reject }
 }
 
@@ -127,19 +130,19 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
     let showConfigMock: Mock
 
     function retryButton() {
-        const button = wrapper.findAll('button').find(b => b.text().includes('Retry'))
+        const button = wrapper.findAll('button').find((b) => b.text().includes('Retry'))
         expect(button).toBeTruthy()
         return button!
     }
 
     function tile(label: string): string {
-        const el = wrapper.findAll('.summary-tile').find(t => t.text().includes(label))
+        const el = wrapper.findAll('.summary-tile').find((t) => t.text().includes(label))
         return el ? el.find('.summary-value').text() : ''
     }
 
     function overviewRow(prefix: string): string {
         const rows = wrapper.findAll('table.distribution tbody tr')
-        const row = rows.filter(r => r.text().includes(prefix))
+        const row = rows.filter((r) => r.text().includes(prefix))
         return row.length ? row[row.length - 1]!.text() : ''
     }
 
@@ -191,8 +194,7 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
     it('mounts in global scope, filters nothing, and fills the overview from per-project stats', async () => {
         const tasks = [makeTask('A-1', { tags: ['x'] }), makeTask('A-2'), makeTask('B-1')]
         listTasksMock.mockResolvedValue({ total: tasks.length, tasks })
-        projectStatsMock.mockImplementation((prefix: string) =>
-            Promise.resolve(prefix === 'A' ? stats(3) : stats(9)))
+        projectStatsMock.mockImplementation((prefix: string) => Promise.resolve(prefix === 'A' ? stats(3) : stats(9)))
 
         await mountInsights()
 
@@ -273,7 +275,10 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         expect(tile('Total tasks')).toBe('2')
 
         expect(listTasksMock).toHaveBeenCalledWith(expect.objectContaining({ project: 'B' }))
-        const lastFeed = activityFeedMock.mock.calls[activityFeedMock.mock.calls.length - 1]![0] as Record<string, unknown>
+        const lastFeed = activityFeedMock.mock.calls[activityFeedMock.mock.calls.length - 1]![0] as Record<
+            string,
+            unknown
+        >
         expect(lastFeed.project).toBe('B')
     })
 
@@ -285,7 +290,8 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         listTasksMock.mockImplementation((filter: any) =>
             filter?.project === 'A'
                 ? Promise.reject(new Error('A unavailable'))
-                : Promise.resolve({ total: 0, tasks: [] }))
+                : Promise.resolve({ total: 0, tasks: [] }),
+        )
 
         await wrapper.find('select.ui-select').setValue('A')
         await flushPromises()
@@ -298,7 +304,8 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         listTasksMock.mockImplementation((filter: any) =>
             filter?.project === 'A'
                 ? Promise.resolve({ total: 1, tasks: [makeTask('A-9')] })
-                : Promise.resolve({ total: 0, tasks: [] }))
+                : Promise.resolve({ total: 0, tasks: [] }),
+        )
 
         await retryButton().trigger('click')
         await flushPromises()
@@ -312,7 +319,8 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         listTasksMock.mockImplementation((filter: any) =>
             filter?.project === 'A'
                 ? Promise.resolve({ total: 2, tasks: [makeTask('A-1'), makeTask('A-2')] })
-                : Promise.resolve({ total: 0, tasks: [] }))
+                : Promise.resolve({ total: 0, tasks: [] }),
+        )
 
         await mountInsights()
         await wrapper.find('select.ui-select').setValue('A')
@@ -322,7 +330,8 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         listTasksMock.mockImplementation((filter: any) =>
             filter?.project === 'A'
                 ? Promise.reject(new Error('flaky reload'))
-                : Promise.resolve({ total: 0, tasks: [] }))
+                : Promise.resolve({ total: 0, tasks: [] }),
+        )
 
         await wrapper.find('button[title="Refresh insights"]').trigger('click')
         await flushPromises()
@@ -409,9 +418,15 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
 
         const firstSince = new Date((activityFeedMock.mock.calls[0]![0] as any).since as string).getTime()
 
-        await wrapper.findAll('.chart-controls button').find(b => b.text() === '60d')!.trigger('click')
+        await wrapper
+            .findAll('.chart-controls button')
+            .find((b) => b.text() === '60d')!
+            .trigger('click')
         await flushPromises()
-        await wrapper.findAll('.chart-controls button').find(b => b.text() === '90d')!.trigger('click')
+        await wrapper
+            .findAll('.chart-controls button')
+            .find((b) => b.text() === '90d')!
+            .trigger('click')
         await flushPromises()
 
         const secondSince = new Date((activityFeedMock.mock.calls[1]![0] as any).since as string).getTime()
@@ -433,7 +448,10 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         await mountInsights()
 
         activityFeedMock.mockRejectedValueOnce(new Error('feed unavailable'))
-        await wrapper.findAll('.chart-controls button').find(b => b.text() === '14d')!.trigger('click')
+        await wrapper
+            .findAll('.chart-controls button')
+            .find((b) => b.text() === '14d')!
+            .trigger('click')
         await flushPromises()
 
         expect(wrapper.text()).toContain('feed unavailable')
@@ -446,7 +464,8 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
 
         const projectA = deferred<{ total: number; tasks: TaskDTO[] }>()
         listTasksMock.mockImplementation((filter: any) =>
-            filter?.project === 'A' ? projectA.promise : Promise.resolve({ total: 0, tasks: [] }))
+            filter?.project === 'A' ? projectA.promise : Promise.resolve({ total: 0, tasks: [] }),
+        )
 
         await wrapper.find('select.ui-select').setValue('A')
         await flushPromises()
@@ -476,7 +495,7 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
                 makeTask('A-2', { status: 'Todo', due_date: '2025-12-01' }), // overdue
                 makeTask('A-3', { status: 'Todo', due_date: '2026-01-05' }), // due today, not overdue
                 makeTask('A-4', { status: 'Done', due_date: '2026-01-05' }), // terminal due today: still due today
-                makeTask('A-5', { status: 'Todo' }),                          // no due date
+                makeTask('A-5', { status: 'Todo' }), // no due date
             ]
             listTasksMock.mockResolvedValue({ total: tasks.length, tasks })
 
@@ -484,7 +503,7 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
 
             expect(tile('Overdue')).toBe('1')
             const rows = wrapper.findAll('table.distribution tbody tr')
-            const dueRow = (label: string) => rows.find(r => r.text().includes(label))
+            const dueRow = (label: string) => rows.find((r) => r.text().includes(label))
             expect(dueRow('Overdue')?.text()).toContain('1')
             expect(dueRow('Due today')?.text()).toContain('2')
 
@@ -523,14 +542,16 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
             await mountInsights()
 
             const rows = wrapper.findAll('table.distribution tbody tr')
-            const overdueRow = rows.find(r => r.text().includes('Overdue'))
+            const overdueRow = rows.find((r) => r.text().includes('Overdue'))
             expect(overdueRow).toBeTruthy()
             await overdueRow!.trigger('click')
 
-            expect(routerPush).toHaveBeenCalledWith(expect.objectContaining({
-                path: '/',
-                query: expect.objectContaining({ due: 'overdue' }),
-            }))
+            expect(routerPush).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: '/',
+                    query: expect.objectContaining({ due: 'overdue' }),
+                }),
+            )
         } finally {
             vi.useRealTimers()
         }
@@ -560,5 +581,5 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
 })
 
 function nextTickP(): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, 0))
+    return new Promise((resolve) => setTimeout(resolve, 0))
 }

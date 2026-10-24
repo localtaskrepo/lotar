@@ -7,7 +7,7 @@
   </TransitionGroup>
 </template>
 <script setup lang="ts">
-import { toasts } from './toast';
+import { toasts } from './toast'
 </script>
 <style scoped>
 .toast-host {

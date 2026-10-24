@@ -7,11 +7,7 @@
         'chip-field__control--open': composerOpen,
       }"
     >
-      <span
-        v-for="(value, index) in values"
-        :key="`${value}-${index}`"
-        :class="chipWrapperClass"
-      >
+      <span v-for="(value, index) in values" :key="`${value}-${index}`" :class="chipWrapperClass">
         <slot name="chip" :value="value" :index="index">
           <span class="chip-field__chip-label">{{ value }}</span>
         </slot>
@@ -55,7 +51,11 @@
     />
 
     <Transition name="chip-field-composer">
-      <div v-if="!useCustomComposer && composerOpen" class="chip-field__composer" @keyup.esc.stop.prevent="closeComposer">
+      <div
+        v-if="!useCustomComposer && composerOpen"
+        class="chip-field__composer"
+        @keyup.esc.stop.prevent="closeComposer"
+      >
         <label class="chip-field__composer-label">
           <span class="muted">{{ composerLabel }}</span>
           <UiInput
@@ -70,9 +70,7 @@
           <UiButton variant="primary" type="button" :disabled="!canCommit" @click="commitDraft">
             {{ composerConfirmLabel }}
           </UiButton>
-          <UiButton variant="ghost" type="button" @click="closeComposer">
-            Cancel
-          </UiButton>
+          <UiButton variant="ghost" type="button" @click="closeComposer"> Cancel </UiButton>
         </div>
         <div v-if="suggestionsAvailable" class="chip-field__suggestions">
           <p class="chip-field__suggestions-label">Suggestions</p>
@@ -260,7 +258,9 @@ const filteredSuggestions = computed(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
   background: color-mix(in oklab, var(--color-surface) 96%, transparent);
-  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .chip-field__control--open {
@@ -324,7 +324,10 @@ const filteredSuggestions = computed(() => {
   background: transparent;
   color: var(--color-muted);
   cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
 }
 
 .chip-field__add:hover:not(:disabled) {

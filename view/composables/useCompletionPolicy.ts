@@ -36,15 +36,16 @@ export type DoneStatesMode = 'explicit' | 'inferred'
 /** Normalized status key: case/whitespace/separator-insensitive. */
 export function normalizeStatusKey(value: string | null | undefined): string {
     return typeof value === 'string'
-        ? value.trim().toLowerCase().replace(/[\s_-]+/g, '')
+        ? value
+              .trim()
+              .toLowerCase()
+              .replace(/[\s_-]+/g, '')
         : ''
 }
 
 /** Match the server's ASCII case-folding without merging distinct labels. */
 export function completionStatusKey(value: string | null | undefined): string {
-    return typeof value === 'string'
-        ? value.replace(/[A-Z]/g, character => character.toLowerCase())
-        : ''
+    return typeof value === 'string' ? value.replace(/[A-Z]/g, (character) => character.toLowerCase()) : ''
 }
 
 export interface CompletionPolicy {
@@ -78,7 +79,9 @@ const serverCalendarDay = ref('')
 function extractPolicy(prefix: string, config: unknown): CompletionPolicy | null {
     const source = (config ?? {}) as Record<string, any>
     const doneLabels: string[] = Array.isArray(source.effective_done_states)
-        ? source.effective_done_states.map((value: unknown) => String(value)).filter((value: string) => value.trim().length > 0)
+        ? source.effective_done_states
+              .map((value: unknown) => String(value))
+              .filter((value: string) => value.trim().length > 0)
         : []
     // Fail closed: without a server-resolved list we never guess terminal
     // statuses client-side (fixtures may omit the field entirely).
@@ -206,9 +209,7 @@ export function refreshCompletionPolicies(): Promise<void> {
 export function refreshCompletionPoliciesForScope(scope: string): Promise<void> {
     const trimmed = (scope || '').trim()
     if (!trimmed) return refreshCompletionPolicies()
-    const refresh = policyRecords.has(trimmed)
-        ? refreshCompletionPolicy(trimmed)
-        : ensureCompletionPolicy(trimmed)
+    const refresh = policyRecords.has(trimmed) ? refreshCompletionPolicy(trimmed) : ensureCompletionPolicy(trimmed)
     return refresh.then(() => {
         invalidateRetainedTaskQueries()
     })
@@ -426,9 +427,7 @@ export function localDueBucketOf(task: PolicyLikeTask | null | undefined): TaskD
 export function embeddedDoneStatesOf(task: PolicyLikeTask | null | undefined): Set<string> | null {
     const states = task?.task_state?.done_states
     if (!Array.isArray(states)) return null
-    const keys = states
-        .map(completionStatusKey)
-        .filter((key) => key.length > 0)
+    const keys = states.map(completionStatusKey).filter((key) => key.length > 0)
     // An embedded empty set is authoritative fail-closed metadata, not a
     // missing field that permits borrowing a cached neighboring policy.
     return new Set(keys)
@@ -471,7 +470,10 @@ export function taskIsDone(policy: CompletionPolicy | null, task: PolicyLikeTask
  * - Without any state, a local start-of-day derivation is used (explicit
  *   fixture fallback only — never applied to known-stale authoritative DTOs).
  */
-export function resolveDueBucket(policy: CompletionPolicy | null, task: PolicyLikeTask | null | undefined): TaskDueBucket | null {
+export function resolveDueBucket(
+    policy: CompletionPolicy | null,
+    task: PolicyLikeTask | null | undefined,
+): TaskDueBucket | null {
     const state = task?.task_state ?? null
     const doneNow = taskIsDone(policy, task)
 

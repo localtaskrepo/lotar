@@ -34,7 +34,12 @@ vi.mock('../api/client', () => {
             taskHistory: vi.fn().mockResolvedValue([]),
             suggestTasks: vi.fn().mockResolvedValue([]),
             listTasks: vi.fn().mockResolvedValue({ total: 0, limit: 50, offset: 0, tasks: [] }),
-            listProjects: vi.fn().mockResolvedValue({ total: 1, limit: 50, offset: 0, projects: [{ prefix: 'DEMO', name: 'Demo Project' }] }),
+            listProjects: vi.fn().mockResolvedValue({
+                total: 1,
+                limit: 50,
+                offset: 0,
+                projects: [{ prefix: 'DEMO', name: 'Demo Project' }],
+            }),
             projectStats: vi.fn(),
             inspectConfig: vi.fn().mockResolvedValue({
                 effective: { remotes: {} },
@@ -57,7 +62,7 @@ vi.mock('../composables/useProjects', () => {
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
-            refresh: vi.fn(async () => { }),
+            refresh: vi.fn(async () => {}),
         }),
     }
 })
@@ -81,7 +86,7 @@ vi.mock('../composables/useConfig', () => {
                 tags: [] as string[],
                 customFields: { product: '' },
             }),
-            refresh: vi.fn(async () => { }),
+            refresh: vi.fn(async () => {}),
         }),
     }
 })
@@ -128,7 +133,7 @@ vi.mock('../composables/useTaskPanelOwnership', () => {
             commitAssigneeCustom: vi.fn(),
             resetReporterSelection: vi.fn(),
             resetAssigneeSelection: vi.fn(),
-            preloadPeople: vi.fn(async () => { }),
+            preloadPeople: vi.fn(async () => {}),
             resetOwnership: vi.fn(),
             syncOwnershipControls: vi.fn(),
         }),
@@ -138,7 +143,15 @@ vi.mock('../composables/useTaskPanelOwnership', () => {
 vi.mock('../composables/useTaskRelationships', () => {
     return {
         useTaskRelationships: () => ({
-            relationships: { depends_on: '', blocks: '', related: '', children: '', fixes: '', parent: '', duplicate_of: '' },
+            relationships: {
+                depends_on: '',
+                blocks: '',
+                related: '',
+                children: '',
+                fixes: '',
+                parent: '',
+                duplicate_of: '',
+            },
             resetRelationships: vi.fn(),
             buildRelationships: vi.fn(() => ({})),
             applyRelationshipsFromTask: vi.fn(),

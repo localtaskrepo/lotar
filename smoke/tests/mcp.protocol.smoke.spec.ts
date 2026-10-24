@@ -58,10 +58,8 @@ describe.concurrent('MCP framed transport compatibility', () => {
             try {
                 await initializeFramedMcp(client);
 
-                const configA =
-                    `default:\n  project: CLI\nissue:\n  states: [Todo,Doing]\n  priorities: [Low]\n  types: [Feature]\n`;
-                const configB =
-                    `default:\n  project: CLI\nissue:\n  states: [Todo,Doing,Done]\n  priorities: [Low]\n  types: [Feature]\n`;
+                const configA = `default:\n  project: CLI\nissue:\n  states: [Todo,Doing]\n  priorities: [Low]\n  types: [Feature]\n`;
+                const configB = `default:\n  project: CLI\nissue:\n  states: [Todo,Doing,Done]\n  priorities: [Low]\n  types: [Feature]\n`;
 
                 let notification = null;
                 for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -121,10 +119,7 @@ describe.concurrent('MCP framed transport compatibility', () => {
                     });
                 }
 
-                const parseError = await client.readUntil(
-                    (frame) => frame.message?.error?.code === -32700,
-                    20_000,
-                );
+                const parseError = await client.readUntil((frame) => frame.message?.error?.code === -32700, 20_000);
                 expect(parseError.message?.id).toBeNull();
                 expect(parseError.message?.error?.message).toBe('Parse error');
                 expect(String(parseError.message?.error?.data?.details)).toContain('maximum frame size');
@@ -151,17 +146,13 @@ describe.concurrent('MCP framed transport compatibility', () => {
                 await initializeFramedMcp(client);
 
                 await new Promise<void>((resolve, reject) => {
-                    client.childProcess.stdin!.write(
-                        'Content-Length: 100\r\n\r\n{"jsonrpc":"2.0","id":1',
-                        (error) => (error ? reject(error) : resolve()),
+                    client.childProcess.stdin!.write('Content-Length: 100\r\n\r\n{"jsonrpc":"2.0","id":1', (error) =>
+                        error ? reject(error) : resolve(),
                     );
                 });
                 client.childProcess.stdin!.end();
 
-                const parseError = await client.readUntil(
-                    (frame) => frame.message?.error?.code === -32700,
-                    20_000,
-                );
+                const parseError = await client.readUntil((frame) => frame.message?.error?.code === -32700, 20_000);
                 expect(parseError.message?.id).toBeNull();
                 expect(parseError.message?.error?.message).toBe('Parse error');
             } finally {

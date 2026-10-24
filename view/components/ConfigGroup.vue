@@ -14,9 +14,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { ConfigSource } from '../api/types';
-import { provenanceClass, provenanceLabel } from '../utils/provenance';
+import { computed } from 'vue'
+import type { ConfigSource } from '../api/types'
+import { provenanceClass, provenanceLabel } from '../utils/provenance'
 
 const props = defineProps<{
   title: string

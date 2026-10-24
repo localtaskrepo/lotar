@@ -141,12 +141,12 @@ export function buildSprintSchedule(
                 beforeActualStart: actualStartEpoch !== null && cursorEpoch < actualStartEpoch,
                 afterActualEnd: actualEndEpoch !== null && cursorEpoch > actualEndEpoch,
             }
-                ; (schedule[key] ||= []).push(entry)
+            ;(schedule[key] ||= []).push(entry)
         }
     }
 
     for (const key of Object.keys(schedule)) {
-        (schedule[key] ??= []).sort((a, b) => {
+        ;(schedule[key] ??= []).sort((a, b) => {
             const startDiff = a.startDate.getTime() - b.startDate.getTime()
             if (startDiff !== 0) {
                 return startDiff

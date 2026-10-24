@@ -38,7 +38,18 @@ function task(overrides: Partial<TaskDTO>): TaskDTO {
 
 describe('normalizeSortBy', () => {
     it('accepts the CLI builtin sort keys', () => {
-        for (const key of ['priority', 'status', 'effort', 'due', 'created', 'modified', 'assignee', 'type', 'project', 'id']) {
+        for (const key of [
+            'priority',
+            'status',
+            'effort',
+            'due',
+            'created',
+            'modified',
+            'assignee',
+            'type',
+            'project',
+            'id',
+        ]) {
             expect(normalizeSortBy(key)).toBe(key)
         }
     })
@@ -83,7 +94,21 @@ describe('column mapping', () => {
     })
 
     it('maps every builtin table column onto a server sort key', () => {
-        for (const col of ['title', 'tags', 'sprints', 'reporter', 'id', 'status', 'priority', 'task_type', 'assignee', 'effort', 'due_date', 'created', 'modified']) {
+        for (const col of [
+            'title',
+            'tags',
+            'sprints',
+            'reporter',
+            'id',
+            'status',
+            'priority',
+            'task_type',
+            'assignee',
+            'effort',
+            'due_date',
+            'created',
+            'modified',
+        ]) {
             expect(colKeyToSortBy(col)).not.toBeNull()
         }
         expect(colKeyToSortBy('nonexistent-column')).toBeNull()
@@ -143,10 +168,7 @@ describe('custom field values', () => {
     })
 
     it('distinguishes missing from present-but-empty like the backend Option ordering', () => {
-        const tasks = [
-            task({ id: 'A-2', custom_fields: { Risk: '' } }),
-            task({ id: 'A-1' }),
-        ]
+        const tasks = [task({ id: 'A-2', custom_fields: { Risk: '' } }), task({ id: 'A-1' })]
         // Missing (None) sorts before a present empty string (Some("")).
         expect(sortTasks(tasks, 'custom:Risk', 'asc').map((t) => t.id)).toEqual(['A-1', 'A-2'])
     })
@@ -223,11 +245,7 @@ describe('sortTasks', () => {
     })
 
     it('sorts by project prefix of the canonical ID', () => {
-        const tasks = [
-            task({ id: 'ZZ-1' }),
-            task({ id: 'AB-2' }),
-            task({ id: 'AB-1' }),
-        ]
+        const tasks = [task({ id: 'ZZ-1' }), task({ id: 'AB-2' }), task({ id: 'AB-1' })]
         expect(sortTasks(tasks, 'project', 'asc').map((t) => t.id)).toEqual(['AB-1', 'AB-2', 'ZZ-1'])
     })
 

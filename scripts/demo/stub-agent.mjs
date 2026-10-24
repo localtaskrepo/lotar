@@ -68,10 +68,7 @@ const genericSteps = [
 
 const steps = /backoff|retr(y|ies)/i.test(title) ? backoffSteps : genericSteps;
 
-const finalSteps = [
-    '✓ all tests passed',
-    `Done. Changes are on branch agent/${ticket}; ready for review.`,
-];
+const finalSteps = ['✓ all tests passed', `Done. Changes are on branch agent/${ticket}; ready for review.`];
 
 emit({ type: 'system', subtype: 'init', model: 'demo-stub', tools: [] });
 for (const step of steps) {

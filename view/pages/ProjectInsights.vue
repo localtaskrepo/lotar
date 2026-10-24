@@ -1,14 +1,16 @@
 <template>
-  <section class="col" style="gap:16px;">
+  <section class="col" style="gap: 16px">
     <div class="header row insights-header">
-      <div class="col" style="gap:4px;">
+      <div class="col" style="gap: 4px">
         <h1>Insights</h1>
         <p class="muted" v-if="selectedProject">
           Health overview for <strong>{{ projectDisplayName }}</strong>
         </p>
       </div>
       <div class="controls row insights-controls">
-        <a :href="`/dependencies${selectedProject ? '?project=' + encodeURIComponent(selectedProject) : ''}`">Dependencies</a>
+        <a :href="`/dependencies${selectedProject ? '?project=' + encodeURIComponent(selectedProject) : ''}`"
+          >Dependencies</a
+        >
         <div
           v-if="hasSingleProject"
           class="input insights-project-static"
@@ -17,7 +19,7 @@
         >
           <span class="insights-project-static__label">{{ singleProjectLabel }}</span>
         </div>
-        <UiSelect v-else v-model="selectedProject" style="min-width:220px;">
+        <UiSelect v-else v-model="selectedProject" style="min-width: 220px">
           <option value="">All projects</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
@@ -30,17 +32,8 @@
             @keydown="onTagFilterKeydown"
             @input="onTagFilterInput"
           />
-          <ul
-            v-if="tagSuggestionsVisible"
-            class="tag-suggestions"
-            role="listbox"
-            aria-label="Tag suggestions"
-          >
-            <li
-              v-for="(entry, index) in tagSuggestionEntries"
-              :key="entry.value"
-              class="tag-suggestions__item"
-            >
+          <ul v-if="tagSuggestionsVisible" class="tag-suggestions" role="listbox" aria-label="Tag suggestions">
+            <li v-for="(entry, index) in tagSuggestionEntries" :key="entry.value" class="tag-suggestions__item">
               <button
                 type="button"
                 class="tag-suggestion"
@@ -64,14 +57,7 @@
             </li>
           </ul>
         </div>
-        <UiButton
-          v-if="tagFilters.length"
-          variant="ghost"
-          type="button"
-          @click="clearTagFilter"
-        >
-          Clear tags
-        </UiButton>
+        <UiButton v-if="tagFilters.length" variant="ghost" type="button" @click="clearTagFilter"> Clear tags </UiButton>
         <ReloadButton
           :disabled="refreshing"
           :loading="refreshing"
@@ -84,191 +70,201 @@
 
     <UiCard>
       <div class="summary-grid">
-        <div
-          v-for="tile in summaryTiles"
-          :key="tile.label"
-          :class="['summary-tile', { highlight: tile.highlight }]"
-        >
+        <div v-for="tile in summaryTiles" :key="tile.label" :class="['summary-tile', { highlight: tile.highlight }]">
           <span class="summary-label">{{ tile.label }}</span>
           <strong class="summary-value">{{ tile.display }}</strong>
         </div>
       </div>
     </UiCard>
 
-    <div v-if="tasksLoading || refreshing" style="margin: 12px 0;">
+    <div v-if="tasksLoading || refreshing" style="margin: 12px 0">
       <UiLoader>Loading insights…</UiLoader>
     </div>
 
     <template v-else>
-    <div v-if="tasksError && hasTaskSnapshot" class="insights-refresh-error" role="alert">
-      <span class="insights-refresh-error__message">Refresh failed: {{ tasksError }}</span>
-      <UiButton variant="ghost" type="button" :disabled="refreshing" @click="retry">Retry</UiButton>
-    </div>
-    <UiEmptyState
-      v-if="tasksError && !hasTaskSnapshot"
-      title="We couldn't load tasks"
-      :description="tasksError"
-      primary-label="Retry"
-      @primary="retry"
-    />
-    <template v-else>
-    <div v-if="!filteredTasks.length" class="muted" style="padding: 24px; text-align: center;">No tasks match the current filters.</div>
-    <div v-else class="insights-grid">
-        <UiCard>
-          <div class="card-head">
-            <h3>Status distribution</h3>
-            <small class="muted">Click a segment to drill into Tasks</small>
-          </div>
-          <div class="row" style="gap:16px; flex-wrap: wrap; align-items: center;">
-            <PieChart :data="statusPieData" :legend="false" :size="160" @select="onStatusSelect" />
+      <div v-if="tasksError && hasTaskSnapshot" class="insights-refresh-error" role="alert">
+        <span class="insights-refresh-error__message">Refresh failed: {{ tasksError }}</span>
+        <UiButton variant="ghost" type="button" :disabled="refreshing" @click="retry">Retry</UiButton>
+      </div>
+      <UiEmptyState
+        v-if="tasksError && !hasTaskSnapshot"
+        title="We couldn't load tasks"
+        :description="tasksError"
+        primary-label="Retry"
+        @primary="retry"
+      />
+      <template v-else>
+        <div v-if="!filteredTasks.length" class="muted" style="padding: 24px; text-align: center">
+          No tasks match the current filters.
+        </div>
+        <div v-else class="insights-grid">
+          <UiCard>
+            <div class="card-head">
+              <h3>Status distribution</h3>
+              <small class="muted">Click a segment to drill into Tasks</small>
+            </div>
+            <div class="row" style="gap: 16px; flex-wrap: wrap; align-items: center">
+              <PieChart :data="statusPieData" :legend="false" :size="160" @select="onStatusSelect" />
+              <table class="distribution">
+                <tbody>
+                  <tr v-for="item in statusBreakdown" :key="item.label" @click="openTaskList({ status: item.raw })">
+                    <th>{{ item.label }}</th>
+                    <td>{{ item.count }}</td>
+                    <td class="muted">{{ item.percent }}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </UiCard>
+
+          <UiCard>
+            <div class="card-head">
+              <h3>Priority mix</h3>
+              <small class="muted">Breakdown across all tasks in scope</small>
+            </div>
             <table class="distribution">
               <tbody>
-                <tr v-for="item in statusBreakdown" :key="item.label" @click="openTaskList({ status: item.raw })">
+                <tr v-for="item in priorityBreakdown" :key="item.label" @click="openTaskList({ priority: item.raw })">
                   <th>{{ item.label }}</th>
                   <td>{{ item.count }}</td>
                   <td class="muted">{{ item.percent }}%</td>
                 </tr>
+                <tr v-if="!priorityBreakdown.length">
+                  <td colspan="3" class="muted">No priority data</td>
+                </tr>
               </tbody>
             </table>
-          </div>
-        </UiCard>
+          </UiCard>
 
-        <UiCard>
-          <div class="card-head">
-            <h3>Priority mix</h3>
-            <small class="muted">Breakdown across all tasks in scope</small>
-          </div>
-          <table class="distribution">
-            <tbody>
-              <tr v-for="item in priorityBreakdown" :key="item.label" @click="openTaskList({ priority: item.raw })">
-                <th>{{ item.label }}</th>
-                <td>{{ item.count }}</td>
-                <td class="muted">{{ item.percent }}%</td>
-              </tr>
-              <tr v-if="!priorityBreakdown.length"><td colspan="3" class="muted">No priority data</td></tr>
-            </tbody>
-          </table>
-        </UiCard>
-
-        <UiCard>
-          <div class="card-head">
-            <h3>Work types</h3>
-            <small class="muted">Categorised by task type</small>
-          </div>
-          <table class="distribution">
-            <tbody>
-              <tr v-for="item in typeBreakdown" :key="item.label" @click="openTaskList({ type: item.raw })">
-                <th>{{ item.label }}</th>
-                <td>{{ item.count }}</td>
-                <td class="muted">{{ item.percent }}%</td>
-              </tr>
-              <tr v-if="!typeBreakdown.length"><td colspan="3" class="muted">No type data</td></tr>
-            </tbody>
-          </table>
-        </UiCard>
-
-        <UiCard>
-          <div class="card-head">
-            <h3>Assignee load</h3>
-            <small class="muted">Who owns the current work</small>
-          </div>
-          <table class="distribution">
-            <tbody>
-              <tr v-for="item in assigneeBreakdown" :key="item.label" @click="openTaskList({ assignee: item.raw })">
-                <th>{{ item.label }}</th>
-                <td>{{ item.count }}</td>
-                <td class="muted">{{ item.percent }}%</td>
-              </tr>
-              <tr v-if="!assigneeBreakdown.length"><td colspan="3" class="muted">No assignee data</td></tr>
-            </tbody>
-          </table>
-        </UiCard>
-
-        <UiCard class="activity-card">
-          <div class="card-head" style="align-items: flex-start;">
-            <div class="col" style="gap:4px;">
-              <h3>Activity trend</h3>
-              <small class="muted">Tasks updated per day (last {{ windowDays }} days)</small>
+          <UiCard>
+            <div class="card-head">
+              <h3>Work types</h3>
+              <small class="muted">Categorised by task type</small>
             </div>
-            <div class="chart-controls" role="group" aria-label="Select activity window">
-              <UiButton
-                v-for="days in timeWindows"
-                :key="days"
-                variant="ghost"
-                :class="{ active: windowDays === days }"
-                type="button"
-                @click="windowDays = days"
-              >
-                {{ days }}d
-              </UiButton>
+            <table class="distribution">
+              <tbody>
+                <tr v-for="item in typeBreakdown" :key="item.label" @click="openTaskList({ type: item.raw })">
+                  <th>{{ item.label }}</th>
+                  <td>{{ item.count }}</td>
+                  <td class="muted">{{ item.percent }}%</td>
+                </tr>
+                <tr v-if="!typeBreakdown.length">
+                  <td colspan="3" class="muted">No type data</td>
+                </tr>
+              </tbody>
+            </table>
+          </UiCard>
+
+          <UiCard>
+            <div class="card-head">
+              <h3>Assignee load</h3>
+              <small class="muted">Who owns the current work</small>
             </div>
-          </div>
-          <div class="chart-scroll" ref="activityChartHost">
-            <UiLoader v-if="activityFeedLoading" style="margin: 12px 0;">Loading activity…</UiLoader>
-            <div v-else-if="activityFeedError" class="muted" style="padding: 12px 0;">{{ activityFeedError }}</div>
-            <BarChart
-              v-else
-              :series="activitySeries"
-              :width="activityChartRenderWidth"
-              :height="180"
-              :key="activityChartKey"
-            />
-          </div>
-          <div class="muted" style="margin-top:8px;">Average {{ formatDecimal(averageUpdatesPerDay) }} updates / day</div>
-        </UiCard>
+            <table class="distribution">
+              <tbody>
+                <tr v-for="item in assigneeBreakdown" :key="item.label" @click="openTaskList({ assignee: item.raw })">
+                  <th>{{ item.label }}</th>
+                  <td>{{ item.count }}</td>
+                  <td class="muted">{{ item.percent }}%</td>
+                </tr>
+                <tr v-if="!assigneeBreakdown.length">
+                  <td colspan="3" class="muted">No assignee data</td>
+                </tr>
+              </tbody>
+            </table>
+          </UiCard>
 
-        <UiCard>
-          <div class="card-head">
-            <h3>Due date outlook</h3>
-            <small class="muted">Stay ahead of upcoming deadlines</small>
-          </div>
-          <table class="distribution">
-            <tbody>
-              <tr
-                v-for="item in dueDateBreakdown"
-                :key="item.label"
-                :class="{ clickable: item.raw }"
-                @click="item.raw ? openDueFilter(item.raw) : null"
-              >
-                <th>{{ item.label }}</th>
-                <td>{{ item.count }}</td>
-                <td class="muted">{{ item.percent }}%</td>
-              </tr>
-              <tr v-if="!dueDateBreakdown.length"><td colspan="3" class="muted">No due date information</td></tr>
-            </tbody>
-          </table>
-        </UiCard>
+          <UiCard class="activity-card">
+            <div class="card-head" style="align-items: flex-start">
+              <div class="col" style="gap: 4px">
+                <h3>Activity trend</h3>
+                <small class="muted">Tasks updated per day (last {{ windowDays }} days)</small>
+              </div>
+              <div class="chart-controls" role="group" aria-label="Select activity window">
+                <UiButton
+                  v-for="days in timeWindows"
+                  :key="days"
+                  variant="ghost"
+                  :class="{ active: windowDays === days }"
+                  type="button"
+                  @click="windowDays = days"
+                >
+                  {{ days }}d
+                </UiButton>
+              </div>
+            </div>
+            <div class="chart-scroll" ref="activityChartHost">
+              <UiLoader v-if="activityFeedLoading" style="margin: 12px 0">Loading activity…</UiLoader>
+              <div v-else-if="activityFeedError" class="muted" style="padding: 12px 0">{{ activityFeedError }}</div>
+              <BarChart
+                v-else
+                :series="activitySeries"
+                :width="activityChartRenderWidth"
+                :height="180"
+                :key="activityChartKey"
+              />
+            </div>
+            <div class="muted" style="margin-top: 8px">
+              Average {{ formatDecimal(averageUpdatesPerDay) }} updates / day
+            </div>
+          </UiCard>
 
-        <UiCard v-if="!selectedProject">
-          <div class="card-head">
-            <h3>Projects overview</h3>
-            <small class="muted">Quick snapshot across teams</small>
-          </div>
-          <table class="distribution">
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Active</th>
-                <th>Last update</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="summary in projectSummaries" :key="summary.prefix">
-                <th style="font-weight:600;">
-                  <button class="link-btn" type="button" @click="selectProject(summary.prefix)">
-                    {{ summary.name }}
-                  </button>
-                  <div class="muted">{{ summary.prefix }}</div>
-                </th>
-                <td>{{ summary.open_count }}</td>
-                <td>{{ summary.last_update }}</td>
-              </tr>
-              <tr v-if="!projectSummaries.length"><td colspan="3" class="muted">No projects available</td></tr>
-            </tbody>
-          </table>
-        </UiCard>
-      </div>
-    </template>
+          <UiCard>
+            <div class="card-head">
+              <h3>Due date outlook</h3>
+              <small class="muted">Stay ahead of upcoming deadlines</small>
+            </div>
+            <table class="distribution">
+              <tbody>
+                <tr
+                  v-for="item in dueDateBreakdown"
+                  :key="item.label"
+                  :class="{ clickable: item.raw }"
+                  @click="item.raw ? openDueFilter(item.raw) : null"
+                >
+                  <th>{{ item.label }}</th>
+                  <td>{{ item.count }}</td>
+                  <td class="muted">{{ item.percent }}%</td>
+                </tr>
+                <tr v-if="!dueDateBreakdown.length">
+                  <td colspan="3" class="muted">No due date information</td>
+                </tr>
+              </tbody>
+            </table>
+          </UiCard>
+
+          <UiCard v-if="!selectedProject">
+            <div class="card-head">
+              <h3>Projects overview</h3>
+              <small class="muted">Quick snapshot across teams</small>
+            </div>
+            <table class="distribution">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Active</th>
+                  <th>Last update</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="summary in projectSummaries" :key="summary.prefix">
+                  <th style="font-weight: 600">
+                    <button class="link-btn" type="button" @click="selectProject(summary.prefix)">
+                      {{ summary.name }}
+                    </button>
+                    <div class="muted">{{ summary.prefix }}</div>
+                  </th>
+                  <td>{{ summary.open_count }}</td>
+                  <td>{{ summary.last_update }}</td>
+                </tr>
+                <tr v-if="!projectSummaries.length">
+                  <td colspan="3" class="muted">No projects available</td>
+                </tr>
+              </tbody>
+            </table>
+          </UiCard>
+        </div>
+      </template>
     </template>
   </section>
 </template>
@@ -354,7 +350,7 @@ const tasksBase = computed<TaskDTO[]>(() => taskQueryHandle.value?.tasks.value ?
 // tasks are never overdue; due-today is not overdue).
 const completion = useCompletionPolicy({ tasks: () => tasksBase.value })
 const tagFilters = computed<string[]>(() => parseTagInput(tagFilterInput.value))
-const tagFiltersNormalized = computed<string[]>(() => tagFilters.value.map(tag => normaliseTag(tag)))
+const tagFiltersNormalized = computed<string[]>(() => tagFilters.value.map((tag) => normaliseTag(tag)))
 
 const tagInputFocused = ref(false)
 let tagBlurTimer: ReturnType<typeof setTimeout> | null = null
@@ -362,18 +358,18 @@ const TAG_SUGGESTION_LIMIT = 8
 
 const tagSuggestionCandidates = computed(() => {
   const map = new Map<string, string>()
-  tasksBase.value.forEach(task => {
-    (task.tags || []).forEach(tag => {
+  tasksBase.value.forEach((task) => {
+    ;(task.tags || []).forEach((tag) => {
       const trimmed = (tag || '').trim()
       if (!trimmed) return
       const key = trimmed.toLowerCase()
       if (!map.has(key)) map.set(key, trimmed)
     })
   })
-  if (tasksBase.value.some(task => !task.tags || !(task.tags.length))) {
+  if (tasksBase.value.some((task) => !task.tags || !task.tags.length)) {
     map.set('untagged', 'Untagged')
   }
-  ;(projectStats.value?.tags_top || []).forEach(tag => {
+  ;(projectStats.value?.tags_top || []).forEach((tag) => {
     const trimmed = (tag || '').trim()
     if (!trimmed) return
     const key = trimmed.toLowerCase()
@@ -385,7 +381,7 @@ const tagSuggestionCandidates = computed(() => {
 const availableTagSuggestions = computed(() => {
   if (!tagSuggestionCandidates.value.length) return [] as string[]
   const selected = new Set(tagFiltersNormalized.value)
-  return tagSuggestionCandidates.value.filter(tag => !selected.has(normaliseTag(tag)))
+  return tagSuggestionCandidates.value.filter((tag) => !selected.has(normaliseTag(tag)))
 })
 
 const activeTagQuery = computed(() => {
@@ -463,14 +459,14 @@ function updateActivityChartWidth(widthOverride?: number) {
   activityChartWidth.value = Math.max(1, Math.floor(measured))
 }
 
-watch(activityChartHost, el => {
+watch(activityChartHost, (el) => {
   if (el) {
     updateActivityChartWidth()
   }
 })
 const projectDisplayName = computed(() => {
   if (!selectedProject.value) return 'All projects'
-  const project = projects.value.find(p => p.prefix === selectedProject.value)
+  const project = projects.value.find((p) => p.prefix === selectedProject.value)
   return project ? project.name : selectedProject.value
 })
 
@@ -486,9 +482,9 @@ watchEffect(() => {
 
 const filteredTasks = computed(() => {
   if (!tagFiltersNormalized.value.length) return tasksBase.value
-  const requiredTags = tagFiltersNormalized.value.filter(tag => tag !== 'untagged')
-  return tasksBase.value.filter(task => {
-    const tags = (task.tags || []).map(tag => normaliseTag(tag)).filter(tag => tag.length > 0)
+  const requiredTags = tagFiltersNormalized.value.filter((tag) => tag !== 'untagged')
+  return tasksBase.value.filter((task) => {
+    const tags = (task.tags || []).map((tag) => normaliseTag(tag)).filter((tag) => tag.length > 0)
     if (!requiredTags.length) return tags.length === 0
     return requiredTags.every((filterTag: string) => tags.includes(filterTag))
   })
@@ -497,22 +493,48 @@ const filteredTasks = computed(() => {
 const totalTasks = computed(() => filteredTasks.value.length)
 const uniqueStatusCount = computed(() => {
   const set = new Set<string>()
-  filteredTasks.value.forEach(task => set.add((task.status || 'Unspecified').trim().toLowerCase()))
+  filteredTasks.value.forEach((task) => set.add((task.status || 'Unspecified').trim().toLowerCase()))
   return set.size
 })
-const assignedTasks = computed(() => filteredTasks.value.filter(t => !!t.assignee).length)
-const unassignedTasks = computed(() => filteredTasks.value.filter(t => !t.assignee).length)
-const taggedTasks = computed(() => filteredTasks.value.filter(t => (t.tags || []).length > 0).length)
-const overdueTasks = computed(() => filteredTasks.value.filter(t => completion.isTaskOverdue(t)).length)
+const assignedTasks = computed(() => filteredTasks.value.filter((t) => !!t.assignee).length)
+const unassignedTasks = computed(() => filteredTasks.value.filter((t) => !t.assignee).length)
+const taggedTasks = computed(() => filteredTasks.value.filter((t) => (t.tags || []).length > 0).length)
+const overdueTasks = computed(() => filteredTasks.value.filter((t) => completion.isTaskOverdue(t)).length)
 
-const noDueDateTasks = computed(() => filteredTasks.value.filter(t => !t.due_date).length)
+const noDueDateTasks = computed(() => filteredTasks.value.filter((t) => !t.due_date).length)
 
-const statusBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => normaliseLabel(t.status), t => t.status || ''))
-const priorityBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => normaliseLabel(t.priority), t => t.priority || ''))
-const typeBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => normaliseLabel(t.task_type), t => t.task_type || ''))
-const assigneeBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => (t.assignee ? formatMember(t.assignee) : 'Unassigned'), t => t.assignee || ''))
+const statusBreakdown = computed(() =>
+  buildBreakdown(
+    filteredTasks.value,
+    (t) => normaliseLabel(t.status),
+    (t) => t.status || '',
+  ),
+)
+const priorityBreakdown = computed(() =>
+  buildBreakdown(
+    filteredTasks.value,
+    (t) => normaliseLabel(t.priority),
+    (t) => t.priority || '',
+  ),
+)
+const typeBreakdown = computed(() =>
+  buildBreakdown(
+    filteredTasks.value,
+    (t) => normaliseLabel(t.task_type),
+    (t) => t.task_type || '',
+  ),
+)
+const assigneeBreakdown = computed(() =>
+  buildBreakdown(
+    filteredTasks.value,
+    (t) => (t.assignee ? formatMember(t.assignee) : 'Unassigned'),
+    (t) => t.assignee || '',
+  ),
+)
 
-const statusPieData = computed(() => statusBreakdown.value.map(item => ({ label: item.label, value: item.count, raw: item.raw })))
+const statusPieData = computed(() =>
+  statusBreakdown.value.map((item) => ({ label: item.label, value: item.count, raw: item.raw })),
+)
 
 const activitySeries = computed(() => {
   const now = new Date()
@@ -520,18 +542,18 @@ const activitySeries = computed(() => {
   start.setDate(now.getDate() - (windowDays.value - 1))
   const startIso = isoDay(start)
   const endIso = isoDay(now)
-  const visibleTasks = new Set(filteredTasks.value.map(task => task.id))
+  const visibleTasks = new Set(filteredTasks.value.map((task) => task.id))
   const dayBuckets = new Map<string, Record<string, number>>()
 
-  activityFeed.value.forEach(item => {
+  activityFeed.value.forEach((item) => {
     if (!visibleTasks.has(item.task_id)) return
-    item.history.forEach(entry => {
+    item.history.forEach((entry) => {
       const entryDate = new Date(entry.at)
       if (Number.isNaN(entryDate.getTime())) return
       const iso = isoDay(entryDate)
       if (iso < startIso || iso > endIso) return
       const bucket = dayBuckets.get(iso) ?? {}
-      entry.changes.forEach(change => {
+      entry.changes.forEach((change) => {
         const kind = (change.kind || 'other').toLowerCase()
         bucket[kind] = (bucket[kind] ?? 0) + 1
       })
@@ -547,35 +569,39 @@ const activitySeries = computed(() => {
     const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     const breakdown = dayBuckets.get(iso) ?? {}
     const total = Object.values(breakdown).reduce((sum, value) => sum + value, 0)
-  series.push({ key: label, total, count: total, breakdown: { ...breakdown } })
+    series.push({ key: label, total, count: total, breakdown: { ...breakdown } })
   }
   return series
 })
 
 const totalActivityInWindow = computed(() => activitySeries.value.reduce((acc, item) => acc + item.total, 0))
 const averageUpdatesPerDay = computed(() => (windowDays.value ? totalActivityInWindow.value / windowDays.value : 0))
-const activityChartKey = computed(() => [
-  selectedProject.value || 'all',
-  windowDays.value,
-  tagFiltersNormalized.value.join('|') || 'none',
-  filteredTasks.value.length,
-  activityFeed.value.length,
-  totalActivityInWindow.value,
-].join(':'))
+const activityChartKey = computed(() =>
+  [
+    selectedProject.value || 'all',
+    windowDays.value,
+    tagFiltersNormalized.value.join('|') || 'none',
+    filteredTasks.value.length,
+    activityFeed.value.length,
+    totalActivityInWindow.value,
+  ].join(':'),
+)
 const activityChartRenderWidth = computed(() => {
   const width = Math.round(activityChartWidth.value)
   return width > 0 ? width : 320
 })
 
-const projectSummaries = computed(() => projects.value.map((project: ProjectDTO) => {
-  const stats = projectStatsMap[project.prefix]
-  return {
-    prefix: project.prefix,
-    name: project.name,
-    open_count: stats?.open_count ?? 0,
-    last_update: formatRelativeTimestamp(stats?.recent_modified ?? null),
-  }
-}))
+const projectSummaries = computed(() =>
+  projects.value.map((project: ProjectDTO) => {
+    const stats = projectStatsMap[project.prefix]
+    return {
+      prefix: project.prefix,
+      name: project.name,
+      open_count: stats?.open_count ?? 0,
+      last_update: formatRelativeTimestamp(stats?.recent_modified ?? null),
+    }
+  }),
+)
 
 const lastUpdatedText = computed(() => {
   if (!lastUpdated.value) return '—'
@@ -602,7 +628,7 @@ const dueDateBreakdown = computed(() => {
   let dueSoon = 0
   let dueLater = 0
   let missing = 0
-  filteredTasks.value.forEach(task => {
+  filteredTasks.value.forEach((task) => {
     if (!task.due_date) {
       missing += 1
       return
@@ -642,8 +668,8 @@ const dueDateBreakdown = computed(() => {
     { label: 'No due date', count: missing, raw: 'missing' },
   ]
   return rows
-    .filter(row => row.count > 0)
-    .map(row => ({ ...row, percent: total ? Math.round((row.count / total) * 100) : 0 }))
+    .filter((row) => row.count > 0)
+    .map((row) => ({ ...row, percent: total ? Math.round((row.count / total) * 100) : 0 }))
 })
 
 function onTagFilterFocus() {
@@ -693,7 +719,7 @@ function currentTagTokens() {
   if (!parts.length) return [] as string[]
   const trailingEmpty = raw.trim().endsWith(',')
   const tokens = trailingEmpty ? parts : parts.slice(0, -1)
-  return tokens.map(part => part.trim()).filter(part => part.length > 0)
+  return tokens.map((part) => part.trim()).filter((part) => part.length > 0)
 }
 
 function selectTagSuggestion(tag: string) {
@@ -715,8 +741,8 @@ function openDueFilter(key: string) {
 function parseTagInput(input: string): string[] {
   return input
     .split(/[\s,]+/)
-    .map(segment => segment.trim())
-    .filter(segment => segment.length > 0)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
 }
 
 function normaliseTag(tag: string): string {
@@ -725,7 +751,7 @@ function normaliseTag(tag: string): string {
 
 function normaliseLabel(value?: string | null) {
   if (!value) return 'Unspecified'
-  return value.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function isoDay(date: Date) {
@@ -738,9 +764,14 @@ function toBreakdownArray(map: Record<string, number>, denominator: number) {
     .sort((a, b) => b.count - a.count)
 }
 
-function buildBreakdown(tasksArray: TaskDTO[], labelFor: (task: TaskDTO) => string, rawFor: (task: TaskDTO) => string, limit = 12) {
+function buildBreakdown(
+  tasksArray: TaskDTO[],
+  labelFor: (task: TaskDTO) => string,
+  rawFor: (task: TaskDTO) => string,
+  limit = 12,
+) {
   const counts: Record<string, { count: number; raw: string }> = {}
-  tasksArray.forEach(task => {
+  tasksArray.forEach((task) => {
     const label = labelFor(task)
     const raw = rawFor(task)
     if (!counts[label]) counts[label] = { count: 0, raw }
@@ -821,7 +852,7 @@ async function refreshActivityFeedWindow() {
 function applyTagFilters(next: string[]) {
   const deduped: string[] = []
   const seen = new Set<string>()
-  next.forEach(tag => {
+  next.forEach((tag) => {
     const trimmed = tag.trim()
     if (!trimmed) return
     const normalised = normaliseTag(trimmed)
@@ -869,19 +900,20 @@ async function loadSelectedProjectStats(generation: number) {
 
 async function ensureProjectStatsMap(opts: { force?: boolean } = {}) {
   if (insightsDisposed) return
-  const prefixes = (opts.force
-    ? projects.value.map(project => project.prefix)
-    : projects.value.filter(project => !projectStatsMap[project.prefix]).map(project => project.prefix)
-  )
+  const prefixes = opts.force
+    ? projects.value.map((project) => project.prefix)
+    : projects.value.filter((project) => !projectStatsMap[project.prefix]).map((project) => project.prefix)
   if (!prefixes.length) return
-  await Promise.all(prefixes.map(async prefix => {
-    try {
-      await fetchProjectStats(prefix)
-    } catch (error: any) {
-      if (insightsDisposed) return
-      showToast(error?.message || `Failed to load stats for ${prefix}`)
-    }
-  }))
+  await Promise.all(
+    prefixes.map(async (prefix) => {
+      try {
+        await fetchProjectStats(prefix)
+      } catch (error: any) {
+        if (insightsDisposed) return
+        showToast(error?.message || `Failed to load stats for ${prefix}`)
+      }
+    }),
+  )
 }
 
 function openTaskList(filters: Record<string, string | string[]>) {
@@ -916,17 +948,17 @@ const routeProject = computed(() => {
 
 const routeTags = computed(() => {
   const value = route.query.tags
-  const values = Array.isArray(value) ? value : (typeof value === 'string' ? value.split(',') : [])
+  const values = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : []
   return values
-    .map(entry => decodeURIComponent(String(entry)))
-    .map(tag => tag.trim())
-    .filter(tag => tag.length > 0)
+    .map((entry) => decodeURIComponent(String(entry)))
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0)
 })
 
 function haveSameTags(a: string[], b: string[]) {
   if (a.length !== b.length) return false
-  const left = [...a].map(tag => normaliseTag(tag)).sort()
-  const right = [...b].map(tag => normaliseTag(tag)).sort()
+  const left = [...a].map((tag) => normaliseTag(tag)).sort()
+  const right = [...b].map((tag) => normaliseTag(tag)).sort()
   return left.every((value, index) => value === right[index])
 }
 
@@ -947,24 +979,24 @@ async function syncRoute() {
   await router.replace({ path: '/insights', query })
 }
 
-watch(routeProject, value => {
+watch(routeProject, (value) => {
   if (!mounted.value) return
   if (value !== selectedProject.value) selectedProject.value = value
 })
 
-watch(routeTags, value => {
+watch(routeTags, (value) => {
   if (!mounted.value) return
   if (haveSameTags(value, tagFilters.value)) return
   applyTagFilters(value)
 })
 
-watch(selectedProject, async value => {
+watch(selectedProject, async (value) => {
   if (!mounted.value) return
   await syncRoute()
   await refreshData()
 })
 
-watch(tagFilters, async value => {
+watch(tagFilters, async (value) => {
   if (!mounted.value) return
   if (haveSameTags(value, routeTags.value)) return
   await syncRoute()
@@ -1018,8 +1050,8 @@ onMounted(async () => {
   await nextTick()
   updateActivityChartWidth()
   if (typeof window !== 'undefined' && typeof ResizeObserver !== 'undefined') {
-    activityResizeObserver = new ResizeObserver(entries => {
-      entries.forEach(entry => {
+    activityResizeObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
         if (entry.target === activityChartHost.value) {
           updateActivityChartWidth(entry.contentRect?.width)
         }
@@ -1032,8 +1064,12 @@ onMounted(async () => {
 })
 </script>
 <style scoped>
-.header h1 { margin: 0; }
-.controls button { white-space: nowrap; }
+.header h1 {
+  margin: 0;
+}
+.controls button {
+  white-space: nowrap;
+}
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1202,9 +1238,15 @@ onMounted(async () => {
   text-align: left;
   border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
 }
-.distribution tr { cursor: pointer; }
-.distribution tr:not(.clickable) { cursor: default; }
-.distribution tr:hover { background: color-mix(in oklab, var(--bg) 75%, transparent); }
+.distribution tr {
+  cursor: pointer;
+}
+.distribution tr:not(.clickable) {
+  cursor: default;
+}
+.distribution tr:hover {
+  background: color-mix(in oklab, var(--bg) 75%, transparent);
+}
 .tag-cloud {
   display: flex;
   flex-wrap: wrap;
@@ -1258,7 +1300,9 @@ onMounted(async () => {
   max-height: 220px;
   overflow-y: auto;
 }
-.tag-suggestions__item + .tag-suggestions__item { margin-top: 2px; }
+.tag-suggestions__item + .tag-suggestions__item {
+  margin-top: 2px;
+}
 .tag-suggestion {
   width: 100%;
   text-align: left;
@@ -1293,5 +1337,7 @@ onMounted(async () => {
   color: var(--color-accent);
   cursor: pointer;
 }
-.link-btn:hover { text-decoration: underline; }
+.link-btn:hover {
+  text-decoration: underline;
+}
 </style>

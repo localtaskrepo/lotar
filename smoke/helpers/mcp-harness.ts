@@ -59,10 +59,7 @@ export interface InitializeMcpOptions {
     readonly clientInfo?: Record<string, unknown>;
 }
 
-export async function initializeMcp(
-    client: McpClientLike,
-    options: InitializeMcpOptions = {},
-): Promise<any> {
+export async function initializeMcp(client: McpClientLike, options: InitializeMcpOptions = {}): Promise<any> {
     const initializeId = nextMcpRequestId('init');
     await client.send({
         jsonrpc: '2.0',
@@ -177,9 +174,7 @@ export function toolErrorText(message: any): string {
 
 export function expectLifecycleRejection(message: any): void {
     if (!message?.error) {
-        throw new Error(
-            `Expected the server to reject a pre-ready request, received: ${JSON.stringify(message)}`,
-        );
+        throw new Error(`Expected the server to reject a pre-ready request, received: ${JSON.stringify(message)}`);
     }
     if (message.result !== undefined) {
         throw new Error(`Expected no result on a pre-ready rejection: ${JSON.stringify(message)}`);
@@ -196,7 +191,9 @@ export function expectProtocolError(message: any, code: number, ...substrings: s
         throw new Error(`Expected a JSON-RPC protocol error, received: ${JSON.stringify(message)}`);
     }
     if (message.error.code !== code) {
-        throw new Error(`Expected protocol error code ${code}, received ${message.error.code}: ${message.error.message}`);
+        throw new Error(
+            `Expected protocol error code ${code}, received ${message.error.code}: ${message.error.message}`,
+        );
     }
     const text = toolErrorText(message);
     for (const substring of substrings) {
@@ -208,7 +205,9 @@ export function expectProtocolError(message: any, code: number, ...substrings: s
 
 export function expectToolFailure(message: any, ...substrings: string[]): void {
     if (message?.error) {
-        throw new Error(`Expected a tool-execution failure (result.isError), received a protocol error: ${JSON.stringify(message.error)}`);
+        throw new Error(
+            `Expected a tool-execution failure (result.isError), received a protocol error: ${JSON.stringify(message.error)}`,
+        );
     }
     if (message?.result?.isError !== true) {
         throw new Error(`Expected result.isError=true, received: ${JSON.stringify(message?.result ?? message)}`);

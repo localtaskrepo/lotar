@@ -4,10 +4,7 @@
       <div class="field field--full">
         <label class="field-label">
           <span>Signal words</span>
-          <span
-            v-if="signalWordsSource"
-            :class="['provenance', provenanceClass(signalWordsSource)]"
-          >
+          <span v-if="signalWordsSource" :class="['provenance', provenanceClass(signalWordsSource)]">
             {{ provenanceLabel(signalWordsSource) }}
           </span>
         </label>
@@ -26,10 +23,7 @@
       <div class="field field--full">
         <label class="field-label">
           <span>Ticket patterns</span>
-          <span
-            v-if="ticketPatternsSource"
-            :class="['provenance', provenanceClass(ticketPatternsSource)]"
-          >
+          <span v-if="ticketPatternsSource" :class="['provenance', provenanceClass(ticketPatternsSource)]">
             {{ provenanceLabel(ticketPatternsSource) }}
           </span>
         </label>
@@ -89,10 +83,7 @@ type ToggleOption = { value: ToggleValue; label: string }
 
 type ValidateField = 'scan_signal_words' | 'scan_ticket_patterns'
 
-type ToggleFieldMap =
-  | 'scanEnableTicketWords'
-  | 'scanEnableMentions'
-  | 'scanStripAttributes'
+type ToggleFieldMap = 'scanEnableTicketWords' | 'scanEnableMentions' | 'scanStripAttributes'
 
 const scanSignalWords = defineModel<string[]>('scanSignalWords', { required: true })
 const scanTicketPatterns = defineModel<string[]>('scanTicketPatterns', { required: true })
@@ -122,6 +113,4 @@ const emit = defineEmits<{
 function handleUpdate(field: ValidateField) {
   emit('validate', field)
 }
-
 </script>
-

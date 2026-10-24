@@ -6,7 +6,9 @@
         <span v-if="sourceLabel" class="provenance" :class="sourceClass">{{ sourceLabel }}</span>
       </div>
       <div class="alias-actions">
-        <UiButton v-if="showClear" variant="ghost" type="button" class="alias-action" @click="$emit('clear')">{{ clearLabel }}</UiButton>
+        <UiButton v-if="showClear" variant="ghost" type="button" class="alias-action" @click="$emit('clear')">{{
+          clearLabel
+        }}</UiButton>
         <UiButton variant="ghost" type="button" class="alias-action" @click="$emit('add')">
           <IconGlyph name="plus" aria-hidden="true" />
           <span>{{ addLabel }}</span>
@@ -43,7 +45,14 @@
           :aria-label="`${title}: maps to ${index + 1}`"
           @blur="onFieldBlur"
         />
-        <UiButton icon-only variant="ghost" type="button" aria-label="Remove alias" title="Remove alias" @click="$emit('remove', index)">
+        <UiButton
+          icon-only
+          variant="ghost"
+          type="button"
+          aria-label="Remove alias"
+          title="Remove alias"
+          @click="$emit('remove', index)"
+        >
           <IconGlyph name="close" />
         </UiButton>
       </div>

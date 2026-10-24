@@ -6,8 +6,7 @@ describe.concurrent('MCP tools/call result shape', () => {
     it('returns top-level content arrays for VS Code clients', async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: {
-                '.tasks/config.yml':
-                    `default:\n  project: CLI\nissue:\n  states: [Todo]\n  priorities: [Low]\n  types: [Feature]\n`,
+                '.tasks/config.yml': `default:\n  project: CLI\nissue:\n  states: [Todo]\n  priorities: [Low]\n  types: [Feature]\n`,
             },
         });
 

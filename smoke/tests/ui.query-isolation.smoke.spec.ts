@@ -96,9 +96,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
             /** Waits until at least `minTotal` list requests were observed and
              * none is still in flight (a pending response is not a hydration). */
             async settle(minTotal: number) {
-                await expect
-                    .poll(() => pending.size === 0 && urls.length >= minTotal, { timeout: 15_000 })
-                    .toBe(true);
+                await expect.poll(() => pending.size === 0 && urls.length >= minTotal, { timeout: 15_000 }).toBe(true);
             },
             /**
              * Waits for the next authoritative list refresh after an API
@@ -107,9 +105,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
              * passes, no manual refresh).
              */
             async waitForNextRequest(afterCount: number) {
-                await expect
-                    .poll(() => urls.length, { timeout: 15_000 })
-                    .toBeGreaterThan(afterCount);
+                await expect.poll(() => urls.length, { timeout: 15_000 }).toBeGreaterThan(afterCount);
                 await this.settle(urls.length);
             },
         };
@@ -178,18 +174,14 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                         timeout: 15_000,
                     });
                     await expect.poll(() => page.locator('h1').textContent()).toContain('(2)');
-                    await expect
-                        .poll(() => page.locator('tbody tr', { hasText: 'Dev65 base anchor' }).count())
-                        .toBe(0);
+                    await expect.poll(() => page.locator('tbody tr', { hasText: 'Dev65 base anchor' }).count()).toBe(0);
 
                     // Exact request scoping: every observed list query stayed
                     // project-scoped — the SSE refresh never broadened BASE.
                     expect(lists.countWith('project', basePrefix)).toBeGreaterThan(0);
                     expect(lists.countWith('project', freshPrefix)).toBeGreaterThan(0);
                     for (const url of lists.urls) {
-                        expect([basePrefix, freshPrefix, null]).toContain(
-                            new URL(url).searchParams.get('project'),
-                        );
+                        expect([basePrefix, freshPrefix, null]).toContain(new URL(url).searchParams.get('project'));
                     }
                 });
             } finally {
@@ -248,10 +240,9 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                         const refreshButton = page.getByRole('button', { name: 'Refresh tasks' });
                         for (let attempt = 0; attempt < 3 && held.length === 0; attempt += 1) {
                             await expect
-                                .poll(
-                                    async () => held.length > 0 || (await refreshButton.isEnabled()),
-                                    { timeout: 10_000 },
-                                )
+                                .poll(async () => held.length > 0 || (await refreshButton.isEnabled()), {
+                                    timeout: 10_000,
+                                })
                                 .toBe(true);
                             if (held.length > 0) break;
                             try {
@@ -354,9 +345,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     const tagsInput = await openFilterPanel(page);
                     await tagsInput.fill('tags=flux');
                     await tagsInput.press('Enter');
-                    await expect
-                        .poll(() => lists.countWith('tags', 'flux'), { timeout: 10_000 })
-                        .toBeGreaterThan(0);
+                    await expect.poll(() => lists.countWith('tags', 'flux'), { timeout: 10_000 }).toBeGreaterThan(0);
                     await lists.settle(lists.urls.length);
                     await page.waitForSelector('tbody tr:has-text("Dev65 flux amy done")', { timeout: 15_000 });
                     await expect
@@ -368,9 +357,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     let seen = lists.urls.length;
                     await apiMutate(server, '/api/tasks/update', { id: keeper.id, tags: [] });
                     await lists.waitForNextRequest(seen);
-                    await expect
-                        .poll(() => page.locator('tbody tr', { hasText: 'Dev65 flux keeper' }).count())
-                        .toBe(0);
+                    await expect.poll(() => page.locator('tbody tr', { hasText: 'Dev65 flux keeper' }).count()).toBe(0);
                     await expect.poll(() => page.locator('h1').textContent()).toContain('(1)');
 
                     // Incoming: the entrant gains the tag on disk.
@@ -384,9 +371,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     const search = page.locator('[data-testid="filter-search"]');
                     await search.fill('assignee:amy');
                     await search.press('Enter');
-                    await expect
-                        .poll(() => lists.countWith('assignee', 'amy'), { timeout: 10_000 })
-                        .toBeGreaterThan(0);
+                    await expect.poll(() => lists.countWith('assignee', 'amy'), { timeout: 10_000 }).toBeGreaterThan(0);
                     await lists.settle(lists.urls.length);
                     await page.waitForSelector('tbody tr:has-text("Dev65 flux amy done")', { timeout: 15_000 });
                     await expect
@@ -411,13 +396,8 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     await page.waitForSelector('tbody tr:has-text("Dev65 flux amy done")', { timeout: 15_000 });
                     await lists.settle(lists.urls.length);
                     await page.click('[data-testid="filter-status"]');
-                    await page
-                        .locator('.filter-bar__menu-item', { hasText: 'Todo' })
-                        .locator('input')
-                        .check();
-                    await expect
-                        .poll(() => lists.countWith('status', 'Todo'), { timeout: 10_000 })
-                        .toBeGreaterThan(0);
+                    await page.locator('.filter-bar__menu-item', { hasText: 'Todo' }).locator('input').check();
+                    await expect.poll(() => lists.countWith('status', 'Todo'), { timeout: 10_000 }).toBeGreaterThan(0);
                     await lists.settle(lists.urls.length);
                     await page.waitForSelector('tbody tr:has-text("Dev65 flux keeper")', { timeout: 15_000 });
                     await page.waitForSelector('tbody tr:has-text("Dev65 flux entrant")', { timeout: 15_000 });
@@ -430,9 +410,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     seen = lists.urls.length;
                     await apiMutate(server, '/api/tasks/update', { id: keeper.id, status: 'Done' });
                     await lists.waitForNextRequest(seen);
-                    await expect
-                        .poll(() => page.locator('tbody tr', { hasText: 'Dev65 flux keeper' }).count())
-                        .toBe(0);
+                    await expect.poll(() => page.locator('tbody tr', { hasText: 'Dev65 flux keeper' }).count()).toBe(0);
                     await expect.poll(() => page.locator('h1').textContent()).toContain('(1)');
                     await page.waitForSelector('tbody tr:has-text("Dev65 flux entrant")', { timeout: 15_000 });
                 });
@@ -515,11 +493,11 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     await expect
                         .poll(() => page.locator('[data-status] article', { hasText: 'Dev65 board keeper' }).count())
                         .toBe(0);
-                    await expect
-                        .poll(() => page.locator('[data-status="Todo"] article').count())
-                        .toBe(1);
+                    await expect.poll(() => page.locator('[data-status="Todo"] article').count()).toBe(1);
                     expect(
-                        await page.locator('[data-status="Done"] article', { hasText: 'Dev65 board done card' }).count(),
+                        await page
+                            .locator('[data-status="Done"] article', { hasText: 'Dev65 board done card' })
+                            .count(),
                     ).toBe(1);
 
                     // The whole sequence stayed live: no refresh failure was
@@ -557,10 +535,9 @@ describe('UI DEV-65 query isolation and live convergence', () => {
             try {
                 await withPage(`${server.url}/calendar?project=BASE`, async (page) => {
                     const lists = trackListRequests(page);
-                    await page.waitForSelector(
-                        `[data-date="${today}"] .task-item:has-text("Dev65 calendar anchor")`,
-                        { timeout: 20_000 },
-                    );
+                    await page.waitForSelector(`[data-date="${today}"] .task-item:has-text("Dev65 calendar anchor")`, {
+                        timeout: 20_000,
+                    });
                     await lists.settle(1);
 
                     // Filter to one tag set; the other task must not render.
@@ -593,9 +570,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     // stable, row-less background.
                     const banner = page.locator('.refresh-error');
                     await banner.waitFor({ state: 'visible', timeout: 15_000 });
-                    await expect
-                        .poll(() => banner.textContent())
-                        .toContain('Calendar refresh failed:');
+                    await expect.poll(() => banner.textContent()).toContain('Calendar refresh failed:');
                     await expect
                         .poll(() => page.locator('.task-item', { hasText: 'Dev65 calendar anchor' }).count())
                         .toBe(0);
@@ -606,10 +581,9 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     // Retry succeeds once the transport recovers.
                     abortTags = null;
                     await retry.click();
-                    await page.waitForSelector(
-                        `[data-date="${today}"] .task-item:has-text("Dev65 calendar relief")`,
-                        { timeout: 15_000 },
-                    );
+                    await page.waitForSelector(`[data-date="${today}"] .task-item:has-text("Dev65 calendar relief")`, {
+                        timeout: 15_000,
+                    });
                     expect(await banner.count()).toBe(0);
 
                     // Live membership moves on the recovered view: outgoing…
@@ -624,10 +598,9 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                     seen = lists.urls.length;
                     await apiMutate(server, '/api/tasks/update', { id: anchor.id, tags: ['calbeta'] });
                     await lists.waitForNextRequest(seen);
-                    await page.waitForSelector(
-                        `[data-date="${today}"] .task-item:has-text("Dev65 calendar anchor")`,
-                        { timeout: 15_000 },
-                    );
+                    await page.waitForSelector(`[data-date="${today}"] .task-item:has-text("Dev65 calendar anchor")`, {
+                        timeout: 15_000,
+                    });
                     expect(await banner.count()).toBe(0);
                 });
             } finally {

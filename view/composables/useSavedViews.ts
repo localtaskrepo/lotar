@@ -2,13 +2,13 @@ import { ref } from 'vue'
 import { storageGetJson, storageSetJson } from '../utils/storage'
 
 export interface SavedView {
-  id: string
-  name: string
-  filter: Record<string, string>
-  columns?: string[]
-  sort?: { key: string | null; dir: 'asc' | 'desc' }
-  created: string
-  updated: string
+    id: string
+    name: string
+    filter: Record<string, string>
+    columns?: string[]
+    sort?: { key: string | null; dir: 'asc' | 'desc' }
+    created: string
+    updated: string
 }
 
 // NOTE: For now, we persist per-browser only. We can later namespace by repo
@@ -16,60 +16,81 @@ export interface SavedView {
 const STORAGE_KEY = 'lotar.savedViews'
 
 function load(): SavedView[] {
-  const arr = storageGetJson<unknown>(STORAGE_KEY)
-  return Array.isArray(arr) ? arr : []
+    const arr = storageGetJson<unknown>(STORAGE_KEY)
+    return Array.isArray(arr) ? arr : []
 }
 
 function persist(list: SavedView[]) {
-  storageSetJson(STORAGE_KEY, list)
+    storageSetJson(STORAGE_KEY, list)
 }
 
 function genId(name: string) {
-  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40)
-  const rand = Math.random().toString(36).slice(2, 6)
-  return `${slug || 'view'}-${rand}`
+    const slug = name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 40)
+    const rand = Math.random().toString(36).slice(2, 6)
+    return `${slug || 'view'}-${rand}`
 }
 
 export function useSavedViews() {
-  const views = ref<SavedView[]>(load())
+    const views = ref<SavedView[]>(load())
 
-  function refresh() {
-    views.value = load()
-  }
+    function refresh() {
+        views.value = load()
+    }
 
-  function saveNew(name: string, filter: Record<string, string>, extras?: { columns?: string[]; sort?: { key: string | null; dir: 'asc' | 'desc' } }) {
-    const now = new Date().toISOString()
-    const v: SavedView = { id: genId(name), name: name.trim() || 'View', filter: { ...filter }, columns: extras?.columns ? [...extras.columns] : undefined, sort: extras?.sort ? { ...extras.sort } : undefined, created: now, updated: now }
-    const next = [v, ...views.value]
-    views.value = next
-    persist(next)
-    return v
-  }
+    function saveNew(
+        name: string,
+        filter: Record<string, string>,
+        extras?: { columns?: string[]; sort?: { key: string | null; dir: 'asc' | 'desc' } },
+    ) {
+        const now = new Date().toISOString()
+        const v: SavedView = {
+            id: genId(name),
+            name: name.trim() || 'View',
+            filter: { ...filter },
+            columns: extras?.columns ? [...extras.columns] : undefined,
+            sort: extras?.sort ? { ...extras.sort } : undefined,
+            created: now,
+            updated: now,
+        }
+        const next = [v, ...views.value]
+        views.value = next
+        persist(next)
+        return v
+    }
 
-  function updateExisting(id: string, patch: Partial<Pick<SavedView, 'name' | 'filter' | 'columns' | 'sort'>>) {
-    const now = new Date().toISOString()
-    const next = views.value.map(v => v.id === id ? {
-      ...v,
-      ...patch,
-      filter: patch.filter ? { ...patch.filter } : v.filter,
-      columns: patch.columns ? [...patch.columns] : v.columns,
-      sort: patch.sort ? { ...patch.sort } : v.sort,
-      updated: now,
-    } : v)
-    views.value = next
-    persist(next)
-    return views.value.find(v => v.id === id) || null
-  }
+    function updateExisting(id: string, patch: Partial<Pick<SavedView, 'name' | 'filter' | 'columns' | 'sort'>>) {
+        const now = new Date().toISOString()
+        const next = views.value.map((v) =>
+            v.id === id
+                ? {
+                      ...v,
+                      ...patch,
+                      filter: patch.filter ? { ...patch.filter } : v.filter,
+                      columns: patch.columns ? [...patch.columns] : v.columns,
+                      sort: patch.sort ? { ...patch.sort } : v.sort,
+                      updated: now,
+                  }
+                : v,
+        )
+        views.value = next
+        persist(next)
+        return views.value.find((v) => v.id === id) || null
+    }
 
-  function remove(id: string) {
-    const next = views.value.filter(v => v.id !== id)
-    views.value = next
-    persist(next)
-  }
+    function remove(id: string) {
+        const next = views.value.filter((v) => v.id !== id)
+        views.value = next
+        persist(next)
+    }
 
-  function getById(id: string) {
-    return views.value.find(v => v.id === id) || null
-  }
+    function getById(id: string) {
+        return views.value.find((v) => v.id === id) || null
+    }
 
-  return { views, refresh, saveNew, updateExisting, remove, getById }
+    return { views, refresh, saveNew, updateExisting, remove, getById }
 }

@@ -53,7 +53,9 @@ export class JiraStub {
     private readonly server: http.Server;
     private readonly projectKey: string;
     /** Base URL the seeded auth profiles point at. */
-    get url(): string { return `http://${HOST}:${this.port}`; }
+    get url(): string {
+        return `http://${HOST}:${this.port}`;
+    }
     private port = 0;
     private nextCreatedId = 4000;
     private gate: Promise<void> | null = null;
@@ -68,10 +70,7 @@ export class JiraStub {
     }
 
     /** Resolves with the record of the first matching request (bounded wait). */
-    async waitForRequest(
-        match: (request: StubRequest) => boolean,
-        timeoutMs = 15_000,
-    ): Promise<StubRequest> {
+    async waitForRequest(match: (request: StubRequest) => boolean, timeoutMs = 15_000): Promise<StubRequest> {
         const existing = this.requests.find(match);
         if (existing) {
             return existing;
@@ -82,7 +81,11 @@ export class JiraStub {
                 if (index >= 0) {
                     this.waiters.splice(index, 1);
                 }
-                reject(new Error(`Timed out waiting for stub request; saw ${JSON.stringify(this.requests.map((r) => `${r.method} ${r.path}`))}`));
+                reject(
+                    new Error(
+                        `Timed out waiting for stub request; saw ${JSON.stringify(this.requests.map((r) => `${r.method} ${r.path}`))}`,
+                    ),
+                );
             }, timeoutMs);
             const waiter = (request: StubRequest) => {
                 if (!match(request)) {
@@ -193,7 +196,10 @@ export class JiraStub {
                     return;
                 }
                 this.sendJson(res, 200, {
-                    transitions: [{ id: '31', name: 'Done' }, { id: '11', name: 'In Progress' }],
+                    transitions: [
+                        { id: '31', name: 'Done' },
+                        { id: '11', name: 'In Progress' },
+                    ],
                 });
                 return;
             }
@@ -213,9 +219,7 @@ export class JiraStub {
             const key = `${this.projectKey}-${this.nextCreatedId}`;
             this.nextCreatedId += 1;
             const summary =
-                (body &&
-                    typeof body === 'object' &&
-                    (body as { fields?: { summary?: unknown } }).fields?.summary) ||
+                (body && typeof body === 'object' && (body as { fields?: { summary?: unknown } }).fields?.summary) ||
                 key;
             this.issues.push({ key, summary: String(summary) });
             this.sendJson(res, 201, { id: String(this.nextCreatedId), key });

@@ -13,8 +13,16 @@ vi.mock('vue-router', () => ({
 }))
 
 const api = vi.hoisted(() => ({
-    getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
-    reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({ status: 'ok', tasks: [], changed: false })),
+    getBacklogOrder: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+        status: 'ok',
+        tasks: [],
+        changed: false,
+    })),
+    reorderTasks: vi.fn(async (): Promise<import('../api/types').TaskOrderResponse> => ({
+        status: 'ok',
+        tasks: [],
+        changed: false,
+    })),
     listTasks: vi.fn(),
     sprintAdd: vi.fn(),
     sprintRemove: vi.fn(),
@@ -58,7 +66,8 @@ vi.mock('../components/UiSelect.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue'],
-        template: '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
+        template:
+            '<select class="select" @change="$emit(\'update:modelValue\', $event.target && $event.target.value)"><slot /></select>',
     },
 }))
 
@@ -84,7 +93,7 @@ vi.mock('../components/analytics/SprintAnalyticsDialog.vue', () => ({
 const sprintsStore = {
     sprints: ref<any[]>([]),
     loading: ref(false),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     missingSprints: ref<any[]>([]),
     hasMissing: ref(false),
 }
@@ -103,13 +112,15 @@ vi.mock('../composables/useTaskPanelController', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         sprintDefaults: ref<any>({}),
         statuses: ref<string[]>(['open', 'done']),
         priorities: ref<string[]>(['low', 'med', 'high']),
         types: ref<string[]>(['task']),
         customFields: ref<string[]>([]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
@@ -125,10 +136,10 @@ vi.mock('../composables/useSprintAnalytics', () => ({
         isSummaryLoading: vi.fn(() => false),
         isBurndownLoading: vi.fn(() => false),
         isVelocityLoading: vi.fn(() => false),
-        loadSummary: vi.fn(async () => { }),
-        loadBurndown: vi.fn(async () => { }),
-        loadVelocity: vi.fn(async () => { }),
-        fetchSprintAnalytics: vi.fn(async () => { }),
+        loadSummary: vi.fn(async () => {}),
+        loadBurndown: vi.fn(async () => {}),
+        loadVelocity: vi.fn(async () => {}),
+        fetchSprintAnalytics: vi.fn(async () => {}),
     }),
 }))
 
@@ -237,12 +248,22 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
     it('reassigning to a genuinely different sprint keeps add, silent source remove, and refresh', async () => {
         const wrapper = await mountSettled()
 
-        api.sprintAdd.mockResolvedValueOnce(sprintResponse({
-            action: 'add', sprint_id: 2, sprint_label: 'Beta', modified: ['PRJ-001'],
-        }))
-        api.sprintRemove.mockResolvedValueOnce(sprintResponse({
-            action: 'remove', sprint_id: 1, sprint_label: 'Alpha', modified: ['PRJ-001'],
-        }))
+        api.sprintAdd.mockResolvedValueOnce(
+            sprintResponse({
+                action: 'add',
+                sprint_id: 2,
+                sprint_label: 'Beta',
+                modified: ['PRJ-001'],
+            }),
+        )
+        api.sprintRemove.mockResolvedValueOnce(
+            sprintResponse({
+                action: 'remove',
+                sprint_id: 1,
+                sprint_label: 'Alpha',
+                modified: ['PRJ-001'],
+            }),
+        )
 
         const row = wrapper.find('tr.task-row[data-task-id="PRJ-001"]')
         await row.trigger('dragstart')
@@ -292,9 +313,14 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
     it('copy-dropping onto a new sprint still adds without force_single', async () => {
         const wrapper = await mountSettled()
 
-        api.sprintAdd.mockResolvedValueOnce(sprintResponse({
-            action: 'add', sprint_id: 2, sprint_label: 'Beta', modified: ['PRJ-001'],
-        }))
+        api.sprintAdd.mockResolvedValueOnce(
+            sprintResponse({
+                action: 'add',
+                sprint_id: 2,
+                sprint_label: 'Beta',
+                modified: ['PRJ-001'],
+            }),
+        )
 
         const row = wrapper.find('tr.task-row[data-task-id="PRJ-001"]')
         await dispatchWithMeta(row.element, 'dragstart')
@@ -322,9 +348,14 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
 
         await wrapper.find('[data-sprint-id="1"] [data-testid="sprint-manual-order"]').trigger('click')
 
-        api.sprintAdd.mockResolvedValueOnce(sprintResponse({
-            action: 'add', sprint_id: 1, sprint_label: 'Alpha', modified: ['PRJ-001'],
-        }))
+        api.sprintAdd.mockResolvedValueOnce(
+            sprintResponse({
+                action: 'add',
+                sprint_id: 1,
+                sprint_label: 'Alpha',
+                modified: ['PRJ-001'],
+            }),
+        )
 
         const row = wrapper.find('tr.task-row[data-task-id="PRJ-001"]')
         await row.trigger('dragstart')

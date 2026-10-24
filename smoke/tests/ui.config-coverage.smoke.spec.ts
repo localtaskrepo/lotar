@@ -40,9 +40,13 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                     let saved = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/config/set');
                     await save.click();
                     expect((await saved).ok()).toBe(true);
-                    await expect.poll(async () => (await inspect(server.url, 'ALPHA')).project_raw?.custom_fields).toEqual([]);
+                    await expect
+                        .poll(async () => (await inspect(server.url, 'ALPHA')).project_raw?.custom_fields)
+                        .toEqual([]);
                     expect((await inspect(server.url, 'ALPHA')).effective.custom_fields).toEqual([]);
-                    expect(parse(await workspace.read('.tasks/ALPHA/config.yml'))).toMatchObject({ custom: { fields: [] } });
+                    expect(parse(await workspace.read('.tasks/ALPHA/config.yml'))).toMatchObject({
+                        custom: { fields: [] },
+                    });
                     // The global wildcard is untouched.
                     expect((await inspect(server.url)).effective.custom_fields).toEqual(['*']);
 
@@ -51,7 +55,9 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                     saved = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/config/set');
                     await save.click();
                     expect((await saved).ok()).toBe(true);
-                    await expect.poll(async () => (await inspect(server.url, 'ALPHA')).project_raw?.custom_fields ?? null).toBeNull();
+                    await expect
+                        .poll(async () => (await inspect(server.url, 'ALPHA')).project_raw?.custom_fields ?? null)
+                        .toBeNull();
                     expect((await inspect(server.url, 'ALPHA')).effective.custom_fields).toEqual(['*']);
                 });
             } finally {
@@ -78,7 +84,10 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                     // Settings live in separate sections (DEV-19); edits survive switching.
                     const section = (id: string) => page.locator(`[data-section-link="${id}"]`).click();
                     await section('sprints');
-                    await page.getByTestId('config-sprints').getByLabel(/^Length/).fill('2w');
+                    await page
+                        .getByTestId('config-sprints')
+                        .getByLabel(/^Length/)
+                        .fill('2w');
                     await page.getByLabel('Capacity (points)').fill('30');
                     await section('people');
                     const members = page.getByTestId('config-members');
@@ -102,10 +111,17 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                         sprints_defaults_length: '2w',
                         sprints_defaults_capacity_points: '30',
                     });
-                    await expect.poll(async () => {
-                        const effective = (await inspect(server.url)).effective;
-                        return [effective.members, effective.sync_write_reports, effective.agent_context_extension, effective.sprint_defaults];
-                    }).toEqual([['alice'], false, '.ctx', { length: '2w', capacity_points: 30 }]);
+                    await expect
+                        .poll(async () => {
+                            const effective = (await inspect(server.url)).effective;
+                            return [
+                                effective.members,
+                                effective.sync_write_reports,
+                                effective.agent_context_extension,
+                                effective.sprint_defaults,
+                            ];
+                        })
+                        .toEqual([['alice'], false, '.ctx', { length: '2w', capacity_points: 30 }]);
                 });
             } finally {
                 await server.stop();
@@ -128,30 +144,39 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
             const server = await startLotarServer(workspace);
             try {
                 for (const scope of ['', 'ALPHA']) {
-                    await withPage(`${server.url}/config?section=automation${scope ? `&project=${scope}` : ''}`, async (page) => {
-                        await page.setViewportSize({ width: 1440, height: 1000 });
-                        const rows = page.locator('[data-testid="config-automation"] .cfg-toggle');
-                        await expect.poll(() => rows.count()).toBe(9);
-                        const controls = await rows.evaluateAll((elements) =>
-                            elements.map((row) => {
-                                const control = row.querySelector('.cfg-switch, select')!.getBoundingClientRect();
-                                const box = row.getBoundingClientRect();
-                                return {
-                                    right: Math.round(control.right),
-                                    centerOffset: Math.abs(control.top + control.height / 2 - (box.top + box.height / 2)),
-                                };
-                            }),
-                        );
-                        expect(new Set(controls.map((c) => c.right)).size).toBe(1);
-                        for (const control of controls) expect(control.centerOffset).toBeLessThan(2);
-                    });
+                    await withPage(
+                        `${server.url}/config?section=automation${scope ? `&project=${scope}` : ''}`,
+                        async (page) => {
+                            await page.setViewportSize({ width: 1440, height: 1000 });
+                            const rows = page.locator('[data-testid="config-automation"] .cfg-toggle');
+                            await expect.poll(() => rows.count()).toBe(9);
+                            const controls = await rows.evaluateAll((elements) =>
+                                elements.map((row) => {
+                                    const control = row.querySelector('.cfg-switch, select')!.getBoundingClientRect();
+                                    const box = row.getBoundingClientRect();
+                                    return {
+                                        right: Math.round(control.right),
+                                        centerOffset: Math.abs(
+                                            control.top + control.height / 2 - (box.top + box.height / 2),
+                                        ),
+                                    };
+                                }),
+                            );
+                            expect(new Set(controls.map((c) => c.right)).size).toBe(1);
+                            for (const control of controls) expect(control.centerOffset).toBeLessThan(2);
+                        },
+                    );
                 }
                 for (const section of ['defaults', 'agents', 'storage', 'sprints']) {
                     await withPage(`${server.url}/config?section=${section}`, async (page) => {
                         await page.setViewportSize({ width: 1440, height: 1000 });
-                        const fields = page.locator(`section[data-section="${section}"] .field input.input, section[data-section="${section}"] .field select.input`);
+                        const fields = page.locator(
+                            `section[data-section="${section}"] .field input.input, section[data-section="${section}"] .field select.input`,
+                        );
                         await expect.poll(() => fields.count()).toBeGreaterThan(1);
-                        const heights = await fields.evaluateAll((elements) => elements.map((el) => Math.round(el.getBoundingClientRect().height)));
+                        const heights = await fields.evaluateAll((elements) =>
+                            elements.map((el) => Math.round(el.getBoundingClientRect().height)),
+                        );
                         expect(new Set(heights).size, `${section}: ${heights.join(',')}`).toBe(1);
                     });
                 }

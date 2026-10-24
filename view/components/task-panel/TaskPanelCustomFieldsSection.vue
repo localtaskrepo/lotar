@@ -35,9 +35,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import UiButton from '../UiButton.vue';
-import UiInput from '../UiInput.vue';
+import { computed, ref, watch } from 'vue'
+import UiButton from '../UiButton.vue'
+import UiInput from '../UiInput.vue'
 
 const props = defineProps<{
   customFields: Record<string, string>
@@ -78,5 +78,3 @@ const emit = defineEmits<{
   (e: 'commit'): void
 }>()
 </script>
-
-

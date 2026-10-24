@@ -96,7 +96,8 @@ const apiFixtures = vi.hoisted(() => {
                 ...state.task,
                 ...patch,
                 tags: patch.tags !== undefined ? [...patch.tags] : state.task.tags,
-                relationships: patch.relationships !== undefined ? clone(patch.relationships) : state.task.relationships,
+                relationships:
+                    patch.relationships !== undefined ? clone(patch.relationships) : state.task.relationships,
             }
             return clone(state.task)
         })
@@ -178,7 +179,7 @@ vi.mock('../components/toast', () => ({
 }))
 
 vi.mock('../composables/useProjects', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
@@ -188,7 +189,7 @@ vi.mock('../composables/useProjects', () => {
 })
 
 vi.mock('../composables/useConfig', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     const statuses = ref(['Open', 'Closed'])
     const priorities = ref(['Low', 'Medium', 'High'])
     const types = ref(['bug', 'feature'])

@@ -132,19 +132,16 @@ describe.concurrent.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () =
 
             const commit = async (message: string, name: string, email: string, date: string) => {
                 await workspace.runGit(['add', '.']);
-                await workspace.runGit(
-                    ['commit', '-m', message],
-                    {
-                        env: {
-                            GIT_AUTHOR_NAME: name,
-                            GIT_AUTHOR_EMAIL: email,
-                            GIT_COMMITTER_NAME: name,
-                            GIT_COMMITTER_EMAIL: email,
-                            GIT_AUTHOR_DATE: date,
-                            GIT_COMMITTER_DATE: date,
-                        },
+                await workspace.runGit(['commit', '-m', message], {
+                    env: {
+                        GIT_AUTHOR_NAME: name,
+                        GIT_AUTHOR_EMAIL: email,
+                        GIT_COMMITTER_NAME: name,
+                        GIT_COMMITTER_EMAIL: email,
+                        GIT_AUTHOR_DATE: date,
+                        GIT_COMMITTER_DATE: date,
                     },
-                );
+                });
             };
 
             await writeTask('Todo', '2025-08-01T10:00:00Z');
@@ -173,9 +170,7 @@ describe.concurrent.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () =
             const entry = payload.items.find((item) => item.id === 'TEST-1');
             expect(entry).toBeDefined();
             const segments = entry?.items ?? [];
-            const secondsByStatus = new Map(
-                segments.map((segment) => [segment.status.toLowerCase(), segment.seconds]),
-            );
+            const secondsByStatus = new Map(segments.map((segment) => [segment.status.toLowerCase(), segment.seconds]));
             expect(secondsByStatus.get('todo')).toBeGreaterThan(0);
             expect(secondsByStatus.get('inprogress')).toBeGreaterThan(0);
             expect(secondsByStatus.get('done')).toBeGreaterThan(0);
@@ -312,20 +307,8 @@ describe.concurrent.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () =
                 '--capacity-hours',
                 '60',
             ]);
-            await workspace.runLotar([
-                'sprint',
-                'start',
-                '1',
-                '--at',
-                '2025-02-01T09:00:00Z',
-            ]);
-            await workspace.runLotar([
-                'sprint',
-                'close',
-                '1',
-                '--at',
-                '2025-02-08T09:00:00Z',
-            ]);
+            await workspace.runLotar(['sprint', 'start', '1', '--at', '2025-02-01T09:00:00Z']);
+            await workspace.runLotar(['sprint', 'close', '1', '--at', '2025-02-08T09:00:00Z']);
 
             const first = await workspace.addTask('Stats hours done');
             const firstYaml = parse(await workspace.readTaskYaml(first.id)) as Record<string, any>;

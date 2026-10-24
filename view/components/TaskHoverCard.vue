@@ -32,21 +32,58 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import type { TaskDTO } from '../api/types';
-import TaskHoverCardBody from './TaskHoverCardBody.vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import type { TaskDTO } from '../api/types'
+import TaskHoverCardBody from './TaskHoverCardBody.vue'
 
-const props = withDefaults(defineProps<{
-  task: Pick<TaskDTO, 'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'created' | 'modified' | 'custom_fields' | 'task_state'>
-  placement?: 'left' | 'right'
-  block?: boolean
-  teleportToBody?: boolean
-  fields?: Partial<Record<'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'modified' | `custom:${string}`, boolean>>
-}>(), {
-  placement: 'left',
-  block: false,
-  teleportToBody: false,
-})
+const props = withDefaults(
+  defineProps<{
+    task: Pick<
+      TaskDTO,
+      | 'id'
+      | 'title'
+      | 'status'
+      | 'priority'
+      | 'task_type'
+      | 'reporter'
+      | 'assignee'
+      | 'effort'
+      | 'tags'
+      | 'sprints'
+      | 'due_date'
+      | 'created'
+      | 'modified'
+      | 'custom_fields'
+      | 'task_state'
+    >
+    placement?: 'left' | 'right'
+    block?: boolean
+    teleportToBody?: boolean
+    fields?: Partial<
+      Record<
+        | 'id'
+        | 'title'
+        | 'status'
+        | 'priority'
+        | 'task_type'
+        | 'reporter'
+        | 'assignee'
+        | 'effort'
+        | 'tags'
+        | 'sprints'
+        | 'due_date'
+        | 'modified'
+        | `custom:${string}`,
+        boolean
+      >
+    >
+  }>(),
+  {
+    placement: 'left',
+    block: false,
+    teleportToBody: false,
+  },
+)
 
 const triggerRef = ref<HTMLElement | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
@@ -169,7 +206,9 @@ const cardClasses = computed(() => [
   'task-hover-card',
   teleportToBody.value
     ? 'task-hover-card--teleport'
-    : (props.placement === 'right' ? 'task-hover-card--right' : 'task-hover-card--left'),
+    : props.placement === 'right'
+      ? 'task-hover-card--right'
+      : 'task-hover-card--left',
   teleportToBody.value && open.value ? 'is-open' : null,
 ])
 </script>
@@ -205,7 +244,10 @@ const cardClasses = computed(() => [
   visibility: hidden;
   pointer-events: none;
   transform: translateY(4px);
-  transition: opacity var(--duration-fast) var(--ease-standard), visibility var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    visibility var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
   color: var(--color-fg);
 }
 

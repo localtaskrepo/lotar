@@ -57,7 +57,10 @@ describe('useProjectFilterSync', () => {
 
 describe('buildServerFilter', () => {
     it('preserves prototype-named extras through project sync and server filter construction', () => {
-        const payload = Object.fromEntries([['__proto__', 'fixture'], ['field:constructor', 'value']])
+        const payload = Object.fromEntries([
+            ['__proto__', 'fixture'],
+            ['field:constructor', 'value'],
+        ])
         const project = ref('AS')
         const filter = ref<Record<string, string>>({})
         const { onFilterUpdate } = useProjectFilterSync(project, filter)

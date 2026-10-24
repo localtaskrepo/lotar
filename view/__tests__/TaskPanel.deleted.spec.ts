@@ -38,7 +38,11 @@ const apiFixtures = vi.hoisted(() => {
         state.task = { ...clone(baseTask) }
         return clone(state.task)
     })
-    const deleteTaskMock = vi.fn(async () => ({ deleted: true, hard: true, warnings: ['kept blob: @attachments/shared.png'] }))
+    const deleteTaskMock = vi.fn(async () => ({
+        deleted: true,
+        hard: true,
+        warnings: ['kept blob: @attachments/shared.png'],
+    }))
     const addCommentMock = vi.fn(async () => clone(state.task))
 
     const reset = () => {
@@ -59,7 +63,17 @@ const apiFixtures = vi.hoisted(() => {
 
     reset()
 
-    return { baseTask, state, clone, getTaskMock, updateTaskMock, restoreTaskMock, deleteTaskMock, addCommentMock, reset }
+    return {
+        baseTask,
+        state,
+        clone,
+        getTaskMock,
+        updateTaskMock,
+        restoreTaskMock,
+        deleteTaskMock,
+        addCommentMock,
+        reset,
+    }
 })
 
 vi.mock('../api/client', () => ({
@@ -119,12 +133,12 @@ vi.mock('../components/toast', () => ({
 vi.mock('../composables/useProjects', () => ({
     useProjects: () => ({
         projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
 vi.mock('../composables/useConfig', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     const defaults = {
         project: 'DEMO',
         status: 'Open',
@@ -192,7 +206,12 @@ describe('TaskPanel deleted (trash) mode — DEV-92', () => {
         store.upsert(apiFixtures.clone(apiFixtures.state.task) as any)
         const wrapper = await mountTaskPanel()
         let release!: (task: any) => void
-        apiFixtures.restoreTaskMock.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+        apiFixtures.restoreTaskMock.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    release = resolve
+                }),
+        )
         await wrapper.find('[data-testid="task-restore"]').trigger('click')
         const newer = { ...apiFixtures.clone(apiFixtures.state.task), deleted_at: '2026-10-06T00:00:00Z' }
         apiFixtures.state.task = newer
@@ -218,9 +237,7 @@ describe('TaskPanel deleted (trash) mode — DEV-92', () => {
     it('blocks field edits while the task is deleted', async () => {
         const wrapper = await mountTaskPanel()
 
-        const title = wrapper
-            .findAll('input')
-            .find((i: any) => (i.element as HTMLInputElement).value === 'Demo task')
+        const title = wrapper.findAll('input').find((i: any) => (i.element as HTMLInputElement).value === 'Demo task')
         expect(title).toBeTruthy()
 
         await title!.setValue('Renamed')

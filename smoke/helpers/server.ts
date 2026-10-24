@@ -45,11 +45,7 @@ export interface ReadyMarker {
 export class ServerReadinessError extends Error {
     readonly reason: 'timeout' | 'eof';
 
-    constructor(
-        message: string,
-        reason: 'timeout' | 'eof',
-        options?: { cause?: unknown },
-    ) {
+    constructor(message: string, reason: 'timeout' | 'eof', options?: { cause?: unknown }) {
         super(message, options);
         this.name = 'ServerReadinessError';
         this.reason = reason;
@@ -87,20 +83,12 @@ function parseReadyMarker(buffer: string): ReadyMarker | undefined {
  * arrives within `timeoutMs` (`timeout`); the internal timer is always
  * cleared once the scan settles.
  */
-export async function readReadyMarker(
-    chunks: AsyncIterable<unknown>,
-    timeoutMs: number,
-): Promise<ReadyMarker> {
+export async function readReadyMarker(chunks: AsyncIterable<unknown>, timeoutMs: number): Promise<ReadyMarker> {
     let buffer = '';
     let timer: NodeJS.Timeout | undefined;
     const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
-            reject(
-                new ServerReadinessError(
-                    `server did not advertise readiness within ${timeoutMs}ms`,
-                    'timeout',
-                ),
-            );
+            reject(new ServerReadinessError(`server did not advertise readiness within ${timeoutMs}ms`, 'timeout'));
         }, timeoutMs);
     });
 
@@ -193,8 +181,7 @@ export async function launchAndWaitReady(
     // goes through the underlying Node child process.
     const node = child.nodeChildProcess;
 
-    const describeStderr = () =>
-        stderrChunks.length > 0 ? `\nstderr:\n${stderrChunks.join('')}` : '';
+    const describeStderr = () => (stderrChunks.length > 0 ? `\nstderr:\n${stderrChunks.join('')}` : '');
 
     const annotate = (error: Error & { node?: unknown }): Error => {
         error.node = node;
@@ -241,11 +228,7 @@ export async function launchAndWaitReady(
     let failure: ExitResult | { kind: 'error'; error: Error } | undefined =
         outcome.kind === 'ready' ? undefined : outcome;
 
-    if (
-        failure?.kind === 'error' &&
-        failure.error instanceof ServerReadinessError &&
-        failure.error.reason === 'eof'
-    ) {
+    if (failure?.kind === 'error' && failure.error instanceof ServerReadinessError && failure.error.reason === 'eof') {
         // stdout closed: if the process exits right after (the common
         // failure shape), report the exit with its code and stderr, which is
         // the precise diagnosis. Bound the wait so a process that closes
@@ -288,10 +271,7 @@ export async function launchAndWaitReady(
         throw new Error('unreachable: failure paths threw above');
     }
     const marker = outcome.marker;
-    if (
-        options.expectedPort !== undefined &&
-        marker.port !== options.expectedPort
-    ) {
+    if (options.expectedPort !== undefined && marker.port !== options.expectedPort) {
         await stopChildProcess(child, node);
         throw annotate(
             new Error(
@@ -344,16 +324,12 @@ export async function startLotarServer(
         ...options.env,
     };
 
-    const launched = await launchAndWaitReady(
-        binary,
-        ['serve', '--port', String(requestedPort), '--host', host],
-        {
-            cwd: workspace.root,
-            env,
-            readyTimeoutMs: options.readyTimeoutMs,
-            expectedPort: options.port,
-        },
-    );
+    const launched = await launchAndWaitReady(binary, ['serve', '--port', String(requestedPort), '--host', host], {
+        cwd: workspace.root,
+        env,
+        readyTimeoutMs: options.readyTimeoutMs,
+        expectedPort: options.port,
+    });
 
     const url = `http://${host}:${launched.port}`;
     return {

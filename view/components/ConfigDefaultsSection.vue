@@ -4,7 +4,10 @@
       <div class="field">
         <label class="field-label" :for="`${uid}-status`">
           <span>Default status</span>
-          <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">
+          <span
+            v-if="sourceFor('default_status')"
+            :class="['provenance', provenanceClass(sourceFor('default_status'))]"
+          >
             {{ provenanceLabel(sourceFor('default_status')) }}
           </span>
         </label>
@@ -19,7 +22,10 @@
       <div class="field">
         <label class="field-label" :for="`${uid}-priority`">
           <span>Default priority</span>
-          <span v-if="sourceFor('default_priority')" :class="['provenance', provenanceClass(sourceFor('default_priority'))]">
+          <span
+            v-if="sourceFor('default_priority')"
+            :class="['provenance', provenanceClass(sourceFor('default_priority'))]"
+          >
             {{ provenanceLabel(sourceFor('default_priority')) }}
           </span>
         </label>
@@ -33,7 +39,10 @@
       <div class="field">
         <label class="field-label" :for="`${uid}-reporter`">
           <span>Default reporter</span>
-          <span v-if="sourceFor('default_reporter')" :class="['provenance', provenanceClass(sourceFor('default_reporter'))]">
+          <span
+            v-if="sourceFor('default_reporter')"
+            :class="['provenance', provenanceClass(sourceFor('default_reporter'))]"
+          >
             {{ provenanceLabel(sourceFor('default_reporter')) }}
           </span>
         </label>
@@ -50,7 +59,10 @@
       <div class="field">
         <label class="field-label" :for="`${uid}-assignee`">
           <span>Default assignee</span>
-          <span v-if="sourceFor('default_assignee')" :class="['provenance', provenanceClass(sourceFor('default_assignee'))]">
+          <span
+            v-if="sourceFor('default_assignee')"
+            :class="['provenance', provenanceClass(sourceFor('default_assignee'))]"
+          >
             {{ provenanceLabel(sourceFor('default_assignee')) }}
           </span>
         </label>
@@ -67,7 +79,10 @@
       <div v-if="isGlobal" class="field">
         <label class="field-label" :for="`${uid}-project`">
           <span>Default project prefix</span>
-          <span v-if="sourceFor('default_project')" :class="['provenance', provenanceClass(sourceFor('default_project'))]">
+          <span
+            v-if="sourceFor('default_project')"
+            :class="['provenance', provenanceClass(sourceFor('default_project'))]"
+          >
             {{ provenanceLabel(sourceFor('default_project')) }}
           </span>
         </label>
@@ -114,12 +129,7 @@ import UiInput from './UiInput.vue'
 import UiSelect from './UiSelect.vue'
 
 type DefaultsField =
-  | 'default_project'
-  | 'default_status'
-  | 'default_priority'
-  | 'default_reporter'
-  | 'default_assignee'
-  | 'default_tags'
+  'default_project' | 'default_status' | 'default_priority' | 'default_reporter' | 'default_assignee' | 'default_tags'
 
 const defaultProject = defineModel<string>('defaultProject', { required: true })
 const defaultStatus = defineModel<string>('defaultStatus', { required: true })
@@ -159,4 +169,3 @@ const emit = defineEmits<{ (e: 'validate', field: DefaultsField): void }>()
 
 const uid = useId()
 </script>
-

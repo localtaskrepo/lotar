@@ -70,9 +70,7 @@ const apiFixtures = vi.hoisted(() => {
     })
 
     const removeTaskFileReferenceMock = vi.fn(async (payload: { id: string; path: string }) => {
-        state.task.references = (state.task.references as any[]).filter(
-            (entry) => entry.file !== payload.path,
-        )
+        state.task.references = (state.task.references as any[]).filter((entry) => entry.file !== payload.path)
         return { task: clone(state.task), removed: true }
     })
 
@@ -90,18 +88,20 @@ const apiFixtures = vi.hoisted(() => {
     const reset = () => {
         state.task = clone(baseTask)
         getTaskMock.mockReset().mockImplementation(async () => clone(state.task))
-        updateTaskMock.mockReset().mockImplementation(async (_id: string, patch: any) => ({ ...clone(state.task), ...patch }))
+        updateTaskMock
+            .mockReset()
+            .mockImplementation(async (_id: string, patch: any) => ({ ...clone(state.task), ...patch }))
         referenceSnippetMock.mockClear()
-        removeTaskAttachmentMock.mockClear().mockImplementation(async (payload: { id: string; stored_path: string }) => {
-            state.task.references = (state.task.references as any[]).filter(
-                (entry) => entry.attachment !== payload.stored_path,
-            )
-            return { task: clone(state.task), deleted: true, still_referenced: false }
-        })
+        removeTaskAttachmentMock
+            .mockClear()
+            .mockImplementation(async (payload: { id: string; stored_path: string }) => {
+                state.task.references = (state.task.references as any[]).filter(
+                    (entry) => entry.attachment !== payload.stored_path,
+                )
+                return { task: clone(state.task), deleted: true, still_referenced: false }
+            })
         removeTaskFileReferenceMock.mockClear().mockImplementation(async (payload: { id: string; path: string }) => {
-            state.task.references = (state.task.references as any[]).filter(
-                (entry) => entry.file !== payload.path,
-            )
+            state.task.references = (state.task.references as any[]).filter((entry) => entry.file !== payload.path)
             return { task: clone(state.task), removed: true }
         })
         addTaskFileReferenceMock.mockClear().mockImplementation(async (payload: { id: string; path: string }) => {
@@ -186,7 +186,7 @@ vi.mock('../components/toast', () => ({
 }))
 
 vi.mock('../composables/useProjects', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'TP', name: 'Typed Project' }]),
@@ -196,7 +196,7 @@ vi.mock('../composables/useProjects', () => {
 })
 
 vi.mock('../composables/useConfig', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useConfig: () => ({
             statuses: ref(['Open', 'Closed']),
@@ -423,7 +423,7 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
         const sameName = 'notes.0123456789abcdef0123456789abcdef.txt'
         apiFixtures.state.task.references = [{ attachment: sameName }, { file: sameName }] as any
 
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         let wrapper: ReturnType<typeof mount> | null = null
         try {
             wrapper = await mountTaskPanel()
@@ -437,7 +437,9 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
             expect(fileRow).toBeTruthy()
             expect(attachmentRow).toBeTruthy()
             expect(fileRow!.find('a.task-panel__reference-link').exists()).toBe(false)
-            expect(attachmentRow!.find('a.task-panel__reference-link').attributes('href')).toContain('/api/attachments/')
+            expect(attachmentRow!.find('a.task-panel__reference-link').attributes('href')).toContain(
+                '/api/attachments/',
+            )
             const fileRowElement = fileRow!.element
 
             // Re-render the list while both same-key rows exist (hover changes
@@ -449,7 +451,9 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
             rows = wrapper.findAll('.task-panel__reference-item')
             expect(rows.length).toBe(2)
             expect(rows.filter((row) => row.find('button[aria-label="Remove attachment"]').exists()).length).toBe(1)
-            expect(rows.filter((row) => row.find('button[aria-label="Remove repository file"]').exists()).length).toBe(1)
+            expect(rows.filter((row) => row.find('button[aria-label="Remove repository file"]').exists()).length).toBe(
+                1,
+            )
 
             // Remove the managed attachment first: the repository-file row must
             // survive while the attachment row leaves the DOM.

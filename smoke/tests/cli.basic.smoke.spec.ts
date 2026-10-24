@@ -86,13 +86,7 @@ describe.concurrent('CLI smoke harness', () => {
             await workspace.runLotar(['sprint', 'create', '--label', 'CLI Delete Smoke Sprint']);
             await workspace.runLotar(['sprint', 'add', first.id, second.id, '--sprint', '1']);
 
-            const result = await workspace.runLotar([
-                'sprint',
-                'delete',
-                '1',
-                '--force',
-                '--cleanup-missing',
-            ]);
+            const result = await workspace.runLotar(['sprint', 'delete', '1', '--force', '--cleanup-missing']);
 
             expect(result.stdout).toContain('Deleted');
             const sprintPath = path.join(workspace.tasksDir, '@sprints', '1.yml');

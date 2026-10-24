@@ -1,6 +1,6 @@
 <template>
-  <section class="col" style="gap: 16px;">
-    <div class="row" style="justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+  <section class="col" style="gap: 16px">
+    <div class="row" style="justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
       <h1>
         Tasks
         <span class="muted" v-if="totalCount">
@@ -8,7 +8,7 @@
           <template v-else>({{ pageStart }}–{{ pageEnd }} / {{ totalCount }})</template>
         </span>
       </h1>
-      <div class="row split-actions" style="gap: 8px; align-items: center;">
+      <div class="row split-actions" style="gap: 8px; align-items: center">
         <UiButton
           icon-only
           type="button"
@@ -86,23 +86,48 @@
               role="menu"
               @click.stop
             >
-              <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">
+              <button
+                class="menu-item"
+                type="button"
+                :disabled="disableBulkActions"
+                @click="handleBulkAction('assign')"
+              >
                 <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
                 <span class="menu-item__label">Assign…</span>
               </button>
-              <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">
+              <button
+                class="menu-item"
+                type="button"
+                :disabled="disableBulkActions"
+                @click="handleBulkAction('unassign')"
+              >
                 <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
                 <span class="menu-item__label">Clear assignee</span>
               </button>
-              <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">
+              <button
+                class="menu-item"
+                type="button"
+                :disabled="disableSprintActions"
+                @click="handleBulkAction('sprint-add')"
+              >
                 <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
                 <span class="menu-item__label">Add to sprint…</span>
               </button>
-              <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">
+              <button
+                class="menu-item"
+                type="button"
+                :disabled="disableSprintActions"
+                @click="handleBulkAction('sprint-remove')"
+              >
                 <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
                 <span class="menu-item__label">Remove from sprint…</span>
               </button>
-              <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">
+              <button
+                class="menu-item danger"
+                type="button"
+                :disabled="disableBulkActions"
+                @click="handleBulkAction('delete')"
+              >
                 <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
                 <span class="menu-item__label">Delete tasks…</span>
               </button>
@@ -151,7 +176,7 @@
       <UiButton variant="ghost" type="button" :disabled="loading" @click="retry">Retry</UiButton>
     </div>
 
-    <div class="col" style="gap: 16px;">
+    <div class="col" style="gap: 16px">
       <UiLoader v-if="loading && !hasTasks" size="md" />
       <UiEmptyState
         v-else-if="error && !hasTasks"
@@ -194,7 +219,7 @@
         @bulk-sprint-remove="openBulkSprintRemove"
         @bulk-delete="openBulkDelete"
         @add="openCreate"
-          @update:selected-ids="setSelectedIds"
+        @update:selected-ids="setSelectedIds"
         @open="view"
         @delete="openSingleDelete"
         @restore="restoreTask"
@@ -221,143 +246,155 @@
     />
 
     <UiModal :open="assignDialogOpen" :aria-label="assignDialogTitle" @close="closeAssignDialog">
-          <form class="col tasks-modal__form" @submit.prevent="submitAssignDialog">
-            <header class="row tasks-modal__header">
-              <div class="col" style="gap: 4px;">
-                <h2>{{ assignDialogTitle }}</h2>
-                <p class="muted tasks-modal__hint">Use <code>@me</code> to assign the tasks to yourself.</p>
-              </div>
-              <UiButton
-                variant="ghost"
-                icon-only
-                type="button"
-                aria-label="Close dialog"
-                title="Close dialog"
-                :disabled="assignDialogSubmitting"
-                @click="closeAssignDialog"
-              >
-                <IconGlyph name="close" />
-              </UiButton>
-            </header>
-            <label class="col" style="gap: 4px;">
-              <span class="muted">Assignee</span>
-              <input
-                ref="assignInputRef"
-                class="input"
-                v-model="assignInputValue"
-                placeholder="username or @me"
-                autocomplete="off"
-              />
-            </label>
-            <div class="row" style="gap: 8px; flex-wrap: wrap;">
-              <UiButton variant="ghost" type="button" @click="useAssignShortcut('@me')">Use @me</UiButton>
-            </div>
-            <footer class="row tasks-modal__footer">
-              <UiButton variant="primary" type="submit" :disabled="assignDialogSubmitting || !assignInputValue.trim()">
-                {{ assignDialogSubmitting ? 'Assigning…' : assignDialogTitle }}
-              </UiButton>
-              <UiButton variant="ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog">Cancel</UiButton>
-            </footer>
-          </form>
+      <form class="col tasks-modal__form" @submit.prevent="submitAssignDialog">
+        <header class="row tasks-modal__header">
+          <div class="col" style="gap: 4px">
+            <h2>{{ assignDialogTitle }}</h2>
+            <p class="muted tasks-modal__hint">Use <code>@me</code> to assign the tasks to yourself.</p>
+          </div>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            :disabled="assignDialogSubmitting"
+            @click="closeAssignDialog"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <label class="col" style="gap: 4px">
+          <span class="muted">Assignee</span>
+          <input
+            ref="assignInputRef"
+            class="input"
+            v-model="assignInputValue"
+            placeholder="username or @me"
+            autocomplete="off"
+          />
+        </label>
+        <div class="row" style="gap: 8px; flex-wrap: wrap">
+          <UiButton variant="ghost" type="button" @click="useAssignShortcut('@me')">Use @me</UiButton>
+        </div>
+        <footer class="row tasks-modal__footer">
+          <UiButton variant="primary" type="submit" :disabled="assignDialogSubmitting || !assignInputValue.trim()">
+            {{ assignDialogSubmitting ? 'Assigning…' : assignDialogTitle }}
+          </UiButton>
+          <UiButton variant="ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog"
+            >Cancel</UiButton
+          >
+        </footer>
+      </form>
     </UiModal>
 
     <UiModal :open="sprintDialogOpen" :aria-label="sprintDialogTitle" @close="closeSprintDialog">
-          <form class="col tasks-modal__form" @submit.prevent="submitSprintDialog">
-            <header class="row tasks-modal__header">
-              <div class="col" style="gap: 4px;">
-                <h2>{{ sprintDialogTitle }}</h2>
-                <p class="muted tasks-modal__hint">
-                  Choose the sprint target for the selected task{{ sprintDialogIds.length === 1 ? '' : 's' }}.
-                </p>
-              </div>
-              <UiButton
-                variant="ghost"
-                icon-only
-                type="button"
-                aria-label="Close dialog"
-                title="Close dialog"
-                :disabled="sprintDialogSubmitting"
-                @click="closeSprintDialog"
-              >
-                <IconGlyph name="close" />
-              </UiButton>
-            </header>
-            <label class="col" style="gap: 4px;">
-              <span class="muted">Sprint</span>
-              <select class="input" v-model="sprintDialogSelection" :disabled="!sprintOptions.length">
-                <option v-for="opt in sprintOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-              </select>
-            </label>
-            <p v-if="!sprintOptions.length" class="muted tasks-modal__hint">No sprints available yet. Create one first.</p>
-            <label v-if="sprintDialogMode === 'add'" class="row tasks-modal__checkbox">
-              <input type="checkbox" v-model="sprintDialogKeepExisting" />
-              Keep existing sprint memberships
-            </label>
-            <label v-if="sprintDialogMode === 'add'" class="row tasks-modal__checkbox">
-              <input type="checkbox" v-model="sprintDialogAllowClosed" />
-              Allow assigning to closed sprints
-            </label>
-            <footer class="row tasks-modal__footer">
-              <UiButton variant="primary" type="submit" :disabled="sprintDialogSubmitting || !sprintOptions.length">
-                {{ sprintDialogSubmitting ? (sprintDialogMode === 'add' ? 'Assigning…' : 'Removing…') : (sprintDialogMode === 'add' ? 'Assign to sprint' : 'Remove from sprint') }}
-              </UiButton>
-              <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">Cancel</UiButton>
-            </footer>
-          </form>
+      <form class="col tasks-modal__form" @submit.prevent="submitSprintDialog">
+        <header class="row tasks-modal__header">
+          <div class="col" style="gap: 4px">
+            <h2>{{ sprintDialogTitle }}</h2>
+            <p class="muted tasks-modal__hint">
+              Choose the sprint target for the selected task{{ sprintDialogIds.length === 1 ? '' : 's' }}.
+            </p>
+          </div>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            :disabled="sprintDialogSubmitting"
+            @click="closeSprintDialog"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <label class="col" style="gap: 4px">
+          <span class="muted">Sprint</span>
+          <select class="input" v-model="sprintDialogSelection" :disabled="!sprintOptions.length">
+            <option v-for="opt in sprintOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </label>
+        <p v-if="!sprintOptions.length" class="muted tasks-modal__hint">No sprints available yet. Create one first.</p>
+        <label v-if="sprintDialogMode === 'add'" class="row tasks-modal__checkbox">
+          <input type="checkbox" v-model="sprintDialogKeepExisting" />
+          Keep existing sprint memberships
+        </label>
+        <label v-if="sprintDialogMode === 'add'" class="row tasks-modal__checkbox">
+          <input type="checkbox" v-model="sprintDialogAllowClosed" />
+          Allow assigning to closed sprints
+        </label>
+        <footer class="row tasks-modal__footer">
+          <UiButton variant="primary" type="submit" :disabled="sprintDialogSubmitting || !sprintOptions.length">
+            {{
+              sprintDialogSubmitting
+                ? sprintDialogMode === 'add'
+                  ? 'Assigning…'
+                  : 'Removing…'
+                : sprintDialogMode === 'add'
+                  ? 'Assign to sprint'
+                  : 'Remove from sprint'
+            }}
+          </UiButton>
+          <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog"
+            >Cancel</UiButton
+          >
+        </footer>
+      </form>
     </UiModal>
 
     <UiModal :open="deleteDialogOpen" :aria-label="deleteDialogTitle" @close="closeDeleteDialog">
-          <div class="col tasks-modal__form">
-            <header class="row tasks-modal__header">
-              <div class="col" style="gap: 4px;">
-                <h2>{{ deleteDialogTitle }}</h2>
-                <p v-if="!deleteDialogHard" class="muted tasks-modal__hint">
-                  Deleted tasks move to the trash. Restore them any time from the Deleted filter.
-                </p>
-                <p v-else class="muted tasks-modal__hint tasks-modal__hint--danger">
-                  This permanently removes the task and its history. This cannot be undone.
-                </p>
-              </div>
-              <UiButton
-                variant="ghost"
-                icon-only
-                type="button"
-                aria-label="Close dialog"
-                title="Close dialog"
-                :disabled="deleteDialogSubmitting"
-                @click="closeDeleteDialog"
-              >
-                <IconGlyph name="close" />
-              </UiButton>
-            </header>
-            <p v-if="!deleteDialogHard">
-              Are you sure you want to delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?
+      <div class="col tasks-modal__form">
+        <header class="row tasks-modal__header">
+          <div class="col" style="gap: 4px">
+            <h2>{{ deleteDialogTitle }}</h2>
+            <p v-if="!deleteDialogHard" class="muted tasks-modal__hint">
+              Deleted tasks move to the trash. Restore them any time from the Deleted filter.
             </p>
-            <div v-else class="col" style="gap: 8px;">
-              <p>
-                Permanently delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?
-                Attached repository files are kept; managed attachment blobs that are still referenced
-                elsewhere are retained.
-              </p>
-              <label class="row tasks-modal__checkbox">
-                <input type="checkbox" v-model="deleteDialogConfirmed" />
-                I understand this cannot be undone
-              </label>
-            </div>
-            <footer class="row tasks-modal__footer">
-              <UiButton
-                variant="danger"
-                type="button"
-                :disabled="deleteDialogSubmitting || (deleteDialogHard && !deleteDialogConfirmed)"
-                @click="submitDeleteDialog"
-              >
-                {{ deleteDialogSubmitting ? 'Deleting…' : deleteDialogHard ? 'Delete permanently' : 'Delete' }}
-              </UiButton>
-              <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</UiButton>
-            </footer>
+            <p v-else class="muted tasks-modal__hint tasks-modal__hint--danger">
+              This permanently removes the task and its history. This cannot be undone.
+            </p>
           </div>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            :disabled="deleteDialogSubmitting"
+            @click="closeDeleteDialog"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <p v-if="!deleteDialogHard">
+          Are you sure you want to delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?
+        </p>
+        <div v-else class="col" style="gap: 8px">
+          <p>
+            Permanently delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}? Attached repository files
+            are kept; managed attachment blobs that are still referenced elsewhere are retained.
+          </p>
+          <label class="row tasks-modal__checkbox">
+            <input type="checkbox" v-model="deleteDialogConfirmed" />
+            I understand this cannot be undone
+          </label>
+        </div>
+        <footer class="row tasks-modal__footer">
+          <UiButton
+            variant="danger"
+            type="button"
+            :disabled="deleteDialogSubmitting || (deleteDialogHard && !deleteDialogConfirmed)"
+            @click="submitDeleteDialog"
+          >
+            {{ deleteDialogSubmitting ? 'Deleting…' : deleteDialogHard ? 'Delete permanently' : 'Delete' }}
+          </UiButton>
+          <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog"
+            >Cancel</UiButton
+          >
+        </footer>
+      </div>
     </UiModal>
-
   </section>
 </template>
 
@@ -389,12 +426,7 @@ import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import type { ColKey } from '../composables/useColumns'
-import {
-    colKeyToSortBy,
-    normalizeSortBy,
-    normalizeSortOrder,
-    sortByToColKey,
-} from '../utils/taskSort'
+import { colKeyToSortBy, normalizeSortBy, normalizeSortOrder, sortByToColKey } from '../utils/taskSort'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { isDeletedTask, projectOf, titleCase } from '../utils/text'
 import { storageGet, storageGetJson, storageRemove, storageSet, storageSetJson } from '../utils/storage'
@@ -454,7 +486,16 @@ function clampOffset(value: number): number {
 const { add: addActivity, markTaskTouch, removeTaskTouch, touches: activityTouches } = useActivity()
 
 const route = useRoute()
-const { statuses, priorities, types, refresh: refreshConfig, customFields: availableCustomFields, scope: configScope, tags: configuredTags, members } = useConfig()
+const {
+  statuses,
+  priorities,
+  types,
+  refresh: refreshConfig,
+  customFields: availableCustomFields,
+  scope: configScope,
+  tags: configuredTags,
+  members,
+} = useConfig()
 const statusOptions = computed(() => [...(statuses.value || [])])
 const priorityOptions = computed(() => [...(priorities.value || [])])
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
@@ -511,21 +552,23 @@ const fieldOptions = columnsStore.fieldOptions
 const isColumnVisible = (key: string) => columnsStore.isVisible(key)
 const setColumnVisible = (key: string, event: Event) => columnsStore.toggleColumn(key, event)
 function resetColumns() {
-    columnsStore.resetColumns()
+  columnsStore.resetColumns()
 }
 
 watch(
-    availableCustomFields,
-    (keys) => {
-        columnsStore.setCustomFieldKeys(keys)
-    },
-    { immediate: true },
+  availableCustomFields,
+  (keys) => {
+    columnsStore.setCustomFieldKeys(keys)
+  },
+  { immediate: true },
 )
 
 // The store's project key is owned by TaskTable (which resolves the concrete
 // project from the filter or the shown tasks), so the page must not override it.
 
-const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && key !== 'sort_by' && !!value))
+const hasFilters = computed(() =>
+  Object.entries(filter.value).some(([key, value]) => key !== 'order' && key !== 'sort_by' && !!value),
+)
 
 // ---------------------------------------------------------------------------
 // Sort ownership (DEV-57): the page owns the sort as part of the query so the
@@ -609,19 +652,26 @@ watch(
 // server's timezone-sensitive date handling can never diverge from what the
 // user sees — and the CSV export, produced from the same query, matches.
 const queryTasks = computed<TaskDTO[]>(() => tasksQuery.value?.tasks.value ?? [])
-const filterOptions = useFilterOptions(() => queryTasks.value, () => filter.value.project || '', {
-  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
-})
+const filterOptions = useFilterOptions(
+  () => queryTasks.value,
+  () => filter.value.project || '',
+  {
+    scope: () => configScope.value,
+    tags: () => configuredTags.value,
+    members: () => members.value,
+  },
+)
 const shownTasks = computed(() => {
   const ranks = tasksQuery.value?.ranks.value
   const items = queryTasks.value
-  const all = ranks && ranks.size
-    ? [...items].sort((a, b) => {
-        const ra = ranks.get(a.id) ?? Number.MAX_SAFE_INTEGER
-        const rb = ranks.get(b.id) ?? Number.MAX_SAFE_INTEGER
-        return ra - rb
-      })
-    : items
+  const all =
+    ranks && ranks.size
+      ? [...items].sort((a, b) => {
+          const ra = ranks.get(a.id) ?? Number.MAX_SAFE_INTEGER
+          const rb = ranks.get(b.id) ?? Number.MAX_SAFE_INTEGER
+          return ra - rb
+        })
+      : items
   const start = pageOffset.value
   const end = start + pageLimit.value
   return all.slice(start, end)
@@ -664,14 +714,18 @@ async function goToPage(page: number) {
   await syncPaginationUrl()
 }
 
-function onFilterUpdate(v: Record<string,string>){ filter.value = v }
-function resetFilters(){
+function onFilterUpdate(v: Record<string, string>) {
+  filter.value = v
+}
+function resetFilters() {
   storageRemove(sortStorageKey(filter.value.project || ''))
   filter.value = {}
   selectedIds.value = []
   filterBarRef.value?.clear?.()
 }
-function clearFilters(){ resetFilters() }
+function clearFilters() {
+  resetFilters()
+}
 
 type NavMode = 'push' | 'replace' | 'none'
 
@@ -683,9 +737,11 @@ type PagingUpdate = {
 let filterGeneration = 0
 let hydrateQueue: Promise<void> = Promise.resolve()
 const loadedFilterGeneration = ref(-1)
-const selectionReady = computed(() => loadedFilterGeneration.value === filterGeneration && !loading.value && !error.value)
+const selectionReady = computed(
+  () => loadedFilterGeneration.value === filterGeneration && !loading.value && !error.value,
+)
 
-async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', paging: PagingUpdate = {}) {
+async function applyFilter(raw: Record<string, string>, nav: NavMode = 'push', paging: PagingUpdate = {}) {
   const request = ++filterGeneration
   loadedFilterGeneration.value = -1
   if (disposed) return
@@ -737,10 +793,12 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   // hydrations so an older query cannot replace a newer result after
   // selection is enabled.
   adoptQuery(store.getQuery(serverFilter))
-  hydrateQueue = hydrateQueue.catch(() => {}).then(async () => {
-    if (disposed || request !== filterGeneration) return
-    await activeQueryHandle?.refresh()
-  })
+  hydrateQueue = hydrateQueue
+    .catch(() => {})
+    .then(async () => {
+      if (disposed || request !== filterGeneration) return
+      await activeQueryHandle?.refresh()
+    })
   await hydrateQueue
   if (disposed || request !== filterGeneration) return
   if (!error.value) loadedFilterGeneration.value = request
@@ -757,8 +815,9 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   if (disposed) return
 }
 
-async function retry(){ await applyFilter(filter.value, 'none') }
-
+async function retry() {
+  await applyFilter(filter.value, 'none')
+}
 
 const view = (id: string) => openTask(id)
 
@@ -817,7 +876,7 @@ function deletedTaskGuard(id: string): boolean {
   return false
 }
 
-async function onUpdateTitle(payload: { id: string; title: string }){
+async function onUpdateTitle(payload: { id: string; title: string }) {
   const { id, title } = payload
   if (deletedTaskGuard(id)) return
   try {
@@ -829,7 +888,7 @@ async function onUpdateTitle(payload: { id: string; title: string }){
   }
 }
 
-async function onUpdateTags(payload: { id: string; tags: string[] }){
+async function onUpdateTags(payload: { id: string; tags: string[] }) {
   const { id, tags } = payload
   if (deletedTaskGuard(id)) return
   try {
@@ -841,7 +900,7 @@ async function onUpdateTags(payload: { id: string; tags: string[] }){
   }
 }
 
-async function onQuickStatus(payload: { id: string; status: string }){
+async function onQuickStatus(payload: { id: string; status: string }) {
   const { id, status } = payload
   if (deletedTaskGuard(id)) return
   try {
@@ -867,8 +926,8 @@ const scopedSelection = computed(() => {
   if (!selectionReady.value) return []
   // DEV-65: scope selection to the keyed query membership (the server's
   // filtered set) instead of re-deriving a project-only predicate client-side.
-  const ids = new Set(queryTasks.value.map(task => task.id))
-  return selectedIds.value.filter(id => ids.has(id))
+  const ids = new Set(queryTasks.value.map((task) => task.id))
+  return selectedIds.value.filter((id) => ids.has(id))
 })
 const disableBulkActions = computed(() => !scopedSelection.value.length)
 const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoading.value || !hasSprints.value)
@@ -909,8 +968,8 @@ function handleBulkAction(action: BulkMenuAction) {
 
 function setSelectedIds(value: string[]) {
   if (!selectionReady.value) return
-  const allowed = new Set([...selectedIds.value, ...shownTasks.value.map(task => task.id)])
-  selectedIds.value = Array.isArray(value) ? [...new Set(value)].filter(id => allowed.has(id)) : []
+  const allowed = new Set([...selectedIds.value, ...shownTasks.value.map((task) => task.id)])
+  selectedIds.value = Array.isArray(value) ? [...new Set(value)].filter((id) => allowed.has(id)) : []
 }
 
 const ASSIGNEE_STORAGE_KEY = 'lotar.tasks.assign.last'
@@ -918,7 +977,6 @@ const lastAssignee = ref('@me')
 {
   const stored = storageGet(ASSIGNEE_STORAGE_KEY)
   if (stored) lastAssignee.value = stored
-
 }
 
 const assignDialogOpen = ref(false)
@@ -1014,9 +1072,8 @@ async function submitAssignDialog() {
     lastAssignee.value = input
     {
       storageSet(ASSIGNEE_STORAGE_KEY, input)
-
     }
-  closeAssignDialog(true)
+    closeAssignDialog(true)
   } finally {
     assignDialogSubmitting.value = false
   }
@@ -1124,7 +1181,9 @@ async function performSprintAction(
       showToast(`Automatically cleaned ${autoCleanup.removed_references} dangling sprint reference(s).`)
     }
     if (response.integrity?.missing_sprints && response.integrity.missing_sprints.length) {
-      showToast(`Still spotting missing sprint IDs: ${response.integrity.missing_sprints.map((id) => `#${id}`).join(', ')}`)
+      showToast(
+        `Still spotting missing sprint IDs: ${response.integrity.missing_sprints.map((id) => `#${id}`).join(', ')}`,
+      )
     }
     // DEV-102: reconcile only after a real change — modified tasks, sprint
     // reassignments, or integrity cleanup. A response that modified nothing
@@ -1135,7 +1194,7 @@ async function performSprintAction(
       await refreshSprints(true)
       await applyFilter(filter.value, 'none')
     }
-  } catch (e:any) {
+  } catch (e: any) {
     showToast(e.message || (mode === 'add' ? 'Failed to assign to sprint' : 'Failed to remove from sprint'))
   }
 }
@@ -1208,7 +1267,7 @@ async function submitSprintDialog() {
     })
     sprintSelection.value = sprintDialogSelection.value
     allowClosedSprint.value = sprintDialogAllowClosed.value
-  closeSprintDialog(true)
+    closeSprintDialog(true)
   } finally {
     sprintDialogSubmitting.value = false
   }
@@ -1243,12 +1302,11 @@ const deletionMode = computed(() =>
 )
 
 const deleteDialogTitle = computed(() => {
-  const noun = deleteDialogHard.value
-    ? 'Permanently delete'
-    : 'Delete'
-  const suffix = deleteDialogMode.value === 'single'
-    ? 'task'
-    : `${deleteDialogIds.value.length} selected task${deleteDialogIds.value.length === 1 ? '' : 's'}`
+  const noun = deleteDialogHard.value ? 'Permanently delete' : 'Delete'
+  const suffix =
+    deleteDialogMode.value === 'single'
+      ? 'task'
+      : `${deleteDialogIds.value.length} selected task${deleteDialogIds.value.length === 1 ? '' : 's'}`
   return `${noun} ${suffix}`
 })
 
@@ -1320,7 +1378,7 @@ async function submitDeleteDialog() {
       showToast(`Failed to delete ${failures.length} task${failures.length === 1 ? '' : 's'}`)
       console.error('Delete errors', failures)
     }
-  closeDeleteDialog(true)
+    closeDeleteDialog(true)
   } finally {
     deleteDialogSubmitting.value = false
   }
@@ -1349,7 +1407,12 @@ function openBulkDelete() {
 
 const { refresh: refreshProjects } = useProjects()
 
-let sse: { es: EventSource; close(): void; on(event: string, handler: (e: MessageEvent) => void): void; off(event: string, handler: (e: MessageEvent) => void): void } | null = null
+let sse: {
+  es: EventSource
+  close(): void
+  on(event: string, handler: (e: MessageEvent) => void): void
+  off(event: string, handler: (e: MessageEvent) => void): void
+} | null = null
 const sseUnsubscribers: Array<() => void> = []
 let disposed = false
 let suppressRouteSync = false
@@ -1399,7 +1462,11 @@ function handleTaskEvent(kind: 'task_created' | 'task_updated' | 'task_deleted',
 
 function registerSseHandlers() {
   if (!sse) return
-  const kinds: Array<'task_created' | 'task_updated' | 'task_deleted'> = ['task_created', 'task_updated', 'task_deleted']
+  const kinds: Array<'task_created' | 'task_updated' | 'task_deleted'> = [
+    'task_created',
+    'task_updated',
+    'task_deleted',
+  ]
   kinds.forEach((kind) => {
     const handler = (ev: MessageEvent) => {
       if (!ev.data) return
@@ -1499,7 +1566,12 @@ watch(bulk, (value) => {
 
 watch(
   // Overlay history is independent of the list query, including pending edits.
-  () => JSON.stringify(Object.entries(route.query).filter(([key]) => key !== 'taskPanel').sort(([a], [b]) => a.localeCompare(b))),
+  () =>
+    JSON.stringify(
+      Object.entries(route.query)
+        .filter(([key]) => key !== 'taskPanel')
+        .sort(([a], [b]) => a.localeCompare(b)),
+    ),
   () => {
     if (disposed || suppressRouteSync) return
     if (debounceTimer) clearTimeout(debounceTimer)
@@ -1554,27 +1626,35 @@ function filterJson(value: Record<string, string>): string {
   return JSON.stringify(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
 }
 
-watch(() => JSON.stringify(Object.entries(filter.value).sort(([a], [b]) => a.localeCompare(b))), () => {
-  filterGeneration += 1
-  loadedFilterGeneration.value = -1
-  selectedIds.value = []
-  closeBulkMenu()
-  closeAssignDialog(true)
-  closeSprintDialog(true)
-  closeDeleteDialog(true)
-}, { flush: 'sync' })
+watch(
+  () => JSON.stringify(Object.entries(filter.value).sort(([a], [b]) => a.localeCompare(b))),
+  () => {
+    filterGeneration += 1
+    loadedFilterGeneration.value = -1
+    selectedIds.value = []
+    closeBulkMenu()
+    closeAssignDialog(true)
+    closeSprintDialog(true)
+    closeDeleteDialog(true)
+  },
+  { flush: 'sync' },
+)
 
-watch(filter, (q) => {
-  if (suppressFilterWatch) return
-  if (debounceTimer) clearTimeout(debounceTimer)
-  if (filterJson(q) === lastFilterJson) return
-  const snapshot = { ...q }
-  debounceTimer = setTimeout(() => {
-    applyFilter(snapshot, 'push', { resetOffset: true }).catch((err) => {
-      console.warn('Failed to apply filter', err)
-    })
-  }, 150)
-}, { deep: true, flush: 'sync' })
+watch(
+  filter,
+  (q) => {
+    if (suppressFilterWatch) return
+    if (debounceTimer) clearTimeout(debounceTimer)
+    if (filterJson(q) === lastFilterJson) return
+    const snapshot = { ...q }
+    debounceTimer = setTimeout(() => {
+      applyFilter(snapshot, 'push', { resetOffset: true }).catch((err) => {
+        console.warn('Failed to apply filter', err)
+      })
+    }, 150)
+  },
+  { deep: true, flush: 'sync' },
+)
 
 const openCreate = () => {
   openTaskPanel({

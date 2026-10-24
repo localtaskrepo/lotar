@@ -28,7 +28,14 @@ export function useReferencePreview() {
     const referencePreviewState = reactive<Record<string, ReferencePreviewEntry>>({})
     const hoveredReferenceCode = ref<string | null>(null)
     const hoveredReferenceAnchor = ref<HTMLElement | null>(null)
-    const hoveredReferenceAnchorRect = ref<{ top: number; left: number; right: number; bottom: number; width: number; height: number } | null>(null)
+    const hoveredReferenceAnchorRect = ref<{
+        top: number
+        left: number
+        right: number
+        bottom: number
+        width: number
+        height: number
+    } | null>(null)
     const referencePreviewElement = ref<HTMLElement | null>(null)
     const referencePreviewRect = ref<{ width: number; height: number } | null>(null)
 
@@ -287,11 +294,10 @@ export function useReferencePreview() {
         entry.error = null
         entry.requestedBefore = clampSnippetContext(before)
         entry.requestedAfter = clampSnippetContext(after)
-        api
-            .referenceSnippet(code, {
-                before: entry.requestedBefore,
-                after: entry.requestedAfter,
-            })
+        api.referenceSnippet(code, {
+            before: entry.requestedBefore,
+            after: entry.requestedAfter,
+        })
             .then((snippet) => {
                 entry.snippet = snippet
                 entry.error = null

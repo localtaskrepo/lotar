@@ -28,33 +28,45 @@
         </div>
       </div>
       <div v-if="error" class="error" role="alert">{{ error }}</div>
-      <div v-if="loading" class="muted" style="padding: 12px 0;">Loading activity…</div>
+      <div v-if="loading" class="muted" style="padding: 12px 0">Loading activity…</div>
       <ul v-else class="feed">
         <li v-for="item in feed" :key="item.commit + ':' + item.task_id" class="feed-item">
           <header class="feed-item__header">
-            <div class="row" style="gap: 8px; align-items: center;">
+            <div class="row" style="gap: 8px; align-items: center">
               <button class="task-pill" type="button" @click="openTask(item.task_id)">{{ item.task_id }}</button>
               <span class="muted">{{ item.task_title || 'Untitled' }}</span>
             </div>
-            <div class="row" style="gap: 12px; align-items: center;">
+            <div class="row" style="gap: 12px; align-items: center">
               <span class="commit-hash" :title="item.commit">{{ item.commit.slice(0, 8) }}</span>
               <span class="muted">{{ formatDate(item.date) }} · {{ item.author }}</span>
             </div>
           </header>
-          <p class="muted" style="margin: 4px 0 12px;">{{ item.message }}</p>
+          <p class="muted" style="margin: 4px 0 12px">{{ item.message }}</p>
           <div class="history">
-            <section v-for="historyEntry in item.history" :key="historyEntry.at + (historyEntry.actor || '')" class="history-entry">
+            <section
+              v-for="historyEntry in item.history"
+              :key="historyEntry.at + (historyEntry.actor || '')"
+              class="history-entry"
+            >
               <header class="history-entry__meta">
                 <span class="muted">{{ formatDate(historyEntry.at) }}</span>
                 <span v-if="historyEntry.actor" class="muted"> · {{ historyEntry.actor }}</span>
               </header>
               <ul class="change-list">
-                <li v-for="change in historyEntry.changes" :key="change.field + ':' + (change.new ?? '')" class="change">
+                <li
+                  v-for="change in historyEntry.changes"
+                  :key="change.field + ':' + (change.new ?? '')"
+                  class="change"
+                >
                   <span class="change-kind" :class="'change-kind--' + change.kind">{{ formatKind(change.kind) }}</span>
                   <span class="change-label">{{ change.field }}</span>
                   <span v-if="change.old || change.new" class="change-values">
-                    <template v-if="change.old && change.new">{{ change.old }} → <strong>{{ change.new }}</strong></template>
-                    <template v-else-if="change.new"><strong>{{ change.new }}</strong></template>
+                    <template v-if="change.old && change.new"
+                      >{{ change.old }} → <strong>{{ change.new }}</strong></template
+                    >
+                    <template v-else-if="change.new"
+                      ><strong>{{ change.new }}</strong></template
+                    >
                     <template v-else>{{ change.old }}</template>
                   </span>
                 </li>

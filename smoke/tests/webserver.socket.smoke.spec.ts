@@ -46,30 +46,18 @@ function parseRawResponse(buffer: Buffer): RawResponse | undefined {
         if (separator === -1) {
             continue;
         }
-        headers.set(
-            line.slice(0, separator).trim().toLowerCase(),
-            line.slice(separator + 1).trim(),
-        );
+        headers.set(line.slice(0, separator).trim().toLowerCase(), line.slice(separator + 1).trim());
     }
     return { statusLine, status, headers, body };
 }
 
-function readHttpResponse(
-    host: string,
-    port: number,
-    request: string,
-    boundMs: number,
-): Promise<RawResponse> {
+function readHttpResponse(host: string, port: number, request: string, boundMs: number): Promise<RawResponse> {
     return new Promise((resolve, reject) => {
         const socket = net.connect({ host, port });
         const chunks: Buffer[] = [];
         const timer = setTimeout(() => {
             socket.destroy();
-            reject(
-                new Error(
-                    `no HTTP response within ${boundMs}ms (request: ${request.split('\r\n')[0]})`,
-                ),
-            );
+            reject(new Error(`no HTTP response within ${boundMs}ms (request: ${request.split('\r\n')[0]})`));
         }, boundMs);
         const settle = (error?: Error) => {
             clearTimeout(timer);
@@ -231,11 +219,7 @@ describe.skipIf(!lotarBinaryAvailable)('lotar serve one-shot response protocol (
                 expect(ok.headers.get('connection')).toBe('close');
 
                 // A dotted path skips the SPA index fallback and is a real 404.
-                const missing = await get(
-                    server.host,
-                    server.port,
-                    `/dev101-missing-${Date.now()}.txt`,
-                );
+                const missing = await get(server.host, server.port, `/dev101-missing-${Date.now()}.txt`);
                 expect(missing.status).toBe(404);
                 expect(missing.headers.get('connection')).toBe('close');
             } finally {

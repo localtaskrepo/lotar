@@ -87,9 +87,7 @@ function globalRaw(overrides: Partial<GlobalConfigRaw> = {}): GlobalConfigRaw {
     }
 }
 
-const projects: ProjectDTO[] = [
-    { prefix: 'TEST', name: 'Test project' } as ProjectDTO,
-]
+const projects: ProjectDTO[] = [{ prefix: 'TEST', name: 'Test project' } as ProjectDTO]
 
 function makeForm(project: string, inspect: ConfigInspectResult) {
     return useConfigForm({

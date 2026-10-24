@@ -2,12 +2,7 @@ import fs from 'fs-extra';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-    HOSTILE_PROMPT,
-    createFixtureAgents,
-    createGateFixture,
-    type GateFixture,
-} from '../helpers/agent-fixtures.js';
+import { HOSTILE_PROMPT, createFixtureAgents, createGateFixture, type GateFixture } from '../helpers/agent-fixtures.js';
 import { startLotarServer } from '../helpers/server.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
@@ -96,7 +91,10 @@ async function waitForFinalizedLog(
     for (;;) {
         const content = await fs.readFile(logPath, 'utf8').catch(() => null);
         if (content !== null) {
-            const lines = content.trim().split('\n').filter((line) => line.length > 0);
+            const lines = content
+                .trim()
+                .split('\n')
+                .filter((line) => line.length > 0);
             // A torn trailing line (read mid-append) parses to null and the
             // poll simply retries until the status line is fully written.
             const entries = lines.map((line) => {
@@ -145,12 +143,7 @@ ${agentsYaml}`;
  * a bare timeout. Bounded and best effort — every section degrades to a
  * short "<absent>" marker rather than throwing.
  */
-async function gatedJobEvidence(
-    serverUrl: string,
-    jobId: string,
-    gate: GateFixture,
-    logsDir: string,
-): Promise<string> {
+async function gatedJobEvidence(serverUrl: string, jobId: string, gate: GateFixture, logsDir: string): Promise<string> {
     const parts: string[] = [gate.diagnostics('progress')];
     try {
         const envelope = await fetchJobsEnvelope(serverUrl);
@@ -165,7 +158,10 @@ async function gatedJobEvidence(
     }
     try {
         const content = await fs.readFile(path.join(logsDir, `${jobId}.jsonl`), 'utf8');
-        const lines = content.trim().split('\n').filter((line) => line.length > 0);
+        const lines = content
+            .trim()
+            .split('\n')
+            .filter((line) => line.length > 0);
         parts.push(`job log tail:\n${lines.slice(-12).join('\n')}`);
     } catch {
         parts.push('job log=<absent>');
@@ -179,9 +175,7 @@ async function gatedJobEvidence(
                 continue;
             }
             try {
-                const markers = fs
-                    .readdirSync(path.join(tmpdir(), entry))
-                    .filter((file) => file.endsWith('.sentinel'));
+                const markers = fs.readdirSync(path.join(tmpdir(), entry)).filter((file) => file.endsWith('.sentinel'));
                 if (markers.length > 0) {
                     strays.push(`${entry}: ${markers.join(',')}`);
                 }
@@ -278,10 +272,7 @@ describe.concurrent('Agent job smoke tests', () => {
                 // reach the agent child byte-exact through the wrapper and
                 // the platform launcher. On Windows the launcher is a .cmd
                 // forwarder, so this asserts the wrapper's shim dispatch.
-                const boot = await fs.readFile(
-                    path.join(gate.dir, 'boot-progress.sentinel'),
-                    'utf8',
-                );
+                const boot = await fs.readFile(path.join(gate.dir, 'boot-progress.sentinel'), 'utf8');
                 const bootArgv = (JSON.parse(boot) as { argv: string[] }).argv;
                 expect(
                     bootArgv.some(
@@ -313,9 +304,7 @@ describe.concurrent('Agent job smoke tests', () => {
                 const entries = await waitForFinalizedLog(logsDir, jobId, 'completed');
 
                 // Verify expected event types are present
-                const eventKinds = entries
-                    .filter((e) => e.type === 'event')
-                    .map((e) => e.kind);
+                const eventKinds = entries.filter((e) => e.type === 'event').map((e) => e.kind);
 
                 expect(eventKinds).toContain('agent_job_started');
                 expect(eventKinds).toContain('agent_job_init');
@@ -325,15 +314,11 @@ describe.concurrent('Agent job smoke tests', () => {
                 expect(eventKinds).toContain('agent_job_completed');
 
                 // Verify progress events contain expected text
-                const progressEvents = entries.filter(
-                    (e) => e.type === 'event' && e.kind === 'agent_job_progress',
-                );
+                const progressEvents = entries.filter((e) => e.type === 'event' && e.kind === 'agent_job_progress');
                 expect(progressEvents.length).toBeGreaterThan(0);
 
                 // Verify message event contains expected text
-                const messageEvents = entries.filter(
-                    (e) => e.type === 'event' && e.kind === 'agent_job_message',
-                );
+                const messageEvents = entries.filter((e) => e.type === 'event' && e.kind === 'agent_job_message');
                 expect(messageEvents.length).toBe(1);
                 expect(messageEvents[0].message).toContain('phase one / phase two done');
 
@@ -367,10 +352,7 @@ describe.concurrent('Agent job smoke tests', () => {
     });
 
     it('lists jobs and queue stats via the REST API', async () => {
-        const agents = await createFixtureAgents(
-            { mock: {} },
-            'lotar-smoke-agents-list-',
-        );
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-list-');
 
         try {
             const workspace = await SmokeWorkspace.create({

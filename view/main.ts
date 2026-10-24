@@ -20,50 +20,50 @@ import { getStartupRedirectPath, storeLastVisitedStartupRoute } from './utils/pr
 import { initializeThemeFromStorage } from './utils/theme'
 
 if (typeof window !== 'undefined') {
-  initializeThemeFromStorage()
+    initializeThemeFromStorage()
 }
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/', component: TasksList },
-    { path: '/sprints', component: SprintsList },
-    { path: '/boards', component: Board },
-    { path: '/calendar', component: Calendar },
-    { path: '/insights', component: ProjectInsights },
-    { path: '/dependencies', component: Dependencies },
-    { path: '/agents', component: AgentJobs },
-    { path: '/automations', component: AutomationView },
-    { path: '/sync', component: SyncHub },
-    { path: '/scan', component: ScanView },
-    { path: '/task/:id', component: TaskDetails },
-    { path: '/config', component: ConfigView },
-    { path: '/preferences', component: Preferences },
-    {
-      path: '/sprints/backlog',
-      redirect: (to) => ({ path: '/sprints', hash: '#backlog', query: to.query }),
-    },
-    { path: '/:pathMatch(.*)*', component: NotFound },
-  ],
+    history: createWebHistory(),
+    routes: [
+        { path: '/', component: TasksList },
+        { path: '/sprints', component: SprintsList },
+        { path: '/boards', component: Board },
+        { path: '/calendar', component: Calendar },
+        { path: '/insights', component: ProjectInsights },
+        { path: '/dependencies', component: Dependencies },
+        { path: '/agents', component: AgentJobs },
+        { path: '/automations', component: AutomationView },
+        { path: '/sync', component: SyncHub },
+        { path: '/scan', component: ScanView },
+        { path: '/task/:id', component: TaskDetails },
+        { path: '/config', component: ConfigView },
+        { path: '/preferences', component: Preferences },
+        {
+            path: '/sprints/backlog',
+            redirect: (to) => ({ path: '/sprints', hash: '#backlog', query: to.query }),
+        },
+        { path: '/:pathMatch(.*)*', component: NotFound },
+    ],
 })
 
 let startupRouteHandled = false
 router.beforeEach((to, from, next) => {
-  if (!startupRouteHandled) {
-    startupRouteHandled = true
-    if (to.path === '/') {
-      const redirect = getStartupRedirectPath(to.path)
-      if (redirect) {
-        next(redirect)
-        return
-      }
+    if (!startupRouteHandled) {
+        startupRouteHandled = true
+        if (to.path === '/') {
+            const redirect = getStartupRedirectPath(to.path)
+            if (redirect) {
+                next(redirect)
+                return
+            }
+        }
     }
-  }
-  next()
+    next()
 })
 
 router.afterEach((to) => {
-  storeLastVisitedStartupRoute(to.path)
+    storeLastVisitedStartupRoute(to.path)
 })
 
 createApp(App).use(router).mount('#app')

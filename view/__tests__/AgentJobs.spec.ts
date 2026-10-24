@@ -64,7 +64,8 @@ const stubs = {
         emits: ['update:modelValue'],
     },
     UiSelect: {
-        template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
+        template:
+            '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
         props: ['modelValue'],
         emits: ['update:modelValue'],
     },
@@ -115,7 +116,11 @@ function job(id: string, overrides: Partial<AgentJob> = {}): AgentJob {
 
 const runningJob = job('job-running', { created_at: '2026-10-08T10:00:01.000Z' })
 const queuedJob = job('job-queued', { status: 'queued', started_at: null, created_at: '2026-10-08T10:00:02.000Z' })
-const completedJob = job('job-done', { status: 'completed', finished_at: '2026-10-08T10:00:03.000Z', created_at: '2026-10-08T09:00:00.000Z' })
+const completedJob = job('job-done', {
+    status: 'completed',
+    finished_at: '2026-10-08T10:00:03.000Z',
+    created_at: '2026-10-08T09:00:00.000Z',
+})
 
 function currentSse() {
     return sseCalls[sseCalls.length - 1]!
@@ -123,12 +128,16 @@ function currentSse() {
 
 function emitSse(kind: string, payload: unknown) {
     const ev = { data: JSON.stringify(payload) }
-    currentSse().handlers.get(kind)?.forEach((handler) => handler(ev))
+    currentSse()
+        .handlers.get(kind)
+        ?.forEach((handler) => handler(ev))
 }
 
 /** Simulate the EventSource transition to OPEN (first open or reconnect). */
 function openSse() {
-    currentSse().lifecycle.get('open')?.forEach((handler) => handler())
+    currentSse()
+        .lifecycle.get('open')
+        ?.forEach((handler) => handler())
 }
 
 async function mountAgentJobs() {
@@ -306,11 +315,7 @@ describe('AgentJobs stop-all confirmation', () => {
 
         stop.resolve({
             cancelled: 2,
-            jobs: [
-                { ...runningJob, status: 'cancelled' },
-                { ...queuedJob, status: 'cancelled' },
-                completedJob,
-            ],
+            jobs: [{ ...runningJob, status: 'cancelled' }, { ...queuedJob, status: 'cancelled' }, completedJob],
         })
         await flushPromises()
 
@@ -342,11 +347,7 @@ describe('AgentJobs stop-all confirmation', () => {
 
         stop.resolve({
             cancelled: 2,
-            jobs: [
-                { ...runningJob, status: 'cancelled' },
-                { ...queuedJob, status: 'cancelled' },
-                completedJob,
-            ],
+            jobs: [{ ...runningJob, status: 'cancelled' }, { ...queuedJob, status: 'cancelled' }, completedJob],
         })
         await flushPromises()
         expect(dialog(wrapper).exists()).toBe(false)
@@ -377,8 +378,18 @@ describe('AgentJobs stop-all confirmation', () => {
 
         await openStopAllDialog(wrapper)
         // Both active jobs finish while the dialog is open.
-        emitSse('agent_job_completed', { id: 'job-running', ticket_id: 'DEV-1', status: 'completed', finished_at: '2026-10-08T10:02:00.000Z' })
-        emitSse('agent_job_cancelled', { id: 'job-queued', ticket_id: 'DEV-1', status: 'cancelled', finished_at: '2026-10-08T10:02:00.000Z' })
+        emitSse('agent_job_completed', {
+            id: 'job-running',
+            ticket_id: 'DEV-1',
+            status: 'completed',
+            finished_at: '2026-10-08T10:02:00.000Z',
+        })
+        emitSse('agent_job_cancelled', {
+            id: 'job-queued',
+            ticket_id: 'DEV-1',
+            status: 'cancelled',
+            finished_at: '2026-10-08T10:02:00.000Z',
+        })
         await flushPromises()
         expect(stopAllButton(wrapper).attributes('disabled')).toBeDefined()
 
@@ -801,7 +812,8 @@ describe('AgentJobs log sequence join', () => {
             // The snapshot window only covers the newest 200 events.
             const windowed = (kind: string, message: string) =>
                 Array.from({ length: 200 }, (_, i) =>
-                    logEntry(kind, 301 + i, '2026-10-08T10:20:01.000Z', `${message}-${301 + i}`))
+                    logEntry(kind, 301 + i, '2026-10-08T10:20:01.000Z', `${message}-${301 + i}`),
+                )
             first.resolve({ job: logJobA, events: windowed('agent_job_progress', 'snap') })
             await flushPromises()
             expect(panelText(wrapper)).toContain('snap-450')
@@ -885,7 +897,8 @@ describe('AgentJobs log sequence join', () => {
         const alpha = deferred<AgentJobLogsResponse>()
         const beta = deferred<AgentJobLogsResponse>()
         ;(api.getAgentJobLogs as any).mockImplementation((id: string) =>
-            id === 'job-logs-a' ? alpha.promise : beta.promise)
+            id === 'job-logs-a' ? alpha.promise : beta.promise,
+        )
         const wrapper = await mountAgentJobs()
         try {
             emitSse('agent_job_started', {

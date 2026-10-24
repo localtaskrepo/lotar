@@ -17,31 +17,36 @@
     <BarChart v-if="series.length" :series="series" :width="width" :height="height" />
     <p v-else class="velocity-trend__empty">No velocity data available for this metric.</p>
     <p v-if="response?.truncated" class="velocity-trend__hint">Showing the most recent {{ response.count }} sprints.</p>
-    <p v-if="response?.skipped_incomplete" class="velocity-trend__hint">Incomplete sprints were skipped. Enable active sprints to include them.</p>
+    <p v-if="response?.skipped_incomplete" class="velocity-trend__hint">
+      Incomplete sprints were skipped. Enable active sprints to include them.
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { SprintVelocityEntryPayload, SprintVelocityResponse } from '../../api/types';
-import BarChart from '../BarChart.vue';
+import { computed } from 'vue'
+import type { SprintVelocityEntryPayload, SprintVelocityResponse } from '../../api/types'
+import BarChart from '../BarChart.vue'
 
 type SprintMetric = 'tasks' | 'points' | 'hours'
 
-const props = withDefaults(defineProps<{
-  response?: SprintVelocityResponse
-  metric?: SprintMetric
-  width?: number
-  height?: number
-  currentSprintId?: number | null
-  windowSize?: number
-}>(), {
-  metric: 'points',
-  width: 560,
-  height: 220,
-  currentSprintId: null,
-  windowSize: 8,
-})
+const props = withDefaults(
+  defineProps<{
+    response?: SprintVelocityResponse
+    metric?: SprintMetric
+    width?: number
+    height?: number
+    currentSprintId?: number | null
+    windowSize?: number
+  }>(),
+  {
+    metric: 'points',
+    width: 560,
+    height: 220,
+    currentSprintId: null,
+    windowSize: 8,
+  },
+)
 
 const fallbackLabel = (entry: SprintVelocityEntryPayload) => entry.summary.label || `#${entry.summary.id}`
 const chartWindowSize = computed(() => Math.max(1, props.windowSize ?? 1))
@@ -78,9 +83,7 @@ const series = computed(() => {
   }))
 })
 
-const visibleSprintIdsAttribute = computed(() =>
-  visibleEntries.value.map((entry) => entry.summary.id).join(','),
-)
+const visibleSprintIdsAttribute = computed(() => visibleEntries.value.map((entry) => entry.summary.id).join(','))
 
 function formatNumber(value?: number | null) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—'

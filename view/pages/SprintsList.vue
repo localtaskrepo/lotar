@@ -1,10 +1,10 @@
 <template>
-  <section class="col sprints-page" style="gap: 16px;">
+  <section class="col sprints-page" style="gap: 16px">
     <header class="row header">
-      <div class="col" style="gap: 4px;">
+      <div class="col" style="gap: 4px">
         <h1>Sprints</h1>
       </div>
-      <div class="row split-actions" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+      <div class="row split-actions" style="gap: 8px; align-items: center; flex-wrap: wrap">
         <a :href="`/dependencies${project ? '?project=' + encodeURIComponent(project) : ''}`">Dependencies</a>
         <UiButton
           icon-only
@@ -28,125 +28,144 @@
 
     <div v-if="hasMissingSprints" class="alert warn">
       <p>
-        Missing sprint files detected for <strong>{{ missingSprintMessage }}</strong>. Review assignments or run cleanup before creating new sprints.
+        Missing sprint files detected for <strong>{{ missingSprintMessage }}</strong
+        >. Review assignments or run cleanup before creating new sprints.
       </p>
     </div>
 
-    <UiModal :open="modal.open" :aria-label="modal.mode === 'create' ? 'Create sprint' : 'Edit sprint'" size="lg" @close="closeModal">
-          <form class="col sprint-modal__form" @submit.prevent="submitModal">
-            <header class="row sprint-modal__header">
-              <div class="col" style="gap: 4px;">
-                <h2>{{ modal.mode === 'create' ? 'Create sprint' : 'Edit sprint' }}</h2>
-                <p class="muted">
-                  {{ modal.mode === 'create'
-                    ? 'Capture scheduling details and capacity to keep planning accurate.'
-                    : 'Update plan metadata, timing, or capacity for this sprint.' }}
-                </p>
-              </div>
-              <UiButton
-                icon-only
-                variant="ghost"
-                type="button"
-                aria-label="Close dialog"
-                :disabled="submitting"
-                @click="closeModal"
-              >
-                <IconGlyph name="close" />
-              </UiButton>
-            </header>
-            <div class="sprint-form__grid sprint-form__grid--names">
-              <label class="sprint-form__field">
-                <span class="muted">Label<span class="muted"> *</span></span>
-                <input ref="firstField" class="input" v-model="form.label" placeholder="Sprint name" required />
-              </label>
-              <label class="sprint-form__field">
-                <span class="muted">Goal</span>
-                <input class="input" v-model="form.goal" placeholder="Optional goal" />
-              </label>
-            </div>
-            <div class="sprint-form__grid sprint-form__grid--schedule">
-              <label class="sprint-form__field">
-                <span class="muted">Planned start</span>
-                <input class="input" type="datetime-local" step="60" v-model="form.starts_at" />
-              </label>
-              <label class="sprint-form__field">
-                <span class="muted">Planned end</span>
-                <input class="input" type="datetime-local" step="60" v-model="form.ends_at" />
-              </label>
-              <label class="sprint-form__field">
-                <span class="muted">Length</span>
-                <input class="input" v-model="form.plan_length" placeholder="2w, 10d" />
-              </label>
-            </div>
-            <div class="sprint-form__grid sprint-form__grid--capacity">
-              <label class="sprint-form__field">
-                <span class="muted">Capacity (points)</span>
-                <input class="input" type="number" inputmode="numeric" v-model="form.capacity_points" />
-              </label>
-              <label class="sprint-form__field">
-                <span class="muted">Capacity (hours)</span>
-                <input class="input" type="number" inputmode="numeric" v-model="form.capacity_hours" />
-              </label>
-              <label class="sprint-form__field">
-                <span class="muted">Overdue after</span>
-                <input class="input" v-model="form.overdue_after" placeholder="12h" />
-              </label>
-            </div>
-            <label class="col" style="gap: 4px;">
-              <span class="muted">Notes</span>
-              <textarea class="input" rows="3" v-model="form.notes" placeholder="Additional context"></textarea>
-            </label>
-            <label v-if="modal.mode === 'create'" class="row" style="gap: 6px; align-items: center;">
-              <input type="checkbox" v-model="form.skip_defaults" />
-              Skip applying sprint defaults for this sprint
-            </label>
-            <footer class="row" style="gap: 8px; flex-wrap: wrap;">
-              <UiButton variant="primary" type="submit" :disabled="submitting">
-                {{ submitting ? (modal.mode === 'create' ? 'Creating…' : 'Saving…') : modal.mode === 'create' ? 'Create sprint' : 'Save changes' }}
-              </UiButton>
-              <ReloadButton
-                :disabled="submitting || busy"
-                :loading="busy"
-                label="Refresh sprint list"
-                title="Refresh sprint list"
-                @click="handleManualRefresh"
-              />
-            </footer>
-          </form>
+    <UiModal
+      :open="modal.open"
+      :aria-label="modal.mode === 'create' ? 'Create sprint' : 'Edit sprint'"
+      size="lg"
+      @close="closeModal"
+    >
+      <form class="col sprint-modal__form" @submit.prevent="submitModal">
+        <header class="row sprint-modal__header">
+          <div class="col" style="gap: 4px">
+            <h2>{{ modal.mode === 'create' ? 'Create sprint' : 'Edit sprint' }}</h2>
+            <p class="muted">
+              {{
+                modal.mode === 'create'
+                  ? 'Capture scheduling details and capacity to keep planning accurate.'
+                  : 'Update plan metadata, timing, or capacity for this sprint.'
+              }}
+            </p>
+          </div>
+          <UiButton
+            icon-only
+            variant="ghost"
+            type="button"
+            aria-label="Close dialog"
+            :disabled="submitting"
+            @click="closeModal"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <div class="sprint-form__grid sprint-form__grid--names">
+          <label class="sprint-form__field">
+            <span class="muted">Label<span class="muted"> *</span></span>
+            <input ref="firstField" class="input" v-model="form.label" placeholder="Sprint name" required />
+          </label>
+          <label class="sprint-form__field">
+            <span class="muted">Goal</span>
+            <input class="input" v-model="form.goal" placeholder="Optional goal" />
+          </label>
+        </div>
+        <div class="sprint-form__grid sprint-form__grid--schedule">
+          <label class="sprint-form__field">
+            <span class="muted">Planned start</span>
+            <input class="input" type="datetime-local" step="60" v-model="form.starts_at" />
+          </label>
+          <label class="sprint-form__field">
+            <span class="muted">Planned end</span>
+            <input class="input" type="datetime-local" step="60" v-model="form.ends_at" />
+          </label>
+          <label class="sprint-form__field">
+            <span class="muted">Length</span>
+            <input class="input" v-model="form.plan_length" placeholder="2w, 10d" />
+          </label>
+        </div>
+        <div class="sprint-form__grid sprint-form__grid--capacity">
+          <label class="sprint-form__field">
+            <span class="muted">Capacity (points)</span>
+            <input class="input" type="number" inputmode="numeric" v-model="form.capacity_points" />
+          </label>
+          <label class="sprint-form__field">
+            <span class="muted">Capacity (hours)</span>
+            <input class="input" type="number" inputmode="numeric" v-model="form.capacity_hours" />
+          </label>
+          <label class="sprint-form__field">
+            <span class="muted">Overdue after</span>
+            <input class="input" v-model="form.overdue_after" placeholder="12h" />
+          </label>
+        </div>
+        <label class="col" style="gap: 4px">
+          <span class="muted">Notes</span>
+          <textarea class="input" rows="3" v-model="form.notes" placeholder="Additional context"></textarea>
+        </label>
+        <label v-if="modal.mode === 'create'" class="row" style="gap: 6px; align-items: center">
+          <input type="checkbox" v-model="form.skip_defaults" />
+          Skip applying sprint defaults for this sprint
+        </label>
+        <footer class="row" style="gap: 8px; flex-wrap: wrap">
+          <UiButton variant="primary" type="submit" :disabled="submitting">
+            {{
+              submitting
+                ? modal.mode === 'create'
+                  ? 'Creating…'
+                  : 'Saving…'
+                : modal.mode === 'create'
+                  ? 'Create sprint'
+                  : 'Save changes'
+            }}
+          </UiButton>
+          <ReloadButton
+            :disabled="submitting || busy"
+            :loading="busy"
+            label="Refresh sprint list"
+            title="Refresh sprint list"
+            @click="handleManualRefresh"
+          />
+        </footer>
+      </form>
     </UiModal>
 
     <UiModal :open="deleteDialog.open" :aria-label="deleteDialogTitle" @close="closeDeleteDialog">
-          <div class="col sprint-delete__content">
-            <header class="row sprint-delete__header">
-              <div class="col" style="gap: 4px;">
-                <h2>{{ deleteDialogTitle }}</h2>
-                <p class="muted">This action cannot be undone.</p>
-              </div>
-              <UiButton
-                variant="ghost"
-                icon-only
-                type="button"
-                aria-label="Close dialog"
-                title="Close dialog"
-                :disabled="deleteDialogSubmitting"
-                @click="closeDeleteDialog"
-              >
-                <IconGlyph name="close" />
-              </UiButton>
-            </header>
-            <div class="col sprint-delete__body">
-              <p>Deleting this sprint removes its board card and clears memberships from affected tasks.</p>
-              <p v-if="deleteDialog.backlogCount">
-                {{ deleteDialog.backlogCount }} task{{ deleteDialog.backlogCount === 1 ? '' : 's' }} will return to the backlog.
-              </p>
-            </div>
-            <footer class="row sprint-delete__actions">
-              <UiButton variant="danger" type="button" :disabled="deleteDialogSubmitting" @click="confirmDeleteSprint">
-                {{ deleteDialogSubmitting ? 'Deleting…' : 'Delete sprint' }}
-              </UiButton>
-              <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</UiButton>
-            </footer>
+      <div class="col sprint-delete__content">
+        <header class="row sprint-delete__header">
+          <div class="col" style="gap: 4px">
+            <h2>{{ deleteDialogTitle }}</h2>
+            <p class="muted">This action cannot be undone.</p>
           </div>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            :disabled="deleteDialogSubmitting"
+            @click="closeDeleteDialog"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <div class="col sprint-delete__body">
+          <p>Deleting this sprint removes its board card and clears memberships from affected tasks.</p>
+          <p v-if="deleteDialog.backlogCount">
+            {{ deleteDialog.backlogCount }} task{{ deleteDialog.backlogCount === 1 ? '' : 's' }} will return to the
+            backlog.
+          </p>
+        </div>
+        <footer class="row sprint-delete__actions">
+          <UiButton variant="danger" type="button" :disabled="deleteDialogSubmitting" @click="confirmDeleteSprint">
+            {{ deleteDialogSubmitting ? 'Deleting…' : 'Delete sprint' }}
+          </UiButton>
+          <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog"
+            >Cancel</UiButton
+          >
+        </footer>
+      </div>
     </UiModal>
 
     <SprintAnalyticsDialog
@@ -154,8 +173,8 @@
       :sprints="sortedSprints"
       :selected-sprint-id="selectedAnalyticsSprintId"
       :summary="analyticsSummary"
-  :summary-loading="summaryLoading"
-  :summary-error="summaryError"
+      :summary-loading="summaryLoading"
+      :summary-error="summaryError"
       :burndown="analyticsBurndown"
       :velocity="analyticsVelocity"
       :loading="analyticsLoading"
@@ -212,7 +231,14 @@
             @reset="resetColumns"
           >
             <template #trigger="{ open, toggle }">
-              <UiButton class="responsive-action" type="button" aria-label="Configure columns" title="Configure columns" :aria-expanded="open" @click="toggle">
+              <UiButton
+                class="responsive-action"
+                type="button"
+                aria-label="Configure columns"
+                title="Configure columns"
+                :aria-expanded="open"
+                @click="toggle"
+              >
                 <IconGlyph name="columns" aria-hidden="true" />
                 <span class="responsive-action__label">Columns</span>
               </UiButton>
@@ -233,7 +259,8 @@
     </div>
 
     <p v-if="hiddenClosedCount" class="muted hint">
-      Hiding {{ hiddenClosedCount }} completed sprint{{ hiddenClosedCount === 1 ? '' : 's' }} outside the selected window. Choose "All time" to include every sprint.
+      Hiding {{ hiddenClosedCount }} completed sprint{{ hiddenClosedCount === 1 ? '' : 's' }} outside the selected
+      window. Choose "All time" to include every sprint.
     </p>
 
     <UiLoader v-if="!initialized" size="md" />
@@ -247,7 +274,7 @@
         @primary="openCreate"
       />
 
-      <div class="col group-stack" style="gap: 12px;">
+      <div class="col group-stack" style="gap: 12px">
         <UiCard
           v-for="sprint in visibleSprints"
           :key="sprint.id"
@@ -261,7 +288,13 @@
           @mouseleave="hideReorderHint"
         >
           <header class="group-header">
-            <button class="collapse-btn" type="button" :aria-expanded="isExpanded(sectionKey(sprint.id))" :aria-label="`${isExpanded(sectionKey(sprint.id)) ? 'Collapse' : 'Expand'} ${sprint.display_name}`" @click="toggleSection(sectionKey(sprint.id))">
+            <button
+              class="collapse-btn"
+              type="button"
+              :aria-expanded="isExpanded(sectionKey(sprint.id))"
+              :aria-label="`${isExpanded(sectionKey(sprint.id)) ? 'Collapse' : 'Expand'} ${sprint.display_name}`"
+              @click="toggleSection(sectionKey(sprint.id))"
+            >
               <span aria-hidden="true">{{ isExpanded(sectionKey(sprint.id)) ? '▾' : '▸' }}</span>
             </button>
             <div class="group-title">
@@ -292,12 +325,19 @@
                 </template>
                 <div
                   v-if="startDelayLookup.get(sprint.id)"
-                  :class="['meta-item', startDelayLookup.get(sprint.id)?.severity === 'danger' ? 'meta-item--danger' : 'meta-item--warning']"
+                  :class="[
+                    'meta-item',
+                    startDelayLookup.get(sprint.id)?.severity === 'danger' ? 'meta-item--danger' : 'meta-item--warning',
+                  ]"
                 >
                   <span class="meta-label">Start overdue</span>
                   <span
                     class="meta-value"
-                    :class="startDelayLookup.get(sprint.id)?.severity === 'danger' ? 'meta-value--danger' : 'meta-value--warning'"
+                    :class="
+                      startDelayLookup.get(sprint.id)?.severity === 'danger'
+                        ? 'meta-value--danger'
+                        : 'meta-value--warning'
+                    "
                   >
                     {{ startDelayLookup.get(sprint.id)?.elapsed }} late
                     <span v-if="startDelayLookup.get(sprint.id)?.limitLabel">
@@ -396,7 +436,11 @@
                 </div>
               </div>
             </div>
-            <span class="group-count">{{ getTasksForSprint(sprint.id).length }} task{{ getTasksForSprint(sprint.id).length === 1 ? '' : 's' }}</span>
+            <span class="group-count"
+              >{{ getTasksForSprint(sprint.id).length }} task{{
+                getTasksForSprint(sprint.id).length === 1 ? '' : 's'
+              }}</span
+            >
             <div class="group-actions">
               <UiButton
                 class="small"
@@ -405,7 +449,11 @@
                 :aria-pressed="isSprintManual(sprint.id)"
                 :disabled="busy"
                 data-testid="sprint-manual-order"
-                :title="isSprintManual(sprint.id) ? 'Use field sorting' : 'Switch to Manual order to drag rows before or after another task'"
+                :title="
+                  isSprintManual(sprint.id)
+                    ? 'Use field sorting'
+                    : 'Switch to Manual order to drag rows before or after another task'
+                "
                 @click="toggleSprintManual(sprint.id)"
               >
                 <IconGlyph name="list" aria-hidden="true" />
@@ -451,16 +499,8 @@
               >
                 Reopen
               </UiButton>
-              <UiButton class="small" type="button" @click="openAnalytics(sprint)">
-                Insights
-              </UiButton>
-              <UiButton
-                icon-only
-                type="button"
-                aria-label="Edit sprint"
-                title="Edit sprint"
-                @click="openEdit(sprint)"
-              >
+              <UiButton class="small" type="button" @click="openAnalytics(sprint)"> Insights </UiButton>
+              <UiButton icon-only type="button" aria-label="Edit sprint" title="Edit sprint" @click="openEdit(sprint)">
                 <IconGlyph name="edit" />
               </UiButton>
               <UiButton
@@ -479,7 +519,9 @@
           </header>
           <transition name="collapse">
             <div v-show="isExpanded(sectionKey(sprint.id))" class="group-body">
-              <p v-if="!getSortedTasksForSprint(sprint.id).length" class="muted empty-placeholder">No tasks in this sprint.</p>
+              <p v-if="!getSortedTasksForSprint(sprint.id).length" class="muted empty-placeholder">
+                No tasks in this sprint.
+              </p>
               <div v-else class="table-wrapper">
                 <table class="sprint-table">
                   <thead>
@@ -509,7 +551,9 @@
                           @dragend="onColDragEnd"
                         >
                           {{ headerLabel(col) }}
-                          <span class="sort-glyph" aria-hidden="true">{{ isSprintManual(sprint.id) ? '⇅' : sortGlyph(col) }}</span>
+                          <span class="sort-glyph" aria-hidden="true">{{
+                            isSprintManual(sprint.id) ? '⇅' : sortGlyph(col)
+                          }}</span>
                         </button>
                       </th>
                     </tr>
@@ -520,17 +564,24 @@
                       :key="task.id + '-' + sprint.id"
                       class="task-row"
                       :class="{
-                        'task-row--dragging': draggingTaskId === task.id && draggingSourceSprint === sprint.id && isSprintManual(sprint.id),
-                        'task-row--before': rowMarker?.task === task.id && rowMarker.sprint === sprint.id && rowMarker.position === 'before',
-                        'task-row--after': rowMarker?.task === task.id && rowMarker.sprint === sprint.id && rowMarker.position === 'after',
+                        'task-row--dragging':
+                          draggingTaskId === task.id && draggingSourceSprint === sprint.id && isSprintManual(sprint.id),
+                        'task-row--before':
+                          rowMarker?.task === task.id &&
+                          rowMarker.sprint === sprint.id &&
+                          rowMarker.position === 'before',
+                        'task-row--after':
+                          rowMarker?.task === task.id &&
+                          rowMarker.sprint === sprint.id &&
+                          rowMarker.position === 'after',
                       }"
-                       :draggable="!dragBlocked"
-                       :title="isSprintManual(sprint.id) ? undefined : automaticOrderHint"
-                       :aria-describedby="reorderHint?.sprint === sprint.id ? 'task-order-tooltip' : undefined"
+                      :draggable="!dragBlocked"
+                      :title="isSprintManual(sprint.id) ? undefined : automaticOrderHint"
+                      :aria-describedby="reorderHint?.sprint === sprint.id ? 'task-order-tooltip' : undefined"
                       :data-task-id="task.id"
                       @dragover="onRowDragOver($event, task.id, sprint.id)"
-                       @dragleave="rowMarker = null"
-                       @mouseleave="hideReorderHint"
+                      @dragleave="rowMarker = null"
+                      @mouseleave="hideReorderHint"
                       @drop="onRowDrop($event, task.id, sprint.id)"
                       @dragstart="onTaskDragStart($event, task.id, sprint.id)"
                       @dragend="onTaskDragEnd"
@@ -549,23 +600,23 @@
                         :sprint-state-class="sprintStateClass"
                       />
                     </tr>
-                   </tbody>
-                 </table>
-               </div>
-               <UiPagination
-                 :offset="sprintTaskOffset(sprint.id)"
-                 :total="getSortedTasksForSprint(sprint.id).length"
-                 :page-size="tasksPageSize"
-                 :disabled="busy"
-                 :ariaLabel="`Sprint #${sprint.id} pagination`"
-                 @page="goToSprintPage(sprint.id, $event)"
-               />
-             </div>
-           </transition>
-         </UiCard>
+                  </tbody>
+                </table>
+              </div>
+              <UiPagination
+                :offset="sprintTaskOffset(sprint.id)"
+                :total="getSortedTasksForSprint(sprint.id).length"
+                :page-size="tasksPageSize"
+                :disabled="busy"
+                :ariaLabel="`Sprint #${sprint.id} pagination`"
+                @page="goToSprintPage(sprint.id, $event)"
+              />
+            </div>
+          </transition>
+        </UiCard>
 
-         <UiCard
-           ref="backlogRef"
+        <UiCard
+          ref="backlogRef"
           id="backlog"
           class="sprint-group backlog-group"
           :class="{ 'sprint-group--drop': hoverBacklog }"
@@ -577,7 +628,13 @@
           @mouseleave="hideReorderHint"
         >
           <header class="group-header">
-            <button class="collapse-btn" type="button" :aria-expanded="isExpanded('backlog')" :aria-label="isExpanded('backlog') ? 'Collapse backlog' : 'Expand backlog'" @click="toggleSection('backlog')">
+            <button
+              class="collapse-btn"
+              type="button"
+              :aria-expanded="isExpanded('backlog')"
+              :aria-label="isExpanded('backlog') ? 'Collapse backlog' : 'Expand backlog'"
+              @click="toggleSection('backlog')"
+            >
               <span aria-hidden="true">{{ isExpanded('backlog') ? '▾' : '▸' }}</span>
             </button>
             <div class="group-title">
@@ -604,7 +661,11 @@
                 :aria-pressed="backlogManualOrder"
                 :disabled="busy"
                 data-testid="backlog-manual-order"
-                :title="backlogManualOrder ? 'Use field sorting' : 'Switch to Manual order to drag rows before or after another task'"
+                :title="
+                  backlogManualOrder
+                    ? 'Use field sorting'
+                    : 'Switch to Manual order to drag rows before or after another task'
+                "
                 @click="backlogManualOrder = !backlogManualOrder"
               >
                 <IconGlyph name="list" aria-hidden="true" />
@@ -656,28 +717,33 @@
                           @dragend="onColDragEnd"
                         >
                           {{ headerLabel(col) }}
-                          <span class="sort-glyph" aria-hidden="true">{{ backlogManualOrder ? '⇅' : sortGlyph(col) }}</span>
+                          <span class="sort-glyph" aria-hidden="true">{{
+                            backlogManualOrder ? '⇅' : sortGlyph(col)
+                          }}</span>
                         </button>
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr
-                       v-for="task in pagedBacklogTasks"
+                      v-for="task in pagedBacklogTasks"
                       :key="task.id"
                       class="task-row"
                       :class="{
-                         'task-row--dragging': draggingTaskId === task.id && draggingSourceSprint === null && backlogManualOrder,
-                        'task-row--before': rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'before',
-                        'task-row--after': rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'after',
+                        'task-row--dragging':
+                          draggingTaskId === task.id && draggingSourceSprint === null && backlogManualOrder,
+                        'task-row--before':
+                          rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'before',
+                        'task-row--after':
+                          rowMarker?.task === task.id && rowMarker.sprint === null && rowMarker.position === 'after',
                       }"
-                        :draggable="!dragBlocked"
-                        :title="backlogManualOrder ? undefined : automaticOrderHint"
-                        :aria-describedby="reorderHint?.sprint === null ? 'task-order-tooltip' : undefined"
+                      :draggable="!dragBlocked"
+                      :title="backlogManualOrder ? undefined : automaticOrderHint"
+                      :aria-describedby="reorderHint?.sprint === null ? 'task-order-tooltip' : undefined"
                       :data-task-id="task.id"
                       @dragover="onRowDragOver($event, task.id, null)"
-                        @dragleave="rowMarker = null"
-                        @mouseleave="hideReorderHint"
+                      @dragleave="rowMarker = null"
+                      @mouseleave="hideReorderHint"
                       @drop="onRowDrop($event, task.id, null)"
                       @dragstart="onTaskDragStart($event, task.id, null)"
                       @dragend="onTaskDragEnd"
@@ -696,32 +762,34 @@
                         :sprint-state-class="sprintStateClass"
                       />
                     </tr>
-                   </tbody>
-                 </table>
-               </div>
-               <UiPagination
-                 :offset="backlogOffset"
-                 :total="backlogTotalCount"
-                 :page-size="tasksPageSize"
-                 :disabled="busy"
-                 ariaLabel="Backlog pagination"
-                 @page="goToBacklogPage"
-               />
-             </div>
-           </transition>
-         </UiCard>
-       </div>
-     </template>
-      <Teleport to="body">
-        <div
-          v-if="reorderHint"
-          id="task-order-tooltip"
-          role="tooltip"
-          class="task-order-tooltip"
-          :style="{ left: `${reorderHint.x}px`, top: `${reorderHint.y}px`, width: `${reorderHint.width}px` }"
-        >{{ automaticOrderHint }}</div>
-      </Teleport>
-    </section>
+                  </tbody>
+                </table>
+              </div>
+              <UiPagination
+                :offset="backlogOffset"
+                :total="backlogTotalCount"
+                :page-size="tasksPageSize"
+                :disabled="busy"
+                ariaLabel="Backlog pagination"
+                @page="goToBacklogPage"
+              />
+            </div>
+          </transition>
+        </UiCard>
+      </div>
+    </template>
+    <Teleport to="body">
+      <div
+        v-if="reorderHint"
+        id="task-order-tooltip"
+        role="tooltip"
+        class="task-order-tooltip"
+        :style="{ left: `${reorderHint.x}px`, top: `${reorderHint.y}px`, width: `${reorderHint.width}px` }"
+      >
+        {{ automaticOrderHint }}
+      </div>
+    </Teleport>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -764,11 +832,26 @@ import { ensureCompletionPolicies, useCompletionPolicy } from '../composables/us
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { MS_PER_DAY, formatRelativeTime, fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
+import {
+  MS_PER_DAY,
+  formatRelativeTime,
+  fromDateTimeInputValue,
+  parseTaskDate,
+  safeTimestamp,
+  startOfLocalDay,
+  toDateTimeInputValue,
+} from '../utils/date'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { projectOf } from '../utils/text'
 import { colKeyToSortBy, sortTasks as sortTasksByContract } from '../utils/taskSort'
-import { storageGet, storageGetFlag, storageGetJson, storageSet, storageSetFlag, storageSetJson } from '../utils/storage'
+import {
+  storageGet,
+  storageGetFlag,
+  storageGetJson,
+  storageSet,
+  storageSetFlag,
+  storageSetJson,
+} from '../utils/storage'
 
 type ColumnKey = import('../composables/useColumns').ColKey
 
@@ -867,7 +950,13 @@ function loadHighlightPreference(): boolean {
 
 const route = useRoute()
 
-const { sprints, loading: sprintsLoading, refresh: refreshSprints, missingSprints, hasMissing: hasMissingSprints } = useSprints()
+const {
+  sprints,
+  loading: sprintsLoading,
+  refresh: refreshSprints,
+  missingSprints,
+  hasMissing: hasMissingSprints,
+} = useSprints()
 const sprintFilterOptions = useSprintFilterOptions(sprints)
 const { state: taskPanelState, openTaskPanel } = useTaskPanelController()
 // Preserve an open draft instead of silently changing its destination.
@@ -898,14 +987,17 @@ const {
   unbindCopyModifierListeners,
 } = useCopyModifier()
 
-const analyticsModal = reactive<{ open: boolean; tab: AnalyticsTab; burndownMetric: SprintMetric; velocityMetric: SprintMetric }>(
-  {
-    open: false,
-    tab: 'health',
-    burndownMetric: 'tasks',
-    velocityMetric: DEFAULT_VELOCITY_PARAMS.metric as SprintMetric,
-  },
-)
+const analyticsModal = reactive<{
+  open: boolean
+  tab: AnalyticsTab
+  burndownMetric: SprintMetric
+  velocityMetric: SprintMetric
+}>({
+  open: false,
+  tab: 'health',
+  burndownMetric: 'tasks',
+  velocityMetric: DEFAULT_VELOCITY_PARAMS.metric as SprintMetric,
+})
 
 const VELOCITY_WINDOW = DEFAULT_VELOCITY_PARAMS.limit
 
@@ -977,7 +1069,6 @@ const customFilterPresets = computed(() => {
   }))
 })
 
-
 function parseDateLike(value?: string | null) {
   return parseTaskDate(value || undefined)
 }
@@ -985,9 +1076,15 @@ function parseDateLike(value?: string | null) {
 const allowClosed = ref(false)
 const timeRange = ref<TimeRangeKey>(loadStoredTimeRange())
 const tasks = ref<TaskDTO[]>([])
-const filterOptions = useFilterOptions(() => tasks.value, () => project.value, {
-  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
-})
+const filterOptions = useFilterOptions(
+  () => tasks.value,
+  () => project.value,
+  {
+    scope: () => configScope.value,
+    tags: () => configuredTags.value,
+    members: () => members.value,
+  },
+)
 const tasksLoading = ref(false)
 const initialized = ref(false)
 
@@ -1121,9 +1218,7 @@ const headerLabel = (col: ColumnKey) => columnStore.headerLabel(col)
 
 const columnMenuOpen = ref(false)
 
-const columnOptions = computed(() =>
-  columnOrder.value.map((col) => ({ key: col, label: headerLabel(col) })),
-)
+const columnOptions = computed(() => columnOrder.value.map((col) => ({ key: col, label: headerLabel(col) })))
 
 const isColumnVisible = (key: string) => columnsSet.value.has(key as ColumnKey)
 
@@ -1131,13 +1226,18 @@ const sortState = loadStoredSort()
 const backlogManualOrder = ref(storageGetFlag('lotar.sprints.backlogManualOrder', false))
 const automaticOrderHint = 'Automatic sorting is on. Switch to Manual order to reorder tasks.'
 const reorderHint = ref<{ x: number; y: number; width: number; sprint: number | null } | null>(null)
-function hideReorderHint() { reorderHint.value = null }
-function isContainerManual(sprint: number | null) { return sprint === null ? backlogManualOrder.value : isSprintManual(sprint) }
+function hideReorderHint() {
+  reorderHint.value = null
+}
+function isContainerManual(sprint: number | null) {
+  return sprint === null ? backlogManualOrder.value : isSprintManual(sprint)
+}
 function showReorderHint(event: DragEvent, sprint: number | null) {
   const bounds = event.currentTarget instanceof Element ? event.currentTarget.getBoundingClientRect() : null
-  const x = Number.isFinite(event.clientX) ? event.clientX : bounds?.left ?? 0
-  const y = Number.isFinite(event.clientY) ? event.clientY : bounds?.bottom ?? 0
-  const bottom = event.currentTarget instanceof Element && event.currentTarget.tagName === 'TR' ? bounds?.bottom ?? y : y
+  const x = Number.isFinite(event.clientX) ? event.clientX : (bounds?.left ?? 0)
+  const y = Number.isFinite(event.clientY) ? event.clientY : (bounds?.bottom ?? 0)
+  const bottom =
+    event.currentTarget instanceof Element && event.currentTarget.tagName === 'TR' ? (bounds?.bottom ?? y) : y
   const viewportWidth = document.documentElement.clientWidth || window.innerWidth
   const viewportHeight = document.documentElement.clientHeight || window.innerHeight
   const width = Math.min(300, viewportWidth - 16)
@@ -1148,8 +1248,12 @@ function showReorderHint(event: DragEvent, sprint: number | null) {
     y: Math.max(8, Math.min(Math.max(y + 24, bottom + 8), viewportHeight - 100)),
   }
 }
-function onOrderHintKeydown(event: KeyboardEvent) { if (event.key === 'Escape') hideReorderHint() }
-const manualSprints = ref<number[]>(storageGetJson<number[]>('lotar.sprints.manualOrder')?.filter(id => Number.isInteger(id) && id > 0) ?? [])
+function onOrderHintKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') hideReorderHint()
+}
+const manualSprints = ref<number[]>(
+  storageGetJson<number[]>('lotar.sprints.manualOrder')?.filter((id) => Number.isInteger(id) && id > 0) ?? [],
+)
 const backlogOrder = ref<string[]>([])
 const backlogOrderLoading = ref(false)
 const reordering = ref(false)
@@ -1165,10 +1269,12 @@ let taskGeneration = 0
 let orderSse: ReturnType<typeof useSse> | null = null
 const isSprintManual = (id: number) => manualSprints.value.includes(id)
 function toggleSprintManual(id: number) {
-  manualSprints.value = isSprintManual(id) ? manualSprints.value.filter(value => value !== id) : [...manualSprints.value, id]
+  manualSprints.value = isSprintManual(id)
+    ? manualSprints.value.filter((value) => value !== id)
+    : [...manualSprints.value, id]
   delete sprintTaskOffsets[id]
 }
-watch(manualSprints, value => storageSetJson('lotar.sprints.manualOrder', value))
+watch(manualSprints, (value) => storageSetJson('lotar.sprints.manualOrder', value))
 watch([backlogManualOrder, manualSprints], hideReorderHint)
 const sort = reactive<{ key: ColumnKey | null; dir: 'asc' | 'desc' }>(
   sortState ?? {
@@ -1195,7 +1301,7 @@ let sortingSprint: number | null = null
 function onSort(key: ColumnKey) {
   hideReorderHint()
   if (sortingSprint === null) backlogManualOrder.value = false
-  else manualSprints.value = manualSprints.value.filter(id => id !== sortingSprint)
+  else manualSprints.value = manualSprints.value.filter((id) => id !== sortingSprint)
   if (sort.key === key) {
     sort.dir = sort.dir === 'asc' ? 'desc' : 'asc'
   } else {
@@ -1255,12 +1361,10 @@ const nonFutureSprints = computed(() => sortedSprints.value.filter((entry) => !s
 const analyticsDefaultSprintId = computed<number | null>(() => {
   const items = sortedSprints.value
   if (!items.length) return null
-  const active = [...items]
-    .reverse()
-    .find((entry) => {
-      const state = sprintStateKey(entry)
-      return state === 'active' || state === 'overdue'
-    })
+  const active = [...items].reverse().find((entry) => {
+    const state = sprintStateKey(entry)
+    return state === 'active' || state === 'overdue'
+  })
   if (active) return active.id
   const fallbackPool = nonFutureSprints.value
   if (fallbackPool.length) {
@@ -1398,9 +1502,8 @@ function multiSprintTooltip(task: TaskDTO, currentSprintId: number | null): stri
     return 'Assigned to multiple sprints'
   }
   const labelFor = (id: number) => sprintLookup.value[id]?.label || `Sprint #${id}`
-  const otherIds = currentSprintId === null
-    ? uniqueMemberships
-    : uniqueMemberships.filter((id) => id !== currentSprintId)
+  const otherIds =
+    currentSprintId === null ? uniqueMemberships : uniqueMemberships.filter((id) => id !== currentSprintId)
   const hints = Array.from(new Set(otherIds.map(labelFor).filter((label) => label && label.trim().length > 0)))
   if (hints.length) {
     return `Also assigned to ${hints.join(', ')}`
@@ -1441,12 +1544,19 @@ function capacitySummary(sprint: SprintListItem): string {
   return `${hours} h`
 }
 
-const backlogTasks = computed(() => tasks.value.filter((task) => !(Array.isArray(task.sprints) && task.sprints.length > 0)))
+const backlogTasks = computed(() =>
+  tasks.value.filter((task) => !(Array.isArray(task.sprints) && task.sprints.length > 0)),
+)
 
 const filtersActive = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
 const busy = computed(
-  () => reordering.value || backlogOrderLoading.value || sprintsLoading.value || tasksLoading.value || Object.keys(lifecycleBusy).length > 0,
+  () =>
+    reordering.value ||
+    backlogOrderLoading.value ||
+    sprintsLoading.value ||
+    tasksLoading.value ||
+    Object.keys(lifecycleBusy).length > 0,
 )
 // DEV-132: dragging only waits for in-flight writes. Read-only refreshes
 // (usually the file-watcher echo of the previous reorder) are superseded by a
@@ -1554,10 +1664,14 @@ function clampSprintOffsets() {
   })
 }
 
-watch(tasks, () => {
-  clampBacklogOffset()
-  clampSprintOffsets()
-}, { deep: true })
+watch(
+  tasks,
+  () => {
+    clampBacklogOffset()
+    clampSprintOffsets()
+  },
+  { deep: true },
+)
 
 const analyticsSummary = computed(
   () => sprintAnalytics.getSummary(selectedAnalyticsSprintId.value) as SprintSummaryReportResponse | undefined,
@@ -2151,7 +2265,8 @@ async function refreshBacklogOrder() {
     const response = await api.getBacklogOrder()
     if (!disposed && generation === orderGenerations.get(null)) backlogOrder.value = response.tasks
   } catch (error: any) {
-    if (!disposed && generation === orderGenerations.get(null)) showToast(error?.message || 'Failed to load backlog order')
+    if (!disposed && generation === orderGenerations.get(null))
+      showToast(error?.message || 'Failed to load backlog order')
   } finally {
     if (!disposed && generation === orderGenerations.get(null)) backlogOrderLoading.value = false
   }
@@ -2161,9 +2276,11 @@ function applyTaskOrder(sprint: number | null, ids: string[]) {
   if (sprint === null) backlogOrder.value = ids
   else {
     const positions = new Map(ids.map((id, index) => [id, index]))
-    tasks.value = tasks.value.map(task => positions.has(task.id)
-      ? { ...task, sprint_order: { ...task.sprint_order, [sprint]: positions.get(task.id)! + 1 } }
-      : task)
+    tasks.value = tasks.value.map((task) =>
+      positions.has(task.id)
+        ? { ...task, sprint_order: { ...task.sprint_order, [sprint]: positions.get(task.id)! + 1 } }
+        : task,
+    )
   }
 }
 
@@ -2192,7 +2309,10 @@ async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null
   if (!draggingTaskId.value || draggingCol.value) return
   event.preventDefault()
   event.stopPropagation()
-  if (dragBlocked.value) { onTaskDragEnd(); return }
+  if (dragBlocked.value) {
+    onTaskDragEnd()
+    return
+  }
   const task = draggingTaskId.value
   const source = draggingSourceSprint.value
   const copyMode = resolveCopyModifier(event)
@@ -2206,7 +2326,10 @@ async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null
     return
   }
   hideReorderHint()
-  if (task === anchor) { onTaskDragEnd(); return }
+  if (task === anchor) {
+    onTaskDragEnd()
+    return
+  }
   if (source === sprint && copyMode) {
     showToast('Release the copy modifier to reorder tasks within this list.')
     onTaskDragEnd()
@@ -2221,7 +2344,7 @@ async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null
   let moved = false
   try {
     if (source !== sprint) {
-      moved = sprint === null ? await onBacklogDrop(event) === true : await onSprintDrop(event, sprint) === true
+      moved = sprint === null ? (await onBacklogDrop(event)) === true : (await onSprintDrop(event, sprint)) === true
       if (!moved) return
     }
     if (!manual) return
@@ -2230,11 +2353,18 @@ async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null
     tasksLoading.value = false
     // A superseded backlog-order load can no longer clear its own flag.
     if (sprint === null) backlogOrderLoading.value = false
-    const response = await api.reorderTasks({ task, sprint, [position]: anchor, ...(allowClosed.value ? { allow_closed: true } : {}) })
+    const response = await api.reorderTasks({
+      task,
+      sprint,
+      [position]: anchor,
+      ...(allowClosed.value ? { allow_closed: true } : {}),
+    })
     if (disposed) return
     if (generation === orderGenerations.get(sprint)) applyTaskOrder(sprint, response.tasks)
   } catch (error: any) {
-    showToast(`${moved ? 'Task moved, but placement failed: ' : 'Could not reorder tasks: '}${error?.message || 'Refresh and try again.'}`)
+    showToast(
+      `${moved ? 'Task moved, but placement failed: ' : 'Could not reorder tasks: '}${error?.message || 'Refresh and try again.'}`,
+    )
   } finally {
     reordering.value = false
     onTaskDragEnd()
@@ -2262,8 +2392,11 @@ interface MutationOptions {
   forceSingle?: boolean
 }
 
-async function assignTasksToSprint(taskIds: string[], sprintId: number, options: MutationOptions = {}): Promise<boolean> {
-
+async function assignTasksToSprint(
+  taskIds: string[],
+  sprintId: number,
+  options: MutationOptions = {},
+): Promise<boolean> {
   if (!taskIds.length) return false
   const targetMeta = sprintLookup.value[sprintId]
   const sprintState = (targetMeta?.state || '').toLowerCase()
@@ -2322,7 +2455,11 @@ async function assignTasksToSprint(taskIds: string[], sprintId: number, options:
   }
 }
 
-async function removeTasksFromSprint(taskIds: string[], sprintId: number, options: MutationOptions = {}): Promise<boolean> {
+async function removeTasksFromSprint(
+  taskIds: string[],
+  sprintId: number,
+  options: MutationOptions = {},
+): Promise<boolean> {
   if (!taskIds.length) return false
   const targetMeta = sprintLookup.value[sprintId]
   const sprintState = (targetMeta?.state || '').toLowerCase()
@@ -2363,7 +2500,10 @@ async function removeTasksFromSprint(taskIds: string[], sprintId: number, option
 }
 
 function onTaskDragStart(event: DragEvent, taskId: string, sourceSprint: number | null) {
-  if (dragBlocked.value || draggingCol.value) { event.preventDefault(); return }
+  if (dragBlocked.value || draggingCol.value) {
+    event.preventDefault()
+    return
+  }
   const target = event.target as HTMLElement | null
   if (target && target.closest('button, a, input, textarea, select')) {
     event.preventDefault()
@@ -2516,9 +2656,7 @@ async function onBacklogDrop(event: DragEvent) {
   const task = tasks.value.find((item) => item.id === taskId)
   const memberships = Array.isArray(task?.sprints)
     ? Array.from(
-        new Set(
-          task!.sprints.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0),
-        ),
+        new Set(task!.sprints.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0)),
       )
     : []
   if (!memberships.length) {
@@ -2659,15 +2797,18 @@ function sortTasks(list: TaskDTO[] | undefined | null) {
 }
 
 function getSortedTasksForSprint(id: number) {
-  if (isSprintManual(id)) return [...getTasksForSprint(id)].sort((a, b) =>
-    ((a.sprint_order?.[id] ?? Infinity) - (b.sprint_order?.[id] ?? Infinity)) || canonicalIdCompare(a.id, b.id))
+  if (isSprintManual(id))
+    return [...getTasksForSprint(id)].sort(
+      (a, b) =>
+        (a.sprint_order?.[id] ?? Infinity) - (b.sprint_order?.[id] ?? Infinity) || canonicalIdCompare(a.id, b.id),
+    )
   return sortTasks(getTasksForSprint(id))
 }
 
 function canonicalIdCompare(a: string, b: string) {
   // Match the server's code-point ordering rather than UTF-16 or locale order.
-  const left = Array.from(a, char => char.codePointAt(0)!)
-  const right = Array.from(b, char => char.codePointAt(0)!)
+  const left = Array.from(a, (char) => char.codePointAt(0)!)
+  const right = Array.from(b, (char) => char.codePointAt(0)!)
   for (let index = 0; index < Math.min(left.length, right.length); index++) {
     if (left[index] !== right[index]) return left[index]! - right[index]!
   }
@@ -2698,10 +2839,7 @@ function badgeClass(state: string) {
   return 'badge--muted'
 }
 
-
 const formatRelative = (value?: string | null) => formatRelativeTime(value, { empty: '—' })
-
-
 
 function sprintLabel(id: number) {
   const entry = sprintLookup.value[id]
@@ -2756,9 +2894,7 @@ async function confirmDeleteSprint() {
       sprint: deleteDialog.sprintId,
       cleanup_missing: true,
     })
-    const name = deleteDialog.label.trim().length
-      ? deleteDialog.label
-      : `Sprint #${deleteDialog.sprintId}`
+    const name = deleteDialog.label.trim().length ? deleteDialog.label : `Sprint #${deleteDialog.sprintId}`
     showToast(`Deleted ${name}`)
     if (response.removed_references > 0) {
       const referencePlural = response.removed_references === 1 ? '' : 's'
@@ -2987,10 +3123,16 @@ function focusBacklogIfRequested() {
 
 onMounted(() => {
   window.addEventListener('keydown', onOrderHintKeydown)
-  orderSse = useSse('/api/events', { kinds: 'task_order_changed' }, {
-    onReconnect: () => { void refreshAll(true) },
-  })
-  orderSse.on('task_order_changed', event => {
+  orderSse = useSse(
+    '/api/events',
+    { kinds: 'task_order_changed' },
+    {
+      onReconnect: () => {
+        void refreshAll(true)
+      },
+    },
+  )
+  orderSse.on('task_order_changed', (event) => {
     if (disposed) return
     try {
       const payload = JSON.parse(event.data)
@@ -3001,7 +3143,9 @@ onMounted(() => {
       // Notifications may race after commit; reconcile current metadata rather
       // than applying a delayed writer's snapshot over a newer order.
       void Promise.all([refreshTasks(), refreshBacklogOrder()])
-    } catch { /* Ignore malformed events; reconnect reconciles from the server. */ }
+    } catch {
+      /* Ignore malformed events; reconnect reconciles from the server. */
+    }
   })
   stopPreferencesListener = onPreferencesChanged((key) => {
     if (key !== 'lotar.preferences.tasks.pageSize') return
@@ -3016,13 +3160,16 @@ onMounted(() => {
   })()
 })
 
-watch(() => route.query, async (q) => {
-  const nextProject = (q as any).project ? String((q as any).project) : ''
-  if (nextProject !== project.value) {
-    project.value = nextProject
-    await refreshAll(true)
-  }
-})
+watch(
+  () => route.query,
+  async (q) => {
+    const nextProject = (q as any).project ? String((q as any).project) : ''
+    if (nextProject !== project.value) {
+      project.value = nextProject
+      await refreshAll(true)
+    }
+  },
+)
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onOrderHintKeydown)
@@ -3059,8 +3206,12 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.task-row--before > td { box-shadow: inset 0 3px var(--color-primary, #4676d7); }
-.task-row--after > td { box-shadow: inset 0 -3px var(--color-primary, #4676d7); }
+.task-row--before > td {
+  box-shadow: inset 0 3px var(--color-primary, #4676d7);
+}
+.task-row--after > td {
+  box-shadow: inset 0 -3px var(--color-primary, #4676d7);
+}
 
 .header {
   justify-content: space-between;
@@ -3175,7 +3326,9 @@ onUnmounted(() => {
 
 .sprint-group {
   position: relative;
-  transition: border-color var(--duration-med) var(--ease-standard), background var(--duration-med) var(--ease-standard);
+  transition:
+    border-color var(--duration-med) var(--ease-standard),
+    background var(--duration-med) var(--ease-standard);
 }
 
 .sprint-group--drop {
@@ -3596,7 +3749,10 @@ onUnmounted(() => {
   background: color-mix(in oklab, var(--color-surface) 94%, transparent);
   border-color: color-mix(in oklab, var(--color-border) 85%, transparent);
   color: var(--color-muted);
-  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
 
 .sprint-delete-button:hover {

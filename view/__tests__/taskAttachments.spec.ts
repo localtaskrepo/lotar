@@ -15,7 +15,9 @@ const HASH = '0123456789abcdef0123456789abcdef'
 describe('task attachment helpers (DEV-116)', () => {
     it('builds hash URLs scoped to the task project and path URLs otherwise', () => {
         expect(attachmentUrl(`notes-${HASH}.txt`, 'REF-1')).toBe(`/api/attachments/h/${HASH}/notes.txt?project=REF`)
-        expect(attachmentUrl(`notes.txt.${HASH}`, 'REF-1')).toBe(`/api/attachments/h/${HASH}/notes.txt.${HASH}?project=REF`)
+        expect(attachmentUrl(`notes.txt.${HASH}`, 'REF-1')).toBe(
+            `/api/attachments/h/${HASH}/notes.txt.${HASH}?project=REF`,
+        )
         expect(attachmentUrl('dir/plain.txt', 'REF-1')).toBe('/api/attachments/get?path=dir%2Fplain.txt&project=REF')
         expect(attachmentUrl('plain.txt', null)).toBe('/api/attachments/get?path=plain.txt')
         expect(attachmentUrl('  ', 'REF-1')).toBe('/api/attachments/get?path=')

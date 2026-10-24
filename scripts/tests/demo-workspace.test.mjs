@@ -28,9 +28,12 @@ test('demo environment removes repository redirects and private task defaults', 
     assert.equal(env.LOTAR_IGNORE_HOME_CONFIG, '1');
     assert.equal(env.GIT_CONFIG_GLOBAL, path.join(dir, '.demo', 'gitconfig'));
     assert.equal(env.GIT_CONFIG_NOSYSTEM, '1');
-    assert.deepEqual(Object.keys(env).filter(key => key.startsWith('GIT_') || key.startsWith('LOTAR_')).sort(), [
-        'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'LOTAR_IGNORE_HOME_CONFIG', 'LOTAR_TASKS_DIR',
-    ]);
+    assert.deepEqual(
+        Object.keys(env)
+            .filter((key) => key.startsWith('GIT_') || key.startsWith('LOTAR_'))
+            .sort(),
+        ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'LOTAR_IGNORE_HOME_CONFIG', 'LOTAR_TASKS_DIR'],
+    );
 });
 
 test('demo environment does not mutate inherited process state', () => {

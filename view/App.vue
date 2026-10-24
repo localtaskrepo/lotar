@@ -41,7 +41,7 @@
       <router-view />
     </div>
   </main>
-  <footer class="container muted" style="padding: 16px;">
+  <footer class="container muted" style="padding: 16px">
     <small>Local Task Repo · v{{ version }}</small>
   </footer>
   <TaskPanelHost />
@@ -112,10 +112,7 @@ function openGlobalNewTask() {
 }
 
 const { visibleTabs } = useNavTabs()
-const visibleNavItems = computed(() => [
-  ...visibleTabs.value,
-  { label: 'Preferences', path: '/preferences' },
-])
+const visibleNavItems = computed(() => [...visibleTabs.value, { label: 'Preferences', path: '/preferences' }])
 
 function isActive(item: { path: string }) {
   const currentPath = route.path
@@ -187,17 +184,21 @@ watch(
 }
 
 @media (prefers-color-scheme: dark) {
-  .brand__logo--light { display: none; }
-  .brand__logo--dark { display: block; }
+  .brand__logo--light {
+    display: none;
+  }
+  .brand__logo--dark {
+    display: block;
+  }
 }
 
-:global(html[data-theme="light"] .brand__logo--light),
-:global(html[data-theme="dark"] .brand__logo--dark) {
+:global(html[data-theme='light'] .brand__logo--light),
+:global(html[data-theme='dark'] .brand__logo--dark) {
   display: block;
 }
 
-:global(html[data-theme="light"] .brand__logo--dark),
-:global(html[data-theme="dark"] .brand__logo--light) {
+:global(html[data-theme='light'] .brand__logo--dark),
+:global(html[data-theme='dark'] .brand__logo--light) {
   display: none;
 }
 

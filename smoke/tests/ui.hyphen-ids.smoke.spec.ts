@@ -27,19 +27,19 @@ describe('UI hyphenated task ids', () => {
             const server = await startLotarServer(workspace);
 
             try {
-                await withPage(`${server.url}/?project=ABC-OPS`, async page => {
+                await withPage(`${server.url}/?project=ABC-OPS`, async (page) => {
                     const inspectedProjects = new Set<string>();
                     const addBodies: Record<string, unknown>[] = [];
                     const updateBodies: Record<string, unknown>[] = [];
                     let createdId = '';
-                    page.on('request', request => {
+                    page.on('request', (request) => {
                         const url = new URL(request.url());
                         if (url.pathname === '/api/config/inspect') {
                             inspectedProjects.add(url.searchParams.get('project') ?? '');
                         }
                         if (url.pathname === '/api/tasks/add') addBodies.push(request.postDataJSON());
                     });
-                    page.on('response', async response => {
+                    page.on('response', async (response) => {
                         if (new URL(response.url()).pathname === '/api/tasks/add' && response.ok()) {
                             try {
                                 const payload = await response.json();
@@ -49,7 +49,7 @@ describe('UI hyphenated task ids', () => {
                             }
                         }
                     });
-                    page.on('request', request => {
+                    page.on('request', (request) => {
                         if (new URL(request.url()).pathname === '/api/tasks/update') {
                             updateBodies.push(request.postDataJSON());
                         }
@@ -80,9 +80,7 @@ describe('UI hyphenated task ids', () => {
                     await seedRow.click();
                     await panel.waitFor({ state: 'visible', timeout: 10_000 });
                     const title = panel.locator('input[placeholder="Title"]');
-                    await expect
-                        .poll(() => title.inputValue(), { timeout: 10_000 })
-                        .toBe(seedTitle);
+                    await expect.poll(() => title.inputValue(), { timeout: 10_000 }).toBe(seedTitle);
                     await title.fill(editedTitle);
                     await title.blur();
                     await expect.poll(() => updateBodies.length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
@@ -100,9 +98,7 @@ describe('UI hyphenated task ids', () => {
                         const target = document.querySelector('.task-panel');
                         if (!target) throw new Error('task panel not found');
                         const dt = new DataTransfer();
-                        dt.items.add(
-                            new File(['hyphen attachment body'], 'hyphen-notes.txt', { type: 'text/plain' }),
-                        );
+                        dt.items.add(new File(['hyphen attachment body'], 'hyphen-notes.txt', { type: 'text/plain' }));
                         target.dispatchEvent(
                             new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }),
                         );

@@ -18,11 +18,11 @@ describe.concurrent('SyncHub required empty report list', () => {
                 for (const query of ['', '?project=RPT']) {
                     const response = await fetch(`${server.url}/api/sync/reports/list${query}`);
                     expect(response.status).toBe(200);
-                    const payload = await response.json() as { data: { reports: unknown[]; total: number } };
+                    const payload = (await response.json()) as { data: { reports: unknown[]; total: number } };
                     expect(payload.data.reports).toEqual([]);
                     expect(payload.data.total).toBe(0);
                 }
-                await withPage(`${server.url}/sync`, async page => {
+                await withPage(`${server.url}/sync`, async (page) => {
                     const empty = page.getByText('No reports yet.', { exact: true });
                     await expect.poll(() => empty.isVisible()).toBe(true);
                     expect(await page.getByText(/Cannot read properties|undefined.*map/).count()).toBe(0);

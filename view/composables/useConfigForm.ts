@@ -244,8 +244,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     const projectExists = computed(() => inspectData.value?.project_exists ?? false)
 
     const tagSuggestions = computed(() =>
-        Array.from(new Set([...(inspectData.value?.effective.tags ?? []), ...(inspectData.value?.effective.default_tags ?? [])]))
-            .filter((value) => value && value !== '*')
+        Array.from(
+            new Set([
+                ...(inspectData.value?.effective.tags ?? []),
+                ...(inspectData.value?.effective.default_tags ?? []),
+            ]),
+        ).filter((value) => value && value !== '*'),
     )
 
     function dedupeCaseInsensitive(values: string[]): string[] {
@@ -386,7 +390,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     // the raw override only.
     const effectiveDoneLabels = computed(() => {
         const labels = inspectData.value?.effective?.effective_done_states
-        return Array.isArray(labels) ? labels.map((value) => String(value)).filter((value) => value.trim().length > 0) : []
+        return Array.isArray(labels)
+            ? labels.map((value) => String(value)).filter((value) => value.trim().length > 0)
+            : []
     })
 
     const doneStatesMode = computed(() => {
@@ -622,7 +628,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         const units = isLength ? '(d|day|days|w|week|weeks)' : '(h|hour|hours|d|day|days|w|week|weeks)'
         const match = value.match(new RegExp(`^(\\d+)\\s*${units}$`))
         if (!match) {
-            return isLength ? 'Use a whole number of days or weeks, e.g. 14d or 2w.' : 'Use a whole number of hours, days or weeks, e.g. 12h, 1d or 2w.'
+            return isLength
+                ? 'Use a whole number of days or weeks, e.g. 14d or 2w.'
+                : 'Use a whole number of hours, days or weeks, e.g. 12h, 1d or 2w.'
         }
         const count = Number(match[1])
         const unit = match[2]![0]
@@ -668,9 +676,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             case 'attachments_max_upload_mb': {
                 const raw = form.attachmentsMaxUploadMb.trim()
                 if (!raw) {
-                    errors.attachments_max_upload_mb = isGlobal.value
-                        ? 'Max upload size is required.'
-                        : null
+                    errors.attachments_max_upload_mb = isGlobal.value ? 'Max upload size is required.' : null
                     return
                 }
                 const value = Number(raw)
@@ -780,8 +786,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             }
             case 'sprints_defaults_capacity_points':
             case 'sprints_defaults_capacity_hours': {
-                const raw = (field === 'sprints_defaults_capacity_points' ? form.sprintCapacityPoints : form.sprintCapacityHours).trim()
-                errors[field] = raw && !/^\d+$/.test(raw) ? 'Enter a whole number of 0 or more, or leave it empty.' : null
+                const raw = (
+                    field === 'sprints_defaults_capacity_points' ? form.sprintCapacityPoints : form.sprintCapacityHours
+                ).trim()
+                errors[field] =
+                    raw && !/^\d+$/.test(raw) ? 'Enter a whole number of 0 or more, or leave it empty.' : null
                 break
             }
             case 'scan_signal_words': {
@@ -1090,7 +1099,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 form.attachmentsDir = typeof raw.attachments_dir === 'string' ? raw.attachments_dir : ''
             }
             if (raw.attachments_max_upload_mb !== undefined) {
-                form.attachmentsMaxUploadMb = raw.attachments_max_upload_mb === null ? '' : String(raw.attachments_max_upload_mb)
+                form.attachmentsMaxUploadMb =
+                    raw.attachments_max_upload_mb === null ? '' : String(raw.attachments_max_upload_mb)
             }
             form.autoSetReporter = toTriToggle(raw.auto_set_reporter)
             form.autoAssignOnStatus = toTriToggle(raw.auto_assign_on_status)
@@ -1124,7 +1134,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             form.syncReportsDir = typeof raw.sync_reports_dir === 'string' ? raw.sync_reports_dir : ''
             form.syncWriteReports = toTriToggle(raw.sync_write_reports)
             form.agentContextEnabled = toTriToggle(raw.agent_context_enabled)
-            form.agentContextExtension = typeof raw.agent_context_extension === 'string' ? raw.agent_context_extension : ''
+            form.agentContextExtension =
+                typeof raw.agent_context_extension === 'string' ? raw.agent_context_extension : ''
             form.agentLogsDir = typeof raw.agent_logs_dir === 'string' ? raw.agent_logs_dir : ''
             applyAgentInstructions(raw.agent_instructions, 'inherit')
             form.agentWorktreeEnabled = toTriToggle(raw.agent_worktree?.enabled)
@@ -1188,7 +1199,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             payload[key] = normalizeCsv(currentArray)
         }
 
-        const addToggleField = (field: ToggleField, key: string, { allowInherit = false }: { allowInherit?: boolean } = {}) => {
+        const addToggleField = (
+            field: ToggleField,
+            key: string,
+            { allowInherit = false }: { allowInherit?: boolean } = {},
+        ) => {
             const currentValue = current[field] as ToggleValue
             const baseValue = base[field] as ToggleValue
             if (currentValue === baseValue) return
@@ -1266,7 +1281,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                     return normalizeCsv(values)
             }
         }
-        const addRestricted = (modeField: 'tagsMode' | 'customFieldsMode', field: 'tags' | 'customFields', key: string) => {
+        const addRestricted = (
+            modeField: 'tagsMode' | 'customFieldsMode',
+            field: 'tags' | 'customFields',
+            key: string,
+        ) => {
             const next = restrictedValue(current[modeField], current[field])
             if (next !== restrictedValue(base[modeField], base[field])) {
                 payload[key] = next

@@ -143,7 +143,7 @@ vi.mock('../components/toast', () => ({
 }))
 
 vi.mock('../composables/useProjects', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'TP', name: 'Typed Project' }]),
@@ -237,11 +237,7 @@ const mountPanel = async (taskId: string) => {
 }
 
 // Real DOM drop on the panel root, mirroring the smoke fixture's dispatch.
-const dispatchFileDrop = async (
-    wrapper: ReturnType<typeof mount>,
-    files: File[],
-    uriList = '',
-) => {
+const dispatchFileDrop = async (wrapper: ReturnType<typeof mount>, files: File[], uriList = '') => {
     const dataTransfer = {
         files,
         items: files.map((file) => ({ kind: 'file' })),
@@ -350,9 +346,7 @@ describe('TaskPanel pending drop lifecycle (DEV-93)', () => {
                 new File(['create payload'], 'create.bin', { type: 'application/octet-stream' }),
             ])
 
-            expect(
-                toastTexts().some((text) => text.includes('Save the task before attaching files')),
-            ).toBe(true)
+            expect(toastTexts().some((text) => text.includes('Save the task before attaching files'))).toBe(true)
             expect(toastTexts().some((text) => text.includes('still loading'))).toBe(false)
             expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
 
@@ -401,10 +395,15 @@ describe('TaskPanel drag overlay depth', () => {
             await drains()
             for (const kind of ['dragenter', 'dragover', 'drop']) {
                 const event = new Event(kind, { bubbles: true, cancelable: true })
-                Object.defineProperty(event, 'dataTransfer', { value: {
-                    files: [], items: [], types: [relationshipMime, 'text/uri-list'],
-                    getData: (type: string) => type === 'text/uri-list' ? 'https://example.com/task/TP-2' : '{"id":"TP-2"}',
-                } })
+                Object.defineProperty(event, 'dataTransfer', {
+                    value: {
+                        files: [],
+                        items: [],
+                        types: [relationshipMime, 'text/uri-list'],
+                        getData: (type: string) =>
+                            type === 'text/uri-list' ? 'https://example.com/task/TP-2' : '{"id":"TP-2"}',
+                    },
+                })
                 wrapper.find('aside.task-panel').element.dispatchEvent(event)
                 expect(event.defaultPrevented).toBe(false)
             }
@@ -412,7 +411,9 @@ describe('TaskPanel drag overlay depth', () => {
             expect(wrapper.find('.task-panel__drop-overlay').exists()).toBe(false)
             expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
             expect(apiFixtures.addTaskLinkReferenceMock).not.toHaveBeenCalled()
-        } finally { wrapper.unmount() }
+        } finally {
+            wrapper.unmount()
+        }
     })
     const dragEvent = (wrapper: ReturnType<typeof mount>, kind: string) => {
         const event = new Event(kind, { bubbles: true, cancelable: true })

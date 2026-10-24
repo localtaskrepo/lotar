@@ -28,12 +28,22 @@ const props = withDefaults(defineProps<{ size?: 'sm' | 'md' | 'lg' }>(), {
   animation: ui-loader-spin 0.9s linear infinite;
 }
 
-.ui-loader__spinner.sm { width: 0.75rem; height: 0.75rem; }
-.ui-loader__spinner.lg { width: 1.25rem; height: 1.25rem; }
+.ui-loader__spinner.sm {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.ui-loader__spinner.lg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
 
-.ui-loader__label { display: inline-block; }
+.ui-loader__label {
+  display: inline-block;
+}
 
 @keyframes ui-loader-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

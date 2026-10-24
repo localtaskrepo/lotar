@@ -59,11 +59,7 @@
               <!-- The modal hides the panel's tag list, so show the task's tags here. -->
               <section class="task-panel__tag-dialog-current" aria-labelledby="task-panel-tag-dialog-current-label">
                 <span id="task-panel-tag-dialog-current-label" class="muted">Current tags</span>
-                <div
-                  class="task-panel__tags-list"
-                  data-testid="tag-dialog-current"
-                  aria-live="polite"
-                >
+                <div class="task-panel__tags-list" data-testid="tag-dialog-current" aria-live="polite">
                   <span
                     v-for="tag in tags"
                     :key="tag"
@@ -121,7 +117,10 @@
                       <span
                         v-for="(part, partIndex) in entry.parts"
                         :key="partIndex"
-                        :class="['task-panel__tag-suggestion-part', { 'task-panel__tag-suggestion-part--match': part.match }]"
+                        :class="[
+                          'task-panel__tag-suggestion-part',
+                          { 'task-panel__tag-suggestion-part--match': part.match },
+                        ]"
                       >
                         {{ part.text }}
                       </span>
@@ -175,10 +174,7 @@ const normalizedConfigured = computed(() => uniqueNormalizedTags(props.configure
 const normalizedKnown = computed(() => uniqueNormalizedTags(props.knownTags))
 
 const tagCandidates = computed(() =>
-  uniqueNormalizedTags([
-    ...normalizedConfigured.value,
-    ...normalizedKnown.value,
-  ]).sort((a, b) => a.localeCompare(b)),
+  uniqueNormalizedTags([...normalizedConfigured.value, ...normalizedKnown.value]).sort((a, b) => a.localeCompare(b)),
 )
 
 const availableTags = computed(() => {

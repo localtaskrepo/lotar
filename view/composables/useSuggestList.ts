@@ -38,9 +38,7 @@ export function useSuggestList(options: UseSuggestListOptions) {
     const activeIndex = ref(-1)
 
     const resolveCandidates = () =>
-        typeof options.candidates === 'function'
-            ? options.candidates()
-            : options.candidates.value
+        typeof options.candidates === 'function' ? options.candidates() : options.candidates.value
 
     const list = computed(() => {
         const base = resolveCandidates()

@@ -34,14 +34,16 @@ function readHidden(): Set<string> {
 
 const hiddenTabs = ref<Set<string>>(readHidden())
 
-watch(hiddenTabs, (value) => {
-    storageSetJson(STORAGE_KEY, Array.from(value))
-}, { deep: true })
+watch(
+    hiddenTabs,
+    (value) => {
+        storageSetJson(STORAGE_KEY, Array.from(value))
+    },
+    { deep: true },
+)
 
 export function useNavTabs() {
-    const visibleTabs = computed(() =>
-        NAV_TABS.filter((tab) => !hiddenTabs.value.has(tab.path)),
-    )
+    const visibleTabs = computed(() => NAV_TABS.filter((tab) => !hiddenTabs.value.has(tab.path)))
 
     function isTabVisible(path: string): boolean {
         return ALWAYS_VISIBLE.has(path) || !hiddenTabs.value.has(path)

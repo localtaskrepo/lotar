@@ -306,8 +306,7 @@ export interface ParsedInstant {
     nanos: bigint
 }
 
-const RFC3339_RE =
-    /^(\d{4})-(\d{2})-(\d{2})[Tt ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?([Zz]|[+-]\d{2}:?\d{2})$/
+const RFC3339_RE = /^(\d{4})-(\d{2})-(\d{2})[Tt ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?([Zz]|[+-]\d{2}:?\d{2})$/
 
 /** Days from 1970-01-01 for a proleptic Gregorian date (Howard Hinnant's algorithm). */
 function daysFromCivil(year: number, month: number, day: number): bigint {
@@ -375,10 +374,7 @@ function cmpParsedInstant(a: string | null | undefined, b: string | null | undef
 }
 
 /** Rust `Option<String>` ordering: missing sorts before any present value. */
-function cmpOptionalStr(
-    a: string | null | undefined,
-    b: string | null | undefined,
-): number {
+function cmpOptionalStr(a: string | null | undefined, b: string | null | undefined): number {
     const aMissing = a === null || a === undefined
     const bMissing = b === null || b === undefined
     if (aMissing && bMissing) return 0
@@ -388,10 +384,7 @@ function cmpOptionalStr(
 }
 
 /** Explicit missing-last ordering used for due dates, as in the backend sort. */
-function cmpOptionalStrMissingLast(
-    a: string | null | undefined,
-    b: string | null | undefined,
-): number {
+function cmpOptionalStrMissingLast(a: string | null | undefined, b: string | null | undefined): number {
     const aMissing = a === null || a === undefined
     const bMissing = b === null || b === undefined
     if (aMissing && bMissing) return 0

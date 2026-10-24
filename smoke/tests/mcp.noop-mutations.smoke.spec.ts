@@ -2,11 +2,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
-import {
-    callTool,
-    extractToolPayload,
-    withMcpClient,
-} from '../helpers/mcp-harness.js';
+import { callTool, extractToolPayload, withMcpClient } from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 // DEV-102 durable MCP stdio no-op regressions: `task_update` with an empty

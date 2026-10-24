@@ -223,7 +223,7 @@ vi.mock('../components/toast', () => ({
 }))
 
 vi.mock('../composables/useProjects', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
@@ -233,7 +233,7 @@ vi.mock('../composables/useProjects', () => {
 })
 
 vi.mock('../composables/useConfig', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     const statuses = ref(['Open', 'Closed'])
     const priorities = ref(['Low', 'Medium', 'High'])
     const types = ref(['bug', 'feature'])
@@ -380,7 +380,10 @@ describe('TaskPanel add code reference dialog', () => {
         await removeButton.trigger('click')
         await flushPromises()
 
-        expect(apiFixtures.removeTaskCodeReferenceMock).toHaveBeenCalledWith({ id: 'DEMO-123', code: 'src/lib.rs#10-12' })
+        expect(apiFixtures.removeTaskCodeReferenceMock).toHaveBeenCalledWith({
+            id: 'DEMO-123',
+            code: 'src/lib.rs#10-12',
+        })
         expect(wrapper.text()).not.toContain('src/lib.rs#10-12')
     })
 })

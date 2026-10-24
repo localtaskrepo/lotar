@@ -26,10 +26,7 @@ describe('smoke workspace helper contracts', () => {
     it('addTask fails bounded when the reported task ID never produces a file', async () => {
         const workspace = await SmokeWorkspace.create();
         const fakeBinary = `${workspace.root}/fake-lotar-no-file`;
-        await fs.writeFile(
-            fakeBinary,
-            '#!/bin/sh\nprintf \'\\u2705 Created task: WEB-99\\n\'\nexit 0\n',
-        );
+        await fs.writeFile(fakeBinary, "#!/bin/sh\nprintf '\\u2705 Created task: WEB-99\\n'\nexit 0\n");
         await fs.chmod(fakeBinary, 0o755);
 
         const previousBinary = process.env.LOTAR_BINARY_PATH;
@@ -58,7 +55,7 @@ describe('smoke workspace helper contracts', () => {
             fakeBinary,
             [
                 '#!/bin/sh',
-                'printf \'\\u2705 Created task: WEB-99\\n\'',
+                "printf '\\u2705 Created task: WEB-99\\n'",
                 'mkdir -p "$PWD/.tasks/BUG"',
                 'printf \'title: decoy\\n\' > "$PWD/.tasks/BUG/1.yml"',
                 'exit 0',

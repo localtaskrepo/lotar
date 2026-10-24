@@ -56,7 +56,13 @@ export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
     { key: 'priority', aliases: ['priority', 'prio'], label: 'Priority', values: 'options', optionsFrom: 'priorities' },
     { key: 'type', aliases: ['type', 'tasktype', 'kind'], label: 'Type', values: 'options', optionsFrom: 'types' },
     { key: 'sprints', aliases: ['sprint', 'sprints'], label: 'Sprint', values: 'options', optionsFrom: 'sprints' },
-    { key: 'project', aliases: ['project', 'projectkey'], label: 'Project', values: 'options', optionsFrom: 'projects' },
+    {
+        key: 'project',
+        aliases: ['project', 'projectkey'],
+        label: 'Project',
+        values: 'options',
+        optionsFrom: 'projects',
+    },
     { key: 'assignee', aliases: ['assignee', 'owner'], label: 'Assignee', values: 'assignee' },
     { key: 'tags', aliases: ['tag', 'tags'], label: 'Tag', values: 'options', optionsFrom: 'tags' },
     { key: 'due', aliases: ['due', 'duedate', 'dueon'], label: 'Due', values: 'due' },
@@ -447,7 +453,8 @@ export function serializeFilterToken(key: string, value: string): string {
     if (isFieldKey(trimmedKey)) {
         const name = trimmedKey.slice(trimmedKey.indexOf(':') + 1).trim()
         const literalName = RESERVED_FIELD_ALIASES[normalizeReservedKey(name)]
-            ? `"${escapeQuoted(name)}"` : quoteIfNeeded(name, SAFE_KEY)
+            ? `"${escapeQuoted(name)}"`
+            : quoteIfNeeded(name, SAFE_KEY)
         keyPart = `field:${name ? literalName : ''}`
     } else {
         keyPart = quoteIfNeeded(trimmedKey, SAFE_KEY)
@@ -569,8 +576,20 @@ function valueCandidates(meta: GrammarKeyMeta, source: FilterValueSource): Value
  * entries are appended per supplied custom field.
  */
 const SORT_BY_BUILTINS = [
-    'priority', 'status', 'effort', 'due-date', 'created', 'modified',
-    'assignee', 'reporter', 'title', 'type', 'project', 'id', 'tags', 'sprints',
+    'priority',
+    'status',
+    'effort',
+    'due-date',
+    'created',
+    'modified',
+    'assignee',
+    'reporter',
+    'title',
+    'type',
+    'project',
+    'id',
+    'tags',
+    'sprints',
 ]
 
 /**
@@ -596,8 +615,9 @@ function candidatesForKey(key: string, source: FilterValueSource): ValueCandidat
     if (key.startsWith('field:')) {
         const name = key.slice('field:'.length)
         const values =
-            Object.entries(source.customFieldValues ?? []).find(([field]) => field.toLowerCase() === name.toLowerCase())?.[1]
-            ?? []
+            Object.entries(source.customFieldValues ?? []).find(
+                ([field]) => field.toLowerCase() === name.toLowerCase(),
+            )?.[1] ?? []
         return values.map((value) => ({ value, label: value, hint: 'Value' }))
     }
     return []

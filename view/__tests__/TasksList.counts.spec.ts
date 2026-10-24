@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 
 const routeState: { query: Record<string, any> } = { query: {} }
-const routerPushMock = vi.fn(async () => { })
-const routerReplaceMock = vi.fn(async () => { })
+const routerPushMock = vi.fn(async () => {})
+const routerReplaceMock = vi.fn(async () => {})
 
 const projectsStore = {
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 const _tasksItems = ref<any[]>([])
@@ -26,7 +26,9 @@ const tasksQueryHandle = {
     error: _error,
     lastSyncAt: ref(1),
     tasks: computed(() => _tasksItems.value),
-    refresh: vi.fn(async () => { _hasSnapshot.value = true }),
+    refresh: vi.fn(async () => {
+        _hasSnapshot.value = true
+    }),
     retain: vi.fn(),
     release: vi.fn(),
 }
@@ -37,15 +39,15 @@ const tasksStore = {
     status: _status,
     error: _error,
     getQuery: vi.fn(() => tasksQueryHandle),
-    hydrateAll: vi.fn(async () => { }),
+    hydrateAll: vi.fn(async () => {}),
     upsert: vi.fn(),
-    remove: vi.fn(async () => { }),
+    remove: vi.fn(async () => {}),
 }
 
 const sprintsStore = {
     sprints: ref<any[]>([]),
     active: ref<any[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     loading: ref(false),
 }
 
@@ -54,7 +56,7 @@ const configStore = {
     priorities: ref<string[]>(['low', 'med', 'high']),
     types: ref<string[]>(['task']),
     customFields: ref<string[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 vi.mock('vue-router', () => ({
@@ -155,7 +157,9 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         statuses: configStore.statuses,
         priorities: configStore.priorities,
         types: configStore.types,
@@ -294,12 +298,26 @@ describe('TasksList counts', () => {
         const vm = wrapper.vm as any
         let finishA!: () => void
         let finishB!: () => void
-        tasksQueryHandle.refresh.mockImplementationOnce(() => new Promise<void>(resolve => {
-            finishA = () => { tasksStore.items.value = [baseTask({ id: 'A-1' })]; _hasSnapshot.value = true; resolve() }
-        }))
-        tasksQueryHandle.refresh.mockImplementationOnce(() => new Promise<void>(resolve => {
-            finishB = () => { tasksStore.items.value = [baseTask({ id: 'B-1' })]; _hasSnapshot.value = true; resolve() }
-        }))
+        tasksQueryHandle.refresh.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    finishA = () => {
+                        tasksStore.items.value = [baseTask({ id: 'A-1' })]
+                        _hasSnapshot.value = true
+                        resolve()
+                    }
+                }),
+        )
+        tasksQueryHandle.refresh.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    finishB = () => {
+                        tasksStore.items.value = [baseTask({ id: 'B-1' })]
+                        _hasSnapshot.value = true
+                        resolve()
+                    }
+                }),
+        )
         vm.filter = { project: 'A' }
         await vi.advanceTimersByTimeAsync(150)
         vm.filter = { project: 'B' }
@@ -343,9 +361,11 @@ describe('TasksList counts', () => {
         expect(vm.shownTasks).toHaveLength(50)
         expect(vm.shownTasks[0].id).toBe('PRJ-51')
         expect(wrapper.find('h1').text()).toContain('(51–100 / 120)')
-        expect(routerPushMock).toHaveBeenLastCalledWith(expect.objectContaining({
-            query: expect.objectContaining({ offset: '50' }),
-        }))
+        expect(routerPushMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                query: expect.objectContaining({ offset: '50' }),
+            }),
+        )
 
         // A single page renders no pager at all.
         tasksStore.items.value = tasksStore.items.value.slice(0, 50)
@@ -366,7 +386,12 @@ describe('TasksList counts', () => {
         vm.openBulkDelete()
         let finish!: () => void
         tasksStore.remove.mockClear()
-        tasksStore.remove.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+        tasksStore.remove.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    finish = resolve
+                }),
+        )
         const pending = vm.submitDeleteDialog()
         vm.filter = { project: 'B' }
         finish()

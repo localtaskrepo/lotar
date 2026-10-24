@@ -149,14 +149,22 @@ describe('MCP framed smoke client (fake child processes)', () => {
     it('parses Content-Length frames split across chunks and keeps unmatched frames', async () => {
         const client = spawnFakeFramedClient();
         try {
-            await client.send({ jsonrpc: '2.0', id: 1, method: 'notify-and-echo', params: { marker: 'framed', chunkBytes: 5 } });
+            await client.send({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'notify-and-echo',
+                params: { marker: 'framed', chunkBytes: 5 },
+            });
             const frame = await client.readUntil((candidate) => candidate.message?.id === 1);
             expect(frame.message.result.echo.marker).toBe('framed');
             expect(frame.headers).toMatch(/^Content-Length:\s*\d+$/i);
-            expect(frame.bodyText).toBe(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { echo: { marker: 'framed', chunkBytes: 5 } } }));
+            expect(frame.bodyText).toBe(
+                JSON.stringify({ jsonrpc: '2.0', id: 1, result: { echo: { marker: 'framed', chunkBytes: 5 } } }),
+            );
 
             const notification = await client.readUntil(
-                (candidate) => candidate.message?.method === 'notifications/fake' && candidate.message?.params?.about === 1,
+                (candidate) =>
+                    candidate.message?.method === 'notifications/fake' && candidate.message?.params?.about === 1,
             );
             expect(notification.message.params.seq).toBe(1);
             expect(notification.headers).toMatch(/^Content-Length:\s*\d+$/i);

@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 
 const routeState: { query: Record<string, any> } = { query: {} }
-const routerPushMock = vi.fn(async () => { })
-const routerReplaceMock = vi.fn(async () => { })
+const routerPushMock = vi.fn(async () => {})
+const routerReplaceMock = vi.fn(async () => {})
 
 const projectsStore = {
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 const _tasksItems = ref<any[]>([])
@@ -26,7 +26,9 @@ const tasksQueryHandle = {
     error: _error,
     lastSyncAt: ref(1),
     tasks: computed(() => _tasksItems.value),
-    refresh: vi.fn(async () => { _hasSnapshot.value = true }),
+    refresh: vi.fn(async () => {
+        _hasSnapshot.value = true
+    }),
     retain: vi.fn(),
     release: vi.fn(),
 }
@@ -38,9 +40,9 @@ const tasksStore = {
     status: _status,
     error: _error,
     getQuery: vi.fn(() => tasksQueryHandle),
-    hydrateAll: vi.fn(async (_filter?: Record<string, unknown>) => { }),
+    hydrateAll: vi.fn(async (_filter?: Record<string, unknown>) => {}),
     upsert: vi.fn(),
-    remove: vi.fn(async () => { }),
+    remove: vi.fn(async () => {}),
 }
 
 /** Simulate a completed hydration: items + the authoritative response order. */
@@ -56,7 +58,7 @@ function seedHydration(tasks: any[], orderedIds?: string[]) {
 const sprintsStore = {
     sprints: ref<any[]>([]),
     active: ref<any[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     loading: ref(false),
 }
 
@@ -65,7 +67,7 @@ const configStore = {
     priorities: ref<string[]>(['low', 'med', 'high']),
     types: ref<string[]>(['task']),
     customFields: ref<string[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 vi.mock('vue-router', () => ({
@@ -93,7 +95,6 @@ vi.mock('../components/IconGlyph.vue', () => ({
 vi.mock('../components/toast', () => ({
     showToast: vi.fn(),
 }))
-
 
 vi.mock('../components/UiButton.vue', () => ({
     default: {
@@ -169,7 +170,9 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         statuses: configStore.statuses,
         priorities: configStore.priorities,
         types: configStore.types,
@@ -291,9 +294,13 @@ describe('TasksList server-authoritative sorting', () => {
         // drifted (e.g. an SSE upsert re-inserted rows). Page slicing must
         // follow the hydration ledger, not the map iteration order.
         const tasks = rankTasks(30)
-        const serverOrder = [...tasks].sort(
-            (a, b) => Number((a.custom_fields as Record<string, unknown>).Rank) - Number((b.custom_fields as Record<string, unknown>).Rank),
-        ).map((t) => t.id)
+        const serverOrder = [...tasks]
+            .sort(
+                (a, b) =>
+                    Number((a.custom_fields as Record<string, unknown>).Rank) -
+                    Number((b.custom_fields as Record<string, unknown>).Rank),
+            )
+            .map((t) => t.id)
         seedHydration([...tasks].reverse(), serverOrder)
         vm.filter = { sort_by: 'custom:Rank', order: 'asc' }
         await settle()
@@ -382,10 +389,7 @@ describe('TasksList server-authoritative sorting', () => {
     it('keeps the persisted sort when a stale FilterBar snapshot carries a different one', async () => {
         localStorage.setItem('lotar.tasks.sort::PA', JSON.stringify({ sort_by: 'priority', order: 'asc' }))
         // Written by an older build, before sort ownership moved to the page.
-        localStorage.setItem(
-            'lotar.tasks.filter',
-            JSON.stringify({ project: 'PA', sort_by: 'status', order: 'desc' }),
-        )
+        localStorage.setItem('lotar.tasks.filter', JSON.stringify({ project: 'PA', sort_by: 'status', order: 'desc' }))
         routeState.query = {}
         const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
         await settle()

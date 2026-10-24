@@ -40,7 +40,8 @@
         <h4>Warnings</h4>
         <ul>
           <li v-for="warning in statusWarnings" :key="warning.code || warning.message">
-            <strong>{{ warning.code }}</strong>: {{ warning.message }}
+            <strong>{{ warning.code }}</strong
+            >: {{ warning.message }}
           </li>
         </ul>
       </div>
@@ -53,23 +54,33 @@
       <div class="sprint-health__metrics">
         <article class="metric">
           <h4>Tasks</h4>
-          <p class="metric__value">{{ formatNumber(summary.metrics.tasks.done) }} / {{ formatNumber(summary.metrics.tasks.committed) }}</p>
+          <p class="metric__value">
+            {{ formatNumber(summary.metrics.tasks.done) }} / {{ formatNumber(summary.metrics.tasks.committed) }}
+          </p>
           <p class="metric__meta">{{ formatPercent(summary.metrics.tasks.completion_ratio) }} complete</p>
         </article>
         <article v-if="summary.metrics.points" class="metric">
           <h4>Points</h4>
-          <p class="metric__value">{{ formatNumber(summary.metrics.points.done) }} / {{ formatNumber(summary.metrics.points.committed) }}</p>
+          <p class="metric__value">
+            {{ formatNumber(summary.metrics.points.done) }} / {{ formatNumber(summary.metrics.points.committed) }}
+          </p>
           <p class="metric__meta">
             {{ formatPercent(summary.metrics.points.completion_ratio) }} complete
-            <span v-if="summary.metrics.points.capacity">(capacity {{ formatNumber(summary.metrics.points.capacity) }})</span>
+            <span v-if="summary.metrics.points.capacity"
+              >(capacity {{ formatNumber(summary.metrics.points.capacity) }})</span
+            >
           </p>
         </article>
         <article v-if="summary.metrics.hours" class="metric">
           <h4>Hours</h4>
-          <p class="metric__value">{{ formatNumber(summary.metrics.hours.done) }} / {{ formatNumber(summary.metrics.hours.committed) }}</p>
+          <p class="metric__value">
+            {{ formatNumber(summary.metrics.hours.done) }} / {{ formatNumber(summary.metrics.hours.committed) }}
+          </p>
           <p class="metric__meta">
             {{ formatPercent(summary.metrics.hours.completion_ratio) }} complete
-            <span v-if="summary.metrics.hours.capacity">(capacity {{ formatNumber(summary.metrics.hours.capacity) }})</span>
+            <span v-if="summary.metrics.hours.capacity"
+              >(capacity {{ formatNumber(summary.metrics.hours.capacity) }})</span
+            >
           </p>
         </article>
       </div>
@@ -122,17 +133,18 @@
     <span class="badge badge--muted">Unknown</span>
     <h3>Health metrics unavailable</h3>
     <p>
-      We haven't collected lifecycle data for this sprint yet. Refresh analytics after the sprint starts or when more activity is recorded.
+      We haven't collected lifecycle data for this sprint yet. Refresh analytics after the sprint starts or when more
+      activity is recorded.
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRefs } from 'vue';
+import { computed, toRefs } from 'vue'
 import { formatDateTime } from '../../utils/date'
-import type { SprintSummaryReportResponse } from '../../api/types';
+import type { SprintSummaryReportResponse } from '../../api/types'
 
-import UiLoader from '../UiLoader.vue';
+import UiLoader from '../UiLoader.vue'
 
 const props = withDefaults(
   defineProps<{ summary?: SprintSummaryReportResponse; loading?: boolean; error?: string | null }>(),
@@ -306,8 +318,20 @@ function formatDuration(days: number | null | undefined) {
   text-transform: uppercase;
 }
 
-.badge--info { background: color-mix(in oklab, var(--color-accent) 15%, transparent); color: var(--color-accent); }
-.badge--danger { background: color-mix(in oklab, var(--color-danger) 15%, transparent); color: var(--color-danger); }
-.badge--success { background: color-mix(in oklab, var(--color-success) 15%, transparent); color: var(--color-success); }
-.badge--muted { background: color-mix(in oklab, var(--color-muted) 15%, transparent); color: var(--color-muted); }
+.badge--info {
+  background: color-mix(in oklab, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+}
+.badge--danger {
+  background: color-mix(in oklab, var(--color-danger) 15%, transparent);
+  color: var(--color-danger);
+}
+.badge--success {
+  background: color-mix(in oklab, var(--color-success) 15%, transparent);
+  color: var(--color-success);
+}
+.badge--muted {
+  background: color-mix(in oklab, var(--color-muted) 15%, transparent);
+  color: var(--color-muted);
+}
 </style>

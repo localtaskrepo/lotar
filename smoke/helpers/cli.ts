@@ -12,10 +12,7 @@ export interface CliRunOptions {
 
 export type CliRunResult = Result;
 
-export async function runLotar(
-    args: readonly string[],
-    options: CliRunOptions,
-): Promise<CliRunResult> {
+export async function runLotar(args: readonly string[], options: CliRunOptions): Promise<CliRunResult> {
     const binary = await ensureBinaryExists();
 
     const child = execa(binary, args as string[], {
@@ -44,10 +41,7 @@ export async function runLotar(
     return result;
 }
 
-export async function spawnLotar(
-    args: readonly string[],
-    options: CliRunOptions,
-): Promise<ResultPromise> {
+export async function spawnLotar(args: readonly string[], options: CliRunOptions): Promise<ResultPromise> {
     const binary = await ensureBinaryExists();
 
     return execa(binary, args as string[], {

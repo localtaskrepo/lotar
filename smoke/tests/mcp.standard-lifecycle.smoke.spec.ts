@@ -15,7 +15,9 @@ const BASIC_CONFIG = `default:\n  project: CLI\n  reporter: me@example.com\nissu
 
 const CONFIG_WITH_EXTRA_STATUS = `default:\n  project: CLI\n  reporter: me@example.com\nissue:\n  states: [Todo, Doing, Done]\n  priorities: [Low]\n  types: [Feature]\n`;
 
-async function workspaceState(workspace: SmokeWorkspace): Promise<{ config: string; taskFiles: string[]; reportEntries: string[] }> {
+async function workspaceState(
+    workspace: SmokeWorkspace,
+): Promise<{ config: string; taskFiles: string[]; reportEntries: string[] }> {
     const entries = await fs.readdir(workspace.tasksDir);
     return {
         config: await workspace.read('.tasks/config.yml'),
@@ -242,7 +244,10 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
                 await client.send({
                     jsonrpc: '2.0',
                     method: 'tools/call',
-                    params: { name: 'task_create', arguments: { title: 'Notification must not create this tool task' } },
+                    params: {
+                        name: 'task_create',
+                        arguments: { title: 'Notification must not create this tool task' },
+                    },
                 });
                 await client.send({
                     jsonrpc: '2.0',
@@ -309,9 +314,7 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
                 await client.send({ jsonrpc: '2.0', id: preReadyPingId, method: 'ping' });
                 expect((await client.awaitResponse(preReadyPingId)).error).toBeUndefined();
                 expect(
-                    client.pendingMessages.filter(
-                        (message) => message.method === 'notifications/tools/list_changed',
-                    ),
+                    client.pendingMessages.filter((message) => message.method === 'notifications/tools/list_changed'),
                 ).toEqual([]);
 
                 await client.send({ jsonrpc: '2.0', method: 'notifications/initialized' });
@@ -331,8 +334,7 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
                 // announced with the same standard method name.
                 await workspace.write('.tasks/config.yml', BASIC_CONFIG);
                 const idleNotification = await client.readUntil(
-                    (message) =>
-                        message.method === 'notifications/tools/list_changed' && message !== notification,
+                    (message) => message.method === 'notifications/tools/list_changed' && message !== notification,
                     60_000,
                 );
                 expect(Array.isArray(idleNotification.params?.hintCategories)).toBe(true);
@@ -406,10 +408,7 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
                         id: malformedId,
                         method: 'ping',
                     });
-                    const rejection = await client.readUntil(
-                        (message) => message?.error?.code === -32600,
-                        20_000,
-                    );
+                    const rejection = await client.readUntil((message) => message?.error?.code === -32600, 20_000);
                     expect(rejection.id).toBeNull();
                 }
 
@@ -434,10 +433,7 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
             try {
                 // Syntactically invalid text is a parse error.
                 await sendRawLine(client, 'this is not json at all');
-                const parseError = await client.readUntil(
-                    (message) => message?.error?.code === -32700,
-                    20_000,
-                );
+                const parseError = await client.readUntil((message) => message?.error?.code === -32700, 20_000);
                 expect(parseError.id).toBeNull();
                 expect(parseError.error?.message).toBe('Parse error');
 
@@ -445,10 +441,7 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
                 // request, not a parse error.
                 for (const line of ['[1, 2, 3]', '"just a string"']) {
                     await sendRawLine(client, line);
-                    const invalidRequest = await client.readUntil(
-                        (message) => message?.error?.code === -32600,
-                        20_000,
-                    );
+                    const invalidRequest = await client.readUntil((message) => message?.error?.code === -32600, 20_000);
                     expect(invalidRequest.id).toBeNull();
                 }
 

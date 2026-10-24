@@ -42,32 +42,35 @@ describe('API live identity', () => {
                 const whoami = async () => {
                     const response = await fetch(`${server.url}/api/whoami`);
                     expect(response.status).toBe(200);
-                    const payload = await response.json() as { data: string };
+                    const payload = (await response.json()) as { data: string };
                     return payload.data;
                 };
-                const transition = () => fetch(`${server.url}/api/tasks/status`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: 'TEST-1', status: 'Done' }),
-                });
+                const transition = () =>
+                    fetch(`${server.url}/api/tasks/status`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: 'TEST-1', status: 'Done' }),
+                    });
 
                 expect(await whoami()).toBe('alpha');
                 const rejected = await transition();
                 expect(rejected.status).toBe(400);
-                const rejection = await rejected.json() as {
+                const rejection = (await rejected.json()) as {
                     error: { code: string; message: string };
                 };
                 expect(rejection.error.code).toBe('INVALID_ARGUMENT');
                 expect(rejection.error.message).toContain("Only reporter 'bravo'");
                 expect(await workspace.read('.tasks/TEST/1.yml')).toBe(REVIEW_TASK);
 
-                await workspace.write('.tasks/config.yml',
-                    WORKSPACE_CONFIG.replace('default.reporter: alpha', 'default.reporter: bravo'));
+                await workspace.write(
+                    '.tasks/config.yml',
+                    WORKSPACE_CONFIG.replace('default.reporter: alpha', 'default.reporter: bravo'),
+                );
                 expect(await whoami()).toBe('bravo');
 
                 const accepted = await transition();
                 expect(accepted.status).toBe(200);
-                const updated = await accepted.json() as {
+                const updated = (await accepted.json()) as {
                     data: { status: string; history: Array<{ actor?: string }> };
                 };
                 expect(updated.data.status).toBe('Done');

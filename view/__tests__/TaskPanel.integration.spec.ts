@@ -37,9 +37,7 @@ const apiFixtures = vi.hoisted(() => {
             {
                 at: '2025-09-30T00:00:00.000Z',
                 actor: 'alice',
-                changes: [
-                    { field: 'title', old: 'Old title', new: 'Demo task' },
-                ],
+                changes: [{ field: 'title', old: 'Old title', new: 'Demo task' }],
             },
         ],
         custom_fields: { product: 'Core' },
@@ -73,19 +71,19 @@ const apiFixtures = vi.hoisted(() => {
             tags: patch.tags !== undefined ? [...patch.tags] : state.task.tags,
             relationships: patch.relationships !== undefined ? clone(patch.relationships) : state.task.relationships,
             custom_fields:
-                patch.custom_fields !== undefined
-                    ? clone(patch.custom_fields)
-                    : clone(state.task.custom_fields),
+                patch.custom_fields !== undefined ? clone(patch.custom_fields) : clone(state.task.custom_fields),
             sprints: patch.sprints !== undefined ? [...patch.sprints] : state.task.sprints,
         }
         return clone(state.task)
     })
 
     const taskHistoryMock = vi.fn(async () => clone(baseCommits))
-    const relationshipMutateMock = vi.fn(async (_payload: any) => ({ changed: true, changed_tasks: ['DEMO-123'], revision: 'r2' }))
-    const suggestTasksMock = vi.fn(async () => [
-        { id: 'DEMO-777', title: 'Suggested work item' },
-    ])
+    const relationshipMutateMock = vi.fn(async (_payload: any) => ({
+        changed: true,
+        changed_tasks: ['DEMO-123'],
+        revision: 'r2',
+    }))
+    const suggestTasksMock = vi.fn(async () => [{ id: 'DEMO-777', title: 'Suggested work item' }])
     const referenceSnippetMock = vi.fn(async () => ({
         path: 'src/lib.rs',
         highlight_start: 10,
@@ -163,15 +161,14 @@ const apiFixtures = vi.hoisted(() => {
                 ...state.task,
                 ...patch,
                 tags: patch.tags !== undefined ? [...patch.tags] : state.task.tags,
-                relationships: patch.relationships !== undefined ? clone(patch.relationships) : state.task.relationships,
+                relationships:
+                    patch.relationships !== undefined ? clone(patch.relationships) : state.task.relationships,
                 sprints: patch.sprints !== undefined ? [...patch.sprints] : state.task.sprints,
             }
             return clone(state.task)
         })
         taskHistoryMock.mockImplementation(async () => clone(baseCommits))
-        suggestTasksMock.mockImplementation(async () => [
-            { id: 'DEMO-777', title: 'Suggested work item' },
-        ])
+        suggestTasksMock.mockImplementation(async () => [{ id: 'DEMO-777', title: 'Suggested work item' }])
         referenceSnippetMock.mockImplementation(async () => ({
             path: 'src/lib.rs',
             highlight_start: 10,
@@ -254,7 +251,14 @@ vi.mock('../api/client', () => ({
         getTask: apiFixtures.getTaskMock,
         updateTask: apiFixtures.updateTaskMock,
         relationshipMutate: apiFixtures.relationshipMutateMock,
-        relationshipGraph: vi.fn(async () => ({ nodes: [], edges: [], issues: [], revision: 'r1', complete: true, truncated: false })),
+        relationshipGraph: vi.fn(async () => ({
+            nodes: [],
+            edges: [],
+            issues: [],
+            revision: 'r1',
+            complete: true,
+            truncated: false,
+        })),
         setStatus: apiFixtures.setStatusMock,
         addTask: vi.fn(),
         addComment: apiFixtures.addCommentMock,
@@ -312,7 +316,7 @@ vi.mock('../components/toast', () => ({
 }))
 
 vi.mock('../composables/useProjects', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
@@ -322,7 +326,7 @@ vi.mock('../composables/useProjects', () => {
 })
 
 vi.mock('../composables/useConfig', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     const statuses = ref(['Open', 'Closed'])
     const priorities = ref(['Low', 'Medium', 'High'])
     const types = ref(['bug', 'feature'])
@@ -436,12 +440,12 @@ describe('TaskPanel integration safeguards', () => {
         const textarea = wrapper.find('.task-panel__description textarea')
         await textarea.setValue('Updated')
 
-            ; (textarea.element as HTMLTextAreaElement).focus()
+        ;(textarea.element as HTMLTextAreaElement).focus()
 
         const closeButton = wrapper.find('button[aria-label="Close panel"]')
         expect(closeButton.exists()).toBe(true)
 
-            ; (closeButton.element as HTMLButtonElement).focus()
+        ;(closeButton.element as HTMLButtonElement).focus()
         await new Promise((resolve) => setTimeout(resolve, 0))
         await flushPromises()
 
@@ -540,12 +544,22 @@ describe('TaskPanel integration safeguards', () => {
         const suggestionItems = wrapper.findAll('section[aria-label="Depends on"] [role="option"] button')
         expect(suggestionItems.length).toBeGreaterThan(0)
 
-        apiFixtures.getTaskMock.mockImplementation(async () => apiFixtures.clone({ ...apiFixtures.state.task, relationships: { ...apiFixtures.state.task.relationships, depends_on: ['DEMO-101', 'DEMO-777'] } }))
+        apiFixtures.getTaskMock.mockImplementation(async () =>
+            apiFixtures.clone({
+                ...apiFixtures.state.task,
+                relationships: { ...apiFixtures.state.task.relationships, depends_on: ['DEMO-101', 'DEMO-777'] },
+            }),
+        )
         await suggestionItems[0]!.trigger('click')
         await flushPromises()
 
         expect(apiFixtures.updateTaskMock).not.toHaveBeenCalled()
-        expect(apiFixtures.relationshipMutateMock).toHaveBeenCalledExactlyOnceWith({ source: 'DEMO-123', target: 'DEMO-777', kind: 'depends_on', operation: 'add' })
+        expect(apiFixtures.relationshipMutateMock).toHaveBeenCalledExactlyOnceWith({
+            source: 'DEMO-123',
+            target: 'DEMO-777',
+            kind: 'depends_on',
+            operation: 'add',
+        })
         expect(wrapper.get('section[aria-label="Depends on"]').text()).toContain('DEMO-777')
 
         wrapper.unmount()
@@ -711,7 +725,10 @@ describe('TaskPanel attachments-area link preferences', () => {
         localStorage.setItem('lotar.preferences.taskPanel.autoDetectLinks', 'false')
 
         // DEV-61: managed blobs live under the typed `attachment` key.
-        apiFixtures.baseTask.references = [{ attachment: 'demo/attachment.txt' }, { link: 'https://example.com/foo' }] as any
+        apiFixtures.baseTask.references = [
+            { attachment: 'demo/attachment.txt' },
+            { link: 'https://example.com/foo' },
+        ] as any
         const wrapper = await mountTaskPanel()
 
         const attachmentsArea = wrapper.find('.task-panel__attachments')
@@ -791,7 +808,10 @@ describe('TaskPanel references manual link add', () => {
         await flushPromises()
 
         const { api } = await import('../api/client')
-        expect((api as any).removeTaskLinkReference).toHaveBeenCalledWith({ id: 'DEMO-123', url: 'https://example.com/foo' })
+        expect((api as any).removeTaskLinkReference).toHaveBeenCalledWith({
+            id: 'DEMO-123',
+            url: 'https://example.com/foo',
+        })
 
         expect(wrapper.text()).not.toContain('https://example.com/foo')
         const attachmentsAfter = wrapper.find('.task-panel__attachments')

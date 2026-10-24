@@ -27,10 +27,14 @@ import TaskPanel from './TaskPanel.vue'
 
 const { state: panelState, closeTaskPanel, notifyCreated, notifyUpdated, setNavigatedTask } = useTaskPanelController()
 const router = inject(routerKey, null)
-watch(() => router?.currentRoute.value.query.taskPanel, (id, previous) => {
-  if (typeof id === 'string') setNavigatedTask(id)
-  else if (previous) closeTaskPanel()
-}, { immediate: true })
+watch(
+  () => router?.currentRoute.value.query.taskPanel,
+  (id, previous) => {
+    if (typeof id === 'string') setNavigatedTask(id)
+    else if (previous) closeTaskPanel()
+  },
+  { immediate: true },
+)
 const store = useTaskStore()
 
 function handleClose() {

@@ -5,380 +5,394 @@ import type { ConfigInspectResult, GlobalConfigRaw, ResolvedConfigDTO } from '..
 import ScanView from '../pages/ScanView.vue'
 
 vi.mock('../api/client', () => ({
-  api: {
-    scanRun: vi.fn(),
-    referenceSnippet: vi.fn(),
-    listProjects: vi.fn(),
-    inspectConfig: vi.fn(),
-  },
+    api: {
+        scanRun: vi.fn(),
+        referenceSnippet: vi.fn(),
+        listProjects: vi.fn(),
+        inspectConfig: vi.fn(),
+    },
 }))
 
 vi.mock('../components/UiModal.vue', () => ({
-  default: {
-    name: 'UiModal',
-    props: ['open', 'ariaLabel', 'ariaLabelledby', 'ariaDescribedby', 'dismissible', 'initialFocus', 'size'],
-    emits: ['close'],
-    template: '<div v-if="open" class="ui-modal-stub"><slot /></div>',
-  },
+    default: {
+        name: 'UiModal',
+        props: ['open', 'ariaLabel', 'ariaLabelledby', 'ariaDescribedby', 'dismissible', 'initialFocus', 'size'],
+        emits: ['close'],
+        template: '<div v-if="open" class="ui-modal-stub"><slot /></div>',
+    },
 }))
 
 import { api } from '../api/client'
 
 const stubs = {
-  UiInput: {
-    template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-    props: ['modelValue'],
-    emits: ['update:modelValue'],
-  },
-  UiSelect: {
-    template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
-    props: ['modelValue'],
-    emits: ['update:modelValue'],
-  },
-  UiButton: {
-    template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
-    emits: ['click'],
-  },
-  UiCard: { template: '<section><slot /></section>' },
-  UiLoader: { template: '<div><slot /></div>' },
+    UiInput: {
+        template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+        props: ['modelValue'],
+        emits: ['update:modelValue'],
+    },
+    UiSelect: {
+        template:
+            '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
+        props: ['modelValue'],
+        emits: ['update:modelValue'],
+    },
+    UiButton: {
+        template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
+        emits: ['click'],
+    },
+    UiCard: { template: '<section><slot /></section>' },
+    UiLoader: { template: '<div><slot /></div>' },
 }
 
 function baseResolvedConfig(): ResolvedConfigDTO {
-  return {
-    review_reviewers: [],
-    server_port: 8080,
-    default_project: 'TEST',
-    attachments_dir: '@attachments',
-    attachments_max_upload_mb: 10,
-    sync_reports_dir: '@reports',
-    sync_write_reports: true,
-    default_assignee: null,
-    default_reporter: null,
-    default_tags: [],
-    default_priority: 'Medium',
-    default_status: 'Todo',
-    issue_states: ['Todo', 'InProgress', 'Done'],
-    issue_types: ['Feature', 'Bug'],
-    issue_priorities: ['Low', 'Medium', 'High'],
-    issue_done_states: null,
-    effective_done_states: ['Done'],
-    done_states_mode: 'inferred',
-    task_calendar_day: '2026-10-02',
-    tags: [],
-    custom_fields: [],
-    auto_set_reporter: true,
-    auto_assign_on_status: true,
-    auto_codeowners_assign: true,
-    auto_tags_from_path: true,
-    auto_branch_infer_type: true,
-    auto_branch_infer_status: true,
-    auto_branch_infer_priority: true,
-    auto_identity: true,
-    auto_identity_git: true,
-    scan_signal_words: ['TODO'],
-    scan_ticket_patterns: [],
-    scan_enable_ticket_words: true,
-    scan_enable_mentions: true,
-    scan_strip_attributes: true,
-    branch_type_aliases: {},
-    branch_status_aliases: {},
-    branch_priority_aliases: {},
-    remotes: {},
-  }
+    return {
+        review_reviewers: [],
+        server_port: 8080,
+        default_project: 'TEST',
+        attachments_dir: '@attachments',
+        attachments_max_upload_mb: 10,
+        sync_reports_dir: '@reports',
+        sync_write_reports: true,
+        default_assignee: null,
+        default_reporter: null,
+        default_tags: [],
+        default_priority: 'Medium',
+        default_status: 'Todo',
+        issue_states: ['Todo', 'InProgress', 'Done'],
+        issue_types: ['Feature', 'Bug'],
+        issue_priorities: ['Low', 'Medium', 'High'],
+        issue_done_states: null,
+        effective_done_states: ['Done'],
+        done_states_mode: 'inferred',
+        task_calendar_day: '2026-10-02',
+        tags: [],
+        custom_fields: [],
+        auto_set_reporter: true,
+        auto_assign_on_status: true,
+        auto_codeowners_assign: true,
+        auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        auto_identity: true,
+        auto_identity_git: true,
+        scan_signal_words: ['TODO'],
+        scan_ticket_patterns: [],
+        scan_enable_ticket_words: true,
+        scan_enable_mentions: true,
+        scan_strip_attributes: true,
+        branch_type_aliases: {},
+        branch_status_aliases: {},
+        branch_priority_aliases: {},
+        remotes: {},
+    }
 }
 
 function baseGlobalRaw(): GlobalConfigRaw {
-  return {
-    server_port: 8080,
-    default_project: 'TEST',
-    attachments_dir: '@attachments',
-    attachments_max_upload_mb: 10,
-    sync_reports_dir: '@reports',
-    sync_write_reports: true,
-    issue_states: ['Todo', 'InProgress', 'Done'],
-    issue_types: ['Feature', 'Bug'],
-    issue_priorities: ['Low', 'Medium', 'High'],
-    tags: [],
-    default_assignee: null,
-    default_reporter: null,
-    default_tags: [],
-    auto_set_reporter: true,
-    auto_assign_on_status: true,
-    auto_identity: true,
-    auto_identity_git: true,
-    auto_codeowners_assign: true,
-    auto_tags_from_path: true,
-    auto_branch_infer_type: true,
-    auto_branch_infer_status: true,
-    auto_branch_infer_priority: true,
-    default_priority: 'Medium',
-    default_status: 'Todo',
-    custom_fields: [],
-    scan_signal_words: ['TODO'],
-    scan_ticket_patterns: [],
-    scan_enable_ticket_words: true,
-    scan_enable_mentions: true,
-    scan_strip_attributes: true,
-    branch_type_aliases: {},
-    branch_status_aliases: {},
-    branch_priority_aliases: {},
-  }
+    return {
+        server_port: 8080,
+        default_project: 'TEST',
+        attachments_dir: '@attachments',
+        attachments_max_upload_mb: 10,
+        sync_reports_dir: '@reports',
+        sync_write_reports: true,
+        issue_states: ['Todo', 'InProgress', 'Done'],
+        issue_types: ['Feature', 'Bug'],
+        issue_priorities: ['Low', 'Medium', 'High'],
+        tags: [],
+        default_assignee: null,
+        default_reporter: null,
+        default_tags: [],
+        auto_set_reporter: true,
+        auto_assign_on_status: true,
+        auto_identity: true,
+        auto_identity_git: true,
+        auto_codeowners_assign: true,
+        auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        default_priority: 'Medium',
+        default_status: 'Todo',
+        custom_fields: [],
+        scan_signal_words: ['TODO'],
+        scan_ticket_patterns: [],
+        scan_enable_ticket_words: true,
+        scan_enable_mentions: true,
+        scan_strip_attributes: true,
+        branch_type_aliases: {},
+        branch_status_aliases: {},
+        branch_priority_aliases: {},
+    }
 }
 
 function baseConfigInspect(): ConfigInspectResult {
-  return {
-    effective: baseResolvedConfig(),
-    global_effective: baseResolvedConfig(),
-    global_raw: baseGlobalRaw(),
-    auth_profiles: {},
-    project_raw: null,
-    has_global_file: true,
-    project_exists: true,
-    sources: {},
-  }
+    return {
+        effective: baseResolvedConfig(),
+        global_effective: baseResolvedConfig(),
+        global_raw: baseGlobalRaw(),
+        auth_profiles: {},
+        project_raw: null,
+        has_global_file: true,
+        project_exists: true,
+        sources: {},
+    }
 }
 
 describe('ScanView', () => {
-  it('runs a dry scan and renders results', async () => {
-    ; (api.listProjects as any).mockResolvedValue({ projects: [{ prefix: 'TEST', name: 'Test' }], limit: 1, offset: 0, total: 1 })
-      ; (api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
-      ; (api.scanRun as any).mockResolvedValue({
-        status: 'ok',
-        dry_run: true,
-        project: 'TEST',
-        summary: { created: 1, updated: 0, skipped: 0, failed: 0 },
-        warnings: [],
-        info: [],
-        entries: [
-          {
-            status: 'created',
-            action: 'create',
-            file: 'src/lib.rs',
-            line: 12,
-            title: 'Add feature',
-            annotation: 'TODO: Add feature',
-            code_reference: 'src/lib.rs#12',
-          },
-        ],
-      })
+    it('runs a dry scan and renders results', async () => {
+        ;(api.listProjects as any).mockResolvedValue({
+            projects: [{ prefix: 'TEST', name: 'Test' }],
+            limit: 1,
+            offset: 0,
+            total: 1,
+        })
+        ;(api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
+        ;(api.scanRun as any).mockResolvedValue({
+            status: 'ok',
+            dry_run: true,
+            project: 'TEST',
+            summary: { created: 1, updated: 0, skipped: 0, failed: 0 },
+            warnings: [],
+            info: [],
+            entries: [
+                {
+                    status: 'created',
+                    action: 'create',
+                    file: 'src/lib.rs',
+                    line: 12,
+                    title: 'Add feature',
+                    annotation: 'TODO: Add feature',
+                    code_reference: 'src/lib.rs#12',
+                },
+            ],
+        })
 
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [{ path: '/scan', component: ScanView }],
+        const router = createRouter({
+            history: createMemoryHistory(),
+            routes: [{ path: '/scan', component: ScanView }],
+        })
+        await router.push('/scan')
+        await router.isReady()
+
+        const wrapper = mount(ScanView, { global: { plugins: [router], stubs } })
+        await flushPromises()
+
+        const dryRunButton = wrapper.findAll('button').find((btn) => btn.text() === 'Dry run')
+        await dryRunButton?.trigger('click')
+        await flushPromises()
+
+        expect(api.scanRun).toHaveBeenCalled()
+        expect(wrapper.text()).toContain('Add feature')
+        expect(wrapper.text()).toContain('src/lib.rs:12')
     })
-    await router.push('/scan')
-    await router.isReady()
-
-    const wrapper = mount(ScanView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-
-    const dryRunButton = wrapper.findAll('button').find((btn) => btn.text() === 'Dry run')
-    await dryRunButton?.trigger('click')
-    await flushPromises()
-
-    expect(api.scanRun).toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Add feature')
-    expect(wrapper.text()).toContain('src/lib.rs:12')
-  })
 })
 
 describe('ScanView run confirmation dialog', () => {
-  const SKIP_KEY = 'scan-skip-run-confirm'
+    const SKIP_KEY = 'scan-skip-run-confirm'
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    localStorage.removeItem(SKIP_KEY)
-    ; (api.listProjects as any).mockResolvedValue({ projects: [], limit: 0, offset: 0, total: 0 })
-      ; (api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
-      ; (api.scanRun as any).mockResolvedValue({
-        status: 'ok', dry_run: false, project: '',
-        summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
-        warnings: [], info: [], entries: [],
-      })
-  })
-
-  afterEach(() => vi.restoreAllMocks())
-
-  async function mountScanView() {
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [{ path: '/scan', component: ScanView }],
+    beforeEach(() => {
+        vi.clearAllMocks()
+        localStorage.removeItem(SKIP_KEY)
+        ;(api.listProjects as any).mockResolvedValue({ projects: [], limit: 0, offset: 0, total: 0 })
+        ;(api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
+        ;(api.scanRun as any).mockResolvedValue({
+            status: 'ok',
+            dry_run: false,
+            project: '',
+            summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
+            warnings: [],
+            info: [],
+            entries: [],
+        })
     })
-    await router.push('/scan')
-    await router.isReady()
-    const wrapper = mount(ScanView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    return wrapper
-  }
 
-  function mainRunButton(wrapper: ReturnType<typeof mount>) {
-    return wrapper.findAll('button').find((btn) => btn.text() === 'Run')
-  }
+    afterEach(() => vi.restoreAllMocks())
 
-  async function openRunConfirm(wrapper: ReturnType<typeof mount>) {
-    await mainRunButton(wrapper)?.trigger('click')
-    await flushPromises()
-  }
-
-  it('binds the dialog title through aria-labelledby and autofocuses Cancel', async () => {
-    const wrapper = await mountScanView()
-    await openRunConfirm(wrapper)
-
-    const modal = wrapper.findComponent({ name: 'UiModal' })
-    expect(modal.props('open')).toBe(true)
-
-    const heading = wrapper.find('.scan-dialog h3')
-    expect(heading.text()).toBe('Run scan?')
-    expect(heading.attributes('id')).toBeTruthy()
-    expect(modal.props('ariaLabelledby')).toBe(heading.attributes('id'))
-    expect(modal.props('ariaDescribedby')).toBe(wrapper.find('.scan-dialog p').attributes('id'))
-
-    const autofocus = wrapper.findAll('.scan-dialog [data-autofocus]')
-    expect(autofocus.length).toBe(1)
-    expect(autofocus[0]!.text()).toBe('Cancel')
-
-    wrapper.unmount()
-  })
-
-  it('cancels safely without running the scan or persisting the skip flag', async () => {
-    const wrapper = await mountScanView()
-    await openRunConfirm(wrapper)
-
-    const cancelButton = wrapper.findAll('.scan-dialog__actions button').find((btn) => btn.text() === 'Cancel')
-    await cancelButton?.trigger('click')
-    await flushPromises()
-
-    expect(api.scanRun).not.toHaveBeenCalled()
-    expect(localStorage.getItem(SKIP_KEY)).toBeNull()
-    expect(wrapper.findComponent({ name: 'UiModal' }).props('open')).toBe(false)
-    expect(wrapper.find('.scan-dialog').exists()).toBe(false)
-
-    wrapper.unmount()
-  })
-
-  it('confirms the destructive run exactly once and persists the skip flag', async () => {
-      ; (api.scanRun as any).mockResolvedValue({
-        status: 'ok',
-        dry_run: false,
-        project: '',
-        summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
-        warnings: [],
-        info: [],
-        entries: [],
-      })
-    const wrapper = await mountScanView()
-    await openRunConfirm(wrapper)
-
-    const checkbox = wrapper.find('.scan-dialog__checkbox input')
-    await checkbox.setValue(true)
-
-    const confirmButton = wrapper.findAll('.scan-dialog__actions button').find((btn) => btn.text() === 'Run')
-    await confirmButton?.trigger('click')
-    await confirmButton?.trigger('click')
-    await flushPromises()
-
-    expect(api.scanRun).toHaveBeenCalledTimes(1)
-    expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
-    expect(localStorage.getItem(SKIP_KEY)).toBe('true')
-    expect(wrapper.find('.scan-dialog').exists()).toBe(false)
-
-    wrapper.unmount()
-  })
-
-  it('marks the dialog non-dismissible while a scan mutation is busy', async () => {
-      ; (api.scanRun as any).mockImplementation(() => new Promise(() => {}))
-    const wrapper = await mountScanView()
-    await openRunConfirm(wrapper)
-
-    const modal = wrapper.findComponent({ name: 'UiModal' })
-    expect(modal.props('dismissible')).toBe(true)
-
-    ; (wrapper.vm as any).loading = true
-    await wrapper.vm.$nextTick()
-    expect(modal.props('dismissible')).toBe(false)
-
-    wrapper.unmount()
-  })
-
-  it('skips the confirmation dialog when the saved preference is set', async () => {
-    localStorage.setItem(SKIP_KEY, 'true')
-      ; (api.scanRun as any).mockResolvedValue({
-        status: 'ok',
-        dry_run: false,
-        project: '',
-        summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
-        warnings: [],
-        info: [],
-        entries: [],
-      })
-    const wrapper = await mountScanView()
-
-    await mainRunButton(wrapper)?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('.scan-dialog').exists()).toBe(false)
-    expect(api.scanRun).toHaveBeenCalledTimes(1)
-    expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
-
-    wrapper.unmount()
-  })
-
-  for (const failure of ['getItem', 'storage getter'] as const) {
-    it(`shows safe confirmation and runs once when ${failure} is denied`, async () => {
-      const wrapper = await mountScanView()
-      try {
-        const denied = () => { throw new DOMException('Storage unavailable', 'SecurityError') }
-        if (failure === 'getItem') vi.spyOn(localStorage, 'getItem').mockImplementation(denied)
-        else vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(denied)
-        expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
+    async function mountScanView() {
+        const router = createRouter({
+            history: createMemoryHistory(),
+            routes: [{ path: '/scan', component: ScanView }],
+        })
+        await router.push('/scan')
+        await router.isReady()
+        const wrapper = mount(ScanView, { global: { plugins: [router], stubs } })
         await flushPromises()
-        expect(wrapper.find('.scan-dialog').exists()).toBe(true)
+        return wrapper
+    }
+
+    function mainRunButton(wrapper: ReturnType<typeof mount>) {
+        return wrapper.findAll('button').find((btn) => btn.text() === 'Run')
+    }
+
+    async function openRunConfirm(wrapper: ReturnType<typeof mount>) {
+        await mainRunButton(wrapper)?.trigger('click')
+        await flushPromises()
+    }
+
+    it('binds the dialog title through aria-labelledby and autofocuses Cancel', async () => {
+        const wrapper = await mountScanView()
+        await openRunConfirm(wrapper)
+
+        const modal = wrapper.findComponent({ name: 'UiModal' })
+        expect(modal.props('open')).toBe(true)
+
+        const heading = wrapper.find('.scan-dialog h3')
+        expect(heading.text()).toBe('Run scan?')
+        expect(heading.attributes('id')).toBeTruthy()
+        expect(modal.props('ariaLabelledby')).toBe(heading.attributes('id'))
+        expect(modal.props('ariaDescribedby')).toBe(wrapper.find('.scan-dialog p').attributes('id'))
+
+        const autofocus = wrapper.findAll('.scan-dialog [data-autofocus]')
+        expect(autofocus.length).toBe(1)
+        expect(autofocus[0]!.text()).toBe('Cancel')
+
+        wrapper.unmount()
+    })
+
+    it('cancels safely without running the scan or persisting the skip flag', async () => {
+        const wrapper = await mountScanView()
+        await openRunConfirm(wrapper)
+
+        const cancelButton = wrapper.findAll('.scan-dialog__actions button').find((btn) => btn.text() === 'Cancel')
+        await cancelButton?.trigger('click')
+        await flushPromises()
+
         expect(api.scanRun).not.toHaveBeenCalled()
-        expect(() => (wrapper.vm as any).handleRunConfirm(false)).not.toThrow()
-        ; (wrapper.vm as any).handleRunConfirm(false)
+        expect(localStorage.getItem(SKIP_KEY)).toBeNull()
+        expect(wrapper.findComponent({ name: 'UiModal' }).props('open')).toBe(false)
+        expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+
+        wrapper.unmount()
+    })
+
+    it('confirms the destructive run exactly once and persists the skip flag', async () => {
+        ;(api.scanRun as any).mockResolvedValue({
+            status: 'ok',
+            dry_run: false,
+            project: '',
+            summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
+            warnings: [],
+            info: [],
+            entries: [],
+        })
+        const wrapper = await mountScanView()
+        await openRunConfirm(wrapper)
+
+        const checkbox = wrapper.find('.scan-dialog__checkbox input')
+        await checkbox.setValue(true)
+
+        const confirmButton = wrapper.findAll('.scan-dialog__actions button').find((btn) => btn.text() === 'Run')
+        await confirmButton?.trigger('click')
+        await confirmButton?.trigger('click')
         await flushPromises()
+
         expect(api.scanRun).toHaveBeenCalledTimes(1)
         expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
-      } finally {
+        expect(localStorage.getItem(SKIP_KEY)).toBe('true')
+        expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+
         wrapper.unmount()
-      }
     })
-  }
 
-  it('keeps one approved scan submission when preference persistence exceeds quota', async () => {
-    const wrapper = await mountScanView()
-    try {
-      await openRunConfirm(wrapper)
-      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-        throw new DOMException('Quota exceeded', 'QuotaExceededError')
-      })
-      expect(() => (wrapper.vm as any).handleRunConfirm(true)).not.toThrow()
-      ; (wrapper.vm as any).handleRunConfirm(true)
-      await flushPromises()
-      expect(api.scanRun).toHaveBeenCalledTimes(1)
-      expect(wrapper.find('.scan-dialog').exists()).toBe(false)
-      expect(localStorage.getItem(SKIP_KEY)).toBeNull()
-    } finally {
-      wrapper.unmount()
-    }
-  })
+    it('marks the dialog non-dismissible while a scan mutation is busy', async () => {
+        ;(api.scanRun as any).mockImplementation(() => new Promise(() => {}))
+        const wrapper = await mountScanView()
+        await openRunConfirm(wrapper)
 
-  it('preserves safe Cancel and one subsequent confirmation when all storage operations fail', async () => {
-    const wrapper = await mountScanView()
-    try {
-      const denied = () => { throw new DOMException('Storage unavailable', 'SecurityError') }
-      vi.spyOn(localStorage, 'getItem').mockImplementation(denied)
-      vi.spyOn(localStorage, 'setItem').mockImplementation(denied)
-      expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
-      ; (wrapper.vm as any).cancelRunConfirm()
-      expect(api.scanRun).not.toHaveBeenCalled()
-      expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
-      expect(() => (wrapper.vm as any).handleRunConfirm(true)).not.toThrow()
-      ; (wrapper.vm as any).handleRunConfirm(true)
-      await flushPromises()
-      expect(api.scanRun).toHaveBeenCalledTimes(1)
-    } finally {
-      wrapper.unmount()
+        const modal = wrapper.findComponent({ name: 'UiModal' })
+        expect(modal.props('dismissible')).toBe(true)
+
+        ;(wrapper.vm as any).loading = true
+        await wrapper.vm.$nextTick()
+        expect(modal.props('dismissible')).toBe(false)
+
+        wrapper.unmount()
+    })
+
+    it('skips the confirmation dialog when the saved preference is set', async () => {
+        localStorage.setItem(SKIP_KEY, 'true')
+        ;(api.scanRun as any).mockResolvedValue({
+            status: 'ok',
+            dry_run: false,
+            project: '',
+            summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
+            warnings: [],
+            info: [],
+            entries: [],
+        })
+        const wrapper = await mountScanView()
+
+        await mainRunButton(wrapper)?.trigger('click')
+        await flushPromises()
+
+        expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+        expect(api.scanRun).toHaveBeenCalledTimes(1)
+        expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
+
+        wrapper.unmount()
+    })
+
+    for (const failure of ['getItem', 'storage getter'] as const) {
+        it(`shows safe confirmation and runs once when ${failure} is denied`, async () => {
+            const wrapper = await mountScanView()
+            try {
+                const denied = () => {
+                    throw new DOMException('Storage unavailable', 'SecurityError')
+                }
+                if (failure === 'getItem') vi.spyOn(localStorage, 'getItem').mockImplementation(denied)
+                else vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(denied)
+                expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
+                await flushPromises()
+                expect(wrapper.find('.scan-dialog').exists()).toBe(true)
+                expect(api.scanRun).not.toHaveBeenCalled()
+                expect(() => (wrapper.vm as any).handleRunConfirm(false)).not.toThrow()
+                ;(wrapper.vm as any).handleRunConfirm(false)
+                await flushPromises()
+                expect(api.scanRun).toHaveBeenCalledTimes(1)
+                expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
+            } finally {
+                wrapper.unmount()
+            }
+        })
     }
-  })
+
+    it('keeps one approved scan submission when preference persistence exceeds quota', async () => {
+        const wrapper = await mountScanView()
+        try {
+            await openRunConfirm(wrapper)
+            vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+                throw new DOMException('Quota exceeded', 'QuotaExceededError')
+            })
+            expect(() => (wrapper.vm as any).handleRunConfirm(true)).not.toThrow()
+            ;(wrapper.vm as any).handleRunConfirm(true)
+            await flushPromises()
+            expect(api.scanRun).toHaveBeenCalledTimes(1)
+            expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+            expect(localStorage.getItem(SKIP_KEY)).toBeNull()
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('preserves safe Cancel and one subsequent confirmation when all storage operations fail', async () => {
+        const wrapper = await mountScanView()
+        try {
+            const denied = () => {
+                throw new DOMException('Storage unavailable', 'SecurityError')
+            }
+            vi.spyOn(localStorage, 'getItem').mockImplementation(denied)
+            vi.spyOn(localStorage, 'setItem').mockImplementation(denied)
+            expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
+            ;(wrapper.vm as any).cancelRunConfirm()
+            expect(api.scanRun).not.toHaveBeenCalled()
+            expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
+            expect(() => (wrapper.vm as any).handleRunConfirm(true)).not.toThrow()
+            ;(wrapper.vm as any).handleRunConfirm(true)
+            await flushPromises()
+            expect(api.scanRun).toHaveBeenCalledTimes(1)
+        } finally {
+            wrapper.unmount()
+        }
+    })
 })

@@ -4,10 +4,7 @@
       <div class="field field--full">
         <label class="field-label">
           <span>Statuses (column order)</span>
-          <span
-            v-if="issueStatesSource"
-            :class="['provenance', provenanceClass(issueStatesSource)]"
-          >
+          <span v-if="issueStatesSource" :class="['provenance', provenanceClass(issueStatesSource)]">
             {{ provenanceLabel(issueStatesSource) }}
           </span>
         </label>
@@ -26,10 +23,7 @@
       <div class="field field--full">
         <label class="field-label">
           <span>Types</span>
-          <span
-            v-if="issueTypesSource"
-            :class="['provenance', provenanceClass(issueTypesSource)]"
-          >
+          <span v-if="issueTypesSource" :class="['provenance', provenanceClass(issueTypesSource)]">
             {{ provenanceLabel(issueTypesSource) }}
           </span>
         </label>
@@ -48,10 +42,7 @@
       <div class="field field--full">
         <label class="field-label">
           <span>Priorities</span>
-          <span
-            v-if="issuePrioritiesSource"
-            :class="['provenance', provenanceClass(issuePrioritiesSource)]"
-          >
+          <span v-if="issuePrioritiesSource" :class="['provenance', provenanceClass(issuePrioritiesSource)]">
             {{ provenanceLabel(issuePrioritiesSource) }}
           </span>
         </label>
@@ -70,10 +61,7 @@
       <div class="field field--full">
         <label class="field-label">
           <span>Done states</span>
-          <span
-            v-if="issueDoneStatesSource"
-            :class="['provenance', provenanceClass(issueDoneStatesSource)]"
-          >
+          <span v-if="issueDoneStatesSource" :class="['provenance', provenanceClass(issueDoneStatesSource)]">
             {{ provenanceLabel(issueDoneStatesSource) }}
           </span>
         </label>
@@ -161,12 +149,16 @@ const emit = defineEmits<{
   (e: 'validate', field: 'issue_states' | 'issue_types' | 'issue_priorities' | 'issue_done_states'): void
 }>()
 
-const doneStatesMode = computed<'automatic' | 'explicit'>(() => (issueDoneStates.value === null ? 'automatic' : 'explicit'))
+const doneStatesMode = computed<'automatic' | 'explicit'>(() =>
+  issueDoneStates.value === null ? 'automatic' : 'explicit',
+)
 
 const doneStatesHint = computed(() =>
   [
     'Tasks in these statuses count as finished.',
-    doneStatesMode.value === 'explicit' ? '' : 'Automatic uses the last status plus conventional names such as Done or Closed.',
+    doneStatesMode.value === 'explicit'
+      ? ''
+      : 'Automatic uses the last status plus conventional names such as Done or Closed.',
     effectiveSummary ? `${effectiveSummary}.` : '',
   ]
     .filter(Boolean)

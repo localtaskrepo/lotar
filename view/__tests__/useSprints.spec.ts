@@ -30,24 +30,24 @@ describe('useSprints', () => {
 
     it('loads sprint summaries and exposes active defaults', async () => {
         const { api } = await import('../api/client')
-            ; (api.sprintList as any).mockResolvedValue({
-                status: 'ok',
-                count: 1,
-                sprints: [
-                    {
-                        id: 5,
-                        label: 'Iteration 5',
-                        display_name: 'Iteration 5',
-                        state: 'active',
-                        planned_start: '2025-10-01T09:00:00Z',
-                        planned_end: null,
-                        actual_start: '2025-10-01T09:00:00Z',
-                        actual_end: null,
-                        computed_end: null,
-                        warnings: [],
-                    },
-                ],
-            })
+        ;(api.sprintList as any).mockResolvedValue({
+            status: 'ok',
+            count: 1,
+            sprints: [
+                {
+                    id: 5,
+                    label: 'Iteration 5',
+                    display_name: 'Iteration 5',
+                    state: 'active',
+                    planned_start: '2025-10-01T09:00:00Z',
+                    planned_end: null,
+                    actual_start: '2025-10-01T09:00:00Z',
+                    actual_end: null,
+                    computed_end: null,
+                    warnings: [],
+                },
+            ],
+        })
         const { wrapper, exposed } = await mountHarness()
         await exposed.refresh(true)
         expect(exposed.sprints.value).toHaveLength(1)
@@ -59,18 +59,18 @@ describe('useSprints', () => {
 
     it('normalizes missing warnings to an empty array', async () => {
         const { api } = await import('../api/client')
-            ; (api.sprintList as any).mockResolvedValue({
-                status: 'ok',
-                count: 1,
-                sprints: [
-                    {
-                        id: 2,
-                        label: 'Iteration 2',
-                        display_name: 'Iteration 2',
-                        state: 'pending',
-                    },
-                ],
-            })
+        ;(api.sprintList as any).mockResolvedValue({
+            status: 'ok',
+            count: 1,
+            sprints: [
+                {
+                    id: 2,
+                    label: 'Iteration 2',
+                    display_name: 'Iteration 2',
+                    state: 'pending',
+                },
+            ],
+        })
         const { wrapper, exposed } = await mountHarness()
         await exposed.refresh(true)
         expect(exposed.sprints.value[0].warnings).toEqual([])
@@ -79,9 +79,9 @@ describe('useSprints', () => {
 
     it('propagates errors when the API fails', async () => {
         const { api } = await import('../api/client')
-            ; (api.sprintList as any)
-                .mockResolvedValueOnce({ status: 'ok', count: 0, sprints: [] })
-                .mockRejectedValueOnce(new Error('boom'))
+        ;(api.sprintList as any)
+            .mockResolvedValueOnce({ status: 'ok', count: 0, sprints: [] })
+            .mockRejectedValueOnce(new Error('boom'))
         const { wrapper, exposed } = await mountHarness()
         await expect(exposed.refresh(true)).rejects.toThrow('boom')
         wrapper.unmount()

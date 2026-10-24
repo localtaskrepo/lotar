@@ -22,10 +22,7 @@ const emit = defineEmits<{
   <div class="row sprints-view-settings">
     <label class="filter-field">
       <span class="muted">Sprint window</span>
-      <UiSelect
-        :model-value="timeRange"
-        @update:model-value="emit('update:timeRange', $event as SprintTimeRangeKey)"
-      >
+      <UiSelect :model-value="timeRange" @update:model-value="emit('update:timeRange', $event as SprintTimeRangeKey)">
         <option v-for="option in choices" :key="option.value" :value="option.value">
           {{ option.label }}
         </option>

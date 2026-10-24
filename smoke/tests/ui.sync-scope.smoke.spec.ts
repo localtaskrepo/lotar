@@ -137,11 +137,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
         return payload.data as T;
     }
 
-    async function apiPost<T>(
-        serverUrl: string,
-        path: string,
-        body: Record<string, unknown>,
-    ): Promise<T> {
+    async function apiPost<T>(serverUrl: string, path: string, body: Record<string, unknown>): Promise<T> {
         const res = await fetch(`${serverUrl}${path}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -213,9 +209,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                         .poll(() => remoteRow(page, 'shared-jira').locator('.remote-provider').textContent())
                         .toContain('JAA');
 
-                    await remoteRow(page, 'shared-jira')
-                        .getByRole('button', { name: 'Pull', exact: true })
-                        .click();
+                    await remoteRow(page, 'shared-jira').getByRole('button', { name: 'Pull', exact: true }).click();
 
                     await expect.poll(() => pillText(page, 'shared-jira'), { timeout: 15_000 }).toBe('Success');
                     await page.waitForSelector('.toast-card:has-text("PULL shared-jira")', { timeout: 10_000 });
@@ -291,9 +285,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
 
                     // Hold the stub's search so the pull stays observably active.
                     stubAlpha.armSearchBarrier();
-                    await remoteRow(page, 'shared-jira')
-                        .getByRole('button', { name: 'Pull', exact: true })
-                        .click();
+                    await remoteRow(page, 'shared-jira').getByRole('button', { name: 'Pull', exact: true }).click();
 
                     const search = await stubAlpha.waitForRequest(
                         (request) => request.path === '/rest/api/3/search/jql',
@@ -379,9 +371,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     await remoteRow(page, 'shared-jira').waitFor({ timeout: 15_000 });
 
                     // Check = dry-run pull: real stub request, nothing persisted.
-                    await remoteRow(page, 'shared-jira')
-                        .getByRole('button', { name: 'Check', exact: true })
-                        .click();
+                    await remoteRow(page, 'shared-jira').getByRole('button', { name: 'Check', exact: true }).click();
                     await expect.poll(() => pillText(page, 'shared-jira'), { timeout: 15_000 }).toBe('Success');
                     await page.waitForSelector('.report-item', { timeout: 15_000 });
                     await page.locator('.report-item').first().click();
@@ -399,9 +389,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     // backend failure, captured in BETA only.
                     await selectScope(page, 'BETA');
                     await page.waitForSelector('.remote-provider:has-text("JDEAD")', { timeout: 15_000 });
-                    await remoteRow(page, 'shared-jira')
-                        .getByRole('button', { name: 'Check', exact: true })
-                        .click();
+                    await remoteRow(page, 'shared-jira').getByRole('button', { name: 'Check', exact: true }).click();
                     await expect.poll(() => pillText(page, 'shared-jira'), { timeout: 15_000 }).toBe('Failed');
                     await page.waitForSelector('.toast-card:has-text("Remote API request failed")', {
                         timeout: 10_000,
@@ -511,9 +499,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     await remoteRow(page, 'inherited-jira').waitFor({ timeout: 15_000 });
                     await page.waitForSelector('.remote-origin-chip:has-text("inherited")', { timeout: 10_000 });
 
-                    await remoteRow(page, 'inherited-jira')
-                        .getByRole('button', { name: 'Edit', exact: true })
-                        .click();
+                    await remoteRow(page, 'inherited-jira').getByRole('button', { name: 'Edit', exact: true }).click();
                     await page.waitForSelector('[data-testid="remote-dialog-choice"]', { timeout: 10_000 });
                     await page.waitForSelector('fieldset.sync-remote-dialog__fieldset[disabled]', { timeout: 10_000 });
                     await expect
@@ -523,9 +509,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     // Explicit override choice unlocks the fields.
                     await page.getByRole('button', { name: 'Override in project ALPHA' }).click();
                     await page.waitForSelector('[data-testid="remote-dialog-choice"]', { state: 'detached' });
-                    await expect
-                        .poll(() => page.locator('.sync-textarea').isDisabled())
-                        .toBe(false);
+                    await expect.poll(() => page.locator('.sync-textarea').isDisabled()).toBe(false);
 
                     // Invalid mapping YAML is rejected client-side, no save.
                     await page.locator('.sync-textarea').fill('title: [unclosed');
@@ -589,9 +573,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                 await withPage(`${server.url}/sync?project=ALPHA`, async (page) => {
                     await remoteRow(page, 'inherited-jira').waitFor({ timeout: 15_000 });
 
-                    await remoteRow(page, 'inherited-jira')
-                        .getByRole('button', { name: 'Edit', exact: true })
-                        .click();
+                    await remoteRow(page, 'inherited-jira').getByRole('button', { name: 'Edit', exact: true }).click();
                     await page.waitForSelector('[data-testid="remote-dialog-choice"]', { timeout: 10_000 });
                     await page.getByRole('button', { name: 'Edit in Global scope' }).click();
                     await expect
@@ -659,7 +641,11 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     const syncUrls: string[] = [];
                     page.on('request', (request) => {
                         const pathname = new URL(request.url()).pathname;
-                        if (pathname === '/api/sync/pull' || pathname === '/api/sync/push' || pathname === '/api/sync/validate') {
+                        if (
+                            pathname === '/api/sync/pull' ||
+                            pathname === '/api/sync/push' ||
+                            pathname === '/api/sync/validate'
+                        ) {
                             syncUrls.push(request.url());
                         }
                     });
@@ -669,9 +655,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     // project, detects the divergent override, and explains it.
                     const actions = ['Pull', 'Push', 'Check'] as const;
                     for (const [index, action] of actions.entries()) {
-                        await remoteRow(page, 'shared-jira')
-                            .getByRole('button', { name: action, exact: true })
-                            .click();
+                        await remoteRow(page, 'shared-jira').getByRole('button', { name: action, exact: true }).click();
                         await page.waitForSelector('.toast-card:has-text("overridden in default project ALPHA")', {
                             timeout: 10_000,
                         });
@@ -679,9 +663,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                         await expect
                             .poll(
                                 () =>
-                                    page
-                                        .locator('.toast-card:has-text("overridden in default project ALPHA")')
-                                        .count(),
+                                    page.locator('.toast-card:has-text("overridden in default project ALPHA")').count(),
                                 { timeout: 10_000 },
                             )
                             .toBeGreaterThanOrEqual(expectedToasts);
@@ -755,7 +737,11 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     const syncUrls: string[] = [];
                     page.on('request', (request) => {
                         const pathname = new URL(request.url()).pathname;
-                        if (pathname === '/api/sync/pull' || pathname === '/api/sync/push' || pathname === '/api/sync/validate') {
+                        if (
+                            pathname === '/api/sync/pull' ||
+                            pathname === '/api/sync/push' ||
+                            pathname === '/api/sync/validate'
+                        ) {
                             syncUrls.push(request.url());
                         }
                     });
@@ -796,7 +782,9 @@ describe('UI sync scope isolation (DEV-67)', () => {
                         await route.fulfill({
                             status: 500,
                             contentType: 'application/json',
-                            body: JSON.stringify({ error: { code: 'INTERNAL', message: 'controlled scope load failure' } }),
+                            body: JSON.stringify({
+                                error: { code: 'INTERNAL', message: 'controlled scope load failure' },
+                            }),
                         });
                     }
                     await page.waitForSelector('[data-testid="scope-load-error"]', { timeout: 10_000 });

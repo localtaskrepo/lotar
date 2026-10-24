@@ -17,7 +17,8 @@ function seed(): Record<string, string> {
                 types: ['Feature', 'Bug', 'Chore'],
             },
             custom_fields: ['iteration', 'sprint'],
-            default: { reporter: 'Fixture' }, auto: { set_reporter: false },
+            default: { reporter: 'Fixture' },
+            auto: { set_reporter: false },
         }),
         '.tasks/ALPHA/config.yml': [
             'project.name: Alpha fixture',
@@ -42,9 +43,11 @@ function seed(): Record<string, string> {
             '',
         ].join('\n'),
         '.tasks/@sprints/1.yml': stringify({
-            created: `${today}T00:00:00Z`, plan_length: '1w',
+            created: `${today}T00:00:00Z`,
+            plan_length: '1w',
             plan: { label: 'Alpha sprint', starts_at: `${today}T00:00:00Z` },
-            actual: { started_at: `${today}T00:00:00Z` }, tasks: [{ id: 'ALPHA-1' }, { id: 'ALPHA-2' }],
+            actual: { started_at: `${today}T00:00:00Z` },
+            tasks: [{ id: 'ALPHA-1' }, { id: 'ALPHA-2' }],
         }),
     };
     for (const [id, title, status, assignee, tags, iteration, sprintValue] of [
@@ -54,8 +57,15 @@ function seed(): Record<string, string> {
     ] as const) {
         const [project, number] = id.split('-');
         files[`.tasks/${project}/${number}.yml`] = stringify({
-            title, status, priority: 'High', type: 'Feature', reporter: 'Fixture', assignee,
-            due_date: today, created: `${today}T00:00:00Z`, modified: `${today}T00:00:00Z`,
+            title,
+            status,
+            priority: 'High',
+            type: 'Feature',
+            reporter: 'Fixture',
+            assignee,
+            due_date: today,
+            created: `${today}T00:00:00Z`,
+            modified: `${today}T00:00:00Z`,
             custom_fields: { iteration, sprint: sprintValue },
             tags,
             ...(project === 'ALPHA' ? { sprints: [1] } : {}),
@@ -65,8 +75,22 @@ function seed(): Record<string, string> {
 }
 
 const HELP_KEYS = [
-    'status', 'priority', 'type', 'sprints', 'project', 'assignee', 'tags', 'due',
-    'recent', 'needs', 'mine', 'field', 'q', 'deletion', 'order', 'sort_by',
+    'status',
+    'priority',
+    'type',
+    'sprints',
+    'project',
+    'assignee',
+    'tags',
+    'due',
+    'recent',
+    'needs',
+    'mine',
+    'field',
+    'q',
+    'deletion',
+    'order',
+    'sort_by',
 ];
 
 function suggestionList(page: Page): Locator {
@@ -88,7 +112,10 @@ async function pickWithKeyboard(page: Page, search: Locator, name: string): Prom
     if (index < 0) throw new Error(`Expected suggestion "${name}", got ${JSON.stringify(labels)}`);
     for (let move = 0; move < index; move++) await search.press('ArrowDown');
     const highlighted = await page.evaluate(
-        () => document.querySelector('[role="option"][aria-selected="true"] .filter-bar__suggestion-label')?.textContent?.trim() ?? null,
+        () =>
+            document
+                .querySelector('[role="option"][aria-selected="true"] .filter-bar__suggestion-label')
+                ?.textContent?.trim() ?? null,
     );
     if (highlighted !== name) throw new Error(`Expected highlight "${name}", got "${highlighted}"`);
     await search.press('Enter');
@@ -98,10 +125,14 @@ async function pickWithMouse(page: Page, search: Locator, name: string): Promise
     const labels = await suggestionLabels(page);
     if (!labels.includes(name)) throw new Error(`Expected suggestion "${name}", got ${JSON.stringify(labels)}`);
     await page.locator('[role="option"]').filter({ hasText: name }).first().click();
-    if (!(await search.evaluate(el => el === document.activeElement))) throw new Error('mouse pick must keep focus in the search input');
+    if (!(await search.evaluate((el) => el === document.activeElement)))
+        throw new Error('mouse pick must keep focus in the search input');
 }
 
-function appliedListQuery(listQueries: string[], match: (params: URLSearchParams) => boolean): URLSearchParams | undefined {
+function appliedListQuery(
+    listQueries: string[],
+    match: (params: URLSearchParams) => boolean,
+): URLSearchParams | undefined {
     for (const query of listQueries.slice().reverse()) {
         const params = new URLSearchParams(query);
         if (match(params)) return params;
@@ -114,7 +145,9 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
         { label: 'desktop', width: 1600, height: 1000 },
         { label: 'mobile', width: 390, height: 844 },
     ]) {
-        it(`offers scoped filter suggestions and compact help beside search on ${viewport.label}`, async ({ expect }) => {
+        it(`offers scoped filter suggestions and compact help beside search on ${viewport.label}`, async ({
+            expect,
+        }) => {
             const workspace = await SmokeWorkspace.create({ seedFiles: seed() });
             const before = await workspace.readTaskYaml('ALPHA-1');
             const artifacts = path.resolve('target/smoke-artifacts/filters');
@@ -122,11 +155,11 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
             try {
                 const server = await startLotarServer(workspace);
                 try {
-                    await withPage(`${server.url}/`, async page => {
+                    await withPage(`${server.url}/`, async (page) => {
                         await page.setViewportSize(viewport);
                         const mutations: string[] = [];
                         const listQueries: string[] = [];
-                        page.on('request', request => {
+                        page.on('request', (request) => {
                             const url = new URL(request.url());
                             if (['POST', 'PUT', 'DELETE'].includes(request.method())) mutations.push(url.pathname);
                             if (url.pathname === '/api/tasks/list') listQueries.push(url.search);
@@ -148,8 +181,8 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         await expect.poll(() => betaSibling.count()).toBe(0);
 
                         const help = page.getByTestId('filter-help');
-                        const closedHelpColor = await helpToggle.evaluate(el => getComputedStyle(el).color);
-                        const helpStyle = await helpToggle.evaluate(el => {
+                        const closedHelpColor = await helpToggle.evaluate((el) => getComputedStyle(el).color);
+                        const helpStyle = await helpToggle.evaluate((el) => {
                             const style = getComputedStyle(el);
                             return { border: style.borderTopWidth, width: style.width, height: style.height };
                         });
@@ -163,7 +196,9 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         expect(helpToggleBounds!.x).toBeGreaterThanOrEqual(searchBounds!.x + searchBounds!.width - 1);
                         expect(helpToggleBounds!.x - (searchBounds!.x + searchBounds!.width)).toBeLessThanOrEqual(4.5);
                         expect(await helpToggle.getAttribute('aria-expanded')).toBe('true');
-                        await expect.poll(() => helpToggle.evaluate(el => getComputedStyle(el).color)).not.toBe(closedHelpColor);
+                        await expect
+                            .poll(() => helpToggle.evaluate((el) => getComputedStyle(el).color))
+                            .not.toBe(closedHelpColor);
 
                         await page.getByTestId('filter-toggle').click();
                         await page.getByTestId('filter-status').click();
@@ -189,14 +224,21 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         const helpBounds = await helpRegion.boundingBox();
                         expect(helpBounds!.x).toBeGreaterThanOrEqual(0);
                         expect(helpBounds!.x + helpBounds!.width).toBeLessThanOrEqual(viewport.width);
-                        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-                        await page.screenshot({ path: path.join(artifacts, `help-${viewport.label}.png`), animations: 'disabled' });
+                        expect(
+                            await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+                        ).toBe(true);
+                        await page.screenshot({
+                            path: path.join(artifacts, `help-${viewport.label}.png`),
+                            animations: 'disabled',
+                        });
                         await helpRegion.focus();
                         await page.keyboard.press('Escape');
                         await help.waitFor({ state: 'detached' });
                         expect(await helpToggle.getAttribute('aria-expanded')).toBe('false');
-                        await expect.poll(() => helpToggle.evaluate(el => getComputedStyle(el).color)).toBe(closedHelpColor);
-                        expect(await helpToggle.evaluate(el => el === document.activeElement)).toBe(true);
+                        await expect
+                            .poll(() => helpToggle.evaluate((el) => getComputedStyle(el).color))
+                            .toBe(closedHelpColor);
+                        expect(await helpToggle.evaluate((el) => el === document.activeElement)).toBe(true);
                         await helpToggle.click();
                         await helpRegion.waitFor({ state: 'visible' });
                         await search.click();
@@ -207,19 +249,27 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         let labels = await suggestionLabels(page);
                         expect(labels).toContain('ui');
                         expect(labels).toContain('release candidate');
-                        await page.screenshot({ path: path.join(artifacts, `autocomplete-${viewport.label}.png`), animations: 'disabled' });
+                        await page.screenshot({
+                            path: path.join(artifacts, `autocomplete-${viewport.label}.png`),
+                            animations: 'disabled',
+                        });
                         await search.fill('tags:release');
                         await pickTag(page, search, 'release candidate');
                         await expect.poll(() => alphaUi.count()).toBe(1);
                         await expect.poll(() => alphaApi.count()).toBe(0);
                         expect(await betaSibling.count()).toBe(0);
-                        const tagQuery = appliedListQuery(listQueries, params => params.get('tags') === 'release candidate');
+                        const tagQuery = appliedListQuery(
+                            listQueries,
+                            (params) => params.get('tags') === 'release candidate',
+                        );
                         expect(tagQuery).toBeDefined();
                         expect(tagQuery!.get('q') ?? '').toBe('');
                         expect(tagQuery!.get('project')).toBe('ALPHA');
                         expect(await page.getByTestId('filter-chips').textContent()).toContain('release candidate');
                         if (viewport.label === 'desktop') {
-                            await page.getByRole('button', { name: 'Remove filter Tag release candidate', exact: true }).click();
+                            await page
+                                .getByRole('button', { name: 'Remove filter Tag release candidate', exact: true })
+                                .click();
                         } else {
                             await page.getByTestId('filter-toggle').click();
                             await panel.getByRole('button', { name: 'Clear conditions', exact: true }).click();
@@ -236,10 +286,15 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         await pickTag(page, search, 'In Progress');
                         await expect.poll(() => alphaUi.count()).toBe(1);
                         await expect.poll(() => alphaApi.count()).toBe(0);
-                        const statusQuery = appliedListQuery(listQueries, params => params.get('status') === 'In Progress');
+                        const statusQuery = appliedListQuery(
+                            listQueries,
+                            (params) => params.get('status') === 'In Progress',
+                        );
                         expect(statusQuery).toBeDefined();
                         expect(statusQuery!.get('project')).toBe('ALPHA');
-                        await page.getByRole('button', { name: 'Remove filter Status In Progress', exact: true }).click();
+                        await page
+                            .getByRole('button', { name: 'Remove filter Status In Progress', exact: true })
+                            .click();
                         await expect.poll(() => alphaApi.count()).toBe(1);
 
                         await search.fill('assignee:');
@@ -250,7 +305,10 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         await pickTag(page, search, 'alice');
                         await expect.poll(() => alphaUi.count()).toBe(1);
                         await expect.poll(() => alphaApi.count()).toBe(0);
-                        const assigneeQuery = appliedListQuery(listQueries, params => params.get('assignee') === 'alice');
+                        const assigneeQuery = appliedListQuery(
+                            listQueries,
+                            (params) => params.get('assignee') === 'alice',
+                        );
                         expect(assigneeQuery).toBeDefined();
                         await page.getByRole('button', { name: 'Remove filter Assignee alice', exact: true }).click();
                         await expect.poll(() => alphaApi.count()).toBe(1);
@@ -273,7 +331,7 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         expect(labels).not.toContain('30d');
                         await search.press('Escape');
                         await suggestionList(page).waitFor({ state: 'detached' });
-                        expect(await search.evaluate(el => el === document.activeElement)).toBe(true);
+                        expect(await search.evaluate((el) => el === document.activeElement)).toBe(true);
 
                         await search.fill('field:');
                         await suggestionList(page).waitFor({ state: 'visible' });
@@ -282,23 +340,31 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         expect(labels).toContain('sprint');
                         await pickTag(page, search, 'iteration');
                         expect(await search.inputValue()).toBe('field:iteration=');
-                        expect(await search.evaluate(el => el === document.activeElement)).toBe(true);
+                        expect(await search.evaluate((el) => el === document.activeElement)).toBe(true);
                         await suggestionList(page).waitFor({ state: 'visible' });
                         labels = await suggestionLabels(page);
                         expect(labels).toContain('wave one');
                         await pickTag(page, search, 'wave one');
                         await expect.poll(() => alphaUi.count()).toBe(1);
                         await expect.poll(() => alphaApi.count()).toBe(0);
-                        const iterationQuery = appliedListQuery(listQueries, params => params.get('field:iteration') === 'wave one');
+                        const iterationQuery = appliedListQuery(
+                            listQueries,
+                            (params) => params.get('field:iteration') === 'wave one',
+                        );
                         expect(iterationQuery).toBeDefined();
-                        await page.getByRole('button', { name: 'Remove filter iteration wave one', exact: true }).click();
+                        await page
+                            .getByRole('button', { name: 'Remove filter iteration wave one', exact: true })
+                            .click();
                         await expect.poll(() => alphaApi.count()).toBe(1);
 
                         await search.fill('field:"sprint"=relay');
                         await search.press('Enter');
                         await expect.poll(() => alphaUi.count()).toBe(1);
                         await expect.poll(() => alphaApi.count()).toBe(0);
-                        const customSprintQuery = appliedListQuery(listQueries, params => params.get('field:sprint') === 'relay');
+                        const customSprintQuery = appliedListQuery(
+                            listQueries,
+                            (params) => params.get('field:sprint') === 'relay',
+                        );
                         expect(customSprintQuery).toBeDefined();
                         expect(customSprintQuery!.get('sprints')).toBeNull();
                         await page.getByRole('button', { name: 'Remove filter sprint relay', exact: true }).click();
@@ -317,7 +383,10 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         await search.press('Enter');
                         await expect.poll(() => alphaUi.count()).toBe(0);
                         await expect.poll(() => alphaApi.count()).toBe(0);
-                        const mysteryQuery = appliedListQuery(listQueries, params => params.get('q') === 'mystery:blue');
+                        const mysteryQuery = appliedListQuery(
+                            listQueries,
+                            (params) => params.get('q') === 'mystery:blue',
+                        );
                         expect(mysteryQuery).toBeDefined();
                         expect(mysteryQuery!.has('mystery')).toBe(false);
                         expect(mysteryQuery!.has('mystery:blue')).toBe(false);
@@ -340,18 +409,41 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         expect(labels).not.toContain('release candidate');
                         await pickTag(page, search, 'infra');
                         await expect.poll(() => betaSibling.count()).toBe(1);
-                        await expect.poll(() => appliedListQuery(listQueries, params => params.get('project') === 'BETA' && params.get('tags') === 'infra')).toBeDefined();
-                        const scopedTagQuery = appliedListQuery(listQueries, params => params.get('tags') === 'infra');
+                        await expect
+                            .poll(() =>
+                                appliedListQuery(
+                                    listQueries,
+                                    (params) => params.get('project') === 'BETA' && params.get('tags') === 'infra',
+                                ),
+                            )
+                            .toBeDefined();
+                        const scopedTagQuery = appliedListQuery(
+                            listQueries,
+                            (params) => params.get('tags') === 'infra',
+                        );
                         expect(scopedTagQuery).toBeDefined();
                         expect(scopedTagQuery!.get('project')).toBe('BETA');
                         await page.getByRole('button', { name: 'Remove filter Tag infra', exact: true }).click();
                         await expect.poll(() => betaSibling.count()).toBe(1);
 
-                        for (const route of ['/boards?project=ALPHA', '/calendar?project=ALPHA', '/sprints?project=ALPHA']) {
+                        for (const route of [
+                            '/boards?project=ALPHA',
+                            '/calendar?project=ALPHA',
+                            '/sprints?project=ALPHA',
+                        ]) {
                             await page.goto(`${server.url}${route}`);
-                            const titles = page.locator(route.startsWith('/boards') ? 'article.task .title'
-                                : route.startsWith('/calendar') ? '.task-item .task-inline > .title' : 'tr.task-row .task-title');
-                            await expect.poll(() => titles.filter({ hasText: /^\s*Alpha ui task\s*$/ }).count(), { message: route }).toBeGreaterThanOrEqual(1);
+                            const titles = page.locator(
+                                route.startsWith('/boards')
+                                    ? 'article.task .title'
+                                    : route.startsWith('/calendar')
+                                      ? '.task-item .task-inline > .title'
+                                      : 'tr.task-row .task-title',
+                            );
+                            await expect
+                                .poll(() => titles.filter({ hasText: /^\s*Alpha ui task\s*$/ }).count(), {
+                                    message: route,
+                                })
+                                .toBeGreaterThanOrEqual(1);
                             await page.getByTestId('filter-search').fill('tag:');
                             await suggestionList(page).waitFor({ state: 'visible' });
                             labels = await suggestionLabels(page);

@@ -230,10 +230,12 @@ export const automationEventOptions: NamedOption<AutomationEventKey>[] = (
     Object.keys(EVENT_LABELS) as AutomationEventKey[]
 ).map((value) => ({ value, label: EVENT_LABELS[value] }))
 
-export const automationConditionOperatorOptions: NamedOption<AutomationConditionOperator>[] = CONDITION_OPERATORS.map((value) => ({
-    value,
-    label: value.replace('_', ' '),
-}))
+export const automationConditionOperatorOptions: NamedOption<AutomationConditionOperator>[] = CONDITION_OPERATORS.map(
+    (value) => ({
+        value,
+        label: value.replace('_', ' '),
+    }),
+)
 
 export const automationConditionFieldOptions: NamedOption<ConditionFieldOptionValue>[] = [
     { value: 'status', label: 'Status' },
@@ -285,9 +287,10 @@ export function parseAutomationYamlDocument(yaml: string): AutomationParsedDocum
             return { rules: sanitizeRuleList(parsed), maxIterations: '', parseError: null }
         }
 
-        const automation = parsed && typeof parsed === 'object' && 'automation' in parsed
-            ? (parsed as Record<string, any>).automation
-            : parsed
+        const automation =
+            parsed && typeof parsed === 'object' && 'automation' in parsed
+                ? (parsed as Record<string, any>).automation
+                : parsed
 
         if (Array.isArray(automation)) {
             return { rules: sanitizeRuleList(automation), maxIterations: '', parseError: null }
@@ -321,9 +324,8 @@ export function buildAutomationYamlDocument(rules: Record<string, any>[], maxIte
     const automation: Record<string, any> = { rules }
     if (trimmedMaxIterations) {
         const numeric = Number(trimmedMaxIterations)
-        automation.max_iterations = Number.isFinite(numeric) && `${numeric}` === trimmedMaxIterations
-            ? numeric
-            : trimmedMaxIterations
+        automation.max_iterations =
+            Number.isFinite(numeric) && `${numeric}` === trimmedMaxIterations ? numeric : trimmedMaxIterations
     }
 
     return stringifyYaml({ automation })
@@ -456,8 +458,9 @@ function summarizeActions(rule: Record<string, any>, events: AutomationEventKey[
     const on = rule?.on
     if (!on || typeof on !== 'object' || !events.length) return ['No actions']
     return events.flatMap((event) => {
-        const action = (on as Record<string, any>)[YAML_EVENT_KEYS[event]]
-            ?? (on as Record<string, any>)[denormalizeEventKey(event)]
+        const action =
+            (on as Record<string, any>)[YAML_EVENT_KEYS[event]] ??
+            (on as Record<string, any>)[denormalizeEventKey(event)]
         const summary = summarizeAction(action)
         return summary.map((line) => `${EVENT_LABELS[event]}: ${line}`)
     })
@@ -730,7 +733,7 @@ function isScalarYamlValue(value: unknown): boolean {
 
 function createRuleDraftFromRule(rule: Record<string, any>): AutomationRuleDraft {
     const when = extractWhen(rule.when)
-    const on = rule.on && typeof rule.on === 'object' && !Array.isArray(rule.on) ? rule.on as Record<string, any> : {}
+    const on = rule.on && typeof rule.on === 'object' && !Array.isArray(rule.on) ? (rule.on as Record<string, any>) : {}
 
     return {
         name: typeof rule.name === 'string' ? rule.name : '',
@@ -824,7 +827,7 @@ function conditionToDraft(value: unknown, field: string, scope: 'field' | 'custo
         }
     }
 
-    const record = value && typeof value === 'object' ? value as Record<string, any> : {}
+    const record = value && typeof value === 'object' ? (value as Record<string, any>) : {}
     const operator = CONDITION_OPERATORS.find((candidate) => candidate in record) ?? 'equals'
     return {
         id: nextRowId('condition'),
@@ -940,11 +943,11 @@ function createEventActionDraft(event: AutomationEventKey): AutomationEventActio
 
 function hasActionContent(value: Record<string, any>): boolean {
     return Boolean(
-        value.comment
-        || value.run
-        || (value.set && Object.keys(value.set).length)
-        || (value.add && Object.keys(value.add).length)
-        || (value.remove && Object.keys(value.remove).length),
+        value.comment ||
+        value.run ||
+        (value.set && Object.keys(value.set).length) ||
+        (value.add && Object.keys(value.add).length) ||
+        (value.remove && Object.keys(value.remove).length),
     )
 }
 
@@ -958,9 +961,7 @@ function buildWhenFromDraft(draft: AutomationRuleDraft): Record<string, any> {
         return entries[0] ?? {}
     }
 
-    return draft.matchMode === 'any'
-        ? { any: entries }
-        : { all: entries }
+    return draft.matchMode === 'any' ? { any: entries } : { all: entries }
 }
 
 function buildWhenEntries(
@@ -1119,11 +1120,7 @@ function buildListAction(entries: AutomationListFieldDraft[]): Record<string, an
         const value = entry.value.trim()
         if (!value) return acc
         const values = entry.field === 'sprint' ? value : listFromCsv(value)
-        acc[entry.field] = entry.field === 'sprint'
-            ? value
-            : values.length === 1
-                ? values[0]
-                : values
+        acc[entry.field] = entry.field === 'sprint' ? value : values.length === 1 ? values[0] : values
         return acc
     }, {})
 }
@@ -1135,7 +1132,6 @@ function parseYamlScalar(value: string): unknown {
         return value
     }
 }
-
 
 function createConditionDraft(): AutomationConditionDraft {
     return {
@@ -1262,7 +1258,7 @@ function cloneRecord(value: Record<string, any>): Record<string, any> {
 function compactAutomationRecord(value: Record<string, any>): Record<string, any> {
     const compacted = compactAutomationValue(value)
     return compacted && typeof compacted === 'object' && !Array.isArray(compacted)
-        ? compacted as Record<string, any>
+        ? (compacted as Record<string, any>)
         : {}
 }
 
@@ -1272,9 +1268,7 @@ function compactAutomationValue(value: unknown): unknown {
     }
 
     if (Array.isArray(value)) {
-        const items = value
-            .map((item) => compactAutomationValue(item))
-            .filter((item) => item !== undefined)
+        const items = value.map((item) => compactAutomationValue(item)).filter((item) => item !== undefined)
         return items.length ? items : undefined
     }
 
@@ -1291,7 +1285,12 @@ function compactAutomationValue(value: unknown): unknown {
         if (Array.isArray(compacted) && compacted.length === 0) {
             continue
         }
-        if (compacted && typeof compacted === 'object' && !Array.isArray(compacted) && Object.keys(compacted).length === 0) {
+        if (
+            compacted &&
+            typeof compacted === 'object' &&
+            !Array.isArray(compacted) &&
+            Object.keys(compacted).length === 0
+        ) {
             continue
         }
         record[key] = compacted

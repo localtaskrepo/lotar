@@ -6,7 +6,7 @@ import { parse } from 'yaml';
 
 const workflow = parse(readFileSync(new URL('../../.github/workflows/release.yml', import.meta.url), 'utf8'));
 const steps = workflow.jobs['update-release-page'].steps;
-const renderer = steps.find(step => step.uses?.startsWith('actions/github-script@'));
+const renderer = steps.find((step) => step.uses?.startsWith('actions/github-script@'));
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const run = new AsyncFunction('github', 'context', 'core', 'process', 'require', renderer.with.script);
 const require = createRequire(new URL('../../package.json', import.meta.url));
@@ -16,43 +16,63 @@ const tasksTree = 'c'.repeat(40);
 const tag = 'v0.9.1';
 const markerCount = (body, marker) => body.split(marker).length - 1;
 
-function fixture({ body = '', subjects = ['DEV-109 Fix backlog ordering'], previous = true, snapshotError = false } = {}) {
+function fixture({
+    body = '',
+    subjects = ['DEV-109 Fix backlog ordering'],
+    previous = true,
+    snapshotError = false,
+} = {}) {
     const updates = [];
     const calls = [];
     const warnings = [];
     const github = {
         rest: {
             repos: {
-                getReleaseByTag: async params => {
+                getReleaseByTag: async (params) => {
                     assert.deepEqual(params, { owner: 'localtaskrepo', repo: 'lotar', tag });
                     return { data: { id: 17, body } };
                 },
-                listTags: async () => { throw new Error('listTags must be paginated'); },
-                compareCommits: async params => {
-                    assert.deepEqual(params, { owner: 'localtaskrepo', repo: 'lotar', base: 'v0.9.0', head: tag });
-                    return { data: { commits: subjects.map(message => ({ commit: { message } })) } };
+                listTags: async () => {
+                    throw new Error('listTags must be paginated');
                 },
-                getCommit: async params => {
+                compareCommits: async (params) => {
+                    assert.deepEqual(params, { owner: 'localtaskrepo', repo: 'lotar', base: 'v0.9.0', head: tag });
+                    return { data: { commits: subjects.map((message) => ({ commit: { message } })) } };
+                },
+                getCommit: async (params) => {
                     calls.push({ method: 'getCommit', ...params });
                     assert.equal(params.ref, tag);
                     if (snapshotError) throw new Error('Snapshot API unavailable');
                     return { data: { sha: revision, commit: { tree: { sha: rootTree } } } };
                 },
-                updateRelease: async params => {
+                updateRelease: async (params) => {
                     updates.push(params);
                     return { data: params };
                 },
             },
             git: {
-                getTree: async params => {
+                getTree: async (params) => {
                     calls.push({ method: 'getTree', ...params });
                     if (params.tree_sha === revision || params.tree_sha === rootTree) {
-                        return { data: { truncated: false, tree: [{ path: '.tasks', type: 'tree', mode: '040000', sha: tasksTree }] } };
+                        return {
+                            data: {
+                                truncated: false,
+                                tree: [{ path: '.tasks', type: 'tree', mode: '040000', sha: tasksTree }],
+                            },
+                        };
                     }
                     assert.equal(params.tree_sha, tasksTree, 'read only the release snapshot task subtree');
-                    return { data: { truncated: false, tree: [109, 62, 63].map(id => ({
-                        path: `DEV/${id}.yml`, type: 'blob', mode: '100644', sha: 'd'.repeat(40),
-                    })) } };
+                    return {
+                        data: {
+                            truncated: false,
+                            tree: [109, 62, 63].map((id) => ({
+                                path: `DEV/${id}.yml`,
+                                type: 'blob',
+                                mode: '100644',
+                                sha: 'd'.repeat(40),
+                            })),
+                        },
+                    };
                 },
             },
         },
@@ -63,10 +83,17 @@ function fixture({ body = '', subjects = ['DEV-109 Fix backlog ordering'], previ
         },
     };
     return {
-        updates, calls, warnings,
+        updates,
+        calls,
+        warnings,
         async render() {
-            await run(github, { repo: { owner: 'localtaskrepo', repo: 'lotar' } },
-                { warning: message => warnings.push(message) }, { env: { GITHUB_REF_NAME: tag } }, require);
+            await run(
+                github,
+                { repo: { owner: 'localtaskrepo', repo: 'lotar' } },
+                { warning: (message) => warnings.push(message) },
+                { env: { GITHUB_REF_NAME: tag } },
+                require,
+            );
             assert.equal(updates.length, 1, 'exactly one release-body write through the mocked client');
             assert.equal(updates[0].release_id, 17);
             assert.equal(updates[0].owner, 'localtaskrepo');
@@ -77,22 +104,28 @@ function fixture({ body = '', subjects = ['DEV-109 Fix backlog ordering'], previ
 }
 
 test('release job checks out its own trusted ref without persistent credentials', () => {
-    const checkout = steps.findIndex(step => step.uses?.startsWith('actions/checkout@'));
+    const checkout = steps.findIndex((step) => step.uses?.startsWith('actions/checkout@'));
     assert.ok(checkout >= 0 && checkout < steps.indexOf(renderer));
     assert.equal(steps[checkout].with.ref, '${{ github.ref }}');
     assert.equal(steps[checkout].with['persist-credentials'], false);
 });
 
 test('actual workflow links all known mentions to immutable release files and preserves other sections', async () => {
-    const retained = 'Handwritten highlights remain here.\n\n**Full Changelog**: https://github.com/localtaskrepo/lotar/compare/v0.9.0...v0.9.1';
-    const sample = fixture({ body: retained, subjects: [
-        'Security Pass DEV-109 and DEV-404',
-        'DEV-62, DEV-63 Fix protocol\nIgnored commit body DEV-404',
-        'A maintenance change',
-    ] });
+    const retained =
+        'Handwritten highlights remain here.\n\n**Full Changelog**: https://github.com/localtaskrepo/lotar/compare/v0.9.0...v0.9.1';
+    const sample = fixture({
+        body: retained,
+        subjects: [
+            'Security Pass DEV-109 and DEV-404',
+            'DEV-62, DEV-63 Fix protocol\nIgnored commit body DEV-404',
+            'A maintenance change',
+        ],
+    });
     const body = await sample.render();
     for (const id of [109, 62, 63]) {
-        assert.ok(body.includes(`[DEV-${id}](https://github.com/localtaskrepo/lotar/blob/${revision}/.tasks/DEV/${id}.yml)`));
+        assert.ok(
+            body.includes(`[DEV-${id}](https://github.com/localtaskrepo/lotar/blob/${revision}/.tasks/DEV/${id}.yml)`),
+        );
     }
     assert.ok(body.includes('DEV-404'));
     assert.ok(!body.includes('[DEV-404]('));
@@ -103,8 +136,12 @@ test('actual workflow links all known mentions to immutable release files and pr
     assert.ok(body.indexOf('- A maintenance change') < body.indexOf('- [DEV-62]'));
     assert.ok(body.indexOf('- [DEV-62]') < body.indexOf('- Security Pass'));
     assert.equal(sample.warnings.length, 0);
-    assert.ok(sample.calls.some(call => call.method === 'getCommit'));
-    assert.ok(sample.calls.filter(call => call.method === 'getTree').every(call => ![tag, 'main'].includes(call.tree_sha)));
+    assert.ok(sample.calls.some((call) => call.method === 'getCommit'));
+    assert.ok(
+        sample.calls
+            .filter((call) => call.method === 'getTree')
+            .every((call) => ![tag, 'main'].includes(call.tree_sha)),
+    );
 });
 
 test('workflow updates markers idempotently and treats replacement tokens as literal commit text', async () => {
@@ -116,18 +153,25 @@ test('workflow updates markers idempotently and treats replacement tokens as lit
     assert.ok(twice.includes('$&'));
     assert.ok(twice.includes('$1'));
     assert.ok(twice.includes(retained));
-    for (const marker of ['<!-- QUICK-LINKS:START -->', '<!-- QUICK-LINKS:END -->', '<!-- COMMITS:START -->', '<!-- COMMITS:END -->']) {
+    for (const marker of [
+        '<!-- QUICK-LINKS:START -->',
+        '<!-- QUICK-LINKS:END -->',
+        '<!-- COMMITS:START -->',
+        '<!-- COMMITS:END -->',
+    ]) {
         assert.equal(markerCount(twice, marker), 1, marker);
     }
 });
 
 test('repeated commit subjects appear once on the release page (DEV-131)', async () => {
-    const sample = fixture({ subjects: [
-        'DEV-118 Share automation parsing\n\nStep 1 only.',
-        'DEV-62 Fix protocol',
-        'DEV-118 Share automation parsing',
-        'DEV-118 Share automation parsing  \nFollow-up body',
-    ] });
+    const sample = fixture({
+        subjects: [
+            'DEV-118 Share automation parsing\n\nStep 1 only.',
+            'DEV-62 Fix protocol',
+            'DEV-118 Share automation parsing',
+            'DEV-118 Share automation parsing  \nFollow-up body',
+        ],
+    });
     const body = await sample.render();
     assert.equal(body.split('Share automation parsing').length - 1, 1, body);
     assert.ok(body.indexOf('- [DEV-118]') < body.indexOf('- [DEV-62]'));
@@ -154,7 +198,10 @@ test('optional snapshot read failure warns but still renders downloads and commi
 test('existing selection cap remains 100 subjects before alphabetical rendering', async () => {
     const subjects = Array.from({ length: 101 }, (_, index) => `DEV-109 Subject${String(index).padStart(3, '0')}`);
     const body = await fixture({ subjects }).render();
-    assert.equal(body.split(`[DEV-109](https://github.com/localtaskrepo/lotar/blob/${revision}/.tasks/DEV/109.yml)`).length - 1, 100);
+    assert.equal(
+        body.split(`[DEV-109](https://github.com/localtaskrepo/lotar/blob/${revision}/.tasks/DEV/109.yml)`).length - 1,
+        100,
+    );
     assert.ok(!body.includes('Subject100'));
     assert.ok(body.includes('and 1 more'));
 });
@@ -162,6 +209,9 @@ test('existing selection cap remains 100 subjects before alphabetical rendering'
 test('release renderer regression suite runs in the existing Node-enabled CI lanes', () => {
     const ci = parse(readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8'));
     for (const job of ['ui_tests', 'windows_checks']) {
-        assert.ok(ci.jobs[job].steps.some(step => step.run === 'npm run test:release'), job);
+        assert.ok(
+            ci.jobs[job].steps.some((step) => step.run === 'npm run test:release'),
+            job,
+        );
     }
 });

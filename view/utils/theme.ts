@@ -31,7 +31,7 @@ export function applyThemePreference(theme: ThemePreference) {
     if (theme === 'system') {
         delete (root as any).dataset.theme
     } else {
-        (root as any).dataset.theme = theme
+        ;(root as any).dataset.theme = theme
     }
     updateChromeThemeColor()
 }
@@ -66,7 +66,10 @@ export function applyAccentPreference(accent: string | null) {
     root.style.setProperty('--color-accent', normalized)
     root.style.setProperty('--color-accent-strong', strong)
     root.style.setProperty('--color-accent-contrast', contrast)
-    root.style.setProperty('--focus-ring', `0 0 0 1px ${withAlpha(normalized, 0.35)}, 0 0 0 4px ${withAlpha(normalized, 0.2)}`)
+    root.style.setProperty(
+        '--focus-ring',
+        `0 0 0 1px ${withAlpha(normalized, 0.35)}, 0 0 0 4px ${withAlpha(normalized, 0.2)}`,
+    )
 }
 
 export function storeAccentPreference(accent: string | null) {

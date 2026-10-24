@@ -94,7 +94,10 @@ describe('useColumnDragReorder', () => {
 
         // Own MIME wins over the text/plain fallback.
         const ownMime = makeDataTransfer({ [TASKS_MIME]: 'priority', 'text/plain': 'title' })
-        dnd.onColDragOver('status', makeEvent({ dataTransfer: ownMime, currentTarget: makeTarget({ left: 100, width: 200 }), clientX: 0 }))
+        dnd.onColDragOver(
+            'status',
+            makeEvent({ dataTransfer: ownMime, currentTarget: makeTarget({ left: 100, width: 200 }), clientX: 0 }),
+        )
         dnd.onColDrop('status', makeEvent({ dataTransfer: ownMime }))
         expect(columnOrder.value.indexOf('priority')).toBeLessThan(columnOrder.value.indexOf('status'))
         expect(columnOrder.value.indexOf('title')).toBeLessThan(columnOrder.value.indexOf('status'))
@@ -107,7 +110,10 @@ describe('useColumnDragReorder', () => {
 
         // ...but the shared text/plain fallback still carries the drag.
         const plainOnly = makeDataTransfer({ 'text/plain': 'modified' })
-        dnd.onColDragOver('id', makeEvent({ dataTransfer: plainOnly, currentTarget: makeTarget({ left: 100, width: 200 }), clientX: 0 }))
+        dnd.onColDragOver(
+            'id',
+            makeEvent({ dataTransfer: plainOnly, currentTarget: makeTarget({ left: 100, width: 200 }), clientX: 0 }),
+        )
         dnd.onColDrop('id', makeEvent({ dataTransfer: plainOnly }))
         expect(columnOrder.value.indexOf('modified')).toBeLessThan(columnOrder.value.indexOf('id'))
 
@@ -144,7 +150,10 @@ describe('useColumnDragReorder', () => {
         const { onSort, dnd } = setup()
         const dt = makeDataTransfer()
         dnd.onColDragStart('priority', makeEvent({ dataTransfer: dt }))
-        dnd.onColDragOver('status', makeEvent({ dataTransfer: dt, currentTarget: makeTarget({ left: 100, width: 200 }) }))
+        dnd.onColDragOver(
+            'status',
+            makeEvent({ dataTransfer: dt, currentTarget: makeTarget({ left: 100, width: 200 }) }),
+        )
         dnd.onColDrop('status', makeEvent({ dataTransfer: dt }))
 
         expect(dnd.draggingCol.value).toBeNull()
@@ -168,7 +177,10 @@ describe('useColumnDragReorder', () => {
         const { columnOrder, onSort, dnd } = setup()
         const dt = makeDataTransfer()
         dnd.onColDragStart('priority', makeEvent({ dataTransfer: dt }))
-        dnd.onColDragOver('status', makeEvent({ dataTransfer: dt, currentTarget: makeTarget({ left: 100, width: 200 }) }))
+        dnd.onColDragOver(
+            'status',
+            makeEvent({ dataTransfer: dt, currentTarget: makeTarget({ left: 100, width: 200 }) }),
+        )
         dnd.onColDragEnd()
 
         expect(dnd.draggingCol.value).toBeNull()

@@ -2,16 +2,7 @@ import type { ConfigFormState } from '../composables/useConfigForm'
 
 /** Sections of the Config page, in menu order (DEV-19). */
 export type ConfigSectionId =
-    | 'general'
-    | 'defaults'
-    | 'workflow'
-    | 'fields'
-    | 'people'
-    | 'automation'
-    | 'git'
-    | 'storage'
-    | 'agents'
-    | 'sprints'
+    'general' | 'defaults' | 'workflow' | 'fields' | 'people' | 'automation' | 'git' | 'storage' | 'agents' | 'sprints'
 
 export interface ConfigSectionDefinition {
     id: ConfigSectionId
@@ -37,8 +28,22 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         id: 'defaults',
         label: 'New tasks',
         summary: 'Values applied when a task is created without them.',
-        fields: ['defaultProject', 'defaultStatus', 'defaultPriority', 'defaultReporter', 'defaultAssignee', 'defaultTags'],
-        errorKeys: ['default_project', 'default_status', 'default_priority', 'default_reporter', 'default_assignee', 'default_tags'],
+        fields: [
+            'defaultProject',
+            'defaultStatus',
+            'defaultPriority',
+            'defaultReporter',
+            'defaultAssignee',
+            'defaultTags',
+        ],
+        errorKeys: [
+            'default_project',
+            'default_status',
+            'default_priority',
+            'default_reporter',
+            'default_assignee',
+            'default_tags',
+        ],
     },
     {
         id: 'workflow',

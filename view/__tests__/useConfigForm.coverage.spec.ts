@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
-import type { ConfigInspectResult, GlobalConfigRaw, ProjectConfigRaw, ProjectDTO, ResolvedConfigDTO } from '../api/types'
+import type {
+    ConfigInspectResult,
+    GlobalConfigRaw,
+    ProjectConfigRaw,
+    ProjectDTO,
+    ResolvedConfigDTO,
+} from '../api/types'
 import { useConfigForm } from '../composables/useConfigForm'
 
 // DEV-146: every settable config field has a bespoke control, and list
@@ -58,7 +64,11 @@ function resolved(overrides: Partial<ResolvedConfigDTO> = {}): ResolvedConfigDTO
     }
 }
 
-function inspectFor(project: string, projectRaw: ProjectConfigRaw | null, global: Partial<ResolvedConfigDTO> = {}): ConfigInspectResult {
+function inspectFor(
+    project: string,
+    projectRaw: ProjectConfigRaw | null,
+    global: Partial<ResolvedConfigDTO> = {},
+): ConfigInspectResult {
     const globalResolved = resolved(global)
     return {
         effective: project ? resolved({ ...global, ...(projectRaw as Partial<ResolvedConfigDTO>) }) : globalResolved,
@@ -208,7 +218,8 @@ describe('useConfigForm sprint duration validation (DEV-111)', () => {
             return form.errors[field]
         }
         for (const ok of ['', '2w', '14d', '3 weeks']) expect(check('sprints_defaults_length', ok)).toBeNull()
-        for (const bad of ['12h', '0d', '-2w', 'soon', '600w']) expect(check('sprints_defaults_length', bad)).toBeTruthy()
+        for (const bad of ['12h', '0d', '-2w', 'soon', '600w'])
+            expect(check('sprints_defaults_length', bad)).toBeTruthy()
         for (const ok of ['', '12h', '0d', '2 hours']) expect(check('sprints_defaults_overdue_after', ok)).toBeNull()
         for (const bad of ['later', '87601h']) expect(check('sprints_defaults_overdue_after', bad)).toBeTruthy()
     })

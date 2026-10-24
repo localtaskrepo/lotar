@@ -14,9 +14,14 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
         const apiTitle = 'UI API auto task';
 
         try {
-
-            await workspace.write(path.join(frontendDir, 'package.json'), JSON.stringify({ name: 'frontend-app', private: true }, null, 2));
-            await workspace.write(path.join(apiDir, 'Cargo.toml'), ['[package]', 'name = "api-service"', 'version = "0.1.0"'].join('\n'));
+            await workspace.write(
+                path.join(frontendDir, 'package.json'),
+                JSON.stringify({ name: 'frontend-app', private: true }, null, 2),
+            );
+            await workspace.write(
+                path.join(apiDir, 'Cargo.toml'),
+                ['[package]', 'name = "api-service"', 'version = "0.1.0"'].join('\n'),
+            );
             await workspace.write(path.join(apiDir, 'src', 'lib.rs'), '// lib');
 
             const frontendTask = await workspace.addTask(frontendTitle, {
@@ -64,8 +69,10 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
         const overrideTitle = 'UI Override project task';
 
         try {
-
-            await workspace.write(path.join(frontendDir, 'package.json'), JSON.stringify({ name: 'frontend-app', private: true }, null, 2));
+            await workspace.write(
+                path.join(frontendDir, 'package.json'),
+                JSON.stringify({ name: 'frontend-app', private: true }, null, 2),
+            );
 
             const defaultTask = await workspace.addTask(defaultTitle, {
                 cwd: path.join(workspace.root, frontendDir),

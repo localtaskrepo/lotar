@@ -1,9 +1,11 @@
 <template>
-  <section class="col" style="gap:16px;">
-    <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-      <h1>Calendar <span v-if="project" class="muted">— {{ project }}</span></h1>
+  <section class="col" style="gap: 16px">
+    <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px">
+      <h1>
+        Calendar <span v-if="project" class="muted">— {{ project }}</span>
+      </h1>
       <div class="row calendar-controls">
-        <div class="row" style="gap:6px; align-items:center;">
+        <div class="row" style="gap: 6px; align-items: center">
           <UiButton icon-only aria-label="Previous month" @click="prevMonth">
             <IconGlyph name="chevron-left" />
           </UiButton>
@@ -49,7 +51,13 @@
           </UiButton>
           <UiButton @click="goToday">Today</UiButton>
         </div>
-        <UiButton class="toggle-sprints" variant="ghost" :class="{ active: showSprints }" :aria-pressed="showSprints ? 'true' : 'false'" @click="toggleSprints">
+        <UiButton
+          class="toggle-sprints"
+          variant="ghost"
+          :class="{ active: showSprints }"
+          :aria-pressed="showSprints ? 'true' : 'false'"
+          @click="toggleSprints"
+        >
           {{ showSprints ? 'Hide sprint schedule' : 'Show sprint schedule' }}
         </UiButton>
         <UiButton
@@ -103,7 +111,14 @@
             @reset="resetCalendarHoverFields"
           >
             <template #trigger="{ open, toggle }">
-              <UiButton class="responsive-action" type="button" aria-label="Configure hover fields" title="Choose which fields appear on hover" :aria-expanded="open" @click="toggle">
+              <UiButton
+                class="responsive-action"
+                type="button"
+                aria-label="Configure hover fields"
+                title="Choose which fields appear on hover"
+                :aria-expanded="open"
+                @click="toggle"
+              >
                 <IconGlyph name="columns" aria-hidden="true" />
                 <span class="responsive-action__label">Fields</span>
               </UiButton>
@@ -113,7 +128,7 @@
       </FilterBar>
     </div>
 
-    <div v-if="initialLoading" style="margin: 12px 0;"><UiLoader>Loading calendar…</UiLoader></div>
+    <div v-if="initialLoading" style="margin: 12px 0"><UiLoader>Loading calendar…</UiLoader></div>
 
     <template v-else>
       <div v-if="loadError" class="card refresh-error" role="alert">
@@ -121,103 +136,117 @@
         <UiButton variant="ghost" type="button" :disabled="loadingTasks" @click="refreshAll">Retry</UiButton>
       </div>
       <div class="calendar">
-      <div class="grid header">
-        <div v-for="d in weekDays" :key="d" class="cell head">{{ d }}</div>
-      </div>
-      <Transition :name="`calendar-slide-${monthSlideDirection}`" mode="out-in">
-        <div class="grid body" :key="monthKey">
-          <div
-            v-for="(cell, idx) in cells"
-            :key="cell.dateKey || idx"
-            class="cell day"
-            :class="{ other: !cell.inMonth, today: isTodayCell(cell.date) }"
-            :data-date="cell.dateKey"
-          >
-          <div class="date">{{ cell.date.getDate() }}</div>
-          <div v-if="showSprints && cell.sprints.length" class="sprints">
+        <div class="grid header">
+          <div v-for="d in weekDays" :key="d" class="cell head">{{ d }}</div>
+        </div>
+        <Transition :name="`calendar-slide-${monthSlideDirection}`" mode="out-in">
+          <div class="grid body" :key="monthKey">
             <div
-              v-for="sprint in cell.sprints"
-              :key="`${sprint.id}-${cell.dateKey}`"
-              class="sprint-pill"
-              :class="{
-                'partial-start': !sprint.isStart,
-                'partial-end': !sprint.isEnd,
-                'dim-before': sprint.beforeActualStart,
-                'dim-after': sprint.afterActualEnd,
-                'actual-end': sprint.isActualEnd,
-              }"
-              :style="{ '--sprint-color': sprintColorForState(sprint.state) }"
-              :data-sprint-id="sprint.id"
-              :data-sprint-state="sprint.state"
-              :data-actual-phase="sprint.afterActualEnd ? 'after-end' : sprint.beforeActualStart ? 'before-start' : 'active'"
-              :title="formatSprintTooltip(sprint)"
+              v-for="(cell, idx) in cells"
+              :key="cell.dateKey || idx"
+              class="cell day"
+              :class="{ other: !cell.inMonth, today: isTodayCell(cell.date) }"
+              :data-date="cell.dateKey"
             >
-              <span class="sprint-pill__label">{{ sprint.label }}</span>
+              <div class="date">{{ cell.date.getDate() }}</div>
+              <div v-if="showSprints && cell.sprints.length" class="sprints">
+                <div
+                  v-for="sprint in cell.sprints"
+                  :key="`${sprint.id}-${cell.dateKey}`"
+                  class="sprint-pill"
+                  :class="{
+                    'partial-start': !sprint.isStart,
+                    'partial-end': !sprint.isEnd,
+                    'dim-before': sprint.beforeActualStart,
+                    'dim-after': sprint.afterActualEnd,
+                    'actual-end': sprint.isActualEnd,
+                  }"
+                  :style="{ '--sprint-color': sprintColorForState(sprint.state) }"
+                  :data-sprint-id="sprint.id"
+                  :data-sprint-state="sprint.state"
+                  :data-actual-phase="
+                    sprint.afterActualEnd ? 'after-end' : sprint.beforeActualStart ? 'before-start' : 'active'
+                  "
+                  :title="formatSprintTooltip(sprint)"
+                >
+                  <span class="sprint-pill__label">{{ sprint.label }}</span>
+                </div>
+              </div>
+              <TransitionGroup name="task-list" tag="ul" class="tasks" :ref="(el) => setTasksListRef(cell.dateKey, el)">
+                <li
+                  v-for="t in cell.tasks.slice(0, visibleCountFor(cell))"
+                  :key="t.id"
+                  class="task-item"
+                  role="button"
+                  tabindex="0"
+                  @click="openTask(t.id)"
+                  @keydown.enter.prevent="openTask(t.id)"
+                  @keydown.space.prevent="openTask(t.id)"
+                >
+                  <TaskHoverCard
+                    :task="t"
+                    :fields="calendarHoverFieldMap"
+                    teleport-to-body
+                    :placement="idx % 7 > 3 ? 'right' : 'left'"
+                  >
+                    <div class="task-inline">
+                      <span class="id">{{ t.id }}</span>
+                      <span class="title">{{ shortTitle(t.title) }}</span>
+                    </div>
+                  </TaskHoverCard>
+                </li>
+                <li v-if="hiddenCountFor(cell) > 0" key="__more__" class="muted more" @click="openDay(cell.date)">
+                  {{ moreTicketsLabel(hiddenCountFor(cell)) }}
+                </li>
+                <li key="__add__" class="cell-add" :data-date="cell.dateKey">
+                  <button
+                    type="button"
+                    class="cell-add__btn"
+                    :aria-label="`Add task due ${cell.dateKey}`"
+                    :title="`Add task due ${cell.dateKey}`"
+                    @click="openCreateOnDate(cell.dateKey)"
+                  >
+                    + Add task
+                  </button>
+                </li>
+              </TransitionGroup>
             </div>
           </div>
-          <TransitionGroup name="task-list" tag="ul" class="tasks" :ref="(el) => setTasksListRef(cell.dateKey, el)">
-            <li
-              v-for="t in cell.tasks.slice(0, visibleCountFor(cell))"
-              :key="t.id"
-              class="task-item"
-              role="button"
-              tabindex="0"
-              @click="openTask(t.id)"
-              @keydown.enter.prevent="openTask(t.id)"
-              @keydown.space.prevent="openTask(t.id)"
-            >
-              <TaskHoverCard :task="t" :fields="calendarHoverFieldMap" teleport-to-body :placement="(idx % 7) > 3 ? 'right' : 'left'">
-                <div class="task-inline">
-                  <span class="id">{{ t.id }}</span>
-                  <span class="title">{{ shortTitle(t.title) }}</span>
-                </div>
-              </TaskHoverCard>
-            </li>
-            <li v-if="hiddenCountFor(cell) > 0" key="__more__" class="muted more" @click="openDay(cell.date)">{{ moreTicketsLabel(hiddenCountFor(cell)) }}</li>
-            <li key="__add__" class="cell-add" :data-date="cell.dateKey">
-              <button
-                type="button"
-                class="cell-add__btn"
-                :aria-label="`Add task due ${cell.dateKey}`"
-                :title="`Add task due ${cell.dateKey}`"
-                @click="openCreateOnDate(cell.dateKey)"
-              >+ Add task</button>
-            </li>
-          </TransitionGroup>
-        </div>
-        </div>
-      </Transition>
+        </Transition>
       </div>
     </template>
 
     <UiModal :open="dayDialogOpen" aria-label="Day tasks" size="sm" @close="closeDayDialog">
-          <header class="calendar-day-dialog__header row" style="justify-content: space-between; align-items: center; gap: 8px;">
-            <strong>{{ dayDialogTitle }}</strong>
-            <UiButton icon-only type="button" aria-label="Close" title="Close" @click="closeDayDialog">
-              <IconGlyph name="close" />
-            </UiButton>
-          </header>
-          <div class="calendar-day-dialog__body">
-            <ul class="calendar-day-dialog__list">
-              <li
-                v-for="t in dayDialogTasks"
-                :key="t.id"
-                class="calendar-day-dialog__item"
-                role="button"
-                tabindex="0"
-                @click="openTaskFromDialog(t.id)"
-                @keydown.enter.prevent="openTaskFromDialog(t.id)"
-                @keydown.space.prevent="openTaskFromDialog(t.id)"
-              >
-                <TaskHoverCard :task="t" :fields="calendarHoverFieldMap" teleport-to-body placement="left" block>
-                  <div class="calendar-day-dialog__inline">
-                    <span class="id">{{ t.id }}</span>
-                    <span class="title">{{ t.title }}</span>
-                  </div>
-                </TaskHoverCard>
-              </li>
-            </ul>
-          </div>
+      <header
+        class="calendar-day-dialog__header row"
+        style="justify-content: space-between; align-items: center; gap: 8px"
+      >
+        <strong>{{ dayDialogTitle }}</strong>
+        <UiButton icon-only type="button" aria-label="Close" title="Close" @click="closeDayDialog">
+          <IconGlyph name="close" />
+        </UiButton>
+      </header>
+      <div class="calendar-day-dialog__body">
+        <ul class="calendar-day-dialog__list">
+          <li
+            v-for="t in dayDialogTasks"
+            :key="t.id"
+            class="calendar-day-dialog__item"
+            role="button"
+            tabindex="0"
+            @click="openTaskFromDialog(t.id)"
+            @keydown.enter.prevent="openTaskFromDialog(t.id)"
+            @keydown.space.prevent="openTaskFromDialog(t.id)"
+          >
+            <TaskHoverCard :task="t" :fields="calendarHoverFieldMap" teleport-to-body placement="left" block>
+              <div class="calendar-day-dialog__inline">
+                <span class="id">{{ t.id }}</span>
+                <span class="title">{{ t.title }}</span>
+              </div>
+            </TaskHoverCard>
+          </li>
+        </ul>
+      </div>
     </UiModal>
   </section>
 </template>
@@ -277,16 +306,31 @@ const initialLoading = computed(() => {
 const { sprints: sprintList, refresh: refreshSprints } = useSprints()
 const sprintFilterOptions = useSprintFilterOptions(sprintList)
 const { openTaskPanel } = useTaskPanelController()
-const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, scope: configScope, tags: configuredTags, members } = useConfig()
+const {
+  statuses,
+  priorities,
+  types,
+  customFields: availableCustomFields,
+  refresh: refreshConfig,
+  scope: configScope,
+  tags: configuredTags,
+  members,
+} = useConfig()
 const { sprintColorForState } = useSprintFormatting(sprintList)
 
 // Initialize from the route at setup so the FilterBar's first emit echoes the
 // real project instead of a transient empty value that would strip ?project=
 // from the URL before onMounted runs.
 const project = ref<string>(route.query.project ? String(route.query.project) : '')
-const filterOptions = useFilterOptions(() => calendarQuery.value?.tasks.value ?? [], () => project.value, {
-  scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
-})
+const filterOptions = useFilterOptions(
+  () => calendarQuery.value?.tasks.value ?? [],
+  () => project.value,
+  {
+    scope: () => configScope.value,
+    tags: () => configuredTags.value,
+    members: () => members.value,
+  },
+)
 const cursor = ref<Date>(new Date()) // month cursor
 const monthKey = computed(() => `${cursor.value.getFullYear()}-${String(cursor.value.getMonth() + 1).padStart(2, '0')}`)
 const monthSlideDirection = ref<'forward' | 'backward'>('forward')
@@ -341,8 +385,7 @@ const calendarHoverFields = useColumns({
 
 const calendarHoverFieldOptions = computed(() => calendarHoverFields.fieldOptions.value)
 const isCalendarHoverFieldVisible = (key: string) => calendarHoverFields.isVisible(key)
-const setCalendarHoverFieldVisible = (key: string, event: Event) =>
-  calendarHoverFields.toggleColumn(key, event)
+const setCalendarHoverFieldVisible = (key: string, event: Event) => calendarHoverFields.toggleColumn(key, event)
 const resetCalendarHoverFields = () => calendarHoverFields.resetColumns()
 const calendarHoverFieldMap = computed<Record<string, boolean>>(() => {
   const map: Record<string, boolean> = {}
@@ -352,11 +395,7 @@ const calendarHoverFieldMap = computed<Record<string, boolean>>(() => {
   return map
 })
 
-watch(
-  availableCustomFields,
-  (keys) => calendarHoverFields.setCustomFieldKeys(keys),
-  { immediate: true },
-)
+watch(availableCustomFields, (keys) => calendarHoverFields.setCustomFieldKeys(keys), { immediate: true })
 
 watch(project, (next) => calendarHoverFields.setProjectKey(next), { immediate: true })
 
@@ -412,12 +451,16 @@ function handleCalendarPopoverClick(event: MouseEvent) {
     monthPickerOpen.value = false
   }
 }
-const { hasFilters, onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
+const {
+  hasFilters,
+  onFilterUpdate,
+  clearFilters: clearFiltersAction,
+} = useProjectFilterSync(project, filter, {
   onProjectChange: syncProjectRoute,
 })
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
-const weekDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function syncProjectRoute(nextProject: string) {
   const desired = nextProject || ''
@@ -432,12 +475,28 @@ function clearFilters() {
 
 const monthLabel = computed(() => cursor.value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
 
-function startOfMonth(d: Date){ return new Date(d.getFullYear(), d.getMonth(), 1) }
-function endOfMonth(d: Date){ return new Date(d.getFullYear(), d.getMonth()+1, 0) }
-function startOfGrid(d: Date){ const s = startOfMonth(d); const w = s.getDay(); return new Date(s.getFullYear(), s.getMonth(), 1 - w) }
-function endOfGrid(d: Date){ const e = endOfMonth(d); const w = e.getDay(); return new Date(e.getFullYear(), e.getMonth(), e.getDate() + (6 - w)) }
-function startOfDay(date: Date) { return startOfLocalDay(date) }
-function parseDateLike(value?: string | null) { return parseTaskDate(value) }
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+function endOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0)
+}
+function startOfGrid(d: Date) {
+  const s = startOfMonth(d)
+  const w = s.getDay()
+  return new Date(s.getFullYear(), s.getMonth(), 1 - w)
+}
+function endOfGrid(d: Date) {
+  const e = endOfMonth(d)
+  const w = e.getDay()
+  return new Date(e.getFullYear(), e.getMonth(), e.getDate() + (6 - w))
+}
+function startOfDay(date: Date) {
+  return startOfLocalDay(date)
+}
+function parseDateLike(value?: string | null) {
+  return parseTaskDate(value)
+}
 const sprintSchedule = computed(() => {
   if (!showSprints.value) return {} as Record<string, SprintCalendarDayEntry[]>
   return buildSprintSchedule(sprintList.value, startOfGrid(cursor.value), endOfGrid(cursor.value))
@@ -445,7 +504,13 @@ const sprintSchedule = computed(() => {
 const cells = computed(() => {
   const start = startOfGrid(cursor.value)
   const end = endOfGrid(cursor.value)
-  const days: Array<{ date: Date; dateKey: string; inMonth: boolean; tasks: any[]; sprints: SprintCalendarDayEntry[] }> = []
+  const days: Array<{
+    date: Date
+    dateKey: string
+    inMonth: boolean
+    tasks: any[]
+    sprints: SprintCalendarDayEntry[]
+  }> = []
   const month = cursor.value.getMonth()
 
   // Smart filters (due/recent/needs/assignee) are applied server-side by the
@@ -474,7 +539,7 @@ const cells = computed(() => {
       date: new Date(d),
       dateKey: key,
       inMonth: d.getMonth() === month,
-      tasks: (byDate[key] || []),
+      tasks: byDate[key] || [],
       sprints: schedule[key] || [],
     })
   }
@@ -489,17 +554,17 @@ async function refreshCalendarTasks(snapshot?: Record<string, string>) {
   await activeQueryHandle!.refresh()
 }
 
-function prevMonth(){
+function prevMonth() {
   monthSlideDirection.value = 'backward'
-  cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth()-1, 1)
+  cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth() - 1, 1)
   pushRoute()
 }
-function nextMonth(){
+function nextMonth() {
   monthSlideDirection.value = 'forward'
-  cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth()+1, 1)
+  cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth() + 1, 1)
   pushRoute()
 }
-function goToday(){
+function goToday() {
   const now = new Date()
   monthSlideDirection.value = now.getTime() >= cursor.value.getTime() ? 'forward' : 'backward'
   cursor.value = now
@@ -510,7 +575,7 @@ const monthPickerOpen = ref(false)
 const monthPickerRef = ref<HTMLElement | null>(null)
 const pickerYear = ref(cursor.value.getFullYear())
 const today = new Date()
-const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function toggleMonthPicker() {
   monthPickerOpen.value = !monthPickerOpen.value
@@ -527,17 +592,21 @@ function selectPickerMonth(monthIndex: number) {
   pushRoute()
 }
 
-function isTodayCell(d: Date){ const now = new Date(); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate() }
+function isTodayCell(d: Date) {
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+}
 
-function pushRoute(){
-  const y = cursor.value.getFullYear(); const m = String(cursor.value.getMonth()+1).padStart(2,'0')
+function pushRoute() {
+  const y = cursor.value.getFullYear()
+  const m = String(cursor.value.getMonth() + 1).padStart(2, '0')
   const q: any = { month: `${y}-${m}` }
   if (project.value) q.project = project.value
   if (showSprints.value) q.sprints = '1'
   router.push({ path: '/calendar', query: q })
 }
 
-function openTask(id: string){
+function openTask(id: string) {
   openTaskPanel({ taskId: id })
 }
 
@@ -553,7 +622,7 @@ function openCreateOnDate(dateKey: string) {
     },
   })
 }
-function openDay(d: Date){
+function openDay(d: Date) {
   const key = toDateKey(d)
   const cell = cells.value.find((c) => c.dateKey === key)
   dayDialogDate.value = new Date(d)
@@ -561,28 +630,24 @@ function openDay(d: Date){
   dayDialogOpen.value = true
 }
 
-function toggleSprints(){
+function toggleSprints() {
   showSprints.value = !showSprints.value
   pushRoute()
 }
 
-function shortTitle(title?: string | null){
+function shortTitle(title?: string | null) {
   const value = (title || '').trim()
   if (!value) return '(no title)'
   if (value.length <= 48) return value
   return `${value.slice(0, 45).trimEnd()}…`
 }
 
-async function refreshAll(){
-  await Promise.all([
-    refreshProjects(),
-    refreshSprints(true),
-    refreshConfig(project.value),
-  ])
+async function refreshAll() {
+  await Promise.all([refreshProjects(), refreshSprints(true), refreshConfig(project.value)])
   await refreshCalendarTasks()
 }
 
-function formatSprintTooltip(entry: SprintCalendarDayEntry){
+function formatSprintTooltip(entry: SprintCalendarDayEntry) {
   const startLabel = entry.startDate.toLocaleDateString()
   const endLabel = entry.endDate.toLocaleDateString()
   const parts = [`Planned: ${startLabel} – ${endLabel}`]
@@ -599,15 +664,19 @@ function formatSprintTooltip(entry: SprintCalendarDayEntry){
 
 let filterDebounce: ReturnType<typeof setTimeout> | null = null
 
-watch(filter, (value) => {
-  if (filterDebounce) clearTimeout(filterDebounce)
-  const snapshot = { ...value }
-  filterDebounce = setTimeout(() => {
-    refreshCalendarTasks(snapshot).catch((err) => {
-      console.warn('Failed to refresh calendar after filter change', err)
-    })
-  }, 150)
-}, { deep: true })
+watch(
+  filter,
+  (value) => {
+    if (filterDebounce) clearTimeout(filterDebounce)
+    const snapshot = { ...value }
+    filterDebounce = setTimeout(() => {
+      refreshCalendarTasks(snapshot).catch((err) => {
+        console.warn('Failed to refresh calendar after filter change', err)
+      })
+    }, 150)
+  },
+  { deep: true },
+)
 
 watch(project, async (nextProject, prevProject) => {
   if (nextProject === prevProject) return
@@ -649,7 +718,9 @@ onMounted(async () => {
   const q = route.query as Record<string, any>
   // Parse month from query (YYYY-MM)
   if (q.month && /^\d{4}-\d{2}$/.test(String(q.month))) {
-    const [y, m] = String(q.month).split('-').map((s: string) => parseInt(s, 10))
+    const [y, m] = String(q.month)
+      .split('-')
+      .map((s: string) => parseInt(s, 10))
     cursor.value = new Date(y ?? 2026, (m ?? 1) - 1, 1)
   }
   showSprints.value = q.sprints === '1'
@@ -659,24 +730,29 @@ onMounted(async () => {
   recalcTaskListRowCapacities()
 })
 
-watch(() => route.query, async (q) => {
-  const r = q as any
-  const nextProject = r.project ? String(r.project) : ''
-  if (nextProject !== project.value) {
-    project.value = nextProject
-    await refreshConfig(project.value)
-    await refreshCalendarTasks()
-  }
-  if (r.month && /^\d{4}-\d{2}$/.test(String(r.month))) {
-    const [y, m] = String(r.month).split('-').map((s: string) => parseInt(s, 10))
-    const next = new Date(y ?? 2026, (m ?? 1) - 1, 1)
-    if (next.getTime() !== cursor.value.getTime()) cursor.value = next
-  }
-  const show = r.sprints === '1'
-  if (show !== showSprints.value) {
-    showSprints.value = show
-  }
-})
+watch(
+  () => route.query,
+  async (q) => {
+    const r = q as any
+    const nextProject = r.project ? String(r.project) : ''
+    if (nextProject !== project.value) {
+      project.value = nextProject
+      await refreshConfig(project.value)
+      await refreshCalendarTasks()
+    }
+    if (r.month && /^\d{4}-\d{2}$/.test(String(r.month))) {
+      const [y, m] = String(r.month)
+        .split('-')
+        .map((s: string) => parseInt(s, 10))
+      const next = new Date(y ?? 2026, (m ?? 1) - 1, 1)
+      if (next.getTime() !== cursor.value.getTime()) cursor.value = next
+    }
+    const show = r.sprints === '1'
+    if (show !== showSprints.value) {
+      showSprints.value = show
+    }
+  },
+)
 
 watch(cells, async () => {
   await nextTick()
@@ -700,19 +776,49 @@ watch(showSprints, (enabled, previous) => {
 </script>
 
 <style scoped>
-.calendar { display: grid; gap: 8px; position: relative; overflow: hidden; }
-.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-.cell { border: 1px solid var(--border); border-radius: var(--radius-base); padding: 8px; background: var(--bg); min-height: 100px; }
-.head { text-align: center; font-weight: 600; color: var(--muted); border: none; background: transparent; min-height: 20px; }
+.calendar {
+  display: grid;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.cell {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-base);
+  padding: 8px;
+  background: var(--bg);
+  min-height: 100px;
+}
+.head {
+  text-align: center;
+  font-weight: 600;
+  color: var(--muted);
+  border: none;
+  background: transparent;
+  min-height: 20px;
+}
 .day {
   display: flex;
   flex-direction: column;
   height: 160px;
   overflow: hidden;
 }
-.day.other { opacity: 0.6; }
-.day.today { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: 2px; }
-.date { font-weight: 600; margin-bottom: 6px; }
+.day.other {
+  opacity: 0.6;
+}
+.day.today {
+  outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent);
+  outline-offset: 2px;
+}
+.date {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
 .tasks {
   display: flex;
   flex-direction: column;
@@ -731,7 +837,9 @@ watch(showSprints, (enabled, previous) => {
   cursor: pointer;
   padding: 3px 4px;
   border-radius: var(--radius-md);
-  transition: background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
   outline: none;
 }
 .tasks .task-item .task-inline {
@@ -762,7 +870,9 @@ watch(showSprints, (enabled, previous) => {
   white-space: nowrap;
   line-height: 1.1;
 }
-.tasks li.more { cursor: pointer; }
+.tasks li.more {
+  cursor: pointer;
+}
 .tasks li.more {
   padding: 2px 4px;
   border-radius: var(--radius-md);
@@ -811,8 +921,14 @@ watch(showSprints, (enabled, previous) => {
   background: color-mix(in oklab, var(--_color) 85%, var(--color-bg));
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--_color) 70%, transparent);
 }
-.sprint-pill.partial-start { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
-.sprint-pill.partial-end { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.sprint-pill.partial-start {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+.sprint-pill.partial-end {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
 .sprint-pill__label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -940,11 +1056,16 @@ watch(showSprints, (enabled, previous) => {
 }
 
 @media (hover: none) {
-  .cell-add { opacity: 1; }
+  .cell-add {
+    opacity: 1;
+  }
 }
 
 /* Month picker button + popover */
-.month-picker { position: relative; display: inline-flex; }
+.month-picker {
+  position: relative;
+  display: inline-flex;
+}
 .month-picker__trigger {
   min-width: 170px;
   justify-content: center;
@@ -972,7 +1093,9 @@ watch(showSprints, (enabled, previous) => {
   justify-content: space-between;
   gap: 6px;
 }
-.month-picker__year { font-size: 0.95rem; }
+.month-picker__year {
+  font-size: 0.95rem;
+}
 .month-picker__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -988,10 +1111,16 @@ watch(showSprints, (enabled, previous) => {
   color: inherit;
   cursor: pointer;
   text-align: center;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
-.month-picker__month:hover { background: color-mix(in oklab, var(--fg) 8%, transparent); }
-.month-picker__month.current { border-color: color-mix(in oklab, var(--fg) 25%, transparent); }
+.month-picker__month:hover {
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
+.month-picker__month.current {
+  border-color: color-mix(in oklab, var(--fg) 25%, transparent);
+}
 .month-picker__month.active {
   background: var(--accent, color-mix(in oklab, var(--fg) 18%, transparent));
   color: var(--accent-contrast, inherit);
@@ -1003,7 +1132,9 @@ watch(showSprints, (enabled, previous) => {
 .calendar-slide-forward-leave-active,
 .calendar-slide-backward-enter-active,
 .calendar-slide-backward-leave-active {
-  transition: transform 0.28s ease, opacity 0.28s ease;
+  transition:
+    transform 0.28s ease,
+    opacity 0.28s ease;
 }
 .calendar-slide-forward-enter-from {
   transform: translateX(24px);

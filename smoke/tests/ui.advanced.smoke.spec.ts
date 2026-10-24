@@ -149,7 +149,7 @@ describe.concurrent.skipIf(!gitAvailable())('UI advanced smoke scenarios', () =>
                         { timeout: 15_000 },
                     );
                     const totalTasksValue = await totalValueHandle.jsonValue();
-                    expect((totalTasksValue as number)).toBeGreaterThanOrEqual(3);
+                    expect(totalTasksValue as number).toBeGreaterThanOrEqual(3);
 
                     const waitForRefreshData = waitForInsightsData(page);
                     await page.locator('button[aria-label="Refresh insights"]').click();

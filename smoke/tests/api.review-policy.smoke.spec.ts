@@ -29,17 +29,20 @@ members: [alice, bob, carol]
 const ENV = { LOTAR_DEFAULT_REPORTER: '' };
 
 function task(reporter?: string): string {
-    return '# Preserve this user-owned comment on rejected and no-op mutations.\n' + stringify({
-        title: 'Private review-policy sentinel',
-        status: 'NeedsReview',
-        priority: 'Medium',
-        type: 'Feature',
-        ...(reporter === undefined ? {} : { reporter }),
-        assignee: 'bob',
-        created: '2026-01-01T00:00:00Z',
-        modified: '2026-01-02T00:00:00Z',
-        tags: [],
-    });
+    return (
+        '# Preserve this user-owned comment on rejected and no-op mutations.\n' +
+        stringify({
+            title: 'Private review-policy sentinel',
+            status: 'NeedsReview',
+            priority: 'Medium',
+            type: 'Feature',
+            ...(reporter === undefined ? {} : { reporter }),
+            assignee: 'bob',
+            created: '2026-01-01T00:00:00Z',
+            modified: '2026-01-02T00:00:00Z',
+            tags: [],
+        })
+    );
 }
 
 async function snapshot(workspace: SmokeWorkspace, id: string) {
@@ -49,53 +52,70 @@ async function snapshot(workspace: SmokeWorkspace, id: string) {
     };
 }
 
-async function withSurface(surface: Surface, workspace: SmokeWorkspace, body: (mutate: Mutate, configure: Configure) => Promise<void>) {
+async function withSurface(
+    surface: Surface,
+    workspace: SmokeWorkspace,
+    body: (mutate: Mutate, configure: Configure) => Promise<void>,
+) {
     if (surface === 'MCP') {
-        await withMcpClient(workspace, async (client) => {
-            let requestId = 0;
-            await body(async (id, patch) => {
-                const response = await callTool(client, ++requestId, 'task_update', { id, patch });
-                if (response.error) {
-                    return { ok: false, code: response.error.code };
-                }
-                // task_update uses protocol errors for validation, not result.isError.
-                expect(response.result?.isError).not.toBe(true);
-                return { ok: true, task: extractToolPayload(response) as ReviewTask };
-            }, async (value, global = false) => {
-                const response = await callTool(client, ++requestId, 'config_set', {
-                    project: 'REVIEW', global, values: { 'review.reviewers': value },
-                });
-                if (response.error || response.result?.isError) return false;
-                expect(response.result).toBeDefined();
-                expect(response.result?.isError).not.toBe(true);
-                return true;
-            });
-        }, { env: ENV });
+        await withMcpClient(
+            workspace,
+            async (client) => {
+                let requestId = 0;
+                await body(
+                    async (id, patch) => {
+                        const response = await callTool(client, ++requestId, 'task_update', { id, patch });
+                        if (response.error) {
+                            return { ok: false, code: response.error.code };
+                        }
+                        // task_update uses protocol errors for validation, not result.isError.
+                        expect(response.result?.isError).not.toBe(true);
+                        return { ok: true, task: extractToolPayload(response) as ReviewTask };
+                    },
+                    async (value, global = false) => {
+                        const response = await callTool(client, ++requestId, 'config_set', {
+                            project: 'REVIEW',
+                            global,
+                            values: { 'review.reviewers': value },
+                        });
+                        if (response.error || response.result?.isError) return false;
+                        expect(response.result).toBeDefined();
+                        expect(response.result?.isError).not.toBe(true);
+                        return true;
+                    },
+                );
+            },
+            { env: ENV },
+        );
         return;
     }
     const server = await startLotarServer(workspace, { env: ENV });
     try {
-        await body(async (id, patch) => {
-            // Exercise the dedicated status route as well as the general update route.
-            const route = patch.assignee === undefined ? 'status' : 'update';
-            const response = await fetch(`${server.url}/api/tasks/${route}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, ...patch }),
-            });
-            const payload = await response.json() as {
-                data?: ReviewTask;
-                error?: { code: string };
-            };
-            expect(response.status).toBe(response.ok ? 200 : 400);
-            return { ok: response.ok, code: payload.error?.code, task: payload.data };
-        }, async (value, global = false) => {
-            const response = await fetch(`${server.url}/api/config/set`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project: 'REVIEW', global, values: { 'review.reviewers': value } }),
-            });
-            return response.ok;
-        });
+        await body(
+            async (id, patch) => {
+                // Exercise the dedicated status route as well as the general update route.
+                const route = patch.assignee === undefined ? 'status' : 'update';
+                const response = await fetch(`${server.url}/api/tasks/${route}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, ...patch }),
+                });
+                const payload = (await response.json()) as {
+                    data?: ReviewTask;
+                    error?: { code: string };
+                };
+                expect(response.status).toBe(response.ok ? 200 : 400);
+                return { ok: response.ok, code: payload.error?.code, task: payload.data };
+            },
+            async (value, global = false) => {
+                const response = await fetch(`${server.url}/api/config/set`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ project: 'REVIEW', global, values: { 'review.reviewers': value } }),
+                });
+                return response.ok;
+            },
+        );
     } finally {
         await server.stop();
     }
@@ -103,11 +123,13 @@ async function withSurface(surface: Surface, workspace: SmokeWorkspace, body: (m
 
 describe.each<Surface>(['REST', 'MCP'])('%s project review policy (DEV-128)', (surface) => {
     it('configures reviewers through the public configuration boundary and rejects invalid or global authority', async () => {
-        const workspace = await SmokeWorkspace.create({ seedFiles: {
-            '.tasks/config.yml': CONFIG,
-            '.tasks/REVIEW/config.yml': '{}\n',
-            '.tasks/REVIEW/1.yml': task('bob'),
-        } });
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: {
+                '.tasks/config.yml': CONFIG,
+                '.tasks/REVIEW/config.yml': '{}\n',
+                '.tasks/REVIEW/1.yml': task('bob'),
+            },
+        });
         try {
             await withSurface(surface, workspace, async (mutate, configure) => {
                 const original = await workspace.read('.tasks/REVIEW/config.yml');
@@ -127,7 +149,9 @@ describe.each<Surface>(['REST', 'MCP'])('%s project review policy (DEV-128)', (s
                 expect(await configure('alice', true)).toBe(false);
                 expect(await workspace.read('.tasks/config.yml')).toBe(global);
             });
-        } finally { await workspace.dispose(); }
+        } finally {
+            await workspace.dispose();
+        }
     });
 
     it('allows a trimmed case-insensitive named reviewer for agent and unknown reporters without changing provenance', async () => {
@@ -180,7 +204,10 @@ describe.each<Surface>(['REST', 'MCP'])('%s project review policy (DEV-128)', (s
                     const before = await snapshot(workspace, id);
                     for (const patch of [{ status: 'Done' }, { assignee: 'carol' }]) {
                         const denied = await mutate(id, patch);
-                        expect(denied).toMatchObject({ ok: false, code: surface === 'REST' ? 'INVALID_ARGUMENT' : -32602 });
+                        expect(denied).toMatchObject({
+                            ok: false,
+                            code: surface === 'REST' ? 'INVALID_ARGUMENT' : -32602,
+                        });
                         expect(await snapshot(workspace, id)).toEqual(before);
                     }
                     for (const patch of [{ status: 'NeedsReview' }, { assignee: 'bob' }]) {
@@ -246,7 +273,8 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
             try {
                 const workspace = await SmokeWorkspace.create({
                     seedFiles: {
-                        '.tasks/config.yml': CONFIG + '\nagent:\n  logs_dir: .logs\n  worktree:\n    enabled: false\n' + agents.yaml,
+                        '.tasks/config.yml':
+                            CONFIG + '\nagent:\n  logs_dir: .logs\n  worktree:\n    enabled: false\n' + agents.yaml,
                         '.tasks/REVIEW/config.yml': 'review.reviewers: [alice]\n',
                         '.tasks/REVIEW/1.yml': task('@copilot'),
                     },
@@ -257,17 +285,28 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
                         const started = await fetch(`${server.url}/api/jobs`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ticket_id: 'REVIEW-1', agent: 'gated', prompt: 'Wait for release.' }),
+                            body: JSON.stringify({
+                                ticket_id: 'REVIEW-1',
+                                agent: 'gated',
+                                prompt: 'Wait for release.',
+                            }),
                         });
                         expect(started.ok).toBe(true);
-                        const payload = await started.json() as { data: { job: { id: string } } };
+                        const payload = (await started.json()) as { data: { job: { id: string } } };
                         await gate.waitForStarted('review');
-                        await expect.poll(async () => {
-                            const response = await fetch(`${server.url}/api/jobs`);
-                            expect(response.ok).toBe(true);
-                            const jobs = await response.json() as { data: { jobs: Array<{ id: string; status: string }> } };
-                            return jobs.data.jobs.find((job) => job.id === payload.data.job.id)?.status;
-                        }, { timeout: 10_000 }).toBe('running');
+                        await expect
+                            .poll(
+                                async () => {
+                                    const response = await fetch(`${server.url}/api/jobs`);
+                                    expect(response.ok).toBe(true);
+                                    const jobs = (await response.json()) as {
+                                        data: { jobs: Array<{ id: string; status: string }> };
+                                    };
+                                    return jobs.data.jobs.find((job) => job.id === payload.data.job.id)?.status;
+                                },
+                                { timeout: 10_000 },
+                            )
+                            .toBe('running');
                         const before = await snapshot(workspace, 'REVIEW-1');
                         for (const patch of [{ status: 'Done' }, { assignee: 'carol' }]) {
                             const response = await fetch(`${server.url}/api/tasks/update`, {
@@ -276,7 +315,7 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
                                 body: JSON.stringify({ id: 'REVIEW-1', ...patch }),
                             });
                             expect(response.status).toBe(400);
-                            const rejected = await response.json() as { error: { code: string; message: string } };
+                            const rejected = (await response.json()) as { error: { code: string; message: string } };
                             expect(rejected.error.code).toBe('INVALID_ARGUMENT');
                             expect(rejected.error.message).toContain('active agent job');
                             expect(await snapshot(workspace, 'REVIEW-1')).toEqual(before);

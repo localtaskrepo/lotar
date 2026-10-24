@@ -4,24 +4,44 @@
       <div class="field">
         <label class="field-label" :for="`${uid}-length`">
           <span>Length</span>
-          <span v-if="sourceFor('sprints_defaults_length')" :class="['provenance', provenanceClass(sourceFor('sprints_defaults_length'))]">
+          <span
+            v-if="sourceFor('sprints_defaults_length')"
+            :class="['provenance', provenanceClass(sourceFor('sprints_defaults_length'))]"
+          >
             {{ provenanceLabel(sourceFor('sprints_defaults_length')) }}
           </span>
         </label>
-        <UiInput :id="`${uid}-length`" v-model="length" maxlength="32" placeholder="2w" @blur="emit('validate', 'sprints_defaults_length')" />
+        <UiInput
+          :id="`${uid}-length`"
+          v-model="length"
+          maxlength="32"
+          placeholder="2w"
+          @blur="emit('validate', 'sprints_defaults_length')"
+        />
         <p class="field-hint">Days or weeks, e.g. 14d or 2w. Leave empty for no default.</p>
         <p v-if="errors.sprints_defaults_length" class="field-error">{{ errors.sprints_defaults_length }}</p>
       </div>
       <div class="field">
         <label class="field-label" :for="`${uid}-overdue`">
           <span>Overdue after</span>
-          <span v-if="sourceFor('sprints_defaults_overdue_after')" :class="['provenance', provenanceClass(sourceFor('sprints_defaults_overdue_after'))]">
+          <span
+            v-if="sourceFor('sprints_defaults_overdue_after')"
+            :class="['provenance', provenanceClass(sourceFor('sprints_defaults_overdue_after'))]"
+          >
             {{ provenanceLabel(sourceFor('sprints_defaults_overdue_after')) }}
           </span>
         </label>
-        <UiInput :id="`${uid}-overdue`" v-model="overdueAfter" maxlength="32" placeholder="12h" @blur="emit('validate', 'sprints_defaults_overdue_after')" />
+        <UiInput
+          :id="`${uid}-overdue`"
+          v-model="overdueAfter"
+          maxlength="32"
+          placeholder="12h"
+          @blur="emit('validate', 'sprints_defaults_overdue_after')"
+        />
         <p class="field-hint">Grace period recorded on new sprints: hours, days or weeks, e.g. 12h or 1d.</p>
-        <p v-if="errors.sprints_defaults_overdue_after" class="field-error">{{ errors.sprints_defaults_overdue_after }}</p>
+        <p v-if="errors.sprints_defaults_overdue_after" class="field-error">
+          {{ errors.sprints_defaults_overdue_after }}
+        </p>
       </div>
       <div class="field">
         <label class="field-label" :for="`${uid}-points`">Capacity (points)</label>
@@ -35,7 +55,9 @@
           placeholder="No default"
           @blur="emit('validate', 'sprints_defaults_capacity_points')"
         />
-        <p v-if="errors.sprints_defaults_capacity_points" class="field-error">{{ errors.sprints_defaults_capacity_points }}</p>
+        <p v-if="errors.sprints_defaults_capacity_points" class="field-error">
+          {{ errors.sprints_defaults_capacity_points }}
+        </p>
       </div>
       <div class="field">
         <label class="field-label" :for="`${uid}-hours`">Capacity (hours)</label>
@@ -49,7 +71,9 @@
           placeholder="No default"
           @blur="emit('validate', 'sprints_defaults_capacity_hours')"
         />
-        <p v-if="errors.sprints_defaults_capacity_hours" class="field-error">{{ errors.sprints_defaults_capacity_hours }}</p>
+        <p v-if="errors.sprints_defaults_capacity_hours" class="field-error">
+          {{ errors.sprints_defaults_capacity_hours }}
+        </p>
       </div>
       <div class="cfg-toggles">
         <ConfigToggleField
@@ -99,4 +123,3 @@ const emit = defineEmits<{
 
 const uid = useId()
 </script>
-

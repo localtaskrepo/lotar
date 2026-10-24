@@ -13,7 +13,7 @@ const api = vi.hoisted(() => ({
     showConfig: vi.fn(async () => ({})),
 }))
 
-const refreshConfig = vi.hoisted(() => vi.fn(async () => { }))
+const refreshConfig = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('../api/client', () => ({ api }))
 
@@ -24,7 +24,7 @@ vi.mock('../components/toast', () => ({
 vi.mock('../composables/useProjects', () => ({
     useProjects: () => ({
         projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
-        refresh: vi.fn(async () => { }),
+        refresh: vi.fn(async () => {}),
     }),
 }))
 
@@ -56,7 +56,7 @@ const sprintsStore = {
     loading: ref(false),
     missingSprints: ref<number[]>([]),
     active: ref<any[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 vi.mock('../composables/useSprints', () => ({
@@ -181,21 +181,23 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         const failure = new Error('simulated async test failure')
 
         try {
-            await expect((async () => {
-                try {
-                    wrapper = await mountCreatePanel({ initialSprint: 101 }, { realTeleport: true })
-                    document.querySelector<HTMLButtonElement>('button[aria-label="Assign sprint"]')!.click()
-                    await nextTick()
-                    await flushPromises()
-                    expect(findSprintModalDialog()).not.toBeNull()
-                    expect(document.body.style.overflow).toBe('hidden')
-                    expect(outside.hasAttribute('inert')).toBe(true)
-                    throw failure
-                } finally {
-                    // Exercise the same cleanup registered with afterEach.
-                    await cleanupPanels()
-                }
-            })()).rejects.toBe(failure)
+            await expect(
+                (async () => {
+                    try {
+                        wrapper = await mountCreatePanel({ initialSprint: 101 }, { realTeleport: true })
+                        document.querySelector<HTMLButtonElement>('button[aria-label="Assign sprint"]')!.click()
+                        await nextTick()
+                        await flushPromises()
+                        expect(findSprintModalDialog()).not.toBeNull()
+                        expect(document.body.style.overflow).toBe('hidden')
+                        expect(outside.hasAttribute('inert')).toBe(true)
+                        throw failure
+                    } finally {
+                        // Exercise the same cleanup registered with afterEach.
+                        await cleanupPanels()
+                    }
+                })(),
+            ).rejects.toBe(failure)
 
             expect(wrapper!.exists()).toBe(false)
             expect(findSprintModalDialog()).toBeNull()
@@ -350,7 +352,11 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
     it('keeps draft sprint edits made while project configuration is loading', async () => {
         const wrapper = await mountCreatePanel({ initialSprint: 101 })
         let finishRefresh!: () => void
-        refreshConfig.mockReturnValueOnce(new Promise<void>(resolve => { finishRefresh = resolve }))
+        refreshConfig.mockReturnValueOnce(
+            new Promise<void>((resolve) => {
+                finishRefresh = resolve
+            }),
+        )
         ;(wrapper.vm as any).form.project = 'OTHER'
         ;(wrapper.vm as any).onProjectChange()
         await nextTick()
@@ -409,7 +415,7 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         const dialog = findSprintModalDialog() as HTMLElement
         const controls = Array.from(
             dialog.querySelectorAll<HTMLElement>('button, input:not([type="hidden"]), select'),
-        ).filter(element => element.tabIndex >= 0 && !(element as HTMLButtonElement).disabled)
+        ).filter((element) => element.tabIndex >= 0 && !(element as HTMLButtonElement).disabled)
         const first = controls[0]!
         const last = controls[controls.length - 1]!
         expect(controls.length).toBeGreaterThanOrEqual(4)
@@ -425,7 +431,11 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
     it('keeps the nested sprint dialog open on Escape while a sprint request is pending', async () => {
         api.getTask.mockResolvedValue({ ...createdTask })
         let resolveAdd!: (value: any) => void
-        api.sprintAdd.mockReturnValue(new Promise<any>(resolve => { resolveAdd = resolve }))
+        api.sprintAdd.mockReturnValue(
+            new Promise<any>((resolve) => {
+                resolveAdd = resolve
+            }),
+        )
         const wrapper = await mountCreatePanel({ taskId: 'DEMO-200' }, { realTeleport: true })
         await flushPromises()
 

@@ -13,16 +13,19 @@ Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearS
 
 type SprintMetric = 'tasks' | 'points' | 'hours'
 
-const props = withDefaults(defineProps<{
-  series: SprintBurndownPointPayload[]
-  metric?: SprintMetric
-  width?: number
-  height?: number
-}>(), {
-  metric: 'tasks',
-  width: 560,
-  height: 240,
-})
+const props = withDefaults(
+  defineProps<{
+    series: SprintBurndownPointPayload[]
+    metric?: SprintMetric
+    width?: number
+    height?: number
+  }>(),
+  {
+    metric: 'tasks',
+    width: 560,
+    height: 240,
+  },
+)
 
 const canvasEl = shallowRef<HTMLCanvasElement | null>(null)
 const chart = shallowRef<Chart<'line'> | null>(null)
@@ -45,7 +48,11 @@ function formatLabel(value: string) {
   }
 }
 
-function extractValue(point: SprintBurndownPointPayload, metric: SprintMetric, kind: 'remaining' | 'ideal'): number | null {
+function extractValue(
+  point: SprintBurndownPointPayload,
+  metric: SprintMetric,
+  kind: 'remaining' | 'ideal',
+): number | null {
   if (metric === 'points') {
     const key = kind === 'remaining' ? point.remaining_points : point.ideal_points
     return typeof key === 'number' ? key : null

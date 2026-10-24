@@ -61,7 +61,9 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: 'page', page: number): void }>()
 
-const safePageSize = computed(() => (Number.isFinite(props.pageSize) && props.pageSize > 0 ? Math.max(1, Math.floor(props.pageSize)) : 1))
+const safePageSize = computed(() =>
+  Number.isFinite(props.pageSize) && props.pageSize > 0 ? Math.max(1, Math.floor(props.pageSize)) : 1,
+)
 
 const pageCount = computed(() => Math.max(1, Math.ceil(Math.max(0, props.total) / safePageSize.value)))
 

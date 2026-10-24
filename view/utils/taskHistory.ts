@@ -15,7 +15,12 @@ export function findLastStatusChangeAt(task: TaskDTO | null | undefined, status?
 }
 
 const statusKey = (value: unknown) =>
-    typeof value === 'string' ? value.trim().toLowerCase().replace(/[\s_-]+/g, '') : ''
+    typeof value === 'string'
+        ? value
+              .trim()
+              .toLowerCase()
+              .replace(/[\s_-]+/g, '')
+        : ''
 
 /**
  * When the task entered `status` (its current status), for age-based board

@@ -45,10 +45,7 @@ describe('automationRules utilities', () => {
 
         const rule = buildAutomationRuleFromDraft(draft)
         expect(rule.when).toEqual({
-            any: [
-                { status: 'InProgress' },
-                { priority: 'High' },
-            ],
+            any: [{ status: 'InProgress' }, { priority: 'High' }],
         })
         expect(rule.on.complete.set.status).toBe('Done')
     })

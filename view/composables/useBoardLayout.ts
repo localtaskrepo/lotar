@@ -53,7 +53,9 @@ export interface LegacyBoardSettings {
 const STORAGE_VERSION = 2
 
 function stringList(value: unknown): string[] {
-    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0) : []
+    return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+        : []
 }
 
 function positiveInt(value: unknown): number | undefined {
@@ -158,12 +160,11 @@ export function migrateLegacySettings(statuses: LayoutStatus[], legacy: LegacyBo
  * left out (a column with only hidden statuses disappears); synthetic columns
  * (the unknown-status "Other" bucket) always get their own trailing lane.
  */
-export function computeBoardLanes<C extends LaneColumn>(
-    columns: C[],
-    layout: BoardLayout,
-): BoardLane<C>[] {
+export function computeBoardLanes<C extends LaneColumn>(columns: C[], layout: BoardLayout): BoardLane<C>[] {
     const byKey = new Map(columns.filter((column) => !column.synthetic).map((column) => [column.key, column]))
-    const statuses = columns.filter((column) => !column.synthetic).map((column) => ({ key: column.key, label: column.label }))
+    const statuses = columns
+        .filter((column) => !column.synthetic)
+        .map((column) => ({ key: column.key, label: column.label }))
     const hidden = new Set(layout.hidden)
     const lanes: BoardLane<C>[] = []
     for (const config of reconcileColumns(layout.columns, statuses)) {
@@ -182,7 +183,13 @@ export function computeBoardLanes<C extends LaneColumn>(
     }
     for (const column of columns) {
         if (column.synthetic) {
-            lanes.push({ key: column.key, columns: [column], stacked: false, title: column.label, config: { statuses: [] } })
+            lanes.push({
+                key: column.key,
+                columns: [column],
+                stacked: false,
+                title: column.label,
+                config: { statuses: [] },
+            })
         }
     }
     return lanes
@@ -199,10 +206,10 @@ export function useBoardLayout(project: Ref<string>, statuses: Ref<LayoutStatus[
         legacy.value = stored.value
             ? {}
             : {
-                stack: storageGetJson<LegacyBoardSettings['stack']>(key('lotar.boardLayout')),
-                wip: storageGetJson<Record<string, unknown>>(key('lotar.wip')),
-                done: storageGetJson<LegacyBoardSettings['done']>(key('lotar.doneFilters')),
-            }
+                  stack: storageGetJson<LegacyBoardSettings['stack']>(key('lotar.boardLayout')),
+                  wip: storageGetJson<Record<string, unknown>>(key('lotar.wip')),
+                  done: storageGetJson<LegacyBoardSettings['done']>(key('lotar.doneFilters')),
+              }
     }
 
     /** The effective layout for the current statuses. */

@@ -28,9 +28,15 @@
                 <li v-for="(change, idx) in entry.changes" :key="idx" class="task-panel__history-change">
                   <strong>{{ formatFieldName(change.field) }}</strong>
                   <span class="task-panel__history-change-values">
-                    <span v-if="formatChangeValue(change.old)" class="task-panel__history-old">{{ formatChangeValue(change.old) }}</span>
-                    <span v-if="formatChangeValue(change.old) && formatChangeValue(change.new)" aria-hidden="true">→</span>
-                    <span v-if="formatChangeValue(change.new)" class="task-panel__history-new">{{ formatChangeValue(change.new) }}</span>
+                    <span v-if="formatChangeValue(change.old)" class="task-panel__history-old">{{
+                      formatChangeValue(change.old)
+                    }}</span>
+                    <span v-if="formatChangeValue(change.old) && formatChangeValue(change.new)" aria-hidden="true"
+                      >→</span
+                    >
+                    <span v-if="formatChangeValue(change.new)" class="task-panel__history-new">{{
+                      formatChangeValue(change.new)
+                    }}</span>
                     <span v-else-if="!formatChangeValue(change.old)" class="task-panel__history-new">Set</span>
                   </span>
                 </li>
@@ -46,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import ReloadButton from '../ReloadButton.vue';
+import ReloadButton from '../ReloadButton.vue'
 
 defineProps<{
   mode: 'create' | 'edit'
@@ -62,5 +68,3 @@ defineProps<{
 
 defineEmits<{ (e: 'reload'): void }>()
 </script>
-
-

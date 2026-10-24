@@ -1,24 +1,24 @@
-import vue from '@vitejs/plugin-vue'
-import { readFileSync } from 'fs'
-import { dirname, resolve } from 'path'
-import { fileURLToPath } from 'url'
-import type { UserConfig } from 'vite'
+import vue from '@vitejs/plugin-vue';
+import { readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import type { UserConfig } from 'vite';
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Read Cargo.toml version once and inject into import.meta.env
 function readCargoVersion(): string {
     try {
-        const cargoToml = readFileSync(resolve(__dirname, 'Cargo.toml'), 'utf8')
+        const cargoToml = readFileSync(resolve(__dirname, 'Cargo.toml'), 'utf8');
         // naive regex: first version = "x.y.z" occurrence
-        const m = cargoToml.match(/^\s*version\s*=\s*"(.*?)"/m)
-        return m?.[1] || '0.0.0'
+        const m = cargoToml.match(/^\s*version\s*=\s*"(.*?)"/m);
+        return m?.[1] || '0.0.0';
     } catch {
-        return '0.0.0'
+        return '0.0.0';
     }
 }
-const CARGO_VERSION = readCargoVersion()
+const CARGO_VERSION = readCargoVersion();
 
 const baseConfig: UserConfig = {
     plugins: [vue()],
@@ -41,23 +41,23 @@ const baseConfig: UserConfig = {
                 // Don't proxy Vite module imports from view/api/ (*.ts etc.)
                 bypass: (req) => {
                     if (req.url && /\.(ts|js|vue|css|json|mts)(\?|$)/.test(req.url)) {
-                        return req.url
+                        return req.url;
                     }
                 },
                 // Prevent response buffering so SSE (text/event-stream) works
                 configure: (proxy) => {
                     proxy.on('proxyReq', (proxyReq) => {
-                        proxyReq.removeHeader('accept-encoding')
+                        proxyReq.removeHeader('accept-encoding');
                         // The backend rejects mutating requests whose Origin does not
                         // match its own Host; the dev server proxies same-origin for
                         // the browser, so the rewritten request must carry no Origin.
-                        proxyReq.removeHeader('origin')
-                    })
+                        proxyReq.removeHeader('origin');
+                    });
                 },
             },
         },
     },
-}
+};
 
-export default baseConfig
-export { baseConfig }
+export default baseConfig;
+export { baseConfig };

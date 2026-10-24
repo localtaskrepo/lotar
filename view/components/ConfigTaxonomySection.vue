@@ -4,10 +4,7 @@
       <div class="field field--full" data-testid="config-tags">
         <label class="field-label" :for="`${uid}-tags-mode`">
           <span>Tags</span>
-          <span
-            v-if="tagsSource"
-            :class="['provenance', provenanceClass(tagsSource)]"
-          >
+          <span v-if="tagsSource" :class="['provenance', provenanceClass(tagsSource)]">
             {{ provenanceLabel(tagsSource) }}
           </span>
         </label>
@@ -32,14 +29,16 @@
       <div class="field field--full" data-testid="config-custom-fields">
         <label class="field-label" :for="`${uid}-custom-fields-mode`">
           <span>Custom fields</span>
-          <span
-            v-if="customFieldsSource"
-            :class="['provenance', provenanceClass(customFieldsSource)]"
-          >
+          <span v-if="customFieldsSource" :class="['provenance', provenanceClass(customFieldsSource)]">
             {{ provenanceLabel(customFieldsSource) }}
           </span>
         </label>
-        <UiSelect :id="`${uid}-custom-fields-mode`" v-model="customFieldsMode" class="cfg-mode-select" @change="handleUpdate('custom_fields')">
+        <UiSelect
+          :id="`${uid}-custom-fields-mode`"
+          v-model="customFieldsMode"
+          class="cfg-mode-select"
+          @change="handleUpdate('custom_fields')"
+        >
           <option
             v-for="option in modeOptions(globalCustomFields, 'custom fields')"
             :key="option.value"
@@ -131,9 +130,7 @@ function modeHint(mode: ListMode, noun: 'tags' | 'custom fields'): string {
     case 'inherit':
       return `Uses the global ${noun} setting.`
     case 'any':
-      return noun === 'tags'
-        ? 'Tasks may use any tag.'
-        : 'Tasks may add any custom field (stored as the "*" wildcard).'
+      return noun === 'tags' ? 'Tasks may use any tag.' : 'Tasks may add any custom field (stored as the "*" wildcard).'
     case 'none':
       return noun === 'tags'
         ? 'Tags are turned off: tasks cannot be tagged.'

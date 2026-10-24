@@ -7,7 +7,9 @@ describe.concurrent('CLI config and agent features smoke', () => {
         const workspace = await SmokeWorkspace.create();
 
         try {
-            await workspace.write('.tasks/config.yml', `default:
+            await workspace.write(
+                '.tasks/config.yml',
+                `default:
   project: CFG
 issue:
   states: [Todo, Done]
@@ -19,7 +21,8 @@ agent:
     enabled: true
     cleanup_on_failure: true
     cleanup_on_cancel: false
-`);
+`,
+            );
 
             const result = await workspace.runLotar(['config', 'show', '--format', 'json']);
             const json = JSON.parse(result.stdout) as Record<string, any>;
@@ -39,7 +42,9 @@ agent:
         const workspace = await SmokeWorkspace.create();
 
         try {
-            await workspace.write('.tasks/config.yml', `default:
+            await workspace.write(
+                '.tasks/config.yml',
+                `default:
   project: CFG
 issue:
   states: [Todo, Done]
@@ -57,7 +62,8 @@ agents:
   code-bot:
     runner: copilot
     description: Writes code
-`);
+`,
+            );
 
             const result = await workspace.runLotar(['config', 'show', '--format', 'json']);
             const json = JSON.parse(result.stdout) as Record<string, any>;
@@ -78,23 +84,29 @@ agents:
         const workspace = await SmokeWorkspace.create();
 
         try {
-            await workspace.write('.tasks/config.yml', `default:
+            await workspace.write(
+                '.tasks/config.yml',
+                `default:
   project: PROJ
 issue:
   states: [Todo, InProgress, Done]
   priorities: [Low, Medium, High]
   types: [Feature]
-`);
+`,
+            );
 
             // Only project-specific automation (no global competing file)
-            await workspace.write('.tasks/PROJ/automation.yml', `automation:
+            await workspace.write(
+                '.tasks/PROJ/automation.yml',
+                `automation:
   rules:
     - name: Project rule
       on:
         created:
           add:
             tags: [project-specific]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Project automation test', {
                 args: ['-p', 'PROJ'],
@@ -112,14 +124,17 @@ issue:
         const workspace = await SmokeWorkspace.create();
 
         try {
-            await workspace.write('.tasks/config.yml', `default:
+            await workspace.write(
+                '.tasks/config.yml',
+                `default:
   project: EXP
   reporter: explain@example.com
 issue:
   states: [Todo, Done]
   priorities: [Low]
   types: [Feature]
-`);
+`,
+            );
 
             const result = await workspace.runLotar(['config', 'show', '--explain']);
             expect(result.stdout).toContain('explain@example.com');

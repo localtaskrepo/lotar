@@ -4,8 +4,8 @@
     <h1 id="not-found-title">This page took a coffee break ☕️</h1>
     <p class="muted not-found__text">
       We asked around but nobody has seen
-      <code class="not-found__path">{{ missingPath }}</code>.
-      Maybe it sprinted off to an emergency retro.
+      <code class="not-found__path">{{ missingPath }}</code
+      >. Maybe it sprinted off to an emergency retro.
     </p>
     <div class="not-found__actions">
       <UiButton variant="primary" type="button" @click="goHome">Back to tasks</UiButton>

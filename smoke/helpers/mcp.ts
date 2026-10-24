@@ -193,7 +193,11 @@ export class NdjsonMcpClient implements McpClientLike {
         child.stdout.on('end', () => {
             this.ended = true;
             if (this.buffer.length > 0 && this.buffer.toString('utf8').trim().length > 0) {
-                this.fail(new Error(`MCP server stdout ended with an incomplete line: ${this.buffer.toString('utf8', 0, 200)}`));
+                this.fail(
+                    new Error(
+                        `MCP server stdout ended with an incomplete line: ${this.buffer.toString('utf8', 0, 200)}`,
+                    ),
+                );
                 return;
             }
             this.queue.fail(this.eofError());
@@ -255,11 +259,7 @@ export class NdjsonMcpClient implements McpClientLike {
     }
 
     async readUntil(predicate: (message: any) => boolean, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpMessage> {
-        return await this.queue.wait(
-            predicate,
-            timeoutMs,
-            'Timed out waiting for expected MCP message',
-        );
+        return await this.queue.wait(predicate, timeoutMs, 'Timed out waiting for expected MCP message');
     }
 
     async dispose(): Promise<void> {
@@ -271,7 +271,9 @@ export class NdjsonMcpClient implements McpClientLike {
             const newlineIndex = this.buffer.indexOf(0x0a);
             if (newlineIndex === -1) {
                 if (this.buffer.length > this.maxLineBytes) {
-                    this.fail(new Error(`MCP NDJSON line exceeded maximum of ${this.maxLineBytes} bytes without a newline`));
+                    this.fail(
+                        new Error(`MCP NDJSON line exceeded maximum of ${this.maxLineBytes} bytes without a newline`),
+                    );
                 }
                 return;
             }
@@ -289,7 +291,9 @@ export class NdjsonMcpClient implements McpClientLike {
             try {
                 parsed = JSON.parse(line);
             } catch (error) {
-                this.fail(new Error(`MCP server wrote a non-JSON line on stdout: ${line.slice(0, 200)}\n${String(error)}`));
+                this.fail(
+                    new Error(`MCP server wrote a non-JSON line on stdout: ${line.slice(0, 200)}\n${String(error)}`),
+                );
                 return;
             }
             if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -311,7 +315,9 @@ export class NdjsonMcpClient implements McpClientLike {
     private eofError(code: number | null = null, signal: string | null = null): Error {
         const exit = signal ? `signal ${signal}` : `exit code ${code}`;
         const stderr = this.stderrDrain.tail();
-        return new Error(`MCP server stdout closed before the awaited message arrived (process ended: ${exit}).\nstderr tail:\n${stderr}`);
+        return new Error(
+            `MCP server stdout closed before the awaited message arrived (process ended: ${exit}).\nstderr tail:\n${stderr}`,
+        );
     }
 }
 
@@ -403,19 +409,11 @@ export class FramedMcpClient implements McpClientLike {
     }
 
     async readFrame(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpFrame> {
-        return await this.queue.wait(
-            () => true,
-            timeoutMs,
-            'Timed out waiting for MCP frame',
-        );
+        return await this.queue.wait(() => true, timeoutMs, 'Timed out waiting for MCP frame');
     }
 
     async readUntil(predicate: (frame: McpFrame) => boolean, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpFrame> {
-        return await this.queue.wait(
-            predicate,
-            timeoutMs,
-            'Timed out waiting for expected MCP frame',
-        );
+        return await this.queue.wait(predicate, timeoutMs, 'Timed out waiting for expected MCP frame');
     }
 
     async awaitResponse(id: unknown, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<any> {
@@ -460,7 +458,11 @@ export class FramedMcpClient implements McpClientLike {
             }
 
             if (length > MCP_MAX_MESSAGE_BYTES) {
-                this.fail(new Error(`MCP frame announced ${length} bytes, exceeding the ${MCP_MAX_MESSAGE_BYTES} byte maximum`));
+                this.fail(
+                    new Error(
+                        `MCP frame announced ${length} bytes, exceeding the ${MCP_MAX_MESSAGE_BYTES} byte maximum`,
+                    ),
+                );
                 return;
             }
 
@@ -493,6 +495,8 @@ export class FramedMcpClient implements McpClientLike {
     private eofError(code: number | null = null, signal: string | null = null): Error {
         const exit = signal ? `signal ${signal}` : `exit code ${code}`;
         const stderr = this.stderrDrain.tail();
-        return new Error(`MCP framed stream closed before the awaited frame arrived (process ended: ${exit}).\nstderr tail:\n${stderr}`);
+        return new Error(
+            `MCP framed stream closed before the awaited frame arrived (process ended: ${exit}).\nstderr tail:\n${stderr}`,
+        );
     }
 }

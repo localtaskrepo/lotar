@@ -111,9 +111,7 @@ describe.concurrent('UI regression: assignee display and sprints project filter'
             });
 
             // This previously failed with "unexpected argument found"
-            const result = await workspace.runLotar([
-                'sprint', 'add', '--sprint', '1', '--project', 'CLI', task.id,
-            ]);
+            const result = await workspace.runLotar(['sprint', 'add', '--sprint', '1', '--project', 'CLI', task.id]);
 
             expect(result.exitCode).toBe(0);
             expect(result.stdout).toContain('Attached sprint');

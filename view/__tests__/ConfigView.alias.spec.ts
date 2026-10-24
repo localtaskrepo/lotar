@@ -24,7 +24,8 @@ const stubs = {
         emits: ['update:modelValue'],
     },
     UiSelect: {
-        template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
+        template:
+            '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
         props: ['modelValue'],
         emits: ['update:modelValue'],
     },
@@ -158,20 +159,20 @@ async function mountConfigView(initialRoute: string) {
 describe('ConfigView branch alias handling', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-            ; (api.listProjects as any).mockResolvedValue({
-                total: 1,
-                limit: 50,
-                offset: 0,
-                projects: [{ name: 'App', prefix: 'APP' }],
-            })
-            ; (api.inspectAutomation as any).mockResolvedValue({
-                source: 'global',
-                scope_exists: true,
-                scope_yaml: '',
-                effective_yaml: '',
-            })
-            ; (api.setConfig as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
-            ; (api.setAutomation as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
+        ;(api.listProjects as any).mockResolvedValue({
+            total: 1,
+            limit: 50,
+            offset: 0,
+            projects: [{ name: 'App', prefix: 'APP' }],
+        })
+        ;(api.inspectAutomation as any).mockResolvedValue({
+            source: 'global',
+            scope_exists: true,
+            scope_yaml: '',
+            effective_yaml: '',
+        })
+        ;(api.setConfig as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
+        ;(api.setAutomation as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
     })
 
     afterEach(() => {
@@ -179,7 +180,7 @@ describe('ConfigView branch alias handling', () => {
     })
 
     it('serializes alias payloads for global scope', async () => {
-        ; (api.inspectConfig as any).mockResolvedValue(createInspectResult())
+        ;(api.inspectConfig as any).mockResolvedValue(createInspectResult())
 
         const { wrapper } = await mountConfigView('/')
         await flushPromises()
@@ -209,7 +210,7 @@ describe('ConfigView branch alias handling', () => {
             project_exists: true,
             sources: { branch_priority_aliases: 'project' },
         })
-            ; (api.inspectConfig as any).mockResolvedValue(projectInspect)
+        ;(api.inspectConfig as any).mockResolvedValue(projectInspect)
 
         const { wrapper } = await mountConfigView('/?project=APP')
         await flushPromises()
@@ -224,7 +225,7 @@ describe('ConfigView branch alias handling', () => {
     })
 
     it('flags duplicate alias entries during validation', async () => {
-        ; (api.inspectConfig as any).mockResolvedValue(createInspectResult())
+        ;(api.inspectConfig as any).mockResolvedValue(createInspectResult())
 
         const { wrapper } = await mountConfigView('/')
         await flushPromises()
@@ -241,7 +242,7 @@ describe('ConfigView branch alias handling', () => {
     })
 
     it('keeps alias sections styled with expected layout values', async () => {
-        ; (api.inspectConfig as any).mockResolvedValue(createInspectResult())
+        ;(api.inspectConfig as any).mockResolvedValue(createInspectResult())
 
         const { wrapper } = await mountConfigView('/')
         await flushPromises()
@@ -262,7 +263,7 @@ describe('ConfigView branch alias handling', () => {
     })
 
     it('shows an error banner and keeps existing state when reload fails', async () => {
-        ; (api.inspectConfig as any).mockResolvedValue(createInspectResult())
+        ;(api.inspectConfig as any).mockResolvedValue(createInspectResult())
 
         const { wrapper } = await mountConfigView('/')
         await flushPromises()
@@ -271,7 +272,7 @@ describe('ConfigView branch alias handling', () => {
         expect(vm.form.serverPort).toBe('8080')
         expect(wrapper.find('.alert-error').exists()).toBe(false)
 
-            ; (api.inspectConfig as any).mockRejectedValueOnce(new Error('server exploded'))
+        ;(api.inspectConfig as any).mockRejectedValueOnce(new Error('server exploded'))
 
         const reloadButton = wrapper.find('button[aria-label="Reload configuration"]')
         expect(reloadButton.exists()).toBe(true)
@@ -287,7 +288,7 @@ describe('ConfigView branch alias handling', () => {
     })
 
     it('surfaces errors when save fails without reloading data', async () => {
-        ; (api.inspectConfig as any).mockResolvedValue(createInspectResult())
+        ;(api.inspectConfig as any).mockResolvedValue(createInspectResult())
 
         const { wrapper } = await mountConfigView('/')
         await flushPromises()
@@ -296,7 +297,7 @@ describe('ConfigView branch alias handling', () => {
         vm.form.defaultProject = 'ALPHA'
         await wrapper.vm.$nextTick()
 
-            ; (api.setConfig as any).mockRejectedValueOnce(new Error('save denied'))
+        ;(api.setConfig as any).mockRejectedValueOnce(new Error('save denied'))
 
         const saveButton = wrapper.find('.floating-actions__buttons .btn')
         expect(saveButton.exists()).toBe(true)
@@ -316,23 +317,21 @@ describe('ConfigView branch alias handling', () => {
     })
 
     it('syncs project selection with the route and reloads config', async () => {
-        ; (api.inspectConfig as any)
-            .mockResolvedValueOnce(createInspectResult())
-            .mockResolvedValueOnce(
-                createInspectResult({
-                    effective: {
-                        ...baseResolvedConfig(),
-                        project_name: 'APP',
-                        default_project: 'APP',
-                    } as any,
-                    project_raw: {
-                        project_name: 'APP',
-                        default_project: 'APP',
-                    } as any,
-                    project_exists: true,
-                    sources: { project_name: 'project' },
-                }),
-            )
+        ;(api.inspectConfig as any).mockResolvedValueOnce(createInspectResult()).mockResolvedValueOnce(
+            createInspectResult({
+                effective: {
+                    ...baseResolvedConfig(),
+                    project_name: 'APP',
+                    default_project: 'APP',
+                } as any,
+                project_raw: {
+                    project_name: 'APP',
+                    default_project: 'APP',
+                } as any,
+                project_exists: true,
+                sources: { project_name: 'project' },
+            }),
+        )
 
         const { wrapper, router } = await mountConfigView('/')
         await flushPromises()
@@ -411,7 +410,7 @@ describe('ConfigView branch alias handling', () => {
 
     it('hydrates default project from inspect payloads', async () => {
         const inspect = createInspectResult()
-            ; (api.inspectConfig as any).mockResolvedValue(inspect)
+        ;(api.inspectConfig as any).mockResolvedValue(inspect)
 
         const { wrapper } = await mountConfigView('/')
         await flushPromises()

@@ -4,12 +4,12 @@ import { computed, nextTick, ref, type ComputedRef, type Ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const routeState: { query: Record<string, any> } = { query: {} }
-const routerPushMock = vi.fn(async () => { })
-const routerReplaceMock = vi.fn(async () => { })
+const routerPushMock = vi.fn(async () => {})
+const routerReplaceMock = vi.fn(async () => {})
 let realRouter = false
 
 const projectsStore = {
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 interface MockHandle {
@@ -83,13 +83,13 @@ function handleFor(filter: Record<string, unknown> = {}): MockHandle {
 const tasksStore = {
     getQuery: vi.fn((filter?: Record<string, unknown>) => handleFor(filter)),
     upsert: vi.fn(),
-    remove: vi.fn(async () => { }),
+    remove: vi.fn(async () => {}),
 }
 
 const sprintsStore = {
     sprints: ref<any[]>([]),
     active: ref<any[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     loading: ref(false),
 }
 
@@ -98,19 +98,22 @@ const configStore = {
     priorities: ref<string[]>(['low', 'med', 'high']),
     types: ref<string[]>(['task']),
     customFields: ref<string[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 vi.mock('vue-router', async (importOriginal) => {
     const actual = await importOriginal<typeof import('vue-router')>()
     return {
         ...actual,
-        useRoute: () => realRouter ? actual.useRoute() : routeState,
-        useRouter: () => realRouter ? actual.useRouter() : ({
-            currentRoute: ref({ path: '/' }),
-            push: routerPushMock,
-            replace: routerReplaceMock,
-        }),
+        useRoute: () => (realRouter ? actual.useRoute() : routeState),
+        useRouter: () =>
+            realRouter
+                ? actual.useRouter()
+                : {
+                      currentRoute: ref({ path: '/' }),
+                      push: routerPushMock,
+                      replace: routerReplaceMock,
+                  },
     }
 })
 
@@ -170,7 +173,8 @@ vi.mock('../components/FilterBar.vue', () => ({
 vi.mock('../components/TaskTable.vue', () => ({
     default: {
         props: ['tasks', 'loading'],
-        template: '<div class="task-table" :data-count="(tasks || []).length" :data-loading="loading ? \'1\' : \'0\'" />',
+        template:
+            '<div class="task-table" :data-count="(tasks || []).length" :data-loading="loading ? \'1\' : \'0\'" />',
     },
 }))
 
@@ -202,7 +206,9 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         statuses: configStore.statuses,
         priorities: configStore.priorities,
         types: configStore.types,
@@ -327,8 +333,14 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
             expect(vm.selectedIds).toEqual(['PRJ-51'])
             expect(vm.shownTasks.map((task: any) => task.id)).toEqual(rows)
             expect(vm.selectionReady).toBe(true)
-            expect(tasksStore.getQuery.mock.calls.every(([filter]) => !Object.prototype.hasOwnProperty.call(filter || {}, 'taskPanel'))).toBe(true)
-        } finally { wrapper.unmount() }
+            expect(
+                tasksStore.getQuery.mock.calls.every(
+                    ([filter]) => !Object.prototype.hasOwnProperty.call(filter || {}, 'taskPanel'),
+                ),
+            ).toBe(true)
+        } finally {
+            wrapper.unmount()
+        }
     })
 
     it('preserves the overlay marker in paging, filter and refresh URL writes', async () => {
@@ -344,7 +356,13 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
             const vm = wrapper.vm as any
             await vm.goToPage(2)
             await settle()
-            expect(router.currentRoute.value.query).toEqual({ taskPanel: 'PRJ-1', q: 'needle', sort_by: 'title', order: 'asc', offset: String(vm.pageLimit) })
+            expect(router.currentRoute.value.query).toEqual({
+                taskPanel: 'PRJ-1',
+                q: 'needle',
+                sort_by: 'title',
+                order: 'asc',
+                offset: String(vm.pageLimit),
+            })
             await vm.retry()
             await settle()
             expect(router.currentRoute.value.query.taskPanel).toBe('PRJ-1')
@@ -352,13 +370,24 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
             // A relationship hop must not cancel the pending debounced filter.
             await router.push({ query: { ...router.currentRoute.value.query, taskPanel: 'PRJ-2' } })
             await settle()
-            expect(router.currentRoute.value.query).toEqual({ taskPanel: 'PRJ-2', q: 'changed', sort_by: 'title', order: 'asc' })
+            expect(router.currentRoute.value.query).toEqual({
+                taskPanel: 'PRJ-2',
+                q: 'changed',
+                sort_by: 'title',
+                order: 'asc',
+            })
             await router.push({ query: { ...router.currentRoute.value.query, q: 'from-route' } })
             await settle()
             expect(vm.filter.q).toBe('from-route')
             expect(vm.filter).not.toHaveProperty('taskPanel')
-            expect(tasksStore.getQuery.mock.calls.every(([filter]) => !Object.prototype.hasOwnProperty.call(filter || {}, 'taskPanel'))).toBe(true)
-        } finally { wrapper.unmount() }
+            expect(
+                tasksStore.getQuery.mock.calls.every(
+                    ([filter]) => !Object.prototype.hasOwnProperty.call(filter || {}, 'taskPanel'),
+                ),
+            ).toBe(true)
+        } finally {
+            wrapper.unmount()
+        }
     })
 
     it('a pending new query shows a loader, never the previous key rows, and disables actions', async () => {
@@ -378,14 +407,15 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
         const projectB = handleFor({ project: 'B' })
         expect(projectB).not.toBe(initial)
         projectB.refresh.mockImplementationOnce(
-            () => new Promise<void>((resolve) => {
-                finishB = () => {
-                    projectB.items.value = []
-                    projectB.hasSnapshot.value = true
-                    projectB.status.value = 'ready'
-                    resolve()
-                }
-            }),
+            () =>
+                new Promise<void>((resolve) => {
+                    finishB = () => {
+                        projectB.items.value = []
+                        projectB.hasSnapshot.value = true
+                        projectB.status.value = 'ready'
+                        resolve()
+                    }
+                }),
         )
         const vm = wrapper.vm as any
         vm.filter = { project: 'B' }
@@ -545,7 +575,10 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
         initial.refresh.mockImplementationOnce(() => {
             initial.status.value = 'loading'
             return new Promise<void>((resolve) => {
-                finish = () => { initial.status.value = 'ready'; resolve() }
+                finish = () => {
+                    initial.status.value = 'ready'
+                    resolve()
+                }
             })
         })
         const retryPromise = vm.retry()
@@ -557,7 +590,7 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
         expect(wrapper.find('.task-table').exists()).toBe(true)
         expect(wrapper.find('.empty').exists()).toBe(false)
         expect(vm.selectionReady).toBe(false)
-        expect((wrapper.find('.task-table').attributes('data-loading'))).toBe('1')
+        expect(wrapper.find('.task-table').attributes('data-loading')).toBe('1')
 
         finish()
         await retryPromise

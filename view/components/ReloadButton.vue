@@ -9,29 +9,34 @@
     v-bind="forwardedAttrs"
     @click="handleClick"
   >
-    <span :class="['reload-button__icon', { 'reload-button__icon--spinning': loading }]"><IconGlyph name="refresh" /></span>
+    <span :class="['reload-button__icon', { 'reload-button__icon--spinning': loading }]"
+      ><IconGlyph name="refresh"
+    /></span>
   </UiButton>
 </template>
 
 <script setup lang="ts">
-import { computed, useAttrs } from 'vue';
-import IconGlyph from './IconGlyph.vue';
-import UiButton from './UiButton.vue';
+import { computed, useAttrs } from 'vue'
+import IconGlyph from './IconGlyph.vue'
+import UiButton from './UiButton.vue'
 
 defineOptions({ inheritAttrs: false })
 
-const props = withDefaults(defineProps<{
-  label: string
-  title?: string
-  loading?: boolean
-  disabled?: boolean
-  variant?: 'primary' | 'danger' | 'ghost' | ''
-}>(), {
-  loading: false,
-  disabled: false,
-  title: undefined,
-  variant: '',
-})
+const props = withDefaults(
+  defineProps<{
+    label: string
+    title?: string
+    loading?: boolean
+    disabled?: boolean
+    variant?: 'primary' | 'danger' | 'ghost' | ''
+  }>(),
+  {
+    loading: false,
+    disabled: false,
+    title: undefined,
+    variant: '',
+  },
+)
 
 const emit = defineEmits<{ (e: 'click', event: MouseEvent): void }>()
 const attrs = useAttrs()

@@ -515,8 +515,7 @@ describe.concurrent('REST API automation endpoints', () => {
                         body: JSON.stringify({ yaml }),
                     });
                     expect(res.status).toBe(400);
-                    expect(await fs.readFile(path.join(workspace.tasksDir, 'automation.yml'), 'utf8'))
-                        .toBe(SEED_RULES);
+                    expect(await fs.readFile(path.join(workspace.tasksDir, 'automation.yml'), 'utf8')).toBe(SEED_RULES);
                 }
             } finally {
                 await server.stop();
@@ -625,7 +624,9 @@ describe.concurrent('REST API automation endpoints', () => {
                 });
                 expect(createRes.status).toBe(201);
 
-                const createBody = (await createRes.json()) as { data: { id: string; priority: string; tags: string[] } };
+                const createBody = (await createRes.json()) as {
+                    data: { id: string; priority: string; tags: string[] };
+                };
 
                 // Automation runs after the DTO is built, so the create
                 // response may not reflect automated changes. Fetch the task
@@ -713,11 +714,10 @@ describe.concurrent('REST API automation endpoints', () => {
         const script = path.join(oldDir, 'chatty-stderr.mjs');
         await fs.writeFile(script, CHATTY_STDERR_SCRIPT, 'utf8');
         try {
-            const oldChild = spawn(
-                nodeExecutable(),
-                [script, ...chattyArgs('.', 'old', 262_144, 3_000)],
-                { cwd: oldDir, stdio: ['ignore', 'ignore', 'pipe'] },
-            );
+            const oldChild = spawn(nodeExecutable(), [script, ...chattyArgs('.', 'old', 262_144, 3_000)], {
+                cwd: oldDir,
+                stdio: ['ignore', 'ignore', 'pipe'],
+            });
             // Guard is the child bound (3s) plus slack: on POSIX the child
             // self-aborts first and close fires normally; on Windows only
             // the guard can end the wedge.
@@ -733,19 +733,15 @@ describe.concurrent('REST API automation endpoints', () => {
                 expect(fs.pathExistsSync(path.join(oldDir, 'aborted-old.marker'))).toBe(true);
             }
 
-            const newChild = spawn(
-                nodeExecutable(),
-                [script, ...chattyArgs('.', 'new', 262_144, 15_000)],
-                { cwd: newDir, stdio: ['ignore', 'ignore', 'pipe'] },
-            );
+            const newChild = spawn(nodeExecutable(), [script, ...chattyArgs('.', 'new', 262_144, 15_000)], {
+                cwd: newDir,
+                stdio: ['ignore', 'ignore', 'pipe'],
+            });
             const newOutcome = await monitorNewShape(newChild);
             expect(newOutcome.code).toBe(0);
             expect(newOutcome.stderrBytes).toBeGreaterThanOrEqual(262_144);
             await waitForMarker(path.join(newDir, 'completed-new.marker'), 5_000);
-            const drained = Number.parseInt(
-                await fs.readFile(path.join(newDir, 'bytes-new.marker'), 'utf8'),
-                10,
-            );
+            const drained = Number.parseInt(await fs.readFile(path.join(newDir, 'bytes-new.marker'), 'utf8'), 10);
             expect(drained).toBeGreaterThanOrEqual(262_144);
             expect(fs.pathExistsSync(path.join(newDir, 'aborted-new.marker'))).toBe(false);
         } finally {
@@ -771,10 +767,9 @@ describe.concurrent('REST API automation endpoints', () => {
       on:
         created:
 ${indentBlock(
-    nodeRunActionYaml(
-        ['fixtures/chatty-stderr.mjs', ...chattyArgs('chatty-markers', 'server', 327_680, 15_000)],
-        { wait: false },
-    ),
+    nodeRunActionYaml(['fixtures/chatty-stderr.mjs', ...chattyArgs('chatty-markers', 'server', 327_680, 15_000)], {
+        wait: false,
+    }),
     10,
 )}
 `,
@@ -800,7 +795,8 @@ ${indentBlock(
                     10,
                 );
                 expect(drained).toBeGreaterThanOrEqual(262_144);
-                const aborted = await fs.readFile(path.join(markers, 'aborted-server.marker'), 'utf8')
+                const aborted = await fs
+                    .readFile(path.join(markers, 'aborted-server.marker'), 'utf8')
                     .catch(() => null);
                 expect(aborted).toBeNull();
             } finally {
@@ -826,8 +822,7 @@ ${indentBlock(
         const headSentinel = `HEAD-${label}-7f3adrop`;
         const tailSentinel = `TAIL-${label}-c9d1-END`;
         const releaseRel = `${markerDirRel}/release-${label}.marker`;
-        const marker = (name: string) =>
-            path.join(workspace.root, markerDirRel, `${name}-${label}.marker`);
+        const marker = (name: string) => path.join(workspace.root, markerDirRel, `${name}-${label}.marker`);
         const workspace = await SmokeWorkspace.create({
             seedFiles: {
                 '.tasks/config.yml': BASE_CONFIG,
@@ -923,9 +918,7 @@ ${indentBlock(
             expect(diagnosticSeenAt - primaryExitedAt).toBeLessThanOrEqual(5_000);
 
             expect(/exited with exit (?:status|code):? 7/.test(line ?? '')).toBe(true);
-            expect(line).toContain(
-                '(stderr pipe still open, likely held by a descendant; tail truncated)',
-            );
+            expect(line).toContain('(stderr pipe still open, likely held by a descendant; tail truncated)');
             // Bounded tail: the head sentinel was dropped, the tail
             // sentinel retained, and the dropped-byte notice accounts for
             // everything above the 8KiB retention window.
@@ -940,9 +933,7 @@ ${indentBlock(
             // its own hold bound is the final leak guard. Probe outcome is
             // read before the workspace disappears so the post-cleanup
             // assertions keep their evidence.
-            await fs
-                .writeFile(path.join(workspace.root, releaseRel), `${process.pid}\n`)
-                .catch(() => undefined);
+            await fs.writeFile(path.join(workspace.root, releaseRel), `${process.pid}\n`).catch(() => undefined);
             if (server) {
                 await waitForMarker(marker('descendant-released'), 10_000)
                     .then(() => {
@@ -953,8 +944,8 @@ ${indentBlock(
             probeOutcome = fs.pathExistsSync(marker('probe-delivered'))
                 ? 'delivered'
                 : fs.pathExistsSync(marker('probe-epipe'))
-                    ? 'epipe'
-                    : 'missing';
+                  ? 'epipe'
+                  : 'missing';
             if (server) {
                 await server.stop();
             }

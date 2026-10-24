@@ -111,7 +111,7 @@ vi.mock('../components/toast', () => ({
 }))
 
 vi.mock('../composables/useProjects', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'ABC-OPS', name: 'Hyphen Project' }]),
@@ -121,7 +121,7 @@ vi.mock('../composables/useProjects', () => {
 })
 
 vi.mock('../composables/useConfig', () => {
-    const refresh = vi.fn(async () => { })
+    const refresh = vi.fn(async () => {})
     return {
         useConfig: () => ({
             statuses: ref(['Open', 'Closed']),

@@ -49,7 +49,9 @@ export function useTaskPanelReferenceMutations(
     // intentionally excluded: they are never managed blobs (DEV-61).
     const attachments = computed(() => {
         const list = Array.isArray(task.references) ? task.references : []
-        return list.filter((entry) => typeof entry?.attachment === 'string' && (entry.attachment || '').trim().length > 0)
+        return list.filter(
+            (entry) => typeof entry?.attachment === 'string' && (entry.attachment || '').trim().length > 0,
+        )
     })
 
     const linkReferences = computed(() => {

@@ -3,8 +3,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { renderMarkdownToHtml } from '../utils/markdown';
+import { computed } from 'vue'
+import { renderMarkdownToHtml } from '../utils/markdown'
 
 const props = defineProps<{
   source: string
@@ -42,7 +42,7 @@ const html = computed(() => renderMarkdownToHtml(props.source || ''))
 }
 
 .markdown-content :deep(code) {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: 0.92em;
 }
 

@@ -8,7 +8,7 @@ const routerPushMock = vi.fn()
 
 const projectsStore = {
     projects: ref([{ prefix: 'ACME', name: 'Acme Co' }]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 const _calendarItems = ref<any[]>([])
@@ -32,7 +32,10 @@ function createCalendarHandle(
         error,
         lastSyncAt: ref(1),
         tasks: computed(() => _calendarItems.value),
-        refresh: vi.fn(async () => { status.value = 'ready'; hasSnapshot.value = true }),
+        refresh: vi.fn(async () => {
+            status.value = 'ready'
+            hasSnapshot.value = true
+        }),
         retain: vi.fn(),
         release: vi.fn(),
     }
@@ -61,7 +64,7 @@ function calendarHandleFor(filter: Record<string, unknown> = {}) {
 const tasksStore = {
     items: _calendarItems,
     getQuery: vi.fn((filter?: Record<string, unknown>) => calendarHandleFor(filter)),
-    hydrateAll: vi.fn(async () => { }),
+    hydrateAll: vi.fn(async () => {}),
     status: _calendarStatus,
 }
 
@@ -71,7 +74,9 @@ function deferHandleRefreshes(handles: Array<ReturnType<typeof createCalendarHan
     for (const handle of handles) {
         handle.refresh.mockImplementation(() => {
             handle.status.value = 'loading'
-            return new Promise<void>((resolve) => { resolvers.push(resolve) })
+            return new Promise<void>((resolve) => {
+                resolvers.push(resolve)
+            })
         })
     }
     return {
@@ -93,7 +98,7 @@ function adoptedCalendarHandle() {
 
 const sprintsStore = {
     sprints: ref<SprintListItem[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     loading: ref(false),
 }
 
@@ -126,7 +131,10 @@ vi.mock('../components/UiSelect.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue', 'change'],
-        setup(props: { modelValue?: string }, { emit, slots }: { emit: (event: string, value: string) => void; slots: Slots }) {
+        setup(
+            props: { modelValue?: string },
+            { emit, slots }: { emit: (event: string, value: string) => void; slots: Slots },
+        ) {
             const onChange = (event: Event) => {
                 const target = event.target as HTMLSelectElement
                 const value = target?.value ?? ''
@@ -190,30 +198,39 @@ describe('Calendar sprint overlay', () => {
         openTaskPanelMock.mockClear()
     })
 
-    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])('hydrates real FilterBar results with route precedence: %j', async query => {
-        routeState.query = query
-        projectsStore.projects.value = [{ prefix: 'ACME', name: 'Acme Co' }, { prefix: 'BETA', name: 'Beta Co' }]
-        localStorage.setItem('lotar.calendar.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
-        const wrapper = mount(Calendar)
-        try {
-            await flushPromises()
-            const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
-            expect((wrapper.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
-            expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
-            expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
-            if (!Object.keys(query).length) expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
-            if (expectedQuery) expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: expectedQuery })
-            else expect(tasksStore.getQuery.mock.lastCall?.[0]?.q).toBeUndefined()
-            const bar = wrapper.getComponent({ name: 'FilterBar' })
-            const emissions = (bar.emitted('update:value') || []).length
-            await flushPromises()
-            expect((bar.emitted('update:value') || []).length).toBe(emissions)
-            expect(emissions).toBeLessThanOrEqual(1)
-        } finally {
-            wrapper.unmount()
-            localStorage.clear()
-        }
-    })
+    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])(
+        'hydrates real FilterBar results with route precedence: %j',
+        async (query) => {
+            routeState.query = query
+            projectsStore.projects.value = [
+                { prefix: 'ACME', name: 'Acme Co' },
+                { prefix: 'BETA', name: 'Beta Co' },
+            ]
+            localStorage.setItem('lotar.calendar.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
+            const wrapper = mount(Calendar)
+            try {
+                await flushPromises()
+                const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
+                expect((wrapper.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(
+                    expectedQuery,
+                )
+                expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
+                expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
+                if (!Object.keys(query).length)
+                    expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
+                if (expectedQuery) expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: expectedQuery })
+                else expect(tasksStore.getQuery.mock.lastCall?.[0]?.q).toBeUndefined()
+                const bar = wrapper.getComponent({ name: 'FilterBar' })
+                const emissions = (bar.emitted('update:value') || []).length
+                await flushPromises()
+                expect((bar.emitted('update:value') || []).length).toBe(emissions)
+                expect(emissions).toBeLessThanOrEqual(1)
+            } finally {
+                wrapper.unmount()
+                localStorage.clear()
+            }
+        },
+    )
 
     it('renders sprint pills across plan length and exposes testing hooks', async () => {
         sprintsStore.sprints.value = [
@@ -253,7 +270,7 @@ describe('Calendar sprint overlay', () => {
             planned_start: '2024-02-02',
             planned_end: '2024-02-05',
         })
-            ; (overdue as any).state = 'OVERDUE'
+        ;(overdue as any).state = 'OVERDUE'
         sprintsStore.sprints.value = [overdue]
 
         const wrapper = mount(Calendar)
@@ -354,7 +371,7 @@ describe('Calendar task hover cards', () => {
         const items = overlay.querySelectorAll('.calendar-day-dialog__item')
         expect(items.length).toBe(7)
 
-            ; (items[0] as HTMLElement).click()
+        ;(items[0] as HTMLElement).click()
         await flushPromises()
 
         expect(openTaskPanelMock).toHaveBeenCalled()
@@ -371,10 +388,12 @@ describe('Calendar task hover cards', () => {
 
         await addBtn.trigger('click')
 
-        expect(openTaskPanelMock).toHaveBeenCalledWith(expect.objectContaining({
-            taskId: 'new',
-            initialDueDate: '2024-02-05',
-        }))
+        expect(openTaskPanelMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                taskId: 'new',
+                initialDueDate: '2024-02-05',
+            }),
+        )
     })
 
     it('wraps due tasks in hover cards and keeps click-to-open behavior', async () => {
@@ -395,7 +414,17 @@ describe('Calendar task hover cards', () => {
     it('loads persisted hover card field visibility per project', async () => {
         localStorage.setItem(
             'lotar.calendarHoverFields.columns::ACME',
-            JSON.stringify(['id', 'title', 'status', 'priority', 'reporter', 'assignee', 'sprints', 'due_date', 'modified']),
+            JSON.stringify([
+                'id',
+                'title',
+                'status',
+                'priority',
+                'reporter',
+                'assignee',
+                'sprints',
+                'due_date',
+                'modified',
+            ]),
         )
 
         const wrapper = mount(Calendar)
@@ -406,70 +435,64 @@ describe('Calendar task hover cards', () => {
         const raw = hover.attributes('data-fields') || ''
         expect(raw).toContain('"tags":false')
     })
-  it('keeps the month grid mounted during background refreshes and surfaces refresh failures', async () => {
-    // The lone project is auto-selected, so the page's first query carries
-    // project ACME. Hold that handle's first refresh open.
-    // The mount may adopt the bare key and/or the auto-selected ACME key;
-    // defer every candidate so the first load is deterministically pending.
-    const deferred = deferHandleRefreshes([
-      calendarHandleFor({}),
-      calendarHandleFor({ project: 'ACME' }),
-    ])
-    const wrapper = mount(Calendar)
-    await flushPromises()
-    expect(wrapper.find('.loader').exists()).toBe(true)
-    expect(wrapper.find('.grid.body').exists()).toBe(false)
+    it('keeps the month grid mounted during background refreshes and surfaces refresh failures', async () => {
+        // The lone project is auto-selected, so the page's first query carries
+        // project ACME. Hold that handle's first refresh open.
+        // The mount may adopt the bare key and/or the auto-selected ACME key;
+        // defer every candidate so the first load is deterministically pending.
+        const deferred = deferHandleRefreshes([calendarHandleFor({}), calendarHandleFor({ project: 'ACME' })])
+        const wrapper = mount(Calendar)
+        await flushPromises()
+        expect(wrapper.find('.loader').exists()).toBe(true)
+        expect(wrapper.find('.grid.body').exists()).toBe(false)
 
-    // First load completes (still in a loading state): the grid renders and
-    // stays mounted — background refreshes never unmount it.
-    deferred.complete()
-    await flushPromises()
-    expect(wrapper.find('.grid.body').exists()).toBe(true)
-    expect(wrapper.find('.loader').exists()).toBe(false)
+        // First load completes (still in a loading state): the grid renders and
+        // stays mounted — background refreshes never unmount it.
+        deferred.complete()
+        await flushPromises()
+        expect(wrapper.find('.grid.body').exists()).toBe(true)
+        expect(wrapper.find('.loader').exists()).toBe(false)
 
-    // A refresh failure surfaces as a retry banner; the grid is retained.
-    const adopted = adoptedCalendarHandle()!
-    adopted.error.value = 'flaky network'
-    adopted.status.value = 'error'
-    await flushPromises()
-    expect(wrapper.find('.refresh-error').exists()).toBe(true)
-    expect(wrapper.find('.refresh-error').text()).toContain('flaky network')
-    expect(wrapper.find('.grid.body').exists()).toBe(true)
-    wrapper.unmount()
-  })
-  it('shows the first-load loader on a project switch until the new key publishes', async () => {
-    const wrapper = mount(Calendar)
-    await flushPromises()
-    expect(wrapper.find('.grid.body').exists()).toBe(true)
+        // A refresh failure surfaces as a retry banner; the grid is retained.
+        const adopted = adoptedCalendarHandle()!
+        adopted.error.value = 'flaky network'
+        adopted.status.value = 'error'
+        await flushPromises()
+        expect(wrapper.find('.refresh-error').exists()).toBe(true)
+        expect(wrapper.find('.refresh-error').text()).toContain('flaky network')
+        expect(wrapper.find('.grid.body').exists()).toBe(true)
+        wrapper.unmount()
+    })
+    it('shows the first-load loader on a project switch until the new key publishes', async () => {
+        const wrapper = mount(Calendar)
+        await flushPromises()
+        expect(wrapper.find('.grid.body').exists()).toBe(true)
 
-    wrapper.unmount()
-    // The real FilterBar persists its snapshot and force-selects a LONE
-    // project; drop the snapshot and offer two projects so the next mount
-    // follows the routed project (BETA) instead of snapping back to ACME.
-    localStorage.clear()
-    projectsStore.projects.value = [
-        { prefix: 'ACME', name: 'Acme Co' },
-        { prefix: 'BETA', name: 'Beta Co' },
-    ]
+        wrapper.unmount()
+        // The real FilterBar persists its snapshot and force-selects a LONE
+        // project; drop the snapshot and offer two projects so the next mount
+        // follows the routed project (BETA) instead of snapping back to ACME.
+        localStorage.clear()
+        projectsStore.projects.value = [
+            { prefix: 'ACME', name: 'Acme Co' },
+            { prefix: 'BETA', name: 'Beta Co' },
+        ]
 
-    // Switch projects (fresh mount on the new route): the new key's first
-    // refresh is held open.
-    const deferred = deferHandleRefreshes([
-      calendarHandleFor({}),
-      calendarHandleFor({ project: 'BETA' }),
-    ])
-    routeState.query = { month: '2024-02', sprints: '1', project: 'BETA' }
-    const wrapper2 = mount(Calendar)
-    await flushPromises()
+        // Switch projects (fresh mount on the new route): the new key's first
+        // refresh is held open.
+        const deferred = deferHandleRefreshes([calendarHandleFor({}), calendarHandleFor({ project: 'BETA' })])
+        routeState.query = { month: '2024-02', sprints: '1', project: 'BETA' }
+        const wrapper2 = mount(Calendar)
+        await flushPromises()
 
-    // First load of the new key: loader shows, grid unmounted.
-    expect(wrapper2.find('.loader').exists()).toBe(true)
-    expect(wrapper2.find('.grid.body').exists()).toBe(false)
+        // First load of the new key: loader shows, grid unmounted.
+        expect(wrapper2.find('.loader').exists()).toBe(true)
+        expect(wrapper2.find('.grid.body').exists()).toBe(false)
 
-    deferred.complete()
-    await flushPromises()
-    expect(wrapper2.find('.loader').exists()).toBe(false)
-    expect(wrapper2.find('.grid.body').exists()).toBe(true)
-    wrapper2.unmount()
-  })
+        deferred.complete()
+        await flushPromises()
+        expect(wrapper2.find('.loader').exists()).toBe(false)
+        expect(wrapper2.find('.grid.body').exists()).toBe(true)
+        wrapper2.unmount()
+    })
 })

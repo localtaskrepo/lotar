@@ -12,7 +12,11 @@ describe('useSavedViews', () => {
         const { views, saveNew, updateExisting, remove, refresh, getById } = useSavedViews()
         expect(views.value).toHaveLength(0)
 
-        const created = saveNew('My view', { project: 'PRJ', status: 'Open' }, { columns: ['id', 'title'], sort: { key: 'modified', dir: 'desc' } })
+        const created = saveNew(
+            'My view',
+            { project: 'PRJ', status: 'Open' },
+            { columns: ['id', 'title'], sort: { key: 'modified', dir: 'desc' } },
+        )
         expect(views.value).toHaveLength(1)
         expect(views.value[0]!.name).toBe('My view')
         expect(getById(created.id)?.filter.project).toBe('PRJ')
@@ -26,7 +30,9 @@ describe('useSavedViews', () => {
         expect(views.value).toHaveLength(0)
         expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')).toHaveLength(0)
 
-        const seeded = [{ id: 'external', name: 'External', filter: { priority: 'High' }, created: 'now', updated: 'now' }]
+        const seeded = [
+            { id: 'external', name: 'External', filter: { priority: 'High' }, created: 'now', updated: 'now' },
+        ]
         localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
         refresh()
         expect(views.value).toHaveLength(1)
@@ -46,7 +52,11 @@ describe('useSavedViews', () => {
         expect(stored?.columns).toEqual(['id'])
         expect(stored?.sort?.dir).toBe('asc')
 
-        const updatePayload = { filter: { status: 'Doing' }, columns: ['title', 'assignee'], sort: { key: 'modified', dir: 'desc' as const } }
+        const updatePayload = {
+            filter: { status: 'Doing' },
+            columns: ['title', 'assignee'],
+            sort: { key: 'modified', dir: 'desc' as const },
+        }
         updateExisting(created.id, updatePayload)
         updatePayload.filter!.status = 'Done'
         updatePayload.columns!.push('tags')

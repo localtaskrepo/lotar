@@ -201,7 +201,8 @@ describe('ConfigView project creation propagation', () => {
                         emits: ['update:modelValue'],
                     },
                     UiSelect: {
-                        template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
+                        template:
+                            '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
                         props: ['modelValue'],
                         emits: ['update:modelValue'],
                     },

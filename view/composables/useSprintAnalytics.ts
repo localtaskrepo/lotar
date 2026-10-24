@@ -1,10 +1,6 @@
 import { reactive } from 'vue'
 import { api } from '../api/client'
-import type {
-    SprintBurndownResponse,
-    SprintSummaryReportResponse,
-    SprintVelocityResponse,
-} from '../api/types'
+import type { SprintBurndownResponse, SprintSummaryReportResponse, SprintVelocityResponse } from '../api/types'
 
 type SprintMetric = 'tasks' | 'points' | 'hours'
 
@@ -30,8 +26,12 @@ export const DEFAULT_VELOCITY_PARAMS: Required<VelocityParams> = {
 
 function normalizeVelocityParams(params: VelocityParams = {}): Required<VelocityParams> {
     return {
-        limit: typeof params.limit === 'number' && params.limit > 0 ? Math.floor(params.limit) : DEFAULT_VELOCITY_PARAMS.limit,
-        include_active: typeof params.include_active === 'boolean' ? params.include_active : DEFAULT_VELOCITY_PARAMS.include_active,
+        limit:
+            typeof params.limit === 'number' && params.limit > 0
+                ? Math.floor(params.limit)
+                : DEFAULT_VELOCITY_PARAMS.limit,
+        include_active:
+            typeof params.include_active === 'boolean' ? params.include_active : DEFAULT_VELOCITY_PARAMS.include_active,
         metric: (params.metric ?? DEFAULT_VELOCITY_PARAMS.metric) satisfies SprintMetric,
     }
 }
@@ -56,7 +56,10 @@ export function useSprintAnalytics() {
     const velocityError = reactive<Record<string, string | null | undefined>>({})
     const velocityPending = new Map<string, Promise<SprintVelocityResponse>>()
 
-    async function fetchSummary(sprintId: number, options: SprintFetchOptions = {}): Promise<SprintSummaryReportResponse> {
+    async function fetchSummary(
+        sprintId: number,
+        options: SprintFetchOptions = {},
+    ): Promise<SprintSummaryReportResponse> {
         if (sprintId <= 0) {
             throw new Error('sprintId must be greater than zero')
         }
@@ -150,7 +153,10 @@ export function useSprintAnalytics() {
         return burndownError[sprintId] ?? null
     }
 
-    async function loadVelocity(params: VelocityParams = {}, options: VelocityFetchOptions = {}): Promise<SprintVelocityResponse> {
+    async function loadVelocity(
+        params: VelocityParams = {},
+        options: VelocityFetchOptions = {},
+    ): Promise<SprintVelocityResponse> {
         const normalized = normalizeVelocityParams(params)
         const key = velocityKey(normalized)
         if (!options.force) {

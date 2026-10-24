@@ -57,7 +57,9 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     }
 
     const assignKnownUsersFrom = (set: Set<string>) => {
-        knownUsers.value = Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b))
+        knownUsers.value = Array.from(set)
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b))
     }
 
     const seedKnownUsers = () => {
@@ -200,7 +202,9 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         const scope = project && project.trim() ? project.trim() : undefined
         const baseline = seedKnownUsers()
         try {
-            const response = await api.listTasks(scope ? ({ project: scope, limit: 200, offset: 0 } as any) : ({ limit: 200, offset: 0 } as any))
+            const response = await api.listTasks(
+                scope ? ({ project: scope, limit: 200, offset: 0 } as any) : ({ limit: 200, offset: 0 } as any),
+            )
             const list = Array.isArray(response.tasks) ? response.tasks : []
             const seen = new Set<string>()
             const tags = new Set<string>()
@@ -215,11 +219,11 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
                     const normalized = raw.startsWith('@') ? raw.slice(1) : raw
                     if (normalized) seen.add(normalized)
                 }
-                    ; (item.tags || []).forEach((tag) => {
-                        if (!tag) return
-                        const trimmed = tag.trim()
-                        if (trimmed) tags.add(trimmed)
-                    })
+                ;(item.tags || []).forEach((tag) => {
+                    if (!tag) return
+                    const trimmed = tag.trim()
+                    if (trimmed) tags.add(trimmed)
+                })
             })
             baseline.forEach((value) => seen.add(value))
             assignKnownUsersFrom(seen)
@@ -299,8 +303,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     })
 
     // Fetch whoami once per panel lifecycle
-    api
-        .whoami()
+    api.whoami()
         .then((value) => {
             const identity = typeof value === 'string' ? value.trim() : ''
             if (!identity) {
@@ -316,7 +319,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
                 syncAssigneeControl()
             }
         })
-        .catch(() => { })
+        .catch(() => {})
 
     return {
         knownUsers,

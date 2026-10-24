@@ -1,14 +1,20 @@
 <template>
   <div class="table-wrap" ref="rootRef">
-    <div v-if="showToolbar" class="table-toolbar row" style="justify-content: space-between; align-items: center; margin-bottom: 8px; position: relative;">
-      <div class="row columns-control" style="gap:8px; align-items:center; position: relative;">
+    <div
+      v-if="showToolbar"
+      class="table-toolbar row"
+      style="justify-content: space-between; align-items: center; margin-bottom: 8px; position: relative"
+    >
+      <div class="row columns-control" style="gap: 8px; align-items: center; position: relative">
         <template v-if="props.showBulkControls">
           <div class="bulk-controls">
             <label class="bulk-controls__toggle columns-control__label">
               <input type="checkbox" :checked="bulk" @change="onToggleBulk($event)" />
               <span>Bulk select</span>
             </label>
-            <span v-if="bulk" class="muted bulk-controls__count columns-control__selected">Selected: {{ selected.length }} / {{ sorted.length }}</span>
+            <span v-if="bulk" class="muted bulk-controls__count columns-control__selected"
+              >Selected: {{ selected.length }} / {{ sorted.length }}</span
+            >
             <div v-if="bulk" class="bulk-controls__menu" ref="bulkMenuPopover">
               <UiButton
                 icon-only
@@ -22,23 +28,48 @@
                 <IconGlyph name="dots-horizontal" />
               </UiButton>
               <div v-if="showBulkMenu" class="menu-popover card bulk-actions-menu">
-                <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">
+                <button
+                  class="menu-item"
+                  type="button"
+                  :disabled="disableBulkActions"
+                  @click="handleBulkAction('assign')"
+                >
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
                   <span class="menu-item__label">Assign…</span>
                 </button>
-                <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">
+                <button
+                  class="menu-item"
+                  type="button"
+                  :disabled="disableBulkActions"
+                  @click="handleBulkAction('unassign')"
+                >
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
                   <span class="menu-item__label">Clear assignee</span>
                 </button>
-                <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">
+                <button
+                  class="menu-item"
+                  type="button"
+                  :disabled="disableSprintActions"
+                  @click="handleBulkAction('sprint-add')"
+                >
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
                   <span class="menu-item__label">Add to sprint…</span>
                 </button>
-                <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">
+                <button
+                  class="menu-item"
+                  type="button"
+                  :disabled="disableSprintActions"
+                  @click="handleBulkAction('sprint-remove')"
+                >
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
                   <span class="menu-item__label">Remove from sprint…</span>
                 </button>
-                <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">
+                <button
+                  class="menu-item danger"
+                  type="button"
+                  :disabled="disableBulkActions"
+                  @click="handleBulkAction('delete')"
+                >
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
                   <span class="menu-item__label">Delete tasks…</span>
                 </button>
@@ -47,7 +78,7 @@
           </div>
         </template>
       </div>
-      <div class="row controls" style="gap:8px; align-items:center; flex-wrap: wrap;">
+      <div class="row controls" style="gap: 8px; align-items: center; flex-wrap: wrap">
         <ColumnsMenu
           :open="showColumnMenu"
           :options="fieldOptions"
@@ -58,7 +89,13 @@
           @reset="resetColumns"
         >
           <template #trigger="{ open, toggle }">
-            <UiButton class="columns-button" type="button" title="Configure columns" :aria-expanded="open" @click="toggle">
+            <UiButton
+              class="columns-button"
+              type="button"
+              title="Configure columns"
+              :aria-expanded="open"
+              @click="toggle"
+            >
               <IconGlyph name="columns" aria-hidden="true" />
               <span>Columns</span>
             </UiButton>
@@ -73,196 +110,287 @@
     <UiCard>
       <div class="table-scroll">
         <table class="table">
-        <thead>
-          <tr>
-            <th v-if="selectable" style="width:28px;">
-              <input aria-label="Select all" ref="selectAllRef" type="checkbox" :checked="allSelected" @change="toggleAll($event)" />
-            </th>
-            <th
-              v-for="col in visibleColumns"
-              :key="col"
-              :class="[{ sortable: isSortableCol(col), active: isSortableCol(col) && sort.key === col }]"
-              :aria-sort="isSortableCol(col) ? (sort.key === col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined"
-              :data-column="col"
-              @dragover.prevent="onColDragOver(col, $event)"
-              @drop.prevent="onColDrop(col, $event)"
-            >
-              <button
-                :class="[
-                  'header-button',
-                  {
-                    'is-drag-over': dragOverCol === col,
-                    'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
-                    'is-dragging': draggingCol === col,
-                  },
-                ]"
-                type="button"
-                draggable="true"
-                @click="onHeaderActivate(col)"
-                @keydown.enter.prevent="onSort(col)"
-                @keydown.space.prevent="onSort(col)"
-                @dragstart="onColDragStart(col, $event)"
-                @dragend="onColDragEnd"
+          <thead>
+            <tr>
+              <th v-if="selectable" style="width: 28px">
+                <input
+                  aria-label="Select all"
+                  ref="selectAllRef"
+                  type="checkbox"
+                  :checked="allSelected"
+                  @change="toggleAll($event)"
+                />
+              </th>
+              <th
+                v-for="col in visibleColumns"
+                :key="col"
+                :class="[{ sortable: isSortableCol(col), active: isSortableCol(col) && sort.key === col }]"
+                :aria-sort="
+                  isSortableCol(col)
+                    ? sort.key === col
+                      ? sort.dir === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                    : undefined
+                "
+                :data-column="col"
+                @dragover.prevent="onColDragOver(col, $event)"
+                @drop.prevent="onColDrop(col, $event)"
               >
-                <span class="header-button__label">{{ headerLabel(col) }}</span>
-                <span v-if="isSortableCol(col)" class="header-button__sort" aria-hidden="true">
-                  <template v-if="sort.key === col">
-                    {{ sort.dir === 'asc' ? '▲' : '▼' }}
+                <button
+                  :class="[
+                    'header-button',
+                    {
+                      'is-drag-over': dragOverCol === col,
+                      'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+                      'is-dragging': draggingCol === col,
+                    },
+                  ]"
+                  type="button"
+                  draggable="true"
+                  @click="onHeaderActivate(col)"
+                  @keydown.enter.prevent="onSort(col)"
+                  @keydown.space.prevent="onSort(col)"
+                  @dragstart="onColDragStart(col, $event)"
+                  @dragend="onColDragEnd"
+                >
+                  <span class="header-button__label">{{ headerLabel(col) }}</span>
+                  <span v-if="isSortableCol(col)" class="header-button__sort" aria-hidden="true">
+                    <template v-if="sort.key === col">
+                      {{ sort.dir === 'asc' ? '▲' : '▼' }}
+                    </template>
+                    <template v-else> ⇅ </template>
+                  </span>
+                </button>
+              </th>
+              <th style="width: 1%; white-space: nowrap">Actions</th>
+            </tr>
+          </thead>
+          <Transition name="task-rows" mode="out-in">
+            <tbody :key="rowsKey">
+              <tr
+                v-for="t in sorted"
+                :key="t.id"
+                :class="{ 'is-recent': !!touchesMap[t.id] }"
+                @click="$emit('open', t.id)"
+              >
+                <td v-if="selectable" @click.stop style="text-align: center">
+                  <input type="checkbox" :checked="isSelected(t.id)" @change="toggleOne(t.id, $event)" />
+                </td>
+                <td v-for="col in visibleColumns" :key="col" :class="['task-table__cell', `task-table__cell--${col}`]">
+                  <template v-if="col === 'id'">
+                    <span class="muted">{{ projectOf(t.id) }}</span>
+                    <strong style="margin-left: 6px">{{ numericOf(t.id) }}</strong>
+                  </template>
+                  <template v-else-if="col === 'title'">
+                    <div class="task-table__title-wrapper">
+                      <span
+                        class="task-table__title-text"
+                        :class="{ 'task-table__title-text--deleted': t.deleted_at != null }"
+                        >{{ t.title }}</span
+                      >
+                      <span
+                        v-if="t.deleted_at != null"
+                        class="tag task-table__deleted-badge"
+                        :title="`Deleted ${fmtDateTime(t.deleted_at)}`"
+                        data-testid="task-deleted-at"
+                        >Deleted {{ relativeTime(t.deleted_at) }}</span
+                      >
+                      <div v-if="touchesMap[t.id]" class="session-touch">
+                        <span class="session-touch__badge" :class="touchesMap[t.id]!.kind">{{
+                          touchBadge(touchesMap[t.id]!)
+                        }}</span>
+                        <span>{{ relativeTime(touchesMap[t.id]!.time) }}</span>
+                        <span v-if="touchesMap[t.id]!.actor">• {{ touchesMap[t.id]!.actor }}</span>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else-if="col === 'status'">
+                    <span class="status" :data-status="t.status">{{ t.status }}</span>
+                  </template>
+                  <template v-else-if="col === 'priority'">
+                    <span>{{ t.priority }}</span>
+                  </template>
+                  <template v-else-if="col === 'task_type'">
+                    <span>{{ t.task_type }}</span>
+                  </template>
+                  <template v-else-if="col === 'reporter'">
+                    <span v-if="t.reporter">{{ formatMember(t.reporter) }}</span>
+                    <span v-else class="muted">—</span>
+                  </template>
+                  <template v-else-if="col === 'assignee'">
+                    <span v-if="t.assignee">{{ formatMember(t.assignee) }}</span>
+                    <span v-else class="muted">—</span>
+                  </template>
+                  <template v-else-if="col === 'effort'">
+                    <span v-if="(t as any).effort">{{ (t as any).effort }}</span>
+                    <span v-else class="muted">—</span>
+                  </template>
+                  <template v-else-if="col === 'tags'">
+                    <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center">
+                      <span v-for="tag in t.tags || []" :key="tag" class="tag">{{ tag }}</span>
+                    </div>
+                  </template>
+                  <template v-else-if="col === 'sprints'">
+                    <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center">
+                      <span
+                        v-for="sprintId in t.sprints || []"
+                        :key="`${t.id}-sprint-${sprintId}`"
+                        class="chip small sprint-chip"
+                        :class="sprintStateClass(sprintId)"
+                        :title="sprintTooltip(sprintId)"
+                      >
+                        {{ sprintLabel(sprintId) }}
+                      </span>
+                      <span v-if="!(t.sprints && t.sprints.length)" class="muted">—</span>
+                    </div>
+                  </template>
+                  <template v-else-if="col === 'due_date'">
+                    <span v-if="t.due_date" :class="{ overdue: isOverdue(t) }">{{ fmtDate(t.due_date) }}</span>
+                    <span v-else class="muted">—</span>
+                  </template>
+                  <template v-else-if="col === 'modified'">
+                    <span :title="fmtDateTime(t.modified)">{{ relativeTime(t.modified) }}</span>
+                    <span v-if="touchesMap[t.id]?.actor" class="muted"> • {{ touchesMap[t.id]?.actor }}</span>
+                  </template>
+                  <template v-else-if="customFieldKey(col)">
+                    <span>{{ t.custom_fields?.[customFieldKey(col)!] || '—' }}</span>
                   </template>
                   <template v-else>
-                    ⇅
+                    <span>{{ (t as any)[col] }}</span>
                   </template>
-                </span>
-              </button>
-            </th>
-            <th style="width: 1%; white-space: nowrap;">Actions</th>
-          </tr>
-        </thead>
-        <Transition name="task-rows" mode="out-in">
-        <tbody :key="rowsKey">
-          <tr v-for="t in sorted" :key="t.id" :class="{ 'is-recent': !!touchesMap[t.id] }" @click="$emit('open', t.id)">
-            <td v-if="selectable" @click.stop style="text-align:center;">
-              <input type="checkbox" :checked="isSelected(t.id)" @change="toggleOne(t.id, $event)" />
-            </td>
-            <td v-for="col in visibleColumns" :key="col" :class="['task-table__cell', `task-table__cell--${col}`]">
-              <template v-if="col === 'id'">
-                <span class="muted">{{ projectOf(t.id) }}</span>
-                <strong style="margin-left: 6px;">{{ numericOf(t.id) }}</strong>
-              </template>
-              <template v-else-if="col === 'title'">
-                <div class="task-table__title-wrapper">
-                  <span class="task-table__title-text" :class="{ 'task-table__title-text--deleted': t.deleted_at != null }">{{ t.title }}</span>
-                  <span
-                    v-if="t.deleted_at != null"
-                    class="tag task-table__deleted-badge"
-                    :title="`Deleted ${fmtDateTime(t.deleted_at)}`"
-                    data-testid="task-deleted-at"
-                  >Deleted {{ relativeTime(t.deleted_at) }}</span>
-                  <div v-if="touchesMap[t.id]" class="session-touch">
-                    <span class="session-touch__badge" :class="touchesMap[t.id]!.kind">{{ touchBadge(touchesMap[t.id]!) }}</span>
-                    <span>{{ relativeTime(touchesMap[t.id]!.time) }}</span>
-                    <span v-if="touchesMap[t.id]!.actor">• {{ touchesMap[t.id]!.actor }}</span>
+                </td>
+                <td class="actions-cell" @click.stop>
+                  <UiButton icon-only aria-label="Row actions" title="Actions" @click.stop="toggleRowMenu(t.id)">
+                    <IconGlyph name="dots-horizontal" />
+                  </UiButton>
+                  <div v-if="isRowMenuOpen(t.id)" class="menu-popover card">
+                    <template v-if="t.deleted_at != null">
+                      <button
+                        class="menu-item"
+                        data-testid="task-row-restore"
+                        @click="
+                          () => {
+                            $emit('restore', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="refresh" /></span>
+                        <span class="menu-item__label">Restore…</span>
+                      </button>
+                      <button
+                        class="menu-item danger"
+                        data-testid="task-row-delete-forever"
+                        @click="
+                          () => {
+                            $emit('delete-forever', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+                        <span class="menu-item__label">Delete permanently…</span>
+                      </button>
+                    </template>
+                    <template v-else>
+                      <button
+                        class="menu-item"
+                        @click="
+                          () => {
+                            $emit('edit-tags', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="tag" /></span>
+                        <span class="menu-item__label">Edit tags</span>
+                      </button>
+                      <button
+                        class="menu-item"
+                        @click="
+                          () => {
+                            $emit('assign', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
+                        <span class="menu-item__label">Assign…</span>
+                      </button>
+                      <button
+                        class="menu-item"
+                        @click="
+                          () => {
+                            $emit('unassign', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
+                        <span class="menu-item__label">Clear assignee</span>
+                      </button>
+                      <button
+                        class="menu-item"
+                        @click="
+                          () => {
+                            $emit('sprint-add', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+                        <span class="menu-item__label">Add to sprint…</span>
+                      </button>
+                      <button
+                        class="menu-item"
+                        @click="
+                          () => {
+                            $emit('sprint-remove', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
+                        <span class="menu-item__label">Remove from sprint…</span>
+                      </button>
+                      <button
+                        class="menu-item danger"
+                        @click="
+                          () => {
+                            $emit('delete', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+                        <span class="menu-item__label">Delete…</span>
+                      </button>
+                    </template>
                   </div>
-                </div>
-              </template>
-              <template v-else-if="col === 'status'">
-                <span class="status" :data-status="t.status">{{ t.status }}</span>
-              </template>
-              <template v-else-if="col === 'priority'">
-                <span>{{ t.priority }}</span>
-              </template>
-              <template v-else-if="col === 'task_type'">
-                <span>{{ t.task_type }}</span>
-              </template>
-              <template v-else-if="col === 'reporter'">
-                <span v-if="t.reporter">{{ formatMember(t.reporter) }}</span>
-                <span v-else class="muted">—</span>
-              </template>
-              <template v-else-if="col === 'assignee'">
-                <span v-if="t.assignee">{{ formatMember(t.assignee) }}</span>
-                <span v-else class="muted">—</span>
-              </template>
-              <template v-else-if="col === 'effort'">
-                <span v-if="(t as any).effort">{{ (t as any).effort }}</span>
-                <span v-else class="muted">—</span>
-              </template>
-              <template v-else-if="col === 'tags'">
-                <div class="row" style="gap:6px; flex-wrap: wrap; align-items:center;">
-                  <span v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-                </div>
-              </template>
-              <template v-else-if="col === 'sprints'">
-                <div class="row" style="gap:6px; flex-wrap: wrap; align-items:center;">
-                  <span
-                    v-for="sprintId in (t.sprints || [])"
-                    :key="`${t.id}-sprint-${sprintId}`"
-                    class="chip small sprint-chip"
-                    :class="sprintStateClass(sprintId)"
-                    :title="sprintTooltip(sprintId)"
-                  >
-                    {{ sprintLabel(sprintId) }}
-                  </span>
-                  <span v-if="!(t.sprints && t.sprints.length)" class="muted">—</span>
-                </div>
-              </template>
-              <template v-else-if="col === 'due_date'">
-                <span v-if="t.due_date" :class="{ overdue: isOverdue(t) }">{{ fmtDate(t.due_date) }}</span>
-                <span v-else class="muted">—</span>
-              </template>
-              <template v-else-if="col === 'modified'">
-                <span :title="fmtDateTime(t.modified)">{{ relativeTime(t.modified) }}</span>
-                <span v-if="touchesMap[t.id]?.actor" class="muted"> • {{ touchesMap[t.id]?.actor }}</span>
-              </template>
-              <template v-else-if="customFieldKey(col)">
-                <span>{{ t.custom_fields?.[customFieldKey(col)!] || '—' }}</span>
-              </template>
-              <template v-else>
-                <span>{{ (t as any)[col] }}</span>
-              </template>
-            </td>
-            <td class="actions-cell" @click.stop>
-              <UiButton icon-only aria-label="Row actions" title="Actions" @click.stop="toggleRowMenu(t.id)">
-                <IconGlyph name="dots-horizontal" />
-              </UiButton>
-              <div v-if="isRowMenuOpen(t.id)" class="menu-popover card">
-                <template v-if="t.deleted_at != null">
-                  <button class="menu-item" data-testid="task-row-restore" @click="$emit('restore', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="refresh" /></span>
-                    <span class="menu-item__label">Restore…</span>
-                  </button>
-                  <button class="menu-item danger" data-testid="task-row-delete-forever" @click="$emit('delete-forever', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
-                    <span class="menu-item__label">Delete permanently…</span>
-                  </button>
-                </template>
-                <template v-else>
-                  <button class="menu-item" @click="$emit('edit-tags', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="tag" /></span>
-                    <span class="menu-item__label">Edit tags</span>
-                  </button>
-                  <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
-                    <span class="menu-item__label">Assign…</span>
-                  </button>
-                  <button class="menu-item" @click="$emit('unassign', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
-                    <span class="menu-item__label">Clear assignee</span>
-                  </button>
-                  <button class="menu-item" @click="$emit('sprint-add', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
-                    <span class="menu-item__label">Add to sprint…</span>
-                  </button>
-                  <button class="menu-item" @click="$emit('sprint-remove', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
-                    <span class="menu-item__label">Remove from sprint…</span>
-                  </button>
-                  <button class="menu-item danger" @click="$emit('delete', t.id); closeRowMenu(t.id)">
-                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
-                    <span class="menu-item__label">Delete…</span>
-                  </button>
-                </template>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="!loading && (!tasks || tasks.length === 0)" key="__empty__"><td :colspan="visibleColumns.length + (selectable ? 2 : 1)" class="muted">No tasks</td></tr>
-        </tbody>
-        </Transition>
+                </td>
+              </tr>
+              <tr v-if="!loading && (!tasks || tasks.length === 0)" key="__empty__">
+                <td :colspan="visibleColumns.length + (selectable ? 2 : 1)" class="muted">No tasks</td>
+              </tr>
+            </tbody>
+          </Transition>
         </table>
       </div>
     </UiCard>
   </div>
-  
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue';
-import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState';
-import { useColumnDragReorder } from '../composables/useColumnDragReorder';
-import { formatMember } from '../utils/member';
-import ColumnsMenu from './ColumnsMenu.vue';
-import IconGlyph from './IconGlyph.vue';
-import UiButton from './UiButton.vue';
-import UiCard from './UiCard.vue';
+import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState'
+import { useColumnDragReorder } from '../composables/useColumnDragReorder'
+import { formatMember } from '../utils/member'
+import ColumnsMenu from './ColumnsMenu.vue'
+import IconGlyph from './IconGlyph.vue'
+import UiButton from './UiButton.vue'
+import UiCard from './UiCard.vue'
 
 const props = withDefaults(defineProps<TaskTableProps & { showToolbar?: boolean }>(), {
   showBulkControls: true,
@@ -307,7 +435,7 @@ const {
   isOverdue,
 } = useTaskTableState(props, emit)
 
-const rowsKey = computed(() => sorted.value.map(t => t.id).join('|'))
+const rowsKey = computed(() => sorted.value.map((t) => t.id).join('|'))
 
 const {
   draggingCol,
@@ -334,7 +462,9 @@ const showBulkMenu = ref(false)
 const bulkMenuButton = ref<BulkMenuButtonRef | null>(null)
 const bulkMenuPopover = ref<HTMLElement | null>(null)
 const disableBulkActions = computed(() => !selected.value.length)
-const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoadingLocal.value || !hasSprintsLocal.value)
+const disableSprintActions = computed(
+  () => disableBulkActions.value || sprintsLoadingLocal.value || !hasSprintsLocal.value,
+)
 
 function sprintLabel(id: number) {
   const entry = sprintLookup.value[id]
@@ -471,7 +601,9 @@ onUnmounted(() => {
 </style>
 
 <style scoped>
-.table-wrap { width: 100%; }
+.table-wrap {
+  width: 100%;
+}
 .table-scroll {
   width: 100%;
   overflow-x: auto;
@@ -607,7 +739,10 @@ tbody tr.is-recent {
   background: color-mix(in oklab, var(--color-accent) 12%, transparent);
 }
 
-.status { color: var(--color-muted); font-weight: 600; }
+.status {
+  color: var(--color-muted);
+  font-weight: 600;
+}
 
 .chip.small {
   font-size: var(--text-xs, 0.75rem);
@@ -717,7 +852,7 @@ tbody tr.is-recent {
   line-height: 2.25rem;
 }
 
-.bulk-controls__toggle input[type="checkbox"] {
+.bulk-controls__toggle input[type='checkbox'] {
   margin: 0;
 }
 
@@ -788,8 +923,6 @@ tbody tr.is-recent {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-
 
 .session-touch {
   display: inline-flex;

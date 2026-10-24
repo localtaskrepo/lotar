@@ -8,7 +8,9 @@ describe.concurrent('shared REST domain error classification', () => {
     it('distinguishes bad input from missing tasks and sprints at the actual HTTP boundary', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({ name: 'rest-domain-errors-' });
         try {
-            const task = await workspace.addTask('Error classification fixture', { args: ['--project=ERRS', '--reporter=Smoke'] });
+            const task = await workspace.addTask('Error classification fixture', {
+                args: ['--project=ERRS', '--reporter=Smoke'],
+            });
             const server = await startLotarServer(workspace);
             try {
                 const cases: Array<[string, Record<string, unknown> | undefined, number]> = [
@@ -36,7 +38,7 @@ describe.concurrent('shared REST domain error classification', () => {
                         body: body ? JSON.stringify(body) : undefined,
                     });
                     expect(response.status, route).toBe(status);
-                    const payload = await response.json() as { error: { code: string; message: string } };
+                    const payload = (await response.json()) as { error: { code: string; message: string } };
                     expect(payload.error.code, route).toBe(status === 404 ? 'NOT_FOUND' : 'INVALID_ARGUMENT');
                     expect(payload.error.message, route).toEqual(expect.any(String));
                     expect(payload.error.message.length, route).toBeGreaterThan(0);
@@ -62,7 +64,7 @@ describe.concurrent('shared REST domain error classification', () => {
                 for (const route of ['/api/sprints/summary?sprint=1', '/api/sprints/burndown?sprint=1']) {
                     const response = await fetch(`${server.url}${route}`);
                     expect(response.status).toBe(500);
-                    const payload = await response.json() as { error: { code: string; message: string } };
+                    const payload = (await response.json()) as { error: { code: string; message: string } };
                     expect(payload.error.code).toBe('INTERNAL');
                     expect(payload.error.message.length).toBeGreaterThan(0);
                 }

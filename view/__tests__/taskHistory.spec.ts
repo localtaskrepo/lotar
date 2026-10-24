@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import type { TaskDTO } from '../api/types';
-import { findLastStatusChangeAt, statusEnteredAt } from '../utils/taskHistory';
+import { describe, expect, it } from 'vitest'
+import type { TaskDTO } from '../api/types'
+import { findLastStatusChangeAt, statusEnteredAt } from '../utils/taskHistory'
 
 function makeTask(history: Array<{ at: string; old?: string | null; new?: string | null }> = []): TaskDTO {
     return {
@@ -77,8 +77,12 @@ describe('statusEnteredAt (DEV-133)', () => {
             statusChange('2026-01-09T00:00:00Z', 'done'),
         ])
         expect(statusEnteredAt(task, 'Done')).toBe(Date.parse('2026-01-09T00:00:00Z'))
-        expect(statusEnteredAt(base({ status: 'InProgress' }, [statusChange('2026-01-04T00:00:00Z', 'in_progress')]), 'InProgress'))
-            .toBe(Date.parse('2026-01-04T00:00:00Z'))
+        expect(
+            statusEnteredAt(
+                base({ status: 'InProgress' }, [statusChange('2026-01-04T00:00:00Z', 'in_progress')]),
+                'InProgress',
+            ),
+        ).toBe(Date.parse('2026-01-04T00:00:00Z'))
     })
 
     it('falls back to creation time when the task never changed status', () => {

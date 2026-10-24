@@ -16,9 +16,17 @@
             aria-label="Search tasks with filter syntax"
             :aria-expanded="suggestionsOpen && suggestions.length ? 'true' : 'false'"
             :aria-controls="suggestionsOpen && suggestions.length ? controlId('suggestions') : undefined"
-            :aria-activedescendant="suggestionsOpen && suggestions.length && activeSuggestion < suggestions.length ? controlId(`suggestion-${activeSuggestion}`) : undefined"
+            :aria-activedescendant="
+              suggestionsOpen && suggestions.length && activeSuggestion < suggestions.length
+                ? controlId(`suggestion-${activeSuggestion}`)
+                : undefined
+            "
             :aria-invalid="searchErrors.length > 0 ? 'true' : 'false'"
-            :aria-describedby="searchErrors.length ? `${controlId('search-hint')} ${controlId('search-error')}` : controlId('search-hint')"
+            :aria-describedby="
+              searchErrors.length
+                ? `${controlId('search-hint')} ${controlId('search-error')}`
+                : controlId('search-hint')
+            "
             data-testid="filter-search"
             autocomplete="off"
             spellcheck="false"
@@ -38,7 +46,9 @@
             title="Clear search"
             data-testid="filter-search-clear"
             @click="clearSearch"
-          >×</button>
+          >
+            ×
+          </button>
           <div
             v-if="suggestionsOpen && suggestions.length"
             :id="controlId('suggestions')"
@@ -64,12 +74,7 @@
           </div>
         </div>
         <p class="filter-bar__search-hint" :id="controlId('search-hint')">{{ searchSyntaxHint }}</p>
-        <p
-          v-if="searchErrors.length"
-          class="filter-bar__search-error"
-          :id="controlId('search-error')"
-          role="alert"
-        >
+        <p v-if="searchErrors.length" class="filter-bar__search-error" :id="controlId('search-error')" role="alert">
           {{ searchErrors.join(' ') }}
         </p>
       </div>
@@ -86,7 +91,8 @@
         :aria-controls="controlId('help')"
         data-testid="filter-help-toggle"
         @click="toggleHelp"
-      ><IconGlyph name="help" /></UiButton>
+        ><IconGlyph name="help"
+      /></UiButton>
 
       <UiButton
         :id="controlId('toggle')"
@@ -120,18 +126,40 @@
       data-testid="filter-help"
     >
       <h3 :id="controlId('help-title')">Search filters</h3>
-      <p>Combine search words with filters. Arrow keys navigate suggestions; Enter or Tab accepts one. Enter applies a typed filter. Quote values containing spaces.</p>
+      <p>
+        Combine search words with filters. Arrow keys navigate suggestions; Enter or Tab accepts one. Enter applies a
+        typed filter. Quote values containing spaces.
+      </p>
       <dl class="filter-bar__help-types">
         <div v-for="item in filterHelp" :key="item.syntax">
-          <dt><code>{{ item.syntax }}</code><span>{{ item.label }}</span></dt>
-          <dd>{{ item.description }}<span v-if="item.aliases"> Aliases: {{ item.aliases }}.</span></dd>
+          <dt>
+            <code>{{ item.syntax }}</code
+            ><span>{{ item.label }}</span>
+          </dt>
+          <dd>
+            {{ item.description }}<span v-if="item.aliases"> Aliases: {{ item.aliases }}.</span>
+          </dd>
         </div>
       </dl>
-      <p>Use commas for multiple statuses, priorities, types, sprints, tags or missing fields. For multi-select filters, colon adds selections; <code>key=value</code> replaces them. Custom fields use <code>field:name=value</code> or <code>name=value</code>; quote reserved custom names, such as <code>field:"sprint"=inc-2</code>.</p>
-      <p>Suggestions combine configured options with values from tasks loaded in the current project scope. Search text, assignees and custom values can also be typed directly. Unknown colon terms and quoted literals remain search text.</p>
+      <p>
+        Use commas for multiple statuses, priorities, types, sprints, tags or missing fields. For multi-select filters,
+        colon adds selections; <code>key=value</code> replaces them. Custom fields use <code>field:name=value</code> or
+        <code>name=value</code>; quote reserved custom names, such as <code>field:"sprint"=inc-2</code>.
+      </p>
+      <p>
+        Suggestions combine configured options with values from tasks loaded in the current project scope. Search text,
+        assignees and custom values can also be typed directly. Unknown colon terms and quoted literals remain search
+        text.
+      </p>
     </section>
 
-    <div v-if="activeChips.length" class="filter-bar__chips-row" data-testid="filter-chips" role="group" aria-label="Applied filters">
+    <div
+      v-if="activeChips.length"
+      class="filter-bar__chips-row"
+      data-testid="filter-chips"
+      role="group"
+      aria-label="Applied filters"
+    >
       <span v-for="chip in activeChips" :key="`${chip.key}-${chip.value}`" class="filter-bar__chip">
         <span class="filter-bar__chip-label">{{ chip.label }}</span>
         <span v-if="chip.display" class="filter-bar__chip-value">{{ chip.display }}</span>
@@ -140,7 +168,9 @@
           class="filter-bar__chip-remove"
           :aria-label="`Remove filter ${chip.label} ${chip.display || chip.value}`"
           @click="removeChip(chip)"
-        >×</button>
+        >
+          ×
+        </button>
       </span>
     </div>
 
@@ -155,12 +185,7 @@
       <div class="filter-bar__panel-header">
         <h3 :id="controlId('panel-title')" class="filter-bar__panel-title">Filters</h3>
         <div class="filter-bar__panel-header-actions">
-          <UiButton
-            type="button"
-            class="filter-bar__panel-clear"
-            :disabled="!hasConditions"
-            @click="onClear(true)"
-          >
+          <UiButton type="button" class="filter-bar__panel-clear" :disabled="!hasConditions" @click="onClear(true)">
             Clear conditions
           </UiButton>
         </div>
@@ -168,220 +193,223 @@
 
       <div class="filter-bar__panel-content">
         <div class="filter-bar__picks-column">
-      <section class="filter-bar__section" :aria-labelledby="controlId('quick-picks-title')">
-        <h4 :id="controlId('quick-picks-title')" class="filter-bar__section-title">Quick picks</h4>
-        <SmartListChips
-          :statuses="statuses"
-          :priorities="priorities"
-          :value="smartChipsValue"
-          :custom-presets="customPresets"
-          :enable-due-soon="enableDueSoon"
-          :enable-recent="enableRecent"
-          @update:value="onSmartChipsUpdate"
-          @preset="appendCustomFilter"
-        />
-      </section>
+          <section class="filter-bar__section" :aria-labelledby="controlId('quick-picks-title')">
+            <h4 :id="controlId('quick-picks-title')" class="filter-bar__section-title">Quick picks</h4>
+            <SmartListChips
+              :statuses="statuses"
+              :priorities="priorities"
+              :value="smartChipsValue"
+              :custom-presets="customPresets"
+              :enable-due-soon="enableDueSoon"
+              :enable-recent="enableRecent"
+              @update:value="onSmartChipsUpdate"
+              @preset="appendCustomFilter"
+            />
+          </section>
 
-      <section v-if="$slots.panel" class="filter-bar__section" :aria-labelledby="controlId('view-options-title')">
-        <h4 :id="controlId('view-options-title')" class="filter-bar__section-title">View options</h4>
-        <slot name="panel" />
-      </section>
+          <section v-if="$slots.panel" class="filter-bar__section" :aria-labelledby="controlId('view-options-title')">
+            <h4 :id="controlId('view-options-title')" class="filter-bar__section-title">View options</h4>
+            <slot name="panel" />
+          </section>
         </div>
 
-      <div class="filter-bar__fields-group" role="group" aria-label="Filter fields">
-        <div class="filter-bar__fields">
-          <div class="filter-bar__field filter-bar__field--project">
-            <span class="filter-bar__field-label" :id="controlId('project-label')">Project</span>
-            <div
-              v-if="hasSingleProject"
-              class="input filter-bar__project-static"
-              :aria-labelledby="controlId('project-label')"
-              data-testid="filter-project"
-              :title="singleProjectLabel"
-            >
-              {{ singleProjectLabel }}
-            </div>
-            <UiSelect
-              v-else
-              :id="controlId('project')"
-              v-model="project"
-              :aria-labelledby="controlId('project-label')"
-              data-testid="filter-project"
-            >
-              <option value="">Project</option>
-              <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
-            </UiSelect>
-          </div>
-
-          <div v-if="showStatusSelect" class="filter-bar__field">
-            <span class="filter-bar__field-label" :id="controlId('status-label')">Status</span>
-            <div ref="statusDropdown" class="filter-bar__dropdown">
-              <button
-                type="button"
-                :id="controlId('status')"
-                class="input filter-bar__dropdown-trigger"
-                :aria-labelledby="controlId('status-label')"
-                data-testid="filter-status"
-                :title="statusTitle"
-                :aria-expanded="statusMenuOpen ? 'true' : 'false'"
-                :aria-controls="statusMenuOpen ? controlId('status-options') : undefined"
-                @click="toggleStatusMenu"
-              >
-                <span class="filter-bar__dropdown-trigger-label">{{ statusTriggerLabel }}</span>
-              </button>
+        <div class="filter-bar__fields-group" role="group" aria-label="Filter fields">
+          <div class="filter-bar__fields">
+            <div class="filter-bar__field filter-bar__field--project">
+              <span class="filter-bar__field-label" :id="controlId('project-label')">Project</span>
               <div
-                v-if="statusMenuOpen"
-                :id="controlId('status-options')"
-                class="filter-bar__menu-popover"
-                role="group"
-                aria-label="Status choices"
-                @click.stop
+                v-if="hasSingleProject"
+                class="input filter-bar__project-static"
+                :aria-labelledby="controlId('project-label')"
+                data-testid="filter-project"
+                :title="singleProjectLabel"
               >
-                <div v-if="statusHasSelections" class="filter-bar__menu-actions">
-                  <button type="button" class="filter-bar__menu-action" @click="clearStatus">Clear</button>
-                  <button type="button" class="filter-bar__menu-action" @click="invertStatus">Invert</button>
+                {{ singleProjectLabel }}
+              </div>
+              <UiSelect
+                v-else
+                :id="controlId('project')"
+                v-model="project"
+                :aria-labelledby="controlId('project-label')"
+                data-testid="filter-project"
+              >
+                <option value="">Project</option>
+                <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
+              </UiSelect>
+            </div>
+
+            <div v-if="showStatusSelect" class="filter-bar__field">
+              <span class="filter-bar__field-label" :id="controlId('status-label')">Status</span>
+              <div ref="statusDropdown" class="filter-bar__dropdown">
+                <button
+                  type="button"
+                  :id="controlId('status')"
+                  class="input filter-bar__dropdown-trigger"
+                  :aria-labelledby="controlId('status-label')"
+                  data-testid="filter-status"
+                  :title="statusTitle"
+                  :aria-expanded="statusMenuOpen ? 'true' : 'false'"
+                  :aria-controls="statusMenuOpen ? controlId('status-options') : undefined"
+                  @click="toggleStatusMenu"
+                >
+                  <span class="filter-bar__dropdown-trigger-label">{{ statusTriggerLabel }}</span>
+                </button>
+                <div
+                  v-if="statusMenuOpen"
+                  :id="controlId('status-options')"
+                  class="filter-bar__menu-popover"
+                  role="group"
+                  aria-label="Status choices"
+                  @click.stop
+                >
+                  <div v-if="statusHasSelections" class="filter-bar__menu-actions">
+                    <button type="button" class="filter-bar__menu-action" @click="clearStatus">Clear</button>
+                    <button type="button" class="filter-bar__menu-action" @click="invertStatus">Invert</button>
+                  </div>
+                  <label v-for="s in statuses" :key="s" class="filter-bar__menu-item">
+                    <input type="checkbox" :checked="statusSelectionSet.has(s)" @change="toggleStatusValue(s)" />
+                    <span>{{ s }}</span>
+                  </label>
                 </div>
-                <label v-for="s in statuses" :key="s" class="filter-bar__menu-item">
-                  <input type="checkbox" :checked="statusSelectionSet.has(s)" @change="toggleStatusValue(s)" />
-                  <span>{{ s }}</span>
-                </label>
               </div>
             </div>
-          </div>
 
-          <div class="filter-bar__field">
-            <span class="filter-bar__field-label" :id="controlId('priority-label')">Priority</span>
-            <div ref="priorityDropdown" class="filter-bar__dropdown">
-              <button
-                type="button"
-                :id="controlId('priority')"
-                class="input filter-bar__dropdown-trigger"
-                :aria-labelledby="controlId('priority-label')"
-                data-testid="filter-priority"
-                :title="priorityTitle"
-                :aria-expanded="priorityMenuOpen ? 'true' : 'false'"
-                :aria-controls="priorityMenuOpen ? controlId('priority-options') : undefined"
-                @click="togglePriorityMenu"
-              >
-                <span class="filter-bar__dropdown-trigger-label">{{ priorityTriggerLabel }}</span>
-              </button>
-              <div
-                v-if="priorityMenuOpen"
-                :id="controlId('priority-options')"
-                class="filter-bar__menu-popover"
-                role="group"
-                aria-label="Priority choices"
-                @click.stop
-              >
-                <div v-if="priorityHasSelections" class="filter-bar__menu-actions">
-                  <button type="button" class="filter-bar__menu-action" @click="clearPriority">Clear</button>
-                  <button type="button" class="filter-bar__menu-action" @click="invertPriority">Invert</button>
+            <div class="filter-bar__field">
+              <span class="filter-bar__field-label" :id="controlId('priority-label')">Priority</span>
+              <div ref="priorityDropdown" class="filter-bar__dropdown">
+                <button
+                  type="button"
+                  :id="controlId('priority')"
+                  class="input filter-bar__dropdown-trigger"
+                  :aria-labelledby="controlId('priority-label')"
+                  data-testid="filter-priority"
+                  :title="priorityTitle"
+                  :aria-expanded="priorityMenuOpen ? 'true' : 'false'"
+                  :aria-controls="priorityMenuOpen ? controlId('priority-options') : undefined"
+                  @click="togglePriorityMenu"
+                >
+                  <span class="filter-bar__dropdown-trigger-label">{{ priorityTriggerLabel }}</span>
+                </button>
+                <div
+                  v-if="priorityMenuOpen"
+                  :id="controlId('priority-options')"
+                  class="filter-bar__menu-popover"
+                  role="group"
+                  aria-label="Priority choices"
+                  @click.stop
+                >
+                  <div v-if="priorityHasSelections" class="filter-bar__menu-actions">
+                    <button type="button" class="filter-bar__menu-action" @click="clearPriority">Clear</button>
+                    <button type="button" class="filter-bar__menu-action" @click="invertPriority">Invert</button>
+                  </div>
+                  <label v-for="p in priorities" :key="p" class="filter-bar__menu-item">
+                    <input type="checkbox" :checked="prioritySelectionSet.has(p)" @change="togglePriorityValue(p)" />
+                    <span>{{ p }}</span>
+                  </label>
                 </div>
-                <label v-for="p in priorities" :key="p" class="filter-bar__menu-item">
-                  <input type="checkbox" :checked="prioritySelectionSet.has(p)" @change="togglePriorityValue(p)" />
-                  <span>{{ p }}</span>
-                </label>
               </div>
             </div>
-          </div>
 
-          <div class="filter-bar__field">
-            <span class="filter-bar__field-label" :id="controlId('type-label')">Type</span>
-            <div ref="typeDropdown" class="filter-bar__dropdown">
-              <button
-                type="button"
-                :id="controlId('type')"
-                class="input filter-bar__dropdown-trigger"
-                :aria-labelledby="controlId('type-label')"
-                data-testid="filter-type"
-                :title="typeTitle"
-                :aria-expanded="typeMenuOpen ? 'true' : 'false'"
-                :aria-controls="typeMenuOpen ? controlId('type-options') : undefined"
-                @click="toggleTypeMenu"
-              >
-                <span class="filter-bar__dropdown-trigger-label">{{ typeTriggerLabel }}</span>
-              </button>
-              <div
-                v-if="typeMenuOpen"
-                :id="controlId('type-options')"
-                class="filter-bar__menu-popover"
-                role="group"
-                aria-label="Type choices"
-                @click.stop
-              >
-                <div v-if="typeHasSelections" class="filter-bar__menu-actions">
-                  <button type="button" class="filter-bar__menu-action" @click="clearType">Clear</button>
-                  <button type="button" class="filter-bar__menu-action" @click="invertType">Invert</button>
+            <div class="filter-bar__field">
+              <span class="filter-bar__field-label" :id="controlId('type-label')">Type</span>
+              <div ref="typeDropdown" class="filter-bar__dropdown">
+                <button
+                  type="button"
+                  :id="controlId('type')"
+                  class="input filter-bar__dropdown-trigger"
+                  :aria-labelledby="controlId('type-label')"
+                  data-testid="filter-type"
+                  :title="typeTitle"
+                  :aria-expanded="typeMenuOpen ? 'true' : 'false'"
+                  :aria-controls="typeMenuOpen ? controlId('type-options') : undefined"
+                  @click="toggleTypeMenu"
+                >
+                  <span class="filter-bar__dropdown-trigger-label">{{ typeTriggerLabel }}</span>
+                </button>
+                <div
+                  v-if="typeMenuOpen"
+                  :id="controlId('type-options')"
+                  class="filter-bar__menu-popover"
+                  role="group"
+                  aria-label="Type choices"
+                  @click.stop
+                >
+                  <div v-if="typeHasSelections" class="filter-bar__menu-actions">
+                    <button type="button" class="filter-bar__menu-action" @click="clearType">Clear</button>
+                    <button type="button" class="filter-bar__menu-action" @click="invertType">Invert</button>
+                  </div>
+                  <label v-for="t in types" :key="t" class="filter-bar__menu-item">
+                    <input type="checkbox" :checked="typeSelectionSet.has(t)" @change="toggleTypeValue(t)" />
+                    <span>{{ t }}</span>
+                  </label>
                 </div>
-                <label v-for="t in types" :key="t" class="filter-bar__menu-item">
-                  <input type="checkbox" :checked="typeSelectionSet.has(t)" @change="toggleTypeValue(t)" />
-                  <span>{{ t }}</span>
-                </label>
               </div>
             </div>
-          </div>
 
-          <div v-if="showSprintSelect" class="filter-bar__field">
-            <span class="filter-bar__field-label" :id="controlId('sprint-label')">Sprint</span>
-            <div ref="sprintDropdown" class="filter-bar__dropdown">
-              <button
-                type="button"
-                :id="controlId('sprint')"
-                class="input filter-bar__dropdown-trigger"
-                :aria-labelledby="controlId('sprint-label')"
-                data-testid="filter-sprint"
-                :title="sprintTitle"
-                :aria-expanded="sprintMenuOpen ? 'true' : 'false'"
-                :aria-controls="sprintMenuOpen ? controlId('sprint-options') : undefined"
-                @click="toggleSprintMenu"
-              >
-                <span class="filter-bar__dropdown-trigger-label">{{ sprintTriggerLabel }}</span>
-              </button>
-              <div
-                v-if="sprintMenuOpen"
-                :id="controlId('sprint-options')"
-                class="filter-bar__menu-popover"
-                role="group"
-                aria-label="Sprint choices"
-                @click.stop
-              >
-                <div v-if="sprintHasSelections" class="filter-bar__menu-actions">
-                  <button type="button" class="filter-bar__menu-action" @click="clearSprint">Clear</button>
-                  <button type="button" class="filter-bar__menu-action" @click="invertSprint">Invert</button>
+            <div v-if="showSprintSelect" class="filter-bar__field">
+              <span class="filter-bar__field-label" :id="controlId('sprint-label')">Sprint</span>
+              <div ref="sprintDropdown" class="filter-bar__dropdown">
+                <button
+                  type="button"
+                  :id="controlId('sprint')"
+                  class="input filter-bar__dropdown-trigger"
+                  :aria-labelledby="controlId('sprint-label')"
+                  data-testid="filter-sprint"
+                  :title="sprintTitle"
+                  :aria-expanded="sprintMenuOpen ? 'true' : 'false'"
+                  :aria-controls="sprintMenuOpen ? controlId('sprint-options') : undefined"
+                  @click="toggleSprintMenu"
+                >
+                  <span class="filter-bar__dropdown-trigger-label">{{ sprintTriggerLabel }}</span>
+                </button>
+                <div
+                  v-if="sprintMenuOpen"
+                  :id="controlId('sprint-options')"
+                  class="filter-bar__menu-popover"
+                  role="group"
+                  aria-label="Sprint choices"
+                  @click.stop
+                >
+                  <div v-if="sprintHasSelections" class="filter-bar__menu-actions">
+                    <button type="button" class="filter-bar__menu-action" @click="clearSprint">Clear</button>
+                    <button type="button" class="filter-bar__menu-action" @click="invertSprint">Invert</button>
+                  </div>
+                  <label v-for="opt in sprintOptions" :key="opt.id" class="filter-bar__menu-item">
+                    <input
+                      type="checkbox"
+                      :checked="sprintSelectionSet.has(String(opt.id))"
+                      @change="toggleSprintValue(String(opt.id))"
+                    />
+                    <span>{{ opt.label }}</span>
+                  </label>
                 </div>
-                <label v-for="opt in sprintOptions" :key="opt.id" class="filter-bar__menu-item">
-                  <input type="checkbox" :checked="sprintSelectionSet.has(String(opt.id))" @change="toggleSprintValue(String(opt.id))" />
-                  <span>{{ opt.label }}</span>
-                </label>
               </div>
             </div>
-          </div>
 
-          <div v-if="showOrderSelect" class="filter-bar__field">
-            <span class="filter-bar__field-label" :id="controlId('order-label')">Sort direction</span>
-            <UiSelect :id="controlId('order')" v-model="order" :aria-labelledby="controlId('order-label')">
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </UiSelect>
-          </div>
+            <div v-if="showOrderSelect" class="filter-bar__field">
+              <span class="filter-bar__field-label" :id="controlId('order-label')">Sort direction</span>
+              <UiSelect :id="controlId('order')" v-model="order" :aria-labelledby="controlId('order-label')">
+                <option value="desc">Descending</option>
+                <option value="asc">Ascending</option>
+              </UiSelect>
+            </div>
 
-          <div class="filter-bar__field">
-            <span class="filter-bar__field-label" :id="controlId('deletion-label')">Task visibility</span>
-            <UiSelect
-              :id="controlId('deletion')"
-              v-model="deletion"
-              :aria-labelledby="controlId('deletion-label')"
-              data-testid="task-deletion-filter"
-              title="Show active tasks, deleted tasks (trash), or both"
-            >
-              <option value="active">Active tasks</option>
-              <option value="deleted">Deleted tasks</option>
-              <option value="all">All tasks</option>
-            </UiSelect>
+            <div class="filter-bar__field">
+              <span class="filter-bar__field-label" :id="controlId('deletion-label')">Task visibility</span>
+              <UiSelect
+                :id="controlId('deletion')"
+                v-model="deletion"
+                :aria-labelledby="controlId('deletion-label')"
+                data-testid="task-deletion-filter"
+                title="Show active tasks, deleted tasks (trash), or both"
+              >
+                <option value="active">Active tasks</option>
+                <option value="deleted">Deleted tasks</option>
+                <option value="all">All tasks</option>
+              </UiSelect>
+            </div>
           </div>
-
         </div>
-      </div>
       </div>
     </section>
   </div>
@@ -392,16 +420,16 @@ import { listFromCsv } from '../composables/useFilterBuilder'
 import { storageGetJson, storageRemove, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import {
-    chipsForFilterValue,
-    canonicalCustomFilterKey,
-    filterFragment,
-    findGrammarKey,
-    GRAMMAR_KEYS,
-    parseFilterQuery,
-    serializeFilterToken,
-    suggestForFragment,
-    type FilterChip,
-    type SuggestionItem,
+  chipsForFilterValue,
+  canonicalCustomFilterKey,
+  filterFragment,
+  findGrammarKey,
+  GRAMMAR_KEYS,
+  parseFilterQuery,
+  serializeFilterToken,
+  suggestForFragment,
+  type FilterChip,
+  type SuggestionItem,
 } from '../composables/useFilterGrammar'
 import { formatProjectLabel } from '../utils/projectLabels'
 import { parseTaskId } from '../utils/text'
@@ -440,8 +468,8 @@ const props = withDefaults(
   },
 )
 const emit = defineEmits<{
-  (e:'update:value', v: Record<string,string>): void
-  (e:'task-selected', id: string): void
+  (e: 'update:value', v: Record<string, string>): void
+  (e: 'task-selected', id: string): void
 }>()
 
 const query = ref('')
@@ -461,7 +489,7 @@ const status = ref('')
 const priority = ref('')
 const type = ref('')
 const sprintFilter = ref('')
-const order = ref<'asc'|'desc'>('desc')
+const order = ref<'asc' | 'desc'>('desc')
 // DEV-92 deletion visibility: 'active' (default) never emits a filter key —
 // the server default and clean URLs stay untouched; 'deleted'/'all' become
 // part of the filter value (and therefore the query key and URL).
@@ -505,12 +533,33 @@ const helpDescriptions: Record<string, string> = {
   mine: 'true: tasks assigned to you.',
 }
 const filterHelp = computed(() => [
-  ...GRAMMAR_KEYS.map(meta => ({ syntax: `${meta.key}:value`, label: meta.label, description: helpDescriptions[meta.key] || '', aliases: meta.aliases.filter(alias => alias !== meta.key).join(', ') })),
-  { syntax: 'field:name=value', label: 'Custom field', description: 'A custom field name and value; known names and values are suggested.', aliases: '' },
-  { syntax: 'q="search words"', label: 'Search text', description: 'Plain words search tasks; q= explicitly sets the search text.', aliases: '' },
+  ...GRAMMAR_KEYS.map((meta) => ({
+    syntax: `${meta.key}:value`,
+    label: meta.label,
+    description: helpDescriptions[meta.key] || '',
+    aliases: meta.aliases.filter((alias) => alias !== meta.key).join(', '),
+  })),
+  {
+    syntax: 'field:name=value',
+    label: 'Custom field',
+    description: 'A custom field name and value; known names and values are suggested.',
+    aliases: '',
+  },
+  {
+    syntax: 'q="search words"',
+    label: 'Search text',
+    description: 'Plain words search tasks; q= explicitly sets the search text.',
+    aliases: '',
+  },
   { syntax: 'deletion=active', label: 'Visibility', description: 'active, deleted or all.', aliases: '' },
   { syntax: 'order=asc', label: 'Sort direction', description: 'asc or desc.', aliases: '' },
-  { syntax: 'sort_by=priority', label: 'Sort field', description: 'priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints or custom:name.', aliases: '' },
+  {
+    syntax: 'sort_by=priority',
+    label: 'Sort field',
+    description:
+      'priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints or custom:name.',
+    aliases: '',
+  },
 ])
 
 function toggleHelp() {
@@ -525,7 +574,9 @@ function closePanel() {
 }
 
 function customFieldsFrom(value: Record<string, unknown>): Record<string, string> {
-  return Object.fromEntries(Object.entries(value).filter(([key, raw]) => !CUSTOM_UI_KEYS.has(key) && typeof raw === 'string' && !!raw)) as Record<string, string>
+  return Object.fromEntries(
+    Object.entries(value).filter(([key, raw]) => !CUSTOM_UI_KEYS.has(key) && typeof raw === 'string' && !!raw),
+  ) as Record<string, string>
 }
 
 const { projects, refresh } = useProjects()
@@ -537,7 +588,6 @@ const singleProjectLabel = computed(() => {
 })
 
 const DOCUMENT_CLICK_OPTS: AddEventListenerOptions = { capture: true }
-
 
 function joinCsv(values: string[]): string {
   return values.join(',')
@@ -716,7 +766,13 @@ function invertSprint() {
 function onDocumentClick(event: MouseEvent) {
   const target = event.target as Node | null
   if (!target) return
-  if (helpOpen.value && !['help', 'help-toggle', 'toggle', 'panel'].some(part => document.getElementById(controlId(part))?.contains(target))) helpOpen.value = false
+  if (
+    helpOpen.value &&
+    !['help', 'help-toggle', 'toggle', 'panel'].some((part) =>
+      document.getElementById(controlId(part))?.contains(target),
+    )
+  )
+    helpOpen.value = false
 
   if (statusMenuOpen.value && statusDropdown.value && !statusDropdown.value.contains(target)) {
     statusMenuOpen.value = false
@@ -736,13 +792,26 @@ function onDocumentKeydown(event: KeyboardEvent) {
   if (!searchInput.value?.isConnected || searchInput.value.closest('[inert], [hidden]')) return
   if (event.defaultPrevented) return
   if (event.key === 'Escape') {
-    const openMenu = statusMenuOpen.value ? 'status' : priorityMenuOpen.value ? 'priority' : typeMenuOpen.value ? 'type' : sprintMenuOpen.value ? 'sprint' : ''
+    const openMenu = statusMenuOpen.value
+      ? 'status'
+      : priorityMenuOpen.value
+        ? 'priority'
+        : typeMenuOpen.value
+          ? 'type'
+          : sprintMenuOpen.value
+            ? 'sprint'
+            : ''
     if (openMenu) {
       closeAllMenus()
       document.getElementById(controlId(openMenu))?.focus()
       event.preventDefault()
       event.stopImmediatePropagation()
-    } else if (helpOpen.value && (document.getElementById(controlId('help'))?.contains(event.target as Node) || document.getElementById(controlId('help-toggle'))?.contains(event.target as Node) || (event.target === searchInput.value && !panelOpen.value))) {
+    } else if (
+      helpOpen.value &&
+      (document.getElementById(controlId('help'))?.contains(event.target as Node) ||
+        document.getElementById(controlId('help-toggle'))?.contains(event.target as Node) ||
+        (event.target === searchInput.value && !panelOpen.value))
+    ) {
       helpOpen.value = false
       document.getElementById(controlId('help-toggle'))?.focus()
       event.preventDefault()
@@ -800,11 +869,11 @@ onMounted(async () => {
         type.value = asText(saved.type)
         sprintFilter.value = asText(saved.sprints)
         assignee.value = asText(saved.assignee)
-    tags.value = asText(saved.tags)
-    dueDate.value = asText(saved.due)
-    recent.value = asText(saved.recent)
-    needs.value = asText(saved.needs)
-    deletion.value = normalizeDeletionValue(saved.deletion)
+        tags.value = asText(saved.tags)
+        dueDate.value = asText(saved.due)
+        recent.value = asText(saved.recent)
+        needs.value = asText(saved.needs)
+        deletion.value = normalizeDeletionValue(saved.deletion)
         // Sort persistence has a single owner: the page's per-project sort
         // storage (`lotar.tasks.sort::*`). Deliberately do NOT restore
         // sort_by/order from this snapshot — a stale one must never override
@@ -815,7 +884,11 @@ onMounted(async () => {
   } catch {}
   // Publish changes queued during initialization only after the full restore.
   // This also covers a lone project selected before the field watcher existed.
-  if (pendingHydrationEmit || (project.value && project.value !== (props.value?.project || '') && hasSingleProject.value)) emitFilter(true)
+  if (
+    pendingHydrationEmit ||
+    (project.value && project.value !== (props.value?.project || '') && hasSingleProject.value)
+  )
+    emitFilter(true)
 })
 
 onUnmounted(() => {
@@ -866,36 +939,39 @@ function isKnownProject(list: Array<{ prefix?: string; name?: string }>, value: 
 }
 
 // Hydration depends only on incoming filters, never option loading or draft edits.
-watch(() => props.value, value => {
-  if (value) {
-    query.value = value.q || ''
-    if (!searchPending.value && !searchFocused.value) {
-      searchDraft.value = query.value
-      searchCaret.value = null
+watch(
+  () => props.value,
+  (value) => {
+    if (value) {
+      query.value = value.q || ''
+      if (!searchPending.value && !searchFocused.value) {
+        searchDraft.value = query.value
+        searchCaret.value = null
+      }
+      project.value = value.project || ''
+      status.value = value.status || ''
+      priority.value = value.priority || ''
+      type.value = value.type || ''
+      sprintFilter.value = value.sprints || ''
+      const incomingAssignee = value.assignee || ''
+      const isMine = value.mine === 'true' || incomingAssignee === '@me'
+      assignee.value = isMine ? '@me' : incomingAssignee
+      tags.value = value.tags || ''
+      dueDate.value = value.due || ''
+      recent.value = value.recent || ''
+      needs.value = value.needs || ''
+      deletion.value = normalizeDeletionValue(value.deletion)
+      const o = value.order
+      order.value = o === 'asc' || o === 'desc' ? o : order.value
+      sortBy.value = value.sort_by || ''
+      const extras = customFieldsFrom(value)
+      if (JSON.stringify(extras) !== JSON.stringify(customFilters.value)) customFilters.value = extras
+    } else if (Object.keys(customFilters.value).length) {
+      customFilters.value = {}
     }
-    project.value = value.project || ''
-    status.value = value.status || ''
-    priority.value = value.priority || ''
-    type.value = value.type || ''
-    sprintFilter.value = value.sprints || ''
-    const incomingAssignee = value.assignee || ''
-    const isMine = value.mine === 'true' || incomingAssignee === '@me'
-    assignee.value = isMine ? '@me' : incomingAssignee
-    tags.value = value.tags || ''
-    dueDate.value = value.due || ''
-    recent.value = value.recent || ''
-    needs.value = value.needs || ''
-    deletion.value = normalizeDeletionValue(value.deletion)
-    const o = value.order
-    order.value = (o === 'asc' || o === 'desc') ? o : order.value
-    sortBy.value = value.sort_by || ''
-    const extras = customFieldsFrom(value)
-    if (JSON.stringify(extras) !== JSON.stringify(customFilters.value)) customFilters.value = extras
-  } else if (Object.keys(customFilters.value).length) {
-    customFilters.value = {}
-  }
-}, { immediate: true, deep: true })
-
+  },
+  { immediate: true, deep: true },
+)
 
 function appendCustomFilter(expr: string) {
   const trimmed = expr.trim()
@@ -922,11 +998,15 @@ const suggestionSource = computed(() => ({
   tags: props.tagOptions ?? [],
   assignees: props.assigneeOptions ?? [],
   customFieldValues: props.customFieldValues ?? {},
-  customFields: [...new Set([
-    ...(props.customFieldOptions ?? []).filter(name => name && name !== '*'),
-    ...(props.customPresets ?? []).map(preset => canonicalCustomFilterKey(preset.expression.replace(/=$/, '')).replace(/^field:/i, '')),
-    ...Object.keys(props.customFieldValues ?? {}),
-  ])],
+  customFields: [
+    ...new Set([
+      ...(props.customFieldOptions ?? []).filter((name) => name && name !== '*'),
+      ...(props.customPresets ?? []).map((preset) =>
+        canonicalCustomFilterKey(preset.expression.replace(/=$/, '')).replace(/^field:/i, ''),
+      ),
+      ...Object.keys(props.customFieldValues ?? {}),
+    ]),
+  ],
 }))
 
 const grammarSuggestions = computed<SuggestionItem[]>(() => {
@@ -937,9 +1017,15 @@ const grammarSuggestions = computed<SuggestionItem[]>(() => {
 
 function isCompletingGrammar(fragment: string): boolean {
   const lower = fragment.toLowerCase()
-  return !!lower && (lower.includes('=') || lower.startsWith('field:') ||
-    (lower.includes(':') && !!findGrammarKey(lower.split(':')[0] || '')) ||
-    ['field', 'q', 'order', 'sort_by', 'deletion', ...GRAMMAR_KEYS.flatMap(meta => meta.aliases)].some(key => key.startsWith(lower)))
+  return (
+    !!lower &&
+    (lower.includes('=') ||
+      lower.startsWith('field:') ||
+      (lower.includes(':') && !!findGrammarKey(lower.split(':')[0] || '')) ||
+      ['field', 'q', 'order', 'sort_by', 'deletion', ...GRAMMAR_KEYS.flatMap((meta) => meta.aliases)].some((key) =>
+        key.startsWith(lower),
+      ))
+  )
 }
 
 const taskLookupText = computed(() => {
@@ -948,24 +1034,35 @@ const taskLookupText = computed(() => {
   return parsed.errors?.length ? '' : (parsed.filters.q ?? parsed.text).trim()
 })
 
-watch([taskLookupText, project, () => props.taskSuggestions, suggestionsOpen], async ([text, scope, source, open], _old, onCleanup) => {
-  taskCandidates.value = []
-  let current = true
-  onCleanup(() => { current = false })
-  if (!source || !text || !open) return
-  try {
-    const results = await source(text, scope || undefined)
-    if (current) taskCandidates.value = results.map(task => ({ insert: task.id, label: task.id, hint: task.title, taskId: task.id }))
-  } catch {
-    // Lookup is advisory; live search and exact-ID acceptance remain available.
-  }
-})
+watch(
+  [taskLookupText, project, () => props.taskSuggestions, suggestionsOpen],
+  async ([text, scope, source, open], _old, onCleanup) => {
+    taskCandidates.value = []
+    let current = true
+    onCleanup(() => {
+      current = false
+    })
+    if (!source || !text || !open) return
+    try {
+      const results = await source(text, scope || undefined)
+      if (current)
+        taskCandidates.value = results.map((task) => ({
+          insert: task.id,
+          label: task.id,
+          hint: task.title,
+          taskId: task.id,
+        }))
+    } catch {
+      // Lookup is advisory; live search and exact-ID acceptance remain available.
+    }
+  },
+)
 
-const suggestions = computed<SearchSuggestion[]>(() => taskLookupText.value
-  ? [...taskCandidates.value, ...grammarSuggestions.value]
-  : grammarSuggestions.value)
+const suggestions = computed<SearchSuggestion[]>(() =>
+  taskLookupText.value ? [...taskCandidates.value, ...grammarSuggestions.value] : grammarSuggestions.value,
+)
 
-watch(suggestions, next => {
+watch(suggestions, (next) => {
   if (activeSuggestion.value >= next.length) activeSuggestion.value = 0
 })
 
@@ -1111,7 +1208,8 @@ function onSearchKeydown(event: KeyboardEvent) {
       selectTask(`${exact.project}-${exact.number}`)
       return
     }
-    const highlighted = suggestionsOpen.value && currentFragment().trim() ? suggestions.value[activeSuggestion.value] : undefined
+    const highlighted =
+      suggestionsOpen.value && currentFragment().trim() ? suggestions.value[activeSuggestion.value] : undefined
     if (highlighted) {
       pickSuggestion(highlighted)
       return
@@ -1129,7 +1227,8 @@ function onSearchKeydown(event: KeyboardEvent) {
 
 function applyGrammarFilters(filters: Record<string, string>, replaceKeys: string[] = []) {
   const replacements = new Set(replaceKeys)
-  const csvValue = (key: string, current: string, value: string) => replacements.has(key) ? value : mergeIntoCsv(current, value)
+  const csvValue = (key: string, current: string, value: string) =>
+    replacements.has(key) ? value : mergeIntoCsv(current, value)
   const extras: Record<string, string> = Object.assign(Object.create(null), customFilters.value)
   for (const [key, value] of Object.entries(filters)) {
     switch (key) {
@@ -1187,8 +1286,10 @@ function applyGrammarFilters(filters: Record<string, string>, replaceKeys: strin
 function applySearchDraft() {
   const parsed = parseFilterQuery(searchDraft.value)
   const errors = [...(parsed.errors ?? [])]
-  if (parsed.filters.order && !['asc', 'desc'].includes(parsed.filters.order)) errors.push('Sort direction must be asc or desc.')
-  if (parsed.filters.deletion && !['active', 'deleted', 'all'].includes(parsed.filters.deletion)) errors.push('Visibility must be active, deleted, or all.')
+  if (parsed.filters.order && !['asc', 'desc'].includes(parsed.filters.order))
+    errors.push('Sort direction must be asc or desc.')
+  if (parsed.filters.deletion && !['active', 'deleted', 'all'].includes(parsed.filters.deletion))
+    errors.push('Visibility must be active, deleted, or all.')
   searchErrors.value = errors
   if (errors.length) return
   applyGrammarFilters(parsed.filters, parsed.replaceKeys)
@@ -1217,12 +1318,34 @@ const structuredFilterValue = computed<Record<string, string>>(() => {
 const activeChips = computed<FilterChip[]>(() => {
   const chips = chipsForFilterValue(structuredFilterValue.value, suggestionSource.value)
   for (const tag of listFromCsv(tags.value)) chips.push({ key: 'tags', label: 'Tag', value: tag, display: tag })
-  if (deletion.value !== 'active') chips.push({ key: 'deletion', label: 'Visibility', value: deletion.value, display: deletion.value === 'deleted' ? 'Deleted tasks' : 'All tasks' })
+  if (deletion.value !== 'active')
+    chips.push({
+      key: 'deletion',
+      label: 'Visibility',
+      value: deletion.value,
+      display: deletion.value === 'deleted' ? 'Deleted tasks' : 'All tasks',
+    })
   return chips
 })
 
 const activeCount = computed(() => activeChips.value.length + (query.value.trim() ? 1 : 0))
-const hasConditions = computed(() => !!(query.value || status.value || priority.value || type.value || sprintFilter.value || assignee.value || tags.value || dueDate.value || recent.value || needs.value || deletion.value !== 'active' || Object.keys(customFilters.value).length))
+const hasConditions = computed(
+  () =>
+    !!(
+      query.value ||
+      status.value ||
+      priority.value ||
+      type.value ||
+      sprintFilter.value ||
+      assignee.value ||
+      tags.value ||
+      dueDate.value ||
+      recent.value ||
+      needs.value ||
+      deletion.value !== 'active' ||
+      Object.keys(customFilters.value).length
+    ),
+)
 
 function removeChip(chip: FilterChip) {
   switch (chip.key) {
@@ -1253,17 +1376,17 @@ function removeChip(chip: FilterChip) {
     case 'due':
       dueDate.value = ''
       break
-      case 'recent':
-        recent.value = ''
-        break
-      case 'deletion':
-        deletion.value = 'active'
-        break
-      default: {
-        const next = { ...customFilters.value }
-        delete next[chip.key]
-        customFilters.value = next
-      }
+    case 'recent':
+      recent.value = ''
+      break
+    case 'deletion':
+      deletion.value = 'active'
+      break
+    default: {
+      const next = { ...customFilters.value }
+      delete next[chip.key]
+      customFilters.value = next
+    }
   }
 }
 
@@ -1296,8 +1419,8 @@ function onSmartChipsUpdate(next: Record<string, string>) {
   needs.value = next.needs || ''
 }
 
-function emitFilter(synchronousTask = false){
-  const v: Record<string,string> = { ...customFilters.value }
+function emitFilter(synchronousTask = false) {
+  const v: Record<string, string> = { ...customFilters.value }
   if (query.value) v.q = query.value
   const shouldEmitProject = props.emitProjectKey || !!project.value
   if (shouldEmitProject) v.project = project.value || ''
@@ -1326,7 +1449,7 @@ function emitFilter(synchronousTask = false){
   storageSetJson(FILTER_KEY.value, snapshot)
   emit('update:value', v)
 }
-function onClear(keepScope = false){
+function onClear(keepScope = false) {
   // Reset all local state and emit an empty filter
   query.value = ''
   searchDraft.value = ''
@@ -1350,7 +1473,7 @@ function onClear(keepScope = false){
   deletion.value = 'active'
   customFilters.value = {}
   storageRemove(FILTER_KEY.value)
-  const empty: Record<string,string> = {}
+  const empty: Record<string, string> = {}
   empty.order = order.value
   if (keepScope && (props.emitProjectKey || project.value)) empty.project = project.value
   if (keepScope && sortBy.value) empty.sort_by = sortBy.value
@@ -1362,11 +1485,31 @@ function normalizeDeletionValue(value: unknown): 'active' | 'deleted' | 'all' {
 }
 
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, status, priority, type, sprintFilter, order, sortBy, tags, customFilters, assignee, dueDate, recent, needs, deletion], () => {
-  // Do not publish or persist a partial parent initialization over saved filters.
-  if (filtersHydrated) emitFilter()
-  else pendingHydrationEmit = true
-}, { deep: false })
+watch(
+  [
+    query,
+    project,
+    status,
+    priority,
+    type,
+    sprintFilter,
+    order,
+    sortBy,
+    tags,
+    customFilters,
+    assignee,
+    dueDate,
+    recent,
+    needs,
+    deletion,
+  ],
+  () => {
+    // Do not publish or persist a partial parent initialization over saved filters.
+    if (filtersHydrated) emitFilter()
+    else pendingHydrationEmit = true
+  },
+  { deep: false },
+)
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>
@@ -1483,7 +1626,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
   border: 0;
 }
 
-.filter-bar__help-toggle.btn[aria-expanded="true"] {
+.filter-bar__help-toggle.btn[aria-expanded='true'] {
   background: color-mix(in oklab, var(--color-accent) 14%, transparent);
   color: var(--color-accent);
 }
@@ -1797,7 +1940,9 @@ defineExpose({ appendCustomFilter, clear: onClear })
   color: var(--color-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--duration-fast) var(--ease-standard), border var(--duration-fast) var(--ease-standard);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border var(--duration-fast) var(--ease-standard);
 }
 
 .filter-bar__menu-action:hover {
@@ -1850,7 +1995,6 @@ defineExpose({ appendCustomFilter, clear: onClear })
     height: 14px;
     font-size: 10px;
   }
-
 }
 
 .filter-bar__search-input.input--invalid {

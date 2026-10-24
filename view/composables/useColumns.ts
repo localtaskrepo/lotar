@@ -146,9 +146,7 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
     const defaultVisible: (ColKey | string)[] = options.defaultVisible ?? DEFAULT_VISIBLE
     const builtinColumns: BuiltinColKey[] = options.builtinColumns ?? BUILTIN_COLUMNS
     const includeCustomFields = options.includeCustomFields ?? true
-    const customFieldKeys = includeCustomFields
-        ? sharedCustomFieldKeys
-        : ref<string[]>([])
+    const customFieldKeys = includeCustomFields ? sharedCustomFieldKeys : ref<string[]>([])
 
     const showColumnMenu = ref(false)
     const projectKey = ref('')
@@ -167,9 +165,7 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
     }
 
     function allColumnsFor(): ColKey[] {
-        const customs = customFieldKeys.value
-            .filter(isCustomFieldName)
-            .map((k) => `custom:${k}` as ColKey)
+        const customs = customFieldKeys.value.filter(isCustomFieldName).map((k) => `custom:${k}` as ColKey)
         return [...builtinColumns, ...customs]
     }
 
@@ -194,9 +190,7 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
                 .filter(([, v]) => v === true)
                 .map(([k]) => {
                     if (isAllowedKey(k)) return k
-                    return isCustomFieldName(k) && customFieldKeys.value.includes(k)
-                        ? `custom:${k}`
-                        : k
+                    return isCustomFieldName(k) && customFieldKeys.value.includes(k) ? `custom:${k}` : k
                 })
         }
         const seen = new Set<ColKey>()
@@ -299,8 +293,7 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
     function setCustomFieldKeys(keys: string[]) {
         const next = [...new Set(keys.map((k) => k.trim()).filter(isCustomFieldName))]
         const same =
-            next.length === customFieldKeys.value.length &&
-            next.every((k, i) => k === customFieldKeys.value[i])
+            next.length === customFieldKeys.value.length && next.every((k, i) => k === customFieldKeys.value[i])
         if (same) return
         customFieldKeys.value = next
         // Stored selections may have been normalized while the custom field list

@@ -71,11 +71,13 @@ describe('useCompletionPolicy', () => {
 
     describe('policy extraction', () => {
         it('extracts explicit done states, mode, and calendar day from config/show', async () => {
-            showConfig.mockResolvedValue(configFixture({
-                effective_done_states: ['Done', 'Shipped'],
-                done_states_mode: 'explicit',
-                task_calendar_day: '2026-02-03',
-            }))
+            showConfig.mockResolvedValue(
+                configFixture({
+                    effective_done_states: ['Done', 'Shipped'],
+                    done_states_mode: 'explicit',
+                    task_calendar_day: '2026-02-03',
+                }),
+            )
 
             await ensureCompletionPolicy('ACME')
 
@@ -111,7 +113,15 @@ describe('useCompletionPolicy', () => {
             // An unseen project has no policy: task_state fallback, not a
             // borrowed neighbor policy.
             expect(completion.policyFor('GAMA')).toBeNull()
-            expect(completion.isTaskDone(taskFixture({ id: 'GAMA-1', status: 'Done', task_state: { is_done: false, due_bucket: null, calendar_day: '2026-01-05' } }))).toBe(false)
+            expect(
+                completion.isTaskDone(
+                    taskFixture({
+                        id: 'GAMA-1',
+                        status: 'Done',
+                        task_state: { is_done: false, due_bucket: null, calendar_day: '2026-01-05' },
+                    }),
+                ),
+            ).toBe(false)
         })
 
         it('ignores requests without a prefix and dedupes concurrent ensures', async () => {
@@ -119,7 +129,11 @@ describe('useCompletionPolicy', () => {
             expect(showConfig).not.toHaveBeenCalled()
 
             let resolveFetch!: (value: unknown) => void
-            showConfig.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+            showConfig.mockReturnValue(
+                new Promise((resolve) => {
+                    resolveFetch = resolve
+                }),
+            )
             const first = ensureCompletionPolicy('ACME')
             const second = ensureCompletionPolicy('ACME')
             resolveFetch(configFixture())
@@ -155,12 +169,26 @@ describe('useCompletionPolicy', () => {
             expect(completion.isTaskDone(closed)).toBe(true)
 
             // Matching status/flag still agree.
-            expect(completion.isTaskDone(taskFixture({ status: 'Done', task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' } }))).toBe(true)
+            expect(
+                completion.isTaskDone(
+                    taskFixture({
+                        status: 'Done',
+                        task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
+                    }),
+                ),
+            ).toBe(true)
         })
 
         it('falls back to task_state.is_done while the policy is loading', () => {
             const completion = useCompletionPolicy()
-            expect(completion.isTaskDone(taskFixture({ status: 'Shipped', task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' } }))).toBe(true)
+            expect(
+                completion.isTaskDone(
+                    taskFixture({
+                        status: 'Shipped',
+                        task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
+                    }),
+                ),
+            ).toBe(true)
             expect(completion.isTaskDone(taskFixture({ status: 'Done' }))).toBe(false)
         })
 
@@ -179,8 +207,22 @@ describe('useCompletionPolicy', () => {
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
 
-            expect(completion.dueBucketFor(taskFixture({ due_date: '2026-01-01', task_state: { is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-05' } }))).toBe('overdue')
-            expect(completion.dueBucketFor(taskFixture({ due_date: '2026-01-09', task_state: { is_done: false, due_bucket: 'soon', calendar_day: '2026-01-05' } }))).toBe('soon')
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        due_date: '2026-01-01',
+                        task_state: { is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-05' },
+                    }),
+                ),
+            ).toBe('overdue')
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        due_date: '2026-01-09',
+                        task_state: { is_done: false, due_bucket: 'soon', calendar_day: '2026-01-05' },
+                    }),
+                ),
+            ).toBe('soon')
         })
 
         it('never reports overdue for a task done now, even with a stale overdue bucket', async () => {
@@ -202,11 +244,15 @@ describe('useCompletionPolicy', () => {
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
 
-            expect(completion.dueBucketFor(taskFixture({
-                status: 'Done',
-                due_date: '2026-01-05',
-                task_state: { is_done: true, due_bucket: 'today', calendar_day: '2026-01-05' },
-            }))).toBe('today')
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        status: 'Done',
+                        due_date: '2026-01-05',
+                        task_state: { is_done: true, due_bucket: 'today', calendar_day: '2026-01-05' },
+                    }),
+                ),
+            ).toBe('today')
         })
 
         it('derives locally after an optimistic reopen (stale done metadata)', async () => {
@@ -225,7 +271,11 @@ describe('useCompletionPolicy', () => {
 
         it('uses server buckets without a policy and local buckets without either', () => {
             const completion = useCompletionPolicy()
-            expect(completion.dueBucketFor(taskFixture({ task_state: { is_done: false, due_bucket: 'later', calendar_day: '2026-01-05' } }))).toBe('later')
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({ task_state: { is_done: false, due_bucket: 'later', calendar_day: '2026-01-05' } }),
+                ),
+            ).toBe('later')
             expect(completion.dueBucketFor(taskFixture({ due_date: '2026-01-05' }))).toBe('today')
             expect(completion.dueBucketFor(taskFixture({ due_date: '2025-12-31' }))).toBe('overdue')
             expect(completion.dueBucketFor(taskFixture({ due_date: '2026-01-06' }))).toBe('soon')
@@ -261,24 +311,34 @@ describe('useCompletionPolicy', () => {
             const completion = useCompletionPolicy()
 
             // Server day rolls over after local midnight refresh.
-            showConfig.mockResolvedValue(configFixture({
-                task_calendar_day: '2026-01-06',
-                effective_done_states: ['Done'],
-            }))
+            showConfig.mockResolvedValue(
+                configFixture({
+                    task_calendar_day: '2026-01-06',
+                    effective_done_states: ['Done'],
+                }),
+            )
             await refreshCompletionPolicies()
 
             expect(completion.serverCalendarDay.value).toBe('2026-01-06')
             // A task due "yesterday" now flips to overdue through the fresh
             // server bucket instead of a frozen date.
-            expect(completion.dueBucketFor(taskFixture({
-                due_date: '2026-01-05',
-                task_state: { is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-06' },
-            }))).toBe('overdue')
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        due_date: '2026-01-05',
+                        task_state: { is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-06' },
+                    }),
+                ),
+            ).toBe('overdue')
         })
 
         it('re-evaluates computeds when a late policy lands (no stale default render)', async () => {
             let resolveFetch!: (value: unknown) => void
-            showConfig.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+            showConfig.mockReturnValue(
+                new Promise((resolve) => {
+                    resolveFetch = resolve
+                }),
+            )
 
             const completion = useCompletionPolicy()
             const isDone = computed(() => completion.isTaskDone(taskFixture({ id: 'ACME-9', status: 'Done' })))
@@ -310,7 +370,12 @@ describe('useCompletionPolicy', () => {
 
             // A forced refresh with a slow OLD response in flight...
             let resolveOld!: (value: unknown) => void
-            showConfig.mockImplementation(() => new Promise((resolve) => { resolveOld = resolve }))
+            showConfig.mockImplementation(
+                () =>
+                    new Promise((resolve) => {
+                        resolveOld = resolve
+                    }),
+            )
             const slowOld = refreshCompletionPolicy('ACME')
 
             // ...superseded by an immediate forced refresh carrying the NEW
@@ -327,7 +392,8 @@ describe('useCompletionPolicy', () => {
 
         it('scope-aware refresh after a same-tab save touches only affected prefixes', async () => {
             showConfig.mockImplementation((project?: string) =>
-                configFixture({ effective_done_states: project === 'BETA' ? ['Closed'] : ['Done'] }))
+                configFixture({ effective_done_states: project === 'BETA' ? ['Closed'] : ['Done'] }),
+            )
             await ensureCompletionPolicies([taskFixture({ id: 'ACME-1' }), taskFixture({ id: 'BETA-2' })])
             expect(showConfig).toHaveBeenCalledTimes(2)
 
@@ -337,7 +403,11 @@ describe('useCompletionPolicy', () => {
 
             // Project save: only that prefix refetches.
             showConfig.mockImplementation((project?: string) =>
-                configFixture({ effective_done_states: project === 'ACME' ? ['Shipped'] : project === 'BETA' ? ['Closed'] : ['Done'] }))
+                configFixture({
+                    effective_done_states:
+                        project === 'ACME' ? ['Shipped'] : project === 'BETA' ? ['Closed'] : ['Done'],
+                }),
+            )
             await refreshCompletionPoliciesForScope('ACME')
             expect(showConfig).toHaveBeenCalledTimes(3)
             expect(completion.policyFor('ACME')!.doneLabels).toEqual(['Shipped'])
@@ -376,7 +446,9 @@ describe('useCompletionPolicy', () => {
         }
 
         it('does not trust a stale authoritative bucket once the server day moved (server basis, not browser clock)', async () => {
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+            )
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
             const entity = staleEntity()
@@ -386,7 +458,9 @@ describe('useCompletionPolicy', () => {
 
             // Server day advances while the BROWSER day stays 2026-01-05
             // (cross-TZ): refresh the policy, entity untouched.
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }),
+            )
             await refreshCompletionPolicies()
             expect(completion.serverCalendarDay.value).toBe('2026-01-06')
 
@@ -399,11 +473,15 @@ describe('useCompletionPolicy', () => {
         })
 
         it('returns neutral null for a known-stale timestamp snapshot until entities refetch', async () => {
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+            )
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
 
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }),
+            )
             await refreshCompletionPolicies()
 
             const entity = staleEntity({ due_date: '2026-01-05T23:30:00Z' })
@@ -415,11 +493,15 @@ describe('useCompletionPolicy', () => {
         })
 
         it('terminal tasks stay non-overdue after the server day moves', async () => {
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+            )
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
 
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }),
+            )
             await refreshCompletionPolicies()
 
             const doneEntity = taskFixture({
@@ -436,7 +518,10 @@ describe('useCompletionPolicy', () => {
             showConfig.mockImplementation((project?: string) =>
                 project === undefined
                     ? Promise.resolve({ task_calendar_day: '2026-01-05' })
-                    : Promise.resolve(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] })))
+                    : Promise.resolve(
+                          configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+                      ),
+            )
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
             invalidator.mockClear()
@@ -445,7 +530,10 @@ describe('useCompletionPolicy', () => {
             showConfig.mockImplementation((project?: string) =>
                 project === undefined
                     ? Promise.resolve({ task_calendar_day: '2026-01-06' })
-                    : Promise.resolve(configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] })))
+                    : Promise.resolve(
+                          configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }),
+                      ),
+            )
 
             await probeServerCalendarDay()
 
@@ -469,7 +557,10 @@ describe('useCompletionPolicy', () => {
             showConfig.mockImplementation((project?: string) =>
                 project === undefined
                     ? Promise.resolve({ task_calendar_day: '2026-01-05' })
-                    : Promise.resolve(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] })))
+                    : Promise.resolve(
+                          configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+                      ),
+            )
             await ensureCompletionPolicy('ACME')
             const acmeFetches = showConfig.mock.calls.filter(([project]) => project === 'ACME').length
             invalidator.mockClear()
@@ -484,13 +575,17 @@ describe('useCompletionPolicy', () => {
             showConfig.mockImplementation((project?: string) =>
                 project === undefined
                     ? Promise.resolve({ task_calendar_day: '2026-01-05' })
-                    : Promise.resolve(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] })))
+                    : Promise.resolve(
+                          configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+                      ),
+            )
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
             invalidator.mockClear()
 
             showConfig.mockImplementation((project?: string) =>
-                project === undefined ? Promise.reject(new Error('probe failed')) : Promise.resolve(configFixture()))
+                project === undefined ? Promise.reject(new Error('probe failed')) : Promise.resolve(configFixture()),
+            )
             await expect(probeServerCalendarDay()).resolves.toBeUndefined()
 
             expect(completion.serverCalendarDay.value).toBe('2026-01-05')
@@ -502,7 +597,10 @@ describe('useCompletionPolicy', () => {
             showConfig.mockImplementation((project?: string) =>
                 project === undefined
                     ? Promise.resolve({ task_calendar_day: '2026-01-05' })
-                    : Promise.resolve(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] })))
+                    : Promise.resolve(
+                          configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+                      ),
+            )
             await ensureCompletionPolicy('ACME')
             expect(showConfig.mock.calls.filter(([project]) => project === undefined)).toHaveLength(0)
 
@@ -534,10 +632,19 @@ describe('useCompletionPolicy', () => {
                 ['Shipped-Now', 'Shipped Now'],
                 ['Ärger', 'ärger'],
             ] as const) {
-                expect(completion.isTaskDone(taskFixture({
-                    status,
-                    task_state: { done_states: [doneState], is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-05' },
-                }))).toBe(false)
+                expect(
+                    completion.isTaskDone(
+                        taskFixture({
+                            status,
+                            task_state: {
+                                done_states: [doneState],
+                                is_done: false,
+                                due_bucket: 'overdue',
+                                calendar_day: '2026-01-05',
+                            },
+                        }),
+                    ),
+                ).toBe(false)
             }
         })
 
@@ -545,10 +652,20 @@ describe('useCompletionPolicy', () => {
             showConfig.mockResolvedValue(configFixture({ effective_done_states: ['Done'] }))
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
-            expect(completion.isTaskDone(taskFixture({
-                id: 'ACME-1', status: 'Done',
-                task_state: { done_states: [], is_done: false, due_bucket: 'overdue', calendar_day: '2026-01-05' },
-            }))).toBe(false)
+            expect(
+                completion.isTaskDone(
+                    taskFixture({
+                        id: 'ACME-1',
+                        status: 'Done',
+                        task_state: {
+                            done_states: [],
+                            is_done: false,
+                            due_bucket: 'overdue',
+                            calendar_day: '2026-01-05',
+                        },
+                    }),
+                ),
+            ).toBe(false)
         })
 
         it('reclassifies optimistic date-only reopens against the server day, not the browser day', async () => {
@@ -556,7 +673,9 @@ describe('useCompletionPolicy', () => {
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
             const reopened = taskFixture({
-                id: 'ACME-1', status: 'Todo', due_date: '2026-01-04',
+                id: 'ACME-1',
+                status: 'Todo',
+                due_date: '2026-01-04',
                 task_state: { done_states: ['Done'], is_done: true, due_bucket: 'today', calendar_day: '2026-01-04' },
             })
             expect(completion.dueBucketFor(reopened)).toBe('today')
@@ -567,7 +686,9 @@ describe('useCompletionPolicy', () => {
             // showConfig('ACME') resolves a CONFLICTING policy for one of
             // the two homonymous-root tasks — it must lose to both embedded
             // sets.
-            showConfig.mockResolvedValue(configFixture({ effective_done_states: ['Done'], task_calendar_day: '2026-01-05' }))
+            showConfig.mockResolvedValue(
+                configFixture({ effective_done_states: ['Done'], task_calendar_day: '2026-01-05' }),
+            )
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
 
@@ -590,11 +711,20 @@ describe('useCompletionPolicy', () => {
             // ...and the embedded set wins in the other direction too: a
             // Shipped status under the [Done]-embedded task is NOT done even
             // though the cached policy happens to also exclude it.
-            expect(completion.isTaskDone(taskFixture({
-                id: 'ACME-2',
-                status: 'Shipped',
-                task_state: { done_states: ['Done'], is_done: false, due_bucket: null, calendar_day: '2026-01-05' },
-            }))).toBe(false)
+            expect(
+                completion.isTaskDone(
+                    taskFixture({
+                        id: 'ACME-2',
+                        status: 'Shipped',
+                        task_state: {
+                            done_states: ['Done'],
+                            is_done: false,
+                            due_bucket: null,
+                            calendar_day: '2026-01-05',
+                        },
+                    }),
+                ),
+            ).toBe(false)
             // Cached prefix policy still classifies a legacy fixture without
             // metadata (guarded fallback path preserved).
             expect(completion.isTaskDone(taskFixture({ id: 'ACME-3', status: 'Done' }))).toBe(true)
@@ -630,45 +760,87 @@ describe('useCompletionPolicy', () => {
 
         it('embedded done-due-today stays today; terminal past-due embeds stay null (fresh snapshot)', () => {
             const completion = useCompletionPolicy()
-            expect(completion.dueBucketFor(taskFixture({
-                id: 'ACME-4',
-                status: 'Done',
-                due_date: '2026-01-05',
-                task_state: { done_states: ['Done'], is_done: true, due_bucket: 'today', calendar_day: '2026-01-05' },
-            }))).toBe('today')
-            expect(completion.dueBucketFor(taskFixture({
-                id: 'ACME-5',
-                status: 'Shipped',
-                due_date: '2025-12-01',
-                task_state: { done_states: ['Shipped'], is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
-            }))).toBeNull()
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        id: 'ACME-4',
+                        status: 'Done',
+                        due_date: '2026-01-05',
+                        task_state: {
+                            done_states: ['Done'],
+                            is_done: true,
+                            due_bucket: 'today',
+                            calendar_day: '2026-01-05',
+                        },
+                    }),
+                ),
+            ).toBe('today')
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        id: 'ACME-5',
+                        status: 'Shipped',
+                        due_date: '2025-12-01',
+                        task_state: {
+                            done_states: ['Shipped'],
+                            is_done: true,
+                            due_bucket: null,
+                            calendar_day: '2026-01-05',
+                        },
+                    }),
+                ),
+            ).toBeNull()
         })
 
         it('embedded set drives a stale snapshot re-derivation against the server day', async () => {
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-05', effective_done_states: ['Done'] }),
+            )
             await ensureCompletionPolicy('ACME')
             const completion = useCompletionPolicy()
-            showConfig.mockResolvedValue(configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }))
+            showConfig.mockResolvedValue(
+                configFixture({ task_calendar_day: '2026-01-06', effective_done_states: ['Done'] }),
+            )
             await refreshCompletionPolicies()
 
             // Open task, date-only due, stale snapshot: server-day derivation.
-            expect(completion.dueBucketFor(taskFixture({
-                id: 'ACME-6',
-                status: 'Todo',
-                due_date: '2026-01-05',
-                task_state: { done_states: ['Shipped'], is_done: false, due_bucket: 'today', calendar_day: '2026-01-05' },
-            }))).toBe('overdue')
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        id: 'ACME-6',
+                        status: 'Todo',
+                        due_date: '2026-01-05',
+                        task_state: {
+                            done_states: ['Shipped'],
+                            is_done: false,
+                            due_bucket: 'today',
+                            calendar_day: '2026-01-05',
+                        },
+                    }),
+                ),
+            ).toBe('overdue')
             // Done-now under the embedded set: overdue derivation maps to null.
-            expect(completion.dueBucketFor(taskFixture({
-                id: 'ACME-7',
-                status: 'Shipped',
-                due_date: '2026-01-05',
-                task_state: { done_states: ['Shipped'], is_done: false, due_bucket: 'today', calendar_day: '2026-01-05' },
-            }))).toBeNull()
+            expect(
+                completion.dueBucketFor(
+                    taskFixture({
+                        id: 'ACME-7',
+                        status: 'Shipped',
+                        due_date: '2026-01-05',
+                        task_state: {
+                            done_states: ['Shipped'],
+                            is_done: false,
+                            due_bucket: 'today',
+                            calendar_day: '2026-01-05',
+                        },
+                    }),
+                ),
+            ).toBeNull()
         })
 
         it('policy-bearing config changes invalidate retained queries so embedded sets refetch', async () => {
-            showConfig.mockResolvedValue(configFixture({ effective_done_states: ['Done'], task_calendar_day: '2026-01-05' }))
+            showConfig.mockResolvedValue(
+                configFixture({ effective_done_states: ['Done'], task_calendar_day: '2026-01-05' }),
+            )
             await ensureCompletionPolicy('ACME')
             invalidator.mockClear()
 
@@ -697,7 +869,12 @@ describe('useCompletionPolicy', () => {
 
         it('taskIsDone without policy trusts only task_state', () => {
             expect(taskIsDone(null, { status: 'Done' })).toBe(false)
-            expect(taskIsDone(null, { status: 'Anything', task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' } })).toBe(true)
+            expect(
+                taskIsDone(null, {
+                    status: 'Anything',
+                    task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
+                }),
+            ).toBe(true)
         })
 
         it('resolveDueBucket without policy or state derives locally and overdue stays possible', () => {

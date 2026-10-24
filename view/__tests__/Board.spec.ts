@@ -7,8 +7,11 @@ let routeState: { query: Record<string, any> } = { query: { project: 'ACME' } }
 const routerPushMock = vi.fn()
 
 const projectsStore = {
-    projects: ref([{ prefix: 'ACME', name: 'Acme Co' }, { prefix: 'BETA', name: 'Beta Co' }]),
-    refresh: vi.fn(async () => { }),
+    projects: ref([
+        { prefix: 'ACME', name: 'Acme Co' },
+        { prefix: 'BETA', name: 'Beta Co' },
+    ]),
+    refresh: vi.fn(async () => {}),
 }
 
 const taskMap = shallowRef(new Map<string, TaskDTO>())
@@ -36,7 +39,10 @@ function createBoardHandle(
             // its member rows, mirroring the server-scoped query contract.
             return memberIds ? all.filter((t) => memberIds.has(t.id)) : all
         }),
-        refresh: vi.fn(async () => { status.value = 'ready'; hasSnapshot.value = true }),
+        refresh: vi.fn(async () => {
+            status.value = 'ready'
+            hasSnapshot.value = true
+        }),
         retain: vi.fn(),
         release: vi.fn(),
     }
@@ -66,7 +72,10 @@ const boardQueryHandle = boardHandleFor({ project: 'ACME' })
 const tasksStore = {
     _map: taskMap,
     version: taskVersion,
-    items: computed(() => { void taskVersion.value; return Array.from(taskMap.value.values()) }),
+    items: computed(() => {
+        void taskVersion.value
+        return Array.from(taskMap.value.values())
+    }),
     count: computed(() => taskMap.value.size),
     serverTotal: shallowRef(0),
     status: shallowRef('ready' as const),
@@ -81,8 +90,14 @@ const tasksStore = {
     add: vi.fn(async (p: any) => p),
     update: vi.fn(async (_id: string, p: any) => p),
     remove: vi.fn(async () => {}),
-    upsert: vi.fn((task: TaskDTO) => { taskMap.value.set(task.id, task); taskVersion.value++; }),
-    evict: vi.fn((id: string) => { taskMap.value.delete(id); taskVersion.value++; }),
+    upsert: vi.fn((task: TaskDTO) => {
+        taskMap.value.set(task.id, task)
+        taskVersion.value++
+    }),
+    evict: vi.fn((id: string) => {
+        taskMap.value.delete(id)
+        taskVersion.value++
+    }),
     connectSse: vi.fn(),
     disconnectSse: vi.fn(),
     sseConnected: shallowRef(false),
@@ -90,7 +105,7 @@ const tasksStore = {
 
 const sprintsStore = {
     sprints: ref<SprintListItem[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     loading: ref(false),
 }
 
@@ -99,7 +114,7 @@ const configStore = {
     priorities: ref<string[]>(['low', 'med', 'high']),
     types: ref<string[]>(['task']),
     customFields: ref<string[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     loading: ref(false),
 }
 
@@ -111,7 +126,7 @@ vi.mock('vue-router', () => ({
 }))
 
 const showConfigMock = vi.fn(async (_project?: string) => ({}))
-const setStatusMock = vi.fn(async (_id: string, _status: string) => { })
+const setStatusMock = vi.fn(async (_id: string, _status: string) => {})
 
 vi.mock('../api/client', () => ({
     api: {
@@ -128,7 +143,8 @@ vi.mock('../components/UiButton.vue', () => ({
     default: {
         props: ['variant', 'iconOnly', 'disabled', 'type', 'ariaLabel', 'title'],
         emits: ['click'],
-        template: '<button type="button" class="btn" :aria-label="ariaLabel" :title="title" :disabled="disabled" @click="$emit(\'click\', $event)"><slot /></button>',
+        template:
+            '<button type="button" class="btn" :aria-label="ariaLabel" :title="title" :disabled="disabled" @click="$emit(\'click\', $event)"><slot /></button>',
     },
 }))
 
@@ -166,10 +182,21 @@ vi.mock('../components/SmartListChips.vue', () => ({
 vi.mock('../components/FilterBar.vue', () => ({
     default: {
         name: 'FilterBar',
-        props: ['statuses', 'priorities', 'types', 'value', 'showStatus', 'emitProjectKey', 'storageKey', 'customPresets', 'enableDueSoon', 'enableRecent'],
+        props: [
+            'statuses',
+            'priorities',
+            'types',
+            'value',
+            'showStatus',
+            'emitProjectKey',
+            'storageKey',
+            'customPresets',
+            'enableDueSoon',
+            'enableRecent',
+        ],
         emits: ['update:value'],
         setup(_props: any, { expose, slots }: { expose: (api: any) => void; slots: any }) {
-            expose({ appendCustomFilter: () => { }, clear: () => { } })
+            expose({ appendCustomFilter: () => {}, clear: () => {} })
             return () => h('div', { class: 'filter-bar' }, slots.actions?.())
         },
     },
@@ -189,12 +216,17 @@ vi.mock('../composables/useSprints', () => ({
         refresh: sprintsStore.refresh,
         loading: sprintsStore.loading,
     }),
-    useSprintFilterOptions: (sprints: any) => computed(() => (sprints?.value || []).map((s: any) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` }))),
+    useSprintFilterOptions: (sprints: any) =>
+        computed(() =>
+            (sprints?.value || []).map((s: any) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
+        ),
 }))
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         statuses: configStore.statuses,
         priorities: configStore.priorities,
         types: configStore.types,
@@ -272,46 +304,53 @@ describe('Board field visibility', () => {
         vi.useRealTimers()
     })
 
-    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])('hydrates real FilterBar results with route precedence: %j', async query => {
-        const previousRoute = routeState
-        routeState = reactive({ query })
-        routerPushMock.mockImplementation(({ query: nextQuery }) => { routeState.query = nextQuery })
-        localStorage.setItem('lotar.boards.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
-        const { default: RealFilterBar } = await vi.importActual<typeof import('../components/FilterBar.vue')>('../components/FilterBar.vue')
-        const wrapper = mount(Board, { global: { stubs: { FilterBar: RealFilterBar } } })
-        try {
-            await flushPromises()
-            await vi.advanceTimersByTimeAsync(400)
-            await flushPromises()
-            const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
-            const bar = wrapper.getComponent(RealFilterBar)
-            expect((bar.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
-            expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
-            expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
-            const initialEmissions = (bar.emitted('update:value') || []).length
-            expect(initialEmissions).toBeLessThanOrEqual(1)
-            // Board intentionally requires a project before fetching results.
-            // Selecting one must use the hydrated filters, not just their draft.
-            if (!(wrapper.vm as any).project) {
-                await bar.get('[data-testid="filter-toggle"]').trigger('click')
-                await bar.get('[data-testid="filter-project"]').setValue('ACME')
+    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])(
+        'hydrates real FilterBar results with route precedence: %j',
+        async (query) => {
+            const previousRoute = routeState
+            routeState = reactive({ query })
+            routerPushMock.mockImplementation(({ query: nextQuery }) => {
+                routeState.query = nextQuery
+            })
+            localStorage.setItem('lotar.boards.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
+            const { default: RealFilterBar } =
+                await vi.importActual<typeof import('../components/FilterBar.vue')>('../components/FilterBar.vue')
+            const wrapper = mount(Board, { global: { stubs: { FilterBar: RealFilterBar } } })
+            try {
+                await flushPromises()
                 await vi.advanceTimersByTimeAsync(400)
                 await flushPromises()
+                const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
+                const bar = wrapper.getComponent(RealFilterBar)
+                expect((bar.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
+                expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
+                expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
+                const initialEmissions = (bar.emitted('update:value') || []).length
+                expect(initialEmissions).toBeLessThanOrEqual(1)
+                // Board intentionally requires a project before fetching results.
+                // Selecting one must use the hydrated filters, not just their draft.
+                if (!(wrapper.vm as any).project) {
+                    await bar.get('[data-testid="filter-toggle"]').trigger('click')
+                    await bar.get('[data-testid="filter-project"]').setValue('ACME')
+                    await vi.advanceTimersByTimeAsync(400)
+                    await flushPromises()
+                }
+                expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject(expectedQuery ? { q: expectedQuery } : {})
+                if (!Object.keys(query).length)
+                    expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
+                else expect(tasksStore.getQuery.mock.lastCall?.[0]?.type).toBeUndefined()
+                const emissions = (bar.emitted('update:value') || []).length
+                await vi.advanceTimersByTimeAsync(400)
+                await flushPromises()
+                expect((bar.emitted('update:value') || []).length).toBe(emissions)
+                expect(emissions).toBeLessThanOrEqual(initialEmissions + 1)
+            } finally {
+                wrapper.unmount()
+                routeState = previousRoute
+                routerPushMock.mockReset()
             }
-            expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject(expectedQuery ? { q: expectedQuery } : {})
-            if (!Object.keys(query).length) expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
-            else expect(tasksStore.getQuery.mock.lastCall?.[0]?.type).toBeUndefined()
-            const emissions = (bar.emitted('update:value') || []).length
-            await vi.advanceTimersByTimeAsync(400)
-            await flushPromises()
-            expect((bar.emitted('update:value') || []).length).toBe(emissions)
-            expect(emissions).toBeLessThanOrEqual(initialEmissions + 1)
-        } finally {
-            wrapper.unmount()
-            routeState = previousRoute
-            routerPushMock.mockReset()
-        }
-    })
+        },
+    )
 
     it('ignores task-panel query hops without refreshing or resetting collapsed groups', async () => {
         const previousRoute = routeState
@@ -336,7 +375,10 @@ describe('Board field visibility', () => {
             routeState.query = { project: 'BETA' }
             await flushPromises()
             expect(configStore.refresh).toHaveBeenLastCalledWith('BETA')
-        } finally { wrapper.unmount(); routeState = previousRoute }
+        } finally {
+            wrapper.unmount()
+            routeState = previousRoute
+        }
     })
 
     it('offers an accessible project chooser instead of selecting the first project', async () => {
@@ -348,8 +390,10 @@ describe('Board field visibility', () => {
         expect(selector.exists()).toBe(true)
         expect(wrapper.find('label[for="board-project-select"]').text()).toBe('Project')
         expect(selector.element.value).toBe('')
-        expect(selector.findAll('option').map(option => option.text())).toEqual([
-            'Choose a project', 'Acme Co (ACME)', 'Beta Co (BETA)',
+        expect(selector.findAll('option').map((option) => option.text())).toEqual([
+            'Choose a project',
+            'Acme Co (ACME)',
+            'Beta Co (BETA)',
         ])
         expect(tasksStore.getQuery).not.toHaveBeenCalled()
         expect(routerPushMock).not.toHaveBeenCalled()
@@ -392,7 +436,7 @@ describe('Board field visibility', () => {
 
     it('opens the create panel with the column status prefilled when the header add button is clicked', async () => {
         const tasks = [baseTask({ id: 'ACME-1', title: 'Alpha' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -403,10 +447,12 @@ describe('Board field visibility', () => {
 
         await addBtn.trigger('click')
 
-        expect(openTaskPanelMock).toHaveBeenCalledWith(expect.objectContaining({
-            taskId: 'new',
-            initialStatus: 'Todo',
-        }))
+        expect(openTaskPanelMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                taskId: 'new',
+                initialStatus: 'Todo',
+            }),
+        )
     })
 
     it('hides card fields per-project and persists to localStorage', async () => {
@@ -414,7 +460,7 @@ describe('Board field visibility', () => {
             baseTask({ id: 'ACME-1', title: 'Alpha' }),
             baseTask({ id: 'BETA-2', title: 'Beta', assignee: 'bob', status: 'Doing' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -429,9 +475,7 @@ describe('Board field visibility', () => {
         expect(firstCard.text()).toContain('one')
 
         // Open the popover so the field checkboxes are in the DOM.
-        const fieldsButton = wrapper
-            .findAll('button')
-            .find((b) => b.text().trim() === 'Fields')
+        const fieldsButton = wrapper.findAll('button').find((b) => b.text().trim() === 'Fields')
         if (fieldsButton) await fieldsButton.trigger('click')
         await flushPromises()
 
@@ -484,7 +528,7 @@ describe('Board field visibility', () => {
             baseTask({ id: 'ACME-1', title: 'Alpha', custom_fields: { sprint: 'Sprint-42' } }),
             baseTask({ id: 'ACME-2', title: 'Beta', custom_fields: {} }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -493,16 +537,12 @@ describe('Board field visibility', () => {
         const cards = wrapper.findAll('article.card.task')
         expect(cards[0]!.text()).not.toContain('Sprint-42')
 
-        const fieldsButton = wrapper
-            .findAll('button')
-            .find((b) => b.text().trim() === 'Fields')
+        const fieldsButton = wrapper.findAll('button').find((b) => b.text().trim() === 'Fields')
         if (fieldsButton) await fieldsButton.trigger('click')
         await flushPromises()
 
         const labels = wrapper.findAll('label.column-option')
-        const sprintCheck = labels
-            .find((l) => l.text().trim() === 'sprint')
-            ?.find('input[type="checkbox"]')
+        const sprintCheck = labels.find((l) => l.text().trim() === 'sprint')?.find('input[type="checkbox"]')
         expect(sprintCheck).toBeTruthy()
         await sprintCheck!.setValue(true)
         await flushPromises()
@@ -530,7 +570,9 @@ describe('Board group-by swimlanes', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('shows swimlane headers when grouped by assignee', async () => {
         const tasks = [
@@ -538,7 +580,7 @@ describe('Board group-by swimlanes', () => {
             baseTask({ id: 'ACME-2', assignee: 'bob', status: 'Todo' }),
             baseTask({ id: 'ACME-3', assignee: null, status: 'Todo' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -554,9 +596,9 @@ describe('Board group-by swimlanes', () => {
 
         const headers = wrapper.findAll('.swimlane-header')
         expect(headers.length).toBeGreaterThanOrEqual(2) // alice, bob, (none)
-        const headerTexts = headers.map(h => h.text())
-        expect(headerTexts.some(t => t.includes('alice'))).toBe(true)
-        expect(headerTexts.some(t => t.includes('bob'))).toBe(true)
+        const headerTexts = headers.map((h) => h.text())
+        expect(headerTexts.some((t) => t.includes('alice'))).toBe(true)
+        expect(headerTexts.some((t) => t.includes('bob'))).toBe(true)
     })
 
     it('shows swimlane headers when grouped by priority', async () => {
@@ -564,7 +606,7 @@ describe('Board group-by swimlanes', () => {
             baseTask({ id: 'ACME-1', priority: 'Critical', status: 'Todo' }),
             baseTask({ id: 'ACME-2', priority: 'Low', status: 'Todo' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -576,9 +618,9 @@ describe('Board group-by swimlanes', () => {
 
         const headers = wrapper.findAll('.swimlane-header')
         expect(headers.length).toBeGreaterThanOrEqual(2)
-        const headerTexts = headers.map(h => h.text())
-        expect(headerTexts.some(t => t.includes('Critical'))).toBe(true)
-        expect(headerTexts.some(t => t.includes('Low'))).toBe(true)
+        const headerTexts = headers.map((h) => h.text())
+        expect(headerTexts.some((t) => t.includes('Critical'))).toBe(true)
+        expect(headerTexts.some((t) => t.includes('Low'))).toBe(true)
     })
 })
 
@@ -596,11 +638,13 @@ describe('Board member badges', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('renders member badges with initials for assignee', async () => {
         const tasks = [baseTask({ id: 'ACME-1', assignee: 'alice', status: 'Todo' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -626,15 +670,24 @@ describe('Board progressive disclosure', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('shows "show more" button when column exceeds page size', async () => {
         // Create 35 tasks in Todo (default page size is 30)
         const tasks: TaskDTO[] = []
         for (let i = 1; i <= 35; i++) {
-            tasks.push(baseTask({ id: `ACME-${i}`, title: `Task ${i}`, status: 'Todo', modified: `2026-01-02T${String(i).padStart(2, '0')}:00:00Z` }))
+            tasks.push(
+                baseTask({
+                    id: `ACME-${i}`,
+                    title: `Task ${i}`,
+                    status: 'Todo',
+                    modified: `2026-01-02T${String(i).padStart(2, '0')}:00:00Z`,
+                }),
+            )
         }
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -660,7 +713,7 @@ describe('Board progressive disclosure', () => {
 
     it('hides "show more" when all cards fit within page size', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -684,7 +737,9 @@ describe('Board group-by type', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('shows swimlane headers when grouped by type', async () => {
         const tasks = [
@@ -692,7 +747,7 @@ describe('Board group-by type', () => {
             baseTask({ id: 'ACME-2', task_type: 'feature', status: 'Todo' }),
             baseTask({ id: 'ACME-3', task_type: 'bug', status: 'Doing' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -704,9 +759,9 @@ describe('Board group-by type', () => {
 
         const headers = wrapper.findAll('.swimlane-header')
         expect(headers.length).toBeGreaterThanOrEqual(2)
-        const headerTexts = headers.map(h => h.text())
-        expect(headerTexts.some(t => t.includes('bug'))).toBe(true)
-        expect(headerTexts.some(t => t.includes('feature'))).toBe(true)
+        const headerTexts = headers.map((h) => h.text())
+        expect(headerTexts.some((t) => t.includes('bug'))).toBe(true)
+        expect(headerTexts.some((t) => t.includes('feature'))).toBe(true)
     })
 })
 
@@ -724,14 +779,16 @@ describe('Board collapsible groups', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('collapses and expands groups when clicking the swimlane header', async () => {
         const tasks = [
             baseTask({ id: 'ACME-1', assignee: 'alice', status: 'Todo' }),
             baseTask({ id: 'ACME-2', assignee: 'bob', status: 'Todo' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -779,14 +836,13 @@ describe('Board ticket highlight', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('highlights a card on single click and deselects on second click', async () => {
-        const tasks = [
-            baseTask({ id: 'ACME-1', status: 'Todo' }),
-            baseTask({ id: 'ACME-2', status: 'Todo' }),
-        ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' }), baseTask({ id: 'ACME-2', status: 'Todo' })]
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -827,7 +883,9 @@ describe('Board aligned swimlanes', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('aligns groups across columns with shared swimlane headers', async () => {
         const tasks = [
@@ -835,7 +893,7 @@ describe('Board aligned swimlanes', () => {
             baseTask({ id: 'ACME-2', assignee: 'bob', status: 'Todo' }),
             baseTask({ id: 'ACME-3', assignee: 'alice', status: 'Doing' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -873,11 +931,13 @@ describe('Board grouping persistence', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('persists groupBy to localStorage when changed', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -896,7 +956,7 @@ describe('Board grouping persistence', () => {
             baseTask({ id: 'ACME-1', assignee: 'alice', status: 'Todo' }),
             baseTask({ id: 'ACME-2', assignee: 'bob', status: 'Todo' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -909,7 +969,7 @@ describe('Board grouping persistence', () => {
 
     it('resets groupBy when clear-filters button is clicked', async () => {
         const tasks = [baseTask({ id: 'ACME-1', assignee: 'alice', status: 'Todo' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -952,11 +1012,13 @@ describe('Board overdue suppression for done tasks', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('shows overdue for tasks not in the last status', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'Todo', due_date: '2025-12-01' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -968,7 +1030,7 @@ describe('Board overdue suppression for done tasks', () => {
 
     it('does not show overdue for tasks in the last configured status', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'Done', due_date: '2025-12-01' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -982,25 +1044,27 @@ describe('Board overdue suppression for done tasks', () => {
     it('suppresses overdue for a custom terminal status in the middle of the list', async () => {
         // Explicit policy: Done + Closed are terminal (Closed sits mid-list).
         configStore.statuses.value = ['Todo', 'Closed', 'Doing', 'Done']
-        showConfigMock.mockImplementation(async () => policyConfig({
-            issue_states: ['Todo', 'Closed', 'Doing', 'Done'],
-            effective_done_states: ['Done', 'Closed'],
-            done_states_mode: 'explicit',
-        }))
+        showConfigMock.mockImplementation(async () =>
+            policyConfig({
+                issue_states: ['Todo', 'Closed', 'Doing', 'Done'],
+                effective_done_states: ['Done', 'Closed'],
+                done_states_mode: 'explicit',
+            }),
+        )
 
         const tasks = [
             baseTask({ id: 'ACME-1', status: 'Closed', due_date: '2025-12-01' }),
             baseTask({ id: 'ACME-2', status: 'Doing', due_date: '2025-12-01' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
         await flushPromises()
 
         const cards = wrapper.findAll('article.card.task')
-        const closed = cards.find(c => c.text().includes('ACME-1'))!
-        const doing = cards.find(c => c.text().includes('ACME-2'))!
+        const closed = cards.find((c) => c.text().includes('ACME-1'))!
+        const doing = cards.find((c) => c.text().includes('ACME-2'))!
         expect(closed.text()).not.toContain('Overdue')
         expect(doing.text()).toContain('Overdue')
         wrapper.unmount()
@@ -1009,25 +1073,27 @@ describe('Board overdue suppression for done tasks', () => {
     it('marks Done overdue again when the explicit policy excludes it', async () => {
         // Explicit policy names only Shipped: Done is no longer terminal.
         configStore.statuses.value = ['Todo', 'Doing', 'Done', 'Shipped']
-        showConfigMock.mockImplementation(async () => policyConfig({
-            issue_states: ['Todo', 'Doing', 'Done', 'Shipped'],
-            effective_done_states: ['Shipped'],
-            done_states_mode: 'explicit',
-        }))
+        showConfigMock.mockImplementation(async () =>
+            policyConfig({
+                issue_states: ['Todo', 'Doing', 'Done', 'Shipped'],
+                effective_done_states: ['Shipped'],
+                done_states_mode: 'explicit',
+            }),
+        )
 
         const tasks = [
             baseTask({ id: 'ACME-1', status: 'Done', due_date: '2025-12-01' }),
             baseTask({ id: 'ACME-2', status: 'Shipped', due_date: '2025-12-01' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
         await flushPromises()
 
         const cards = wrapper.findAll('article.card.task')
-        const done = cards.find(c => c.text().includes('ACME-1'))!
-        const shipped = cards.find(c => c.text().includes('ACME-2'))!
+        const done = cards.find((c) => c.text().includes('ACME-1'))!
+        const shipped = cards.find((c) => c.text().includes('ACME-2'))!
         expect(done.text()).toContain('Overdue')
         expect(shipped.text()).not.toContain('Overdue')
         wrapper.unmount()
@@ -1035,13 +1101,15 @@ describe('Board overdue suppression for done tasks', () => {
 
     it('does not treat a stale is_done flag as done after an optimistic status change', async () => {
         // Reopened: status Doing, but the cached server metadata still says done.
-        const tasks = [baseTask({
-            id: 'ACME-1',
-            status: 'Doing',
-            due_date: '2025-12-01',
-            task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
-        })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        const tasks = [
+            baseTask({
+                id: 'ACME-1',
+                status: 'Doing',
+                due_date: '2025-12-01',
+                task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
+            }),
+        ]
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1054,17 +1122,21 @@ describe('Board overdue suppression for done tasks', () => {
 
     it('turns earlier Done-column rules into per-column card rules without writing new settings', async () => {
         window.localStorage.setItem('lotar.doneFilters::ACME', JSON.stringify({ statuses: ['Done'], maxVisible: 1 }))
-        taskMap.value = new Map([
-            baseTask({ id: 'ACME-1', status: 'Done', modified: '2026-01-02T10:00:00Z' }),
-            baseTask({ id: 'ACME-2', status: 'Done', modified: '2026-01-03T10:00:00Z' }),
-            baseTask({ id: 'ACME-3', status: 'Doing' }),
-        ].map(t => [t.id, t]))
+        taskMap.value = new Map(
+            [
+                baseTask({ id: 'ACME-1', status: 'Done', modified: '2026-01-02T10:00:00Z' }),
+                baseTask({ id: 'ACME-2', status: 'Done', modified: '2026-01-03T10:00:00Z' }),
+                baseTask({ id: 'ACME-3', status: 'Doing' }),
+            ].map((t) => [t.id, t]),
+        )
         taskVersion.value++
         const wrapper = mount(Board)
         await flushPromises()
         const done = wrapper.find('.board.grid > .col.column[data-status="Done"]')
-        expect(done.findAll('article.card.task').map(c => c.find('.id').text())).toEqual(['ACME-2'])
-        expect(wrapper.find('.board.grid > .col.column[data-status="Doing"]').findAll('article.card.task')).toHaveLength(1)
+        expect(done.findAll('article.card.task').map((c) => c.find('.id').text())).toEqual(['ACME-2'])
+        expect(
+            wrapper.find('.board.grid > .col.column[data-status="Doing"]').findAll('article.card.task'),
+        ).toHaveLength(1)
         // Reading earlier settings never freezes a new preference by itself.
         expect(window.localStorage.getItem('lotar.boardColumns::ACME')).toBeNull()
         wrapper.unmount()
@@ -1072,7 +1144,7 @@ describe('Board overdue suppression for done tasks', () => {
 
     it('shows a retry banner while retaining cards when a refresh fails with data', async () => {
         const tasks = [baseTask({ id: 'ACME-1', title: 'Alpha' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1101,7 +1173,7 @@ describe('Board overdue suppression for done tasks', () => {
     })
     it('shows the first-load loader on a project switch until the new key publishes', async () => {
         const tasks = [baseTask({ id: 'ACME-1', title: 'Alpha' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1116,7 +1188,9 @@ describe('Board overdue suppression for done tasks', () => {
         let finishBeta!: () => void
         betaHandle.refresh.mockImplementationOnce(() => {
             betaHandle.status.value = 'loading'
-            return new Promise<void>((resolve) => { finishBeta = resolve })
+            return new Promise<void>((resolve) => {
+                finishBeta = resolve
+            })
         })
         routeState.query = { project: 'BETA' }
         const wrapper2 = mount(Board)
@@ -1129,7 +1203,7 @@ describe('Board overdue suppression for done tasks', () => {
         expect(wrapper2.findAll('article.card.task').length).toBe(0)
 
         const betaTasks = [baseTask({ id: 'BETA-1', title: 'Beta task' })]
-        taskMap.value = new Map(betaTasks.map(t => [t.id, t]))
+        taskMap.value = new Map(betaTasks.map((t) => [t.id, t]))
         taskVersion.value++
         betaHandle.hasSnapshot.value = true
         betaHandle.status.value = 'ready'
@@ -1164,7 +1238,9 @@ describe('Board unknown-status Other column (DEV-68)', () => {
             localStorage.clear()
         }
     })
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
 
     it('renders unknown-status tasks in a synthetic Other column, sorted like configured columns', async () => {
         const tasks = [
@@ -1173,7 +1249,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
             baseTask({ id: 'ACME-2', status: 'Blocked', modified: '2026-01-04T10:00:00Z' }),
             baseTask({ id: 'ACME-3', status: 'Blocked', modified: '2026-01-03T10:00:00Z' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1191,7 +1267,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
 
         // Same deterministic order as configured columns: modified desc with
         // id-asc tie-breaks.
-        const ids = otherCol.findAll('article.card.task').map(c => c.find('.id').text())
+        const ids = otherCol.findAll('article.card.task').map((c) => c.find('.id').text())
         expect(ids).toEqual(['ACME-2', 'ACME-9', 'ACME-3'])
 
         // Every project task renders; grid tracks equal rendered columns.
@@ -1206,7 +1282,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
             baseTask({ id: 'ACME-1', assignee: 'alice', status: 'Todo' }),
             baseTask({ id: 'ACME-2', assignee: 'bob', status: 'Blocked' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1218,7 +1294,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
 
         // A group whose only task has an unknown status counts and renders.
         const headers = wrapper.findAll('.swimlane-header')
-        const bobHeader = headers.find(h => h.text().includes('bob'))
+        const bobHeader = headers.find((h) => h.text().includes('bob'))
         expect(bobHeader).toBeTruthy()
         expect(bobHeader!.find('.swimlane-count').text()).toBe('1')
 
@@ -1233,11 +1309,8 @@ describe('Board unknown-status Other column (DEV-68)', () => {
 
     it('keeps a configured literal __other__ status writable and distinct from the synthetic column', async () => {
         configStore.statuses.value = ['Todo', 'Doing', 'Done', '__other__']
-        const tasks = [
-            baseTask({ id: 'ACME-1', status: '__other__' }),
-            baseTask({ id: 'ACME-2', status: 'Mystery' }),
-        ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        const tasks = [baseTask({ id: 'ACME-1', status: '__other__' }), baseTask({ id: 'ACME-2', status: 'Mystery' })]
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1258,7 +1331,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         expect(wrapper.findAll('.board.grid > .col.column').length).toBe(5)
 
         // Dropping on the configured literal writes the real status value.
-        const mysteryCard = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-2'))!
+        const mysteryCard = wrapper.findAll('article.card.task').find((c) => c.text().includes('ACME-2'))!
         await mysteryCard.trigger('dragstart')
         await configured.trigger('drop')
         await flushPromises()
@@ -1267,11 +1340,8 @@ describe('Board unknown-status Other column (DEV-68)', () => {
     })
 
     it('never writes a status for drops on the synthetic Other column', async () => {
-        const tasks = [
-            baseTask({ id: 'ACME-1', status: 'Todo' }),
-            baseTask({ id: 'ACME-2', status: 'Mystery' }),
-        ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' }), baseTask({ id: 'ACME-2', status: 'Mystery' })]
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1280,11 +1350,13 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         const synthetic = wrapper.find('.board.grid > .col.column[data-column-kind="other"]')
         expect(synthetic.exists()).toBe(true)
 
-        const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-2'))!
+        const card = wrapper.findAll('article.card.task').find((c) => c.text().includes('ACME-2'))!
         await card.trigger('dragstart')
         await synthetic.trigger('drop')
         await synthetic.trigger('keydown', { key: 'Enter' })
-        await wrapper.find('.column[data-column-kind="status"][data-status="Todo"]').trigger('keydown', { key: 'Enter' })
+        await wrapper
+            .find('.column[data-column-kind="status"][data-status="Todo"]')
+            .trigger('keydown', { key: 'Enter' })
         await flushPromises()
 
         expect(setStatusMock).not.toHaveBeenCalled()
@@ -1293,22 +1365,23 @@ describe('Board unknown-status Other column (DEV-68)', () => {
 
     it('keeps a configured Other status configurable in the columns dialog while the synthetic column is not', async () => {
         configStore.statuses.value = ['Todo', 'Doing', 'Done', 'Other']
-        showConfigMock.mockImplementation(async () => policyConfig({
-            issue_states: ['Todo', 'Doing', 'Done', 'Other'],
-            effective_done_states: ['Done'],
-        }))
-        const tasks = [
-            baseTask({ id: 'ACME-1', status: 'Other' }),
-            baseTask({ id: 'ACME-2', status: 'Blocked' }),
-        ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        showConfigMock.mockImplementation(async () =>
+            policyConfig({
+                issue_states: ['Todo', 'Doing', 'Done', 'Other'],
+                effective_done_states: ['Done'],
+            }),
+        )
+        const tasks = [baseTask({ id: 'ACME-1', status: 'Other' }), baseTask({ id: 'ACME-2', status: 'Blocked' })]
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board, { global: { stubs: { teleport: true } } })
         await flushPromises()
 
         // Configured "Other" is a real column; the synthetic fallback coexists.
-        const configuredOther = wrapper.find('.board.grid > .col.column[data-column-kind="status"][data-status="Other"]')
+        const configuredOther = wrapper.find(
+            '.board.grid > .col.column[data-column-kind="status"][data-status="Other"]',
+        )
         expect(configuredOther.exists()).toBe(true)
         expect(configuredOther.find('article.card.task').text()).toContain('ACME-1')
         expect(wrapper.find('.board.grid > .col.column[data-column-kind="other"]').exists()).toBe(true)
@@ -1317,8 +1390,9 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         // each, never the synthetic fallback.
         await wrapper.find('[data-testid="board-columns-button"]').trigger('click')
         await flushPromises()
-        const labels = wrapper.findAll('[data-testid="board-columns-dialog"] [data-layout-status]')
-            .map(row => row.attributes('data-layout-status'))
+        const labels = wrapper
+            .findAll('[data-testid="board-columns-dialog"] [data-layout-status]')
+            .map((row) => row.attributes('data-layout-status'))
         expect(labels).toEqual(['Todo', 'Doing', 'Done', 'Other'])
         wrapper.unmount()
     })
@@ -1326,9 +1400,15 @@ describe('Board unknown-status Other column (DEV-68)', () => {
     it('paginates the synthetic Other column like normal columns', async () => {
         const tasks: TaskDTO[] = []
         for (let i = 1; i <= 32; i++) {
-            tasks.push(baseTask({ id: `ACME-${i}`, status: 'Blocked', modified: `2026-01-02T${String(i % 24).padStart(2, '0')}:00:00Z` }))
+            tasks.push(
+                baseTask({
+                    id: `ACME-${i}`,
+                    status: 'Blocked',
+                    modified: `2026-01-02T${String(i % 24).padStart(2, '0')}:00:00Z`,
+                }),
+            )
         }
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1342,8 +1422,12 @@ describe('Board unknown-status Other column (DEV-68)', () => {
 
         await showMoreBtn.trigger('click')
         await flushPromises()
-        expect(wrapper.find('.board.grid > .col.column[data-column-kind="other"]').findAll('article.card.task').length).toBe(32)
-        expect(wrapper.find('.board.grid > .col.column[data-column-kind="other"]').find('.show-more-btn').exists()).toBe(false)
+        expect(
+            wrapper.find('.board.grid > .col.column[data-column-kind="other"]').findAll('article.card.task').length,
+        ).toBe(32)
+        expect(
+            wrapper.find('.board.grid > .col.column[data-column-kind="other"]').find('.show-more-btn').exists(),
+        ).toBe(false)
         wrapper.unmount()
     })
 
@@ -1353,7 +1437,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
             baseTask({ id: 'ACME-2', status: 'Blocked' }),
             baseTask({ id: 'BETA-1', status: 'Blocked' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = mount(Board)
@@ -1376,11 +1460,8 @@ describe('Board unknown-status Other column (DEV-68)', () => {
     })
 
     it('renders only the active query membership, not every cached insertion', async () => {
-        const tasks = [
-            baseTask({ id: 'ACME-1', status: 'Todo' }),
-            baseTask({ id: 'ACME-2', status: 'Todo' }),
-        ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' }), baseTask({ id: 'ACME-2', status: 'Todo' })]
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         // Server-scoped query membership: the base ACME query contains only
@@ -1427,47 +1508,61 @@ describe('Board semantic swimlane order (DEV-87)', () => {
         vi.useRealTimers()
     })
 
-    it.each(['priority', 'type'] as const)('uses configured %s order, then unknown values and missing last, including Other', async mode => {
-        const configured = mode === 'priority' ? ['Later', 'Normal', 'Urgent'] : ['Feature', 'Bug', 'Chore']
-        const expected = mode === 'priority' ? [...configured].reverse() : configured
-        const source = mode === 'priority' ? configStore.priorities : configStore.types
-        source.value = ['Unused', ...configured]
-        const field = mode === 'priority' ? 'priority' : 'task_type'
-        const tasks = [...configured, 'Zulu', 'Alpha', ''].map((label, index) => baseTask({
-            id: `ACME-${index + 1}`, [field]: label, status: index === 1 ? 'Legacy' : 'Todo',
-        }))
-        tasks.push(baseTask({ id: 'BETA-1', [field]: 'Foreign' }))
-        taskMap.value = new Map(tasks.map(task => [task.id, task]))
-        const wrapper = mount(Board)
-        try {
-            await flushPromises()
-            await wrapper.find('[data-testid="board-groupby"]').setValue(mode)
-            const labels = () => wrapper.findAll('.swimlane-label').map(label => label.text())
-            expect(labels()).toEqual([...expected, 'Alpha', 'Zulu', '(none)'])
-            expect(wrapper.findAll('.swimlane-count').map(count => count.text())).toEqual(Array(6).fill('1'))
-            expect(wrapper.findAll('article.task')).toHaveLength(6)
-            expect(wrapper.findAll('[data-column-kind="other"] article.task')).toHaveLength(1)
+    it.each(['priority', 'type'] as const)(
+        'uses configured %s order, then unknown values and missing last, including Other',
+        async (mode) => {
+            const configured = mode === 'priority' ? ['Later', 'Normal', 'Urgent'] : ['Feature', 'Bug', 'Chore']
+            const expected = mode === 'priority' ? [...configured].reverse() : configured
+            const source = mode === 'priority' ? configStore.priorities : configStore.types
+            source.value = ['Unused', ...configured]
+            const field = mode === 'priority' ? 'priority' : 'task_type'
+            const tasks = [...configured, 'Zulu', 'Alpha', ''].map((label, index) =>
+                baseTask({
+                    id: `ACME-${index + 1}`,
+                    [field]: label,
+                    status: index === 1 ? 'Legacy' : 'Todo',
+                }),
+            )
+            tasks.push(baseTask({ id: 'BETA-1', [field]: 'Foreign' }))
+            taskMap.value = new Map(tasks.map((task) => [task.id, task]))
+            const wrapper = mount(Board)
+            try {
+                await flushPromises()
+                await wrapper.find('[data-testid="board-groupby"]').setValue(mode)
+                const labels = () => wrapper.findAll('.swimlane-label').map((label) => label.text())
+                expect(labels()).toEqual([...expected, 'Alpha', 'Zulu', '(none)'])
+                expect(wrapper.findAll('.swimlane-count').map((count) => count.text())).toEqual(Array(6).fill('1'))
+                expect(wrapper.findAll('article.task')).toHaveLength(6)
+                expect(wrapper.findAll('[data-column-kind="other"] article.task')).toHaveLength(1)
 
-            await wrapper.findAll('.swimlane-header')[0]!.trigger('click')
-            source.value = [...configured].reverse()
-            await nextTick()
-            const reordered = mode === 'priority' ? configured : [...configured].reverse()
-            expect(labels()).toEqual(reordered.concat(['Alpha', 'Zulu', '(none)']))
-            expect(wrapper.find('.swimlane-header.collapsed .swimlane-label').text()).toBe(expected[0])
-            expect(wrapper.findAll('article.task')).toHaveLength(5)
-        } finally {
-            wrapper.unmount()
-        }
-    })
+                await wrapper.findAll('.swimlane-header')[0]!.trigger('click')
+                source.value = [...configured].reverse()
+                await nextTick()
+                const reordered = mode === 'priority' ? configured : [...configured].reverse()
+                expect(labels()).toEqual(reordered.concat(['Alpha', 'Zulu', '(none)']))
+                expect(wrapper.find('.swimlane-header.collapsed .swimlane-label').text()).toBe(expected[0])
+                expect(wrapper.findAll('article.task')).toHaveLength(5)
+            } finally {
+                wrapper.unmount()
+            }
+        },
+    )
 
     it('keeps assignees alphabetical and missing values last', async () => {
-        const tasks = ['zoe', 'amy', '', 'ben'].map((assignee, index) => baseTask({ id: `ACME-${index + 1}`, assignee }))
-        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const tasks = ['zoe', 'amy', '', 'ben'].map((assignee, index) =>
+            baseTask({ id: `ACME-${index + 1}`, assignee }),
+        )
+        taskMap.value = new Map(tasks.map((task) => [task.id, task]))
         const wrapper = mount(Board)
         try {
             await flushPromises()
             await wrapper.find('[data-testid="board-groupby"]').setValue('assignee')
-            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['amy', 'ben', 'zoe', '(none)'])
+            expect(wrapper.findAll('.swimlane-label').map((label) => label.text())).toEqual([
+                'amy',
+                'ben',
+                'zoe',
+                '(none)',
+            ])
         } finally {
             wrapper.unmount()
         }
@@ -1475,13 +1570,21 @@ describe('Board semantic swimlane order (DEV-87)', () => {
 
     it('matches backend ASCII case/separators without merging distinct Unicode labels', async () => {
         configStore.priorities.value = ['\u00e4', 'Very High', 'Zed', '\u00c4', 'Low', 'very-high']
-        const tasks = ['VERY_HIGH', 'low', '\u00c4', '\u00e4', 'Zed'].map((priority, index) => baseTask({ id: `ACME-${index + 1}`, priority }))
-        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const tasks = ['VERY_HIGH', 'low', '\u00c4', '\u00e4', 'Zed'].map((priority, index) =>
+            baseTask({ id: `ACME-${index + 1}`, priority }),
+        )
+        taskMap.value = new Map(tasks.map((task) => [task.id, task]))
         const wrapper = mount(Board)
         try {
             await flushPromises()
             await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
-            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['low', '\u00c4', 'Zed', 'VERY_HIGH', '\u00e4'])
+            expect(wrapper.findAll('.swimlane-label').map((label) => label.text())).toEqual([
+                'low',
+                '\u00c4',
+                'Zed',
+                'VERY_HIGH',
+                '\u00e4',
+            ])
         } finally {
             wrapper.unmount()
         }
@@ -1489,13 +1592,20 @@ describe('Board semantic swimlane order (DEV-87)', () => {
 
     it('falls back to alphabetical order when the configuration has no values', async () => {
         configStore.priorities.value = []
-        const tasks = ['Medium', '', 'High', 'Low'].map((priority, index) => baseTask({ id: `ACME-${index + 1}`, priority }))
-        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const tasks = ['Medium', '', 'High', 'Low'].map((priority, index) =>
+            baseTask({ id: `ACME-${index + 1}`, priority }),
+        )
+        taskMap.value = new Map(tasks.map((task) => [task.id, task]))
         const wrapper = mount(Board)
         try {
             await flushPromises()
             await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
-            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['High', 'Low', 'Medium', '(none)'])
+            expect(wrapper.findAll('.swimlane-label').map((label) => label.text())).toEqual([
+                'High',
+                'Low',
+                'Medium',
+                '(none)',
+            ])
         } finally {
             wrapper.unmount()
         }
@@ -1503,13 +1613,20 @@ describe('Board semantic swimlane order (DEV-87)', () => {
 
     it('puts default Critical and High lanes above Medium and Low', async () => {
         configStore.priorities.value = ['Low', 'Medium', 'High', 'Critical']
-        const tasks = ['Low', 'High', 'Critical', 'Medium'].map((priority, index) => baseTask({ id: `ACME-${index + 1}`, priority }))
-        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const tasks = ['Low', 'High', 'Critical', 'Medium'].map((priority, index) =>
+            baseTask({ id: `ACME-${index + 1}`, priority }),
+        )
+        taskMap.value = new Map(tasks.map((task) => [task.id, task]))
         const wrapper = mount(Board)
         try {
             await flushPromises()
             await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
-            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['Critical', 'High', 'Medium', 'Low'])
+            expect(wrapper.findAll('.swimlane-label').map((label) => label.text())).toEqual([
+                'Critical',
+                'High',
+                'Medium',
+                'Low',
+            ])
         } finally {
             wrapper.unmount()
         }
@@ -1517,14 +1634,17 @@ describe('Board semantic swimlane order (DEV-87)', () => {
 
     it('orders only the active query members, not unrelated cached groups', async () => {
         configStore.priorities.value = ['High', 'Medium', 'Low']
-        const tasks = [baseTask({ id: 'ACME-1', priority: 'High' }), baseTask({ id: 'ACME-2', priority: 'Medium', status: 'Legacy' })]
-        taskMap.value = new Map(tasks.map(task => [task.id, task]))
+        const tasks = [
+            baseTask({ id: 'ACME-1', priority: 'High' }),
+            baseTask({ id: 'ACME-2', priority: 'Medium', status: 'Legacy' }),
+        ]
+        taskMap.value = new Map(tasks.map((task) => [task.id, task]))
         boardHandleFor({ project: 'ACME' }, new Set(['ACME-2']))
         const wrapper = mount(Board)
         try {
             await flushPromises()
             await wrapper.find('[data-testid="board-groupby"]').setValue('priority')
-            expect(wrapper.findAll('.swimlane-label').map(label => label.text())).toEqual(['Medium'])
+            expect(wrapper.findAll('.swimlane-label').map((label) => label.text())).toEqual(['Medium'])
             expect(wrapper.find('.swimlane-count').text()).toBe('1')
             expect(wrapper.findAll('article.task')).toHaveLength(1)
         } finally {
@@ -1568,12 +1688,12 @@ describe('Board no-op drop guards (DEV-102)', () => {
 
     it('drops on the current column without any request, optimistic write, toast, or refresh', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = await mountSettled()
         try {
-            const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-1'))!
+            const card = wrapper.findAll('article.card.task').find((c) => c.text().includes('ACME-1'))!
             await card.trigger('dragstart')
             await wrapper.find('.column[data-column-kind="status"][data-status="Todo"]').trigger('drop')
             await flushPromises()
@@ -1589,7 +1709,7 @@ describe('Board no-op drop guards (DEV-102)', () => {
 
     it('treats a case-variant of the configured label as the same effective status', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'todo' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = await mountSettled()
@@ -1615,7 +1735,7 @@ describe('Board no-op drop guards (DEV-102)', () => {
         // "Other" normalizes onto the configured "__other__" bucket but is a
         // distinct raw value: the drop must still write "__other__".
         const tasks = [baseTask({ id: 'ACME-1', status: 'Other' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = await mountSettled()
@@ -1636,12 +1756,12 @@ describe('Board no-op drop guards (DEV-102)', () => {
 
     it('posts exactly one status change for a genuine cross-column drop and reconciles', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' })]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
 
         const wrapper = await mountSettled()
         try {
-            const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-1'))!
+            const card = wrapper.findAll('article.card.task').find((c) => c.text().includes('ACME-1'))!
             await card.trigger('dragstart')
             await wrapper.find('.column[data-column-kind="status"][data-status="Doing"]').trigger('drop')
             await flushPromises()
@@ -1675,7 +1795,7 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
             baseTask({ id: 'ACME-4', status: 'WontDo', priority: 'High' }),
             baseTask({ id: 'ACME-5', status: 'WontDo', priority: 'Low' }),
         ]
-        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
         taskVersion.value++
     })
     afterEach(() => {
@@ -1685,7 +1805,7 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
 
     const mountBoard = () => mount(Board, { global: { stubs: { teleport: true } } })
     const laneTitles = (wrapper: ReturnType<typeof mount>) =>
-        wrapper.findAll('.board.grid > .col.column').map(lane => lane.find('.lane-header__title').text())
+        wrapper.findAll('.board.grid > .col.column').map((lane) => lane.find('.lane-header__title').text())
     async function openDialog(wrapper: ReturnType<typeof mount>) {
         await wrapper.find('[data-testid="board-columns-button"]').trigger('click')
         await flushPromises()
@@ -1707,7 +1827,8 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
         // Move WontDo in with Todo (not adjacent), and give Done + Review a shared column.
         const menuMove = async (label: string, item: string) => {
             const button = statusRow(wrapper.find('[data-testid="board-columns-dialog"]'), label)
-                .findAll('.board-columns-dialog__menu-item').find(b => b.text() === item)!
+                .findAll('.board-columns-dialog__menu-item')
+                .find((b) => b.text() === item)!
             await button.trigger('click')
         }
         await menuMove('WontDo', 'Move to Todo')
@@ -1720,11 +1841,11 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
         const stacked = wrapper.find('.board.grid > .col.column.column--stacked')
         expect(stacked.attributes('data-column-kind')).toBe('stack')
         const sections = stacked.findAll('.column-section--stacked')
-        expect(sections.map(s => s.attributes('data-status'))).toEqual(['Todo', 'WontDo'])
+        expect(sections.map((s) => s.attributes('data-status'))).toEqual(['Todo', 'WontDo'])
         expect(stacked.find('.lane-header__count').text()).toBe('3')
         expect(sections[1]!.find('.column-section__count').text()).toBe('2')
 
-        const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-3'))!
+        const card = wrapper.findAll('article.card.task').find((c) => c.text().includes('ACME-3'))!
         await card.trigger('dragstart')
         await sections[1]!.find('.col-cards').trigger('drop')
         await flushPromises()
@@ -1732,13 +1853,17 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
 
         // The stacked header's add menu offers each status.
         const items = stacked.findAll('.lane-add-menu__item')
-        expect(items.map(i => i.text())).toEqual(['Add in Todo', 'Add in WontDo'])
+        expect(items.map((i) => i.text())).toEqual(['Add in Todo', 'Add in WontDo'])
         await items[1]!.trigger('click')
         expect(openTaskPanelMock).toHaveBeenLastCalledWith(expect.objectContaining({ initialStatus: 'WontDo' }))
 
         const stored = JSON.parse(localStorage.getItem('lotar.boardColumns::ACME') || '{}')
         expect(stored.version).toBe(2)
-        expect(stored.columns.map((c: { statuses: string[] }) => c.statuses.join('+'))).toEqual(['todo+wontdo', 'doing', 'done+review'])
+        expect(stored.columns.map((c: { statuses: string[] }) => c.statuses.join('+'))).toEqual([
+            'todo+wontdo',
+            'doing',
+            'done+review',
+        ])
         wrapper.unmount()
         const again = mountBoard()
         await flushPromises()
@@ -1762,7 +1887,10 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
             await dialog().find('input.board-columns-dialog__rename').trigger('keydown', { key: 'Enter' })
         }
         await edit()
-        await dialog().findAll('button').find(b => b.text() === 'Cancel')!.trigger('click')
+        await dialog()
+            .findAll('button')
+            .find((b) => b.text() === 'Cancel')!
+            .trigger('click')
         await flushPromises()
         expect(laneTitles(wrapper)).toEqual(['Todo', 'Doing', 'Review', 'Done', 'WontDo'])
 
@@ -1776,32 +1904,45 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
         expect(laneTitles(wrapper)).toEqual(['Backlog', 'Doing', 'Review', 'WontDo', 'Done'])
 
         await openDialog(wrapper)
-        await dialog().findAll('button').find(b => b.text() === 'Reset to defaults')!.trigger('click')
+        await dialog()
+            .findAll('button')
+            .find((b) => b.text() === 'Reset to defaults')!
+            .trigger('click')
         await apply(wrapper)
         expect(laneTitles(wrapper)).toEqual(['Todo', 'Doing', 'Review', 'Done', 'WontDo'])
         wrapper.unmount()
     })
 
     it('applies a column WIP limit across stacked statuses and per-column card rules', async () => {
-        localStorage.setItem('lotar.boardColumns::ACME', JSON.stringify({
-            version: 2,
-            columns: [
-                { statuses: ['todo'] }, { statuses: ['doing'] }, { statuses: ['review'] },
-                { statuses: ['done', 'wontdo'], name: 'Closed', wipLimit: 2, maxVisible: 1 },
-            ],
-            hidden: [],
-        }))
+        localStorage.setItem(
+            'lotar.boardColumns::ACME',
+            JSON.stringify({
+                version: 2,
+                columns: [
+                    { statuses: ['todo'] },
+                    { statuses: ['doing'] },
+                    { statuses: ['review'] },
+                    { statuses: ['done', 'wontdo'], name: 'Closed', wipLimit: 2, maxVisible: 1 },
+                ],
+                hidden: [],
+            }),
+        )
         const wrapper = mountBoard()
         await flushPromises()
         const closed = wrapper.find('.board.grid > .col.column.column--stacked')
         expect(closed.find('.lane-header__title').text()).toBe('Closed')
         // Card rule keeps one card per status section; the limit counts both sections.
-        expect(closed.findAll('.column-section--stacked').map(s => s.findAll('article.card.task').length)).toEqual([1, 1])
+        expect(closed.findAll('.column-section--stacked').map((s) => s.findAll('article.card.task').length)).toEqual([
+            1, 1,
+        ])
         expect(closed.find('.lane-header__count').text()).toBe('2 / 2')
         expect(closed.classes()).not.toContain('over-limit')
 
         await openDialog(wrapper)
-        const closedSettings = () => wrapper.findAll('[data-testid="board-columns-dialog"] .board-columns-dialog__column')[3]!.findAll('.board-columns-dialog__settings input')
+        const closedSettings = () =>
+            wrapper
+                .findAll('[data-testid="board-columns-dialog"] .board-columns-dialog__column')[3]!
+                .findAll('.board-columns-dialog__settings input')
         await closedSettings()[0]!.setValue('1')
         await closedSettings()[2]!.setValue('')
         await apply(wrapper)
@@ -1813,44 +1954,87 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
 
     it('hides cards that entered their status before the age limit, including cards created in it (DEV-133)', async () => {
         vi.setSystemTime(new Date('2026-03-01T12:00:00Z'))
-        localStorage.setItem('lotar.boardColumns::ACME', JSON.stringify({
-            version: 2,
-            columns: [{ statuses: ['todo'] }, { statuses: ['doing'] }, { statuses: ['review'] }, { statuses: ['done'], maxAgeDays: 7 }, { statuses: ['wontdo'] }],
-            hidden: [],
-        }))
-        const statusChange = (at: string, value: string) => ({ at, changes: [{ field: 'status', old: 'Doing', new: value }] })
-        taskMap.value = new Map([
-            // Created directly as Done long ago, never moved: previously stayed forever.
-            baseTask({ id: 'ACME-1', status: 'Done', created: '2026-01-01T00:00:00Z', modified: '2026-02-28T00:00:00Z', history: [] }),
-            // Moved into Done recently, recorded in lower case.
-            baseTask({ id: 'ACME-2', status: 'Done', created: '2026-01-01T00:00:00Z', history: [statusChange('2026-02-27T00:00:00Z', 'done')] as any }),
-            // Moved into Done a month ago.
-            baseTask({ id: 'ACME-3', status: 'Done', created: '2026-01-01T00:00:00Z', history: [statusChange('2026-01-30T00:00:00Z', 'Done')] as any }),
-            // Recently created as Done.
-            baseTask({ id: 'ACME-4', status: 'Done', created: '2026-02-28T00:00:00Z', history: [] }),
-            // Undatable cards stay visible.
-            baseTask({ id: 'ACME-5', status: 'Done', created: 'unknown', history: [] }),
-        ].map(t => [t.id, t]))
+        localStorage.setItem(
+            'lotar.boardColumns::ACME',
+            JSON.stringify({
+                version: 2,
+                columns: [
+                    { statuses: ['todo'] },
+                    { statuses: ['doing'] },
+                    { statuses: ['review'] },
+                    { statuses: ['done'], maxAgeDays: 7 },
+                    { statuses: ['wontdo'] },
+                ],
+                hidden: [],
+            }),
+        )
+        const statusChange = (at: string, value: string) => ({
+            at,
+            changes: [{ field: 'status', old: 'Doing', new: value }],
+        })
+        taskMap.value = new Map(
+            [
+                // Created directly as Done long ago, never moved: previously stayed forever.
+                baseTask({
+                    id: 'ACME-1',
+                    status: 'Done',
+                    created: '2026-01-01T00:00:00Z',
+                    modified: '2026-02-28T00:00:00Z',
+                    history: [],
+                }),
+                // Moved into Done recently, recorded in lower case.
+                baseTask({
+                    id: 'ACME-2',
+                    status: 'Done',
+                    created: '2026-01-01T00:00:00Z',
+                    history: [statusChange('2026-02-27T00:00:00Z', 'done')] as any,
+                }),
+                // Moved into Done a month ago.
+                baseTask({
+                    id: 'ACME-3',
+                    status: 'Done',
+                    created: '2026-01-01T00:00:00Z',
+                    history: [statusChange('2026-01-30T00:00:00Z', 'Done')] as any,
+                }),
+                // Recently created as Done.
+                baseTask({ id: 'ACME-4', status: 'Done', created: '2026-02-28T00:00:00Z', history: [] }),
+                // Undatable cards stay visible.
+                baseTask({ id: 'ACME-5', status: 'Done', created: 'unknown', history: [] }),
+            ].map((t) => [t.id, t]),
+        )
         taskVersion.value++
         const wrapper = mountBoard()
         await flushPromises()
         const done = wrapper.find('.board.grid > .col.column[data-status="Done"]')
-        expect(done.findAll('article.card.task').map(c => c.find('.id').text()).sort()).toEqual(['ACME-2', 'ACME-4', 'ACME-5'])
+        expect(
+            done
+                .findAll('article.card.task')
+                .map((c) => c.find('.id').text())
+                .sort(),
+        ).toEqual(['ACME-2', 'ACME-4', 'ACME-5'])
         wrapper.unmount()
     })
 
     it('keeps statuses distinct inside stacked lanes when grouped by priority, with one header row', async () => {
-        localStorage.setItem('lotar.boardColumns::ACME', JSON.stringify({
-            version: 2,
-            columns: [{ statuses: ['todo'] }, { statuses: ['review'] }, { statuses: ['done', 'wontdo'] }, { statuses: ['doing'] }],
-            hidden: ['doing'],
-        }))
+        localStorage.setItem(
+            'lotar.boardColumns::ACME',
+            JSON.stringify({
+                version: 2,
+                columns: [
+                    { statuses: ['todo'] },
+                    { statuses: ['review'] },
+                    { statuses: ['done', 'wontdo'] },
+                    { statuses: ['doing'] },
+                ],
+                hidden: ['doing'],
+            }),
+        )
         localStorage.setItem('lotar.boardGroupBy::ACME', 'priority')
         const wrapper = mountBoard()
         await flushPromises()
 
         const headers = wrapper.findAll('.board-col-header')
-        expect(headers.map(h => h.find('.lane-header__title').text())).toEqual(['Todo', 'Review', 'Done · WontDo'])
+        expect(headers.map((h) => h.find('.lane-header__title').text())).toEqual(['Todo', 'Review', 'Done · WontDo'])
         // One compact row per header, also for the stacked lane.
         expect(headers[2]!.findAll('.lane-header__title')).toHaveLength(1)
         expect(wrapper.find('.board.grid').attributes('style')).toContain('repeat(3')
@@ -1858,10 +2042,10 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
         const cells = wrapper.findAll('.column-group-cell--stacked')
         expect(cells.length).toBe(2) // High and Low swimlanes
         const high = cells[0]!.findAll('.column-section--stacked')
-        expect(high.map(s => s.find('.column-section__label').text())).toEqual(['Done', 'WontDo'])
+        expect(high.map((s) => s.find('.column-section__label').text())).toEqual(['Done', 'WontDo'])
         expect(high[1]!.find('article.card.task').text()).toContain('ACME-4')
 
-        const card = wrapper.findAll('article.card.task').find(c => c.text().includes('ACME-2'))!
+        const card = wrapper.findAll('article.card.task').find((c) => c.text().includes('ACME-2'))!
         await card.trigger('dragstart')
         await high[0]!.find('.col-cards').trigger('drop')
         await flushPromises()

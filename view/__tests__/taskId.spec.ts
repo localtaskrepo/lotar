@@ -32,9 +32,31 @@ describe('parseTaskId (final-dash canonical grammar)', () => {
 
     it('fails closed for malformed ids without injecting a prefix', () => {
         const malformed = [
-            '', 'TP123', 'TP-', 'TP--', 'TP-1x', 'TP-x1', 'TP-1.5', 'TP- 1', 'TP-1 ', 'TP-１',
-            'TP-+12', 'TP-12+', '../evil-1', '..-1', '.-1', 'a/b-1', 'a\\b-1', '/tmp/abs-1',
-            '@sprints-1', '.hidden-1', '-flag-1', 'a b-1', 'a..b-1', ' TP-1', 'TP-1\n',
+            '',
+            'TP123',
+            'TP-',
+            'TP--',
+            'TP-1x',
+            'TP-x1',
+            'TP-1.5',
+            'TP- 1',
+            'TP-1 ',
+            'TP-１',
+            'TP-+12',
+            'TP-12+',
+            '../evil-1',
+            '..-1',
+            '.-1',
+            'a/b-1',
+            'a\\b-1',
+            '/tmp/abs-1',
+            '@sprints-1',
+            '.hidden-1',
+            '-flag-1',
+            'a b-1',
+            'a..b-1',
+            ' TP-1',
+            'TP-1\n',
         ]
         for (const bad of malformed) {
             expect(parseTaskId(bad), `expected null for ${JSON.stringify(bad)}`).toBeNull()

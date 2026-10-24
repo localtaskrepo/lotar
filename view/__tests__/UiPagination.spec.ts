@@ -125,7 +125,17 @@ describe('UiPagination', () => {
         const wrapper = mount(UiPagination, {
             props: { offset: 200, total: 350, pageSize: 50, ariaLabel: 'Task list pagination' },
         })
-        expect(wrapper.findAll('button').map((b) => b.text())).toEqual(['Prev', '1', '2', '3', '4', '5', '6', '7', 'Next'])
+        expect(wrapper.findAll('button').map((b) => b.text())).toEqual([
+            'Prev',
+            '1',
+            '2',
+            '3',
+            '4',
+            '5',
+            '6',
+            '7',
+            'Next',
+        ])
         expect(wrapper.findAll('.ui-pagination__ellipsis')).toHaveLength(0)
     })
 })

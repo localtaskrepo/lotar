@@ -27,7 +27,10 @@ describe('AutomationRulesEditor', () => {
         await findButton(wrapper, 'New rule')?.trigger('click')
         await flushPromises()
 
-        await wrapper.findAll('button').find((button) => button.text().includes('Move a task'))?.trigger('click')
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('Move a task'))
+            ?.trigger('click')
         await flushPromises()
 
         await wrapper.find('input[placeholder="Human review after testing"]').setValue('Ship after tests')
@@ -63,7 +66,10 @@ describe('AutomationRulesEditor', () => {
         await findButton(wrapper, 'New rule')?.trigger('click')
         await flushPromises()
 
-        await wrapper.findAll('button').find((b) => b.text().includes('Leave a comment'))?.trigger('click')
+        await wrapper
+            .findAll('button')
+            .find((b) => b.text().includes('Leave a comment'))
+            ?.trigger('click')
         await flushPromises()
 
         await wrapper.find('input[placeholder="Human review after testing"]').setValue('Notify reviewer')
@@ -107,7 +113,10 @@ describe('AutomationRulesEditor', () => {
         await findButton(wrapper, 'New rule')?.trigger('click')
         await flushPromises()
 
-        await wrapper.findAll('button').find((b) => b.text().includes('Move a task'))?.trigger('click')
+        await wrapper
+            .findAll('button')
+            .find((b) => b.text().includes('Move a task'))
+            ?.trigger('click')
         await flushPromises()
         await findButton(wrapper, 'Next')?.trigger('click')
         await flushPromises()
@@ -177,7 +186,10 @@ describe('AutomationRulesEditor', () => {
         await findButton(wrapper, 'New rule')?.trigger('click')
         await flushPromises()
 
-        await wrapper.findAll('button').find((b) => b.text().includes('Manage tags'))?.trigger('click')
+        await wrapper
+            .findAll('button')
+            .find((b) => b.text().includes('Manage tags'))
+            ?.trigger('click')
         await flushPromises()
         await findButton(wrapper, 'Next')?.trigger('click')
         await flushPromises()
@@ -257,7 +269,10 @@ describe('AutomationRulesEditor dialog migration', () => {
 
         await findButton(wrapper, 'New rule')?.trigger('click')
         await flushPromises()
-        await wrapper.findAll('button').find((button) => button.text().includes('Move a task'))?.trigger('click')
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('Move a task'))
+            ?.trigger('click')
         await flushPromises()
 
         wrapper.findComponent({ name: 'UiModal' }).vm.$emit('close')
@@ -277,7 +292,10 @@ describe('AutomationRulesEditor dialog migration', () => {
 
         await findButton(wrapper, 'New rule')?.trigger('click')
         await flushPromises()
-        await wrapper.findAll('button').find((button) => button.text().includes('Move a task'))?.trigger('click')
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('Move a task'))
+            ?.trigger('click')
         await flushPromises()
 
         await findButton(wrapper, 'Cancel')?.trigger('click')

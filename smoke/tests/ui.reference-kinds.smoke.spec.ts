@@ -86,10 +86,7 @@ async function createRepoAnchoredWorkspace(): Promise<SmokeWorkspace> {
 // Repository-relative display path of a file inside the scratch workspace
 // (e.g. `target/smoke-scratch/<tmp>/docs/notes.txt`).
 function repoRelPath(workspace: SmokeWorkspace, workspaceRelative: string): string {
-    return path
-        .relative(REPO_ROOT, path.join(workspace.root, workspaceRelative))
-        .split(path.sep)
-        .join('/');
+    return path.relative(REPO_ROOT, path.join(workspace.root, workspaceRelative)).split(path.sep).join('/');
 }
 
 function repoFileLine(line: number): string {
@@ -162,9 +159,7 @@ async function dropFileOnPanel(page: Page, filename: string, content: string): P
             if (!target) throw new Error('task panel not found');
             const dt = new DataTransfer();
             dt.items.add(new File([body], name, { type: 'text/plain' }));
-            target.dispatchEvent(
-                new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }),
-            );
+            target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
         },
         { filename, content },
     );
@@ -179,10 +174,7 @@ async function openTaskPanel(page: Page, title: string) {
     return panel;
 }
 
-async function openReferencesTab(
-    page: Page,
-    panel: Awaited<ReturnType<typeof openTaskPanel>>,
-): Promise<void> {
+async function openReferencesTab(page: Page, panel: Awaited<ReturnType<typeof openTaskPanel>>): Promise<void> {
     await panel.locator('.task-panel__activity .task-panel__tab', { hasText: 'References' }).click();
     await page.locator('.task-panel__references').waitFor({ state: 'visible', timeout: 15_000 });
 }
@@ -217,17 +209,15 @@ describe('UI reference kinds (DEV-61)', () => {
 
                     const chip = panel.locator('.task-panel__attachments .task-panel__attachment-link');
                     await chip.waitFor({ timeout: 15_000 });
-                    await expect(
-                        panel.locator('.task-panel__attachments .task-panel__attachment-name'),
-                    ).toHaveText(MANAGED_FILENAME);
+                    await expect(panel.locator('.task-panel__attachments .task-panel__attachment-name')).toHaveText(
+                        MANAGED_FILENAME,
+                    );
                     const href = (await chip.getAttribute('href')) ?? '';
-                    expect(href).toMatch(
-                        /^\/api\/attachments\/h\/[0-9a-f]{32}\/notes\.txt\?project=REF$/,
-                    );
+                    expect(href).toMatch(/^\/api\/attachments\/h\/[0-9a-f]{32}\/notes\.txt\?project=REF$/);
 
-                    await expect.poll(() => storedPathGetter(), { timeout: 15_000 }).toMatch(
-                        /^notes\.[0-9a-f]{32}\.txt$/,
-                    );
+                    await expect
+                        .poll(() => storedPathGetter(), { timeout: 15_000 })
+                        .toMatch(/^notes\.[0-9a-f]{32}\.txt$/);
                     const storedPath = storedPathGetter();
                     const blobPath = path.join(workspace.tasksDir, '@attachments', storedPath);
                     await expect.poll(() => fs.pathExists(blobPath), { timeout: 15_000 }).toBe(true);
@@ -235,9 +225,7 @@ describe('UI reference kinds (DEV-61)', () => {
                         .poll(() => workspace.readTaskYaml(task.id), { timeout: 15_000 })
                         .toContain(`attachment: ${storedPath}`);
 
-                    const uploadCall = apiCalls.find(
-                        (call) => call.path === '/api/tasks/attachments/upload',
-                    );
+                    const uploadCall = apiCalls.find((call) => call.path === '/api/tasks/attachments/upload');
                     expect(uploadCall?.body).toMatchObject({
                         id: task.id,
                         filename: MANAGED_FILENAME,
@@ -249,17 +237,11 @@ describe('UI reference kinds (DEV-61)', () => {
                     expect((await view.text()).trim()).toBe(MANAGED_CONTENT);
                     expect(view.headers()['content-type'] ?? '').toContain('text/plain');
 
-                    const download = await page.request.get(
-                        `${new URL(href, server.url).toString()}&download=1`,
-                    );
+                    const download = await page.request.get(`${new URL(href, server.url).toString()}&download=1`);
                     expect(download.status()).toBe(200);
-                    expect(
-                        (download.headers()['content-disposition'] ?? '').startsWith('attachment;'),
-                    ).toBe(true);
+                    expect((download.headers()['content-disposition'] ?? '').startsWith('attachment;')).toBe(true);
 
-                    await panel
-                        .locator('.task-panel__attachments button[aria-label="Remove attachment"]')
-                        .click();
+                    await panel.locator('.task-panel__attachments button[aria-label="Remove attachment"]').click();
                     await chip.waitFor({ state: 'detached', timeout: 15_000 });
                     await expect.poll(() => fs.pathExists(blobPath), { timeout: 15_000 }).toBe(false);
                     // Detach proves out through typed membership on the parsed
@@ -277,16 +259,12 @@ describe('UI reference kinds (DEV-61)', () => {
                         .toBe(false);
                     const detached = await readParsedTask(workspace, task.id);
                     expect(typedReferences(detached)).toHaveLength(0);
-                    const removals = historyChanges(detached).filter(
-                        (change) => change.field === 'reference_removed',
-                    );
+                    const removals = historyChanges(detached).filter((change) => change.field === 'reference_removed');
                     expect(removals).toHaveLength(1);
                     expect(removals[0].old).toBe(`attachment:${storedPath}`);
                     expect(removals[0].new ?? null).toBe(null);
 
-                    const removeCall = apiCalls.find(
-                        (call) => call.path === '/api/tasks/attachments/remove',
-                    );
+                    const removeCall = apiCalls.find((call) => call.path === '/api/tasks/attachments/remove');
                     expect(removeCall?.body).toMatchObject({
                         id: task.id,
                         stored_path: storedPath,
@@ -326,9 +304,7 @@ describe('UI reference kinds (DEV-61)', () => {
                     await expect(fileRow).toContainText(repoFile);
                     await expect(fileRow.locator('a')).toHaveCount(0);
 
-                    const addCall = apiCalls.find(
-                        (call) => call.path === '/api/tasks/references/file/add',
-                    );
+                    const addCall = apiCalls.find((call) => call.path === '/api/tasks/references/file/add');
                     expect(addCall?.body).toMatchObject({ id: task.id, path: repoFile });
 
                     await expect
@@ -360,14 +336,10 @@ describe('UI reference kinds (DEV-61)', () => {
                     expect(anchoredData.highlight_end).toBe(3);
 
                     await page.mouse.move(0, 0);
-                    await fileRow
-                        .locator('button[aria-label="Remove repository file"]')
-                        .click();
+                    await fileRow.locator('button[aria-label="Remove repository file"]').click();
                     await fileRow.waitFor({ state: 'detached', timeout: 15_000 });
 
-                    const removeCall = apiCalls.find(
-                        (call) => call.path === '/api/tasks/references/file/remove',
-                    );
+                    const removeCall = apiCalls.find((call) => call.path === '/api/tasks/references/file/remove');
                     expect(removeCall?.body).toMatchObject({ id: task.id, path: repoFile });
 
                     // Same typed-membership discipline: absence must be
@@ -385,9 +357,7 @@ describe('UI reference kinds (DEV-61)', () => {
                         .toBe(false);
                     const detached = await readParsedTask(workspace, task.id);
                     expect(typedReferences(detached)).toHaveLength(0);
-                    const removals = historyChanges(detached).filter(
-                        (change) => change.field === 'reference_removed',
-                    );
+                    const removals = historyChanges(detached).filter((change) => change.field === 'reference_removed');
                     expect(removals).toHaveLength(1);
                     expect(removals[0].old).toBe(`file:${repoFile}`);
                     const preserved = await workspace.read(SCRATCH_FILE);
@@ -441,9 +411,9 @@ describe('UI reference kinds (DEV-61)', () => {
                         .filter({ has: page.locator('button[aria-label="Remove attachment"]') });
                     await expect(attachmentRow).toHaveCount(1);
                     await expect(attachmentRow.locator('a.task-panel__reference-link')).toHaveCount(1);
-                    expect(
-                        (await attachmentRow.locator('a').first().getAttribute('href')) ?? '',
-                    ).toContain('/api/attachments/h/');
+                    expect((await attachmentRow.locator('a').first().getAttribute('href')) ?? '').toContain(
+                        '/api/attachments/h/',
+                    );
 
                     const fileRow = page
                         .locator('.task-panel__reference-item')
@@ -456,9 +426,9 @@ describe('UI reference kinds (DEV-61)', () => {
                     await expect(chipNames).toHaveCount(1);
                     await expect(chipNames).toHaveText(MANAGED_FILENAME);
 
-                    await expect.poll(() => storedPathGetter(), { timeout: 15_000 }).toMatch(
-                        /^notes\.[0-9a-f]{32}\.txt$/,
-                    );
+                    await expect
+                        .poll(() => storedPathGetter(), { timeout: 15_000 })
+                        .toMatch(/^notes\.[0-9a-f]{32}\.txt$/);
                     const storedPath = storedPathGetter();
                     const blobPath = path.join(workspace.tasksDir, '@attachments', storedPath);
                     await expect.poll(() => fs.pathExists(blobPath), { timeout: 15_000 }).toBe(true);
@@ -474,36 +444,25 @@ describe('UI reference kinds (DEV-61)', () => {
                     // name (no path separators, parseable hash tag) sharing the
                     // display basename but not referenced by the task, so the
                     // typed-membership gate is what rejects it.
-                    const wrongKind = await page.request.post(
-                        `${server.url}/api/tasks/attachments/remove`,
-                        {
-                            data: {
-                                id: task.id,
-                                stored_path: `notes.${'0123456789abcdef'.repeat(2)}.txt`,
-                            },
+                    const wrongKind = await page.request.post(`${server.url}/api/tasks/attachments/remove`, {
+                        data: {
+                            id: task.id,
+                            stored_path: `notes.${'0123456789abcdef'.repeat(2)}.txt`,
                         },
-                    );
+                    });
                     expect(wrongKind.status()).toBe(400);
                     const wrongKindBody = await wrongKind.json();
-                    expect(String(wrongKindBody?.error?.message ?? '')).toContain(
-                        'does not reference attachment',
-                    );
+                    expect(String(wrongKindBody?.error?.message ?? '')).toContain('does not reference attachment');
                     expect(await fs.pathExists(blobPath)).toBe(true);
 
                     // The managed-store guard denies repository file references
                     // that target the attachments store, failing closed.
-                    const storeGuard = await page.request.post(
-                        `${server.url}/api/tasks/references/file/add`,
-                        {
-                            data: {
-                                id: task.id,
-                                path: repoRelPath(
-                                    workspace,
-                                    path.join('.tasks', '@attachments', storedPath),
-                                ),
-                            },
+                    const storeGuard = await page.request.post(`${server.url}/api/tasks/references/file/add`, {
+                        data: {
+                            id: task.id,
+                            path: repoRelPath(workspace, path.join('.tasks', '@attachments', storedPath)),
                         },
-                    );
+                    });
                     expect(storeGuard.status()).toBe(400);
                     const storeGuardBody = await storeGuard.json();
                     expect(String(storeGuardBody?.error?.message ?? '')).toContain(
@@ -516,14 +475,10 @@ describe('UI reference kinds (DEV-61)', () => {
                     await fileRow.waitFor({ state: 'detached', timeout: 15_000 });
                     await expect(chipNames).toHaveCount(1);
                     expect(await fs.pathExists(blobPath)).toBe(true);
-                    const fileRemoveCall = apiCalls.find(
-                        (call) => call.path === '/api/tasks/references/file/remove',
-                    );
+                    const fileRemoveCall = apiCalls.find((call) => call.path === '/api/tasks/references/file/remove');
                     expect(fileRemoveCall?.body).toMatchObject({ id: task.id, path: repoFile });
 
-                    await panel
-                        .locator('.task-panel__attachments button[aria-label="Remove attachment"]')
-                        .click();
+                    await panel.locator('.task-panel__attachments button[aria-label="Remove attachment"]').click();
                     await expect(chipNames).toHaveCount(0);
                     await expect.poll(() => fs.pathExists(blobPath), { timeout: 15_000 }).toBe(false);
                     const preserved = await workspace.read(SCRATCH_FILE);
@@ -557,18 +512,14 @@ describe('UI reference kinds (DEV-61)', () => {
                     const chip = panel.locator('.task-panel__attachments .task-panel__attachment-link');
                     await chip.waitFor({ timeout: 15_000 });
                     const href = (await chip.getAttribute('href')) ?? '';
-                    expect(href).toMatch(
-                        /^\/api\/attachments\/h\/[0-9a-f]{32}\/vault-notes\.txt\?project=STORE$/,
-                    );
+                    expect(href).toMatch(/^\/api\/attachments\/h\/[0-9a-f]{32}\/vault-notes\.txt\?project=STORE$/);
 
-                    await expect.poll(() => storedPathGetter(), { timeout: 15_000 }).toMatch(
-                        /^vault-notes\.[0-9a-f]{32}\.txt$/,
-                    );
+                    await expect
+                        .poll(() => storedPathGetter(), { timeout: 15_000 })
+                        .toMatch(/^vault-notes\.[0-9a-f]{32}\.txt$/);
                     const storedPath = storedPathGetter();
 
-                    const uploadCall = apiCalls.find(
-                        (call) => call.path === '/api/tasks/attachments/upload',
-                    );
+                    const uploadCall = apiCalls.find((call) => call.path === '/api/tasks/attachments/upload');
                     expect(uploadCall?.body).toMatchObject({
                         id: task.id,
                         filename: 'vault-notes.txt',
@@ -576,21 +527,15 @@ describe('UI reference kinds (DEV-61)', () => {
 
                     const vaultPath = path.join(workspace.tasksDir, '@vault', storedPath);
                     await expect.poll(() => fs.pathExists(vaultPath), { timeout: 15_000 }).toBe(true);
-                    expect(
-                        await fs.pathExists(path.join(workspace.tasksDir, '@attachments', storedPath)),
-                    ).toBe(false);
+                    expect(await fs.pathExists(path.join(workspace.tasksDir, '@attachments', storedPath))).toBe(false);
 
                     const view = await page.request.get(new URL(href, server.url).toString());
                     expect(view.status()).toBe(200);
                     expect((await view.text()).trim()).toBe('vault store payload');
 
-                    const download = await page.request.get(
-                        `${new URL(href, server.url).toString()}&download=1`,
-                    );
+                    const download = await page.request.get(`${new URL(href, server.url).toString()}&download=1`);
                     expect(download.status()).toBe(200);
-                    expect(
-                        (download.headers()['content-disposition'] ?? '').startsWith('attachment;'),
-                    ).toBe(true);
+                    expect((download.headers()['content-disposition'] ?? '').startsWith('attachment;')).toBe(true);
                     expect((await download.text()).trim()).toBe('vault store payload');
                 });
             } finally {
@@ -633,9 +578,7 @@ describe('UI reference kinds (DEV-61)', () => {
                     const releaseHeldRoutes = async (): Promise<void> => {
                         barrierReleased = true;
                         const pending = heldRoutes.splice(0, heldRoutes.length);
-                        await Promise.all(
-                            pending.map((held) => held.route.continue().catch(() => undefined)),
-                        );
+                        await Promise.all(pending.map((held) => held.route.continue().catch(() => undefined)));
                     };
                     const configBarrier = async (route: Route) => {
                         if (!barrierArmed || barrierReleased) {
@@ -688,9 +631,7 @@ describe('UI reference kinds (DEV-61)', () => {
                         // assigning any task field, so a captured config
                         // request proves the panel is mid-load — and while it
                         // stays held the task provably cannot finish loading.
-                        await expect
-                            .poll(() => heldRoutes.length, { timeout: 15_000 })
-                            .toBeGreaterThanOrEqual(1);
+                        await expect.poll(() => heldRoutes.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
                         const capturedAt = Math.max(...heldRoutes.map((held) => held.at));
 
                         await dropFileOnPanel(page, 'vault-notes.txt', 'vault store payload');
@@ -704,14 +645,10 @@ describe('UI reference kinds (DEV-61)', () => {
                         // ready, no upload is ever sent and this wait times
                         // out (the pinned CI failure shape of the per-project
                         // custom-store case).
-                        const chip = panel.locator(
-                            '.task-panel__attachments .task-panel__attachment-link',
-                        );
+                        const chip = panel.locator('.task-panel__attachments .task-panel__attachment-link');
                         await chip.waitFor({ timeout: 15_000 });
                         const href = (await chip.getAttribute('href')) ?? '';
-                        expect(href).toMatch(
-                            /^\/api\/attachments\/h\/[0-9a-f]{32}\/vault-notes\.txt\?project=STORE$/,
-                        );
+                        expect(href).toMatch(/^\/api\/attachments\/h\/[0-9a-f]{32}\/vault-notes\.txt\?project=STORE$/);
 
                         // Ordering proof from observed events only: the held
                         // config response landed after the drop and after the
@@ -733,42 +670,34 @@ describe('UI reference kinds (DEV-61)', () => {
                         expect(configResponseAt).toBeGreaterThan(droppedAt);
                         const uploadAt =
                             timed.find(
-                                (event) =>
-                                    event.kind === 'request' &&
-                                    event.path === '/api/tasks/attachments/upload',
+                                (event) => event.kind === 'request' && event.path === '/api/tasks/attachments/upload',
                             )?.at ?? 0;
                         expect(uploadAt).toBeGreaterThan(0);
                         expect(uploadAt).toBeGreaterThanOrEqual(configResponseAt);
 
-                        await expect.poll(() => storedPathGetter(), { timeout: 15_000 }).toMatch(
-                            /^vault-notes\.[0-9a-f]{32}\.txt$/,
-                        );
+                        await expect
+                            .poll(() => storedPathGetter(), { timeout: 15_000 })
+                            .toMatch(/^vault-notes\.[0-9a-f]{32}\.txt$/);
                         const storedPath = storedPathGetter();
 
-                        const uploadCall = apiCalls.find(
-                            (call) => call.path === '/api/tasks/attachments/upload',
-                        );
+                        const uploadCall = apiCalls.find((call) => call.path === '/api/tasks/attachments/upload');
                         expect(uploadCall?.body).toMatchObject({
                             id: task.id,
                             filename: 'vault-notes.txt',
                         });
 
                         const vaultPath = path.join(workspace.tasksDir, '@vault', storedPath);
-                        await expect
-                            .poll(() => fs.pathExists(vaultPath), { timeout: 15_000 })
-                            .toBe(true);
-                        expect(
-                            await fs.pathExists(
-                                path.join(workspace.tasksDir, '@attachments', storedPath),
-                            ),
-                        ).toBe(false);
+                        await expect.poll(() => fs.pathExists(vaultPath), { timeout: 15_000 }).toBe(true);
+                        expect(await fs.pathExists(path.join(workspace.tasksDir, '@attachments', storedPath))).toBe(
+                            false,
+                        );
 
                         await expect
                             .poll(
                                 async () =>
-                                    typedReferences(
-                                        await readParsedTask(workspace, task.id),
-                                    ).some((entry) => entry.attachment === storedPath),
+                                    typedReferences(await readParsedTask(workspace, task.id)).some(
+                                        (entry) => entry.attachment === storedPath,
+                                    ),
                                 { timeout: 15_000 },
                             )
                             .toBe(true);
@@ -777,15 +706,9 @@ describe('UI reference kinds (DEV-61)', () => {
                         expect(view.status()).toBe(200);
                         expect((await view.text()).trim()).toBe('vault store payload');
 
-                        const download = await page.request.get(
-                            `${new URL(href, server.url).toString()}&download=1`,
-                        );
+                        const download = await page.request.get(`${new URL(href, server.url).toString()}&download=1`);
                         expect(download.status()).toBe(200);
-                        expect(
-                            (download.headers()['content-disposition'] ?? '').startsWith(
-                                'attachment;',
-                            ),
-                        ).toBe(true);
+                        expect((download.headers()['content-disposition'] ?? '').startsWith('attachment;')).toBe(true);
                         expect((await download.text()).trim()).toBe('vault store payload');
                     } finally {
                         // Release any still-held routes before unrouting so a

@@ -4,9 +4,18 @@ import TaskPanel from '../components/TaskPanel.vue'
 import { invalidateCompletionPolicies } from '../composables/useCompletionPolicy'
 
 const api = vi.hoisted(() => ({
-    getTask: vi.fn(), showConfig: vi.fn(), updateTask: vi.fn(), setStatus: vi.fn(), addTask: vi.fn(),
-    listProjects: vi.fn(), listTasks: vi.fn(), sprintList: vi.fn(), taskHistory: vi.fn(), inspectConfig: vi.fn(),
-    suggestTasks: vi.fn(), whoami: vi.fn(),
+    getTask: vi.fn(),
+    showConfig: vi.fn(),
+    updateTask: vi.fn(),
+    setStatus: vi.fn(),
+    addTask: vi.fn(),
+    listProjects: vi.fn(),
+    listTasks: vi.fn(),
+    sprintList: vi.fn(),
+    taskHistory: vi.fn(),
+    inspectConfig: vi.fn(),
+    suggestTasks: vi.fn(),
+    whoami: vi.fn(),
 }))
 const toast = vi.hoisted(() => vi.fn())
 vi.mock('../api/client', () => ({ api }))
@@ -14,9 +23,21 @@ vi.mock('../components/toast', () => ({ showToast: toast }))
 
 function task(id: string, status: string, taskState?: Record<string, unknown>) {
     return {
-        id, title: id, status, priority: 'Medium', task_type: 'Task',
-        reporter: '', assignee: '', description: '', tags: [] as string[], sprints: [],
-        relationships: {}, comments: [], references: [], history: [], custom_fields: {},
+        id,
+        title: id,
+        status,
+        priority: 'Medium',
+        task_type: 'Task',
+        reporter: '',
+        assignee: '',
+        description: '',
+        tags: [] as string[],
+        sprints: [],
+        relationships: {},
+        comments: [],
+        references: [],
+        history: [],
+        custom_fields: {},
         ...(taskState ? { task_state: taskState } : {}),
     }
 }
@@ -31,9 +52,14 @@ function config(project: string) {
         effective_done_states: ['Shipped'],
         done_states_mode: 'explicit',
         task_calendar_day: '2026-10-05',
-        default_project: project, default_status: 'Todo', default_priority: 'Medium',
-        default_reporter: '', default_assignee: '', default_tags: [] as string[],
-        tags: ['*'], custom_fields: [],
+        default_project: project,
+        default_status: 'Todo',
+        default_priority: 'Medium',
+        default_reporter: '',
+        default_assignee: '',
+        default_tags: [] as string[],
+        tags: ['*'],
+        custom_fields: [],
     }
 }
 
@@ -43,7 +69,8 @@ async function panel(taskId: string, status: string, taskState?: Record<string, 
     api.getTask.mockImplementation(async () => task(taskId, status, taskState))
     const wrapper = mount(TaskPanel, {
         props: { open: true, taskId, initialProject: 'A' },
-        global: { stubs: { Teleport: true } }, attachTo: document.body,
+        global: { stubs: { Teleport: true } },
+        attachTo: document.body,
     })
     wrappers.push(wrapper)
     await flushPromises()
@@ -69,7 +96,7 @@ describe('TaskPanel status badge vs explicit done policy (DEV-21 F2)', () => {
     })
 
     afterEach(() => {
-        wrappers.forEach(wrapper => wrapper.unmount())
+        wrappers.forEach((wrapper) => wrapper.unmount())
         wrappers = []
         document.body.innerHTML = ''
     })
@@ -108,7 +135,7 @@ describe('TaskPanel status badge vs explicit done policy (DEV-21 F2)', () => {
         expect(badge.classes()).toContain('badge--muted')
     })
 
-    it('drives the badge from the task\'s embedded actual-root done states', async () => {
+    it("drives the badge from the task's embedded actual-root done states", async () => {
         // The task carries its OWN policy ([Shipped]); the scoped showConfig
         // cache says [Shipped] too, but the embedded set is what decides —
         // and no green 'Done' guess once embedded states are provided.
@@ -131,7 +158,8 @@ describe('TaskPanel status badge vs explicit done policy (DEV-21 F2)', () => {
         // Shipped — the embedded set wins even when the status name is Done.
         const embedded = { done_states: ['Shipped'], is_done: false, due_bucket: null, calendar_day: '2026-10-05' }
         api.showConfig.mockImplementation(async (project?: string) => ({
-            ...config(project ?? ''), effective_done_states: ['Done'],
+            ...config(project ?? ''),
+            effective_done_states: ['Done'],
         }))
         const wrapper = await panel('A-6', 'Done', embedded)
         const vm = wrapper.vm as any
@@ -143,10 +171,14 @@ describe('TaskPanel status badge vs explicit done policy (DEV-21 F2)', () => {
 
     it('does not borrow cached Done when the task embeds an empty fail-closed policy', async () => {
         api.showConfig.mockImplementation(async (project?: string) => ({
-            ...config(project ?? ''), effective_done_states: ['Done'],
+            ...config(project ?? ''),
+            effective_done_states: ['Done'],
         }))
         const wrapper = await panel('A-7', 'Done', {
-            done_states: [], is_done: false, due_bucket: null, calendar_day: '2026-10-05',
+            done_states: [],
+            is_done: false,
+            due_bucket: null,
+            calendar_day: '2026-10-05',
         })
         expect(wrapper.find('[data-testid="task-panel-status-badge"]').classes()).toContain('badge--muted')
     })

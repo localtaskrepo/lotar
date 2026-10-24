@@ -159,7 +159,10 @@ export function extractDroppedUrls(event: DragEvent): string[] {
     // Firefox can expose URL drags as a single string with a newline-separated title.
     const moz = dt.getData('text/x-moz-url')
     if (moz) {
-        const parts = moz.split(/\r?\n/).map((p) => p.trim()).filter(Boolean)
+        const parts = moz
+            .split(/\r?\n/)
+            .map((p) => p.trim())
+            .filter(Boolean)
         if (parts[0]) candidates.push(parts[0])
     }
 
@@ -176,11 +179,7 @@ export function isFileDrag(event: DragEvent): boolean {
     if (items.some((item) => item.kind === 'file')) return true
 
     const types = Array.from(dt.types ?? [])
-    return (
-        types.includes('Files') ||
-        types.includes('public.file-url') ||
-        types.includes('application/x-moz-file')
-    )
+    return types.includes('Files') || types.includes('public.file-url') || types.includes('application/x-moz-file')
 }
 
 export function isLinkDrag(event: DragEvent): boolean {

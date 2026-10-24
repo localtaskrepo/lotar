@@ -105,7 +105,11 @@ export function useTaskPanelController() {
         if (!router) return
         const route = router.currentRoute.value
         if (route.path === '/dependencies') {
-            await router.push({ path: route.path, query: { ...route.query, root: taskId, q: taskId, taskPanel: taskId }, hash: route.hash })
+            await router.push({
+                path: route.path,
+                query: { ...route.query, root: taskId, q: taskId, taskPanel: taskId },
+                hash: route.hash,
+            })
             return
         }
         if (route.path.startsWith('/task/')) {
@@ -113,15 +117,26 @@ export function useTaskPanelController() {
             return
         }
         if (state.open && state.taskId && state.taskId !== 'new' && !route.query.taskPanel) {
-            await router.replace({ path: route.path, query: { ...route.query, taskPanel: state.taskId }, hash: route.hash })
+            await router.replace({
+                path: route.path,
+                query: { ...route.query, taskPanel: state.taskId },
+                hash: route.hash,
+            })
         }
-        await router.push({ path: route.path, query: { ...router.currentRoute.value.query, taskPanel: taskId }, hash: route.hash })
+        await router.push({
+            path: route.path,
+            query: { ...router.currentRoute.value.query, taskPanel: taskId },
+            hash: route.hash,
+        })
     }
     return {
         state: readonly(state),
         openTaskPanel,
         navigateTask,
-        setNavigatedTask: (taskId: string) => { state.taskId = taskId; state.open = true },
+        setNavigatedTask: (taskId: string) => {
+            state.taskId = taskId
+            state.open = true
+        },
         closeTaskPanel,
         notifyCreated,
         notifyUpdated,

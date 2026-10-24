@@ -11,13 +11,22 @@ const STATES = ['Todo', 'InProgress', 'NeedsReview', 'QA', 'Done', 'WontDo'];
 
 function seed(): Record<string, string> {
     const files: Record<string, string> = {
-        '.tasks/config.yml': 'default.project: LAY\ndefault.reporter: Fixture\nauto.set_reporter: false\nauto.assign_on_status: false\n',
-        '.tasks/LAY/config.yml': stringify({ project: { name: 'Layout' }, issue: { states: STATES, done_states: ['Done', 'WontDo'] } }),
+        '.tasks/config.yml':
+            'default.project: LAY\ndefault.reporter: Fixture\nauto.set_reporter: false\nauto.assign_on_status: false\n',
+        '.tasks/LAY/config.yml': stringify({
+            project: { name: 'Layout' },
+            issue: { states: STATES, done_states: ['Done', 'WontDo'] },
+        }),
     };
     STATES.forEach((status, index) => {
         files[`.tasks/LAY/${index + 1}.yml`] = stringify({
-            title: `${status} card`, status, priority: index % 2 ? 'High' : 'Low', type: 'Feature', reporter: 'Fixture',
-            created: '2026-10-01T00:00:00Z', modified: `2026-10-01T00:00:0${index}Z`,
+            title: `${status} card`,
+            status,
+            priority: index % 2 ? 'High' : 'Low',
+            type: 'Feature',
+            reporter: 'Fixture',
+            created: '2026-10-01T00:00:00Z',
+            modified: `2026-10-01T00:00:0${index}Z`,
         });
     });
     return files;
@@ -29,7 +38,7 @@ describe.concurrent('UI board columns dialog (DEV-130)', () => {
         try {
             const server = await startLotarServer(workspace);
             try {
-                await withPage(`${server.url}/boards?project=LAY`, async page => {
+                await withPage(`${server.url}/boards?project=LAY`, async (page) => {
                     await page.setViewportSize({ width: 1280, height: 900 });
                     const lanes = () => page.locator('.board.grid > .col.column .lane-header__title').allTextContents();
                     await expect.poll(lanes).toEqual(STATES);
@@ -58,13 +67,17 @@ describe.concurrent('UI board columns dialog (DEV-130)', () => {
                     const columnTitles = () => dialog.locator('.board-columns-dialog__title').allTextContents();
                     expect(await columnTitles()).toEqual(['Todo · WontDo', 'InProgress', 'Review', 'Done']);
                     // Drag the Done column by its header onto the left half of InProgress, then back to the end.
-                    const columnNamed = (title: string) => dialog.locator('.board-columns-dialog__column')
-                        .filter({ has: page.locator('.board-columns-dialog__title').getByText(title, { exact: true }) });
+                    const columnNamed = (title: string) =>
+                        dialog.locator('.board-columns-dialog__column').filter({
+                            has: page.locator('.board-columns-dialog__title').getByText(title, { exact: true }),
+                        });
                     const header = (title: string) => columnNamed(title).locator('.board-columns-dialog__column-head');
                     await header('Done').dragTo(columnNamed('InProgress'), { targetPosition: { x: 8, y: 80 } });
                     await expect.poll(columnTitles).toEqual(['Todo · WontDo', 'Done', 'InProgress', 'Review']);
                     const reviewBox = (await columnNamed('Review').boundingBox())!;
-                    await header('Done').dragTo(columnNamed('Review'), { targetPosition: { x: reviewBox.width - 10, y: 80 } });
+                    await header('Done').dragTo(columnNamed('Review'), {
+                        targetPosition: { x: reviewBox.width - 10, y: 80 },
+                    });
                     await expect.poll(columnTitles).toEqual(['Todo · WontDo', 'InProgress', 'Review', 'Done']);
                     const reviewColumn = dialog.locator('.board-columns-dialog__column').nth(2);
                     await reviewColumn.getByLabel('WIP limit').fill('1');
@@ -72,18 +85,24 @@ describe.concurrent('UI board columns dialog (DEV-130)', () => {
                     await dialog.waitFor({ state: 'detached' });
 
                     await expect.poll(lanes).toEqual(['Todo · WontDo', 'Review', 'Done']);
-                    expect(await page.getByTestId('board-hidden-columns').textContent()).toContain('1 column hidden (InProgress) · 1 task');
+                    expect(await page.getByTestId('board-hidden-columns').textContent()).toContain(
+                        '1 column hidden (InProgress) · 1 task',
+                    );
                     const review = page.locator('.board.grid > .col.column', { hasText: 'Review' }).first();
                     expect(await review.locator('.lane-header__count').textContent()).toContain('2 / 1');
-                    expect(await review.evaluate(el => el.classList.contains('over-limit'))).toBe(true);
+                    expect(await review.evaluate((el) => el.classList.contains('over-limit'))).toBe(true);
 
                     // Once the card move animation settles, the lanes fit without horizontal scroll.
-                    await expect.poll(() => page.locator('.board.grid').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+                    await expect
+                        .poll(() => page.locator('.board.grid').evaluate((el) => el.scrollWidth - el.clientWidth))
+                        .toBeLessThanOrEqual(1);
 
                     // Drop the Done card into the WontDo section of the stacked Todo lane.
                     const card = page.locator('article.task', { hasText: 'Done card' });
                     await card.dispatchEvent('dragstart');
-                    await page.locator('.column--stacked .column-section[data-status="WontDo"] .col-cards').dispatchEvent('drop');
+                    await page
+                        .locator('.column--stacked .column-section[data-status="WontDo"] .col-cards')
+                        .dispatchEvent('drop');
                     await expect.poll(async () => parse(await workspace.readTaskYaml('LAY-5')).status).toBe('WontDo');
 
                     await page.reload();
@@ -92,9 +111,17 @@ describe.concurrent('UI board columns dialog (DEV-130)', () => {
                     // Priority swimlanes: one compact header row, per-status sections in stacked cells.
                     await page.getByTestId('board-groupby').selectOption('priority');
                     await expect.poll(() => page.locator('.column-group-cell--stacked').count()).toBeGreaterThan(0);
-                    const headerHeights = await page.locator('.board-col-header').evaluateAll(nodes => nodes.map(n => Math.round(n.getBoundingClientRect().height)));
+                    const headerHeights = await page
+                        .locator('.board-col-header')
+                        .evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().height)));
                     expect(new Set(headerHeights).size).toBe(1);
-                    expect(await page.locator('.column-group-cell--stacked').first().locator('.column-section__label').allTextContents()).toHaveLength(2);
+                    expect(
+                        await page
+                            .locator('.column-group-cell--stacked')
+                            .first()
+                            .locator('.column-section__label')
+                            .allTextContents(),
+                    ).toHaveLength(2);
 
                     await page.getByTestId('board-groupby').selectOption('none');
                     await page.getByTestId('board-hidden-columns').getByRole('button', { name: 'Show all' }).click();

@@ -6,12 +6,7 @@ import net from 'node:net';
 import getPort from 'get-port';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveBinaryPath } from '../helpers/binary.js';
-import {
-    launchAndWaitReady,
-    readReadyMarker,
-    resolveServerBind,
-    startLotarServer,
-} from '../helpers/server.js';
+import { launchAndWaitReady, readReadyMarker, resolveServerBind, startLotarServer } from '../helpers/server.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 vi.mock('get-port', async (importOriginal) => {
@@ -132,15 +127,11 @@ describe('smoke harness server bind resolution', () => {
 });
 
 describe('ready marker scanning', () => {
-    const banner =
-        '   Host: 127.0.0.1\n   Port: 0\n   URL: http://127.0.0.1:41234\n   UI: embedded\n';
+    const banner = '   Host: 127.0.0.1\n   Port: 0\n   URL: http://127.0.0.1:41234\n   UI: embedded\n';
 
     it('recovers the advertised port for every possible split of the banner', async () => {
         for (let split = 1; split < banner.length; split += 1) {
-            const marker = await readReadyMarker(
-                chunksOf([banner.slice(0, split), banner.slice(split)]),
-                1_000,
-            );
+            const marker = await readReadyMarker(chunksOf([banner.slice(0, split), banner.slice(split)]), 1_000);
             expect(marker.host).toBe('127.0.0.1');
             expect(marker.port).toBe(41234);
         }
@@ -162,15 +153,13 @@ describe('ready marker scanning', () => {
     });
 
     it('rejects on early EOF when the marker never completes', async () => {
-        await expect(
-            readReadyMarker(chunksOf(['   URL: http://127.0.0.1:54']), 1_000),
-        ).rejects.toThrow(/ended before a complete readiness banner/i);
+        await expect(readReadyMarker(chunksOf(['   URL: http://127.0.0.1:54']), 1_000)).rejects.toThrow(
+            /ended before a complete readiness banner/i,
+        );
     });
 
     it('rejects on timeout when the stream stays silent', async () => {
-        await expect(readReadyMarker(silentStream(), 80)).rejects.toThrow(
-            /did not advertise readiness within 80ms/i,
-        );
+        await expect(readReadyMarker(silentStream(), 80)).rejects.toThrow(/did not advertise readiness within 80ms/i);
     });
 });
 
@@ -178,11 +167,11 @@ describe('server launch readiness against real child processes', () => {
     it('fails deterministically when the child exits before readiness', async () => {
         const cwd = tempCwd();
         try {
-            const error = await launchAndWaitReady(
-                process.execPath,
-                ['-e', 'process.exit(3)'],
-                { cwd, env: { ...process.env }, readyTimeoutMs: 5_000 },
-            ).then(
+            const error = await launchAndWaitReady(process.execPath, ['-e', 'process.exit(3)'], {
+                cwd,
+                env: { ...process.env },
+                readyTimeoutMs: 5_000,
+            }).then(
                 () => undefined,
                 (failure: Error & { node?: ChildProcess }) => failure,
             );
@@ -207,9 +196,7 @@ describe('server launch readiness against real child processes', () => {
                 (failure: Error & { node?: ChildProcess }) => failure,
             );
             expect(error).toBeInstanceOf(Error);
-            expect(error?.message).toMatch(
-                /exited before becoming ready|ended before a complete readiness banner/i,
-            );
+            expect(error?.message).toMatch(/exited before becoming ready|ended before a complete readiness banner/i);
         } finally {
             rmSync(cwd, { recursive: true, force: true });
         }
@@ -218,14 +205,13 @@ describe('server launch readiness against real child processes', () => {
     it('times out and kills a child that never becomes ready', async () => {
         const cwd = tempCwd();
         try {
-            const error = await launchAndWaitReady(
-                process.execPath,
-                ['-e', 'setInterval(() => {}, 1000);'],
-                { cwd, env: { ...process.env }, readyTimeoutMs: 400 },
-            ).then(
+            const error = await launchAndWaitReady(process.execPath, ['-e', 'setInterval(() => {}, 1000);'], {
+                cwd,
+                env: { ...process.env },
+                readyTimeoutMs: 400,
+            }).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) =>
-                    failure,
+                (failure: Error & { node?: ChildProcess }) => failure,
             );
             expect(error?.message).toMatch(/did not advertise readiness within 400ms/i);
             // The timed-out child was killed and reaped before the rejection.
@@ -290,8 +276,7 @@ describe('server launch readiness against real child processes', () => {
                 expectedPort: 59_999,
             }).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) =>
-                    failure,
+                (failure: Error & { node?: ChildProcess }) => failure,
             );
             expect(error?.message).toMatch(/advertised port 45678 but 59999 was requested/i);
             expect(exited(error?.node)).toBe(true);
@@ -311,8 +296,7 @@ describe.skipIf(!lotarBinaryAvailable)('lotar serve readiness contract (real bin
             const held = (holder.address() as net.AddressInfo).port;
             const error = await startLotarServer(workspace, { port: held }).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) =>
-                    failure,
+                (failure: Error & { node?: ChildProcess }) => failure,
             );
             expect(error).toBeInstanceOf(Error);
             // The banner is only printed after a successful bind, so a bind

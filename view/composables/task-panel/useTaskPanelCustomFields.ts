@@ -53,8 +53,7 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
     // this map are skipped; null means "no baseline yet" (defer to server).
     let appliedTaskCustomFields: Record<string, unknown> | null = null
 
-    const displayValue = (value: unknown): string =>
-        value === undefined || value === null ? '' : String(value)
+    const displayValue = (value: unknown): string => (value === undefined || value === null ? '' : String(value))
 
     /**
      * Structural deep equality for custom-field maps: preserves raw types
@@ -71,9 +70,17 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
         if (a !== null && b !== null && typeof a === 'object' && typeof b === 'object') {
             const aKeys = Object.keys(a as Record<string, unknown>)
             const bKeys = Object.keys(b as Record<string, unknown>)
-            return aKeys.length === bKeys.length && aKeys.every((key) =>
-                Object.prototype.hasOwnProperty.call(b, key) &&
-                customFieldValuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
+            return (
+                aKeys.length === bKeys.length &&
+                aKeys.every(
+                    (key) =>
+                        Object.prototype.hasOwnProperty.call(b, key) &&
+                        customFieldValuesEqual(
+                            (a as Record<string, unknown>)[key],
+                            (b as Record<string, unknown>)[key],
+                        ),
+                )
+            )
         }
         return false
     }

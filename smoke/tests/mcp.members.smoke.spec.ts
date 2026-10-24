@@ -34,10 +34,7 @@ describe.concurrent('MCP strict member smoke scenarios', () => {
                     reporter: 'allowed@example.com',
                     assignee: 'intruder@example.com',
                 });
-                expectToolFailure(
-                    invalid,
-                    "Assignee 'intruder@example.com' is not in configured members",
-                );
+                expectToolFailure(invalid, "Assignee 'intruder@example.com' is not in configured members");
 
                 const success = await callTool(client, 3, 'task/create', {
                     title: 'MCP strict members allowed assignee',

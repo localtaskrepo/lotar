@@ -91,9 +91,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
         }
 
         if (seen.size !== membershipSet.size) {
-            const remainder = membership
-                .filter((id) => !seen.has(id))
-                .sort((a, b) => a - b)
+            const remainder = membership.filter((id) => !seen.has(id)).sort((a, b) => a - b)
             idOrder.push(...remainder)
         }
 

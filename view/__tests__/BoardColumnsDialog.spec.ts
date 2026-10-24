@@ -14,7 +14,9 @@ const row = (wrapper: Wrapper, label: string) => wrapper.find(`[data-layout-stat
 const column = (wrapper: Wrapper, index: number) => wrapper.findAll('.board-columns-dialog__column')[index]!
 const titles = (wrapper: Wrapper) => wrapper.findAll('.board-columns-dialog__title').map((t) => t.text())
 async function menuMove(wrapper: Wrapper, label: string, item: string) {
-    const button = row(wrapper, label).findAll('.board-columns-dialog__menu-item').find((b) => b.text() === item)
+    const button = row(wrapper, label)
+        .findAll('.board-columns-dialog__menu-item')
+        .find((b) => b.text() === item)
     expect(button, `${item} for ${label}`).toBeTruthy()
     await button!.trigger('click')
 }
@@ -27,7 +29,14 @@ const stacks = (layout: BoardLayout) => layout.columns.map((c) => c.statuses.joi
 
 describe('BoardColumnsDialog (DEV-130)', () => {
     it('shows columns side by side with plain titles until renamed', async () => {
-        const wrapper = mountDialog({ columns: [{ statuses: ['todo'] }, { statuses: ['doing', 'review'], name: 'Active' }, { statuses: ['done'] }], hidden: [] })
+        const wrapper = mountDialog({
+            columns: [
+                { statuses: ['todo'] },
+                { statuses: ['doing', 'review'], name: 'Active' },
+                { statuses: ['done'] },
+            ],
+            hidden: [],
+        })
         await flushPromises()
         expect(titles(wrapper)).toEqual(['Todo', 'Active', 'Done'])
         expect(wrapper.find('input.board-columns-dialog__rename').exists()).toBe(false)
@@ -77,7 +86,10 @@ describe('BoardColumnsDialog (DEV-130)', () => {
     })
 
     it('stacks by dragging a status onto another column, status, or the new-column target', async () => {
-        const wrapper = mountDialog({ columns: [{ statuses: ['todo', 'doing'] }, { statuses: ['review'] }, { statuses: ['done'] }], hidden: [] })
+        const wrapper = mountDialog({
+            columns: [{ statuses: ['todo', 'doing'] }, { statuses: ['review'] }, { statuses: ['done'] }],
+            hidden: [],
+        })
         await flushPromises()
         await row(wrapper, 'Done').trigger('dragstart')
         await row(wrapper, 'Doing').trigger('drop')
@@ -91,14 +103,30 @@ describe('BoardColumnsDialog (DEV-130)', () => {
     })
 
     it('keeps per-column settings with the column and resets to one column per status', async () => {
-        const wrapper = mountDialog({ columns: [{ statuses: ['todo'] }, { statuses: ['doing', 'review'], name: 'Active', wipLimit: 4 }, { statuses: ['done'] }], hidden: ['done'] })
+        const wrapper = mountDialog({
+            columns: [
+                { statuses: ['todo'] },
+                { statuses: ['doing', 'review'], name: 'Active', wipLimit: 4 },
+                { statuses: ['done'] },
+            ],
+            hidden: ['done'],
+        })
         await flushPromises()
         await column(wrapper, 1).find('.board-columns-dialog__grip').trigger('keydown', { key: 'ArrowLeft' })
         await column(wrapper, 0).findAll('.board-columns-dialog__settings input')[2]!.setValue('5')
         const result = await applied(wrapper)
-        expect(result.columns[0]).toEqual({ statuses: ['doing', 'review'], name: 'Active', wipLimit: 4, maxAgeDays: undefined, maxVisible: 5 })
+        expect(result.columns[0]).toEqual({
+            statuses: ['doing', 'review'],
+            name: 'Active',
+            wipLimit: 4,
+            maxAgeDays: undefined,
+            maxVisible: 5,
+        })
         expect(result.hidden).toEqual(['done'])
-        await wrapper.findAll('button').find((b) => b.text() === 'Reset to defaults')!.trigger('click')
+        await wrapper
+            .findAll('button')
+            .find((b) => b.text() === 'Reset to defaults')!
+            .trigger('click')
         const reset = await applied(wrapper)
         expect(stacks(reset)).toEqual(['todo', 'doing', 'review', 'done'])
         expect(reset.hidden).toEqual([])

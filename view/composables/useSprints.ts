@@ -21,9 +21,9 @@ async function load(force = false): Promise<void> {
             const response = await api.sprintList()
             const normalized = Array.isArray(response.sprints)
                 ? response.sprints.map((item) => ({
-                    ...item,
-                    warnings: Array.isArray((item as any).warnings) ? item.warnings : [],
-                }))
+                      ...item,
+                      warnings: Array.isArray((item as any).warnings) ? item.warnings : [],
+                  }))
                 : []
             sprints.value = normalized
             missingSprints.value = Array.isArray(response.missing_sprints) ? response.missing_sprints : []
@@ -54,7 +54,9 @@ export function useSprints() {
     })
 
     const active = computed(() => sprints.value.filter((item) => item.state === 'active' || item.state === 'overdue'))
-    const defaultSprintId = computed<number | undefined>(() => (active.value.length === 1 ? (active.value[0]?.id ?? undefined) : undefined))
+    const defaultSprintId = computed<number | undefined>(() =>
+        active.value.length === 1 ? (active.value[0]?.id ?? undefined) : undefined,
+    )
     const hasMissing = computed(() => missingSprints.value.length > 0)
 
     return {
@@ -72,7 +74,5 @@ export function useSprints() {
 
 /** Dropdown options for the sprint grammar/filter UI (id + label), shared by pages. */
 export function useSprintFilterOptions(sprints: Ref<SprintListItem[]>) {
-    return computed(() =>
-        (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
-    )
+    return computed(() => (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })))
 }

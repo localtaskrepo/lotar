@@ -12,7 +12,12 @@ import { useTaskPanelSprints } from './task-panel/useTaskPanelSprints'
 import { useTaskPanelTags } from './task-panel/useTaskPanelTags'
 import { useTaskPanelWatchers } from './task-panel/useTaskPanelWatchers'
 import { useConfig } from './useConfig'
-import { completionStatusKey, embeddedDoneStatesOf, ensureCompletionPolicy, useCompletionPolicy } from './useCompletionPolicy'
+import {
+    completionStatusKey,
+    embeddedDoneStatesOf,
+    ensureCompletionPolicy,
+    useCompletionPolicy,
+} from './useCompletionPolicy'
 import { useProjects } from './useProjects'
 import { useReferencePreview } from './useReferencePreview'
 import { useSprints } from './useSprints'
@@ -117,8 +122,16 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         tags: [] as string[],
         sprints: [] as number[],
     })
-    const canCreate = computed(() => props.open && mode.value === 'create' && ready.value &&
-        !loading.value && !submitting.value && !!form.project.trim() && loadedConfigScope.value === form.project)
+    const canCreate = computed(
+        () =>
+            props.open &&
+            mode.value === 'create' &&
+            ready.value &&
+            !loading.value &&
+            !submitting.value &&
+            !!form.project.trim() &&
+            loadedConfigScope.value === form.project,
+    )
 
     const {
         hoveredReferenceCode,
@@ -278,8 +291,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         formatChangeValue,
     } = useTaskPanelActivity()
 
-    const loadCommitHistory = (id: string, limit?: number) =>
-        loadCommitHistoryFromActivity(id, limit)
+    const loadCommitHistory = (id: string, limit?: number) => loadCommitHistoryFromActivity(id, limit)
 
     const refreshCommits = async () => {
         if (!task.id) return
@@ -330,32 +342,37 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     })
 
     let relationshipRead = 0
-    const {
-        relationships,
-        resetRelationships,
-        buildRelationships,
-        applyRelationshipsFromTask,
-        mutateRelationship,
-    } = useTaskRelationships({
-        mode,
-        ready,
-        suppressWatch,
-        scope: () => `${props.open}:${props.taskId}:${task.deleted_at || ''}:${panelGeneration.value}`,
-        taskId: () => task.id || '',
-        editable: () => props.open && !task.deleted_at,
-        execute: async (intent) => { await api.relationshipMutate(relationshipMutation(task.id, intent)) },
-        reconcile: async () => {
-            const id = task.id, request = panelGeneration.value, read = ++relationshipRead
-            const updated = await api.getTask(id, undefined, { includeDeleted: true })
-            if (!props.open || props.taskId !== id || panelGeneration.value !== request || read !== relationshipRead) return
-            task.relationships = updated.relationships
-            task.history = updated.history
-            task.modified = updated.modified
-            if (updated.deleted_at) task.deleted_at = updated.deleted_at
-            emit('updated', updated)
-            return updated
-        },
-    })
+    const { relationships, resetRelationships, buildRelationships, applyRelationshipsFromTask, mutateRelationship } =
+        useTaskRelationships({
+            mode,
+            ready,
+            suppressWatch,
+            scope: () => `${props.open}:${props.taskId}:${task.deleted_at || ''}:${panelGeneration.value}`,
+            taskId: () => task.id || '',
+            editable: () => props.open && !task.deleted_at,
+            execute: async (intent) => {
+                await api.relationshipMutate(relationshipMutation(task.id, intent))
+            },
+            reconcile: async () => {
+                const id = task.id,
+                    request = panelGeneration.value,
+                    read = ++relationshipRead
+                const updated = await api.getTask(id, undefined, { includeDeleted: true })
+                if (
+                    !props.open ||
+                    props.taskId !== id ||
+                    panelGeneration.value !== request ||
+                    read !== relationshipRead
+                )
+                    return
+                task.relationships = updated.relationships
+                task.history = updated.history
+                task.modified = updated.modified
+                if (updated.deleted_at) task.deleted_at = updated.deleted_at
+                emit('updated', updated)
+                return updated
+            },
+        })
 
     const {
         whoami,
@@ -467,11 +484,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             await ensureProjectsLoaded()
             if (!current()) return
             if (mode.value === 'create') {
-                const scopeProject =
-                    props.initialProject ||
-                    defaults.value.project ||
-                    projects.value[0]?.prefix ||
-                    ''
+                const scopeProject = props.initialProject || defaults.value.project || projects.value[0]?.prefix || ''
                 form.project = scopeProject
                 await refreshConfig(scopeProject)
                 if (!current() || form.project !== scopeProject || loadedConfigScope.value !== scopeProject) return
@@ -684,7 +697,9 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         handleSubmit,
         updateStatus,
         reloadTask,
-        invalidateTaskRequests: () => { panelGeneration.value += 1 },
+        invalidateTaskRequests: () => {
+            panelGeneration.value += 1
+        },
         formatDate,
         formatCommit,
         formatFieldName,

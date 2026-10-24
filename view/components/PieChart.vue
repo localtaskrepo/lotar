@@ -3,12 +3,7 @@
     <canvas ref="canvasEl" :width="size" :height="size"></canvas>
   </div>
   <div class="legend" v-if="legend && legendItems.length">
-    <div
-      class="legend-item"
-      v-for="(item, index) in legendItems"
-      :key="item.label + index"
-      @click="emitSlice(index)"
-    >
+    <div class="legend-item" v-for="(item, index) in legendItems" :key="item.label + index" @click="emitSlice(index)">
       <span class="swatch" :style="{ background: item.color }"></span>
       <span>{{ item.label }}</span>
       <span class="muted">{{ item.value }}</span>
@@ -17,22 +12,25 @@
 </template>
 
 <script setup lang="ts">
-import { ArcElement, Chart, Legend as ChartLegend, DoughnutController, Tooltip } from 'chart.js';
-import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
+import { ArcElement, Chart, Legend as ChartLegend, DoughnutController, Tooltip } from 'chart.js'
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 
 Chart.register(DoughnutController, ArcElement, Tooltip, ChartLegend)
 
-const props = withDefaults(defineProps<{
-  data?: Array<{ label: string; value: number; color?: string }>
-  series?: Array<{ key: string; count: number; color?: string }>
-  size?: number
-  thickness?: number
-  withHole?: boolean
-  legend?: boolean
-  colors?: string[]
-}>(), { size: 160, thickness: 18, withHole: true, legend: true })
+const props = withDefaults(
+  defineProps<{
+    data?: Array<{ label: string; value: number; color?: string }>
+    series?: Array<{ key: string; count: number; color?: string }>
+    size?: number
+    thickness?: number
+    withHole?: boolean
+    legend?: boolean
+    colors?: string[]
+  }>(),
+  { size: 160, thickness: 18, withHole: true, legend: true },
+)
 
-const emit = defineEmits<{ (e:'select', payload: unknown): void }>()
+const emit = defineEmits<{ (e: 'select', payload: unknown): void }>()
 
 const canvasEl = shallowRef<HTMLCanvasElement | null>(null)
 const chart = shallowRef<Chart<'doughnut'> | null>(null)
@@ -52,10 +50,10 @@ type Slice = { label: string; value: number; color?: string; raw: unknown }
 
 const normalizedData = computed<Slice[]>(() => {
   if (props.data?.length) {
-    return props.data.map(item => ({ label: item.label, value: item.value, color: item.color, raw: item }))
+    return props.data.map((item) => ({ label: item.label, value: item.value, color: item.color, raw: item }))
   }
   if (props.series?.length) {
-    return props.series.map(item => ({ label: item.key, value: item.count, color: item.color, raw: item }))
+    return props.series.map((item) => ({ label: item.key, value: item.count, color: item.color, raw: item }))
   }
   return []
 })
@@ -66,7 +64,7 @@ const slices = computed(() => {
     .map((value) => value?.trim())
     .filter((value): value is string => !!value)
 
-  const paletteFallback = palette.length ? palette : (fallback ? [fallback] : [])
+  const paletteFallback = palette.length ? palette : fallback ? [fallback] : []
 
   return normalizedData.value.map((item, index) => {
     const paletteColor = paletteFallback.length ? paletteFallback[index % paletteFallback.length] : fallback
@@ -75,10 +73,10 @@ const slices = computed(() => {
   })
 })
 
-const labels = computed(() => slices.value.map(item => item.label))
-const values = computed(() => slices.value.map(item => item.value))
-const backgroundColors = computed(() => slices.value.map(item => item.color))
-const borderWidth = computed(() => props.withHole ? Math.max(1, Math.floor(props.thickness / 8)) : 0)
+const labels = computed(() => slices.value.map((item) => item.label))
+const values = computed(() => slices.value.map((item) => item.value))
+const backgroundColors = computed(() => slices.value.map((item) => item.color))
+const borderWidth = computed(() => (props.withHole ? Math.max(1, Math.floor(props.thickness / 8)) : 0))
 const cutoutValue = computed(() => {
   if (!props.withHole) return '0%'
   const diameter = props.size || 0
@@ -104,12 +102,14 @@ function upsertChart() {
       type: 'doughnut',
       data: {
         labels: labels.value,
-        datasets: [{
-          data: values.value,
-          backgroundColor: backgroundColors.value,
-          borderColor,
-          borderWidth: borderWidth.value,
-        }],
+        datasets: [
+          {
+            data: values.value,
+            backgroundColor: backgroundColors.value,
+            borderColor,
+            borderWidth: borderWidth.value,
+          },
+        ],
       },
       options: {
         responsive: false,
@@ -142,14 +142,17 @@ function upsertChart() {
 
 watch([labels, values, backgroundColors, cutoutValue, borderWidth], upsertChart, { deep: true })
 
-watch(() => props.size, newSize => {
-  if (!canvasEl.value) return
-  if (newSize) {
-    canvasEl.value.width = newSize
-    canvasEl.value.height = newSize
-  }
-  chart.value?.resize()
-})
+watch(
+  () => props.size,
+  (newSize) => {
+    if (!canvasEl.value) return
+    if (newSize) {
+      canvasEl.value.width = newSize
+      canvasEl.value.height = newSize
+    }
+    chart.value?.resize()
+  },
+)
 
 function emitSlice(index: number) {
   const slice = slices.value[index]

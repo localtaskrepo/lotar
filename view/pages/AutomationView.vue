@@ -1,20 +1,18 @@
 <template>
-  <section class="col" style="gap: 16px;">
-    <header class="row" style="align-items: flex-start; justify-content: space-between;">
-      <div class="col" style="gap: 4px;">
-        <h1 style="margin: 0;">Automations</h1>
-        <p class="muted" style="margin: 0;">Configure rules that trigger actions automatically.</p>
+  <section class="col" style="gap: 16px">
+    <header class="row" style="align-items: flex-start; justify-content: space-between">
+      <div class="col" style="gap: 4px">
+        <h1 style="margin: 0">Automations</h1>
+        <p class="muted" style="margin: 0">Configure rules that trigger actions automatically.</p>
       </div>
-      <div class="row" style="gap: 8px; flex-wrap: wrap;">
-        <UiSelect v-model="project" aria-label="Project scope" style="min-width: 200px;">
+      <div class="row" style="gap: 8px; flex-wrap: wrap">
+        <UiSelect v-model="project" aria-label="Project scope" style="min-width: 200px">
           <option value="">Global rules</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">
             {{ formatProjectLabel(p) }}
           </option>
         </UiSelect>
-        <UiButton variant="ghost" type="button" :disabled="loading" @click="openConfig">
-          Open config
-        </UiButton>
+        <UiButton variant="ghost" type="button" :disabled="loading" @click="openConfig"> Open config </UiButton>
         <ReloadButton
           :disabled="loading || savingRules"
           :loading="loading"
@@ -26,18 +24,13 @@
       </div>
     </header>
 
-    <p v-if="projectsError" class="muted" style="margin: 0; font-size: 13px;">
+    <p v-if="projectsError" class="muted" style="margin: 0; font-size: 13px">
       Project list unavailable: {{ projectsError }}
     </p>
 
     <!-- Tabs for Rules vs Simulator -->
-    <div class="row" style="gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-      <button
-        class="filter-tab"
-        :class="{ active: activeTab === 'rules' }"
-        type="button"
-        @click="activeTab = 'rules'"
-      >
+    <div class="row" style="gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px">
+      <button class="filter-tab" :class="{ active: activeTab === 'rules' }" type="button" @click="activeTab = 'rules'">
         Rules
       </button>
       <button
@@ -55,16 +48,29 @@
 
     <!-- Rules Tab -->
     <template v-else-if="activeTab === 'rules'">
-      <div class="col" style="gap: 12px;">
-        <div class="row automation-rules__toolbar" style="justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <p class="muted" style="margin: 0; max-width: 48rem;">
+      <div class="col" style="gap: 12px">
+        <div
+          class="row automation-rules__toolbar"
+          style="justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap"
+        >
+          <p class="muted" style="margin: 0; max-width: 48rem">
             Create rules visually here, or fine-tune the generated YAML for advanced cases.
           </p>
-          <div class="row" style="gap: 8px; flex-wrap: wrap;">
-            <UiButton variant="ghost" type="button" :disabled="loading || savingRules || !rulesDirty" @click="resetRules">
+          <div class="row" style="gap: 8px; flex-wrap: wrap">
+            <UiButton
+              variant="ghost"
+              type="button"
+              :disabled="loading || savingRules || !rulesDirty"
+              @click="resetRules"
+            >
               Reset
             </UiButton>
-            <UiButton variant="primary" type="button" :disabled="loading || savingRules || !rulesDirty" @click="saveRules">
+            <UiButton
+              variant="primary"
+              type="button"
+              :disabled="loading || savingRules || !rulesDirty"
+              @click="saveRules"
+            >
               {{ savingRules ? 'Saving…' : 'Save rules' }}
             </UiButton>
           </div>
@@ -76,7 +82,11 @@
           :loading="loading || savingRules"
           :error="rulesSaveError"
           :source-label="automationSourceLabel"
-          :scope-hint="project ? `Edit .tasks/${project}/automation.yml. Leave it empty to inherit higher scopes.` : 'Edit .tasks/automation.yml. Leave it empty to clear the global scoped rules.'"
+          :scope-hint="
+            project
+              ? `Edit .tasks/${project}/automation.yml. Leave it empty to inherit higher scopes.`
+              : 'Edit .tasks/automation.yml. Leave it empty to clear the global scoped rules.'
+          "
           :available-statuses="availableStatuses"
           :available-priorities="availablePriorities"
           :available-types="availableTypes"
@@ -85,9 +95,10 @@
       </div>
 
       <div class="help-text">
-        <p class="muted" style="font-size: 13px;">
-          Rules live in <code>.tasks/automation.yml</code> (global) or <code>.tasks/&lt;PROJECT&gt;/automation.yml</code> (project).
-          You can edit them here or from the Configuration page, and use the simulator tab to test job lifecycle events.
+        <p class="muted" style="font-size: 13px">
+          Rules live in <code>.tasks/automation.yml</code> (global) or
+          <code>.tasks/&lt;PROJECT&gt;/automation.yml</code> (project). You can edit them here or from the Configuration
+          page, and use the simulator tab to test job lifecycle events.
           <span v-if="automationSourceLabel">Effective source: {{ automationSourceLabel }}.</span>
         </p>
       </div>
@@ -96,15 +107,15 @@
     <!-- Simulator Tab -->
     <template v-else-if="activeTab === 'simulator'">
       <UiCard class="simulator-card">
-        <h3 style="margin: 0 0 12px 0;">Test automation rules</h3>
-        <p class="muted" style="margin: 0 0 16px 0; font-size: 13px;">
+        <h3 style="margin: 0 0 12px 0">Test automation rules</h3>
+        <p class="muted" style="margin: 0 0 16px 0; font-size: 13px">
           Select a job lifecycle event and a ticket to see which rules would trigger.
         </p>
 
-        <div class="col" style="gap: 12px;">
-          <div class="row" style="gap: 12px;">
-            <div class="col" style="gap: 4px; flex: 1;">
-              <label class="muted" style="font-size: 12px;">Event type</label>
+        <div class="col" style="gap: 12px">
+          <div class="row" style="gap: 12px">
+            <div class="col" style="gap: 4px; flex: 1">
+              <label class="muted" style="font-size: 12px">Event type</label>
               <UiSelect v-model="simEvent" aria-label="Event type">
                 <option value="">Select event…</option>
                 <option value="job_start">job_start</option>
@@ -113,13 +124,13 @@
                 <option value="cancel">cancel</option>
               </UiSelect>
             </div>
-            <div class="col" style="gap: 4px; flex: 1;">
-              <label class="muted" style="font-size: 12px;">Ticket ID</label>
+            <div class="col" style="gap: 4px; flex: 1">
+              <label class="muted" style="font-size: 12px">Ticket ID</label>
               <UiInput v-model="simTicket" placeholder="e.g., PROJ-123" />
             </div>
           </div>
 
-          <div class="row" style="gap: 8px; justify-content: flex-end;">
+          <div class="row" style="gap: 8px; justify-content: flex-end">
             <UiButton
               variant="primary"
               type="button"
@@ -136,19 +147,13 @@
 
       <template v-if="simResult">
         <UiCard class="result-card">
-          <h4 style="margin: 0 0 8px 0;">Simulation result</h4>
+          <h4 style="margin: 0 0 8px 0">Simulation result</h4>
 
-          <div v-if="!simResult.actions.length" class="muted">
-            No rules matched for this event.
-          </div>
+          <div v-if="!simResult.actions.length" class="muted">No rules matched for this event.</div>
 
-          <div v-else class="col" style="gap: 12px;">
-            <div
-              v-for="(action, idx) in simResult.actions"
-              :key="idx"
-              class="simulated-action"
-            >
-              <div class="row" style="gap: 8px; align-items: center;">
+          <div v-else class="col" style="gap: 12px">
+            <div v-for="(action, idx) in simResult.actions" :key="idx" class="simulated-action">
+              <div class="row" style="gap: 8px; align-items: center">
                 <span v-if="simResult.rule_name" class="rule-ref">{{ simResult.rule_name }}</span>
                 <span v-else class="rule-ref muted">Unnamed rule</span>
                 <span class="action-chip">{{ action.action }}</span>
@@ -165,9 +170,9 @@
         </UiCard>
 
         <UiCard v-if="simResult.task_after" class="result-card">
-          <h4 style="margin: 0 0 8px 0;">Task state after actions</h4>
+          <h4 style="margin: 0 0 8px 0">Task state after actions</h4>
           <div class="task-preview">
-            <div class="row" style="gap: 8px; flex-wrap: wrap;">
+            <div class="row" style="gap: 8px; flex-wrap: wrap">
               <span class="chip">{{ simResult.task_after.id }}</span>
               <span class="chip">{{ simResult.task_after.status }}</span>
               <span v-if="simResult.task_after.priority" class="chip">{{ simResult.task_after.priority }}</span>
@@ -175,10 +180,14 @@
               <span v-if="simResult.task_after.due_date" class="chip">Due {{ simResult.task_after.due_date }}</span>
               <span v-if="simResult.task_after.effort" class="chip">{{ simResult.task_after.effort }}</span>
             </div>
-            <p v-if="simResult.task_after.title" style="margin: 8px 0 0 0;">
+            <p v-if="simResult.task_after.title" style="margin: 8px 0 0 0">
               {{ simResult.task_after.title }}
             </p>
-            <div v-if="simResult.task_after.tags?.length" class="row" style="gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+            <div
+              v-if="simResult.task_after.tags?.length"
+              class="row"
+              style="gap: 4px; margin-top: 8px; flex-wrap: wrap"
+            >
               <span v-for="tag in simResult.task_after.tags" :key="tag" class="tag-chip">{{ tag }}</span>
             </div>
           </div>
@@ -192,11 +201,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
-import type {
-    AutomationSimulateResponse,
-    ConfigInspectResult,
-    ProjectDTO,
-} from '../api/types'
+import type { AutomationSimulateResponse, ConfigInspectResult, ProjectDTO } from '../api/types'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import UiButton from '../components/UiButton.vue'
@@ -220,7 +225,9 @@ const configData = ref<ConfigInspectResult | null>(null)
 const router = useRouter()
 const loadedScope = ref<string | null>(null)
 let generation = 0
-const rulesDirty = computed(() => loadedScope.value === project.value && !loading.value && !error.value && scopeYaml.value !== baselineYaml.value)
+const rulesDirty = computed(
+  () => loadedScope.value === project.value && !loading.value && !error.value && scopeYaml.value !== baselineYaml.value,
+)
 
 const availableStatuses = computed(() => configData.value?.effective.issue_states ?? [])
 const availablePriorities = computed(() => configData.value?.effective.issue_priorities ?? [])
@@ -352,10 +359,16 @@ onMounted(() => {
   void Promise.allSettled([loadProjects(), refresh()])
 })
 
-watch(project, () => {
-  void refresh()
-}, { flush: 'sync' })
-onUnmounted(() => { generation += 1 })
+watch(
+  project,
+  () => {
+    void refresh()
+  },
+  { flush: 'sync' },
+)
+onUnmounted(() => {
+  generation += 1
+})
 </script>
 
 <style scoped>

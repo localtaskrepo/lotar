@@ -190,19 +190,15 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.applyTaskSprints(data)
         options.resetReferencePreviews()
 
-        options.task.comments = Array.isArray(data.comments)
-            ? data.comments.map((comment) => ({ ...comment }))
-            : []
+        options.task.comments = Array.isArray(data.comments) ? data.comments.map((comment) => ({ ...comment })) : []
         options.task.references = Array.isArray(data.references)
             ? data.references.map((reference) => ({ ...reference }))
             : []
         options.task.history = Array.isArray(data.history)
             ? data.history.map((entry) => ({
-                ...entry,
-                changes: Array.isArray(entry.changes)
-                    ? entry.changes.map((change) => ({ ...change }))
-                    : [],
-            }))
+                  ...entry,
+                  changes: Array.isArray(entry.changes) ? entry.changes.map((change) => ({ ...change })) : [],
+              }))
             : []
 
         options.syncFromTaskHistory(data)
@@ -230,7 +226,12 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options
             .refreshConfig(project)
             .then(() => {
-                if (request !== projectGeneration || project !== options.form.project || options.mode.value !== 'create') return
+                if (
+                    request !== projectGeneration ||
+                    project !== options.form.project ||
+                    options.mode.value !== 'create'
+                )
+                    return
                 // Preserve the latest global membership, including draft edits
                 // made while the project's configuration was loading.
                 const sprintMembership = Array.isArray(options.form.sprints) ? [...options.form.sprints] : []
@@ -239,7 +240,12 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
                 options.ready.value = true
             })
             .catch((error: unknown) => {
-                if (request !== projectGeneration || project !== options.form.project || options.mode.value !== 'create') return
+                if (
+                    request !== projectGeneration ||
+                    project !== options.form.project ||
+                    options.mode.value !== 'create'
+                )
+                    return
                 options.errors.config = error instanceof Error ? error.message : 'Failed to load project configuration'
             })
     }

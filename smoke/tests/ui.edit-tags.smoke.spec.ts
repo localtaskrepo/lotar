@@ -27,11 +27,7 @@ describe.concurrent('UI edit-tags row action', () => {
 
                     // Sanity: the tags column is visible and shows our tag.
                     await page.waitForSelector('.task-table__cell--tags', { timeout: 15_000 });
-                    expect(
-                        await page
-                            .locator('.task-table__cell--tags', { hasText: tag })
-                            .count(),
-                    ).toBeGreaterThan(0);
+                    expect(await page.locator('.task-table__cell--tags', { hasText: tag }).count()).toBeGreaterThan(0);
 
                     // Hide the tags column through the "Configure columns" control
                     // (the exact path a user takes) to reproduce the bug condition.
@@ -59,17 +55,11 @@ describe.concurrent('UI edit-tags row action', () => {
                     await page.waitForSelector('[data-testid="tag-dialog"]', {
                         timeout: 15_000,
                     });
-                    const heading = await page
-                        .locator('[data-testid="tag-dialog"] h2')
-                        .textContent();
+                    const heading = await page.locator('[data-testid="tag-dialog"] h2').textContent();
                     expect(heading).toBe('Manage tags');
 
                     // The existing tag travels into the panel context.
-                    expect(
-                        await page
-                            .locator('.task-panel__tag-label', { hasText: tag })
-                            .count(),
-                    ).toBeGreaterThan(0);
+                    expect(await page.locator('.task-panel__tag-label', { hasText: tag }).count()).toBeGreaterThan(0);
 
                     // DEV-144: the modal hides the panel's tag list, so the dialog
                     // lists the task's tags itself, including newly added ones.

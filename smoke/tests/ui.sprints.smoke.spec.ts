@@ -58,8 +58,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
 
                     const headings = await page.$$eval(
                         '.sprint-group:not(.backlog-group) .group-title h2',
-                        (nodes: Element[]) =>
-                            nodes.map((node) => (node.textContent ? node.textContent.trim() : '')),
+                        (nodes: Element[]) => nodes.map((node) => (node.textContent ? node.textContent.trim() : '')),
                     );
 
                     expect(headings.some((text: string) => text.includes('Smoke Sprint Smoke Test'))).toBe(true);
@@ -113,9 +112,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     const sourceMembership = await readSprintMembership(workspace, '1');
                     expect(sourceMembership).not.toContain(task.id);
 
-                    const remaining = await page.$(
-                        '[data-sprint-id="1"] tr.task-row[data-task-id="' + task.id + '"]',
-                    );
+                    const remaining = await page.$('[data-sprint-id="1"] tr.task-row[data-task-id="' + task.id + '"]');
                     expect(remaining).toBeNull();
                 });
             } finally {
@@ -143,14 +140,10 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     await page.waitForSelector('[data-sprint-id="1"] .sprint-table', { timeout: 15_000 });
 
                     const headerOrder = async () =>
-                        page.$$eval(
-                            '[data-sprint-id="1"] .sprint-table thead tr th',
-                            (nodes: Element[]) =>
-                                nodes.map((node) =>
-                                    (node as HTMLElement).dataset.column
-                                        ? (node as HTMLElement).dataset.column
-                                        : '',
-                                ),
+                        page.$$eval('[data-sprint-id="1"] .sprint-table thead tr th', (nodes: Element[]) =>
+                            nodes.map((node) =>
+                                (node as HTMLElement).dataset.column ? (node as HTMLElement).dataset.column : '',
+                            ),
                         );
 
                     const before = await headerOrder();
@@ -382,9 +375,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                         const group = page.locator(`[data-sprint-id="${sprintId}"]`);
                         await group.waitFor({ timeout: 15_000 });
                         await group.getByRole('button', { name: 'Start', exact: true }).click();
-                        await group
-                            .getByRole('button', { name: 'Complete', exact: true })
-                            .waitFor({ timeout: 15_000 });
+                        await group.getByRole('button', { name: 'Complete', exact: true }).waitFor({ timeout: 15_000 });
                         await group.getByRole('button', { name: 'Complete', exact: true }).click();
                         await group.waitFor({ state: 'detached', timeout: 15_000 });
                     }

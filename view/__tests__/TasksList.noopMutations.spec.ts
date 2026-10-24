@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref, shallowRef } from 'vue'
 
 const routeState: { query: Record<string, any> } = { query: {} }
-const routerPushMock = vi.fn(async () => { })
-const routerReplaceMock = vi.fn(async () => { })
+const routerPushMock = vi.fn(async () => {})
+const routerReplaceMock = vi.fn(async () => {})
 
 const projectsStore = {
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 const _tasksItems = ref<any[]>([])
@@ -27,7 +27,9 @@ const tasksQueryHandle = {
     error: _error,
     lastSyncAt: ref(1),
     tasks: computed(() => _tasksItems.value),
-    refresh: vi.fn(async () => { _hasSnapshot.value = true }),
+    refresh: vi.fn(async () => {
+        _hasSnapshot.value = true
+    }),
     retain: vi.fn(),
     release: vi.fn(),
 }
@@ -39,15 +41,15 @@ const tasksStore = {
     status: _status,
     error: _error,
     getQuery: vi.fn(() => tasksQueryHandle),
-    hydrateAll: vi.fn(async () => { }),
+    hydrateAll: vi.fn(async () => {}),
     upsert: vi.fn(),
-    remove: vi.fn(async () => { }),
+    remove: vi.fn(async () => {}),
 }
 
 const sprintsStore = {
     sprints: ref<any[]>([]),
     active: ref<any[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
     loading: ref(false),
 }
 
@@ -56,7 +58,7 @@ const configStore = {
     priorities: ref<string[]>(['low', 'med', 'high']),
     types: ref<string[]>(['task']),
     customFields: ref<string[]>([]),
-    refresh: vi.fn(async () => { }),
+    refresh: vi.fn(async () => {}),
 }
 
 vi.mock('vue-router', () => ({
@@ -143,7 +145,9 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
-        scope: ref(''), tags: ref<string[]>([]), members: ref<string[]>([]),
+        scope: ref(''),
+        tags: ref<string[]>([]),
+        members: ref<string[]>([]),
         statuses: configStore.statuses,
         priorities: configStore.priorities,
         types: configStore.types,

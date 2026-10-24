@@ -1,5 +1,12 @@
 <template>
-  <UiModal :open="open" aria-label="Board columns" :aria-labelledby="titleId" size="xl" initial-focus="[data-testid='board-columns-apply']" @close="emit('close')">
+  <UiModal
+    :open="open"
+    aria-label="Board columns"
+    :aria-labelledby="titleId"
+    size="xl"
+    initial-focus="[data-testid='board-columns-apply']"
+    @close="emit('close')"
+  >
     <div class="board-columns-dialog" data-testid="board-columns-dialog">
       <header class="board-columns-dialog__header">
         <h2 :id="titleId">Board columns</h2>
@@ -26,7 +33,11 @@
           @dragover.prevent="onColumnDragOver(column.id, $event)"
           @drop.prevent="onColumnDrop(column.id)"
         >
-          <header class="board-columns-dialog__column-head" draggable="true" @dragstart="startColumnDrag(column.id, $event)">
+          <header
+            class="board-columns-dialog__column-head"
+            draggable="true"
+            @dragstart="startColumnDrag(column.id, $event)"
+          >
             <button
               type="button"
               class="board-columns-dialog__grip"
@@ -34,7 +45,9 @@
               title="Drag to reorder (or use the arrow keys)"
               @keydown.left.prevent="moveColumn(index, -1)"
               @keydown.right.prevent="moveColumn(index, 1)"
-            >⠿</button>
+            >
+              ⠿
+            </button>
             <template v-if="renaming === column.id">
               <input
                 :ref="setRenameInput"
@@ -86,8 +99,16 @@
               >
                 <IconGlyph :name="hidden.has(key) ? 'eye-off' : 'eye'" />
               </button>
-              <details class="board-columns-dialog__menu" @toggle="positionMenu" @keydown.escape.stop="closeMenu($event)">
-                <summary class="board-columns-dialog__icon-button" :aria-label="`Move ${labelOf(key)}`" title="Move to another column">
+              <details
+                class="board-columns-dialog__menu"
+                @toggle="positionMenu"
+                @keydown.escape.stop="closeMenu($event)"
+              >
+                <summary
+                  class="board-columns-dialog__icon-button"
+                  :aria-label="`Move ${labelOf(key)}`"
+                  title="Move to another column"
+                >
                   <IconGlyph name="dots-horizontal" />
                 </summary>
                 <div class="card board-columns-dialog__menu-list">
@@ -95,15 +116,29 @@
                     v-if="column.statuses.length > 1"
                     type="button"
                     class="board-columns-dialog__menu-item"
-                    @click="closeMenu($event); moveStatus(key, 'new')"
-                  >Own column</button>
+                    @click="
+                      ($event) => {
+                        closeMenu($event)
+                        moveStatus(key, 'new')
+                      }
+                    "
+                  >
+                    Own column
+                  </button>
                   <button
                     v-for="other in draft.filter((entry) => entry.id !== column.id)"
                     :key="other.id"
                     type="button"
                     class="board-columns-dialog__menu-item"
-                    @click="closeMenu($event); moveStatus(key, other.id)"
-                  >Move to {{ displayTitle(other) }}</button>
+                    @click="
+                      ($event) => {
+                        closeMenu($event)
+                        moveStatus(key, other.id)
+                      }
+                    "
+                  >
+                    Move to {{ displayTitle(other) }}
+                  </button>
                 </div>
               </details>
             </li>
@@ -116,7 +151,15 @@
             </label>
             <label title="Hide cards that moved into their status more than this many days ago">
               <span>Hide after</span>
-              <input v-model.number="column.maxAgeDays" class="input" type="number" min="0" step="1" placeholder="days" aria-label="Hide after (days)" />
+              <input
+                v-model.number="column.maxAgeDays"
+                class="input"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="days"
+                aria-label="Hide after (days)"
+              />
             </label>
             <label title="Show only the most recently updated cards per status">
               <span>Max cards</span>
@@ -205,13 +248,17 @@ function toDraft(column: BoardColumnConfig): DraftColumn {
   }
 }
 
-watch(() => props.open, (open) => {
-  if (!open) return
-  draft.value = props.layout.columns.map(toDraft)
-  hidden.value = new Set(props.layout.hidden)
-  renaming.value = null
-  endDrag()
-}, { immediate: true })
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) return
+    draft.value = props.layout.columns.map(toDraft)
+    hidden.value = new Set(props.layout.hidden)
+    renaming.value = null
+    endDrag()
+  },
+  { immediate: true },
+)
 
 const labelOf = (key: string) => props.statuses.find((status) => status.key === key)?.label ?? key
 const defaultTitle = (column: DraftColumn) => column.statuses.map(labelOf).join(' · ')
@@ -471,15 +518,23 @@ function apply() {
   position: relative;
 }
 
-.board-columns-dialog__column.is-hidden { opacity: 0.65; }
-.board-columns-dialog__column.is-dragging { opacity: 0.4; }
+.board-columns-dialog__column.is-hidden {
+  opacity: 0.65;
+}
+.board-columns-dialog__column.is-dragging {
+  opacity: 0.4;
+}
 .board-columns-dialog__column.is-status-target,
 .board-columns-dialog__new-column.is-status-target {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-accent) 25%, transparent);
 }
-.board-columns-dialog__column.is-drop-before { box-shadow: -3px 0 0 0 var(--color-accent); }
-.board-columns-dialog__column.is-drop-after { box-shadow: 3px 0 0 0 var(--color-accent); }
+.board-columns-dialog__column.is-drop-before {
+  box-shadow: -3px 0 0 0 var(--color-accent);
+}
+.board-columns-dialog__column.is-drop-after {
+  box-shadow: 3px 0 0 0 var(--color-accent);
+}
 
 .board-columns-dialog__column-head {
   display: flex;
@@ -491,7 +546,9 @@ function apply() {
   min-height: 40px;
 }
 
-.board-columns-dialog__column-head:active { cursor: grabbing; }
+.board-columns-dialog__column-head:active {
+  cursor: grabbing;
+}
 
 .board-columns-dialog__grip,
 .board-columns-dialog__icon-button {
@@ -512,7 +569,9 @@ function apply() {
   list-style: none;
 }
 
-.board-columns-dialog__grip { cursor: grab; }
+.board-columns-dialog__grip {
+  cursor: grab;
+}
 
 .board-columns-dialog__grip:hover,
 .board-columns-dialog__icon-button:hover,
@@ -522,7 +581,9 @@ function apply() {
   color: var(--fg);
 }
 
-.board-columns-dialog__icon-button::-webkit-details-marker { display: none; }
+.board-columns-dialog__icon-button::-webkit-details-marker {
+  display: none;
+}
 
 .board-columns-dialog__title {
   flex: 1 1 auto;
@@ -566,7 +627,9 @@ function apply() {
   cursor: grab;
 }
 
-.board-columns-dialog__status.is-drop-before { box-shadow: 0 -2px 0 0 var(--color-accent); }
+.board-columns-dialog__status.is-drop-before {
+  box-shadow: 0 -2px 0 0 var(--color-accent);
+}
 
 .board-columns-dialog__status.is-hidden .board-columns-dialog__label {
   color: var(--muted);
@@ -588,7 +651,9 @@ function apply() {
   white-space: nowrap;
 }
 
-.board-columns-dialog__menu { position: relative; }
+.board-columns-dialog__menu {
+  position: relative;
+}
 
 .board-columns-dialog__menu-list {
   position: fixed;
@@ -614,7 +679,9 @@ function apply() {
 }
 
 .board-columns-dialog__menu-item:hover,
-.board-columns-dialog__menu-item:focus-visible { background: color-mix(in oklab, var(--fg) 8%, transparent); }
+.board-columns-dialog__menu-item:focus-visible {
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
 
 .board-columns-dialog__settings {
   display: flex;
@@ -640,7 +707,9 @@ function apply() {
   padding: 0 6px;
 }
 
-.board-columns-dialog__new-column-hint { font-size: var(--text-xs, 0.75rem); }
+.board-columns-dialog__new-column-hint {
+  font-size: var(--text-xs, 0.75rem);
+}
 
 .board-columns-dialog__new-column {
   flex: 0 0 104px;
@@ -667,5 +736,7 @@ function apply() {
   gap: var(--space-2, 0.5rem);
 }
 
-.board-columns-dialog__spacer { flex: 1 1 auto; }
+.board-columns-dialog__spacer {
+  flex: 1 1 auto;
+}
 </style>

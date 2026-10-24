@@ -1,10 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-    createGateFixture,
-    indentBlock,
-    nodeRunActionYaml,
-} from '../helpers/agent-fixtures.js';
+import { createGateFixture, indentBlock, nodeRunActionYaml } from '../helpers/agent-fixtures.js';
 import { parse } from 'yaml';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
@@ -32,7 +28,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Auto-set on create
       on:
@@ -41,7 +39,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
             priority: High
           add:
             tags: [auto-created]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Test auto create');
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
@@ -58,7 +57,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: InProgress triggers tag
       when:
@@ -67,7 +68,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         updated:
           add:
             tags: [working]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Test auto update');
             await workspace.runLotar(['status', task.id, 'InProgress']);
@@ -85,7 +87,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Auto-set on assign
       on:
@@ -94,7 +98,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
             status: InProgress
           add:
             tags: [assigned]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Test auto assign');
             await workspace.runLotar(['assignee', task.id, 'dev@example.com']);
@@ -113,7 +118,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Status transition tag
       when:
@@ -125,7 +132,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         updated:
           add:
             tags: [review-ready]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Test changes block');
             await workspace.runLotar(['status', task.id, 'InProgress']);
@@ -144,7 +152,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Only from InProgress
       when:
@@ -156,7 +166,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         updated:
           add:
             tags: [review-ready]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Test changes mismatch');
             // Transition directly from Todo -> Review (not from InProgress)
@@ -176,7 +187,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Add seed tag on create
       on:
@@ -192,7 +205,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
             tags: [active]
           remove:
             tags: [needs-review]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Test tag swap');
             let yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
@@ -214,13 +228,16 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Comment on create
       on:
         created:
           comment: "Auto-created by automation"
-`);
+`,
+            );
 
             const task = await workspace.addTask('Test comment action');
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
@@ -238,7 +255,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: High priority rule
       when:
@@ -249,16 +268,20 @@ describe.concurrent('CLI automation smoke scenarios', () => {
             status: Review
           add:
             tags: [priority-escalated]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Simulate test', {
                 args: ['--priority', 'High'],
             });
 
             const result = await workspace.runLotar([
-                'automation', 'simulate',
-                '--ticket', task.id,
-                '--event', 'updated',
+                'automation',
+                'simulate',
+                '--ticket',
+                task.id,
+                '--event',
+                'updated',
             ]);
 
             expect(result.stdout).toContain('Rule matched');
@@ -273,7 +296,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Only High priority
       when:
@@ -282,15 +307,19 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         updated:
           set:
             status: Review
-`);
+`,
+            );
 
             const task = await workspace.addTask('Simulate no match');
             // Created with default Medium priority, so rule won't match
 
             const result = await workspace.runLotar([
-                'automation', 'simulate',
-                '--ticket', task.id,
-                '--event', 'updated',
+                'automation',
+                'simulate',
+                '--ticket',
+                task.id,
+                '--event',
+                'updated',
             ]);
 
             expect(result.stdout).toContain('No automation rules matched');
@@ -304,7 +333,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Combined conditions
       when:
@@ -317,7 +348,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         created:
           add:
             tags: [hot]
-`);
+`,
+            );
 
             // Positive: priority=High + type=Feature(default) → both all conditions match
             const task1 = await workspace.addTask('Combinator pos', {
@@ -344,7 +376,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
             // Create a rule that would cascade: created sets InProgress, InProgress sets Review
             // With max_iterations: 1, only the first rule fires
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   max_iterations: 1
   rules:
     - name: First cascade
@@ -359,7 +393,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         updated:
           add:
             tags: [cascaded]
-`);
+`,
+            );
 
             const task = await workspace.addTask('Max iterations test');
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
@@ -379,7 +414,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Regex title match
       when:
@@ -390,7 +427,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
           set:
             type: Bug
             priority: High
-`);
+`,
+            );
 
             const task = await workspace.addTask('[BUG] Something broken');
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
@@ -409,13 +447,16 @@ describe.concurrent('CLI automation smoke scenarios', () => {
             // Shell form (plain string) runs synchronously with wait:true by
             // default; `echo ... >>` is understood by both sh and cmd so the
             // payload stays portable without Unix-only binaries.
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Run on create
       on:
         created:
           run: "echo shell-run-fired >> run-fired.txt"
-`);
+`,
+            );
 
             await workspace.addTask('Run action test');
             // Shell variant waits by default; the sentinel must already exist
@@ -434,13 +475,16 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Expand ticket fields
       on:
         created:
           comment: "Type is \${{ticket.type}}, priority is \${{ticket.priority}}"
-`);
+`,
+            );
 
             const task = await workspace.addTask('Template test', {
                 args: ['--type', 'Bug', '--priority', 'High'],
@@ -460,13 +504,16 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Previous status comment
       on:
         updated:
           comment: "Was \${{previous.status}}, now \${{ticket.status}}"
-`);
+`,
+            );
 
             const task = await workspace.addTask('Previous vars test');
             await workspace.runLotar(['status', task.id, 'InProgress']);
@@ -490,7 +537,9 @@ describe.concurrent('CLI automation smoke scenarios', () => {
             // Structured run form executes the Node runtime directly
             // (Command + args, no sh/cmd) with wait:false, so the command is
             // cross-platform without shell quoting games.
-            await writeAutomation(workspace, `automation:
+            await writeAutomation(
+                workspace,
+                `automation:
   rules:
     - name: Gated async run
       on:
@@ -498,7 +547,8 @@ describe.concurrent('CLI automation smoke scenarios', () => {
 ${indentBlock(nodeRunActionYaml([gate.script, ...gate.agentArgs({ mode: 'plain', label: 'automation', holdMs: 20_000 })], { wait: false }), 10)}
           add:
             tags: [async-verified]
-`);
+`,
+            );
 
             // The CLI must return while the gated child is still running: the
             // created rule already applied the tag and the child is provably
