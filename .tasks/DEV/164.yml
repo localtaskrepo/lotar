@@ -1,0 +1,31 @@
+title: Add report-only code coverage for Rust and UI tests
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:44:19.844035+00:00
+modified: 2026-10-24T23:33:36.573902+00:00
+comments:
+- date: 2026-10-24T23:33:36.546109+00:00
+  text: 'Outcome: report-only coverage. npm run coverage:ui runs Vitest with @vitest/coverage-v8 (pinned to the installed vitest 5.0.5; config in view/vitest.config.ts: app .ts/.vue, tests and d.ts excluded, text-summary/json-summary/html/lcov into target/coverage/ui, no thresholds). npm run coverage:rust runs cargo llvm-cov nextest --all-features --no-fail-fast with HTML and lcov into target/coverage/rust plus a summary. New .github/workflows/coverage.yml (push to main + workflow_dispatch only, so PRs are not slowed; continue-on-error on both jobs so it never gates) writes totals to the run summary and uploads both reports as 14-day artifacts; Rust job installs llvm-tools-preview through rustup (honours rust-toolchain.toml) and cargo-llvm-cov/nextest via the SHA-pinned install-action; coverage.yml is included in the pinned-actions contract test. Baseline (local, 2026-10-24): UI 74.4% lines / 63.0% branches (18s); Rust 77.7% lines / 77.3% regions / 74.1% functions with all 1669 tests passing under instrumentation (~2.5 min incl. instrumented build). Remaining: first Coverage workflow run on GitHub after push. Guidance: no durable finding.'
+description: Test completeness is enforced (manifest vs JUnit) but line coverage is not measured. Add cargo-llvm-cov and Vitest v8 coverage scripts and a non-gating CI job that publishes summaries and reports as artifacts.
+history:
+- at: 2026-10-24T23:29:55.436940+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T23:33:36.546109+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:33:36.573902+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

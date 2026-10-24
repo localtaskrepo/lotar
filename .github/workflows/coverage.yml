@@ -1,0 +1,137 @@
+name: Coverage
+
+# DEV-164: report-only line coverage for the Rust and UI test suites. It
+# never gates a change: it runs after pushes to main (and on demand), writes
+# the totals to the run summary and uploads HTML/lcov reports as artifacts.
+# Correctness gates stay in ci.yml.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  ui:
+    name: UI coverage
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Determine Node version
+        id: node_version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').engines.node")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ steps.node_version.outputs.version }}
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci --prefer-offline
+
+      - name: Run Vitest with coverage
+        run: npm run coverage:ui
+
+      - name: Write summary
+        if: always()
+        run: |
+          node -e "
+            const t = require('./target/coverage/ui/coverage-summary.json').total;
+            const row = (k) => '| ' + k + ' | ' + t[k].pct + '% | ' + t[k].covered + ' / ' + t[k].total + ' |';
+            console.log(['### UI coverage', '| Metric | Percent | Covered |', '| --- | --- | --- |', ...['lines', 'statements', 'functions', 'branches'].map(row)].join('\n'));
+          " >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload UI coverage report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: coverage-ui
+          path: target/coverage/ui/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  rust:
+    name: Rust coverage
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      USER: mallox
+      USERNAME: mallox
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # rustup (preinstalled) reads rust-toolchain.toml, so this installs the
+      # pinned compiler plus the LLVM tools cargo-llvm-cov needs.
+      - name: Setup Rust toolchain
+        run: rustup component add llvm-tools-preview
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          cache-on-failure: true
+          shared-key: coverage-${{ runner.os }}
+
+      - name: Install cargo-llvm-cov and cargo-nextest
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        with:
+          tool: cargo-llvm-cov,nextest
+
+      # include_dir! embeds target/web-embed, so web assets come first.
+      - name: Determine Node version
+        id: node_version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').engines.node")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ steps.node_version.outputs.version }}
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci --prefer-offline
+
+      - name: Build web assets
+        run: npm run build:web
+
+      - name: Run nextest with coverage
+        run: npm run coverage:rust
+
+      - name: Write summary
+        if: always()
+        run: |
+          {
+            echo '### Rust coverage'
+            echo '```'
+            cargo llvm-cov report --summary-only | tail -n 1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Rust coverage report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: coverage-rust
+          path: target/coverage/rust/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -40,7 +40,9 @@
     "clean": "cargo clean && rm -rf node_modules",
     "hooks:install": "git config core.hooksPath .githooks",
     "test:hooks": "node --test scripts/tests/git-hooks.test.mjs",
-    "check:deps": "cargo deny check"
+    "check:deps": "cargo deny check",
+    "coverage:ui": "vitest run --config view/vitest.config.ts --coverage",
+    "coverage:rust": "cargo llvm-cov nextest --all-features --no-fail-fast --html --output-dir target/coverage/rust && cargo llvm-cov report --lcov --output-path target/coverage/rust/lcov.info && cargo llvm-cov report --summary-only"
   },
   "keywords": [
     "local",
@@ -69,6 +71,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^26.6.5",
     "@vitejs/plugin-vue": "^6.0.10",
+    "@vitest/coverage-v8": "^5.0.5",
     "@vue/test-utils": "^2.5.1",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",

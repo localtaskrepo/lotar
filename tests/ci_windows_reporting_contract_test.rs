@@ -272,6 +272,10 @@ fn every_workflow_action_is_pinned_to_a_commit_sha() {
             include_str!("../.github/workflows/codeql.yml"),
         ),
         (
+            "coverage.yml",
+            include_str!("../.github/workflows/coverage.yml"),
+        ),
+        (
             "homebrew-verify.yml",
             include_str!("../.github/workflows/homebrew-verify.yml"),
         ),

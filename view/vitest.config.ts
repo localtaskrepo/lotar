@@ -44,6 +44,15 @@ export default mergeConfig(
             environment: 'jsdom',
             globals: true,
             setupFiles: ['__tests__/vitest.setup.ts'],
+            // Report-only coverage (DEV-164): `npm run coverage:ui`. No
+            // thresholds; the numbers inform where tests are missing.
+            coverage: {
+                provider: 'v8',
+                include: ['**/*.{ts,vue}'],
+                exclude: ['__tests__/**', '**/*.d.ts', 'main.ts'],
+                reporter: ['text-summary', 'json-summary', 'html', 'lcov'],
+                reportsDirectory: '../target/coverage/ui',
+            },
         },
     }),
 )
