@@ -1,0 +1,7 @@
+title: Local full-parallel smoke runs intermittently fail two UI specs
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-24T23:52:53.970680+00:00
+description: 'Observed 2026-10-24 on macOS full smoke runs (test:smoke:agent / test:smoke:quick:agent), all passing when rerun in isolation: ui.query-isolation ''surfaces failed calendar query switches without stale rows and recovers via retry'' (once), ui.query-isolation ''keeps a foreign-project task out of the active filtered view while it stays reachable via its own project'' (once) and ui.relationships ''ranks exact IDs first across lookup fields and restores searched content after leaving the view'' (once); about 1 failing run in 5. Same pattern as DEV-132/DEV-136: timing under full parallel load. Next: capture the assertion and timing evidence for each and make the waits condition-based.'

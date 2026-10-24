@@ -1,0 +1,7 @@
+title: Add search functionality to config UI
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-24T23:46:55.865283+00:00
+description: We have quite a few config options. We should add a search field to allow finding the config page that the user is looking for faster.

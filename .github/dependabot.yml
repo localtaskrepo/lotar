@@ -18,6 +18,11 @@ updates:
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # TypeScript majors wait for vue-tsc and typescript-eslint support
+      # (DEV-123); minor and patch updates still arrive.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # Workflow actions are pinned to commit SHAs with the tag as a comment;
   # Dependabot updates both.

@@ -1,0 +1,31 @@
+title: Stop Dependabot from proposing TypeScript major updates until DEV-123
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T23:50:46.968332+00:00
+modified: 2026-10-24T23:53:19.373479+00:00
+comments:
+- date: 2026-10-24T23:53:19.348539+00:00
+  text: 'Outcome: .github/dependabot.yml npm entry ignores semver-major updates of typescript with a pointer to DEV-123; minor/patch TypeScript updates and all other npm updates still arrive. Evidence: Dependabot PR ''Bump typescript to 7.0.2'' (run 40143688774) failed every job at npm ci (peer ranges of typescript-eslint/vue tooling stop at <6.1); config parses. Remaining: close that open PR on GitHub (Dependabot does not need it once the ignore applies; left to the developer since it is an external action). Guidance: no durable finding.'
+description: Dependabot opened 'Bump typescript to 7.0.2' immediately after DEV-163 enabled npm updates; every job fails at npm ci because typescript-eslint and the Vue toolchain support only TypeScript <6.1 (DEV-123 is blocked on stable Vue compiler support). Ignore semver-major TypeScript updates in .github/dependabot.yml with a pointer to DEV-123.
+history:
+- at: 2026-10-24T23:53:05.953055+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T23:53:19.348539+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:53:19.373479+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
