@@ -184,3 +184,41 @@ fn ci_uses_the_pinned_toolchain_and_keeps_profile_caches_independent() {
             .contains("--lib --bins --tests")
     );
 }
+
+#[test]
+fn smoke_job_caches_the_headless_browser_per_playwright_version() {
+    let workflow: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
+    let steps = workflow["jobs"]["smoke_tests"]["steps"]
+        .as_sequence()
+        .unwrap();
+    let step = |name: &str| {
+        steps
+            .iter()
+            .find(|step| step["name"].as_str() == Some(name))
+            .unwrap_or_else(|| panic!("smoke_tests is missing step {name:?}"))
+    };
+    let cache = step("Cache Playwright browsers");
+    assert_eq!(
+        cache["with"]["path"].as_str(),
+        Some("~/.cache/ms-playwright")
+    );
+    assert!(
+        cache["with"]["key"]
+            .as_str()
+            .unwrap()
+            .contains("steps.playwright_version.outputs.version")
+    );
+    let install = step("Install Playwright browser");
+    assert_eq!(
+        install["if"].as_str(),
+        Some("steps.playwright_cache.outputs.cache-hit != 'true'")
+    );
+    assert!(install["run"].as_str().unwrap().contains("--only-shell"));
+    assert!(
+        step("Install Playwright system dependencies")["run"]
+            .as_str()
+            .unwrap()
+            .contains("install-deps")
+    );
+}

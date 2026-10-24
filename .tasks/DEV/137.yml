@@ -1,7 +1,37 @@
 title: Speed up CI smoke tests
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-22T20:34:20.974252+00:00
+modified: 2026-10-24T03:17:54.885313+00:00
+comments:
+- date: 2026-10-24T03:12:51.951752+00:00
+  text: 'Plan: in ci.yml smoke_tests, (1) cache ~/.cache/ms-playwright keyed by OS + installed @playwright/test version, (2) download only chromium-headless-shell (smoke helper always launches headless) and skip download on cache hit, (3) keep system deps via ''playwright install-deps chromium'' but disable man-db auto-update first (apt trigger rebuilds are a known multi-minute cost on ubuntu-24.04 runners). Add a workflow contract assertion in tests/ci_windows_reporting_contract_test.rs. Checks: targeted nextest for the contract test + YAML parse. Limitation: real CI timing can only be verified on GitHub Actions.'
+- date: 2026-10-24T03:17:54.861582+00:00
+  text: 'Outcome: smoke_tests job now resolves the installed @playwright/test version, caches ~/.cache/ms-playwright under a per-OS/per-version key, downloads only chromium-headless-shell on a cache miss (smoke/helpers/ui.ts always launches headless), and runs ''playwright install-deps chromium'' with man-db auto-update disabled so apt triggers don''t rebuild the man index. Evidence: new contract test smoke_job_caches_the_headless_browser_per_playwright_version in tests/ci_windows_reporting_contract_test.rs; binary(ci_windows_reporting_contract_test) 3/3 pass. Remaining: actual CI timing can only be confirmed on the next GitHub Actions run (first run is a cache miss; later runs should skip the download). Local ''npm run playwright:install'' unchanged. Guidance: no durable finding.'
 description: Smoke tests on Github Actions CI take up to 10 minutes to install playwright browsers before they even start testing. We can probably speed that up, e.g. using caching.
+history:
+- at: 2026-10-24T03:12:51.920880+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T03:12:51.951752+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:17:54.861582+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:17:54.885313+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
