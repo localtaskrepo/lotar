@@ -232,3 +232,19 @@ fn smoke_job_caches_the_headless_browser_per_playwright_version() {
             .contains("install-deps")
     );
 }
+
+#[test]
+fn ui_job_typechecks_the_frontend() {
+    let workflow: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
+    let runs: Vec<&str> = workflow["jobs"]["ui_tests"]["steps"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .filter_map(|step| step["run"].as_str())
+        .collect();
+    assert!(
+        runs.iter().any(|run| run.contains("npm run lint:frontend")),
+        "ui_tests must run the vue-tsc typecheck: {runs:?}"
+    );
+}

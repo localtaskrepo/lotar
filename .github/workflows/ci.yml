@@ -248,6 +248,11 @@ jobs:
     - name: Install npm dependencies
       run: npm ci --prefer-offline
 
+    # vite build and Vitest strip types without checking them; this is the
+    # only CI step that typechecks view/ (DEV-159).
+    - name: Typecheck frontend
+      run: npm run lint:frontend
+
     - name: Run Vitest suite
       run: npm run test:ui
 

@@ -1,0 +1,31 @@
+title: Typecheck the frontend in CI
+status: Done
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:44:19.671117+00:00
+modified: 2026-10-24T22:45:21.325185+00:00
+comments:
+- date: 2026-10-24T22:45:21.297314+00:00
+  text: 'Outcome: ui_tests now runs ''npm run lint:frontend'' (vue-tsc, ~17s locally) before Vitest; new contract test ui_job_typechecks_the_frontend in tests/ci_windows_reporting_contract_test.rs keeps it there. Evidence: contract binary 4/4 pass; lint:frontend passes on current main. Remaining: confirm on the next GitHub Actions run. Guidance: no durable finding.'
+description: CI never runs npm run lint:frontend (vue-tsc). vite build and Vitest do not typecheck, so type errors in view/ can merge. Add the typecheck to the UI Unit Tests job and pin it with a workflow contract test.
+history:
+- at: 2026-10-24T22:44:27.798624+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T22:45:21.297314+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T22:45:21.325185+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
