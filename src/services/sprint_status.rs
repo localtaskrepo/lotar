@@ -109,9 +109,10 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
     let computed_end = if let Some(end) = planned_end {
         Some(end)
     } else if let (Some(actual_start), Some(length)) = (actual_start.as_ref(), length.as_ref()) {
-        Some(*actual_start + *length)
+        // Checked: a legacy out-of-range length must not panic status reads.
+        actual_start.checked_add_signed(*length)
     } else if let (Some(planned_start), Some(length)) = (planned_start.as_ref(), length.as_ref()) {
-        Some(*planned_start + *length)
+        planned_start.checked_add_signed(*length)
     } else {
         None
     };

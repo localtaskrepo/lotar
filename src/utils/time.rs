@@ -206,13 +206,14 @@ fn is_bare_offset(s: &str) -> bool {
 }
 
 fn parse_unsigned_days_or_weeks(s: &str) -> Option<Duration> {
+    // Checked constructors: an out-of-range count is "unparseable", never a panic.
     if let Some(num) = s.strip_suffix('d') {
         let n = num.parse::<i64>().ok()?;
-        return Some(Duration::days(n));
+        return Duration::try_days(n);
     }
     if let Some(num) = s.strip_suffix('w') {
         let n = num.parse::<i64>().ok()?;
-        return Some(Duration::weeks(n));
+        return Duration::try_weeks(n);
     }
     let parts: Vec<&str> = s.split_whitespace().collect();
     if parts.len() == 2
@@ -220,13 +221,93 @@ fn parse_unsigned_days_or_weeks(s: &str) -> Option<Duration> {
     {
         let unit = parts[1].to_lowercase();
         if unit.starts_with('d') || unit.starts_with("day") {
-            return Some(Duration::days(n));
+            return Duration::try_days(n);
         }
         if unit.starts_with('w') || unit.starts_with("week") {
-            return Some(Duration::weeks(n));
+            return Duration::try_weeks(n);
         }
     }
     None
+}
+
+/// Upper bound for sprint durations (ten years), so a configured value can
+/// never overflow date arithmetic.
+pub const MAX_SPRINT_DURATION_DAYS: i64 = 3650;
+
+#[derive(Clone, Copy)]
+enum SprintDurationUnit {
+    Hours,
+    Days,
+    Weeks,
+}
+
+/// Strict `<count><unit>` / `<count> <unit>` grammar shared by sprint
+/// durations. Units: h/hour(s) (only when `allow_hours`), d/day(s), w/week(s).
+fn parse_sprint_duration(
+    input: &str,
+    allow_hours: bool,
+    allow_zero: bool,
+) -> Result<Duration, String> {
+    let raw = input.trim().to_lowercase();
+    let units = if allow_hours {
+        "h (hours), d (days) or w (weeks), e.g. 12h, 3d or 2w"
+    } else {
+        "d (days) or w (weeks), e.g. 14d or 2w"
+    };
+    let invalid = || {
+        format!(
+            "'{}' is not a duration; use a whole number with {}",
+            input.trim(),
+            units
+        )
+    };
+    let split = raw
+        .find(|c: char| !c.is_ascii_digit())
+        .ok_or_else(invalid)?;
+    let (digits, unit) = raw.split_at(split);
+    if digits.is_empty() {
+        return Err(invalid());
+    }
+    let unit = match unit.trim() {
+        "h" | "hour" | "hours" if allow_hours => SprintDurationUnit::Hours,
+        "d" | "day" | "days" => SprintDurationUnit::Days,
+        "w" | "week" | "weeks" => SprintDurationUnit::Weeks,
+        _ => return Err(invalid()),
+    };
+    let max_hours = MAX_SPRINT_DURATION_DAYS * 24;
+    let count: i64 = digits.parse().map_err(|_| {
+        format!(
+            "'{}' is longer than the {} day maximum",
+            input.trim(),
+            MAX_SPRINT_DURATION_DAYS
+        )
+    })?;
+    let hours = match unit {
+        SprintDurationUnit::Hours => Some(count),
+        SprintDurationUnit::Days => count.checked_mul(24),
+        SprintDurationUnit::Weeks => count.checked_mul(24 * 7),
+    };
+    match hours {
+        Some(0) if !allow_zero => Err(format!("'{}' must be longer than zero", input.trim())),
+        Some(hours) if hours <= max_hours => Ok(Duration::hours(hours)),
+        _ => Err(format!(
+            "'{}' is longer than the {} day maximum",
+            input.trim(),
+            MAX_SPRINT_DURATION_DAYS
+        )),
+    }
+}
+
+/// Validate a sprint plan length (`sprints.defaults.length`, `--length`):
+/// a positive number of days or weeks, at most ten years.
+pub fn parse_sprint_length(input: &str) -> Result<Duration, String> {
+    parse_sprint_duration(input, false, false)
+}
+
+/// Validate a sprint overdue grace period (`sprints.defaults.overdue_after`,
+/// `--overdue-after`): zero or more hours, days or weeks, at most ten years.
+pub fn parse_sprint_overdue_after(input: &str) -> Result<Duration, String> {
+    parse_sprint_duration(input, true, true)
 }
 
 fn parse_weekday_name(name: &str) -> Option<Weekday> {
@@ -410,4 +491,53 @@ fn add_business_days(mut date: chrono::NaiveDate, mut days: i64) -> chrono::Naiv
         }
     }
     date
+}
+
+#[cfg(test)]
+mod sprint_duration_tests {
+    use super::*;
+
+    #[test]
+    fn sprint_length_accepts_days_and_weeks_only() {
+        assert_eq!(parse_sprint_length("2w"), Ok(Duration::weeks(2)));
+        assert_eq!(parse_sprint_length(" 14D "), Ok(Duration::days(14)));
+        assert_eq!(parse_sprint_length("3 weeks"), Ok(Duration::weeks(3)));
+        assert_eq!(parse_sprint_length("1 day"), Ok(Duration::days(1)));
+        assert_eq!(parse_sprint_length("520w"), Ok(Duration::weeks(520)));
+        for invalid in [
+            "", "12h", "0d", "-2w", "+2w", "2", "w", "2 dogs", "2.5w", "1y", "3651d",
+        ] {
+            assert!(
+                parse_sprint_length(invalid).is_err(),
+                "{invalid:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn sprint_overdue_after_accepts_hours_and_zero() {
+        assert_eq!(parse_sprint_overdue_after("12h"), Ok(Duration::hours(12)));
+        assert_eq!(parse_sprint_overdue_after("0d"), Ok(Duration::zero()));
+        assert_eq!(
+            parse_sprint_overdue_after("2 hours"),
+            Ok(Duration::hours(2))
+        );
+        assert_eq!(
+            parse_sprint_overdue_after("87600h"),
+            Ok(Duration::days(3650))
+        );
+        for invalid in ["87601h", "soon", "-1d", "99999999999999999999h"] {
+            assert!(
+                parse_sprint_overdue_after(invalid).is_err(),
+                "{invalid:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn duration_like_treats_out_of_range_counts_as_unparseable() {
+        assert_eq!(parse_duration_like("9223372036854775807w"), None);
+        assert_eq!(parse_duration_like("9223372036854775807 days"), None);
+        assert_eq!(parse_duration_like("2w"), Some(Duration::weeks(2)));
+    }
 }

@@ -1,7 +1,31 @@
 title: Validate sprint-default durations before saving configuration
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-13T22:20:36.696046+00:00
+modified: 2026-10-24T21:34:57.328630+00:00
+comments:
+- date: 2026-10-24T21:34:57.300879+00:00
+  text: 'Outcome: policy implemented. Grammar (src/utils/time.rs): sprints_defaults_length = positive whole days/weeks (14d, 2w, ''3 weeks''); sprints_defaults_overdue_after = zero or more hours/days/weeks (12h, 0d, 1d); both capped at 3650 days; empty clears (unchanged semantics). Mutation: validate_field_value rejects anything else as a schema error, so CLI, --dry-run, REST and MCP share it, --force cannot bypass it, and rejected changes leave config bytes unchanged. Legacy: values already in config files still load (unrelated reads/writes unaffected); config validate reports them as warnings; env override values are applied as given; sprint creation keeps its existing warning behavior and explicit sprint --length/--overdue-after are not covered (deliberately out of scope). Also fixed a crash: an out-of-range plan.length (e.g. 99999999999w) panicked ''sprint list'' (TimeDelta::weeks out of bounds, reproduced with the previous binary); parse_duration_like now uses checked constructors and sprint_status uses checked_add_signed. Config UI mirrors the grammar with inline errors. Docs: config-reference, help/developers environment tables (previously claimed ''Integer days''). Evidence: tests/dev111_sprint_default_durations_test.rs (5 tests: CLI accept/clear, CLI reject x {plain,--dry-run,--force} with byte check, service/REST/MCP reject without write, legacy load + validate warnings, no panic), time.rs sprint_duration_tests (3), view/__tests__/useConfigForm.coverage.spec.ts DEV-111 case. Gates: lint:agent clean; test:agent 1667 Rust + 1112 UI + release pass; full smoke runs with the DEV-19 batch before push. Follow-up: DEV-154 (overdue_after has no runtime effect on overdue status). Guidance: no durable finding.'
 description: DEV-83 executable docs audit confirmed config set sprints_defaults_length not-a-duration --global --dry-run reports success, and sprint creation consuming that default can persist invalid plan.length with a warning. Documentation now describes this behavior; strict duration validation is not shipped. Define and implement a consistent mutation-time validation policy for sprint default length/overdue_after using the actual sprint grammar and overflow/sign bounds, without claiming every existing plan is invalid or rewriting user data. Validate full candidate including related overrides, preserve dry-run/write parity and exact bytes on rejected mutation, and make clearing an override/default retain current semantics. Decide legacy malformed-config read/warning behavior explicitly; do not retroactively brick unrelated reads or silently coerce values. Add CLI/REST/MCP candidate regression coverage, valid 2w/12h, empty clears, invalid/overflow values, force boundary and no-write proof. Keep any desired sprint plan mutation strictness a deliberate policy choice; current sprint service warnings are documented and not claimed fixed by DEV-83. No real workspace mutation/deletion, external sync, or weakening test gates.
+history:
+- at: 2026-10-24T21:24:53.351595+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T21:34:57.300879+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T21:34:57.328630+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

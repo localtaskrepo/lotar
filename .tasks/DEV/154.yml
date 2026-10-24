@@ -1,0 +1,7 @@
+title: Sprint overdue_after grace period has no effect on overdue status
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-24T21:32:01.331415+00:00
+description: 'Found during DEV-111. plan.overdue_after (and sprints.defaults.overdue_after, CLI --overdue-after described as ''Grace period before overdue warnings'') is stored, defaulted and displayed, but src/services/sprint_status.rs derives Overdue purely from now > computed_end and nothing parses overdue_after at runtime. DEV-111 added mutation-time validation of the default (time::parse_sprint_overdue_after: zero or more h/d/w, max ten years). Decide whether the grace period should delay the Overdue state and overdue warnings (then apply it with that parser, tolerate legacy unparseable values with a warning, and cover CLI/REST/UI lifecycle labels), or document it as informational only.'

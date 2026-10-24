@@ -1403,8 +1403,17 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 })?;
             }
         }
-        "sprints_defaults_length" | "sprints_defaults_overdue_after" => {
-            // No additional validation beyond trimming; empty clears the override
+        // Empty clears the default; anything else must use the sprint grammar
+        // (DEV-111). Already-saved values are only warned about on read.
+        "sprints_defaults_length" if !value.trim().is_empty() => {
+            crate::utils::time::parse_sprint_length(value).map_err(|err| {
+                ConfigError::ParseError(format!("Invalid sprint length: {err}"))
+            })?;
+        }
+        "sprints_defaults_overdue_after" if !value.trim().is_empty() => {
+            crate::utils::time::parse_sprint_overdue_after(value).map_err(|err| {
+                ConfigError::ParseError(format!("Invalid sprint overdue grace period: {err}"))
+            })?;
         }
         "sprints_notifications_enabled"
             if !value.trim().is_empty() => {

@@ -106,8 +106,8 @@ All rows below are defined inside the same override table and map directly to th
 | --- | --- | --- | --- |
 | `sprints.defaults.capacity_points` | `LOTAR_SPRINTS_DEFAULT_CAPACITY_POINTS` | Integer | Default story point capacity per sprint. |
 | `sprints.defaults.capacity_hours` | `LOTAR_SPRINTS_DEFAULT_CAPACITY_HOURS` | Integer | Default hour capacity per sprint. |
-| `sprints.defaults.length` | `LOTAR_SPRINTS_DEFAULT_LENGTH` | Integer days | Sprint length in days. |
-| `sprints.defaults.overdue_after` | `LOTAR_SPRINTS_DEFAULT_OVERDUE_AFTER` | Integer days | When overdue counts begin. |
+| `sprints.defaults.length` | `LOTAR_SPRINTS_DEFAULT_LENGTH` | Duration (`14d`, `2w`) | Default planned sprint length: a positive number of days or weeks. |
+| `sprints.defaults.overdue_after` | `LOTAR_SPRINTS_DEFAULT_OVERDUE_AFTER` | Duration (`12h`, `1d`) | Default overdue grace period recorded on new sprints: zero or more hours, days or weeks. |
 | `sprints.notifications.enabled` | `LOTAR_SPRINTS_NOTIFICATIONS_ENABLED` | `true`/`false` | Toggles sprint reminder notifications. |
 
 ### Web server

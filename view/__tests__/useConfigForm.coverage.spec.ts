@@ -197,3 +197,19 @@ describe('useConfigForm newly represented fields (DEV-146)', () => {
         expect(form.errors.sprints_defaults_capacity_hours).toBeNull()
     })
 })
+
+describe('useConfigForm sprint duration validation (DEV-111)', () => {
+    it('matches the server grammar for lengths and overdue grace periods', () => {
+        const form = load('', inspectFor('', null))
+        const check = (field: 'sprints_defaults_length' | 'sprints_defaults_overdue_after', value: string) => {
+            if (field === 'sprints_defaults_length') form.form.sprintLength = value
+            else form.form.sprintOverdueAfter = value
+            form.validateField(field)
+            return form.errors[field]
+        }
+        for (const ok of ['', '2w', '14d', '3 weeks']) expect(check('sprints_defaults_length', ok)).toBeNull()
+        for (const bad of ['12h', '0d', '-2w', 'soon', '600w']) expect(check('sprints_defaults_length', bad)).toBeTruthy()
+        for (const ok of ['', '12h', '0d', '2 hours']) expect(check('sprints_defaults_overdue_after', ok)).toBeNull()
+        for (const bad of ['later', '87601h']) expect(check('sprints_defaults_overdue_after', bad)).toBeTruthy()
+    })
+})

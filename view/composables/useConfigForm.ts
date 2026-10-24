@@ -614,6 +614,24 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         return invalid ? `"${invalid}" is too long (max 50 characters).` : null
     }
 
+    // Mirrors the server grammar (DEV-111): lengths take days/weeks and must be
+    // positive; overdue grace also takes hours and may be zero. Max ten years.
+    function validateSprintDuration(raw: string, isLength: boolean): string | null {
+        const value = raw.trim().toLowerCase()
+        if (!value) return null
+        const units = isLength ? '(d|day|days|w|week|weeks)' : '(h|hour|hours|d|day|days|w|week|weeks)'
+        const match = value.match(new RegExp(`^(\\d+)\\s*${units}$`))
+        if (!match) {
+            return isLength ? 'Use a whole number of days or weeks, e.g. 14d or 2w.' : 'Use a whole number of hours, days or weeks, e.g. 12h, 1d or 2w.'
+        }
+        const count = Number(match[1])
+        const unit = match[2]![0]
+        const hours = count * (unit === 'h' ? 1 : unit === 'd' ? 24 : 168)
+        if (isLength && hours === 0) return 'The length must be longer than zero.'
+        if (hours > 3650 * 24) return 'Keep it to ten years (3650 days) or less.'
+        return null
+    }
+
     function validateField(field: string) {
         switch (field) {
             case 'server_port': {
@@ -752,6 +770,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 } else {
                     errors.agent_instructions = null
                 }
+                break
+            }
+            case 'sprints_defaults_length':
+            case 'sprints_defaults_overdue_after': {
+                const isLength = field === 'sprints_defaults_length'
+                errors[field] = validateSprintDuration(isLength ? form.sprintLength : form.sprintOverdueAfter, isLength)
                 break
             }
             case 'sprints_defaults_capacity_points':
@@ -959,7 +983,14 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'branch_priority_aliases',
         ]
         if (isGlobal.value) {
-            fields.push('server_port', 'default_project', 'sprints_defaults_capacity_points', 'sprints_defaults_capacity_hours')
+            fields.push(
+                'server_port',
+                'default_project',
+                'sprints_defaults_length',
+                'sprints_defaults_overdue_after',
+                'sprints_defaults_capacity_points',
+                'sprints_defaults_capacity_hours',
+            )
         } else {
             fields.push('project_name')
         }

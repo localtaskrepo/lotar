@@ -53,7 +53,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - auto.branch_infer_priority: boolean (default true)
 - auto.populate_members: boolean (default true)
 - branch.type_aliases / branch.status_aliases / branch.priority_aliases: maps of branch token to configured label (default empty)
-- sprints.defaults.length / sprints.defaults.overdue_after: optional duration strings (e.g., 2w / 12h); see the recipes below
+- sprints.defaults.length: optional positive duration in days or weeks (`14d`, `2w`, `3 weeks`); sprints.defaults.overdue_after: optional grace period of zero or more hours, days or weeks (`12h`, `1d`). Both are capped at ten years; see the recipes below
 - sprints.defaults.capacity_points / capacity_hours: optional nonnegative numbers
 - sprints.notifications.enabled: boolean (default true; project-overridable)
 - web_ui_path: optional global-only path (top-level spelling), for an external web bundle
@@ -184,7 +184,7 @@ lotar config show --full --format=json | jq '.config.sprint_defaults'
 lotar config show --project=DEMO --full --format=json | jq -r '.config.issue_priorities[]'
 ```
 
-Nested YAML paths are not all exposed as dotted CLI mutation aliases: the sprint recipes deliberately use the shipped flat setter names. Sprint defaults are stored as strings: config set/dry-run can accept a malformed duration, and sprint creation can persist it with a warning rather than reject it. Do not treat successful config or sprint creation as proof of a usable schedule. Dry-run runs the same implemented config validators as persistence, not every downstream parser. [DEV-111](../../.tasks/DEV/111.yml) tracks stricter default-duration validation. Use [sprint](./sprints.md) for length/grace inputs and [automation](./automation.md) for its separately validated cooldown grammar.
+Nested YAML paths are not all exposed as dotted CLI mutation aliases: the sprint recipes deliberately use the shipped flat setter names. `config set`, its dry run, REST and MCP reject a sprint default duration outside that grammar (for example `not-a-duration`, `12h` as a length, `0w`, or more than ten years) without writing, and `--force` does not bypass it; an empty value clears the default. A malformed value already saved in a config file is still loaded so unrelated commands keep working: `lotar config validate` reports it as a warning, and sprint status treats an unusable length as unknown. Environment-variable values are applied as given. Explicit sprint `--length`/`--overdue-after` values are not validated by this check. Use [sprint](./sprints.md) for length/grace inputs and [automation](./automation.md) for its separately validated cooldown grammar.
 
 ## Validation
 - Values are checked against allowed enums.

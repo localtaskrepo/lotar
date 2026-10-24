@@ -387,6 +387,33 @@ impl ConfigValidator {
             self.validate_ticket_patterns(patterns, &mut result);
         }
 
+        // Sprint default durations (DEV-111): new values are rejected when
+        // set; an already-saved malformed value stays readable and only warns.
+        let defaults = &config.sprints.defaults;
+        for (field, value, parse) in [
+            (
+                "sprints.defaults.length",
+                defaults.length.as_deref(),
+                crate::utils::time::parse_sprint_length as fn(&str) -> Result<_, String>,
+            ),
+            (
+                "sprints.defaults.overdue_after",
+                defaults.overdue_after.as_deref(),
+                crate::utils::time::parse_sprint_overdue_after,
+            ),
+        ] {
+            if let Some(raw) = value.filter(|raw| !raw.trim().is_empty())
+                && let Err(err) = parse(raw)
+            {
+                result.add_error(
+                    ValidationError::warning(Some(field.to_string()), err).with_fix(format!(
+                        "Set a valid value or clear it: lotar config set {} \"\" --global",
+                        field.replace('.', "_")
+                    )),
+                );
+            }
+        }
+
         result
     }
 

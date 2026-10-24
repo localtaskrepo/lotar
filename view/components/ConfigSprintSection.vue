@@ -8,8 +8,9 @@
             {{ provenanceLabel(sourceFor('sprints_defaults_length')) }}
           </span>
         </label>
-        <UiInput :id="`${uid}-length`" v-model="length" maxlength="32" placeholder="2w" />
+        <UiInput :id="`${uid}-length`" v-model="length" maxlength="32" placeholder="2w" @blur="emit('validate', 'sprints_defaults_length')" />
         <p class="field-hint">Days or weeks, e.g. 14d or 2w. Leave empty for no default.</p>
+        <p v-if="errors.sprints_defaults_length" class="field-error">{{ errors.sprints_defaults_length }}</p>
       </div>
       <div class="field">
         <label class="field-label" :for="`${uid}-overdue`">
@@ -18,8 +19,9 @@
             {{ provenanceLabel(sourceFor('sprints_defaults_overdue_after')) }}
           </span>
         </label>
-        <UiInput :id="`${uid}-overdue`" v-model="overdueAfter" maxlength="32" placeholder="2d" />
-        <p class="field-hint">Grace period past the planned end before a sprint is reported overdue.</p>
+        <UiInput :id="`${uid}-overdue`" v-model="overdueAfter" maxlength="32" placeholder="12h" @blur="emit('validate', 'sprints_defaults_overdue_after')" />
+        <p class="field-hint">Grace period recorded on new sprints: hours, days or weeks, e.g. 12h or 1d.</p>
+        <p v-if="errors.sprints_defaults_overdue_after" class="field-error">{{ errors.sprints_defaults_overdue_after }}</p>
       </div>
       <div class="field">
         <label class="field-label" :for="`${uid}-points`">Capacity (points)</label>
@@ -84,7 +86,14 @@ const { errors, sourceFor, provenanceLabel, provenanceClass } = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'sprints_defaults_capacity_points' | 'sprints_defaults_capacity_hours'): void
+  (
+    e: 'validate',
+    field:
+      | 'sprints_defaults_length'
+      | 'sprints_defaults_overdue_after'
+      | 'sprints_defaults_capacity_points'
+      | 'sprints_defaults_capacity_hours',
+  ): void
 }>()
 
 const uid = useId()
