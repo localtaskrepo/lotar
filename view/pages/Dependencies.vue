@@ -272,7 +272,10 @@ onBeforeUnmount(() => { alive = false; generation += 1; routeRequest += 1; pendi
 .dependency-relationships label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); }
 .dependency-relationships-all { font-weight: 600; }
 .dependency-relationships p { flex-basis: 100%; margin: 0; font-size: var(--text-xs); }
-.dependency-depth-picker { display: grid; gap: 4px; flex: 0 1 7rem; min-width: 0; font-size: var(--text-sm); }
+/* A definite width (not only a flex-basis) so the row's intrinsic width
+   includes it; otherwise a narrower label font wraps the button below. */
+.dependency-depth-picker { display: grid; gap: 4px; flex: none; width: 7rem; min-width: 0; font-size: var(--text-sm); }
+.dependency-range-options > .btn { flex: none; white-space: nowrap; }
 .dependency-range-options { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
 .dependency-range-help { flex-basis: 100%; margin: 0; font-size: var(--text-xs); }
 .dependency-depth-picker :deep(.input), .dependency-sort :deep(.input) { box-sizing: border-box; height: var(--control-height); min-height: var(--control-height); }
@@ -288,5 +291,5 @@ onBeforeUnmount(() => { alive = false; generation += 1; routeRequest += 1; pendi
 .integrity-details { margin: 8px 0; font-size: .9em; }
 .integrity-details summary { cursor: pointer; color: var(--muted); }
 .integrity-details ul { max-height: 220px; overflow: auto; padding-left: 20px; }
-@media (max-width: 640px) { .dependency-relationships { flex-basis: 100%; } .dependency-range-options { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .dependency-relationships { flex-basis: 100%; } .dependency-range-options { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); } .dependency-depth-picker { width: auto; } }
 </style>

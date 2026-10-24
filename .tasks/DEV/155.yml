@@ -1,0 +1,31 @@
+title: 'CI smoke fails: dependency filter wraps Show unlinked tasks on Linux'
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T21:56:02.845214+00:00
+modified: 2026-10-24T21:56:39.462074+00:00
+comments:
+- date: 2026-10-24T21:56:39.440295+00:00
+  text: 'Outcome: root cause is flex intrinsic sizing in view/pages/Dependencies.vue. .dependency-range-options sizes to its children''s max-content, but the picker only had flex-basis 7rem, which is ignored for that intrinsic width. On Linux the ''Connection range'' label renders narrower than 7rem, so the row came out 304px while the items needed 306px and the button wrapped (46px = one row). On macOS the label is at least 7rem, so it fit. Fix: picker gets a definite width: 7rem (flex: none) and the button flex: none/nowrap; at <=640px the picker goes back to width:auto for the stacked full-width layout. Evidence: reproduced in Linux Chromium (Playwright 1.64.1 noble container via run-server + exposeNetwork loopback): 46px at every width before, 0 after; the real smoke test ''keeps filter fields orderly…'' passes in that Linux browser (helper change was temporary and reverted) and the full ui.relationships spec passes locally (19/19). Remaining: confirm green on the next GitHub Actions run. Guidance: no durable finding.'
+description: 'CI Smoke Tests have failed on main since 630a486 (also 67555cc): ui.relationships ''keeps filter fields orderly and focus input bounded at wide, tablet and mobile sizes'' expects ''Show unlinked tasks'' and ''Connection range'' on one row above 640px but they are 46px apart. Passes on macOS.'
+history:
+- at: 2026-10-24T21:56:39.399076+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T21:56:39.440295+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T21:56:39.462074+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
