@@ -211,6 +211,7 @@ function handleUpdate(field: 'issue_states' | 'issue_types' | 'issue_priorities'
 
 .done-states-mode {
   width: fit-content;
+  max-width: 100%;
   min-height: 34px;
 }
 

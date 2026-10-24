@@ -1,0 +1,7 @@
+title: agent.automation lifecycle settings have no runtime consumer
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-24T03:38:24.172542+00:00
+description: 'Found during DEV-146. agent.automation.on_start/on_success/on_failure/on_cancel (set_status, reassign_to) are parsed, resolved, settable via config set (agent_on_*_status / agent_on_*_reassign_to) and documented in docs/help/config-reference.md, but nothing outside src/config reads ResolvedConfig.agent_automation; agent job lifecycle now runs through automation rules. The Config UI deliberately does not expose them. Decide: wire them into agent job lifecycle, or deprecate them (keep YAML backwards-compatible, warn on use, update docs). Acceptance: either behavior that honors the settings with tests, or a documented deprecation.'

@@ -1,10 +1,46 @@
 title: Web UI Config screen is incomplete
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-23T17:18:28.025185+00:00
+modified: 2026-10-24T03:43:45.309647+00:00
+comments:
+- date: 2026-10-24T03:27:37.198739+00:00
+  text: 'Audit (src/config/fields.rs catalog vs view/pages/ConfigView.vue): the UI covers server port, default project/priority/status, attachments, project name, default reporter/assignee/tags, tags, custom fields, issue states/types/priorities/done states, 9 automation toggles (only 2 overridable per project), scanning, branch aliases and automation.yml. Missing entirely: members, strict_members, auto_populate_members, review_reviewers (project), sync_reports_dir/sync_write_reports, agent_context_enabled/extension, agent_logs_dir, agent_instructions/_file, agent_on_{start,success,failure,cancel}_{status,reassign_to}, agent_worktree_enabled/dir/branch_prefix, sprints_defaults_{length,overdue_after,capacity_points,capacity_hours}, sprints_notifications_enabled, web_ui_path. Root cause of the reported custom-fields problem: the Taxonomy chip lists conflate wildcard, empty and inherit. A project-scope empty value clears the override (inherit), so ''no custom fields for this project'' was not expressible; the hint ''leave empty to inherit'' also hid that ''*'' means any. Verified with the CLI that an explicit YAML ''[]'' stores custom.fields: [] and resolves to none. Plan: (1) Tags/custom fields get a mode select: Inherit (project) / Any (*) / Only these / None ([]). (2) Add People fields: members, strict members, auto-populate members, project reviewers. (3) Make all 9 automation toggles tri-state per project. (4) New groups: Sprint defaults (global; duration + number inputs + notifications toggle), Sync reports, Agent jobs (context, logs dir, instructions mode built-in/inline/file, lifecycle status selects + reassign inputs, worktree), web UI path in Server. (5) Numeric inputs for numbers. Out of scope (no config-set setter exists): agent_worktree max_parallel_jobs/cleanup_*, named agent profiles, remotes (edited on the Sync page), auth profiles (home-only secrets). Checks: Vitest for useConfigForm payloads, UI typecheck, browser screenshots, smoke on config save.'
+- date: 2026-10-24T03:41:26.203956+00:00
+  text: 'Outcome: Config page now represents every option config set can write, with bespoke controls. Taxonomy: tags and custom fields use a mode select (project: Inherit global (currently …); Any (*); Only these (chips); None ([])), fixing the reported case: custom fields can be turned off per project and set back to inherit. People: members chips, ''Only allow members'' and ''Auto-add new members'' toggles, project reviewers. Automation: all 9 toggles are overridable per project (previously 2). New groups: Sync reports (folder, write toggle, link to Sync page for remotes), Agent jobs (context toggle/extension, logs folder, instructions built-in/text/file, worktree toggle/prefix/folder), Sprint defaults (global: length, overdue after, numeric capacities, sprint warnings), Server web UI folder; port and max upload use number inputs. Also fixed on the same screen: global page loaded dirty because a watcher forced an unset default status to the first status (now an explicit ''First status (…)'' option); Done states select overflowed at 390px. view/api/types.ts now declares fields the inspect API already returned (no REST shape change; openapi does not model these objects). docs/help/config-reference.md documents */list/[] and the ''[]'' project example (verified with the CLI). Evidence: view/__tests__/useConfigForm.coverage.spec.ts (7 tests: modes, payload keys, project overrides/clears, validation); smoke/tests/ui.config-coverage.smoke.spec.ts (project custom fields none -> custom.fields: [] -> inherit, global hidden settings saved through UI with exact payload, page loads clean); browser screenshots global/project at 1280 and 390, no horizontal overflow. Gates: npm run lint:agent clean; npm run test:agent 1659 Rust + 1111 UI + release pass; npm run test:smoke:agent 82 files / 342 tests pass. Out of scope with follow-ups: agent.automation lifecycle settings have no runtime consumer (DEV-152, not exposed in UI); worktree max_parallel_jobs/cleanup flags have no setter (DEV-153). Named agent profiles and home-only auth profiles are not config-set fields; remotes stay on the Sync page. Guidance: no durable finding.'
+- date: 2026-10-24T03:43:45.309647+00:00
+  text: 'Commit pending: git commit failed with ''1Password: failed to fill whole buffer'' (SSH commit signing). All DEV-146 changes are staged; run the commit once 1Password is unlocked.'
 description: |-
   The config screen is missing multiple config options, probably because a lot have been added since this was created without updating this UI.
   For example, I was just trying to configure custom fields for this project (turning them off) and the option is nowhere to be found.
   This ticket is to go through all config options and make sure they are fully represented in the UI with bespoke inputs (no generic "text" input for everything)
+history:
+- at: 2026-10-24T03:24:58.515714+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T03:27:37.198739+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:41:26.203956+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:41:26.229365+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-24T03:43:45.309647+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

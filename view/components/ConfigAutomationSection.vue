@@ -19,64 +19,69 @@
         :source-label="provenanceLabel(sourceFor('auto_assign_on_status'))"
         :source-class="provenanceClass(sourceFor('auto_assign_on_status'))"
       />
-      <template v-if="isGlobal">
-        <ConfigToggleField
-          label="Auto CODEOWNERS assignee"
-          v-model="autoCodeownersAssign"
-          :is-global="true"
-          :options="toggleSelectOptions('autoCodeownersAssign')"
-          :source-label="provenanceLabel(sourceFor('auto_codeowners_assign'))"
-          :source-class="provenanceClass(sourceFor('auto_codeowners_assign'))"
-        />
-        <ConfigToggleField
-          label="Auto tags from path"
-          v-model="autoTagsFromPath"
-          :is-global="true"
-          :options="toggleSelectOptions('autoTagsFromPath')"
-          :source-label="provenanceLabel(sourceFor('auto_tags_from_path'))"
-          :source-class="provenanceClass(sourceFor('auto_tags_from_path'))"
-        />
-        <ConfigToggleField
-          label="Infer type from branch"
-          v-model="autoBranchInferType"
-          :is-global="true"
-          :options="toggleSelectOptions('autoBranchInferType')"
-          :source-label="provenanceLabel(sourceFor('auto_branch_infer_type'))"
-          :source-class="provenanceClass(sourceFor('auto_branch_infer_type'))"
-        />
-        <ConfigToggleField
-          label="Infer status from branch"
-          v-model="autoBranchInferStatus"
-          :is-global="true"
-          :options="toggleSelectOptions('autoBranchInferStatus')"
-          :source-label="provenanceLabel(sourceFor('auto_branch_infer_status'))"
-          :source-class="provenanceClass(sourceFor('auto_branch_infer_status'))"
-        />
-        <ConfigToggleField
-          label="Infer priority from branch"
-          v-model="autoBranchInferPriority"
-          :is-global="true"
-          :options="toggleSelectOptions('autoBranchInferPriority')"
-          :source-label="provenanceLabel(sourceFor('auto_branch_infer_priority'))"
-          :source-class="provenanceClass(sourceFor('auto_branch_infer_priority'))"
-        />
-        <ConfigToggleField
-          label="Auto identity resolution"
-          v-model="autoIdentity"
-          :is-global="true"
-          :options="toggleSelectOptions('autoIdentity')"
-          :source-label="provenanceLabel(sourceFor('auto_identity'))"
-          :source-class="provenanceClass(sourceFor('auto_identity'))"
-        />
-        <ConfigToggleField
-          label="Use git identity fallback"
-          v-model="autoIdentityGit"
-          :is-global="true"
-          :options="toggleSelectOptions('autoIdentityGit')"
-          :source-label="provenanceLabel(sourceFor('auto_identity_git'))"
-          :source-class="provenanceClass(sourceFor('auto_identity_git'))"
-        />
-      </template>
+      <ConfigToggleField
+        label="Auto CODEOWNERS assignee"
+        v-model="autoCodeownersAssign"
+        :is-global="isGlobal"
+        :options="toggleSelectOptions('autoCodeownersAssign')"
+        :hint="hint('autoCodeownersAssign')"
+        :source-label="provenanceLabel(sourceFor('auto_codeowners_assign'))"
+        :source-class="provenanceClass(sourceFor('auto_codeowners_assign'))"
+      />
+      <ConfigToggleField
+        label="Auto tags from path"
+        v-model="autoTagsFromPath"
+        :is-global="isGlobal"
+        :options="toggleSelectOptions('autoTagsFromPath')"
+        :hint="hint('autoTagsFromPath')"
+        :source-label="provenanceLabel(sourceFor('auto_tags_from_path'))"
+        :source-class="provenanceClass(sourceFor('auto_tags_from_path'))"
+      />
+      <ConfigToggleField
+        label="Infer type from branch"
+        v-model="autoBranchInferType"
+        :is-global="isGlobal"
+        :options="toggleSelectOptions('autoBranchInferType')"
+        :hint="hint('autoBranchInferType')"
+        :source-label="provenanceLabel(sourceFor('auto_branch_infer_type'))"
+        :source-class="provenanceClass(sourceFor('auto_branch_infer_type'))"
+      />
+      <ConfigToggleField
+        label="Infer status from branch"
+        v-model="autoBranchInferStatus"
+        :is-global="isGlobal"
+        :options="toggleSelectOptions('autoBranchInferStatus')"
+        :hint="hint('autoBranchInferStatus')"
+        :source-label="provenanceLabel(sourceFor('auto_branch_infer_status'))"
+        :source-class="provenanceClass(sourceFor('auto_branch_infer_status'))"
+      />
+      <ConfigToggleField
+        label="Infer priority from branch"
+        v-model="autoBranchInferPriority"
+        :is-global="isGlobal"
+        :options="toggleSelectOptions('autoBranchInferPriority')"
+        :hint="hint('autoBranchInferPriority')"
+        :source-label="provenanceLabel(sourceFor('auto_branch_infer_priority'))"
+        :source-class="provenanceClass(sourceFor('auto_branch_infer_priority'))"
+      />
+      <ConfigToggleField
+        label="Auto identity resolution"
+        v-model="autoIdentity"
+        :is-global="isGlobal"
+        :options="toggleSelectOptions('autoIdentity')"
+        :hint="hint('autoIdentity')"
+        :source-label="provenanceLabel(sourceFor('auto_identity'))"
+        :source-class="provenanceClass(sourceFor('auto_identity'))"
+      />
+      <ConfigToggleField
+        label="Use git identity fallback"
+        v-model="autoIdentityGit"
+        :is-global="isGlobal"
+        :options="toggleSelectOptions('autoIdentityGit')"
+        :hint="hint('autoIdentityGit')"
+        :source-label="provenanceLabel(sourceFor('auto_identity_git'))"
+        :source-class="provenanceClass(sourceFor('auto_identity_git'))"
+      />
     </div>
   </ConfigGroup>
 </template>

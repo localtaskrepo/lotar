@@ -844,6 +844,27 @@ export interface SyncAuthProfile {
 }
 
 
+/** Inline instructions text, or a file reference; null/absent = built-in. */
+export type AgentInstructionsValue = string | { file: string } | null | undefined
+
+export interface AgentWorktreeConfig {
+  enabled: boolean
+  dir?: string | null
+  branch_prefix: string
+  max_parallel_jobs?: number | null
+  cleanup_on_done?: boolean
+  cleanup_on_failure?: boolean
+  cleanup_on_cancel?: boolean
+  cleanup_delete_branches?: boolean
+}
+
+export interface SprintDefaultsConfig {
+  capacity_points?: number | null
+  capacity_hours?: number | null
+  length?: string | null
+  overdue_after?: string | null
+}
+
 export interface ResolvedConfigDTO {
   /** Project-only named reviewers; empty keeps reporter-only review authorization. */
   review_reviewers: string[]
@@ -888,6 +909,17 @@ export interface ResolvedConfigDTO {
   branch_type_aliases: Record<string, string>
   branch_status_aliases: Record<string, string>
   branch_priority_aliases: Record<string, string>
+  // Always sent by the server; optional so partial fixtures stay valid.
+  members?: string[]
+  strict_members?: boolean
+  auto_populate_members?: boolean
+  agent_context_enabled?: boolean
+  agent_context_extension?: string
+  agent_logs_dir?: string | null
+  agent_instructions?: AgentInstructionsValue
+  agent_worktree?: AgentWorktreeConfig
+  sprint_defaults?: SprintDefaultsConfig
+  sprint_notifications?: { enabled: boolean }
   remotes?: Record<string, SyncRemoteConfig>
 }
 
@@ -927,6 +959,8 @@ export interface GlobalConfigRaw {
   branch_type_aliases: Record<string, string>
   branch_status_aliases: Record<string, string>
   branch_priority_aliases: Record<string, string>
+  /** Global-only external web bundle path; absent when unset. */
+  web_ui_path?: string | null
   remotes?: Record<string, SyncRemoteConfig>
   auth_profiles?: Record<string, SyncAuthProfile>
 }
@@ -951,8 +985,23 @@ export interface ProjectConfigRaw {
   default_priority?: string | null
   default_status?: string | null
   custom_fields?: string[]
+  members?: string[]
+  strict_members?: boolean
+  auto_populate_members?: boolean
   auto_set_reporter?: boolean
   auto_assign_on_status?: boolean
+  auto_codeowners_assign?: boolean
+  auto_tags_from_path?: boolean
+  auto_branch_infer_type?: boolean
+  auto_branch_infer_status?: boolean
+  auto_branch_infer_priority?: boolean
+  auto_identity?: boolean
+  auto_identity_git?: boolean
+  agent_context_enabled?: boolean
+  agent_context_extension?: string
+  agent_logs_dir?: string
+  agent_instructions?: AgentInstructionsValue
+  agent_worktree?: Partial<AgentWorktreeConfig>
   scan_signal_words?: string[]
   scan_ticket_patterns?: string[]
   scan_enable_ticket_words?: boolean

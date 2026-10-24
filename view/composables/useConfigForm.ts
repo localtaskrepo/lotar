@@ -1,8 +1,19 @@
 import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
-import type { ConfigInspectResult, ConfigSource, ProjectDTO } from '../api/types'
+import type { AgentInstructionsValue, ConfigInspectResult, ConfigSource, ProjectDTO } from '../api/types'
 import { provenanceClass as getProvenanceClass, provenanceLabel as getProvenanceLabel } from '../utils/provenance'
 
 export type ToggleValue = 'inherit' | 'true' | 'false'
+
+/**
+ * How a value list (tags, custom fields) is restricted. `inherit` exists only
+ * in project scope; `any` stores the wildcard `*`; `none` stores an explicit
+ * empty list, which a blank value cannot express in project scope (blank
+ * clears the override).
+ */
+export type ListMode = 'inherit' | 'any' | 'list' | 'none'
+
+/** Where agent instructions come from; `inherit` is project scope only. */
+export type AgentInstructionsMode = 'inherit' | 'builtin' | 'inline' | 'file'
 
 export interface BranchAliasEntry {
     key: string
@@ -29,8 +40,15 @@ export interface ConfigFormState {
      * explicit empty array is invalid (one-or-more rule).
      */
     issueDoneStates: string[] | null
+    tagsMode: ListMode
     tags: string[]
+    customFieldsMode: ListMode
     customFields: string[]
+    members: string[]
+    strictMembers: ToggleValue
+    autoPopulateMembers: ToggleValue
+    /** Project-only named reviewers. */
+    reviewReviewers: string[]
     autoSetReporter: ToggleValue
     autoAssignOnStatus: ToggleValue
     autoCodeownersAssign: ToggleValue
@@ -48,6 +66,25 @@ export interface ConfigFormState {
     branchTypeAliases: BranchAliasEntry[]
     branchStatusAliases: BranchAliasEntry[]
     branchPriorityAliases: BranchAliasEntry[]
+    syncReportsDir: string
+    syncWriteReports: ToggleValue
+    agentContextEnabled: ToggleValue
+    agentContextExtension: string
+    agentLogsDir: string
+    agentInstructionsMode: AgentInstructionsMode
+    agentInstructions: string
+    agentInstructionsFile: string
+    agentWorktreeEnabled: ToggleValue
+    agentWorktreeDir: string
+    agentWorktreeBranchPrefix: string
+    /** Global-only sprint defaults. */
+    sprintLength: string
+    sprintOverdueAfter: string
+    sprintCapacityPoints: string
+    sprintCapacityHours: string
+    sprintNotificationsEnabled: ToggleValue
+    /** Global-only external web bundle path. */
+    webUiPath: string
 }
 
 export type ToggleField =
@@ -63,6 +100,12 @@ export type ToggleField =
     | 'scanEnableTicketWords'
     | 'scanEnableMentions'
     | 'scanStripAttributes'
+    | 'strictMembers'
+    | 'autoPopulateMembers'
+    | 'syncWriteReports'
+    | 'agentContextEnabled'
+    | 'agentWorktreeEnabled'
+    | 'sprintNotificationsEnabled'
 
 type AliasField = 'branchTypeAliases' | 'branchStatusAliases' | 'branchPriorityAliases'
 
@@ -146,8 +189,14 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         issueTypes: [],
         issuePriorities: [],
         issueDoneStates: null,
+        tagsMode: 'any',
         tags: [],
+        customFieldsMode: 'any',
         customFields: [],
+        members: [],
+        strictMembers: 'false',
+        autoPopulateMembers: 'true',
+        reviewReviewers: [],
         autoSetReporter: 'inherit',
         autoAssignOnStatus: 'inherit',
         autoCodeownersAssign: 'true',
@@ -165,6 +214,23 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         branchTypeAliases: [],
         branchStatusAliases: [],
         branchPriorityAliases: [],
+        syncReportsDir: '',
+        syncWriteReports: 'true',
+        agentContextEnabled: 'true',
+        agentContextExtension: '',
+        agentLogsDir: '',
+        agentInstructionsMode: 'builtin',
+        agentInstructions: '',
+        agentInstructionsFile: '',
+        agentWorktreeEnabled: 'false',
+        agentWorktreeDir: '',
+        agentWorktreeBranchPrefix: '',
+        sprintLength: '',
+        sprintOverdueAfter: '',
+        sprintCapacityPoints: '',
+        sprintCapacityHours: '',
+        sprintNotificationsEnabled: 'true',
+        webUiPath: '',
     })
 
     const baseline = ref<ConfigFormState | null>(null)
@@ -350,7 +416,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         ([global, options]) => {
             if (!global) return
             if (!options.length) return
-            if (!form.defaultStatus || !options.includes(form.defaultStatus)) {
+            // Blank is valid (creation uses the first status); only replace a
+            // value that is no longer a configured status.
+            if (form.defaultStatus && !options.includes(form.defaultStatus)) {
                 form.defaultStatus = options[0] ?? ''
             }
         },
@@ -371,8 +439,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     const taxonomyDescription = computed(() =>
         isGlobal.value
-            ? 'Control shared taxonomy defaults such as tags plus any custom fields you rely on across projects.'
-            : 'Trim the list to limit this project or leave it empty to inherit global taxonomy and custom fields.',
+            ? 'Choose which tags and custom fields tasks may use: any, only a list, or none.'
+            : 'Inherit the global tags and custom fields, or allow any, only a list, or none for this project.',
     )
 
     const projectOverviewDescription = computed(() =>
@@ -403,78 +471,22 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         return inspectData.value?.sources?.[field]
     }
 
-    function snapshotForm(): ConfigFormState {
-        return {
-            serverPort: form.serverPort,
-            defaultProject: form.defaultProject,
-            attachmentsDir: form.attachmentsDir,
-            attachmentsMaxUploadMb: form.attachmentsMaxUploadMb,
-            projectName: form.projectName,
-            defaultReporter: form.defaultReporter,
-            defaultAssignee: form.defaultAssignee,
-            defaultTags: [...form.defaultTags],
-            defaultPriority: form.defaultPriority,
-            defaultStatus: form.defaultStatus,
-            issueStates: [...form.issueStates],
-            issueTypes: [...form.issueTypes],
-            issuePriorities: [...form.issuePriorities],
-            issueDoneStates: form.issueDoneStates === null ? null : [...form.issueDoneStates],
-            tags: [...form.tags],
-            customFields: [...form.customFields],
-            autoSetReporter: form.autoSetReporter,
-            autoAssignOnStatus: form.autoAssignOnStatus,
-            autoCodeownersAssign: form.autoCodeownersAssign,
-            autoTagsFromPath: form.autoTagsFromPath,
-            autoBranchInferType: form.autoBranchInferType,
-            autoBranchInferStatus: form.autoBranchInferStatus,
-            autoBranchInferPriority: form.autoBranchInferPriority,
-            autoIdentity: form.autoIdentity,
-            autoIdentityGit: form.autoIdentityGit,
-            scanSignalWords: [...form.scanSignalWords],
-            scanTicketPatterns: [...form.scanTicketPatterns],
-            scanEnableTicketWords: form.scanEnableTicketWords,
-            scanEnableMentions: form.scanEnableMentions,
-            scanStripAttributes: form.scanStripAttributes,
-            branchTypeAliases: form.branchTypeAliases.map((entry) => ({ ...entry })),
-            branchStatusAliases: form.branchStatusAliases.map((entry) => ({ ...entry })),
-            branchPriorityAliases: form.branchPriorityAliases.map((entry) => ({ ...entry })),
+    function cloneState(state: ConfigFormState): ConfigFormState {
+        const copy = { ...state } as Record<string, unknown>
+        for (const [key, value] of Object.entries(copy)) {
+            if (Array.isArray(value)) {
+                copy[key] = value.map((entry) => (entry && typeof entry === 'object' ? { ...entry } : entry))
+            }
         }
+        return copy as unknown as ConfigFormState
+    }
+
+    function snapshotForm(): ConfigFormState {
+        return cloneState(form)
     }
 
     function applySnapshot(snapshot: ConfigFormState) {
-        form.serverPort = snapshot.serverPort
-        form.defaultProject = snapshot.defaultProject
-        form.attachmentsDir = snapshot.attachmentsDir
-        form.attachmentsMaxUploadMb = snapshot.attachmentsMaxUploadMb
-        form.projectName = snapshot.projectName
-        form.defaultReporter = snapshot.defaultReporter
-        form.defaultAssignee = snapshot.defaultAssignee
-        form.defaultTags = [...snapshot.defaultTags]
-        form.defaultPriority = snapshot.defaultPriority
-        form.defaultStatus = snapshot.defaultStatus
-        form.issueStates = [...snapshot.issueStates]
-        form.issueTypes = [...snapshot.issueTypes]
-        form.issuePriorities = [...snapshot.issuePriorities]
-        form.issueDoneStates = snapshot.issueDoneStates === null ? null : [...snapshot.issueDoneStates]
-        form.tags = [...snapshot.tags]
-        form.customFields = [...snapshot.customFields]
-        form.autoSetReporter = snapshot.autoSetReporter
-        form.autoAssignOnStatus = snapshot.autoAssignOnStatus
-        form.autoCodeownersAssign = snapshot.autoCodeownersAssign
-        form.autoTagsFromPath = snapshot.autoTagsFromPath
-        form.autoBranchInferType = snapshot.autoBranchInferType
-        form.autoBranchInferStatus = snapshot.autoBranchInferStatus
-        form.autoBranchInferPriority = snapshot.autoBranchInferPriority
-        form.autoIdentity = snapshot.autoIdentity
-        form.autoIdentityGit = snapshot.autoIdentityGit
-        form.scanSignalWords = [...snapshot.scanSignalWords]
-        form.scanTicketPatterns = [...snapshot.scanTicketPatterns]
-        form.scanEnableTicketWords = snapshot.scanEnableTicketWords
-        form.scanEnableMentions = snapshot.scanEnableMentions
-        form.scanStripAttributes = snapshot.scanStripAttributes
-        form.branchTypeAliases = snapshot.branchTypeAliases.map((entry) => ({ ...entry }))
-        form.branchStatusAliases = snapshot.branchStatusAliases.map((entry) => ({ ...entry }))
-        form.branchPriorityAliases = snapshot.branchPriorityAliases.map((entry) => ({ ...entry }))
+        Object.assign(form, cloneState(snapshot))
     }
 
     function deepEqual(a: ConfigFormState, b: ConfigFormState): boolean {
@@ -555,6 +567,18 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 return global.scan_enable_mentions
             case 'scanStripAttributes':
                 return global.scan_strip_attributes
+            case 'strictMembers':
+                return global.strict_members ?? null
+            case 'autoPopulateMembers':
+                return global.auto_populate_members ?? null
+            case 'syncWriteReports':
+                return global.sync_write_reports
+            case 'agentContextEnabled':
+                return global.agent_context_enabled ?? null
+            case 'agentWorktreeEnabled':
+                return global.agent_worktree?.enabled ?? null
+            case 'sprintNotificationsEnabled':
+                return global.sprint_notifications?.enabled ?? null
             default:
                 return null
         }
@@ -578,6 +602,16 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         const value = globalToggleValue(field)
         if (value === null) return ''
         return value ? 'On' : 'Off'
+    }
+
+    function validateRestrictedList(mode: ListMode, values: string[], label: string): string | null {
+        if (mode !== 'list') return null
+        const trimmed = values.map((value) => value.trim()).filter(Boolean)
+        if (!trimmed.length) {
+            return `Add at least one ${label}, or choose another option.`
+        }
+        const invalid = trimmed.find((value) => value.length > 50)
+        return invalid ? `"${invalid}" is too long (max 50 characters).` : null
     }
 
     function validateField(field: string) {
@@ -676,15 +710,54 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 break
             }
             case 'tags': {
-                const values = form.tags
-                const invalid = values.find((value) => value.trim().length > 50)
-                errors.tags = invalid ? `"${invalid}" is too long (max 50 characters).` : null
+                errors.tags = validateRestrictedList(form.tagsMode, form.tags, 'tag')
                 break
             }
             case 'custom_fields': {
-                const values = form.customFields
-                const invalid = values.find((value) => value.trim().length > 50)
-                errors.custom_fields = invalid ? `"${invalid}" is too long (max 50 characters).` : null
+                errors.custom_fields = validateRestrictedList(form.customFieldsMode, form.customFields, 'custom field')
+                break
+            }
+            case 'members':
+            case 'review_reviewers': {
+                const values = field === 'members' ? form.members : form.reviewReviewers
+                const invalid = values.find((value) => value.trim().length > 100)
+                errors[field] = invalid ? `"${invalid}" is too long (max 100 characters).` : null
+                break
+            }
+            case 'sync_reports_dir':
+            case 'agent_context_extension':
+            case 'agent_worktree_branch_prefix': {
+                const labels: Record<string, [string, string]> = {
+                    sync_reports_dir: ['syncReportsDir', 'Reports folder'],
+                    agent_context_extension: ['agentContextExtension', 'Context file extension'],
+                    agent_worktree_branch_prefix: ['agentWorktreeBranchPrefix', 'Branch prefix'],
+                }
+                const [key, label] = labels[field]!
+                const value = String(form[key as keyof ConfigFormState] ?? '').trim()
+                const loaded = String(baseline.value?.[key as keyof ConfigFormState] ?? '').trim()
+                if (!value) {
+                    // Global values cannot be blank; only flag a value the user cleared.
+                    errors[field] = isGlobal.value && loaded ? `${label} is required.` : null
+                } else {
+                    errors[field] = value.length > 512 ? `Keep the ${label.toLowerCase()} under 512 characters.` : null
+                }
+                break
+            }
+            case 'agent_instructions': {
+                const mode = form.agentInstructionsMode
+                if (mode === 'inline' && !form.agentInstructions.trim()) {
+                    errors.agent_instructions = 'Enter the instructions text, or choose another source.'
+                } else if (mode === 'file' && !form.agentInstructionsFile.trim()) {
+                    errors.agent_instructions = 'Enter the instructions file path, or choose another source.'
+                } else {
+                    errors.agent_instructions = null
+                }
+                break
+            }
+            case 'sprints_defaults_capacity_points':
+            case 'sprints_defaults_capacity_hours': {
+                const raw = (field === 'sprints_defaults_capacity_points' ? form.sprintCapacityPoints : form.sprintCapacityHours).trim()
+                errors[field] = raw && !/^\d+$/.test(raw) ? 'Enter a whole number of 0 or more, or leave it empty.' : null
                 break
             }
             case 'scan_signal_words': {
@@ -873,6 +946,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'issue_done_states',
             'tags',
             'custom_fields',
+            'members',
+            'review_reviewers',
+            'sync_reports_dir',
+            'agent_context_extension',
+            'agent_worktree_branch_prefix',
+            'agent_instructions',
             'scan_signal_words',
             'scan_ticket_patterns',
             'branch_type_aliases',
@@ -880,7 +959,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'branch_priority_aliases',
         ]
         if (isGlobal.value) {
-            fields.push('server_port', 'default_project')
+            fields.push('server_port', 'default_project', 'sprints_defaults_capacity_points', 'sprints_defaults_capacity_hours')
         } else {
             fields.push('project_name')
         }
@@ -891,6 +970,28 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function normalizeDoneStatesRaw(value: unknown): string[] | null {
         if (!Array.isArray(value)) return null
         return value.map((entry) => String(entry)).filter((entry) => entry.trim().length > 0)
+    }
+
+    function applyRestrictedList(field: 'tags' | 'customFields', values: string[] | null | undefined) {
+        const list = Array.isArray(values) ? values : []
+        const modeKey = field === 'tags' ? 'tagsMode' : 'customFieldsMode'
+        const named = list.filter((value) => value !== '*')
+        form[modeKey] = list.includes('*') ? 'any' : named.length ? 'list' : 'none'
+        form[field] = list.includes('*') ? [] : named
+    }
+
+    function applyAgentInstructions(value: AgentInstructionsValue, unsetMode: AgentInstructionsMode) {
+        form.agentInstructions = ''
+        form.agentInstructionsFile = ''
+        if (typeof value === 'string') {
+            form.agentInstructionsMode = 'inline'
+            form.agentInstructions = value
+        } else if (value && typeof value === 'object' && typeof value.file === 'string') {
+            form.agentInstructionsMode = 'file'
+            form.agentInstructionsFile = value.file
+        } else {
+            form.agentInstructionsMode = unsetMode
+        }
     }
 
     function populateForm(data: ConfigInspectResult) {
@@ -909,8 +1010,27 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.issueTypes = [...effective.issue_types]
         form.issuePriorities = [...effective.issue_priorities]
         form.issueDoneStates = null
-        form.tags = (effective.tags ?? []).filter((value) => value !== '*')
-        form.customFields = (effective.custom_fields ?? []).filter((value) => value !== '*')
+        applyRestrictedList('tags', effective.tags)
+        applyRestrictedList('customFields', effective.custom_fields)
+        form.members = [...(effective.members ?? [])]
+        form.strictMembers = toToggle(!!effective.strict_members)
+        form.autoPopulateMembers = toToggle(effective.auto_populate_members !== false)
+        form.reviewReviewers = []
+        form.syncReportsDir = effective.sync_reports_dir ?? ''
+        form.syncWriteReports = toToggle(effective.sync_write_reports !== false)
+        form.agentContextEnabled = toToggle(effective.agent_context_enabled !== false)
+        form.agentContextExtension = effective.agent_context_extension ?? ''
+        form.agentLogsDir = effective.agent_logs_dir ?? ''
+        applyAgentInstructions(effective.agent_instructions, 'builtin')
+        form.agentWorktreeEnabled = toToggle(!!effective.agent_worktree?.enabled)
+        form.agentWorktreeDir = effective.agent_worktree?.dir ?? ''
+        form.agentWorktreeBranchPrefix = effective.agent_worktree?.branch_prefix ?? ''
+        form.sprintLength = effective.sprint_defaults?.length ?? ''
+        form.sprintOverdueAfter = effective.sprint_defaults?.overdue_after ?? ''
+        form.sprintCapacityPoints = effective.sprint_defaults?.capacity_points?.toString() ?? ''
+        form.sprintCapacityHours = effective.sprint_defaults?.capacity_hours?.toString() ?? ''
+        form.sprintNotificationsEnabled = toToggle(effective.sprint_notifications?.enabled !== false)
+        form.webUiPath = data.global_raw?.web_ui_path ?? ''
         form.autoCodeownersAssign = toToggle(!!effective.auto_codeowners_assign)
         form.autoTagsFromPath = toToggle(!!effective.auto_tags_from_path)
         form.autoBranchInferType = toToggle(!!effective.auto_branch_infer_type)
@@ -943,6 +1063,39 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             form.scanEnableTicketWords = toTriToggle(raw.scan_enable_ticket_words)
             form.scanEnableMentions = toTriToggle(raw.scan_enable_mentions)
             form.scanStripAttributes = toTriToggle(raw.scan_strip_attributes)
+            form.autoCodeownersAssign = toTriToggle(raw.auto_codeowners_assign)
+            form.autoTagsFromPath = toTriToggle(raw.auto_tags_from_path)
+            form.autoBranchInferType = toTriToggle(raw.auto_branch_infer_type)
+            form.autoBranchInferStatus = toTriToggle(raw.auto_branch_infer_status)
+            form.autoBranchInferPriority = toTriToggle(raw.auto_branch_infer_priority)
+            form.autoIdentity = toTriToggle(raw.auto_identity)
+            form.autoIdentityGit = toTriToggle(raw.auto_identity_git)
+            // Project scope edits overrides only; absent keys inherit.
+            if (Array.isArray(raw.tags)) {
+                applyRestrictedList('tags', raw.tags)
+            } else {
+                form.tagsMode = 'inherit'
+                form.tags = []
+            }
+            if (Array.isArray(raw.custom_fields)) {
+                applyRestrictedList('customFields', raw.custom_fields)
+            } else {
+                form.customFieldsMode = 'inherit'
+                form.customFields = []
+            }
+            form.members = Array.isArray(raw.members) ? [...raw.members] : []
+            form.strictMembers = toTriToggle(raw.strict_members)
+            form.autoPopulateMembers = toTriToggle(raw.auto_populate_members)
+            form.reviewReviewers = Array.isArray(raw.review_reviewers) ? [...raw.review_reviewers] : []
+            form.syncReportsDir = typeof raw.sync_reports_dir === 'string' ? raw.sync_reports_dir : ''
+            form.syncWriteReports = toTriToggle(raw.sync_write_reports)
+            form.agentContextEnabled = toTriToggle(raw.agent_context_enabled)
+            form.agentContextExtension = typeof raw.agent_context_extension === 'string' ? raw.agent_context_extension : ''
+            form.agentLogsDir = typeof raw.agent_logs_dir === 'string' ? raw.agent_logs_dir : ''
+            applyAgentInstructions(raw.agent_instructions, 'inherit')
+            form.agentWorktreeEnabled = toTriToggle(raw.agent_worktree?.enabled)
+            form.agentWorktreeDir = raw.agent_worktree?.dir ?? ''
+            form.agentWorktreeBranchPrefix = raw.agent_worktree?.branch_prefix ?? ''
             if (Array.isArray(raw.scan_signal_words)) {
                 form.scanSignalWords = [...raw.scan_signal_words]
             }
@@ -1064,8 +1217,35 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             }
         }
 
-        addArray('tags', 'tags')
-        addArray('customFields', 'custom_fields')
+        // Restricted lists: inherit clears the project override, `*` allows
+        // any value, and `[]` stores an explicit "none" (a blank value would
+        // clear the override in project scope instead).
+        const restrictedValue = (mode: ListMode, values: string[]) => {
+            switch (mode) {
+                case 'inherit':
+                    return ''
+                case 'any':
+                    return '*'
+                case 'none':
+                    return '[]'
+                default:
+                    return normalizeCsv(values)
+            }
+        }
+        const addRestricted = (modeField: 'tagsMode' | 'customFieldsMode', field: 'tags' | 'customFields', key: string) => {
+            const next = restrictedValue(current[modeField], current[field])
+            if (next !== restrictedValue(base[modeField], base[field])) {
+                payload[key] = next
+            }
+        }
+        addRestricted('tagsMode', 'tags', 'tags')
+        addRestricted('customFieldsMode', 'customFields', 'custom_fields')
+        addArray('members', 'members')
+        addToggleField('strictMembers', 'strict_members', { allowInherit: true })
+        addToggleField('autoPopulateMembers', 'auto_populate_members', { allowInherit: true })
+        if (!isGlobal.value) {
+            addArray('reviewReviewers', 'review_reviewers')
+        }
         addArray('scanSignalWords', 'scan_signal_words')
         addArray('scanTicketPatterns', 'scan_ticket_patterns')
 
@@ -1075,14 +1255,48 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addToggleField('scanEnableMentions', 'scan_enable_mentions', { allowInherit: true })
         addToggleField('scanStripAttributes', 'scan_strip_attributes', { allowInherit: true })
 
+        addToggleField('autoCodeownersAssign', 'auto_codeowners_assign', { allowInherit: true })
+        addToggleField('autoTagsFromPath', 'auto_tags_from_path', { allowInherit: true })
+        addToggleField('autoBranchInferType', 'auto_branch_infer_type', { allowInherit: true })
+        addToggleField('autoBranchInferStatus', 'auto_branch_infer_status', { allowInherit: true })
+        addToggleField('autoBranchInferPriority', 'auto_branch_infer_priority', { allowInherit: true })
+        addToggleField('autoIdentity', 'auto_identity', { allowInherit: true })
+        addToggleField('autoIdentityGit', 'auto_identity_git', { allowInherit: true })
+
+        addValue('syncReportsDir', 'sync_reports_dir', { allowEmpty: !isGlobal.value })
+        addToggleField('syncWriteReports', 'sync_write_reports', { allowInherit: true })
+        addToggleField('agentContextEnabled', 'agent_context_enabled', { allowInherit: true })
+        addValue('agentContextExtension', 'agent_context_extension', { allowEmpty: !isGlobal.value })
+        addValue('agentLogsDir', 'agent_logs_dir')
+        {
+            // One source at a time: inline text and file path share a setting.
+            const instructions = (state: ConfigFormState): [string, string] => {
+                switch (state.agentInstructionsMode) {
+                    case 'inline':
+                        return ['agent_instructions', state.agentInstructions.trim()]
+                    case 'file':
+                        return ['agent_instructions_file', state.agentInstructionsFile.trim()]
+                    default:
+                        return ['agent_instructions', '']
+                }
+            }
+            const [key, value] = instructions(current)
+            const [baseKey, baseValue] = instructions(base)
+            if (key !== baseKey || value !== baseValue) {
+                payload[key] = value
+            }
+        }
+        addToggleField('agentWorktreeEnabled', 'agent_worktree_enabled', { allowInherit: true })
+        addValue('agentWorktreeDir', 'agent_worktree_dir')
+        addValue('agentWorktreeBranchPrefix', 'agent_worktree_branch_prefix', { allowEmpty: !isGlobal.value })
+
         if (isGlobal.value) {
-            addToggleField('autoCodeownersAssign', 'auto_codeowners_assign')
-            addToggleField('autoTagsFromPath', 'auto_tags_from_path')
-            addToggleField('autoBranchInferType', 'auto_branch_infer_type')
-            addToggleField('autoBranchInferStatus', 'auto_branch_infer_status')
-            addToggleField('autoBranchInferPriority', 'auto_branch_infer_priority')
-            addToggleField('autoIdentity', 'auto_identity')
-            addToggleField('autoIdentityGit', 'auto_identity_git')
+            addValue('sprintLength', 'sprints_defaults_length')
+            addValue('sprintOverdueAfter', 'sprints_defaults_overdue_after')
+            addValue('sprintCapacityPoints', 'sprints_defaults_capacity_points')
+            addValue('sprintCapacityHours', 'sprints_defaults_capacity_hours')
+            addToggleField('sprintNotificationsEnabled', 'sprints_notifications_enabled')
+            addValue('webUiPath', 'web_ui_path')
         }
 
         addAliasMap('branchTypeAliases', 'branch_type_aliases')

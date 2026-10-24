@@ -1,7 +1,7 @@
 <template>
   <ConfigGroup
     title="Server"
-    description="Port used by the embedded HTTP server."
+    description="Embedded HTTP server settings. Restart the server after changing them."
     :source="groupSource"
   >
     <div class="field">
@@ -12,13 +12,26 @@
       <UiInput
         v-model="serverPort"
         class="server-port-input"
+        type="number"
+        min="1024"
+        max="65535"
+        step="1"
         inputmode="numeric"
-        maxlength="5"
         placeholder="8080"
         @blur="onBlur"
       />
       <p v-if="error" class="field-error">{{ error }}</p>
-      <p class="field-hint">Any value &gt;= 1024 works. Restart the server if you change this.</p>
+      <p class="field-hint">Any value from 1024 to 65535.</p>
+    </div>
+    <div class="field">
+      <label class="field-label" for="config-web-ui-path">Web UI folder</label>
+      <UiInput
+        id="config-web-ui-path"
+        v-model="webUiPath"
+        maxlength="512"
+        placeholder="Built-in web UI"
+      />
+      <p class="field-hint">Serve web UI files from this folder first, falling back to the built-in UI. Leave empty for the built-in UI only.</p>
     </div>
   </ConfigGroup>
 </template>
@@ -30,6 +43,7 @@ import ConfigGroup from './ConfigGroup.vue'
 import UiInput from './UiInput.vue'
 
 const serverPort = defineModel<string>({ required: true })
+const webUiPath = defineModel<string>('webUiPath', { required: true })
 
 const props = defineProps<{
   error?: string | null
@@ -78,5 +92,9 @@ function onBlur() {
 
 .server-port-input {
   width: min(120px, 100%);
+}
+
+.field + .field {
+  margin-top: 12px;
 }
 </style>

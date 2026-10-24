@@ -61,6 +61,7 @@
           <div v-if="isGlobal" class="config-grid__item">
             <ConfigServerSection
               v-model="form.serverPort"
+              v-model:web-ui-path="form.webUiPath"
               :error="errors.server_port"
               :group-source="serverPortSource"
               :field-source-label="serverPortSourceLabel"
@@ -96,6 +97,7 @@
                     <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">{{ provenanceLabel(sourceFor('default_status')) }}</span>
                   </label>
                   <UiSelect v-model="form.defaultStatus" @change="validateField('default_status')">
+                    <option value="">First status{{ statusOptions[0] ? ` (${statusOptions[0]})` : '' }}</option>
                     <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
                   </UiSelect>
                   <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
@@ -123,7 +125,7 @@
                     <span>Max upload (MiB)</span>
                     <span v-if="sourceFor('attachments_max_upload_mb')" :class="['provenance', provenanceClass(sourceFor('attachments_max_upload_mb'))]">{{ provenanceLabel(sourceFor('attachments_max_upload_mb')) }}</span>
                   </label>
-                  <UiInput v-model="form.attachmentsMaxUploadMb" maxlength="32" @blur="validateField('attachments_max_upload_mb')" :placeholder="isGlobal ? '10' : '(inherit global)'" />
+                  <UiInput v-model="form.attachmentsMaxUploadMb" type="number" min="-1" step="1" inputmode="numeric" @blur="validateField('attachments_max_upload_mb')" :placeholder="isGlobal ? '10' : '(inherit global)'" />
                   <p class="field-hint" v-if="isGlobal">0 disables uploads. -1 allows unlimited uploads. Positive values are MiB.</p>
                   <p class="field-hint" v-else>Leave empty to inherit the global limit. 0 disables uploads; -1 is unlimited; positive values are MiB.</p>
                   <p v-if="errors.attachments_max_upload_mb" class="field-error">{{ errors.attachments_max_upload_mb }}</p>
@@ -173,6 +175,16 @@
               v-model:default-reporter="form.defaultReporter"
               v-model:default-assignee="form.defaultAssignee"
               v-model:default-tags="form.defaultTags"
+              v-model:members="form.members"
+              v-model:strict-members="form.strictMembers"
+              v-model:auto-populate-members="form.autoPopulateMembers"
+              v-model:review-reviewers="form.reviewReviewers"
+              :members-error="errors.members"
+              :review-reviewers-error="errors.review_reviewers"
+              :global-members="inspectData.global_effective?.members ?? []"
+              :source-for="sourceFor"
+              :toggle-select-options="toggleSelectOptions"
+              :global-toggle-summary="globalToggleSummary"
               :tag-suggestions="tagSuggestions"
               :default-reporter-error="errors.default_reporter"
               :default-assignee-error="errors.default_assignee"
@@ -189,10 +201,13 @@
           <div class="config-grid__item">
             <ConfigTaxonomySection
               :description="taxonomyDescription"
+              :is-global="isGlobal"
+              v-model:tags-mode="form.tagsMode"
               v-model:tags="form.tags"
+              v-model:custom-fields-mode="form.customFieldsMode"
               v-model:custom-fields="form.customFields"
-              :tag-wildcard="tagWildcard"
-              :custom-field-wildcard="customFieldWildcard"
+              :global-tags="inspectData.global_effective?.tags ?? []"
+              :global-custom-fields="inspectData.global_effective?.custom_fields ?? []"
               :tags-error="errors.tags"
               :custom-fields-error="errors.custom_fields"
               :tags-source="sourceFor('tags')"
@@ -283,6 +298,71 @@
               :scan-ticket-patterns-error="errors.scan_ticket_patterns"
               :signal-words-source="sourceFor('scan_signal_words')"
               :ticket-patterns-source="sourceFor('scan_ticket_patterns')"
+              @validate="validateField"
+            />
+          </div>
+
+          <div class="config-grid__item">
+            <ConfigGroup title="Sync reports" :description="isGlobal ? 'Where sync runs write their reports. Relative paths resolve under .tasks.' : 'Override sync report settings for this project (leave blank to inherit global).'">
+              <div class="field-grid" data-testid="config-sync-reports">
+                <div class="field">
+                  <label class="field-label" for="config-sync-reports-dir">
+                    <span>Reports folder</span>
+                  </label>
+                  <UiInput id="config-sync-reports-dir" v-model="form.syncReportsDir" maxlength="512" @blur="validateField('sync_reports_dir')" :placeholder="isGlobal ? '@reports' : `(inherit global: ${inspectData.global_effective?.sync_reports_dir || '@reports'})`" />
+                  <p v-if="errors.sync_reports_dir" class="field-error">{{ errors.sync_reports_dir }}</p>
+                </div>
+                <ConfigToggleField
+                  label="Write reports"
+                  v-model="form.syncWriteReports"
+                  :is-global="isGlobal"
+                  enabled-label="Save a report for each sync run"
+                  :options="toggleSelectOptions('syncWriteReports')"
+                  :hint="isGlobal ? '' : `Global: ${globalToggleSummary('syncWriteReports') || 'unknown'}`"
+                />
+              </div>
+              <p class="field-hint">Remotes and field mappings are managed on the <a href="/sync">Sync page</a>.</p>
+            </ConfigGroup>
+          </div>
+
+          <div class="config-grid__item">
+            <ConfigAgentSection
+              :description="isGlobal ? 'Defaults for agent jobs started from LoTaR.' : 'Override agent job settings for this project. Blank values and Inherit use the global settings.'"
+              :is-global="isGlobal"
+              :errors="errors"
+              v-model:context-enabled="form.agentContextEnabled"
+              v-model:context-extension="form.agentContextExtension"
+              v-model:logs-dir="form.agentLogsDir"
+              v-model:instructions-mode="form.agentInstructionsMode"
+              v-model:instructions="form.agentInstructions"
+              v-model:instructions-file="form.agentInstructionsFile"
+              v-model:worktree-enabled="form.agentWorktreeEnabled"
+              v-model:worktree-dir="form.agentWorktreeDir"
+              v-model:worktree-branch-prefix="form.agentWorktreeBranchPrefix"
+              :global-context-extension="inspectData.global_effective?.agent_context_extension ?? ''"
+              :global-logs-dir="inspectData.global_effective?.agent_logs_dir ?? ''"
+              :global-branch-prefix="inspectData.global_effective?.agent_worktree?.branch_prefix ?? ''"
+              :global-worktree-dir="inspectData.global_effective?.agent_worktree?.dir ?? ''"
+              :source-for="sourceFor"
+              :toggle-select-options="toggleSelectOptions"
+              :global-toggle-summary="globalToggleSummary"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              @validate="validateField"
+            />
+          </div>
+
+          <div v-if="isGlobal" class="config-grid__item">
+            <ConfigSprintSection
+              v-model:length="form.sprintLength"
+              v-model:overdue-after="form.sprintOverdueAfter"
+              v-model:capacity-points="form.sprintCapacityPoints"
+              v-model:capacity-hours="form.sprintCapacityHours"
+              v-model:notifications-enabled="form.sprintNotificationsEnabled"
+              :errors="errors"
+              :source-for="sourceFor"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
               @validate="validateField"
             />
           </div>
@@ -441,13 +521,16 @@
 import { computed, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
+import ConfigAgentSection from '../components/ConfigAgentSection.vue'
 import ConfigAutomationSection from '../components/ConfigAutomationSection.vue'
 import ConfigBranchAliasSection from '../components/ConfigBranchAliasSection.vue'
 import ConfigGroup from '../components/ConfigGroup.vue'
 import ConfigPeopleSection from '../components/ConfigPeopleSection.vue'
 import ConfigScanningSection from '../components/ConfigScanningSection.vue'
 import ConfigServerSection from '../components/ConfigServerSection.vue'
+import ConfigSprintSection from '../components/ConfigSprintSection.vue'
 import ConfigTaxonomySection from '../components/ConfigTaxonomySection.vue'
+import ConfigToggleField from '../components/ConfigToggleField.vue'
 import ConfigWorkflowSection from '../components/ConfigWorkflowSection.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
@@ -602,8 +685,6 @@ const {
   errors,
   isGlobal,
   currentProject,
-  tagWildcard,
-  customFieldWildcard,
   tagSuggestions,
   statusOptions,
   priorityOptions,

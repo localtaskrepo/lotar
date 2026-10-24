@@ -1,0 +1,7 @@
+title: Make agent worktree parallelism and cleanup settings editable
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-24T03:38:24.205770+00:00
+description: Found during DEV-146. agent.worktree.max_parallel_jobs and cleanup_on_done/cleanup_on_failure/cleanup_on_cancel/cleanup_delete_branches are documented and used at runtime but have no config set setter (fields.rs lists the cleanup flags as inspect-only and max_parallel_jobs not at all), so neither the CLI nor the Config UI can change them. Add setters (global + project override), validation (positive integer for max_parallel_jobs), and controls in view/components/ConfigAgentSection.vue.

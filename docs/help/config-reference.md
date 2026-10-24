@@ -21,6 +21,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - issue.priorities: string[] (built-in [Low, Medium, High]; Critical requires configuration)
 - issue.tags: string[] (default wildcard ["*"])
 - custom_fields: string[] (default wildcard ["*"])
+  - For both lists, `["*"]` allows any value, a named list allows only those values, and `[]` allows none (for example, it turns custom fields off). In project scope a blank `config set` value clears the override, so set an explicit empty list with `lotar config set custom_fields '[]' --project=DEMO`.
 - attachments.dir: string (default "@attachments")
 - attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited; positive values are MiB
 - sync.reports_dir: string (default "@reports")
