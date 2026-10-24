@@ -1695,7 +1695,10 @@ impl<'a> SetPlan<'a> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call"
+)]
 fn apply_set_action(
     set: &AutomationActionSet,
     current: &TaskDTO,

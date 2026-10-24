@@ -148,7 +148,6 @@ pub fn build_global_source_labels_with_port(
     labels
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn build_project_source_labels(
     resolved_project: &ResolvedConfig,
     base_config: &ResolvedConfig,

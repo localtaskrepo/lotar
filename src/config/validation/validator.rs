@@ -425,7 +425,6 @@ impl ConfigValidator {
         result
     }
 
-    #[allow(dead_code)]
     pub fn validate_resolved_config(&self, config: &ResolvedConfig) -> ValidationResult {
         let mut result = ValidationResult::new();
 
@@ -550,7 +549,6 @@ impl ConfigValidator {
         }
     }
 
-    #[allow(dead_code)]
     pub fn validate_prefix_format(&self, prefix: &str) -> ValidationResult {
         let mut result = ValidationResult::new();
         self.validate_prefix(prefix, &mut result);

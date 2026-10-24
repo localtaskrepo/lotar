@@ -1,7 +1,11 @@
 // Auto-generated from stats_handler.rs.
 use crate::cli::args::stats::StatsEffortUnit;
 
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[expect(
+    clippy::too_many_arguments,
+    clippy::needless_pass_by_value,
+    reason = "one parameter per CLI flag; this handler forwards them unchanged; parsed arguments are moved in"
+)]
 pub(crate) fn run(
     by: &str,
     r#where: Vec<(String, String)>,

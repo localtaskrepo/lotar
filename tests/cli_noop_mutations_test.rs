@@ -23,7 +23,6 @@ const MARKER_COMMENTED_HOOK: &str = "commented-hook";
 
 struct NoopCliEnv {
     fixtures: TestFixtures,
-    #[allow(dead_code)]
     _log_path: Option<PathBuf>,
 }
 

@@ -25,7 +25,10 @@ impl CommandHandler for SearchHandler {
         let validator = CliValidator::new(&ctx.config);
         let build = Self::build_task_filter(&args, &validator, project, &ctx)?;
 
-        #[allow(clippy::drop_non_drop)]
+        #[expect(
+            clippy::drop_non_drop,
+            reason = "marks where the validator's borrow ends before the configuration is used again"
+        )]
         drop(validator);
 
         renderer.log_debug("list: executing search");

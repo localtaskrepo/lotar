@@ -131,7 +131,10 @@ struct CommentAddInputs {
     explain: bool,
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "the caller hands this value over and does not use it afterwards"
+)]
 fn handle_add_comment(
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,

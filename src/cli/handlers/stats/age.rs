@@ -1,7 +1,10 @@
 // Auto-generated from stats_handler.rs.
 use crate::cli::args::stats::StatsAgeDistribution;
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "parsed CLI arguments are moved in from the command"
+)]
 pub(crate) fn run(
     distribution: StatsAgeDistribution,
     limit: usize,

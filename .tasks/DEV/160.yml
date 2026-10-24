@@ -1,0 +1,31 @@
+title: Centralize Rust lint configuration and make suppressions self-checking
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:44:19.710549+00:00
+modified: 2026-10-24T23:00:45.084852+00:00
+comments:
+- date: 2026-10-24T23:00:45.014916+00:00
+  text: 'Outcome: Cargo.toml now has a [lints.clippy] table for all targets (allow_attributes_without_reason, dbg_macro, todo = warn; -D warnings in CI/pre-push makes them blocking); needless_pass_by_value stays library-only in src/lib.rs because enabling it package-wide flagged 25 owned-value test helpers (stale comment there replaced). All src #[allow]s were converted to #[expect(..., reason = ...)]: 26 were already stale under default, --all-features and --no-default-features and were removed (incl. 15 dead_code on items that are used/public, and workspace::is_current_directory which was genuinely dead and is deleted); the remaining 36 carry specific reasons (CLI-flag adapters, shared sync options, owned temporaries, explicit validator borrow ends). tests/common (and env_mutex, also included by lib tests via #[path]) replace 23 per-item dead_code allows with one reasoned module-level allow; a stale allow on an underscore field in cli_noop_mutations_test was dropped. rustfmt.toml edition 2021 -> 2024 to match Cargo.toml (cargo fmt already formatted in 2024 style; standalone rustfmt in editors now agrees; pinning style_edition 2021 would have reformatted 611 hunks). Evidence: clippy --all-targets --all-features clean; a probe #[allow(dead_code)] without reason is reported; cargo fmt --check clean; test:rust:agent 1668/1668. Guidance: no durable finding.'
+description: 'Cargo.toml has no [lints] table (one crate-level clippy attribute) and src has 63 #[allow]s (21 dead_code) that never report when stale. Move lint levels into Cargo.toml [lints], convert allows to #[expect(..., reason = ...)] or remove them when unneeded, and fix rustfmt.toml edition = 2021 vs crate edition 2024. Keep clippy warning-free and formatting stable.'
+history:
+- at: 2026-10-24T22:45:48.354218+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T23:00:45.014916+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:00:45.084852+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

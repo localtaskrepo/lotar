@@ -50,7 +50,6 @@ impl HelpSystem {
     }
 
     /// List all available help topics
-    #[allow(dead_code)]
     pub fn list_available_help(&self) -> Result<String, String> {
         let mut help_files = Vec::new();
 
@@ -88,7 +87,10 @@ impl HelpSystem {
         self.find_help_file(&help_file)
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the caller hands this value over and does not use it afterwards"
+    )]
     fn render_help_file(
         &self,
         command: &str,
@@ -115,8 +117,6 @@ impl HelpSystem {
         }
     }
 
-    #[allow(dead_code)]
-    #[allow(clippy::only_used_in_recursion)]
     fn collect_help_files(&self, dir: &Dir<'_>, files: &mut Vec<String>) {
         for entry in dir.entries() {
             match entry {
@@ -135,7 +135,6 @@ impl HelpSystem {
         }
     }
 
-    #[allow(dead_code)]
     fn extract_description(&self, filename: &str) -> Option<String> {
         if let Some(file) = self.find_help_file(filename)
             && let Some(content) = file.contents_utf8()

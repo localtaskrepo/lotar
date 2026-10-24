@@ -35,7 +35,10 @@ pub struct AgentQueueEntry {
 pub struct AgentQueueService;
 
 impl AgentQueueService {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the caller hands this value over and does not use it afterwards"
+    )]
     pub fn enqueue(tasks_dir: &Path, req: AgentJobCreateRequest) -> LoTaRResult<bool> {
         let agent = req
             .agent

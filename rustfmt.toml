@@ -2,7 +2,9 @@
 # Using only stable rustfmt features for consistent code style
 
 # Basic formatting
-edition = "2021"
+# Match Cargo.toml so standalone rustfmt (editors) formats like `cargo fmt`,
+# which already passes the crate's 2024 edition and style.
+edition = "2024"
 max_width = 100
 hard_tabs = false
 tab_spaces = 4

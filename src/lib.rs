@@ -1,8 +1,6 @@
-// Note: clippy allows for `uninlined_format_args` and `collapsible_if` were
-// previously added to suppress new lints when upgrading the stable toolchain.
-// We'll remove them temporarily in CI so we can evaluate whether the warnings
-// still occur and address them individually. If necessary we can re-add a more
-// targeted allow later.
+// Library-only lint (shared lint levels live in Cargo.toml [lints]): test
+// helpers routinely take owned values for convenience, so this stays off for
+// integration tests.
 #![warn(clippy::needless_pass_by_value)]
 
 // A designated runner (LOTAR_REQUIRE_GIT=1, set by CI) must never end up with

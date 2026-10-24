@@ -1,5 +1,8 @@
 // Auto-generated from stats_handler.rs.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one parameter per CLI flag; this handler forwards them unchanged"
+)]
 pub(crate) fn run(
     since: Option<&str>,
     until: Option<&str>,

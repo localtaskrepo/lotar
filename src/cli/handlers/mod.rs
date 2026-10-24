@@ -379,7 +379,10 @@ impl CommandHandler for AddHandler {
             );
         }
 
-        #[allow(clippy::drop_non_drop)]
+        #[expect(
+            clippy::drop_non_drop,
+            reason = "marks where the validator's borrow ends before the configuration is used again"
+        )]
         drop(validator);
 
         // Determine storage roots and project identifiers prior to any mutation of the config

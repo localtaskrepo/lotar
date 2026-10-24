@@ -53,7 +53,10 @@ impl TasksDirectoryResolver {
     }
 
     /// Internal resolve with optional home config override (used in tests)
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the caller hands this value over and does not use it afterwards"
+    )]
     fn resolve_internal(
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,
@@ -299,16 +302,6 @@ impl TasksDirectoryResolver {
         }
 
         Ok(None)
-    }
-
-    /// Check if a path is the current working directory
-    #[allow(dead_code)]
-    fn is_current_directory(path: &Path) -> bool {
-        if let Ok(current_dir) = env::current_dir() {
-            path == current_dir
-        } else {
-            false
-        }
     }
 }
 

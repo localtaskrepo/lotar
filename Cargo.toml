@@ -20,6 +20,15 @@ path = "src/main.rs"
 name = "lotar-agent-wrapper"
 path = "src/bin/lotar_agent_wrapper.rs"
 
+# Lint levels for every target (lib, bins, tests). CI and the pre-push hook
+# run clippy with -D warnings, so "warn" blocks merges. Suppress with
+# #[expect(lint, reason = "...")] so stale suppressions are reported.
+# (needless_pass_by_value is enabled for the library only, in src/lib.rs.)
+[lints.clippy]
+allow_attributes_without_reason = "warn"
+dbg_macro = "warn"
+todo = "warn"
+
 # Optimize dependencies for smaller binaries
 [dependencies]
 regex = { version = "1.13.1", default-features = false, features = ["std", "unicode", "unicode-perl"] }

@@ -1197,7 +1197,10 @@ enum JobOutcome {
     Cancelled,
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "the caller hands this value over and does not use it afterwards"
+)]
 fn maybe_cleanup_worktree(
     job_id: &str,
     ticket_id: &str,
@@ -1248,7 +1251,11 @@ fn maybe_cleanup_worktree(
     drop(registry);
 }
 
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[expect(
+    clippy::too_many_arguments,
+    clippy::needless_pass_by_value,
+    reason = "job state moved into the worker thread; independent inputs from the single caller; bundling them only for this lint would not clarify the call"
+)]
 fn run_job(
     job_id: String,
     runner_kind: AgentRunnerKind,
@@ -1742,7 +1749,6 @@ fn finalize_cancelled_job(job_id: &str) {
     }
 }
 
-#[allow(clippy::ptr_arg)]
 fn handle_runner_line(
     job_id: &str,
     runner_kind: AgentRunnerKind,

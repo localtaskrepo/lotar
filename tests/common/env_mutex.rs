@@ -1,14 +1,19 @@
+// Also included by the library's unit tests via #[path]; each including
+// crate uses a different subset of these helpers.
+#![allow(
+    dead_code,
+    reason = "each including test crate uses a different subset of these helpers"
+)]
+
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::{env, ffi::OsString};
 
 // Registry of per-environment-variable mutexes.
 // We store leaked &'static Mutex<()> pointers so we can return 'static guards safely.
-#[allow(dead_code)]
 static ENV_LOCKS: LazyLock<Mutex<HashMap<String, &'static Mutex<()>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-#[allow(dead_code)]
 fn get_mutex_for(var: &str) -> &'static Mutex<()> {
     let mut map = ENV_LOCKS.lock().expect("ENV_LOCKS poisoned");
     if let Some(m) = map.get(var) {
@@ -24,21 +29,18 @@ fn get_mutex_for(var: &str) -> &'static Mutex<()> {
 /// Use like:
 /// let _guard = lock_var("LOTAR_TASKS_DIR");
 /// ... mutate env var safely within this scope ...
-#[allow(dead_code)]
 pub fn lock_var(var: &str) -> MutexGuard<'static, ()> {
     get_mutex_for(var).lock().expect("env var mutex poisoned")
 }
 
 /// RAII guard for temporarily setting an environment variable in a serialized fashion.
 /// Acquires a per-variable mutex, sets the variable, and restores the previous value on drop.
-#[allow(dead_code)]
 pub struct EnvVarGuard {
     var: String,
     prev: Option<OsString>,
     _guard: MutexGuard<'static, ()>,
 }
 
-#[allow(dead_code)]
 impl EnvVarGuard {
     /// Temporarily set an env var. The previous value will be restored when the guard is dropped.
     pub fn set(var: &str, value: &str) -> Self {

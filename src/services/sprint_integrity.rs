@@ -133,7 +133,6 @@ pub fn cleanup_missing_sprint_refs(
     }))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cleanup_under_transaction(
     storage: &mut Storage,
     records: &mut Vec<SprintRecord>,

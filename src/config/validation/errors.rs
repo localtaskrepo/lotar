@@ -4,7 +4,6 @@ use std::fmt;
 pub enum ValidationSeverity {
     Error,
     Warning,
-    #[allow(dead_code)]
     Info,
 }
 
@@ -101,12 +100,10 @@ impl ValidationResult {
         !self.warnings.is_empty()
     }
 
-    #[allow(dead_code)]
     pub fn has_issues(&self) -> bool {
         self.has_errors() || self.has_warnings()
     }
 
-    #[allow(dead_code)]
     pub fn total_issues(&self) -> usize {
         self.errors.len() + self.warnings.len()
     }

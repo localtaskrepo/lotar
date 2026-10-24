@@ -439,7 +439,10 @@ pub(crate) fn apply_unknown_key_filters(
     });
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
+)]
 pub(super) fn bad_request(msg: String) -> HttpResponse {
     ok_json(
         400,
@@ -451,7 +454,10 @@ pub(super) fn internal(v: serde_json::Value) -> HttpResponse {
     ok_json(500, v)
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
+)]
 pub(super) fn not_found(msg: String) -> HttpResponse {
     ok_json(404, json!({"error": {"code": "NOT_FOUND", "message": msg}}))
 }
@@ -495,7 +501,10 @@ pub(super) fn map_lotar_error(err: LoTaRError) -> HttpResponse {
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
+)]
 pub(super) fn json_response(
     status: u16,
     v: serde_json::Value,
@@ -508,7 +517,10 @@ pub(super) fn json_response(
     })
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
+)]
 pub(super) fn json_serialize_error(e: serde_json::Error) -> HttpResponse {
     let fallback = json!({"error": {"code": "SERIALIZE", "message": e.to_string()}});
     HttpResponse {

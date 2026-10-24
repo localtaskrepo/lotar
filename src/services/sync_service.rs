@@ -89,7 +89,10 @@ impl SyncReportRecorder {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the caller hands this value over and does not use it afterwards"
+    )]
     fn record(&mut self, status: SyncEntryStatus, entry: SyncReportEntry) {
         match status {
             SyncEntryStatus::Created => self.summary.created += 1,
@@ -576,7 +579,10 @@ fn attach_sync_reference(
 }
 
 impl SyncService {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "sync options shared by the CLI, REST and MCP entry points; an options struct is a separate refactor"
+    )]
     pub fn push(
         resolver: &TasksDirectoryResolver,
         remote: &str,
@@ -602,7 +608,10 @@ impl SyncService {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "sync options shared by the CLI, REST and MCP entry points; an options struct is a separate refactor"
+    )]
     pub fn pull(
         resolver: &TasksDirectoryResolver,
         remote: &str,
@@ -628,7 +637,6 @@ impl SyncService {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn validate(
         resolver: &TasksDirectoryResolver,
         project: Option<&str>,
@@ -741,7 +749,10 @@ impl SyncService {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "sync options shared by the CLI, REST and MCP entry points; an options struct is a separate refactor"
+    )]
     fn run(
         resolver: &TasksDirectoryResolver,
         direction: SyncDirection,
@@ -1263,7 +1274,10 @@ enum ReferenceState {
     None,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "sync options shared by the CLI, REST and MCP entry points; an options struct is a separate refactor"
+)]
 fn perform_push(
     resolver: &TasksDirectoryResolver,
     remote: &SyncRemoteConfig,
@@ -1725,7 +1739,10 @@ impl PushPayload {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "sync options shared by the CLI, REST and MCP entry points; an options struct is a separate refactor"
+)]
 fn perform_pull(
     resolver: &TasksDirectoryResolver,
     remote: &SyncRemoteConfig,
@@ -3460,7 +3477,10 @@ fn apply_jira_field(
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "the caller hands this value over and does not use it afterwards"
+)]
 fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, value: FieldValue) {
     let field_lower = field.to_ascii_lowercase();
     match field_lower.as_str() {

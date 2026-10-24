@@ -388,7 +388,6 @@ impl StringConfigField {
         }
     }
 
-    #[allow(dead_code)]
     pub fn new_strict(values: Vec<String>) -> Self {
         Self { values }
     }
@@ -397,7 +396,6 @@ impl StringConfigField {
         self.values.contains(&"*".to_string())
     }
 
-    #[allow(dead_code)]
     pub fn get_suggestions(&self) -> Vec<String> {
         self.values.iter().filter(|v| *v != "*").cloned().collect()
     }

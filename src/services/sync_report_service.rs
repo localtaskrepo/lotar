@@ -86,7 +86,10 @@ impl SyncReportService {
         unreachable!("report filename suffix exhausted")
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the caller hands this value over and does not use it afterwards"
+    )]
     pub fn list_reports(
         tasks_dir: &Path,
         config: &ResolvedConfig,

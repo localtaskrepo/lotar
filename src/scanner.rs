@@ -221,19 +221,12 @@ impl CommentLexer {
 
 #[derive(Debug, Clone)]
 pub struct Reference {
-    #[allow(dead_code)]
     pub file_path: PathBuf,
-    #[allow(dead_code)]
     pub line_number: usize,
-    #[allow(dead_code)]
     pub title: String,
-    #[allow(dead_code)]
     pub uuid: String,
-    #[allow(dead_code)]
     pub annotation: String,
-    #[allow(dead_code)]
     pub code_block: String,
-    #[allow(dead_code)]
     pub comment_block: String,
 }
 

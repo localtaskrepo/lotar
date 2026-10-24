@@ -394,7 +394,10 @@ impl TaskService {
     /// new task file itself. Returns the allocated task ID. Any error here
     /// leaves the workspace untouched, except the fail-closed case where the
     /// transaction's own rollback cannot complete (journal retained).
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call"
+    )]
     fn stage_create(
         txn: &mut MultiFileTransaction,
         storage: &Storage,
@@ -445,7 +448,10 @@ impl TaskService {
     /// or during publication leaves every affected file unchanged. Returns
     /// the allocated task ID; automation and events stay with the caller so
     /// the CLI keeps firing them exactly once after the commit.
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the caller hands this value over and does not use it afterwards"
+    )]
     pub fn commit_prepared_create(
         storage: &Storage,
         prepared: PreparedTaskCreate<'_>,

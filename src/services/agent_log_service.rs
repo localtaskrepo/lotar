@@ -58,7 +58,10 @@ pub struct AgentLogService;
 impl AgentLogService {
     /// Initialize log file for a new job. Writes header line.
     /// Only writes if logs_dir is provided.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call"
+    )]
     pub fn init_log(
         workspace_root: &Path,
         logs_dir: Option<&str>,

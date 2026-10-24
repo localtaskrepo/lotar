@@ -72,7 +72,6 @@ impl RelationshipKind {
 // ...existing code...
 // Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
 
-#[allow(dead_code)]
 fn deserialize_kv_pairs<'de, D>(deserializer: D) -> Result<Vec<(String, String)>, D::Error>
 where
     D: Deserializer<'de>,

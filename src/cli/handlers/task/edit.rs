@@ -161,7 +161,10 @@ impl CommandHandler for EditHandler {
             patch.custom_fields = Some(merged);
         }
 
-        #[allow(clippy::drop_non_drop)]
+        #[expect(
+            clippy::drop_non_drop,
+            reason = "marks where the validator's borrow ends before the configuration is used again"
+        )]
         drop(validator);
 
         plan_auto_populate_members(&mut ctx, &task);

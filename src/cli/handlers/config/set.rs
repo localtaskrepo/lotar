@@ -8,7 +8,10 @@ use crate::utils::project::resolve_project_input;
 use crate::workspace::TasksDirectoryResolver;
 
 impl ConfigHandler {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one parameter per CLI flag; this handler forwards them unchanged"
+    )]
     pub(super) fn handle_config_set(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,

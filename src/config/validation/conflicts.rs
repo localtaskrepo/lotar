@@ -105,7 +105,6 @@ impl PrefixConflictDetector {
         result
     }
 
-    #[allow(dead_code)]
     pub fn suggest_alternatives(&self, base_prefix: &str) -> Vec<String> {
         let mut suggestions = Vec::new();
         let base_upper = base_prefix.to_uppercase();

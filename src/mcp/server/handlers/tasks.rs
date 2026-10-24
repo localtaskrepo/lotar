@@ -597,7 +597,10 @@ fn applied_defaults_for_task_create(params: &Value, task: &TaskDTO) -> Vec<Value
         })
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
+    )]
     fn push_default(acc: &mut Vec<Value>, field: &str, value: Value) {
         acc.push(json!({ "field": field, "value": value }));
     }
@@ -1953,7 +1956,10 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
             )),
         }
     }
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
+    )]
     fn query_parse_error(req_id: &Option<Value>, msg: String) -> JsonRpcResponse {
         err(req_id.clone(), -32602, &msg, None)
     }

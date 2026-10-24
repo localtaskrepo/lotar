@@ -1,3 +1,10 @@
+// Shared helpers compiled into every integration test binary; each binary
+// uses a different subset, so unused items are expected per binary.
+#![allow(
+    dead_code,
+    reason = "each test binary uses a different subset of these helpers"
+)]
+
 use assert_cmd::Command;
 use assert_cmd::cargo::{CargoError, cargo_bin_cmd};
 use ctor::ctor;
@@ -13,7 +20,6 @@ pub mod env_mutex;
 
 // Minimal OpenAPI schema validator for semantic contract tests (DEV-82).
 // Compiled into every test binary via `mod common`; only contract tests use it.
-#[allow(dead_code)]
 pub mod openapi_semantics;
 
 /// Test fixtures to create isolated work directories per test.
@@ -27,7 +33,6 @@ pub struct TestFixtures {
 /// `LOTAR_IGNORE_HOME_CONFIG=1` and without `RUST_TEST_THREADS`, independent
 /// of the test process environment, which stays owned by guards and the
 /// process constructor baseline.
-#[allow(dead_code)]
 pub fn lotar_cmd() -> Result<Command, CargoError> {
     let mut cmd = cargo_bin_cmd!("lotar");
     cmd.env_remove("RUST_TEST_THREADS");
@@ -201,7 +206,6 @@ pub fn reset_lotar_test_environment() {
 
 /// Create an isolated temp directory without mutating the process
 /// environment (DEV-80): live `EnvVarGuard` values survive this call.
-#[allow(dead_code)]
 pub fn temp_dir() -> TempDir {
     TempDir::new().expect("Failed to create temp directory")
 }
@@ -214,7 +218,6 @@ impl TestFixtures {
     /// baseline (cleared LOTAR vars, `LOTAR_IGNORE_HOME_CONFIG=1`) is owned
     /// by the process constructor plus the child-scoped defaults in
     /// [`lotar_cmd`].
-    #[allow(dead_code)]
     pub fn new() -> Self {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let tasks_root = temp_dir.path().join(".tasks");
@@ -226,18 +229,15 @@ impl TestFixtures {
         }
     }
 
-    #[allow(dead_code)] // Used across multiple test modules
     pub fn create_storage(&self) -> Storage {
         Storage::new(&self.tasks_root.clone())
     }
 
-    #[allow(dead_code)] // Used across multiple test modules
     pub fn get_temp_path(&self) -> &std::path::Path {
         self.temp_dir.path()
     }
 
     /// Run a lotar command with the given arguments and return the output
-    #[allow(dead_code)] // Used by output format consistency tests
     pub fn run_command(&self, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
         // Create a basic Cargo.toml if it doesn't exist for project detection
         let cargo_toml_path = self.temp_dir.path().join("Cargo.toml");
@@ -275,7 +275,6 @@ impl TestFixtures {
     }
 
     /// Create a config file in the specified directory
-    #[allow(dead_code)]
     pub fn create_config_in_dir(&self, dir: &std::path::Path, content: &str) {
         let config_path = dir.join("config.yml");
         std::fs::write(&config_path, content).expect("Failed to create config file");
@@ -283,7 +282,6 @@ impl TestFixtures {
 }
 
 /// Extract a task identifier from CLI output (text or JSON).
-#[allow(dead_code)]
 pub fn extract_task_id_from_output(output: &str) -> Option<String> {
     // JSON payloads may nest the task ID within "task" or expose "task_id" directly.
     if let Ok(json) = serde_json::from_str::<Value>(output) {
@@ -317,14 +315,12 @@ pub fn extract_task_id_from_output(output: &str) -> Option<String> {
 }
 
 /// Convenience wrapper to parse IDs from binary stdout captures.
-#[allow(dead_code)]
 pub fn extract_task_id_from_bytes(output: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(output);
     extract_task_id_from_output(&text)
 }
 
 /// Command helpers shared across CLI tests
-#[allow(dead_code)]
 pub fn cargo_bin_silent() -> Command {
     // Spawn lotar with LOTAR_TEST_SILENT=1 to suppress non-essential warnings in tests
     let mut cmd = lotar_cmd().expect("binary 'lotar' not found");
@@ -333,7 +329,6 @@ pub fn cargo_bin_silent() -> Command {
 }
 
 /// Spawn the CLI with LOTAR_TEST_SILENT and cwd set to the fixture dir.
-#[allow(dead_code)]
 pub fn cargo_bin_in(fixtures: &TestFixtures) -> Command {
     let mut cmd = cargo_bin_silent();
     cmd.current_dir(fixtures.get_temp_path());
@@ -344,7 +339,6 @@ pub fn cargo_bin_in(fixtures: &TestFixtures) -> Command {
 // across all test files that import this module. Each test file should test its own functionality.
 
 /// Result of the runtime Git capability probe.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitProbe {
     pub available: bool,
@@ -365,13 +359,11 @@ pub struct GitProbe {
 ///
 /// Environment-variable overrides are deliberately not provided; the
 /// designated-runner environment contract is tracked separately (DEV-80).
-#[allow(dead_code)]
 pub fn git_available() -> bool {
     git_capability().available
 }
 
 /// Cached outcome of the runtime Git capability probe.
-#[allow(dead_code)]
 pub fn git_capability() -> &'static GitProbe {
     static CAPABILITY: std::sync::OnceLock<GitProbe> = std::sync::OnceLock::new();
     CAPABILITY.get_or_init(|| probe_git_with_binary(None))
@@ -382,7 +374,6 @@ pub fn git_capability() -> &'static GitProbe {
 /// Guarded tests call this instead of returning silently when Git is
 /// unavailable: a selected test that cannot exercise its Git-dependent path
 /// must fail with a diagnostic rather than report a pass (DEV-79).
-#[allow(dead_code)]
 #[track_caller]
 pub fn require_git() {
     let probe = git_capability();
@@ -398,7 +389,6 @@ pub fn require_git() {
 }
 
 /// Probe Git with the environment-resolved `git` binary in a fresh temp dir.
-#[allow(dead_code)]
 pub fn probe_git_with_binary(git_binary: Option<&std::path::Path>) -> GitProbe {
     match tempfile::tempdir() {
         Ok(tmp) => probe_git_in(tmp.path(), git_binary),
@@ -437,7 +427,6 @@ fn apply_windows_bootstrap_env(
 /// cached capability uses) or a path to a controlled executable, which lets
 /// the probe's own tests drive failure and missing-binary outcomes
 /// deterministically on any platform.
-#[allow(dead_code)]
 pub fn probe_git_in(
     probe_root: &std::path::Path,
     git_binary: Option<&std::path::Path>,

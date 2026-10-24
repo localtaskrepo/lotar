@@ -24,7 +24,6 @@ use scaffolds::{AgentsScaffold, AutomationScaffold, ScaffoldPlan, SyncRemote};
 use wizard::{WizardInputs, WizardOutcome};
 
 impl ConfigHandler {
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn handle_config_init(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -540,5 +539,4 @@ fn copy_from_project(
 }
 
 // Silence unused-import warnings by exposing Yaml via `super` when tests need it.
-#[allow(dead_code)]
 pub(crate) fn _yaml_phantom(_: Yaml) {}
