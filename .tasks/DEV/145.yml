@@ -1,7 +1,37 @@
 title: Task Details "Preview" button overlaps text
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-23T17:14:14.278448+00:00
+modified: 2026-10-24T03:21:52.530602+00:00
+comments:
+- date: 2026-10-24T03:15:40.269661+00:00
+  text: 'Reproduced at 1280px: the absolutely positioned top-right Preview toggle covers the end of the first text line. Plan: anchor a compact toggle centered just below the editor box, overlaying the empty middle of the Tags header row (Details fieldset gap is only 12px), so the textarea text is never covered and the Tags section does not move. Verify by browser screenshot at 1280/390 plus a Playwright smoke geometry assertion.'
+- date: 2026-10-24T03:21:52.510008+00:00
+  text: 'Outcome: the description Preview/Hide preview toggle is now a compact button anchored centered just below the editor box, overlaying the empty middle of the Tags header row; it never covers textarea text and takes no layout space, so Tags does not move. It also follows the textarea in DOM/tab order and has data-testid=description-preview-toggle. Evidence: browser screenshots at 1280/390 in edit and preview modes; new smoke/tests/ui.description-preview.smoke.spec.ts (toggle below and centered on the textarea, Tags keeps the fieldset gap, toggle switches to preview) passes at 1280 and 390 and fails against the old top-right placement; view/__tests__/TaskPanel.integration.spec.ts passes. Remaining: none; full lint/test/smoke gates run at the end of this batch. Guidance: no durable finding.'
 description: "When adding details to a task in the Task panel, the \"Preview\" button floats over the text to allow seeing a markdown rendered preview.  \nAs soon as the first line fills, this button is in the way and neither the preview button nor the text are legible. We should find a better way to place this button.Maybe right below the box centered, but without moving the tags section any further down."
+history:
+- at: 2026-10-24T03:15:40.235974+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T03:15:40.269661+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:21:52.510008+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:21:52.530602+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

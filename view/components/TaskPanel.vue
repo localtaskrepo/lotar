@@ -123,16 +123,6 @@
                   </div>
 
                   <div v-else class="task-panel__description-editor">
-                    <div class="task-panel__description-controls">
-                      <UiButton
-                        variant="ghost"
-                        type="button"
-                        class="task-panel__description-preview-toggle"
-                        @click="descriptionPreview = !descriptionPreview"
-                      >
-                        {{ descriptionPreview ? 'Hide preview' : 'Preview' }}
-                      </UiButton>
-                    </div>
                     <div class="task-panel__description-body">
                       <textarea
                         v-if="!descriptionPreview"
@@ -149,6 +139,17 @@
                       >
                         <MarkdownContent :source="form.description || ''" />
                       </div>
+                    </div>
+                    <div class="task-panel__description-controls">
+                      <UiButton
+                        variant="ghost"
+                        type="button"
+                        class="task-panel__description-preview-toggle"
+                        data-testid="description-preview-toggle"
+                        @click="descriptionPreview = !descriptionPreview"
+                      >
+                        {{ descriptionPreview ? 'Hide preview' : 'Preview' }}
+                      </UiButton>
                     </div>
                   </div>
                 </div>
@@ -2055,10 +2056,13 @@ textarea {
   position: relative;
 }
 
+/* Centered just below the editor box, over the empty middle of the next
+   row (the Tags header), so it never covers text or pushes content down. */
 .task-panel__description-controls {
   position: absolute;
-  top: var(--space-1, 0.25rem);
-  right: var(--space-1, 0.25rem);
+  top: calc(100% + var(--space-3, 0.75rem) + var(--space-1, 0.25rem));
+  left: 50%;
+  transform: translateX(-50%);
   z-index: var(--z-control);
 }
 
@@ -2075,7 +2079,10 @@ textarea {
 
 .task-panel__description-preview-toggle {
   font-size: var(--text-xs, 0.75rem);
+  min-height: 0;
+  height: 1.75rem;
   padding: 0 var(--space-2, 0.5rem);
+  white-space: nowrap;
 }
 
 .task-panel__description-preview {
