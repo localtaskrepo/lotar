@@ -198,7 +198,8 @@ fn smoke_job_caches_the_headless_browser_per_playwright_version() {
             .find(|step| step["name"].as_str() == Some(name))
             .unwrap_or_else(|| panic!("smoke_tests is missing step {name:?}"))
     };
-    let cache = step("Cache Playwright browsers");
+    let cache = step("Restore Playwright browsers");
+    assert_eq!(cache["uses"].as_str(), Some("actions/cache/restore@v5"));
     assert_eq!(
         cache["with"]["path"].as_str(),
         Some("~/.cache/ms-playwright")
@@ -209,6 +210,15 @@ fn smoke_job_caches_the_headless_browser_per_playwright_version() {
             .unwrap()
             .contains("steps.playwright_version.outputs.version")
     );
+    // Saved right after the download, so a failing smoke run keeps the cache.
+    let save = step("Save Playwright browsers");
+    assert_eq!(save["uses"].as_str(), Some("actions/cache/save@v5"));
+    assert_eq!(
+        save["with"]["key"].as_str(),
+        Some("${{ steps.playwright_cache.outputs.cache-primary-key }}")
+    );
+    let position = |name: &str| steps.iter().position(|s| s["name"].as_str() == Some(name));
+    assert!(position("Save Playwright browsers") < position("Run smoke suite"));
     let install = step("Install Playwright browser");
     assert_eq!(
         install["if"].as_str(),

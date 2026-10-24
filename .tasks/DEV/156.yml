@@ -1,0 +1,31 @@
+title: Keep the Playwright browser cache when CI smoke tests fail
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T21:56:02.889866+00:00
+modified: 2026-10-24T21:57:46.979935+00:00
+comments:
+- date: 2026-10-24T21:57:46.950518+00:00
+  text: 'Outcome: smoke_tests now uses actions/cache/restore@v5 (''Restore Playwright browsers'') and, on a cache miss, actions/cache/save@v5 (''Save Playwright browsers'') immediately after the headless-shell download, keyed by the restore step''s cache-primary-key. The cache is stored before the smoke suite runs, so a failing suite no longer discards it. Evidence: tests/ci_windows_reporting_contract_test.rs asserts restore/save actions, shared key, and that save precedes ''Run smoke suite'' (3/3 pass). Remaining: confirm on the next two GitHub Actions runs (first saves, second restores). Guidance: no durable finding.'
+description: Follow-up to DEV-137. The first CI run with the new cache (67555cc) installed browser + deps in ~14s, but actions/cache only saves in its post step when the job succeeds; the smoke job failed, so 'Post Cache Playwright browsers' was skipped and the next run downloads again. Split into actions/cache/restore + actions/cache/save right after the download so the cache is stored regardless of test outcome; keep the workflow contract test in sync.
+history:
+- at: 2026-10-24T21:56:50.030807+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T21:57:46.950518+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T21:57:46.979935+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
