@@ -1,0 +1,31 @@
+title: Windows smoke cleanup fails with EBUSY after async automation tests
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T23:50:46.928135+00:00
+modified: 2026-10-24T23:52:54.034541+00:00
+comments:
+- date: 2026-10-24T23:52:54.008227+00:00
+  text: 'Outcome: SmokeWorkspace.dispose (and the parentDir workspace cleanup) now remove the workspace with fs.rm({recursive, force, maxRetries: 10, retryDelay: 100}) via removeWorkspaceDir, instead of tmp-promise/fs-extra single attempts. Node retries EBUSY/EPERM/ENOTEMPTY with linear backoff (~5.5s worst case), which covers Windows keeping the directory locked briefly after a just-exited wait:false automation child; a persistent lock still fails loudly. Evidence: CI log for run 40143592444 had no body error before the EBUSY and the test took 301ms, consistent with a passing body and a cleanup race; Windows lane passed on the previous 7 main runs and on the npm Dependabot PR with the same code. Local: smoke full suite 343/343 (one earlier full run had 2 unrelated load-sensitive UI failures that pass in isolation, recorded as a separate ticket); lint/format clean. Remaining: confirm on the Windows CI lane after push; cannot reproduce EBUSY on macOS. Guidance: no durable finding.'
+description: 'main CI run 40143592444 (19ff96a): Windows portable smoke failed in cli.automation ''async run action does not block the task update and completes after release'' (301ms) with EBUSY rmdir of the temp workspace. The same code passed on the npm Dependabot PR and the previous 7 main runs, and no body error was logged, so cleanup raced a just-exited wait:false child that used the workspace (Windows keeps the directory locked briefly). SmokeWorkspace.dispose deletes once via tmp-promise/fs-extra without retries. Fix: retrying removal (fs.rm maxRetries/retryDelay) for both workspace creation modes.'
+history:
+- at: 2026-10-24T23:50:55.706432+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T23:52:54.008227+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:52:54.034541+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

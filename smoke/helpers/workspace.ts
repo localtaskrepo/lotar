@@ -1,5 +1,5 @@
 import fs from 'fs-extra';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { dir, DirectoryResult } from 'tmp-promise';
@@ -46,7 +46,7 @@ export class SmokeWorkspace {
             await fs.ensureDir(options.parentDir);
             const root = await mkdtemp(path.join(options.parentDir, options.name ?? 'lotar-smoke-'));
             const workspace = new SmokeWorkspace(
-                { path: root, cleanup: async () => fs.remove(root) } as DirectoryResult,
+                { path: root, cleanup: async () => removeWorkspaceDir(root) } as DirectoryResult,
                 options,
             );
             await workspace.bootstrap(options.seedFiles ?? {});
@@ -252,7 +252,10 @@ export class SmokeWorkspace {
     }
 
     async dispose(): Promise<void> {
-        await this.temporary.cleanup();
+        // Not tmp-promise's cleanup: it deletes once, and Windows keeps a
+        // directory locked briefly after a child process that used it (for
+        // example a wait:false automation run) exits (DEV-168).
+        await removeWorkspaceDir(this.temporary.path);
     }
 
     private static extractCreatedTaskId(stdout: string): string {
@@ -273,4 +276,14 @@ export class SmokeWorkspace {
         const sequence = trimmed.slice(lastDash + 1);
         return { project, sequence };
     }
+}
+
+/**
+ * Remove a workspace directory, retrying the transient EBUSY/EPERM/ENOTEMPTY
+ * errors Windows reports while a just-exited process still holds a handle.
+ * Node backs off linearly (100ms, 200ms, ...), so ten retries wait up to
+ * about 5.5s before the error is reported.
+ */
+export async function removeWorkspaceDir(dir: string): Promise<void> {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
