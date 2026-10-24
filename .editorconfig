@@ -1,0 +1,22 @@
+# Editor defaults matching rustfmt.toml and .prettierrc.json (DEV-165).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Vue, YAML (workflows, task files), JSON and the CommonJS workflow helper
+# use two spaces.
+[*.{vue,yml,yaml,json,cjs}]
+indent_size = 2
+
+# Markdown uses trailing double spaces for line breaks.
+[*.md]
+trim_trailing_whitespace = false
+
+[view/styles.css]
+indent_style = tab

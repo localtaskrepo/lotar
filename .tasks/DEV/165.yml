@@ -1,0 +1,25 @@
+title: Tidy repository tooling files
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:44:19.877987+00:00
+modified: 2026-10-24T23:33:51.178139+00:00
+comments:
+- date: 2026-10-24T23:33:51.149200+00:00
+  text: 'Outcome: .editorconfig added (UTF-8, LF, final newline, 4-space default; 2-space for Vue/YAML/JSON/CJS; Markdown keeps trailing whitespace for line breaks; tabs for view/styles.css) matching rustfmt.toml and .prettierrc.json. codeql.yml rewritten without the GitHub template boilerplate: same name, triggers (push/PR on main, weekly Monday cron), permissions, language matrix (actions, javascript-typescript, rust; build-mode none) and SHA-pinned actions; dropped the unreachable manual-build placeholder step (no language uses build-mode manual) and the swift runner switch. docs/developers/testing.md gains a ''Code quality tools'' overview table (Rust lints/expect, frontend tsc/ESLint/Prettier + suppressions, tests, cargo-deny/Dependabot/SHA pins, CodeQL, report-only coverage, opt-in hooks, .editorconfig). Hook and contributor docs were already updated in DEV-161/DEV-162. Evidence: codeql.yml parses with the same triggers and matrix; contract tests 5/5 (including the SHA-pin check over codeql.yml). Guidance: no durable finding.'
+description: Add .editorconfig matching rustfmt/Prettier settings, strip the CodeQL template boilerplate comments, and update hook/contributor docs for the new toolchain.
+history:
+- at: 2026-10-24T23:33:51.149200+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:33:51.178139+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
