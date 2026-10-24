@@ -1,37 +1,39 @@
 <template>
   <ConfigGroup
     title="Server"
-    description="Embedded HTTP server settings. Restart the server after changing them."
+    description="Embedded web server settings. Restart the server after changing them."
     :source="groupSource"
   >
-    <div class="field">
-      <label class="field-label">
-        <span>Server port</span>
-        <span v-if="fieldSourceLabel" class="provenance" :class="fieldSourceClass">{{ fieldSourceLabel }}</span>
-      </label>
-      <UiInput
-        v-model="serverPort"
-        class="server-port-input"
-        type="number"
-        min="1024"
-        max="65535"
-        step="1"
-        inputmode="numeric"
-        placeholder="8080"
-        @blur="onBlur"
-      />
-      <p v-if="error" class="field-error">{{ error }}</p>
-      <p class="field-hint">Any value from 1024 to 65535.</p>
-    </div>
-    <div class="field">
-      <label class="field-label" for="config-web-ui-path">Web UI folder</label>
-      <UiInput
-        id="config-web-ui-path"
-        v-model="webUiPath"
-        maxlength="512"
-        placeholder="Built-in web UI"
-      />
-      <p class="field-hint">Serve web UI files from this folder first, falling back to the built-in UI. Leave empty for the built-in UI only.</p>
+    <div class="field-grid" data-testid="config-server">
+      <div class="field">
+        <label class="field-label" for="config-server-port">
+          <span>Server port</span>
+          <span v-if="fieldSourceLabel" class="provenance" :class="fieldSourceClass">{{ fieldSourceLabel }}</span>
+        </label>
+        <UiInput
+          id="config-server-port"
+          v-model="serverPort"
+          type="number"
+          min="1024"
+          max="65535"
+          step="1"
+          inputmode="numeric"
+          placeholder="8080"
+          @blur="onBlur"
+        />
+        <p class="field-hint">1024–65535.</p>
+        <p v-if="error" class="field-error">{{ error }}</p>
+      </div>
+      <div class="field field--full">
+        <label class="field-label" for="config-web-ui-path">Web UI folder</label>
+        <UiInput
+          id="config-web-ui-path"
+          v-model="webUiPath"
+          maxlength="512"
+          placeholder="Built-in web UI"
+        />
+        <p class="field-hint">Serve web UI files from this folder first, falling back to the built-in UI. Leave empty for the built-in UI only.</p>
+      </div>
     </div>
   </ConfigGroup>
 </template>
@@ -65,36 +67,3 @@ function onBlur() {
   emit('validate')
 }
 </script>
-
-<style scoped>
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.field-error {
-  color: var(--color-danger);
-  font-size: 12px;
-}
-
-.field-hint {
-  color: var(--color-muted);
-  font-size: 12px;
-}
-
-.server-port-input {
-  width: min(120px, 100%);
-}
-
-.field + .field {
-  margin-top: 12px;
-}
-</style>

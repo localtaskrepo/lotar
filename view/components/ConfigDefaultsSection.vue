@@ -1,23 +1,6 @@
 <template>
   <ConfigGroup title="Defaults for new tasks" :description="description">
     <div class="field-grid" data-testid="config-defaults">
-      <div v-if="isGlobal" class="field">
-        <label class="field-label" :for="`${uid}-project`">
-          <span>Default project prefix</span>
-          <span v-if="sourceFor('default_project')" :class="['provenance', provenanceClass(sourceFor('default_project'))]">
-            {{ provenanceLabel(sourceFor('default_project')) }}
-          </span>
-        </label>
-        <UiInput
-          :id="`${uid}-project`"
-          v-model="defaultProject"
-          maxlength="20"
-          placeholder="ACME"
-          @blur="emit('validate', 'default_project')"
-        />
-        <p v-if="errors.default_project" class="field-error">{{ errors.default_project }}</p>
-      </div>
-
       <div class="field">
         <label class="field-label" :for="`${uid}-status`">
           <span>Default status</span>
@@ -27,7 +10,7 @@
         </label>
         <UiSelect :id="`${uid}-status`" v-model="defaultStatus" @change="emit('validate', 'default_status')">
           <option v-if="isGlobal" value="">First status{{ statusOptions[0] ? ` (${statusOptions[0]})` : '' }}</option>
-          <option v-else value="">(inherit global)</option>
+          <option v-else value="">Inherit global ({{ globalStatus || statusOptions[0] || 'first status' }})</option>
           <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
         </UiSelect>
         <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
@@ -41,7 +24,7 @@
           </span>
         </label>
         <UiSelect :id="`${uid}-priority`" v-model="defaultPriority" @change="emit('validate', 'default_priority')">
-          <option v-if="!isGlobal" value="">(inherit global)</option>
+          <option v-if="!isGlobal" value="">Inherit global ({{ globalPriority || 'not set' }})</option>
           <option v-for="option in priorityOptions" :key="option" :value="option">{{ option }}</option>
         </UiSelect>
         <p v-if="errors.default_priority" class="field-error">{{ errors.default_priority }}</p>
@@ -79,6 +62,24 @@
           @blur="emit('validate', 'default_assignee')"
         />
         <p v-if="errors.default_assignee" class="field-error">{{ errors.default_assignee }}</p>
+      </div>
+
+      <div v-if="isGlobal" class="field">
+        <label class="field-label" :for="`${uid}-project`">
+          <span>Default project prefix</span>
+          <span v-if="sourceFor('default_project')" :class="['provenance', provenanceClass(sourceFor('default_project'))]">
+            {{ provenanceLabel(sourceFor('default_project')) }}
+          </span>
+        </label>
+        <UiInput
+          :id="`${uid}-project`"
+          v-model="defaultProject"
+          maxlength="20"
+          placeholder="ACME"
+          @blur="emit('validate', 'default_project')"
+        />
+        <p class="field-hint">Used when a command does not name a project.</p>
+        <p v-if="errors.default_project" class="field-error">{{ errors.default_project }}</p>
       </div>
 
       <div class="field field--full">
@@ -134,6 +135,8 @@ const {
   statusOptions,
   priorityOptions,
   tagSuggestions = [],
+  globalStatus = null,
+  globalPriority = null,
   sourceFor,
   provenanceLabel,
   provenanceClass,
@@ -144,6 +147,9 @@ const {
   statusOptions: string[]
   priorityOptions: string[]
   tagSuggestions?: string[]
+  /** Effective global values, shown in the project inherit options. */
+  globalStatus?: string | null
+  globalPriority?: string | null
   sourceFor: (field: string) => ConfigSource | undefined
   provenanceLabel: (source: ConfigSource | undefined) => string
   provenanceClass: (source: ConfigSource | undefined) => string
@@ -154,42 +160,3 @@ const emit = defineEmits<{ (e: 'validate', field: DefaultsField): void }>()
 const uid = useId()
 </script>
 
-<style scoped>
-.field-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field--full {
-  grid-column: 1 / -1;
-}
-
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.field :deep(.input) {
-  height: var(--config-control-height, 40px);
-  box-sizing: border-box;
-}
-
-.field-error {
-  color: var(--color-danger);
-  font-size: 12px;
-}
-
-.field-hint {
-  color: var(--color-muted);
-  font-size: 12px;
-}
-</style>

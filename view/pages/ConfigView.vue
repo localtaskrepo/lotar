@@ -134,6 +134,8 @@
               :status-options="statusOptions"
               :priority-options="priorityOptions"
               :tag-suggestions="tagSuggestions"
+              :global-status="inspectData.global_effective?.default_status"
+              :global-priority="inspectData.global_effective?.default_priority"
               :source-for="sourceFor"
               :provenance-label="provenanceLabel"
               :provenance-class="provenanceClass"
@@ -315,6 +317,9 @@
               v-model:type-entries="form.branchTypeAliases"
               v-model:status-entries="form.branchStatusAliases"
               v-model:priority-entries="form.branchPriorityAliases"
+              :type-options="typeOptions"
+              :status-options="statusOptions"
+              :priority-options="priorityOptions"
               :type-error="errors.branch_type_aliases"
               :status-error="errors.branch_status_aliases"
               :priority-error="errors.branch_priority_aliases"
@@ -338,52 +343,49 @@
         >
           <h2 class="config-nav__sr">{{ sectionLabel('storage') }}</h2>
           <div class="config-section__item">
-            <ConfigGroup title="Attachments" :description="isGlobal ? 'Where uploaded files are stored. Relative paths resolve under .tasks.' : 'Override attachment settings for this project (leave blank to inherit global).'">
-              <div class="field-grid">
-                <div class="field">
-                  <label class="field-label">
+            <ConfigGroup title="Attachments" :description="isGlobal ? 'Where uploaded files are stored and how large they may be.' : 'Override attachment storage for this project. Leave a field empty to inherit the global value.'">
+              <div class="field-grid" data-testid="config-attachments">
+                <div class="field field--full">
+                  <label class="field-label" for="config-attachments-dir">
                     <span>Attachments folder</span>
                     <span v-if="sourceFor('attachments_dir')" :class="['provenance', provenanceClass(sourceFor('attachments_dir'))]">{{ provenanceLabel(sourceFor('attachments_dir')) }}</span>
                   </label>
-                  <UiInput v-model="form.attachmentsDir" maxlength="512" @blur="validateField('attachments_dir')" :placeholder="isGlobal ? '@attachments' : '(inherit global)'" />
-                  <p class="field-hint" v-if="isGlobal">Defaults to .tasks/@attachments (absolute paths are allowed).</p>
-                  <p class="field-hint" v-else>Leave empty to inherit the global attachments folder.</p>
+                  <UiInput id="config-attachments-dir" v-model="form.attachmentsDir" maxlength="512" @blur="validateField('attachments_dir')" :placeholder="isGlobal ? '@attachments' : `Inherit global (${inspectData.global_effective?.attachments_dir || '@attachments'})`" />
+                  <p class="field-hint">Relative paths resolve under .tasks; absolute paths are allowed.</p>
                   <p v-if="errors.attachments_dir" class="field-error">{{ errors.attachments_dir }}</p>
                 </div>
-
                 <div class="field">
-                  <label class="field-label">
-                    <span>Max upload (MiB)</span>
+                  <label class="field-label" for="config-attachments-max">
+                    <span>Max upload size (MiB)</span>
                     <span v-if="sourceFor('attachments_max_upload_mb')" :class="['provenance', provenanceClass(sourceFor('attachments_max_upload_mb'))]">{{ provenanceLabel(sourceFor('attachments_max_upload_mb')) }}</span>
                   </label>
-                  <UiInput v-model="form.attachmentsMaxUploadMb" type="number" min="-1" step="1" inputmode="numeric" @blur="validateField('attachments_max_upload_mb')" :placeholder="isGlobal ? '10' : '(inherit global)'" />
-                  <p class="field-hint" v-if="isGlobal">0 disables uploads. -1 allows unlimited uploads. Positive values are MiB.</p>
-                  <p class="field-hint" v-else>Leave empty to inherit the global limit. 0 disables uploads; -1 is unlimited; positive values are MiB.</p>
+                  <UiInput id="config-attachments-max" v-model="form.attachmentsMaxUploadMb" type="number" min="-1" step="1" inputmode="numeric" @blur="validateField('attachments_max_upload_mb')" :placeholder="isGlobal ? '10' : `Inherit global (${inspectData.global_effective?.attachments_max_upload_mb ?? 10})`" />
+                  <p class="field-hint">0 turns uploads off; -1 removes the limit.</p>
                   <p v-if="errors.attachments_max_upload_mb" class="field-error">{{ errors.attachments_max_upload_mb }}</p>
                 </div>
               </div>
             </ConfigGroup>
-                    </div>
+          </div>
+
           <div class="config-section__item">
-            <ConfigGroup title="Sync reports" :description="isGlobal ? 'Where sync runs write their reports. Relative paths resolve under .tasks.' : 'Override sync report settings for this project (leave blank to inherit global).'">
+            <ConfigGroup title="Sync reports" :description="isGlobal ? 'Reports written after each sync run. Remotes and field mappings are managed on the Sync page.' : 'Override sync report settings for this project. Remotes and field mappings are managed on the Sync page.'">
               <div class="field-grid" data-testid="config-sync-reports">
-                <div class="field">
-                  <label class="field-label" for="config-sync-reports-dir">
-                    <span>Reports folder</span>
-                  </label>
-                  <UiInput id="config-sync-reports-dir" v-model="form.syncReportsDir" maxlength="512" @blur="validateField('sync_reports_dir')" :placeholder="isGlobal ? '@reports' : `(inherit global: ${inspectData.global_effective?.sync_reports_dir || '@reports'})`" />
+                <div class="field field--full">
+                  <label class="field-label" for="config-sync-reports-dir">Reports folder</label>
+                  <UiInput id="config-sync-reports-dir" v-model="form.syncReportsDir" maxlength="512" @blur="validateField('sync_reports_dir')" :placeholder="isGlobal ? '@reports' : `Inherit global (${inspectData.global_effective?.sync_reports_dir || '@reports'})`" />
+                  <p class="field-hint">Relative paths resolve under .tasks. <a href="/sync">Open the Sync page</a></p>
                   <p v-if="errors.sync_reports_dir" class="field-error">{{ errors.sync_reports_dir }}</p>
                 </div>
-                <ConfigToggleField
-                  label="Write reports"
-                  v-model="form.syncWriteReports"
-                  :is-global="isGlobal"
-                  enabled-label="Save a report for each sync run"
-                  :options="toggleSelectOptions('syncWriteReports')"
-                  :hint="isGlobal ? '' : `Global: ${globalToggleSummary('syncWriteReports') || 'unknown'}`"
-                />
+                <div class="cfg-toggles">
+                  <ConfigToggleField
+                    label="Write reports"
+                    v-model="form.syncWriteReports"
+                    :is-global="isGlobal"
+                    description="Save a report file for every sync run."
+                    :options="toggleSelectOptions('syncWriteReports')"
+                  />
+                </div>
               </div>
-              <p class="field-hint">Remotes and field mappings are managed on the <a href="/sync">Sync page</a>.</p>
             </ConfigGroup>
                     </div>
         </section>
@@ -617,6 +619,7 @@ import UiInput from '../components/UiInput.vue'
 import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { showToast } from '../components/toast'
+import './config-form.css'
 import { useConfigForm } from '../composables/useConfigForm'
 import { refreshCompletionPoliciesForScope } from '../composables/useCompletionPolicy'
 import { useConfigScope } from '../composables/useConfigScope'
@@ -767,6 +770,7 @@ const {
   tagSuggestions,
   statusOptions,
   priorityOptions,
+  typeOptions,
   statusSuggestions,
   prioritySuggestions,
   typeSuggestions,
@@ -1138,12 +1142,13 @@ watch(
 
 <style scoped>
 .config-page {
-  --field-height: 34px;
+  --field-height: var(--control-height);
   --config-control-height: var(--field-height);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-bottom: 72px;
+  /* Room for the floating save bar so it never covers the last field. */
+  padding-bottom: 120px;
 }
 
 .page-header {
@@ -1348,68 +1353,47 @@ watch(
   }
 }
 
-.field {
+.dialog-form .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.field :deep(.input) {
+.dialog-form .field :deep(.input) {
   height: var(--field-height);
   padding: calc(var(--space-2) - 4px) var(--space-3);
   box-sizing: border-box;
 }
 
-.field :deep(.ui-select) {
+.dialog-form .field :deep(.ui-select) {
   height: var(--field-height);
   padding: calc(var(--space-2) - 4px) calc(var(--space-3) + 16px) calc(var(--space-2) - 4px) var(--space-3);
   box-sizing: border-box;
 }
 
-.toggle-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
 
-.toggle-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
 
-.toggle-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-fg);
-}
 
-.toggle-control input {
-  width: 14px;
-  height: 14px;
-}
 
-.field-grid {
+.dialog-form .field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 
-.field-label {
+.dialog-form .field-label {
   display: flex;
   align-items: center;
   gap: 8px;
   font-weight: 600;
 }
 
-.field-error {
+.dialog-form .field-error {
   color: var(--color-danger);
   font-size: 12px;
 }
 
-.field-hint {
+.dialog-form .field-hint {
   color: var(--color-muted);
   font-size: 12px;
 }

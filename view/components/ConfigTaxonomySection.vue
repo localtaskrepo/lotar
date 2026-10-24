@@ -1,63 +1,65 @@
 <template>
-  <ConfigGroup title="Taxonomy" :description="description">
-    <div class="field" data-testid="config-tags">
-      <label class="field-label" :for="`${uid}-tags-mode`">
-        <span>Tags</span>
-        <span
-          v-if="tagsSource"
-          :class="['provenance', provenanceClass(tagsSource)]"
-        >
-          {{ provenanceLabel(tagsSource) }}
-        </span>
-      </label>
-      <UiSelect :id="`${uid}-tags-mode`" v-model="tagsMode" @change="handleUpdate('tags')">
-        <option v-for="option in modeOptions(globalTags, 'tags')" :key="option.value" :value="option.value">
-          {{ option.label }}
-        </option>
-      </UiSelect>
-      <ChipListField
-        v-if="tagsMode === 'list'"
-        v-model="tags"
-        placeholder="frontend"
-        add-label="Add tag"
-        composer-label="Tag"
-        empty-label="No tags yet"
-        @update:modelValue="handleUpdate('tags')"
-      />
-      <p class="field-hint">{{ modeHint(tagsMode, 'tags') }}</p>
-      <p v-if="tagsError" class="field-error">{{ tagsError }}</p>
-    </div>
+  <ConfigGroup title="Tags & custom fields" :description="description">
+    <div class="field-grid">
+      <div class="field field--full" data-testid="config-tags">
+        <label class="field-label" :for="`${uid}-tags-mode`">
+          <span>Tags</span>
+          <span
+            v-if="tagsSource"
+            :class="['provenance', provenanceClass(tagsSource)]"
+          >
+            {{ provenanceLabel(tagsSource) }}
+          </span>
+        </label>
+        <UiSelect :id="`${uid}-tags-mode`" v-model="tagsMode" class="cfg-mode-select" @change="handleUpdate('tags')">
+          <option v-for="option in modeOptions(globalTags, 'tags')" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </UiSelect>
+        <ChipListField
+          v-if="tagsMode === 'list'"
+          v-model="tags"
+          placeholder="frontend"
+          add-label="Add tag"
+          composer-label="Tag"
+          empty-label="No tags yet"
+          @update:modelValue="handleUpdate('tags')"
+        />
+        <p class="field-hint">{{ modeHint(tagsMode, 'tags') }}</p>
+        <p v-if="tagsError" class="field-error">{{ tagsError }}</p>
+      </div>
 
-    <div class="field" data-testid="config-custom-fields">
-      <label class="field-label" :for="`${uid}-custom-fields-mode`">
-        <span>Custom fields</span>
-        <span
-          v-if="customFieldsSource"
-          :class="['provenance', provenanceClass(customFieldsSource)]"
-        >
-          {{ provenanceLabel(customFieldsSource) }}
-        </span>
-      </label>
-      <UiSelect :id="`${uid}-custom-fields-mode`" v-model="customFieldsMode" @change="handleUpdate('custom_fields')">
-        <option
-          v-for="option in modeOptions(globalCustomFields, 'custom fields')"
-          :key="option.value"
-          :value="option.value"
-        >
-          {{ option.label }}
-        </option>
-      </UiSelect>
-      <ChipListField
-        v-if="customFieldsMode === 'list'"
-        v-model="customFields"
-        placeholder="Name a custom field"
-        add-label="Add field"
-        composer-label="Field"
-        empty-label="No custom fields yet"
-        @update:modelValue="handleUpdate('custom_fields')"
-      />
-      <p class="field-hint">{{ modeHint(customFieldsMode, 'custom fields') }}</p>
-      <p v-if="customFieldsError" class="field-error">{{ customFieldsError }}</p>
+      <div class="field field--full" data-testid="config-custom-fields">
+        <label class="field-label" :for="`${uid}-custom-fields-mode`">
+          <span>Custom fields</span>
+          <span
+            v-if="customFieldsSource"
+            :class="['provenance', provenanceClass(customFieldsSource)]"
+          >
+            {{ provenanceLabel(customFieldsSource) }}
+          </span>
+        </label>
+        <UiSelect :id="`${uid}-custom-fields-mode`" v-model="customFieldsMode" class="cfg-mode-select" @change="handleUpdate('custom_fields')">
+          <option
+            v-for="option in modeOptions(globalCustomFields, 'custom fields')"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </UiSelect>
+        <ChipListField
+          v-if="customFieldsMode === 'list'"
+          v-model="customFields"
+          placeholder="Name a custom field"
+          add-label="Add field"
+          composer-label="Field"
+          empty-label="No custom fields yet"
+          @update:modelValue="handleUpdate('custom_fields')"
+        />
+        <p class="field-hint">{{ modeHint(customFieldsMode, 'custom fields') }}</p>
+        <p v-if="customFieldsError" class="field-error">{{ customFieldsError }}</p>
+      </div>
     </div>
   </ConfigGroup>
 </template>
@@ -149,26 +151,7 @@ function handleUpdate(field: 'tags' | 'custom_fields') {
 </script>
 
 <style scoped>
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.field-hint {
-  color: var(--color-muted);
-  font-size: 12px;
-}
-
-.field-error {
-  color: var(--color-danger);
-  font-size: 12px;
+.cfg-mode-select {
+  max-width: 420px;
 }
 </style>

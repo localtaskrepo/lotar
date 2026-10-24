@@ -1,26 +1,37 @@
 <template>
-  <div class="toggle-field">
-    <label class="field-label">
-      <span>{{ label }}</span>
-      <span v-if="sourceLabel" class="provenance" :class="sourceClass">{{ sourceLabel }}</span>
+  <div class="cfg-toggle">
+    <div class="cfg-toggle__text">
+      <span :id="labelId" class="cfg-toggle__label">
+        {{ label }}
+        <span v-if="sourceLabel" class="provenance" :class="sourceClass">{{ sourceLabel }}</span>
+      </span>
+      <span v-if="descriptionText" :id="descriptionId" class="cfg-toggle__description">{{ descriptionText }}</span>
+    </div>
+    <label v-if="isGlobal" class="cfg-switch">
+      <input
+        type="checkbox"
+        role="switch"
+        :checked="model === 'true'"
+        :aria-labelledby="labelId"
+        :aria-describedby="descriptionText ? descriptionId : undefined"
+        @change="onSwitchChange"
+      />
+      <span class="cfg-switch__track" aria-hidden="true"><span class="cfg-switch__thumb" /></span>
     </label>
-    <template v-if="isGlobal">
-      <label class="toggle-control">
-        <input type="checkbox" :checked="modelValue === 'true'" @change="onCheckboxChange" />
-        <span>{{ enabledLabel }}</span>
-      </label>
-    </template>
-    <template v-else>
-      <UiSelect v-model="modelValue">
-        <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </UiSelect>
-      <p v-if="hint" class="field-hint">{{ hint }}</p>
-    </template>
+    <UiSelect
+      v-else
+      v-model="model"
+      class="cfg-toggle__select"
+      :aria-labelledby="labelId"
+      :aria-describedby="descriptionText ? descriptionId : undefined"
+    >
+      <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
+    </UiSelect>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRefs } from 'vue'
+import { computed, useId } from 'vue'
 import UiSelect from './UiSelect.vue'
 
 type ToggleValue = 'inherit' | 'true' | 'false'
@@ -35,69 +46,33 @@ const props = withDefaults(
     label: string
     isGlobal: boolean
     options?: ToggleOption[]
+    /** One-line explanation shown under the label. */
+    description?: string
+    /** Legacy alias for `description`. */
+    enabledLabel?: string
+    /** Deprecated: the inherit option label already states the global value. */
     hint?: string
     sourceLabel?: string
     sourceClass?: string
-    enabledLabel?: string
   }>(),
   {
     options: () => [],
+    description: undefined,
+    enabledLabel: undefined,
     hint: undefined,
     sourceLabel: undefined,
     sourceClass: undefined,
-    enabledLabel: 'Enabled',
   },
 )
 
-const model = defineModel<ToggleValue>({
-  required: true,
-})
+const model = defineModel<ToggleValue>({ required: true })
 
-const { label, isGlobal, options, hint, sourceLabel, sourceClass, enabledLabel } = toRefs(props)
+const uid = useId()
+const labelId = `${uid}-label`
+const descriptionId = `${uid}-description`
+const descriptionText = computed(() => props.description ?? props.enabledLabel ?? '')
 
-const modelValue = computed({
-  get: () => model.value,
-  set: (value: ToggleValue) => {
-    model.value = value
-  },
-})
-
-function onCheckboxChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  model.value = target.checked ? 'true' : 'false'
+function onSwitchChange(event: Event) {
+  model.value = (event.target as HTMLInputElement).checked ? 'true' : 'false'
 }
 </script>
-
-<style scoped>
-.toggle-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-
-.toggle-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-fg);
-}
-
-.toggle-control input {
-  width: 14px;
-  height: 14px;
-}
-
-.field-hint {
-  color: var(--color-muted);
-  font-size: 12px;
-}
-</style>

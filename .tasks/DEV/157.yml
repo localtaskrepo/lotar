@@ -1,0 +1,37 @@
+title: Polish Config page alignment and input sizing
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:09:15.021351+00:00
+modified: 2026-10-24T22:27:08.762566+00:00
+comments:
+- date: 2026-10-24T22:10:44.095461+00:00
+  text: 'Audit (1440px, both scopes, every section): auto-fit grids put fields in 2/3/4 columns with ragged gaps; inputs are filled grey but UiSelect sets background: inherit (white), and the Done states mode is an unstyled native select; short-choice selects stretch to the full card width; toggle cells misalign whenever a label wraps (e.g. ''Auto CODEOWNERS assignee''), checkboxes sit beside 36px inputs at a different baseline, and project hints repeat ''Global: On'' under ''(Currently On)''; .provenance colors are dark-theme only, so PROJECT/GLOBAL badges are nearly unreadable in light mode; automation rules source line runs two sentences together; each section duplicates slightly different .field/.field-label CSS. Plan: one shared, unscoped config form stylesheet (2-column grid via container query, 1 column when narrow; one control height/fill for inputs and selects; explicit full-width rows only for paths/chip lists/text), settings-style toggle rows (label + one-line explanation left, switch or Inherit/On/Off select right), theme-aware provenance badges, styled Done states select, tidy branch alias and automation-rules headers. Verify with screenshots of every section at 1440/390 in light and dark, plus existing tests.'
+- date: 2026-10-24T22:27:08.733066+00:00
+  text: 'Outcome: new shared stylesheet view/pages/config-form.css (imported by ConfigView) replaces each section''s scoped field CSS. Every card uses a 2-column grid (1 column under 600px via container query) with explicit full-width rows for paths, chip lists and text; one control height and fill for inputs and selects; selects get appearance:none and a theme-colored chevron (UiSelect had none, so selects read as text boxes) and the Done states native select is styled the same; short-choice selects are capped at 420px. ConfigToggleField is now a settings row: label + one-line explanation left, accessible switch (role=switch) in global scope or Inherit/On/Off select in project scope right; rows sit in bordered lists, never misalign when labels wrap, and the redundant ''Global: On'' hints are gone. Automation toggles are grouped (Ownership, Identity, Inference from branches and paths) with doc-accurate explanations; Agents is grouped (Context, Instructions, Logs, Worktrees); scanning/people/storage/sprints toggles use rows with explanations. Provenance badges are theme-aware (were dark-only and unreadable in light mode) and BUILT-IN badges are hidden on this page so only GLOBAL/PROJECT overrides stand out. Branch aliases: compact header with Add/Clear, ''No aliases'' empty state, column headings, and target values chosen from the configured types/statuses/priorities. Also: project ''Default status/priority'' load the project override (blank = inherit, labelled ''Inherit global (Medium)'') instead of showing the effective value as if overridden; Done states option label shortened with an explanatory hint; automation rules source line separated; page bottom padding clears the floating save bar. README config screenshots regenerated. Evidence: screenshots of all 19 section/scope combinations at 1440 light/dark and 390; ConfigToggleField spec rewritten as behavior tests (switch, inherit select, badge, grid rule); smoke ui.config-coverage adds a geometry check (9 automation controls share one right edge and are vertically centred in both scopes; all inputs/selects in defaults/agents/storage/sprints have one height). Gates: lint:agent clean; test:agent 1667 Rust + 1120 UI + release pass; test:smoke:agent 82 files / 343 tests pass. Guidance: no durable finding.'
+description: 'Reported after DEV-19: many alignments and input sizes on the Config page are inconsistent. Audit every section in global and project scope (desktop and phone, light and dark) and make field widths, control heights, label/badge alignment, spacing and grids consistent with attention to detail.'
+history:
+- at: 2026-10-24T22:10:44.061538+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T22:10:44.095461+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T22:27:08.733066+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T22:27:08.762566+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

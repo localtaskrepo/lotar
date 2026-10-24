@@ -300,22 +300,24 @@ p {
 	white-space: nowrap;
 }
 
+/* Badge text mixes the hue with the theme foreground so it stays readable
+   in both light and dark themes. */
 .provenance.source-project {
-	background: rgba(0, 180, 120, 0.25);
-	border-color: rgba(0, 180, 120, 0.35);
-	color: #9ef0d0;
+	background: color-mix(in oklab, #10b981 14%, transparent);
+	border-color: color-mix(in oklab, #10b981 40%, transparent);
+	color: color-mix(in oklab, #10b981 55%, var(--color-fg));
 }
 
 .provenance.source-global {
-	background: rgba(0, 120, 255, 0.2);
-	border-color: rgba(0, 120, 255, 0.35);
-	color: #8bc0ff;
+	background: color-mix(in oklab, #3b82f6 13%, transparent);
+	border-color: color-mix(in oklab, #3b82f6 40%, transparent);
+	color: color-mix(in oklab, #3b82f6 60%, var(--color-fg));
 }
 
 .provenance.source-built_in {
-	background: rgba(255, 255, 255, 0.12);
-	border-color: rgba(255, 255, 255, 0.25);
-	color: rgba(255, 255, 255, 0.85);
+	background: color-mix(in oklab, var(--color-fg) 6%, transparent);
+	border-color: color-mix(in oklab, var(--color-fg) 18%, transparent);
+	color: var(--color-muted);
 }
 
 .list {

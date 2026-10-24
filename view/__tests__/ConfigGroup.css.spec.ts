@@ -53,7 +53,8 @@ describe('ConfigGroup styles', () => {
         const globalStyle = globalStyleSource
 
         expect(styleContent).toMatch(/\.config-group__source[^{}]*\{[^}]*align-self:\s*center/)
-        expect(globalStyle).toMatch(/\.provenance\.source-project[^{}]*\{[^}]*background:\s*rgba\(0,\s*180,\s*120,\s*0\.25\)/)
+        // Readable in both themes: badge text mixes the hue with the theme foreground.
+        expect(globalStyle).toMatch(/\.provenance\.source-project[^{}]*\{[^}]*color:\s*color-mix\([^;]*var\(--color-fg\)\)/)
         expect(globalStyle).toMatch(/\.provenance[^{}]*\{[^}]*text-transform:\s*uppercase/)
 
         const badge = wrapper.find('.config-group__source.provenance')

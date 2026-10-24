@@ -398,7 +398,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         const effective = effectiveDoneLabels.value
         const summary = effective.length ? effective.join(', ') : 'inferred automatically'
         if (isGlobal.value) {
-            return `Automatic (last status + conventional names — currently ${summary})`
+            return `Automatic (currently ${summary})`
         }
         return `Inherit global (Currently ${summary})`
     })
@@ -1080,6 +1080,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         if (!isGlobal.value) {
             const raw = ((data.project_raw as any) || {}) as Record<string, any>
             form.projectName = raw.project_name || currentProject.value?.name || ''
+            // Project defaults show overrides only; blank means inherit.
+            form.defaultPriority = typeof raw.default_priority === 'string' ? raw.default_priority : ''
+            form.defaultStatus = typeof raw.default_status === 'string' ? raw.default_status : ''
             // Explicit project override (kept even when equal to the global
             // list — intent is preserved, never erased to inherit).
             form.issueDoneStates = normalizeDoneStatesRaw(raw.issue_done_states)

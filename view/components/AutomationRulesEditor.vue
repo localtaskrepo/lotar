@@ -20,6 +20,7 @@
 
     <div class="automation-builder__meta row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
       <span v-if="sourceLabel" class="muted">Effective source: {{ sourceLabel }}</span>
+      <span v-if="sourceLabel && scopeHint" class="muted" aria-hidden="true">·</span>
       <span v-if="scopeHint" class="muted">{{ scopeHint }}</span>
     </div>
 

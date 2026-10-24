@@ -86,7 +86,7 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                     await members.getByRole('textbox').fill('alice');
                     await members.getByRole('textbox').press('Enter');
                     await section('storage');
-                    await page.getByTestId('config-sync-reports').getByRole('checkbox').uncheck();
+                    await page.getByTestId('config-sync-reports').getByRole('switch').uncheck();
                     await section('agents');
                     await page.getByLabel('Context file extension').fill('.ctx');
                     expect(await page.locator('.config-nav__badge--dirty').count()).toBe(4);
@@ -107,6 +107,54 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                         return [effective.members, effective.sync_write_reports, effective.agent_context_extension, effective.sprint_defaults];
                     }).toEqual([['alice'], false, '.ctx', { length: '2w', capacity_points: 30 }]);
                 });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    // DEV-157: one control size and aligned settings rows in every section.
+    it('aligns setting rows and sizes controls consistently in both scopes', async ({ expect }) => {
+        const workspace = await SmokeWorkspace.create({
+            name: 'dev157-config-layout-',
+            seedFiles: {
+                '.tasks/config.yml': stringify({ default: { project: 'ALPHA' } }),
+                '.tasks/ALPHA/config.yml': stringify({ project: { name: 'Alpha' } }),
+            },
+        });
+        try {
+            const server = await startLotarServer(workspace);
+            try {
+                for (const scope of ['', 'ALPHA']) {
+                    await withPage(`${server.url}/config?section=automation${scope ? `&project=${scope}` : ''}`, async (page) => {
+                        await page.setViewportSize({ width: 1440, height: 1000 });
+                        const rows = page.locator('[data-testid="config-automation"] .cfg-toggle');
+                        await expect.poll(() => rows.count()).toBe(9);
+                        const controls = await rows.evaluateAll((elements) =>
+                            elements.map((row) => {
+                                const control = row.querySelector('.cfg-switch, select')!.getBoundingClientRect();
+                                const box = row.getBoundingClientRect();
+                                return {
+                                    right: Math.round(control.right),
+                                    centerOffset: Math.abs(control.top + control.height / 2 - (box.top + box.height / 2)),
+                                };
+                            }),
+                        );
+                        expect(new Set(controls.map((c) => c.right)).size).toBe(1);
+                        for (const control of controls) expect(control.centerOffset).toBeLessThan(2);
+                    });
+                }
+                for (const section of ['defaults', 'agents', 'storage', 'sprints']) {
+                    await withPage(`${server.url}/config?section=${section}`, async (page) => {
+                        await page.setViewportSize({ width: 1440, height: 1000 });
+                        const fields = page.locator(`section[data-section="${section}"] .field input.input, section[data-section="${section}"] .field select.input`);
+                        await expect.poll(() => fields.count()).toBeGreaterThan(1);
+                        const heights = await fields.evaluateAll((elements) => elements.map((el) => Math.round(el.getBoundingClientRect().height)));
+                        expect(new Set(heights).size, `${section}: ${heights.join(',')}`).toBe(1);
+                    });
+                }
             } finally {
                 await server.stop();
             }

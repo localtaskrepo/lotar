@@ -51,15 +51,16 @@
         />
         <p v-if="errors.sprints_defaults_capacity_hours" class="field-error">{{ errors.sprints_defaults_capacity_hours }}</p>
       </div>
-      <ConfigToggleField
-        class="field--full"
-        label="Sprint warnings"
-        v-model="notificationsEnabled"
-        :is-global="true"
-        enabled-label="Warn about overdue, future or overlapping sprints"
-        :source-label="provenanceLabel(sourceFor('sprints_notifications_enabled'))"
-        :source-class="provenanceClass(sourceFor('sprints_notifications_enabled'))"
-      />
+      <div class="cfg-toggles">
+        <ConfigToggleField
+          label="Sprint warnings"
+          v-model="notificationsEnabled"
+          :is-global="true"
+          description="Warn about overdue, future or overlapping sprints when starting or closing one."
+          :source-label="provenanceLabel(sourceFor('sprints_notifications_enabled'))"
+          :source-class="provenanceClass(sourceFor('sprints_notifications_enabled'))"
+        />
+      </div>
     </div>
   </ConfigGroup>
 </template>
@@ -99,42 +100,3 @@ const emit = defineEmits<{
 const uid = useId()
 </script>
 
-<style scoped>
-.field-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field--full {
-  grid-column: 1 / -1;
-}
-
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.field :deep(.input) {
-  height: var(--config-control-height, 40px);
-  box-sizing: border-box;
-}
-
-.field-error {
-  color: var(--color-danger);
-  font-size: 12px;
-}
-
-.field-hint {
-  color: var(--color-muted);
-  font-size: 12px;
-}
-</style>

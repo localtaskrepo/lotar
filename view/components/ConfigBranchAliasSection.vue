@@ -6,6 +6,7 @@
       :error="typeError"
       key-placeholder="feature"
       value-placeholder="Feature"
+      :value-options="typeOptions"
       add-label="Add alias"
       clear-label="Clear overrides"
       :show-clear="typeShowClear"
@@ -23,6 +24,7 @@
       :error="statusError"
       key-placeholder="ready"
       value-placeholder="InProgress"
+      :value-options="statusOptions"
       add-label="Add alias"
       clear-label="Clear overrides"
       :show-clear="statusShowClear"
@@ -40,6 +42,7 @@
       :error="priorityError"
       key-placeholder="hotfix"
       value-placeholder="High"
+      :value-options="priorityOptions"
       add-label="Add alias"
       clear-label="Clear overrides"
       :show-clear="priorityShowClear"
@@ -72,6 +75,9 @@ const props = defineProps<{
   typeError?: string | null
   statusError?: string | null
   priorityError?: string | null
+  typeOptions?: string[]
+  statusOptions?: string[]
+  priorityOptions?: string[]
 }>()
 
 type BranchAliasField = 'branchTypeAliases' | 'branchStatusAliases' | 'branchPriorityAliases'
@@ -84,6 +90,9 @@ const emit = defineEmits<{
   (e: 'validate', field: BranchAliasConfigField): void
 }>()
 
+const typeOptions = computed(() => props.typeOptions ?? [])
+const statusOptions = computed(() => props.statusOptions ?? [])
+const priorityOptions = computed(() => props.priorityOptions ?? [])
 const typeError = computed(() => props.typeError ?? null)
 const statusError = computed(() => props.statusError ?? null)
 const priorityError = computed(() => props.priorityError ?? null)

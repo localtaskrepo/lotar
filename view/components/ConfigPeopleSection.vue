@@ -17,31 +17,31 @@
           @update:modelValue="emit('validate', 'members')"
         />
         <p class="field-hint">
-          Reporters and assignees allowed when "Only allow members" is on{{ isGlobal ? '' : '. Leave empty to inherit the global list' }}.
+          People who may report or be assigned tasks when "Only allow members" is on{{ isGlobal ? '' : '. Leave empty to inherit the global list' }}.
         </p>
         <p v-if="membersError" class="field-error">{{ membersError }}</p>
       </div>
 
-      <ConfigToggleField
-        label="Only allow members"
-        v-model="strictMembers"
-        :is-global="isGlobal"
-        enabled-label="Reject reporters/assignees not in Members"
-        :options="toggleSelectOptions('strictMembers')"
-        :hint="toggleHint('strictMembers')"
-        :source-label="provenanceLabel(sourceFor('strict_members'))"
-        :source-class="provenanceClass(sourceFor('strict_members'))"
-      />
-      <ConfigToggleField
-        label="Auto-add new members"
-        v-model="autoPopulateMembers"
-        :is-global="isGlobal"
-        enabled-label="Add new reporters/assignees (strict mode)"
-        :options="toggleSelectOptions('autoPopulateMembers')"
-        :hint="toggleHint('autoPopulateMembers')"
-        :source-label="provenanceLabel(sourceFor('auto_populate_members'))"
-        :source-class="provenanceClass(sourceFor('auto_populate_members'))"
-      />
+      <div class="cfg-toggles">
+        <ConfigToggleField
+          label="Only allow members"
+          v-model="strictMembers"
+          :is-global="isGlobal"
+          description="Reject reporters and assignees who are not listed in Members."
+          :options="toggleSelectOptions('strictMembers')"
+          :source-label="provenanceLabel(sourceFor('strict_members'))"
+          :source-class="provenanceClass(sourceFor('strict_members'))"
+        />
+        <ConfigToggleField
+          label="Add new people automatically"
+          v-model="autoPopulateMembers"
+          :is-global="isGlobal"
+          description="With Only allow members on, add new reporters and assignees to Members instead of rejecting them."
+          :options="toggleSelectOptions('autoPopulateMembers')"
+          :source-label="provenanceLabel(sourceFor('auto_populate_members'))"
+          :source-class="provenanceClass(sourceFor('auto_populate_members'))"
+        />
+      </div>
 
       <div v-if="!isGlobal" class="field field--full" data-testid="config-reviewers">
         <label class="field-label">
@@ -88,7 +88,6 @@ const {
   globalMembers = [],
   sourceFor,
   toggleSelectOptions,
-  globalToggleSummary,
 } = defineProps<{
   description: string
   isGlobal: boolean
@@ -99,57 +98,14 @@ const {
   globalMembers?: string[]
   sourceFor: (field: string) => ConfigSource | undefined
   toggleSelectOptions: (field: ToggleField) => Array<{ value: ToggleValue; label: string }>
-  globalToggleSummary: (field: ToggleField) => string
+  /** Unused since the inherit option states the global value; kept for callers. */
+  globalToggleSummary?: (field: ToggleField) => string
 }>()
 
 const globalMembersSummary = computed(() => (globalMembers.length ? globalMembers.join(', ') : 'none'))
-
-function toggleHint(field: ToggleField) {
-  return isGlobal ? '' : `Global: ${globalToggleSummary(field) || 'unknown'}`
-}
 
 const emit = defineEmits<{
   (e: 'validate', field: 'members' | 'review_reviewers'): void
 }>()
 </script>
 
-<style scoped>
-.field-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.field--full {
-  grid-column: 1 / -1;
-}
-
-.field :deep(.input) {
-  height: var(--config-control-height, 40px);
-  padding: calc(var(--space-2) - 4px) var(--space-3);
-  box-sizing: border-box;
-}
-
-.field-error {
-  color: var(--color-danger);
-  font-size: 12px;
-}
-
-.field-hint {
-  color: var(--color-muted);
-  font-size: 12px;
-}
-</style>
