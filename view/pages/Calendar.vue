@@ -291,11 +291,11 @@ const cursor = ref<Date>(new Date()) // month cursor
 const monthKey = computed(() => `${cursor.value.getFullYear()}-${String(cursor.value.getMonth() + 1).padStart(2, '0')}`)
 const monthSlideDirection = ref<'forward' | 'backward'>('forward')
 const showSprints = ref(false)
-const filter = ref<Record<string, string>>({})
+const filter = ref<Record<string, string>>(typeof route.query.q === 'string' ? { q: route.query.q } : {})
 const filterBarRef = ref<{ clear?: () => void } | null>(null)
 const filterPayload = computed(() => ({
   ...filter.value,
-  project: project.value || '',
+  ...(project.value || Object.prototype.hasOwnProperty.call(route.query, 'project') ? { project: project.value } : {}),
 }))
 
 const dayDialogOpen = ref(false)

@@ -7,6 +7,234 @@ use crate::types::TaskRelationships;
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
+pub fn execute_action(
+    action: crate::cli::args::task::TaskRelationshipsAction,
+    project: Option<&str>,
+    resolver: &TasksDirectoryResolver,
+    renderer: &OutputRenderer,
+) -> Result<(), String> {
+    use crate::api_types::{
+        RelationshipGraphRequest, RelationshipMutationRequest, RelationshipOperation,
+        RelationshipRepairRequest,
+    };
+    use crate::cli::args::task::TaskRelationshipsAction as Action;
+    use crate::services::relationships;
+
+    let storage = crate::storage::manager::Storage::try_open(&resolver.path)
+        .ok_or("Relationship snapshot unavailable: tasks directory does not exist")?;
+    let project =
+        project.map(|value| crate::utils::project::resolve_project_input(value, &resolver.path));
+    match action {
+        Action::Check => {
+            let report =
+                relationships::check(&storage, project.as_deref()).map_err(|e| e.to_string())?;
+            let blocking = !report.complete || report.issues.iter().any(|i| i.severity == "error");
+            render_report(renderer, &report)?;
+            if blocking {
+                return Err("Relationship check found blocking findings or incomplete data".into());
+            }
+        }
+        Action::Graph {
+            root,
+            depth,
+            max_nodes,
+            relationship_kinds,
+            include_isolated,
+        } => {
+            let root = root
+                .map(|id| resolve_id(&id, project.as_deref(), resolver))
+                .transpose()?;
+            let report = relationships::graph(
+                &storage,
+                &RelationshipGraphRequest {
+                    project,
+                    task_id: root,
+                    depth: Some(depth),
+                    max_nodes: Some(max_nodes),
+                    filters: Default::default(),
+                    relationship_kinds: if relationship_kinds.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            relationship_kinds
+                                .into_iter()
+                                .map(|kind| {
+                                    serde_json::from_value(JsonValue::String(kind))
+                                        .map_err(|e| e.to_string())
+                                })
+                                .collect::<Result<_, _>>()?,
+                        )
+                    },
+                    include_isolated,
+                },
+            )
+            .map_err(|e| e.to_string())?;
+            let incomplete = !report.complete
+                || report.truncated
+                || report.nodes.iter().any(|node| {
+                    matches!(node.state.as_str(), "missing" | "unreadable" | "ambiguous")
+                });
+            render_report(renderer, &report)?;
+            if incomplete {
+                return Err("Relationship graph is incomplete or truncated".into());
+            }
+        }
+        Action::Repair {
+            apply,
+            dry_run: _,
+            expected_revision,
+            issue_ids,
+        } => {
+            let report = relationships::repair(
+                &storage,
+                &RelationshipRepairRequest {
+                    project,
+                    apply,
+                    revision: expected_revision,
+                    issue_ids,
+                },
+            )
+            .map_err(|e| e.to_string())?;
+            render_report(renderer, &report)?;
+        }
+        action => {
+            let (id, target, kind, operation, from_kind, expected) = match action {
+                Action::Add {
+                    id,
+                    target,
+                    kind,
+                    expected_current,
+                } => (
+                    id,
+                    target,
+                    kind,
+                    RelationshipOperation::Add,
+                    None,
+                    expected_current,
+                ),
+                Action::Remove { id, target, kind } => {
+                    (id, target, kind, RelationshipOperation::Remove, None, None)
+                }
+                Action::Move {
+                    id,
+                    target,
+                    from,
+                    to,
+                    expected_current,
+                } => (
+                    id,
+                    target,
+                    to,
+                    RelationshipOperation::ChangeKind,
+                    Some(from),
+                    expected_current,
+                ),
+                _ => unreachable!(),
+            };
+            let source = resolve_id(&id, project.as_deref(), resolver)?;
+            let source_project = crate::storage::TaskId::parse(&source)
+                .map_err(|e| e.to_string())?
+                .project;
+            let target = resolve_id(&target, Some(&source_project), resolver)?;
+            let expected_current = expected
+                .map(|id| resolve_id(&id, Some(&source_project), resolver))
+                .transpose()?;
+            let report = relationships::mutate(
+                &storage,
+                &RelationshipMutationRequest {
+                    source,
+                    target,
+                    kind: relationship_field(kind),
+                    operation,
+                    from_kind: from_kind.map(relationship_field),
+                    expected_current,
+                },
+            )
+            .map_err(|e| e.to_string())?;
+            render_report(renderer, &report)?;
+        }
+    }
+    Ok(())
+}
+
+fn resolve_id(
+    raw: &str,
+    project: Option<&str>,
+    resolver: &TasksDirectoryResolver,
+) -> Result<String, String> {
+    let mut projects = crate::cli::project::ProjectResolver::new(resolver)?;
+    projects.validate_task_id_format(raw)?;
+    let full = projects.get_full_task_id(raw, project)?;
+    crate::storage::TaskId::parse(&full)
+        .map(|id| id.canonical())
+        .map_err(|e| e.to_string())
+}
+
+fn relationship_field(kind: RelationshipKind) -> crate::api_types::RelationshipField {
+    use crate::api_types::RelationshipField as Api;
+    use crate::cli::args::task::RelationshipKind as Cli;
+    match kind {
+        Cli::DependsOn => Api::DependsOn,
+        Cli::Blocks => Api::Blocks,
+        Cli::Related => Api::Related,
+        Cli::Fixes => Api::Fixes,
+        Cli::Parent => Api::Parent,
+        Cli::Children => Api::Children,
+        Cli::DuplicateOf => Api::DuplicateOf,
+    }
+}
+
+fn render_report(renderer: &OutputRenderer, report: &impl serde::Serialize) -> Result<(), String> {
+    match renderer.format {
+        OutputFormat::Json => renderer.emit_json(report),
+        OutputFormat::Text => {
+            let report = serde_json::to_value(report).map_err(|e| e.to_string())?;
+            for key in ["revision", "complete", "truncated", "applied", "changed"] {
+                if let Some(value) = report.get(key) {
+                    let text = value
+                        .as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| value.to_string());
+                    renderer.emit_raw_stdout(format_args!("{key}: {text}"));
+                }
+            }
+            for key in ["changed_tasks", "nodes", "edges", "issues"] {
+                if let Some(entries) = report.get(key).and_then(JsonValue::as_array) {
+                    renderer.emit_raw_stdout(format_args!("{key}: {}", entries.len()));
+                    for entry in entries {
+                        let text = if key == "issues" {
+                            format!(
+                                "{} [{}]: {}",
+                                entry["severity"].as_str().unwrap_or_default(),
+                                entry["code"].as_str().unwrap_or_default(),
+                                entry["message"].as_str().unwrap_or_default()
+                            )
+                        } else if key == "edges" {
+                            format!(
+                                "{} --{}--> {}",
+                                entry["source"].as_str().unwrap_or_default(),
+                                entry["kind"].as_str().unwrap_or_default(),
+                                entry["target"].as_str().unwrap_or_default()
+                            )
+                        } else if key == "nodes" {
+                            format!(
+                                "{} [{}] {}",
+                                entry["id"].as_str().unwrap_or_default(),
+                                entry["state"].as_str().unwrap_or_default(),
+                                entry["title"].as_str().unwrap_or_default()
+                            )
+                        } else {
+                            entry.as_str().unwrap_or_default().to_string()
+                        };
+                        renderer.emit_raw_stdout(format_args!("  {text}"));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub struct RelationshipsHandler;
 
 pub struct RelationshipsArgs {

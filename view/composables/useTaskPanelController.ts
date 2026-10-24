@@ -1,4 +1,5 @@
-import { reactive, readonly } from 'vue'
+import { hasInjectionContext, inject, reactive, readonly } from 'vue'
+import { routerKey } from 'vue-router'
 import type { TaskDTO } from '../api/types'
 
 type TaskPanelCallback = (task: TaskDTO) => void
@@ -99,9 +100,28 @@ function notifyUpdated(task: TaskDTO) {
 }
 
 export function useTaskPanelController() {
+    const router = hasInjectionContext() ? inject(routerKey, null) : null
+    async function navigateTask(taskId: string) {
+        if (!router) return
+        const route = router.currentRoute.value
+        if (route.path === '/dependencies') {
+            await router.push({ path: route.path, query: { ...route.query, root: taskId, q: taskId, taskPanel: taskId }, hash: route.hash })
+            return
+        }
+        if (route.path.startsWith('/task/')) {
+            await router.push(`/task/${encodeURIComponent(taskId)}`)
+            return
+        }
+        if (state.open && state.taskId && state.taskId !== 'new' && !route.query.taskPanel) {
+            await router.replace({ path: route.path, query: { ...route.query, taskPanel: state.taskId }, hash: route.hash })
+        }
+        await router.push({ path: route.path, query: { ...router.currentRoute.value.query, taskPanel: taskId }, hash: route.hash })
+    }
     return {
         state: readonly(state),
         openTaskPanel,
+        navigateTask,
+        setNavigatedTask: (taskId: string) => { state.taskId = taskId; state.open = true },
         closeTaskPanel,
         notifyCreated,
         notifyUpdated,

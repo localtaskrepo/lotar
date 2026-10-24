@@ -107,6 +107,13 @@ vi.mock('../composables/useSprints', () => ({
     }),
 }))
 
+vi.mock('../composables/useProjects', () => ({
+    useProjects: () => ({
+        projects: ref([{ prefix: 'PRJ', name: 'Project' }, { prefix: 'ACME', name: 'Acme Co' }]),
+        refresh: vi.fn(async () => {}),
+    }),
+}))
+
 vi.mock('../composables/useTaskPanelController', () => ({
     useTaskPanelController: () => ({
         state: { open: false },
@@ -206,6 +213,32 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
 
     afterEach(() => {
         vi.useRealTimers()
+    })
+
+    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])('hydrates real FilterBar results with route precedence: %j', async query => {
+        routeState.query = query
+        localStorage.setItem('lotar.sprints.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
+        vi.mocked(api.listTasks).mockResolvedValue({ status: 'ok', count: 0, total: 0, tasks: [], limit: 200, offset: 0 } as any)
+        const { default: RealFilterBar } = await vi.importActual<typeof import('../components/FilterBar.vue')>('../components/FilterBar.vue')
+        const wrapper = mount(SprintsList, { global: { stubs: { FilterBar: RealFilterBar } } })
+        try {
+            await flushPromises()
+            await vi.advanceTimersByTimeAsync(400)
+            await flushPromises()
+            const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
+            const bar = wrapper.getComponent(RealFilterBar)
+            expect((bar.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
+            expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
+            expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
+            if (!Object.keys(query).length) expect(vi.mocked(api.listTasks).mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
+            if (expectedQuery) expect(vi.mocked(api.listTasks).mock.lastCall?.[0]).toMatchObject({ q: expectedQuery })
+            else expect(vi.mocked(api.listTasks).mock.lastCall?.[0]?.q).toBeUndefined()
+            const emissions = (bar.emitted('update:value') || []).length
+            await vi.advanceTimersByTimeAsync(400)
+            await flushPromises()
+            expect((bar.emitted('update:value') || []).length).toBe(emissions)
+            expect(emissions).toBeLessThanOrEqual(1)
+        } finally { wrapper.unmount() }
     })
 
     it('the overdue filter excludes terminal tasks and styles only real overdue rows', async () => {

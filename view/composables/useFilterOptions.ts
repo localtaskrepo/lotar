@@ -8,7 +8,7 @@ interface KnownOptions {
 }
 
 export function useFilterOptions(
-  tasks: () => TaskDTO[],
+  tasks: () => Pick<TaskDTO, 'id' | 'tags' | 'assignee' | 'custom_fields'>[],
   project: () => string,
   config: { scope: () => string; tags: () => string[]; members: () => string[] },
 ) {

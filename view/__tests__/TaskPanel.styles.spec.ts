@@ -138,21 +138,11 @@ vi.mock('../composables/useTaskPanelOwnership', () => {
 vi.mock('../composables/useTaskRelationships', () => {
     return {
         useTaskRelationships: () => ({
-            relationDefs: ref([] as any[]),
-            relationships: ref({ depends_on: [] as string[] }),
-            relationSuggestions: ref([] as any[]),
-            relationActiveIndex: ref(-1),
+            relationships: { depends_on: '', blocks: '', related: '', children: '', fixes: '', parent: '', duplicate_of: '' },
             resetRelationships: vi.fn(),
             buildRelationships: vi.fn(() => ({})),
-            snapshotRelationshipsBaselineFromTask: vi.fn(),
-            snapshotRelationshipsBaselineFromInputs: vi.fn(),
             applyRelationshipsFromTask: vi.fn(),
-            updateRelationshipField: vi.fn(),
-            handleRelationshipBlur: vi.fn(),
-            onRelationInput: vi.fn(),
-            onRelationKey: vi.fn(),
-            pickRelation: vi.fn(),
-            commitRelationships: vi.fn(),
+            mutateRelationship: vi.fn(),
         }),
     }
 })

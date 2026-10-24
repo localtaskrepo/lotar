@@ -43,6 +43,13 @@ import type {
   ProjectListResponse,
   ProjectStatsDTO,
   ReferenceSnippet,
+  RelationshipGraphRequest,
+  RelationshipGraphResponse,
+  RelationshipCheckResponse,
+  RelationshipMutationRequest,
+  RelationshipMutationResponse,
+  RelationshipRepairRequest,
+  RelationshipRepairResponse,
   ScanRequest,
   ScanResponse,
   SprintAssignmentRequest,
@@ -157,6 +164,10 @@ async function post<T>(path: string, body: any): Promise<T> {
 }
 
 export const api = {
+  relationshipGraph(params: RelationshipGraphRequest = {}): Promise<RelationshipGraphResponse> { const { relationship_kinds, ...query } = params; return get('/api/relationships/graph', { ...query, kinds: relationship_kinds?.join(','), filters: params.filters === undefined ? undefined : JSON.stringify(params.filters) }) },
+  relationshipCheck(project?: string): Promise<RelationshipCheckResponse> { return get('/api/relationships/check', { project }) },
+  relationshipMutate(payload: RelationshipMutationRequest): Promise<RelationshipMutationResponse> { return post('/api/relationships/mutate', payload) },
+  relationshipRepair(payload: RelationshipRepairRequest): Promise<RelationshipRepairResponse> { return post('/api/relationships/repair', payload) },
   // Tasks
   listTasks(filter: TaskListFilter = {}): Promise<TaskListResponse> { return get('/api/tasks/list', filter as any) },
   getTask(id: string, project?: string, opts?: { includeDeleted?: boolean }): Promise<TaskDTO> {

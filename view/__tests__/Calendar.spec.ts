@@ -190,6 +190,31 @@ describe('Calendar sprint overlay', () => {
         openTaskPanelMock.mockClear()
     })
 
+    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])('hydrates real FilterBar results with route precedence: %j', async query => {
+        routeState.query = query
+        projectsStore.projects.value = [{ prefix: 'ACME', name: 'Acme Co' }, { prefix: 'BETA', name: 'Beta Co' }]
+        localStorage.setItem('lotar.calendar.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
+        const wrapper = mount(Calendar)
+        try {
+            await flushPromises()
+            const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
+            expect((wrapper.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
+            expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
+            expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
+            if (!Object.keys(query).length) expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
+            if (expectedQuery) expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: expectedQuery })
+            else expect(tasksStore.getQuery.mock.lastCall?.[0]?.q).toBeUndefined()
+            const bar = wrapper.getComponent({ name: 'FilterBar' })
+            const emissions = (bar.emitted('update:value') || []).length
+            await flushPromises()
+            expect((bar.emitted('update:value') || []).length).toBe(emissions)
+            expect(emissions).toBeLessThanOrEqual(1)
+        } finally {
+            wrapper.unmount()
+            localStorage.clear()
+        }
+    })
+
     it('renders sprint pills across plan length and exposes testing hooks', async () => {
         sprintsStore.sprints.value = [
             baseSprint({

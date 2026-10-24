@@ -1,0 +1,47 @@
+title: Align dependency exploration and relationship navigation with shared UI patterns
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-23T02:16:54.305149+00:00
+modified: 2026-10-23T03:33:52.262838+00:00
+comments:
+- date: 2026-10-23T02:17:04.417690+00:00
+  text: 'Plan: inspect and reuse Calendar FilterBar/useProjectFilterSync/useColumns/TaskHoverCard/UiButton/UiSelect patterns; no new ad hoc controls. Separate bounded ownership for relationship/history/live refresh and graph layout/detail projection; parent integrates page/filter/autocomplete and browser verification. Direct x removal, native dragging and safety confirmations retained; no Move/reload control. Correct Back stack for route and overlay origins, preserve silent SSE scroll/drafts. Dependency-aware layout with meaningful stages and cycle handling, metadata-backed filtering/sorting/details without losing prerequisite context or inventing graph membership from list pages. Clarify loaded-scope diagnostics vs full validation and consistent outlined 36px controls. Targeted tests, actual browser/visual/history/scroll and full required gates; no Git mutation/server restart/bulk repair.'
+- date: 2026-10-23T03:20:18.927560+00:00
+  text: 'Implementation/targeted verification milestone: removed Move menus and manual reload; chips have direct x removal and guarded native DND. Router-backed task history supports detail and overlay A/B/Back, preserves originating callbacks/context; taskPanel metadata excluded from TasksList/Board filter watchers and retained by URL writers, with no marker-only data refetch/layout reset. Actual browser tests prove prior-ticket restoration and retained filtered row DOM/query state. Silent SSE updates preserve panel scroll and unsaved relationship draft. Shared FilterBar replaces ad hoc project input; ID/title autocomplete keyboard+stale-scope guards, standard UiButton/UiInput/UiSelect/control-height border-box, configurable Calendar TaskHoverCard fields, validated sort-before-limit (review finding fixed), layers URL separate task-type type and taskPanel metadata. Canonical graph query provides strict inventory metadata summaries/matches_filter and context preservation, no per-nodeHTTP/heavy histories. SCC-condensed dependency ranks replace index-modulo-three; stable disconnected layout, labeled stages, list default for no connections/mobile, clarified Tasks in this graph/Connections/Problems shown vs Validate project/workspace. Targeted backend70, graph/layout/hover35, navigation/list86, parent65 frontend tests pass (overlapping selections), typecheck passes. Six browser cases passed together; seventh exploration scenario now passes after fixture selectors aligned to actual shared Toggle filters/multiselect UI. Real 5-stage/rich-hover/filters/autocomplete/project-switch/control-height checks pass. Visual desktop/mobile screenshots inspected; temporary capture code removed. No extra runtime deps, Git writes/server restarts/bulk repair. Full gates next.'
+- date: 2026-10-23T03:33:52.240461+00:00
+  text: |-
+    Outcome: all requested relationship/dependency UX corrections implemented. Removed chip Move menus and manual relationship/graph reload, direct x removal and guarded DND retained. Actual router history returns prior task for detail and list/graph overlay origins without document/list reset; taskPanel query state excluded from filter parsing, marker-only watchers do not refetch/reset, and normal URL writers preserve active panel context. Silent SSE updates retain scroll, relationship draft and unsaved metadata; scoped stale-response/callback guards preserved. Shared FilterBar/project chooser, title/ID focus autocomplete, Calendar TaskHoverCard/Fields per-project preferences, sort field+direction and outlined shared UiButton controls replace bespoke inputs. Main controls use existing control-height with border-box; browser measures equal36px. Relationship layers URL separated from task-type filter with legacy layer-link parsing. Backend graph filters reuse strict server validators/matchers before max_nodes and return compact actual-root metadata/matches_filter with referenced boundary context. SCC-condensed prerequisite ranks replace fixed3columns, labeled stages supportarbitrarydepth; cycles/disconnectedgroups stable, independent tasks sort correctly in list/diagram, unknown-metadata nodes remain visible and sort deterministically. No connections defaults list; native modified link clicks preserved. Tasks in this graph/Connections/Problems shown in this graph clarified; Validate project/workspace explicitly full scope independent of view filters, safe Fix preview/confirmation retained. Rust/TS/OpenAPI/help synchronized.
+    Evidence: targeted backend70, graph/layout/hover35, navigation/list86 and parentfocused65 selections passed (overlap). Independent review found sort notforwarded beforecap; corrected composed query, due canonical key and invalidorder forwarding, new boundary regression; follow-up no findings. Late independent-component sorting gap fixed with mixed known/missing asc/desc regression. Seven real browser cases now pass in fullsuite: desktop/mobile native drag+x, detailA/B/Back, overlayB/A/Back with samegraphDOM, TasksList filteredrows retained/no view refetch, SSE draft/scroll, repairconfirm/SSEreceipt, navprefs, 5dependency stages, actualhoverfield toggles, status/contextfilter, autocomplete, project switch, equalheights and outlined borders. Screenshots inspected anonymousdesktop/mobile fixtures; temporary capture removed. Test fixtures clarified ownership-hint list GETs vs actual view queries (viewstate/rowDOM assertions retained), used populatedPriority rather than absentReporter and real shared Toggle filters/multiselect semantics. Actual runtime defects caught browser: inputcontentbox causing14pxheight mismatch and missing sort-direction flag, both fixed. No deadlines/retries/assertions relaxed. Final lint:agent alltarget/allfeature Clippy-Dwarnings+Vue typecheck+fmt passed; default andallfeature custom-value fixture made portable. Full Rust1589/143binaries, frontend992/87files, release26 passed; final fresh build-firstsmoke301/74files passed. Final whitespace check clean.
+    Remaining: no known task blocker. Existing46 Git-required exclusions/25smoke skips and Vueinjectwarnings recorded, no new exclusions; no nativeWindows/remoteCI execution. Existing advisory-lock/external-editor and bounded projection limits unchanged; no bulk repair. User staging preserved exactly; latest follow-up fixes/tracking edits remain unstaged. No staging/commits/Gitconfig/hookchanges or user-server restart, no newdependencies. Earlier tickets remain Done, DEV-138 verify/hook follow-up unchanged.
+    Guidance: no durable instruction correction; existing reuse/visual/browser/contract guidance applied.
+description: 'Developer follow-up to DEV-139: remove Move-to menus and relationship reload, use direct x removal plus drag/drop with confirmations. Fix related-task navigation so browser Back returns prior task without task-list reload; live backend/SSE refresh must preserve task scroll and draft state. Align Dependencies with Calendar/shared FilterBar/project selector/UiButton/UiInput heights, task autocomplete, filter conditions, sortable results and configurable task hover details. Replace arbitrary three-column boxes with meaningful dependency-aware layered layout, keeping cycles/unresolved/context explicit. Clarify or consolidate graph-only issue diagnostics versus full project/workspace validation and rename ambiguous Task list and links. Preserve explicit safe repair preview/revision/confirmation, authoritative graph membership and hidden boundary dependencies. Verify focused regressions, browser history/live update/scroll/layout/filters/autocomplete and full lint/test/build-first smoke; preserve unrelated dirty work, no Git writes, user server restart or bulk repair.'
+history:
+- at: 2026-10-23T02:17:04.386871+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-23T02:17:04.417690+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T03:20:18.927560+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T03:33:52.240461+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T03:33:52.262838+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -919,18 +919,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
             .get("limit")
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(20);
-        let filter = crate::api_types::TaskListFilter {
-            text_query: if q.is_empty() { None } else { Some(q) },
-            project,
-            ..Default::default()
-        };
-        let mut list = crate::services::task_service::TaskService::list(&storage, &filter)
+        let list = TaskService::suggest(&storage, &q, project, limit)
             .into_iter()
             .map(|(id, t)| json!({"id": id, "title": t.title}))
             .collect::<Vec<_>>();
-        if list.len() > limit {
-            list.truncate(limit);
-        }
         ok_json(200, json!({"data": list}))
     });
 

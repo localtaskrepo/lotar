@@ -53,6 +53,21 @@ Field | Type | Notes
 - `ReferenceEntry` supports `code` (e.g., `app/lib.rs#120` or `app/lib.rs#12-20`; `#L12`-style input anchors are accepted and stored canonically without the `L`), `link` (URL), `file` (a repository-relative path; paths resolving inside the configured attachments store are rejected), `attachment` (a managed attachments-store blob name, written by uploads and the `attachment` reference kind), and platform references via `jira` or `github`. The `file` and `attachment` kinds are distinct on purpose: managed blobs are never stored under `file` and repository files never under `attachment`, so detach and download operations cannot cross storage roots.
 - `TaskChangeLogEntry` captures `{ at, actor?, changes[] }`, where each `TaskChange` includes `field`, `old`, and `new` values for audit review.
 
+Relationship edits maintain `depends_on`/`blocks`, `parent`/`children`, and both
+ends of `related` together. The dependency graph coalesces the stored assertions:
+`A.depends_on: [B]` and `B.blocks: [A]` describe one edge B to A. A one-sided
+legacy declaration still establishes that logical edge, so dependency evaluation
+and visualization agree before repair. `fixes` and `duplicate_of` stay directional;
+incoming links are computed rather than stored in invented inverse fields.
+
+Parenthood does not implicitly block work, and indirect dependencies are not
+saved as extra direct links. Each prerequisite uses its own project's done-state
+policy. Existing dangling or conflicting data remains inspectable and does not
+block unrelated metadata edits; new relationship operations validate their
+affected edges. Explicit repair previews separate mechanical reciprocal or
+duplicate normalization from choices such as which dependency to remove from a
+cycle. No read operation silently repairs task YAML.
+
 ### Custom fields
 
 `custom_fields` is a free-form map backed by `HashMap<String, serde_yaml::Value>` (or JSON when schema generation is enabled). Keys correspond to names declared in `config.custom_fields` or dynamic fields permitted by `custom_fields.values`. CLI and REST mutate them via `field:<name>` syntax, while listing/filtering converts them back into strings using `custom_value_to_string`.

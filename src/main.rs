@@ -141,7 +141,18 @@ fn main() {
     }
 
     // Resolve tasks directory
-    let resolver = match resolve_tasks_directory_with_override(cli.tasks_dir.as_deref()) {
+    let relationship_command = matches!(
+        &cli.command,
+        Commands::Task {
+            action: Some(TaskAction::Relationships(_))
+        }
+    );
+    let resolved = if relationship_command {
+        TasksDirectoryResolver::resolve_read_only(cli.tasks_dir.as_deref(), None)
+    } else {
+        resolve_tasks_directory_with_override(cli.tasks_dir.as_deref())
+    };
+    let resolver = match resolved {
         Ok(resolver) => resolver,
         Err(error) => {
             let renderer =

@@ -1,0 +1,58 @@
+title: Polish dependency cards and restore search state with exact-ID ranking
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-23T18:15:59.153947+00:00
+modified: 2026-10-23T18:55:15.263350+00:00
+comments:
+- date: 2026-10-23T18:16:15.002334+00:00
+  text: 'Plan: parent adds tri-stateAll connectionselector and integration/browser regressions. Separateboundedownership: sharedAPI suggestionrelevance beforelimit; sharedFilterBar saved-model hydration; graph/card/list presentation with Board-stylemetadata and typed-match highlight. Preserve no-idleRootnav andautocompleteDOM/caret. Addfail-first tests plusrealbrowsernavigationaway/back, numeric/fullID firstsuggestion/typedhighlight, All/none, visiblecompactfields, tallerplot/noarrowtext, styledlists/legend andmobile/lightdarkgeometry. FinalfullQA; preserveindex/unrelatedtickets andno Git/server/taskdatarepair.'
+- date: 2026-10-23T18:32:04.118643+00:00
+  text: 'Milestone: actualBoardCardMeta/compactheader reused withstructuralmetadata+explicitFields override, oldBoardinjectionbehaviorpreserved. Plot maxmin(82dvh,1000px), dynamicmeasurements preserved; noSVGtextlabels/redundanthelp, accessibleedgeTitles+legend/dash/arrowsstay. Bounded20remcardgrid andstyledmax64remendpoint/type rowsverified. Alltristatecheckbox supportsall/none/partial; typedexact/numeric/paddedmatch highlightsuniquevisibleIDwithoutnav/choice andambiguitynotguessed. TaskService.suggest rankscanonical/full/numeric firstbeforelimit, exact-caseproject andnaturalnumeric tie, prefix/title/description/tags preserved, explicitlist-sortunchanged. SharedFilterBarhydration waitsparentmountflush/rechecksURLprops thenemitsmodel once; parentdoesnot falselyadvertiseemptyprojectonblankURL. Integrationred restoredinput/modeltest nowgreen. Targetedbackend33,searchrestore137 andgraph/Board116, parent202selectedpasses/typecheck. Elevenactualbrowsercases pass includingRanklimit1 endpoint, firstsuggestion insharedsearchandrelationshipfield, typedhighlightbeforeaccept, navPreferences/back restoresq+actualmatchingcontent, All/none, >500pxplot, <=320pxlistcards, styledconnections/noarrowtext, lightdarkcontrast andexistinghistory/SSE/repair. Screenshots inspectedlight/dark/mobile aftertheme transitionssettled; temporarycapturesremoved. No newAPIshape/deps/userdatarepair/Git/serverchanges. Fullgatesnext.'
+- date: 2026-10-23T18:38:15.282557+00:00
+  text: 'Final gate evidence: warning-free lint:agent Vue/alltarget-allfeatureClippy-Dwarnings/fmtpassed; full test:agent Rust1593/144binaries,frontend1061/88files,release26passed. Finalfreshbuildfullsmoke305/74filespassed, elevenfocusedbrowsercases andactual light/dark/mobile snapshotsverified. Theme screenshot waitscomputedtextcolor transition ratherthanfixedsleep; endpointreadabilityassertions retained. Temporarycaptureinstrumentationremoved. ActualAllselector red→green andsavedinput+parentquery integrationred→green, APIranking33 andsharedFilterBar137 graph/Board116targetedpassed. Preserveuserstaging (user stagedcurrentworkmidrun); finaltrackingupdatesonlyunstaged. No Git/server/hook/bulkrepair/newdeps. Existing46Gitrequiredexclusions/25smokeskips andVuewarnings recorded, no newskip;nativeWindows/remoteCI notrun. Awaitboundedindependentreviewresult thenexactclosure; no knownfunctionalblocker.'
+- date: 2026-10-23T18:48:33.381201+00:00
+  text: 'Independent final review received: no material suggestion-ranking/routing or All-kinds findings. One P2 sharedrestore regression: syntheticprojectempty from Board/Calendar/Sprints blocks saved snapshots underexplicitvalueprecedence. Alreadyassigned narrowcallerfix to originalrestoreworker; Dependencies alreadyomitsunknownemptyproject. RealBoard/Calendarresult-requestbrowserregression reproducedred onoldartifact. KeepInProgress until3callerproof/fullUI/build-firstsmoke verified; preserveexplicitclears andDEV142scope.'
+- date: 2026-10-23T18:55:15.239283+00:00
+  text: |-
+    Outcome complete: tallerresponsiveplot, Board-stylecompactheader/metadata usingactualsharedBoardCardMeta, boundedtaskcardgrid andstyledendpoint/relationshipconnectionrows. Removedvisiblearrowtextandredundanthelpparagraph; retainedlegend/arrows/patterns/SVGtitles/accessibletypeinformation. Allcheckboxselects/clears5typeswithmixedstate. Typedexactfull/padded/compact/numericquerieshighlightauniquevisiblematchwithnoremount/nav/forcedacceptance; ambiguitynotguessed. SharedAPI rankingexactfull/numericbeforeprefix/title/mentions/tags BEFORElimit, naturalties/case/project/u64constraints preserved, regularlistorderingunchanged. Savedfiltermodelrestorationnowwaitsparentmountthenhydratesconditions/resultquerycoherently, URL/explicitclearsauthoritative. Independentreviewcaught syntheticemptyproject blockingrestoreonBoard/Calendar/Sprints; threecallerpayloads fixedtocarryprojectonlywhenchosen/routed, their ownstoragekeysretained. Before-red real-FilterBar testsall3 and241targetedtests/typecheckgreen. AddedactualBoard+CalendarRESTfilteredresultbrowsercase withview-specifickeys; freshbuildpasses. DependenciesintegrationmodelrestoreandAllred→green. NoDEV142crossview-syncimplementation.
+    Verification final: all-target/all-featurewarning-freelint/fmtpassed. EarlierfullRust1593/144binaries andrelease26passed; no subsequentRustchanges. Finalfrontend1076/88filespassedaftercallerfix, finalfreshbuildfullsmoke306/74filespassed. Twelvefocusedbrowsercasescoveridranking/highlight/savedbacknav/Allandprevioushistory/SSE/repair pluscrosspagequeryhydrate; screenshotsinspectedlight/dark/mobile, nativeplot>500pxandcards<=320pxwithnooverlap, colortransitionssettledusingobservablechecks. No newdeps/APIshape/bulkdatarepair. Rootreviewfindingresolved; actuale2eseed correctedview-specificstoragekeys ratherthanassuminggeneric, no assertion/deadline/retry/concurrency weakened. Temporarycapturecode removed andwhitespaceclean.
+    Limits: existing46Git-requiredexclusions/25smokeskips/Vueinjectwarnings unchanged andnotpasses; nativeWindows/remoteCInotrun. Advisorylocking/otherbaselineconstraints unchanged. Userstagingpreservedexactly; latestthreecallerfixes/test/trackingupdatesunstaged. No commits/staging/Gitconfig/hookchanges/user-serverrestart. UserDEV137/142/144-147andunrelatedworkleftalone. No durableinstructioncorrection; implementationfollowedexistingreuse/testing/visualguidance.
+description: 'Developer follow-up: diagram taller responsive, remove visible arrow labels and redundant arrowhead help while retaining legend/accessibility. Add All relationship selection. Use compact Board card metadata rather than Calendar hover DL, bound task-list cards and style Connections endpoint/type rows. Restore saved search into actual parent result query on navigation/remount (not justinput), with URLprecedence/caret/scope guards. Rank exact/padded/full/numeric ID suggestions ahead ofprefix/title/substrings acrosssharedtasklookup beforelimit, no reordering explicit tasklists. Typed exact-ID/numeric search shouldhighlight uniquevisiblematch withoutclick or navigation/cancelingautocomplete. Preserve shared components/fields/preferences/roots/history/SSE/repair, no crossviewDEV142sync, no task repair or Git/server writes. Test fail-first shared restoration/ranking, actualbrowsernavaway/back/highlight/UI geometry and full lint/test/build-first smoke.'
+history:
+- at: 2026-10-23T18:16:14.967729+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-23T18:16:15.002334+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T18:32:04.118643+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T18:38:15.282557+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T18:48:33.381201+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T18:55:15.239283+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T18:55:15.263350+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

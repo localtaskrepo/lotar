@@ -8,7 +8,7 @@ import { formatMember } from '../utils/member'
 import { projectOf } from '../utils/text'
 
 const props = defineProps<{
-    task: TaskDTO
+    task: Pick<TaskDTO, 'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'created' | 'modified' | 'custom_fields' | 'task_state'>
     fields?: Partial<Record<string, boolean>>
 }>()
 

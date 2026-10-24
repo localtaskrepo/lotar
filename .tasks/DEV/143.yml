@@ -1,0 +1,46 @@
+title: Unify dependency search and make card fields and relationship meanings explicit
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-23T17:07:18.885161+00:00
+modified: 2026-10-23T17:43:37.886852+00:00
+comments:
+- date: 2026-10-23T17:07:31.036486+00:00
+  text: 'Plan: replace separate focus input/timers with shared FilterBar task lookup provider+selection events, fix typed filter suggestions/echo handling without page remount, keep broadertext/conditions andexplicit taskgraphroot. Use existing FilterBar panel extension for5independent connection kinds anddepth, preservelegacylinks/fieldprefs. RenderselectedFieldsinlineoncard/list, adaptlayoutheights to preventoverlap. Edgewordlabels plus redundantstroke/color/arrows andlegend, parallel kinds separate. Parent owns page/search orchestration andbrowser/fullgates; boundedworkers own shared search internals and graphcard/layout rendering. Existing rootdataread/safety/repair/historycontracts unchanged. Preserveuser DEV142 andallstaging; no sharedsearch-syncfeature, Git/server/configwrites/bulkrepair.'
+- date: 2026-10-23T17:38:38.544497+00:00
+  text: 'Milestone: separateFocusinput/idle300msroutecommit removed; one sharedFilterBar supportsbroadertext/conditions plus explicit ID/title taskselection. Sharedcomponentdiagnosis: caretcontext incorrectlyusedfinaltoken; fixedcaret-awaregrammarvalues/replacement and optionaltaskprovider(synccoherentfilterupdate BEFOREtaskselected). Controlled DOM/focus/caret/draft retained throughroute echoes; title/ID lookuplate/scope/error guards covered. Pagegraph no root/projectkeyedremount; repairrefresh publicmethod retainsview. Oldroot URLs prefillsearch;clear/projectchangesremovefocus coherently whileordinarytextsurvivesprojectchange. Independent5checkboxkindsinexistingpanel slot, includingempty, oldlayers linksdecoded. Fields nowinlinegraph/listdetails withsavedperprojectvalues, noHoverwrapper; measuredResizeObserverlayout handleswrappedvariableheight. Connectionwords/dash/color/marker+visible-kindlegend andseparateparallelpaths; darktexttokensfixed. Parentunfocusedprojection alsofiltersnonmatchingcontext byenabledkindreachability, independentmatcheskept. Reviewfoundroot-onlyClearFiltersdisabled; reproducedred,fixedenable+clearregression. Worker101search and54graph/layout tests +parent68initialpassed; all10actualbrowser scenarios pass includingtypecaretcompletionmid-string/conditions, dropdownsurvivesliveqrouteecho/inputsameDOM,no documentnavigation, visiblefields+nooverlap5types, choiceindependence/history/SSE/repair. Light/dark/mobile screenshotsinspected; temporarycapturesremoved. Fixture fixes: unsupportedtask-type CLI replacedvalidseed/addoptions, accessiblelinkselectionalignedaria;noassertions/deadlinesweakened. No backend/API/newdeps/globalfilter-sync(DEV142)scope. Fullgatesnext.'
+- date: 2026-10-23T17:43:37.861415+00:00
+  text: |-
+    Outcome: implemented unified dependency interaction. Removed separate Focus task field, idle selection timers and keyed graph remount. One real shared FilterBar supports broad text/structuredconditions and optional ID/title tasklookup; choosingtask or exact-IDEnter explicitly rootsgraph, typedID idleonlysearches. Controlled updates preserveinputDOM/focus/caret/dropdown, conditionscommit synchronously beforetaskselected. Actualsharedautocompletebug was final-token ratherthancaret-token completion; fixed middle-token type values withoutforkinggrammar. Root-onlylegacy links prefillsameinput; Clear filters nowenabled forroot-onlyscope (reviewP2 reproducedred/fixed), clear/projectchangescoherent; textsurvivesprojectchange. PerprojectFields control visiblegraph/listcardrows usingexistingpresentation, no graphhover-onlywrapper. Savedchoices retained; measurements/estimates+variableheightlayout preventwrapped/customdetailoverlap. Independent five relationshipcheckboxes+depth useexistingFilterBar panel slot, allowdependencyoff/none, no newcommonUI fork. Newrelationships URL supportscomma kinds/none andold layers/type links. Everyvisiblekindhaswordlabel,color,dash/arrowstyle+compactlegend; samepair/reversepathslanesseparate; unknown/context/cycles/history/liveupdates/sorting/safe repair preserved. Hidden-kind-onlynonmatchingcontext excluded evenbroadsearch, independentmatchesretained. No newAPI/backend/taskdatachanges/dependencies orcrossviewsearch-sync (DEV142 remainsseparate).
+    Evidence: sharedsearch101/8targeted andgraph/layout54targeted passed; parentinitial68 plusroot-clearred/green. Ten actualbrowsercasespass, coveringdropdownsurvivesliveq/URLwithsamefocusedinput/no documentnav, middle-caret typecompletion preservingprioritycondition, explicitID/title/clear/projectswitch, visibleFields toggle/noTooltip, 5samepairelabels/distinctdash/path+legend, longmetadataCard nooverlap, independentchoices/focus/history/SSE/repair andresponsivecontrols. Light/dark/mobile screenshotsinspected; temporaryinstrumentationremoved. Initialnewsmokefixture setup unsupportedtasktypeCLI correctedviavalidaddoptions/isolatedYAMLseed, accessiblelink selector matchednewcardaria; no applicationassertions/deadlinesrelaxed. Final full lint:agent typecheck/all-target-all-featureClippy-Dwarnings/fmtpassed; test:agent Rust1589/143binaries,frontend1039/88files,release26passed; finalfreshbuildfullsmoke304/74filespassed. Whitespaceclean.
+    Remaining: existing46Git-requiredexclusions/25smokeskips/VueinjectwarningsandnativeWindows/remoteCIlimits recorded, notclaimedpassed. No staging/commit/Gitconfig/hook/serverrestart/bulkrepair. ExistingstagedindexandunrelatedCargo/DEV137/142/usernewtickets preserved; currentfollowupfixesremainunstaged. No durableguidancecorrection; reuse/sharedslot, contractandactualbrowser/visualguidance applied. Currentgoalcomplete.
+description: 'Developer follow-up to DEV-141: Focus-task auto navigation interrupts/cancels autocomplete; use one real shared search for task lookup and structured filters with stable DOM/draft/caret, no idle focus navigation. Diagnose type-filter autocomplete parity. Fields should control visible graph cards, not a newly added hover-only layer. Use independent relationship-kind checkboxes inside shared FilterBar panel extension slot, not dropdown/forced dependencies. Make relationship kinds clear using readable edge labels, redundant colors/dashes/arrows and a legend in diagram view. Preserve graph-root exploration via explicit task selection/exact-ID Enter and broad text/structured search, old links/history/SSE/safe repair/preference values. No syncing search across views (separate user-created DEV-142), no backend/data migration/bulk repair. Test fail-first cancellation/keyboard/echo/scope behaviors, visible card geometry and accessible relation semantics, actual browser and viewport screenshots, full lint/test/build-first smoke. Keep staged index and unrelated work unchanged; no Git writes/server restart/newdeps.'
+history:
+- at: 2026-10-23T17:07:31.003593+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-23T17:07:31.036486+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T17:38:38.544497+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T17:43:37.861415+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T17:43:37.886852+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

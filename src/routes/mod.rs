@@ -40,6 +40,7 @@ mod config;
 mod jobs;
 mod projects;
 mod references;
+mod relationships;
 mod scan;
 mod sprints;
 mod sync;
@@ -244,7 +245,7 @@ pub(super) const TASK_LIST_KNOWN_KEYS: &[&str] = &[
 /// Shared by the list and export endpoints so both support the full grammar:
 /// CSV enum lists, `q`, `tags`, `sprints`, custom fields (declared or
 /// `field:`-prefixed), and `assignee` including `@me` and `__none__`.
-pub(super) fn parse_task_query(
+pub(crate) fn parse_task_query(
     query: &std::collections::HashMap<String, String>,
     cfg: &crate::config::types::ResolvedConfig,
     tasks_root: &std::path::Path,
@@ -410,7 +411,7 @@ pub(super) fn parse_strict_sprints_csv(raw: Option<&String>) -> Result<Vec<u32>,
 }
 
 /// Apply leftover unknown-key filters (fuzzy set matching) in memory.
-pub(super) fn apply_unknown_key_filters(
+pub(crate) fn apply_unknown_key_filters(
     tasks: &mut Vec<(String, crate::api_types::TaskDTO)>,
     uf: &std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
     cfg: &crate::config::types::ResolvedConfig,
@@ -523,6 +524,7 @@ pub fn initialize(api_server: &mut ApiServer) {
     tasks::register(api_server);
     sprints::register(api_server);
     references::register(api_server);
+    relationships::register(api_server);
     attachments::register(api_server);
     config::register(api_server);
     automation::register(api_server);

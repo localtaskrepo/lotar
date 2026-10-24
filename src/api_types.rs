@@ -15,6 +15,203 @@ use schemars::JsonSchema;
 // list filter (DEV-92). Defined in the storage layer next to `TaskFilter`.
 pub use crate::storage::filter::DeletionFilter;
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RelationshipKind {
+    Dependency,
+    Hierarchy,
+    Related,
+    Fixes,
+    Duplicate,
+}
+
+/// Mutation vocabulary is relative to the addressed source task. Graph edge
+/// kinds remain canonical and deliberately do not encode storage direction.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RelationshipField {
+    DependsOn,
+    Blocks,
+    Related,
+    Fixes,
+    Parent,
+    Children,
+    DuplicateOf,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RelationshipOperation {
+    Add,
+    Remove,
+    ChangeKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipGraphRequest {
+    pub project: Option<String>,
+    pub task_id: Option<String>,
+    pub depth: Option<usize>,
+    pub max_nodes: Option<usize>,
+    pub relationship_kinds: Option<Vec<RelationshipKind>>,
+    pub include_isolated: Option<bool>,
+    #[serde(default)]
+    pub filters: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipTaskSummary {
+    pub id: String,
+    pub title: String,
+    pub status: crate::types::TaskStatus,
+    pub priority: crate::types::Priority,
+    pub task_type: crate::types::TaskType,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task_state: Option<TaskStateDTO>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reporter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub assignee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
+    pub tags: Vec<String>,
+    pub sprints: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub due_date: Option<String>,
+    pub created: String,
+    pub modified: String,
+    pub custom_fields: crate::types::CustomFields,
+}
+
+impl From<&TaskDTO> for RelationshipTaskSummary {
+    fn from(task: &TaskDTO) -> Self {
+        Self {
+            id: task.id.clone(),
+            title: task.title.clone(),
+            status: task.status.clone(),
+            priority: task.priority.clone(),
+            task_type: task.task_type.clone(),
+            task_state: task.task_state.clone(),
+            reporter: task.reporter.clone(),
+            assignee: task.assignee.clone(),
+            effort: task.effort.clone(),
+            tags: task.tags.clone(),
+            sprints: task.sprints.clone(),
+            due_date: task.due_date.clone(),
+            created: task.created.clone(),
+            modified: task.modified.clone(),
+            custom_fields: task.custom_fields.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipNode {
+    pub id: String,
+    pub title: Option<String>,
+    pub status: Option<String>,
+    pub project: String,
+    /// active, external (read-only sibling workspace), deleted, missing,
+    /// ambiguous, or unreadable. No filesystem paths are exposed.
+    pub state: String,
+    pub is_done: bool,
+    pub matches_filter: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task: Option<RelationshipTaskSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipProvenance {
+    pub task_id: String,
+    pub field: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipEdge {
+    pub source: String,
+    pub target: String,
+    pub kind: RelationshipKind,
+    pub provenance: Vec<RelationshipProvenance>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipIssue {
+    pub id: String,
+    pub code: String,
+    pub severity: String,
+    pub message: String,
+    pub tasks: Vec<String>,
+    pub repairable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipGraphResponse {
+    pub nodes: Vec<RelationshipNode>,
+    pub edges: Vec<RelationshipEdge>,
+    pub issues: Vec<RelationshipIssue>,
+    pub revision: String,
+    pub complete: bool,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipCheckResponse {
+    pub issues: Vec<RelationshipIssue>,
+    pub revision: String,
+    pub complete: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipMutationRequest {
+    pub source: String,
+    pub target: String,
+    pub kind: RelationshipField,
+    pub operation: RelationshipOperation,
+    pub from_kind: Option<RelationshipField>,
+    pub expected_current: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipMutationResponse {
+    pub changed: bool,
+    pub changed_tasks: Vec<String>,
+    pub revision: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipRepairRequest {
+    pub project: Option<String>,
+    #[serde(default)]
+    pub issue_ids: Vec<String>,
+    #[serde(default)]
+    pub apply: bool,
+    pub revision: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct RelationshipRepairResponse {
+    pub applied: bool,
+    pub changed_tasks: Vec<String>,
+    pub revision: String,
+    pub issues: Vec<RelationshipIssue>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskDTO {

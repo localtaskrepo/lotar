@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import TaskPanel from '../components/TaskPanel.vue'
+import { relationshipMime } from '../utils/relationships'
 
 // DEV-93 lifecycle coverage for drops that arrive while the task panel is
 // still initializing an edit target: the buffered payload belongs to the
@@ -394,6 +395,25 @@ describe('TaskPanel pending drop lifecycle (DEV-93)', () => {
 // DEV-116: drag depth is tracked across nested children so the overlay stays
 // up until the pointer leaves the panel, and a drop always resets it.
 describe('TaskPanel drag overlay depth', () => {
+    it('isolates relationship drags from attachment capture even when browsers attach link payloads', async () => {
+        const wrapper = await mountPanel('TP-1')
+        try {
+            await drains()
+            for (const kind of ['dragenter', 'dragover', 'drop']) {
+                const event = new Event(kind, { bubbles: true, cancelable: true })
+                Object.defineProperty(event, 'dataTransfer', { value: {
+                    files: [], items: [], types: [relationshipMime, 'text/uri-list'],
+                    getData: (type: string) => type === 'text/uri-list' ? 'https://example.com/task/TP-2' : '{"id":"TP-2"}',
+                } })
+                wrapper.find('aside.task-panel').element.dispatchEvent(event)
+                expect(event.defaultPrevented).toBe(false)
+            }
+            await drains()
+            expect(wrapper.find('.task-panel__drop-overlay').exists()).toBe(false)
+            expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
+            expect(apiFixtures.addTaskLinkReferenceMock).not.toHaveBeenCalled()
+        } finally { wrapper.unmount() }
+    })
     const dragEvent = (wrapper: ReturnType<typeof mount>, kind: string) => {
         const event = new Event(kind, { bubbles: true, cancelable: true })
         Object.defineProperty(event, 'dataTransfer', {

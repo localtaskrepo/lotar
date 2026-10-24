@@ -166,11 +166,61 @@ impl MultiFileTransaction {
     pub(crate) fn begin(root: &Path, project_prefixes: &[String]) -> LoTaRResult<Self> {
         let sprints_dir = crate::storage::sprint::Sprint::dir(root);
         fs::create_dir_all(&sprints_dir)?;
-        let mut locks = vec![acquire_storage_lock(
+        let locks = vec![acquire_storage_lock(
             &sprints_dir,
             crate::storage::safety::sprint_lock_name(),
         )?];
 
+        Self::begin_locked(root, project_prefixes, locks)
+    }
+
+    /// Relationship validation needs the entire local graph, including incoming
+    /// assertions in other projects. Discover projects under the coordinator,
+    /// then lock all of them before reading or validating any task.
+    pub(crate) fn begin_all(root: &Path, extra: &[String]) -> LoTaRResult<Self> {
+        let sprints_dir = crate::storage::sprint::Sprint::dir(root);
+        fs::create_dir_all(&sprints_dir)?;
+        let locks = vec![acquire_storage_lock(
+            &sprints_dir,
+            crate::storage::safety::sprint_lock_name(),
+        )?];
+        let mut projects = Self::project_prefixes(root)?;
+        projects.extend_from_slice(extra);
+        Self::begin_locked(root, &projects, locks)
+    }
+
+    pub(crate) fn project_prefixes(root: &Path) -> LoTaRResult<Vec<String>> {
+        let mut projects = Vec::new();
+        let unavailable = |error: std::io::Error| {
+            LoTaRError::ValidationError(format!(
+                "Relationship project inventory unavailable at {}: {error}",
+                root.display()
+            ))
+        };
+        for entry in fs::read_dir(root).map_err(unavailable)? {
+            let entry = entry.map_err(unavailable)?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if crate::storage::safety::is_valid_project_prefix(&name) {
+                let ty = entry.file_type().map_err(unavailable)?;
+                if ty.is_symlink() {
+                    return Err(LoTaRError::ValidationError(format!(
+                        "Relationship snapshot refuses symlink project '{name}'"
+                    )));
+                }
+                if ty.is_dir() {
+                    projects.push(name);
+                }
+            }
+        }
+        projects.sort();
+        Ok(projects)
+    }
+
+    fn begin_locked(
+        root: &Path,
+        project_prefixes: &[String],
+        mut locks: Vec<File>,
+    ) -> LoTaRResult<Self> {
         let journal_path = root.join(JOURNAL_FILE_NAME);
         let mut sorted: BTreeSet<String> = BTreeSet::new();
         for prefix in project_prefixes {
@@ -285,7 +335,27 @@ impl MultiFileTransaction {
         result
     }
 
+    /// Keep the coordinated locks after publication while a caller captures a
+    /// coherent post-commit graph revision. No further staging is possible.
+    pub(crate) fn commit_checked(self, check: impl Fn() -> LoTaRResult<()>) -> LoTaRResult<()> {
+        self.commit_retaining_locks_checked(check).map(drop)
+    }
+
+    pub(crate) fn commit_retaining_locks_checked(
+        mut self,
+        check: impl Fn() -> LoTaRResult<()>,
+    ) -> LoTaRResult<Vec<File>> {
+        self.publish_checked(check)?;
+        self.committed = true;
+        Ok(self._locks)
+    }
+
     fn publish(&mut self) -> LoTaRResult<()> {
+        self.publish_checked(|| Ok(()))
+    }
+
+    fn publish_checked(&mut self, check: impl Fn() -> LoTaRResult<()>) -> LoTaRResult<()> {
+        check()?;
         if self.staged.is_empty() {
             return Ok(());
         }
@@ -310,6 +380,7 @@ impl MultiFileTransaction {
         let fail_at = fault::take_fail_publish_at();
         let outcome = (|| -> LoTaRResult<()> {
             for (write_index, write) in self.staged.iter().enumerate() {
+                check()?;
                 // Index only drives the test-only injection below.
                 let _ = write_index;
                 #[cfg(test)]
@@ -323,6 +394,7 @@ impl MultiFileTransaction {
                 // continuing; an fsync failure here is a publish failure and
                 // triggers rollback (review L2).
                 sync_parent_dir(&write.path)?;
+                check()?;
             }
             Ok(())
         })();

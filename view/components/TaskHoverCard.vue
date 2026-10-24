@@ -37,7 +37,7 @@ import type { TaskDTO } from '../api/types';
 import TaskHoverCardBody from './TaskHoverCardBody.vue';
 
 const props = withDefaults(defineProps<{
-  task: TaskDTO
+  task: Pick<TaskDTO, 'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'created' | 'modified' | 'custom_fields' | 'task_state'>
   placement?: 'left' | 'right'
   block?: boolean
   teleportToBody?: boolean

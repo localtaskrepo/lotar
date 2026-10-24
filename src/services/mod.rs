@@ -12,6 +12,7 @@ pub mod completion;
 pub mod config_service;
 pub mod project_service;
 pub mod reference_service;
+pub mod relationships;
 pub mod scan_anchor_service;
 pub mod scan_service;
 pub mod sprint_analytics;

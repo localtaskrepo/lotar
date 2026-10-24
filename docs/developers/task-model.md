@@ -48,6 +48,35 @@ Field | Type | Notes
 - `ReferenceEntry` supports `code` (e.g., `src/lib.rs#120`, stored canonically as `path#line` or `path#start-end`), `link` (URL), `file` (repository-relative path; store paths rejected), `attachment` (managed attachments-store blob name), and `jira`/`github` platform references. The two file-ish kinds are distinct: managed blobs live only under `attachment`, repository files only under `file`.
 - `TaskChangeLogEntry` captures `{ at, actor?, changes[] }`, where each `TaskChange` includes `field`, `old`, and `new` values for audit review.
 
+Relationship storage remains in each task's existing YAML. The shared relationship
+service interprets `A.depends_on: [B]` and `B.blocks: [A]` as one logical dependency
+edge from prerequisite B to dependent A, retaining both stored origins. Likewise,
+`parent`/`children` form one hierarchy edge and `related` is symmetric. `fixes` and
+`duplicate_of` remain directional; their incoming links are projections, not new
+stored fields. Hierarchy does not imply blocking and transitive dependencies are
+not materialized as additional links.
+
+Supported relationship mutations validate fresh state and stage all affected
+assertions in a coordinated transaction. Removing a logical relationship removes
+both assertions; changing its category is not two independent saves. Graph reads
+coordinate with those writers, because multi-file rollback alone does not provide
+simultaneous visibility to readers. Noncooperating external file edits remain
+outside that guarantee. Existing inconsistent data is reported, not repaired by
+reads or unrelated metadata edits. Repair previews distinguish safe duplicate or
+reciprocal normalization from decisions such as target selection, cycle breaking,
+or conflicting parents. An additive mirror repair can restore an intentionally
+manually deleted side, so it always requires explicit review/application.
+
+Read coordination can initialize ignored advisory lock metadata and its
+coordinator directory inside existing tasks roots. It never initializes an
+absent tasks root or changes task/configuration/history/journal data. Read
+snapshots share advisory locks and exclude exclusive writers. Transient
+contention is retried for a 500 ms wait budget, releasing every partial lock set
+before rediscovering roots/projects. External context acquired while holding a
+mutation's local locks stays fail-fast to avoid circular waits. Unsupported or
+persistent lock failures and pending transaction recovery remain explicit
+unavailable results, not successful empty inventories.
+
 ### Custom fields
 
 `custom_fields` is a free-form map backed by `HashMap<String, serde_yaml::Value>` (or JSON when schema generation is enabled). Keys correspond to names declared in `config.custom_fields` or dynamic fields permitted by `custom_fields.values`. CLI and REST mutate them via `field:<name>` syntax, while listing/filtering converts them back into strings using `custom_value_to_string`.

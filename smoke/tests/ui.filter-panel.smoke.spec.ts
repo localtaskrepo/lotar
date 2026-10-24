@@ -66,6 +66,14 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         const search = page.getByTestId('filter-search');
                         const toggle = page.getByTestId('filter-toggle');
                         const panel = page.getByRole('region', { name: 'Filters', exact: true });
+                        const assertSharedControlHeight = async () => {
+                            const input = await search.boundingBox();
+                            const button = await toggle.boundingBox();
+                            expect(Math.abs(input!.height - button!.height)).toBeLessThan(1);
+                            expect(await search.evaluate(element => getComputedStyle(element).boxSizing)).toBe('border-box');
+                        };
+                        await search.waitFor({ state: 'visible' });
+                        await assertSharedControlHeight();
                         await toggle.click();
                         await page.getByTestId('filter-project').selectOption('FIL');
                         await expect.poll(() => page.getByText('Alpha task', { exact: true }).count()).toBe(1);
@@ -77,12 +85,9 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         const fields = panel.getByRole('group', { name: 'Filter fields', exact: true });
                         const quickBox = await quick.boundingBox();
                         const fieldsBox = await fields.boundingBox();
-                        if (viewport.label === 'desktop') {
-                            expect(fieldsBox!.x).toBeGreaterThan(quickBox!.x + quickBox!.width);
-                            expect(Math.abs(fieldsBox!.y - quickBox!.y)).toBeLessThanOrEqual(1);
-                        } else {
-                            expect(fieldsBox!.y).toBeGreaterThanOrEqual(quickBox!.y + quickBox!.height);
-                        }
+                        expect(fieldsBox!.y).toBeGreaterThanOrEqual(quickBox!.y + quickBox!.height);
+                        expect(Math.abs(fieldsBox!.x - quickBox!.x)).toBeLessThanOrEqual(1);
+                        expect(Math.abs(fieldsBox!.width - quickBox!.width)).toBeLessThanOrEqual(1);
                         const title = quick.getByRole('heading', { name: 'Quick picks', exact: true });
                         const label = fields.locator('.filter-bar__field-label').first();
                         expect(await title.evaluate(el => [getComputedStyle(el).fontSize, getComputedStyle(el).fontWeight, getComputedStyle(el).lineHeight]))
@@ -161,6 +166,8 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         // Each consumer receives the same structured field key, not a free-text q.
                         for (const route of ['/boards?project=FIL', '/calendar?project=FIL', '/sprints?project=FIL']) {
                             await page.goto(`${server.url}${route}`);
+                            await search.waitFor({ state: 'visible' });
+                            await assertSharedControlHeight();
                             const titles = page.locator(route.startsWith('/boards') ? 'article.task .title'
                                 : route.startsWith('/calendar') ? '.task-item .task-inline > .title' : 'tr.task-row .task-title');
                             const alpha = titles.filter({ hasText: /^\s*Alpha task\s*$/ });
@@ -182,6 +189,9 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                             await panel.waitFor({ state: 'detached' });
                             expect(await toggle.evaluate(el => el === document.activeElement)).toBe(true);
                         }
+                        await page.goto(`${server.url}/dependencies?project=FIL`);
+                        await search.waitFor({ state: 'visible' });
+                        await assertSharedControlHeight();
                         expect(mutations).toEqual([]);
                         expect(await workspace.readTaskYaml('FIL-2')).toBe(before);
                     });

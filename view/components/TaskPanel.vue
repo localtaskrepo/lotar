@@ -369,16 +369,11 @@
                 <TaskPanelRelationshipsTab
                   v-else-if="activityTab === 'relationships'"
                   :mode="mode"
-                  :relation-defs="relationDefs"
                   :relationships="relationships"
-                  :relation-suggestions="relationSuggestions"
-                  :relation-active-index="relationActiveIndex"
-                  :on-relation-input="onRelationInput"
-                  :on-relation-key="onRelationKey"
-                  :on-relation-blur="handleRelationshipBlur"
-                  :on-pick-relation="pickRelation"
-                  @reload="reloadTask"
-                  @update:relationship="updateRelationshipField"
+                  :task-id="task.id"
+                  :project="form.project"
+                  :disabled="isDeleted || !ready"
+                  :mutate="mutateRelationship"
                 />
 
                 <TaskPanelHistoryTab
@@ -675,6 +670,7 @@ const taskStore = useTaskStore()
 
 const {
   mode,
+  ready,
   projects,
   statusOptions,
   priorityOptions,
@@ -720,15 +716,8 @@ const {
   sprintOptions,
   sprintLookup,
   hasSprints,
-  relationDefs,
   relationships,
-  relationSuggestions,
-  relationActiveIndex,
-  handleRelationshipBlur,
-  onRelationInput,
-  onRelationKey,
-  pickRelation,
-  updateRelationshipField,
+  mutateRelationship,
   mergeKnownTags,
   projectLabel,
   commitCustomFields,

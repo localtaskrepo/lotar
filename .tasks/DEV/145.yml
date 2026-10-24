@@ -1,0 +1,7 @@
+title: Task Details "Preview" button overlaps text
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-23T17:14:14.278448+00:00
+description: "When adding details to a task in the Task panel, the \"Preview\" button floats over the text to allow seeing a markdown rendered preview.  \nAs soon as the first line fills, this button is in the way and neither the preview button nor the text are legible. We should find a better way to place this button.Maybe right below the box centered, but without moving the tags section any further down."

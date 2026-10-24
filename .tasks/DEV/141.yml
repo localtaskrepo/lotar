@@ -1,0 +1,47 @@
+title: Correct dependency focus and make graph controls automatic and responsive
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-23T05:13:24.362339+00:00
+modified: 2026-10-23T05:39:55.385067+00:00
+comments:
+- date: 2026-10-23T05:13:34.246927+00:00
+  text: 'Reproduction: actual DEV-54 depth1 graph API has9nodes: root54, five dependents55/59/60/64/82, related23/28 and parent53. Current dependency-only view hides nondependencyedges but still draws all9cards and has no distinct initial focus. Fix visible-kind reachability plus one explicitfocus, preserving connectedcontext. Parent implements automatic scope controls and bounded page layout/relationship wording; separate bounded ownership handles graph focus and shared FilterBar panel responsiveness. Add failing unit/browser regressions, use anonymous equivalent shape for browser (no realtaskmutation), inspect wide/tablet/mobile screenshots, run full required gates. Existing staged work remains unchanged in index.'
+- date: 2026-10-23T05:33:25.715857+00:00
+  text: 'Milestone: dependency-only DEV54-shaped projection now exactly root+5dependents withonefocalID; related/parent-only cards hidden untilrelationships enabled, depth0rootonly, clearingreturnsprojectgraph. No backend/data changes. Auto controls removeExplore: suggestionsimmediate, exactIDs300msdebounced, relationship/depth immediate; pendingqueriesmerge rapidchanges, project/stale-result/Escape guards preserved. Focusfield max26rem, sharedFilterBar uses quickpicks above fullwidth intrinsic12rem fieldgrid insteadwide sidebar/forced2cols. Nine realbrowser cases passed, including equivalentshape9→6→9→1 focus, no overflow/overlap at1920/1280/768/390 andboundedinput. Screenshots inspected. Review found delayedrootack clobbernewerID/title andpending-clearEscape restoringoldfocus; both reproducedred andfixed withsubmission/inputrevision handling, syncack binding, externalnav restore andempty-pending distinction. Focusworker42 andsharedFilterBar88targeted tests/typecheck passed, parent109initial+65updatedfocused passed, finalfullgates next. Existing staged index untouched, no serverrestart/Gitmutation/bulk repair.'
+- date: 2026-10-23T05:39:55.358380+00:00
+  text: |-
+    Outcome: corrected single-focus view semantics and automatic responsive controls. DEV-54 read-only graph reproduction has9nodes(root,fivedependents,twoRelated,parent); dependency-only display nowroot+fivedependents withoneinitialhighlight/focalbadge andconnected-task count. Enabled-kind-only reachability honorsdepth/aliases, excludeshidden-kind-only cards; all relationships includes9,depth0rootonly,clearreturnsunfocusedprojectindependenttasks. No backend/API/taskdata change. RemovedExplore; suggestionsapplyimmediately, exactID/clear300msdebounced, relationship/depth auto-updateURL/view. Pendingquerymergesrapidsettings; inputrevision/local-submission syncack guards preservenewerID/title whileolderroutecommits, ordinaryexternalnavrestoresURLfocus, Escapepending-clear cannotrestoreoldroot. Rootinputmax26rem, explicit Relationships shown labels/options/helper text, bounded shared panel responsive intrinsic12remcolumns withquickpicksabovefullwidthfields andcontainedpopovers. Existing history/SSE/filter/sort/repair guaranteespreserved; helpupdated.
+    Evidence: initialauto-controltestredthenfixed. Focusworker42tests andsharedFilterBar88selectedtests passed; parent109initial then65updatedfocused. Independentreview identifieddelayedack draftloss (bothID/title red reproduced) andpendingclearEscape(red reproduced), fixedwithregressions plus externalrestore. Nine actualbrowser scenarios pass, includinganonymousDEV54equivalentshape6/9/1/clear andsinglefocus, allpreviousnav/SSE/repair behaviors, automaticchanges/noExplore, fieldcontainment/nonoverlap at1920/1280/768/390, focuswidth<=416px. Actualscreenshotsinspected wide/tablet/mobileandonefocus; capturesremoved. Full lint:agent(Vue/alltarget/allfeatureClippy-Dwarnings/fmt) passed. Full test:agent Rust1589/143binaries,frontend1019/88files,release26passed. Firstfullsmoke302pass1fail: legacyDEV98testdemandedoldwidequick-pickssidebar; updatedintentionalcontracttofullwidthfieldsbelowquickpicks withx/widthalignment, preservedallsearch/filter/popup/no-mutationassertions. Targeted2/2 andfinalfreshbuildfullsmoke303/74filespassed. Finalwhitespaceclean. No testbudgets/retries/isolation/concurrencyrelaxed.
+    Remaining: no knownfeatureblocker. Existing46Git-requiredexclusions/25smokeskips/VueinjectwarningsandnativeWindows/remoteCIlimitsunchanged, notreportedpassed. UserstagedindexandunrelatedCargo/DEV137/priorworkpreserved; followupeditsremainunstaged. No staging/commits/Gitconfig/hookchanges/user-serverrestart/realDEV54mutation/bulkrepair/newdependencies.
+    Guidance: no durableinstructionfinding; existing scopedtesting and actualvisualverification guidance applied.
+description: 'Developer follow-up after DEV-140: focusing DEV-54 appears to select multiple tasks; reproduce actual graph data and distinguish one focus from its visible relationship context, hiding disconnected cards introduced only by disabled relationship kinds. Filter panel wraps awkwardly even wide; focus task input grows excessively. Bound focus field, make filter layout responsive without overflow, rename unclear Layers to explicit relationship visibility with descriptions. Remove Explore; focus selection, exact-ID typing/clearing, relationship-type and depth changes auto-update URL/graph with debounce, stale suggestion/scope guards and no in-progress text clobbering or bulk repair. Preserve shared FilterBar/Fields/sort/history/SSE and staged index. Verify actual DEV-54 read-only data, equivalent browser fixture, multiple viewport screenshots, unit/API/UI and final required gates; no Git writes, server restart or real task repair.'
+history:
+- at: 2026-10-23T05:13:34.216702+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-23T05:13:34.246927+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T05:33:25.715857+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T05:39:55.358380+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T05:39:55.385067+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

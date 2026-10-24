@@ -22,9 +22,12 @@
             data-testid="filter-search"
             autocomplete="off"
             spellcheck="false"
-            @focus="suggestionsOpen = true"
+            @focus="onSearchFocus"
             @blur="onSearchBlur"
             @input="onSearchInput"
+            @click="updateSearchCaret"
+            @select="updateSearchCaret"
+            @keyup="updateSearchCaret"
             @keydown="onSearchKeydown"
           />
           <button
@@ -401,6 +404,7 @@ import {
     type SuggestionItem,
 } from '../composables/useFilterGrammar'
 import { formatProjectLabel } from '../utils/projectLabels'
+import { parseTaskId } from '../utils/text'
 import SmartListChips from './SmartListChips.vue'
 import UiButton from './UiButton.vue'
 import IconGlyph from './IconGlyph.vue'
@@ -429,12 +433,16 @@ const props = withDefaults(
     customPresets?: CustomPreset[]
     enableDueSoon?: boolean
     enableRecent?: boolean
+    taskSuggestions?: (query: string, project?: string) => Promise<Array<{ id: string; title: string }>>
   }>(),
   {
     showStatus: true,
   },
 )
-const emit = defineEmits<{ (e:'update:value', v: Record<string,string>): void }>()
+const emit = defineEmits<{
+  (e:'update:value', v: Record<string,string>): void
+  (e:'task-selected', id: string): void
+}>()
 
 const query = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -442,6 +450,12 @@ const searchDraft = ref('')
 const searchPending = ref(false)
 const suggestionsOpen = ref(false)
 const activeSuggestion = ref(0)
+const suggestionNavigated = ref(false)
+const searchFocused = ref(false)
+const searchCaret = ref<number | null>(null)
+type SearchSuggestion = SuggestionItem & { taskId?: string }
+const taskCandidates = ref<SearchSuggestion[]>([])
+let synchronousTaskSnapshot = ''
 const project = ref('')
 const status = ref('')
 const priority = ref('')
@@ -466,6 +480,9 @@ const filterId = useId()
 const controlId = (name: string) => `${filterId}-filter-${name}`
 const searchSyntaxHint = 'Enter applies filters: status:Todo field:iteration=beta.'
 let searchBlurTimer: number | undefined
+let unmounted = false
+let filtersHydrated = false
+let pendingHydrationEmit = false
 // Keys that have dedicated UI controls and must not fall through to the
 // custom-field map. Derived from the grammar so aliases stay in one place.
 const CUSTOM_UI_KEYS = new Set(['q', 'order', 'deletion', 'sort_by', ...GRAMMAR_KEYS.map((meta) => meta.key)])
@@ -751,25 +768,29 @@ function onDocumentKeydown(event: KeyboardEvent) {
 function hasMeaningfulIncoming(value?: Record<string, string>): boolean {
   if (!value) return false
   for (const [key, raw] of Object.entries(value)) {
-    if (key === 'order') {
-      if (raw === 'asc') return true
-      continue
-    }
-    if ((raw || '').trim().length) return true
+    // Sorting belongs to the page and may be restored independently of filters.
+    if (key === 'order' || key === 'sort_by') continue
+    // Presence matters: an explicit empty query/project also overrides storage.
+    if (typeof raw === 'string') return true
   }
   return false
 }
 
 // Persist last used filter to localStorage for convenience
 const FILTER_KEY = computed(() => props.storageKey || 'lotar.tasks.filter')
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', onDocumentClick, DOCUMENT_CLICK_OPTS)
   document.addEventListener('keydown', onDocumentKeydown)
+  // Parents initialize routed filters in onMounted. Wait for their props to
+  // settle before restoring, otherwise that initialization erases the snapshot.
+  await nextTick()
+  if (unmounted) return
+  filtersHydrated = true
   try {
     const hasIncoming = hasMeaningfulIncoming(props.value)
     if (!hasIncoming) {
       const saved = storageGetJson<Record<string, unknown>>(FILTER_KEY.value)
-      if (saved && typeof saved === 'object') {
+      if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
         const asText = (v: unknown) => (typeof v === 'string' ? v : '')
         query.value = asText(saved.q)
         searchDraft.value = query.value
@@ -792,9 +813,13 @@ onMounted(() => {
       }
     }
   } catch {}
+  // Publish changes queued during initialization only after the full restore.
+  // This also covers a lone project selected before the field watcher existed.
+  if (pendingHydrationEmit || (project.value && project.value !== (props.value?.project || '') && hasSingleProject.value)) emitFilter(true)
 })
 
 onUnmounted(() => {
+  unmounted = true
   document.removeEventListener('click', onDocumentClick, DOCUMENT_CLICK_OPTS)
   document.removeEventListener('keydown', onDocumentKeydown)
   if (searchBlurTimer !== undefined) window.clearTimeout(searchBlurTimer)
@@ -840,41 +865,36 @@ function isKnownProject(list: Array<{ prefix?: string; name?: string }>, value: 
   })
 }
 
-let lastPropsSnapshot = ''
-watchEffect(() => {
-  if (props.value) {
-    // Only hydrate from props when the incoming value actually changed; otherwise
-    // unrelated effect triggers (template refs, option lists) would clobber state
-    // the user just typed.
-    const snapshot = JSON.stringify(props.value)
-    if (snapshot === lastPropsSnapshot) return
-    lastPropsSnapshot = snapshot
-    query.value = props.value.q || ''
-    if (!searchPending.value && document.activeElement !== searchInput.value) {
+// Hydration depends only on incoming filters, never option loading or draft edits.
+watch(() => props.value, value => {
+  if (value) {
+    query.value = value.q || ''
+    if (!searchPending.value && !searchFocused.value) {
       searchDraft.value = query.value
+      searchCaret.value = null
     }
-    project.value = props.value.project || ''
-    status.value = props.value.status || ''
-    priority.value = props.value.priority || ''
-    type.value = props.value.type || ''
-    sprintFilter.value = props.value.sprints || ''
-    const incomingAssignee = props.value.assignee || ''
-    const isMine = props.value.mine === 'true' || incomingAssignee === '@me'
+    project.value = value.project || ''
+    status.value = value.status || ''
+    priority.value = value.priority || ''
+    type.value = value.type || ''
+    sprintFilter.value = value.sprints || ''
+    const incomingAssignee = value.assignee || ''
+    const isMine = value.mine === 'true' || incomingAssignee === '@me'
     assignee.value = isMine ? '@me' : incomingAssignee
-    tags.value = props.value.tags || ''
-    dueDate.value = props.value.due || ''
-    recent.value = props.value.recent || ''
-    needs.value = props.value.needs || ''
-    deletion.value = normalizeDeletionValue(props.value.deletion)
-    const o = props.value.order
+    tags.value = value.tags || ''
+    dueDate.value = value.due || ''
+    recent.value = value.recent || ''
+    needs.value = value.needs || ''
+    deletion.value = normalizeDeletionValue(value.deletion)
+    const o = value.order
     order.value = (o === 'asc' || o === 'desc') ? o : order.value
-    sortBy.value = props.value.sort_by || ''
-    const extras = customFieldsFrom(props.value)
+    sortBy.value = value.sort_by || ''
+    const extras = customFieldsFrom(value)
     if (JSON.stringify(extras) !== JSON.stringify(customFilters.value)) customFilters.value = extras
   } else if (Object.keys(customFilters.value).length) {
     customFilters.value = {}
   }
-})
+}, { immediate: true, deep: true })
 
 
 function appendCustomFilter(expr: string) {
@@ -883,6 +903,7 @@ function appendCustomFilter(expr: string) {
   const token = trimmed.endsWith('=') ? serializeFilterToken(trimmed.slice(0, -1), '') : trimmed
   const current = searchDraft.value.trimEnd()
   if (!current.endsWith(token)) searchDraft.value = [current, token].filter(Boolean).join(' ')
+  searchCaret.value = null
   searchErrors.value = []
   searchPending.value = true
   if (!trimmed.endsWith('=')) applySearchDraft()
@@ -908,45 +929,102 @@ const suggestionSource = computed(() => ({
   ])],
 }))
 
-const suggestions = computed<SuggestionItem[]>(() => {
+const grammarSuggestions = computed<SuggestionItem[]>(() => {
   const fragment = currentFragment()
   if (!fragment && !searchDraft.value.trim()) return []
   return suggestForFragment(fragment, suggestionSource.value)
 })
+
+function isCompletingGrammar(fragment: string): boolean {
+  const lower = fragment.toLowerCase()
+  return !!lower && (lower.includes('=') || lower.startsWith('field:') ||
+    (lower.includes(':') && !!findGrammarKey(lower.split(':')[0] || '')) ||
+    ['field', 'q', 'order', 'sort_by', 'deletion', ...GRAMMAR_KEYS.flatMap(meta => meta.aliases)].some(key => key.startsWith(lower)))
+}
+
+const taskLookupText = computed(() => {
+  if (!props.taskSuggestions || isCompletingGrammar(currentFragment())) return ''
+  const parsed = parseFilterQuery(searchDraft.value)
+  return parsed.errors?.length ? '' : (parsed.filters.q ?? parsed.text).trim()
+})
+
+watch([taskLookupText, project, () => props.taskSuggestions, suggestionsOpen], async ([text, scope, source, open], _old, onCleanup) => {
+  taskCandidates.value = []
+  let current = true
+  onCleanup(() => { current = false })
+  if (!source || !text || !open) return
+  try {
+    const results = await source(text, scope || undefined)
+    if (current) taskCandidates.value = results.map(task => ({ insert: task.id, label: task.id, hint: task.title, taskId: task.id }))
+  } catch {
+    // Lookup is advisory; live search and exact-ID acceptance remain available.
+  }
+})
+
+const suggestions = computed<SearchSuggestion[]>(() => taskLookupText.value
+  ? [...taskCandidates.value, ...grammarSuggestions.value]
+  : grammarSuggestions.value)
 
 watch(suggestions, next => {
   if (activeSuggestion.value >= next.length) activeSuggestion.value = 0
 })
 
 function currentFragment(): string {
-  return filterFragment(searchDraft.value).fragment
+  return filterFragment(searchDraft.value.slice(0, searchCaret.value ?? searchDraft.value.length)).fragment
+}
+
+function updateSearchCaret() {
+  searchCaret.value = searchInput.value?.selectionStart ?? null
+}
+
+function onSearchFocus() {
+  searchFocused.value = true
+  suggestionsOpen.value = true
 }
 
 function replaceFragment(replacement: string): void {
-  const { prefix } = filterFragment(searchDraft.value)
+  const caret = searchCaret.value ?? searchDraft.value.length
+  const { prefix } = filterFragment(searchDraft.value.slice(0, caret))
+  let end = prefix.length
+  let quote = ''
+  for (; end < searchDraft.value.length; end++) {
+    const char = searchDraft.value[end]!
+    if (quote) {
+      if (char === '\\' && ['\\', quote].includes(searchDraft.value[end + 1] || '')) end++
+      else if (char === quote) quote = ''
+    } else if (char === '"' || char === "'") quote = char
+    else if (/\s/.test(char)) break
+  }
+  const tail = searchDraft.value.slice(end).trimStart()
   // Key prefixes are inserted without a trailing space so the
   // current fragment stays "key:" and value suggestions appear immediately.
-  const suffix = !replacement || replacement.endsWith(':') || replacement.endsWith('=') ? '' : ' '
-  searchDraft.value = `${prefix}${replacement}${suffix}`
+  const completingKey = replacement.endsWith(':') || replacement.endsWith('=')
+  const suffix = !replacement || (completingKey && !tail) ? '' : ' '
+  searchDraft.value = `${prefix}${replacement}${suffix}${tail}`
+  searchCaret.value = completingKey ? prefix.length + replacement.length : null
+  if (completingKey) {
+    const position = prefix.length + replacement.length
+    nextTick(() => searchInput.value?.setSelectionRange(position, position))
+  }
 }
 
 function onSearchInput(event: Event) {
   suggestionsOpen.value = true
   activeSuggestion.value = 0
+  suggestionNavigated.value = false
   const value = (event.target as HTMLInputElement | null)?.value ?? ''
   searchDraft.value = value
+  updateSearchCaret()
   searchErrors.value = []
   const parsed = parseFilterQuery(value)
   const fragment = currentFragment()
-  const fragmentKey = fragment.split(':')[0] || ''
-  const keyPrefix = fragment.toLowerCase()
-  const completingKey = !!keyPrefix && ['field', 'q', 'order', 'sort_by', 'deletion', ...GRAMMAR_KEYS.flatMap(meta => meta.aliases)].some(key => key.startsWith(keyPrefix))
-  searchPending.value = !!(Object.keys(parsed.filters).length || parsed.errors?.length || completingKey || keyPrefix.startsWith('field:') || (fragment.includes(':') && findGrammarKey(fragmentKey)))
+  searchPending.value = !!(Object.keys(parsed.filters).length || parsed.errors?.length || isCompletingGrammar(fragment))
   // Structured drafts are committed on Enter; normal text still searches live.
   if (!searchPending.value) query.value = parsed.text
 }
 
 function onSearchBlur() {
+  searchFocused.value = false
   // Delay so mousedown-based picks register before the blur clears state.
   if (searchBlurTimer !== undefined) window.clearTimeout(searchBlurTimer)
   searchBlurTimer = window.setTimeout(() => {
@@ -954,7 +1032,29 @@ function onSearchBlur() {
   }, 120)
 }
 
-function pickSuggestion(item: SuggestionItem) {
+function selectTask(id: string) {
+  const parsed = parseFilterQuery(searchDraft.value)
+  if (parsed.errors?.length) return
+  applyGrammarFilters(parsed.filters, parsed.replaceKeys)
+  query.value = id
+  searchDraft.value = id
+  searchCaret.value = null
+  searchPending.value = false
+  searchErrors.value = []
+  suggestionsOpen.value = false
+  activeSuggestion.value = 0
+  // Root selection reads the parent's latest filters, including this draft.
+  emitFilter(true)
+  emit('task-selected', id)
+}
+
+function pickSuggestion(item: SearchSuggestion) {
+  if (item.taskId) {
+    selectTask(item.taskId)
+    searchInput.value?.focus()
+    suggestionsOpen.value = false
+    return
+  }
   if (!item.insert.endsWith(':') && !item.insert.endsWith('=')) {
     replaceFragment(item.insert)
     applySearchDraft()
@@ -974,6 +1074,7 @@ function pickSuggestion(item: SuggestionItem) {
 function clearSearch() {
   query.value = ''
   searchDraft.value = ''
+  searchCaret.value = null
   searchPending.value = false
   searchErrors.value = []
   suggestionsOpen.value = false
@@ -986,11 +1087,13 @@ function onSearchKeydown(event: KeyboardEvent) {
   if (suggestionsOpen.value && suggestions.value.length) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
+      suggestionNavigated.value = true
       activeSuggestion.value = (activeSuggestion.value + 1) % suggestions.value.length
       return
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault()
+      suggestionNavigated.value = true
       activeSuggestion.value = (activeSuggestion.value - 1 + suggestions.value.length) % suggestions.value.length
       return
     }
@@ -1003,6 +1106,11 @@ function onSearchKeydown(event: KeyboardEvent) {
   }
   if (event.key === 'Enter') {
     event.preventDefault()
+    const exact = taskLookupText.value && parseTaskId(taskLookupText.value)
+    if (exact && !suggestionNavigated.value) {
+      selectTask(`${exact.project}-${exact.number}`)
+      return
+    }
     const highlighted = suggestionsOpen.value && currentFragment().trim() ? suggestions.value[activeSuggestion.value] : undefined
     if (highlighted) {
       pickSuggestion(highlighted)
@@ -1086,6 +1194,7 @@ function applySearchDraft() {
   applyGrammarFilters(parsed.filters, parsed.replaceKeys)
   query.value = parsed.filters.q ?? parsed.text
   searchDraft.value = query.value
+  searchCaret.value = null
   searchPending.value = false
 }
 
@@ -1187,7 +1296,7 @@ function onSmartChipsUpdate(next: Record<string, string>) {
   needs.value = next.needs || ''
 }
 
-function emitFilter(){
+function emitFilter(synchronousTask = false){
   const v: Record<string,string> = { ...customFilters.value }
   if (query.value) v.q = query.value
   const shouldEmitProject = props.emitProjectKey || !!project.value
@@ -1206,6 +1315,11 @@ function emitFilter(){
   if (sortBy.value) {
     v.sort_by = sortBy.value
   }
+  const serialized = JSON.stringify(v)
+  const alreadyEmitted = !synchronousTask && synchronousTaskSnapshot === serialized
+  synchronousTaskSnapshot = synchronousTask ? serialized : ''
+  // The batched watcher must not echo a synchronous selection/hydration emit.
+  if (alreadyEmitted) return
   // Persist the snapshot WITHOUT the sort keys (see the restore note above):
   // the live emit carries them for the current page, the snapshot must not.
   const { sort_by: _snapshotSortBy, order: _snapshotOrder, ...snapshot } = v
@@ -1216,6 +1330,7 @@ function onClear(keepScope = false){
   // Reset all local state and emit an empty filter
   query.value = ''
   searchDraft.value = ''
+  searchCaret.value = null
   searchPending.value = false
   searchErrors.value = []
   if (!keepScope) project.value = ''
@@ -1247,7 +1362,11 @@ function normalizeDeletionValue(value: unknown): 'active' | 'deleted' | 'all' {
 }
 
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, status, priority, type, sprintFilter, order, sortBy, tags, customFilters, assignee, dueDate, recent, needs, deletion], emitFilter, { deep: false })
+watch([query, project, status, priority, type, sprintFilter, order, sortBy, tags, customFilters, assignee, dueDate, recent, needs, deletion], () => {
+  // Do not publish or persist a partial parent initialization over saved filters.
+  if (filtersHydrated) emitFilter()
+  else pendingHydrationEmit = true
+}, { deep: false })
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>
@@ -1255,6 +1374,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
 .filter-bar {
   container-type: inline-size;
   container-name: filter-controls;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1272,7 +1392,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
   flex-direction: column;
   gap: 2px;
   flex: 1 1 180px;
-  min-width: 140px;
+  min-width: min(100%, 140px);
   /* Cap the stretch so ultrawide layouts keep the bar compact; page-level
      actions right-align against the container's max-width instead. */
   max-width: 440px;
@@ -1308,10 +1428,14 @@ defineExpose({ appendCustomFilter, clear: onClear })
   flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .filter-bar__search-input {
   width: 100%;
+  height: var(--control-height);
+  min-height: var(--control-height);
   /* Form controls refuse to shrink below their intrinsic size without this,
      which made the search box overrun the Filters button on narrow screens. */
   min-width: 0;
@@ -1537,12 +1661,15 @@ defineExpose({ appendCustomFilter, clear: onClear })
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .filter-bar__section {
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 0.5rem);
+  min-width: 0;
 }
 
 .filter-bar__section-title,
@@ -1566,19 +1693,12 @@ defineExpose({ appendCustomFilter, clear: onClear })
   min-width: 0;
 }
 
-@container filter-controls (min-width: 1000px) {
-  .filter-bar__panel-content {
-    display: grid;
-    grid-template-columns: minmax(240px, 0.4fr) minmax(0, 1fr);
-    align-items: start;
-    gap: var(--space-4, 1rem);
-  }
-}
-
 .filter-bar__fields {
   display: grid;
   gap: var(--space-2, 0.5rem);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 156px), 1fr));
+  /* Full-width rows share equal tracks; add columns only when a readable
+     control fits, independent of the viewport or the number of quick picks. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
 }
 
 .filter-bar__field {
@@ -1598,6 +1718,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
    never grows horizontal overflow; labels ellipsize instead. */
 .filter-bar__field .input {
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -1605,6 +1726,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
   position: relative;
   display: flex;
   width: 100%;
+  min-width: 0;
 }
 
 .filter-bar__project-static {
@@ -1617,7 +1739,6 @@ defineExpose({ appendCustomFilter, clear: onClear })
   color: var(--color-muted);
   box-shadow: none;
   cursor: default;
-  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1652,8 +1773,10 @@ defineExpose({ appendCustomFilter, clear: onClear })
   flex-direction: column;
   gap: var(--space-1, 0.25rem);
   z-index: var(--z-popover);
-  min-width: min(220px, calc(100vw - 24px));
-  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   max-height: 280px;
   overflow: auto;
 }
@@ -1661,7 +1784,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
 .filter-bar__menu-actions {
   display: flex;
   gap: var(--space-2, 0.5rem);
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
 }
 
@@ -1706,7 +1829,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 640px) {
+@container filter-controls (max-width: 40rem) {
   .filter-bar__toggle {
     position: relative;
     width: 36px;
@@ -1728,24 +1851,6 @@ defineExpose({ appendCustomFilter, clear: onClear })
     font-size: 10px;
   }
 
-  .filter-bar__actions {
-    flex-wrap: nowrap;
-  }
-
-  .filter-bar__fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .filter-bar__field--project {
-    grid-column: 1 / -1;
-  }
-
-  .filter-bar__menu-popover {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-  }
 }
 
 .filter-bar__search-input.input--invalid {

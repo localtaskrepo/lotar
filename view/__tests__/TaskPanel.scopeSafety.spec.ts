@@ -8,6 +8,12 @@ const api = vi.hoisted(() => ({
   suggestTasks: vi.fn(), whoami: vi.fn(),
 }))
 const toast = vi.hoisted(() => vi.fn())
+const streams = vi.hoisted(() => [] as Array<{ handlers: Record<string, (message: { data: string }) => void>; reconnect?: () => void }>)
+vi.mock('../composables/useSse', () => ({ useSse: (_url: string, _query: unknown, options?: { onReconnect?: () => void }) => {
+  const stream = { handlers: {} as Record<string, (message: { data: string }) => void>, reconnect: options?.onReconnect }
+  streams.push(stream)
+  return { on: (event: string, callback: (message: { data: string }) => void) => { stream.handlers[event] = callback }, off: vi.fn(), close: vi.fn() }
+} }))
 vi.mock('../api/client', () => ({ api }))
 vi.mock('../components/toast', () => ({ showToast: toast }))
 
@@ -45,6 +51,7 @@ function panel(taskId = 'new') {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  streams.length = 0
   localStorage.clear()
   api.listProjects.mockResolvedValue({ projects: [{ prefix: 'A' }, { prefix: 'B' }], total: 2 })
   api.listTasks.mockResolvedValue({ tasks: [], total: 0 })
@@ -64,9 +71,46 @@ afterEach(() => {
   wrappers.forEach(wrapper => wrapper.unmount())
   wrappers = []
   document.body.innerHTML = ''
+  vi.unstubAllGlobals()
 })
 
 describe('TaskPanel with real config and persistence', () => {
+  it('silently refreshes SSE relationships without replacing the scroller or unsaved fields and ignores stale task reads', async () => {
+    vi.stubGlobal('EventSource', class {})
+    const wrapper = panel('A-1')
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.form.title = 'Unsaved title'
+    vm.form.description = 'Unsaved description'
+    const body = wrapper.get('.task-panel__body').element as HTMLElement
+    body.scrollTop = 321
+    const read = deferred()
+    api.getTask.mockReturnValueOnce(read.promise)
+    const stream = streams.find((entry) => entry.reconnect && entry.handlers.task_updated)!
+    stream.handlers.task_updated!({ data: JSON.stringify({ id: 'A-1' }) })
+    await flushPromises()
+    expect(wrapper.find('.task-panel__loading').exists()).toBe(false)
+    read.resolve({ ...task('A-1', 'Server title'), relationships: { blocks: ['A-2'] } })
+    await flushPromises()
+    expect(vm.relationships.blocks).toBe('A-2')
+    expect(vm.form.title).toBe('Unsaved title')
+    expect(vm.form.description).toBe('Unsaved description')
+    expect(wrapper.get('.task-panel__body').element).toBe(body)
+    expect(body.scrollTop).toBe(321)
+    const stale = deferred()
+    api.getTask.mockReturnValueOnce(stale.promise)
+    stream.reconnect!()
+    await wrapper.setProps({ taskId: 'B-1' })
+    await flushPromises()
+    expect(vm.task.id).toBe('B-1')
+    await wrapper.setProps({ taskId: 'A-1' })
+    await flushPromises()
+    stale.resolve({ ...task('A-1'), relationships: { blocks: ['A-3'] } })
+    await flushPromises()
+    expect(vm.task.id).toBe('A-1')
+    expect(vm.relationships.blocks).toBe('')
+    expect(wrapper.emitted('updated')?.flat().filter((event: any) => event.id === 'A-1')).toHaveLength(1)
+  })
   it('keeps B fields and B mutation ID when A config completes after B has loaded', async () => {
     const fetchA = deferred()
     const fetchB = deferred()

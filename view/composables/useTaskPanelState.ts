@@ -18,7 +18,7 @@ import { useReferencePreview } from './useReferencePreview'
 import { useSprints } from './useSprints'
 import { useTaskPanelOwnership } from './useTaskPanelOwnership'
 import { useTaskRelationships } from './useTaskRelationships'
-import { projectOf } from '../utils/text'
+import { relationshipMutation } from '../utils/relationships'
 
 export interface TaskPanelProps {
     open: boolean
@@ -329,38 +329,32 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         return 'badge--muted'
     })
 
-    let projectForSuggestionsImpl = () => {
-        if (form.project) return form.project
-        if (form.id) return projectOf(form.id)
-        if (props.initialProject) return props.initialProject
-        return defaults.value.project || projects.value[0]?.prefix || ''
-    }
-
-    const projectForSuggestions = () => projectForSuggestionsImpl()
-
+    let relationshipRead = 0
     const {
-        relationDefs,
         relationships,
-        relationSuggestions,
-        relationActiveIndex,
         resetRelationships,
         buildRelationships,
-        snapshotRelationshipsBaselineFromTask,
-        snapshotRelationshipsBaselineFromInputs,
         applyRelationshipsFromTask,
-        updateRelationshipField: setRelationshipValue,
-        handleRelationshipBlur,
-        onRelationInput,
-        onRelationKey,
-        pickRelation,
-        commitRelationships,
+        mutateRelationship,
     } = useTaskRelationships({
         mode,
         ready,
         suppressWatch,
-        applyPatch,
-        projectForSuggestions,
-        suggestTasks: api.suggestTasks,
+        scope: () => `${props.open}:${props.taskId}:${task.deleted_at || ''}:${panelGeneration.value}`,
+        taskId: () => task.id || '',
+        editable: () => props.open && !task.deleted_at,
+        execute: async (intent) => { await api.relationshipMutate(relationshipMutation(task.id, intent)) },
+        reconcile: async () => {
+            const id = task.id, request = panelGeneration.value, read = ++relationshipRead
+            const updated = await api.getTask(id, undefined, { includeDeleted: true })
+            if (!props.open || props.taskId !== id || panelGeneration.value !== request || read !== relationshipRead) return
+            task.relationships = updated.relationships
+            task.history = updated.history
+            task.modified = updated.modified
+            if (updated.deleted_at) task.deleted_at = updated.deleted_at
+            emit('updated', updated)
+            return updated
+        },
     })
 
     const {
@@ -402,7 +396,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         validate,
         applyDefaults,
         applyTask,
-        projectForSuggestions: projectForSuggestionsFromLifecycle,
         ensureProjectsLoaded,
         onProjectChange: onProjectChangeFromLifecycle,
     } = useTaskPanelFormLifecycle({
@@ -431,8 +424,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         preloadPeople,
         resetReferencePreviews,
         resetRelationships,
-        snapshotRelationshipsBaselineFromInputs,
-        snapshotRelationshipsBaselineFromTask,
         applyRelationshipsFromTask,
         applyTaskCustomFields,
         applyTaskSprints,
@@ -460,8 +451,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         submitting.value = false
         onProjectChangeFromLifecycle()
     }
-
-    projectForSuggestionsImpl = projectForSuggestionsFromLifecycle
 
     bindCommentApplyTask(applyTask)
 
@@ -523,10 +512,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         }
     }
 
-    function updateRelationshipField(field: string, value: string) {
-        setRelationshipValue(field, value)
-    }
-
     function handleFieldBlur(field: string) {
         onFieldBlur(field)
     }
@@ -578,7 +563,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         applyTask,
         applyTaskCustomFields,
         applyRelationshipsFromTask,
-        snapshotRelationshipsBaselineFromTask,
         validate,
         closePanel,
         resetActivity,
@@ -678,15 +662,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         sprintOptions,
         hasSprints,
         statusBadgeClass,
-        relationDefs,
         relationships,
-        relationSuggestions,
-        relationActiveIndex,
-        handleRelationshipBlur,
-        onRelationInput,
-        onRelationKey,
-        pickRelation,
-        updateRelationshipField,
+        mutateRelationship,
         mergeKnownTags,
         projectLabel,
         buildCustomFields,

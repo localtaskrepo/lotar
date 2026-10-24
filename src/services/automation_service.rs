@@ -1477,6 +1477,20 @@ mod windows_async_stdio {
     }
 }
 
+#[cfg(test)]
+mod action_read_barrier {
+    use std::cell::RefCell;
+    thread_local! { static HOOK: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) }; }
+    pub(super) fn install(hook: impl FnOnce() + 'static) {
+        HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(hook)));
+    }
+    pub(super) fn pause() {
+        if let Some(hook) = HOOK.with(|slot| slot.borrow_mut().take()) {
+            hook();
+        }
+    }
+}
+
 /// Apply one automation action.
 ///
 /// Collection updates (tags, custom fields, relationships) compose against
@@ -1496,6 +1510,8 @@ fn apply_action(
     // earlier actions in this dispatch (collection commits, sprint
     // assignment, comments).
     let base = TaskService::get(storage, &current.id, None)?;
+    #[cfg(test)]
+    action_read_barrier::pause();
 
     let tmpl = TemplateContext::from_task(current)
         .with_previous(action_context.previous.as_ref())
@@ -1505,7 +1521,12 @@ fn apply_action(
     let mut patch = TaskUpdate::default();
     let mut updated_tags = base.tags.clone();
     let mut custom_fields = base.custom_fields.clone();
-    let mut updated_relationships = base.relationships.clone();
+    let has_relationship_delta = [action.add.as_ref(), action.remove.as_ref()]
+        .into_iter()
+        .flatten()
+        .any(|action| {
+            action.depends_on.is_some() || action.blocks.is_some() || action.related.is_some()
+        });
 
     if let Some(set) = action.set.as_ref() {
         apply_set_action(
@@ -1522,14 +1543,12 @@ fn apply_action(
 
     if let Some(add) = action.add.as_ref() {
         apply_tag_action(add, true, &mut updated_tags);
-        apply_relationship_action(add, true, &mut updated_relationships);
         if let Some(sprint_ref) = add.sprint.as_ref() {
             apply_sprint_action(storage, &current.id, sprint_ref, true)?;
         }
     }
     if let Some(remove) = action.remove.as_ref() {
         apply_tag_action(remove, false, &mut updated_tags);
-        apply_relationship_action(remove, false, &mut updated_relationships);
         if let Some(sprint_ref) = remove.sprint.as_ref() {
             apply_sprint_action(storage, &current.id, sprint_ref, false)?;
         }
@@ -1541,12 +1560,24 @@ fn apply_action(
     if patch.custom_fields.is_none() && custom_fields != base.custom_fields {
         patch.custom_fields = Some(custom_fields);
     }
-    if patch.relationships.is_none() && updated_relationships != base.relationships {
-        patch.relationships = Some(updated_relationships);
-    }
 
     let mut next_task = None;
-    if patch_has_changes(&patch) {
+    if has_relationship_delta {
+        next_task = Some(TaskService::update_with_relationship_delta(
+            storage,
+            &base.id,
+            patch,
+            TaskUpdateContext::automation_disabled(),
+            |relationships| {
+                if let Some(add) = &action.add {
+                    apply_relationship_action(add, true, relationships);
+                }
+                if let Some(remove) = &action.remove {
+                    apply_relationship_action(remove, false, relationships);
+                }
+            },
+        )?);
+    } else if patch_has_changes(&patch) {
         next_task = Some(TaskService::update_with_context(
             storage,
             &base.id,
@@ -1765,19 +1796,22 @@ fn apply_relationship_action(
     relationships: &mut crate::types::TaskRelationships,
 ) {
     fn modify_vec(vec: &mut Vec<String>, values: &[String], add: bool) {
+        fn identity(value: &str) -> String {
+            crate::storage::TaskId::parse(value)
+                .map(|id| id.canonical())
+                .unwrap_or_else(|_| value.to_string())
+        }
         if add {
             for v in values {
                 let trimmed = v.trim();
-                if !trimmed.is_empty() && !vec.iter().any(|e| e.eq_ignore_ascii_case(trimmed)) {
-                    vec.push(trimmed.to_string());
+                let key = identity(trimmed);
+                if !trimmed.is_empty() && !vec.iter().any(|e| identity(e) == key) {
+                    vec.push(key);
                 }
             }
         } else {
-            let remove: HashSet<String> = values
-                .iter()
-                .map(|v| v.trim().to_ascii_lowercase())
-                .collect();
-            vec.retain(|e| !remove.contains(&e.to_ascii_lowercase()));
+            let remove: HashSet<String> = values.iter().map(|v| identity(v.trim())).collect();
+            vec.retain(|e| !remove.contains(&identity(e)));
         }
     }
 
@@ -1967,45 +2001,12 @@ fn find_blocked_dependencies(
     task: &TaskDTO,
     _config: &ResolvedConfig,
 ) -> Vec<String> {
-    if task.relationships.depends_on.is_empty() {
-        return Vec::new();
-    }
-
-    // DEV-21: every dependency classifies under its OWN project's
-    // completion policy (explicit issue.done_states or inferred), resolved
-    // from the tasks root that actually holds it — never the dependent
-    // task's global policy.
-    let done_sets = crate::services::completion::resolve_task_done_sets(
+    crate::services::relationships::blocked_dependencies(
         storage,
-        task.relationships.depends_on.iter().map(String::as_str),
-    );
-    let mut blocked = Vec::new();
-
-    for dep in &task.relationships.depends_on {
-        let trimmed = dep.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let prefix = crate::storage::TaskId::parse(trimmed)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
-        let status = storage
-            .get(trimmed, &prefix)
-            .filter(|task| task.deleted_at.is_none())
-            .map(|task| task.status)
-            .map(|status| status.as_str().to_ascii_lowercase());
-
-        let is_done = status.as_deref().is_some_and(|value| {
-            done_sets
-                .done_set(trimmed)
-                .is_some_and(|done| done.contains(value))
-        });
-        if !is_done {
-            blocked.push(trimmed.to_string());
-        }
-    }
-
-    blocked
+        &task.id,
+        &task.relationships.depends_on,
+    )
+    .unwrap_or_else(|error| vec![format!("dependency graph unavailable: {error}")])
 }
 
 fn mark_task_blocked(
@@ -2257,6 +2258,221 @@ mod cooldown_tests {
 mod dev21_cross_root_dependency_tests {
     use super::*;
     use crate::api_types::TaskDTO;
+
+    #[test]
+    fn padded_alias_actions_preserve_noop_bytes_history_events_and_remove_both_assertions() {
+        use crate::api_types::{
+            RelationshipField, RelationshipMutationRequest, RelationshipOperation,
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let workspace = temp.path().join("workspace");
+        write_config(&workspace, "Done");
+        write_task(&workspace, "PX", 1, "Todo");
+        write_task(&workspace, "BB", 1, "Todo");
+        let mut storage = Storage {
+            root_path: workspace.join(".tasks"),
+        };
+        crate::services::relationships::mutate(
+            &storage,
+            &RelationshipMutationRequest {
+                source: "PX-1".into(),
+                target: "BB-1".into(),
+                kind: RelationshipField::DependsOn,
+                operation: RelationshipOperation::Add,
+                from_kind: None,
+                expected_current: None,
+            },
+        )
+        .unwrap();
+        let current = TaskService::get(&storage, "PX-1", None).unwrap();
+        let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
+        let context = AutomationActionContext {
+            event: AutomationEvent::Updated,
+            job: None,
+            previous: None,
+            comment_text: None,
+        };
+        let source = storage.root_path.join("PX/1.yml");
+        let target = storage.root_path.join("BB/1.yml");
+        let before_source = std::fs::read(&source).unwrap();
+        let before_target = std::fs::read(&target).unwrap();
+        let events = crate::api_events::subscribe();
+        let add: AutomationAction =
+            serde_yaml_ng::from_str("add:\n  depends_on: [BB-001]\n").unwrap();
+        apply_action(&mut storage, &current, &config, &add, &context).unwrap();
+        assert_eq!(std::fs::read(&source).unwrap(), before_source);
+        assert_eq!(std::fs::read(&target).unwrap(), before_target);
+        assert!(events.try_iter().next().is_none());
+        let remove: AutomationAction =
+            serde_yaml_ng::from_str("remove:\n  depends_on: [BB-001]\n").unwrap();
+        apply_action(&mut storage, &current, &config, &remove, &context).unwrap();
+        let after = TaskService::get(&storage, "PX-1", None).unwrap();
+        assert!(after.relationships.depends_on.is_empty());
+        assert!(
+            TaskService::get(&storage, "BB-1", None)
+                .unwrap()
+                .relationships
+                .blocks
+                .is_empty()
+        );
+        assert_eq!(after.history.len(), current.history.len() + 1);
+        let emitted: Vec<_> = events.try_iter().collect();
+        assert_eq!(
+            emitted
+                .iter()
+                .filter(|event| event.kind == "task_updated")
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn relationship_deltas_compose_after_concurrent_user_commit_and_keep_rule_atomic() {
+        use crate::api_types::{
+            RelationshipField, RelationshipMutationRequest, RelationshipOperation,
+        };
+        use std::fs;
+        use std::sync::mpsc;
+        use std::time::Duration;
+        for removing in [false, true] {
+            let temp = tempfile::tempdir().unwrap();
+            let workspace = temp.path().join("workspace");
+            write_config(&workspace, "Done");
+            for number in 1..=3 {
+                write_task(&workspace, "PX", number, "Todo");
+            }
+            let storage = Storage {
+                root_path: workspace.join(".tasks"),
+            };
+            let request = RelationshipMutationRequest {
+                source: "PX-1".into(),
+                target: "PX-2".into(),
+                kind: RelationshipField::DependsOn,
+                operation: RelationshipOperation::Add,
+                from_kind: None,
+                expected_current: None,
+            };
+            if removing {
+                crate::services::relationships::mutate(&storage, &request).unwrap();
+            }
+            let current = TaskService::get(&storage, "PX-1", None).unwrap();
+            let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
+            let action: AutomationAction = serde_yaml_ng::from_str(&format!(
+                "set:\n  title: rule edit\n{}:\n  depends_on: [PX-2]\n",
+                if removing { "remove" } else { "add" }
+            ))
+            .unwrap();
+            let (read_tx, read_rx) = mpsc::channel();
+            let (resume_tx, resume_rx) = mpsc::channel();
+            let root = storage.root_path.clone();
+            let worker = std::thread::spawn(move || {
+                action_read_barrier::install(move || {
+                    read_tx.send(()).unwrap();
+                    resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                });
+                apply_action(
+                    &mut Storage { root_path: root },
+                    &current,
+                    &config,
+                    &action,
+                    &AutomationActionContext {
+                        event: AutomationEvent::Updated,
+                        job: None,
+                        previous: None,
+                        comment_text: None,
+                    },
+                )
+            });
+            read_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            crate::services::relationships::mutate(
+                &storage,
+                &RelationshipMutationRequest {
+                    target: "PX-3".into(),
+                    kind: RelationshipField::Blocks,
+                    ..request
+                },
+            )
+            .unwrap();
+            resume_tx.send(()).unwrap();
+            worker.join().unwrap().unwrap();
+            let updated = TaskService::get(&storage, "PX-1", None).unwrap();
+            assert_eq!(updated.title, "rule edit");
+            assert_eq!(updated.relationships.blocks, ["PX-3"]);
+            assert_eq!(
+                TaskService::get(&storage, "PX-3", None)
+                    .unwrap()
+                    .relationships
+                    .depends_on,
+                ["PX-1"]
+            );
+            assert_eq!(
+                updated.relationships.depends_on,
+                if removing {
+                    vec![]
+                } else {
+                    vec!["PX-2".to_string()]
+                }
+            );
+            assert_eq!(
+                TaskService::get(&storage, "PX-2", None)
+                    .unwrap()
+                    .relationships
+                    .blocks,
+                if removing {
+                    vec![]
+                } else {
+                    vec!["PX-1".to_string()]
+                }
+            );
+
+            let before: Vec<_> = (1..=3)
+                .map(|n| fs::read(storage.root_path.join(format!("PX/{n}.yml"))).unwrap())
+                .collect();
+            let invalid: AutomationAction = serde_yaml_ng::from_str(
+                "set:\n  title: must not publish\nadd:\n  depends_on: [ABSENT-99]\n",
+            )
+            .unwrap();
+            let mut current_storage = Storage {
+                root_path: storage.root_path.clone(),
+            };
+            let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
+            assert!(
+                apply_action(
+                    &mut current_storage,
+                    &updated,
+                    &config,
+                    &invalid,
+                    &AutomationActionContext {
+                        event: AutomationEvent::Updated,
+                        job: None,
+                        previous: None,
+                        comment_text: None
+                    }
+                )
+                .is_err()
+            );
+            for n in 1..=3 {
+                assert_eq!(
+                    fs::read(storage.root_path.join(format!("PX/{n}.yml"))).unwrap(),
+                    before[n - 1]
+                );
+            }
+            assert!(!storage.root_path.join("ABSENT").exists());
+        }
+    }
+
+    #[test]
+    fn relationship_actions_preserve_exact_case_task_identities() {
+        let action: AutomationTagAction = serde_yaml_ng::from_str("depends_on: [aa-1]\n").unwrap();
+        let mut relationships = crate::types::TaskRelationships {
+            depends_on: vec!["AA-1".into()],
+            ..Default::default()
+        };
+        apply_relationship_action(&action, true, &mut relationships);
+        assert_eq!(relationships.depends_on, ["AA-1", "aa-1"]);
+        apply_relationship_action(&action, false, &mut relationships);
+        assert_eq!(relationships.depends_on, ["AA-1"]);
+    }
 
     fn write_task(root: &std::path::Path, prefix: &str, num: u32, status: &str) {
         let dir = root.join(".tasks").join(prefix);

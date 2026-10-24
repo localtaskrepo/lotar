@@ -1,0 +1,10 @@
+title: Web UI Config screen is incomplete
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-23T17:18:28.025185+00:00
+description: |-
+  The config screen is missing multiple config options, probably because a lot have been added since this was created without updating this UI.
+  For example, I was just trying to configure custom fields for this project (turning them off) and the option is nowhere to be found.
+  This ticket is to go through all config options and make sure they are fully represented in the UI with bespoke inputs (no generic "text" input for everything)

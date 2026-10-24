@@ -1,0 +1,7 @@
+title: Some relationships inputs cause centered auto complete text
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-23T17:20:57.499789+00:00
+description: When adding a task as a relationship, some inputs case the auto-complete to be centered instead of left aligned. This doesn't happen for all searches. In the example I was searching "config" and it was centered, searching for "configs" aligned it left. My guess is that the former had more results and thus broke something.

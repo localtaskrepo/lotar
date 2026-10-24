@@ -1,10 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, nextTick, ref, type ComputedRef, type Ref } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 const routeState: { query: Record<string, any> } = { query: {} }
 const routerPushMock = vi.fn(async () => { })
 const routerReplaceMock = vi.fn(async () => { })
+let realRouter = false
 
 const projectsStore = {
     refresh: vi.fn(async () => { }),
@@ -99,14 +101,18 @@ const configStore = {
     refresh: vi.fn(async () => { }),
 }
 
-vi.mock('vue-router', () => ({
-    useRoute: () => routeState,
-    useRouter: () => ({
-        currentRoute: ref({ path: '/' }),
-        push: routerPushMock,
-        replace: routerReplaceMock,
-    }),
-}))
+vi.mock('vue-router', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('vue-router')>()
+    return {
+        ...actual,
+        useRoute: () => realRouter ? actual.useRoute() : routeState,
+        useRouter: () => realRouter ? actual.useRouter() : ({
+            currentRoute: ref({ path: '/' }),
+            push: routerPushMock,
+            replace: routerReplaceMock,
+        }),
+    }
+})
 
 vi.mock('../api/client', () => ({
     api: {
@@ -267,6 +273,7 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
         localStorage.clear()
 
         routeState.query = {}
+        realRouter = false
         handles.clear()
         tasksStore.getQuery.mockClear()
         tasksStore.upsert.mockClear()
@@ -280,6 +287,78 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
 
     afterEach(() => {
         vi.useRealTimers()
+    })
+
+    it('isolates overlay Back history from the real list query, offset, sort, rows and selection', async () => {
+        realRouter = true
+        const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: TasksList }] })
+        const query = { project: 'PRJ', q: 'needle', sort_by: 'title', order: 'asc', offset: '50' }
+        await router.push({ path: '/', query })
+        await router.isReady()
+        const handle = handleFor({ project: 'PRJ', q: 'needle', sort_by: 'title', order: 'asc' })
+        handle.items.value = Array.from({ length: 120 }, (_, index) => baseTask({ id: `PRJ-${index + 1}` }))
+        const wrapper = mount(TasksList, { global: { plugins: [router], stubs: { Teleport: true } } })
+        try {
+            await settle()
+            const vm = wrapper.vm as any
+            vm.setSelectedIds(['PRJ-51'])
+            await settle()
+            const filter = { ...vm.filter }
+            const rows = vm.shownTasks.map((task: any) => task.id)
+            const requests = handle.refresh.mock.calls.length
+            const queries = tasksStore.getQuery.mock.calls.length
+            const configReads = configStore.refresh.mock.calls.length
+            expect(vm.pageOffset).toBe(50)
+            expect(filter).toEqual({ project: 'PRJ', q: 'needle', sort_by: 'title', order: 'asc' })
+            await router.replace({ query: { ...router.currentRoute.value.query, taskPanel: 'PRJ-51' } })
+            await settle()
+            await router.push({ query: { ...router.currentRoute.value.query, taskPanel: 'PRJ-52' } })
+            await settle()
+            router.back()
+            await settle()
+            expect(router.currentRoute.value.query.taskPanel).toBe('PRJ-51')
+            await router.replace({ query: { ...router.currentRoute.value.query, taskPanel: undefined } })
+            await settle()
+            expect(handle.refresh).toHaveBeenCalledTimes(requests)
+            expect(tasksStore.getQuery).toHaveBeenCalledTimes(queries)
+            expect(configStore.refresh).toHaveBeenCalledTimes(configReads)
+            expect(vm.filter).toEqual(filter)
+            expect(vm.pageOffset).toBe(50)
+            expect(vm.selectedIds).toEqual(['PRJ-51'])
+            expect(vm.shownTasks.map((task: any) => task.id)).toEqual(rows)
+            expect(vm.selectionReady).toBe(true)
+            expect(tasksStore.getQuery.mock.calls.every(([filter]) => !Object.prototype.hasOwnProperty.call(filter || {}, 'taskPanel'))).toBe(true)
+        } finally { wrapper.unmount() }
+    })
+
+    it('preserves the overlay marker in paging, filter and refresh URL writes', async () => {
+        realRouter = true
+        const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: TasksList }] })
+        await router.push('/?taskPanel=PRJ-1&q=needle&sort_by=title&order=asc')
+        await router.isReady()
+        const handle = handleFor({ q: 'needle', sort_by: 'title', order: 'asc' })
+        handle.items.value = Array.from({ length: 120 }, (_, index) => baseTask({ id: `PRJ-${index + 1}` }))
+        const wrapper = mount(TasksList, { global: { plugins: [router], stubs: { Teleport: true } } })
+        try {
+            await settle()
+            const vm = wrapper.vm as any
+            await vm.goToPage(2)
+            await settle()
+            expect(router.currentRoute.value.query).toEqual({ taskPanel: 'PRJ-1', q: 'needle', sort_by: 'title', order: 'asc', offset: String(vm.pageLimit) })
+            await vm.retry()
+            await settle()
+            expect(router.currentRoute.value.query.taskPanel).toBe('PRJ-1')
+            vm.filter = { ...vm.filter, q: 'changed' }
+            // A relationship hop must not cancel the pending debounced filter.
+            await router.push({ query: { ...router.currentRoute.value.query, taskPanel: 'PRJ-2' } })
+            await settle()
+            expect(router.currentRoute.value.query).toEqual({ taskPanel: 'PRJ-2', q: 'changed', sort_by: 'title', order: 'asc' })
+            await router.push({ query: { ...router.currentRoute.value.query, q: 'from-route' } })
+            await settle()
+            expect(vm.filter.q).toBe('from-route')
+            expect(vm.filter).not.toHaveProperty('taskPanel')
+            expect(tasksStore.getQuery.mock.calls.every(([filter]) => !Object.prototype.hasOwnProperty.call(filter || {}, 'taskPanel'))).toBe(true)
+        } finally { wrapper.unmount() }
     })
 
     it('a pending new query shows a loader, never the previous key rows, and disables actions', async () => {

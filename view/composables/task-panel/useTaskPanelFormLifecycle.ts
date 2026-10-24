@@ -52,8 +52,6 @@ interface UseTaskPanelFormLifecycleOptions {
     preloadPeople: (project: string) => void
     resetReferencePreviews: () => void
     resetRelationships: () => void
-    snapshotRelationshipsBaselineFromInputs: () => void
-    snapshotRelationshipsBaselineFromTask: (task: TaskDTO | null | undefined) => void
     applyRelationshipsFromTask: (task: TaskDTO | null | undefined) => void
     applyTaskCustomFields: (values: Record<string, unknown>) => void
     applyTaskSprints: (task: TaskDTO) => void
@@ -72,7 +70,6 @@ export interface TaskPanelFormLifecycleApi {
     validate: () => boolean
     applyDefaults: (project: string) => void
     applyTask: (task: TaskDTO) => void
-    projectForSuggestions: () => string
     projectFromList: () => string
     ensureProjectsLoaded: () => Promise<void>
     onProjectChange: () => void
@@ -111,7 +108,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.resetRelationships()
         options.resetReferencePreviews()
         options.resetComments()
-        options.snapshotRelationshipsBaselineFromInputs()
         nextTick(() => (options.suppressWatch.value = false))
     }
 
@@ -215,7 +211,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.applyTaskCustomFields((data.custom_fields || {}) as Record<string, unknown>)
         options.applyRelationshipsFromTask(data)
         options.cancelEditComment()
-        options.snapshotRelationshipsBaselineFromTask(data)
 
         nextTick(() => (options.suppressWatch.value = false))
     }
@@ -224,15 +219,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         if (!options.projects.value.length) {
             await options.refreshProjects()
         }
-    }
-
-    const projectForSuggestions = () => {
-        if (options.form.project) return options.form.project
-        if (options.form.id) return parseTaskId(options.form.id)?.project ?? ''
-        const initial = options.getInitialProject()
-        if (initial) return initial
-        if (options.defaults.value.project) return options.defaults.value.project
-        return projectFromList()
     }
 
     const onProjectChange = () => {
@@ -276,7 +262,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         validate,
         applyDefaults,
         applyTask,
-        projectForSuggestions,
         projectFromList: () => projectFromList() ?? '',
         ensureProjectsLoaded,
         onProjectChange,

@@ -1,0 +1,7 @@
+title: Speed up CI smoke tests
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-22T20:34:20.974252+00:00
+description: Smoke tests on Github Actions CI take up to 10 minutes to install playwright browsers before they even start testing. We can probably speed that up, e.g. using caching.

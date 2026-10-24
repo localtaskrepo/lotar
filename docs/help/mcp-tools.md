@@ -98,6 +98,39 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page. Pages iterate a deterministic global order (default `modified` desc, canonical-ID ascending tiebreak) identical to REST `/api/tasks/list` and `/api/tasks/export`.
 - **Completion and due dates:** `due: "overdue"` means non-finished tasks due before today's local calendar date. Each task uses its own project's done-state policy, including mixed-project results; finished and due-today tasks do not match. Task DTOs include computed `task_state` metadata rather than a persisted completion flag. See [Done States](./config.md#done-states).
 
+## Relationship Tools
+
+These tools share the same typed graph and mutation service as the CLI and REST
+API. Task YAML retains its existing relationship fields. Dependency edges point
+from prerequisite to dependent; reciprocal `depends_on`/`blocks` declarations
+are one edge, not a cycle. IDs preserve project-prefix casing.
+
+Read operations may initialize advisory lock metadata inside existing tasks roots
+to coordinate snapshots, but never create an absent root or change task/config
+or journal data. Unavailable locks and pending recovery are reported explicitly.
+
+### `relationship_graph`
+- **Params:** optional `project`, `task_id`, `depth` (0-8), and `max_nodes` (1-500).
+- **Behavior:** reads a bounded, coordinated graph snapshot with stored provenance. It does not repair files, recover journals, or infer missing relationships from cached task-list pages.
+- **Response:** `nodes`, `edges`, `issues`, `revision`, `complete`, and `truncated`. Unresolved targets remain explicit nodes rather than silently disappearing.
+
+### `relationship_check`
+- **Params:** optional `project`.
+- **Behavior:** reports invalid targets, reciprocal inconsistencies, self-links, conflicting parents, and cycles by relationship kind. A missing or unreadable inventory is not a clean result.
+- **Response:** structured `issues`, snapshot `revision`, and `complete`.
+
+### `relationship_mutate`
+- **Params:** required `source`, `target`, `kind`, and `operation`; optional `from_kind` and `expected_current`.
+- **Kinds:** `depends_on`, `blocks`, `related`, `parent`, `children`, `fixes`, `duplicate_of`. These are categories relative to `source`, not the canonical graph edge kinds.
+- **Operations:** `add`, `remove`, or `change_kind`. A category change requires `from_kind`; changing Depends on to Blocks reverses the dependency. Occupied singular destinations require their expected current target before replacement.
+- **Behavior:** validates and updates all affected assertions together. Removing a logical edge removes its reciprocal too; unrelated categories remain untouched. Same-category moves and repeated additions are effective no-ops.
+- **Response:** `changed`, `changed_tasks`, and `revision`.
+
+### `relationship_repair`
+- **Params:** optional `project`, `apply` (default false), and `revision`.
+- **Behavior:** previews conservative duplicate/alias and reciprocal repairs. Applying requires `apply: true` and the unchanged preview revision. Inspect the preview: restoring a missing mirror may undo an intentional manual one-sided deletion. Repairs never guess targets, delete edges, break cycles, choose parents, or restore deleted tasks.
+- **Response:** `applied`, `changed_tasks`, `revision`, and `issues`.
+
 ## Sprint Tools
 
 ### `sprint_list`

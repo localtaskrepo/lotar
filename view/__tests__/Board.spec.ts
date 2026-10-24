@@ -1,9 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, h, nextTick, ref, shallowRef } from 'vue'
+import { computed, h, nextTick, reactive, ref, shallowRef } from 'vue'
 import type { SprintListItem, TaskDTO } from '../api/types'
 
-const routeState: { query: Record<string, any> } = { query: { project: 'ACME' } }
+let routeState: { query: Record<string, any> } = { query: { project: 'ACME' } }
 const routerPushMock = vi.fn()
 
 const projectsStore = {
@@ -189,9 +189,7 @@ vi.mock('../composables/useSprints', () => ({
         refresh: sprintsStore.refresh,
         loading: sprintsStore.loading,
     }),
-    useSprintFilterOptions: (sprints: any) => ({
-        value: (sprints?.value || []).map((s: any) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
-    }),
+    useSprintFilterOptions: (sprints: any) => computed(() => (sprints?.value || []).map((s: any) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` }))),
 }))
 
 vi.mock('../composables/useConfig', () => ({
@@ -272,6 +270,73 @@ describe('Board field visibility', () => {
 
     afterEach(() => {
         vi.useRealTimers()
+    })
+
+    it.each([{}, { project: '' }, { project: 'ACME' }, { q: '' }, { q: 'routed' }])('hydrates real FilterBar results with route precedence: %j', async query => {
+        const previousRoute = routeState
+        routeState = reactive({ query })
+        routerPushMock.mockImplementation(({ query: nextQuery }) => { routeState.query = nextQuery })
+        localStorage.setItem('lotar.boards.filter', JSON.stringify({ q: 'repair', type: 'Bug' }))
+        const { default: RealFilterBar } = await vi.importActual<typeof import('../components/FilterBar.vue')>('../components/FilterBar.vue')
+        const wrapper = mount(Board, { global: { stubs: { FilterBar: RealFilterBar } } })
+        try {
+            await flushPromises()
+            await vi.advanceTimersByTimeAsync(400)
+            await flushPromises()
+            const expectedQuery = Object.keys(query).length ? ('q' in query ? query.q : '') : 'repair'
+            const bar = wrapper.getComponent(RealFilterBar)
+            expect((bar.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(expectedQuery)
+            expect((wrapper.vm as any).filter.q || '').toBe(expectedQuery)
+            expect((wrapper.vm as any).filter.type).toBe(Object.keys(query).length ? undefined : 'Bug')
+            const initialEmissions = (bar.emitted('update:value') || []).length
+            expect(initialEmissions).toBeLessThanOrEqual(1)
+            // Board intentionally requires a project before fetching results.
+            // Selecting one must use the hydrated filters, not just their draft.
+            if (!(wrapper.vm as any).project) {
+                await bar.get('[data-testid="filter-toggle"]').trigger('click')
+                await bar.get('[data-testid="filter-project"]').setValue('ACME')
+                await vi.advanceTimersByTimeAsync(400)
+                await flushPromises()
+            }
+            expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject(expectedQuery ? { q: expectedQuery } : {})
+            if (!Object.keys(query).length) expect(tasksStore.getQuery.mock.lastCall?.[0]).toMatchObject({ q: 'repair', type: ['Bug'] })
+            else expect(tasksStore.getQuery.mock.lastCall?.[0]?.type).toBeUndefined()
+            const emissions = (bar.emitted('update:value') || []).length
+            await vi.advanceTimersByTimeAsync(400)
+            await flushPromises()
+            expect((bar.emitted('update:value') || []).length).toBe(emissions)
+            expect(emissions).toBeLessThanOrEqual(initialEmissions + 1)
+        } finally {
+            wrapper.unmount()
+            routeState = previousRoute
+            routerPushMock.mockReset()
+        }
+    })
+
+    it('ignores task-panel query hops without refreshing or resetting collapsed groups', async () => {
+        const previousRoute = routeState
+        routeState = reactive({ query: { project: 'ACME' } })
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            const vm = wrapper.vm as any
+            vm.collapsedGroups = new Set(['kept'])
+            const queries = tasksStore.getQuery.mock.calls.length
+            const configs = configStore.refresh.mock.calls.length
+            const handle = boardHandleFor({ project: 'ACME' })
+            const refreshes = handle.refresh.mock.calls.length
+            for (const taskPanel of ['ACME-1', 'ACME-2', 'ACME-1', undefined]) {
+                routeState.query = { project: 'ACME', taskPanel }
+                await flushPromises()
+            }
+            expect(tasksStore.getQuery).toHaveBeenCalledTimes(queries)
+            expect(configStore.refresh).toHaveBeenCalledTimes(configs)
+            expect(handle.refresh).toHaveBeenCalledTimes(refreshes)
+            expect([...vm.collapsedGroups]).toEqual(['kept'])
+            routeState.query = { project: 'BETA' }
+            await flushPromises()
+            expect(configStore.refresh).toHaveBeenLastCalledWith('BETA')
+        } finally { wrapper.unmount(); routeState = previousRoute }
     })
 
     it('offers an accessible project chooser instead of selecting the first project', async () => {

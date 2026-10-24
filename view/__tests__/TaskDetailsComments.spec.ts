@@ -47,8 +47,10 @@ vi.mock('../api/client', () => {
   }
 })
 
-vi.mock('vue-router', async () => {
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
   return {
+    ...actual,
     useRoute: () => ({ params: { id: 'PRJ-1' }, query: {} }),
     useRouter: () => ({ push: vi.fn(), replace: vi.fn() })
   }

@@ -1,6 +1,7 @@
 pub(super) mod agent;
 pub(super) mod config;
 pub(super) mod projects;
+pub(super) mod relationships;
 pub(super) mod sprints;
 pub(super) mod sync;
 pub(super) mod tasks;
@@ -12,6 +13,10 @@ pub(super) use agent::{
 };
 pub(super) use config::{handle_config_set, handle_config_show};
 pub(super) use projects::{handle_project_list, handle_project_stats};
+pub(super) use relationships::{
+    handle_relationship_check, handle_relationship_graph, handle_relationship_mutate,
+    handle_relationship_repair,
+};
 pub(super) use sprints::{
     handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create,
     handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove,

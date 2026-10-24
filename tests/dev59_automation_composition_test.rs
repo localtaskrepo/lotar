@@ -150,6 +150,7 @@ fn relationships_compose_across_rules_without_duplicates() {
     let mut storage = Storage::new(&tasks_dir);
     let overlap = create_task(&mut storage, "Overlap", &[]);
     let first_only = create_task(&mut storage, "First only", &[]);
+    let blocked_only = create_task(&mut storage, "Blocked only", &[]);
     let seeded = create_task(&mut storage, "Seeded", &[]);
     let task = TaskService::create(
         &mut storage,
@@ -164,16 +165,18 @@ fn relationships_compose_across_rules_without_duplicates() {
         },
     )
     .expect("create task");
-    // The first rule contributes `first_only` to both collections without
-    // the second rule repeating it, so a second action cloned from the
-    // stale event snapshot would drop it. The second rule re-adds
+    // The first rule contributes distinct prerequisite and dependent targets
+    // without the second rule repeating them. Using the same target in both
+    // directions would be a forbidden dependency cycle. A stale snapshot would
+    // drop the first rule's contributions. The second rule re-adds
     // `overlap` (dedup) and removes the seeded member.
     set_automation(
         &tasks_dir,
         &format!(
-            "    - name: link-one\n      when: {{status: InProgress}}\n      on: {{updated: {{add: {{depends_on: [{overlap}, {first_only}], blocks: [{first_only}]}}}}}}\n    - name: link-two\n      when: {{status: InProgress}}\n      on:\n        updated:\n          add: {{depends_on: [{overlap}]}}\n          remove: {{depends_on: [{seeded}]}}\n",
+            "    - name: link-one\n      when: {{status: InProgress}}\n      on: {{updated: {{add: {{depends_on: [{overlap}, {first_only}], blocks: [{blocked_only}]}}}}}}\n    - name: link-two\n      when: {{status: InProgress}}\n      on:\n        updated:\n          add: {{depends_on: [{overlap}]}}\n          remove: {{depends_on: [{seeded}]}}\n",
             overlap = overlap.id,
             first_only = first_only.id,
+            blocked_only = blocked_only.id,
             seeded = seeded.id
         ),
     );
@@ -189,9 +192,29 @@ fn relationships_compose_across_rules_without_duplicates() {
     );
     assert_eq!(
         after.relationships.blocks,
-        vec![first_only.id.clone()],
+        vec![blocked_only.id.clone()],
         "{:?}",
         after.relationships
+    );
+    assert_eq!(
+        get_task(&storage, &overlap.id).relationships.blocks,
+        std::slice::from_ref(&task.id)
+    );
+    assert_eq!(
+        get_task(&storage, &first_only.id).relationships.blocks,
+        std::slice::from_ref(&task.id)
+    );
+    assert_eq!(
+        get_task(&storage, &blocked_only.id)
+            .relationships
+            .depends_on,
+        [task.id]
+    );
+    assert!(
+        get_task(&storage, &seeded.id)
+            .relationships
+            .blocks
+            .is_empty()
     );
 }
 

@@ -39,6 +39,8 @@ Use **Default page size** (25, 50, 100, or 200; default 50) for Tasks and the in
 
 Hide tabs you do not use to reduce clutter in the main navigation. Uncheck a tab on the Preferences page and it disappears from the nav immediately; the page itself stays reachable by URL. Preferences is always visible so you can restore tabs. The setting persists in `localStorage` (key `lotar.preferences.hiddenTabs`).
 
+**Dependencies** is visible by default and can be hidden or restored with its Navigation checkbox. Hiding it does not block direct access to `/dependencies`. Existing hidden-tab choices are preserved when new tabs are added. Table and filter resets do not change these choices; clearing browser site data restores default visibility.
+
 ## Board Columns
 
 The **Columns** button on a board opens one dialog that arranges the board for this project and browser without changing the workflow. It shows the columns side by side, like the board:

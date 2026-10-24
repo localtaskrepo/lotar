@@ -1,15 +1,26 @@
 title: Drag-and-drop tickets between relationship categories (WebUI)
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.734366+00:00
-modified: 2026-09-06T13:12:53.866785+00:00
+modified: 2026-10-23T00:02:07.573800+00:00
 comments:
 - date: 2026-09-06T13:12:53.866785+00:00
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 9: Option to drag and drop tickets between relationship categories in the web UI.
+- date: 2026-10-22T23:01:12.598228+00:00
+  text: 'Approved plan: replace relationship CSV editing with navigable categorized task chips and autocomplete, add/remove/change-kind operations backed by DEV-15 transactional service, drag/drop plus visible keyboard/touch Move-to equivalent, explicit direction and guarded occupied-parent/duplicate replacement. Isolate relationship MIME from attachments; preserve other relationship kinds and handle failures/stale panel/deleted task changes. UI unit and real browser regressions; final shared lint/test/smoke gates.'
+- date: 2026-10-22T23:32:29.734571+00:00
+  text: 'UI milestone: categorized navigable task chips, autocomplete and explicit add/remove/change-kind requests implemented; seven source-relative categories preserve focused source and allow depends_on-to-blocks atomic reversal. Parent/duplicate replacement guarded with expected_current; nested category forms removed so Add/Enter cannot submit outer task form. Focused frontend sweep 142/17 files passed (later graph-only 18/18 after external marker). Fresh browser build targeted four new scenarios: final 4/4 pass across1440px/390px, native desktop drag and mobile Move-to, exact reciprocal removal/creation, no attachment or stale whole-task POSTs, SVG/list navigation preserving graph URL. First run2/4 exposed test-fixture errors (native drag started over select; delete lacked --yes), corrected coordinates/fixture flag, no assertion/deadline weakening. Core automation-race fixes and final full gates still pending; not Done yet.'
+- date: 2026-10-23T00:02:07.502277+00:00
+  text: |-
+    Outcome: completed categorized navigable relationship chips, autocomplete Add/Remove, atomic source-relative Move-to and native drag/drop, with keyboard/touch equivalent. Explicit direction-reversal and occupied-parent/duplicate confirmations, expected-current guards, same-kind no-op/dedup, stale-task/error reconciliation and internal MIME isolation from attachments. Removed nested forms and stale whole-map relationship autosave paths. Parent task metadata editor preserved.
+    Evidence: focused UI tests/typecheck passed; final real Chromium smoke covers desktop1440px native card drag and mobile390px Move-to, depends_on-to-blocks direction reversal and both reciprocal removals/additions, no attachment POSTs or full-task update POSTs, task-panel preservation and graph-context navigation. Four new browser cases passed on final fresh artifact. Shared final gates passed: lint/allfeatures/fmt;1580 Rust,955 frontend,26 release,298 smoke. Initial browser fixture mistakes fixed (drag coordinates avoid select control, explicit delete --yes), no deadlines/retries/assertions weakened. DEV59 fixture updated to valid distinct endpoints with stronger inverse checks, not relaxed cycle validation.
+    Remaining: no feature blocker; shared environment/advisory-lock/remote-platform limits and complete verification evidence recorded in DEV-15. DEV-138 remains open for unified validation hook, existing mutating hook untouched. No Git writes or user-server restart.
+    Guidance: no durable instruction finding; help updated.
 description: |-
   Migrated checklist requirements:
   Support moving existing ticket relationships between categories using drag-and-drop, with persisted category changes and an accessible non-drag alternative. Current text-input category editing is not completion.
@@ -25,3 +36,29 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-22T23:01:12.569526+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T23:01:12.598228+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T23:32:29.734571+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T00:02:07.502277+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T00:02:07.573800+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

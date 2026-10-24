@@ -12,6 +12,82 @@
     }
   ],
   "paths": {
+    "/api/relationships/graph": {
+      "get": {
+        "summary": "Read a bounded typed relationship graph",
+        "description": "Read-only data projection from a coordinated relationship snapshot, not a paginated task-list cache. Dependency arrows point prerequisite to dependent. Canonical reciprocal assertions form one edge with stored provenance. Missing, deleted, ambiguous and unreadable nodes remain explicit; complete and truncated describe inventory/projection limits. Coordination may initialize advisory lock metadata inside existing roots, but never creates an absent tasks root or changes task/configuration/history/journal data and never recovers pending transactions.",
+        "parameters": [
+          { "name": "project", "in": "query", "schema": { "type": "string" } },
+          { "name": "task_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "depth", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 8 } },
+          { "name": "max_nodes", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 500 } },
+          { "name": "kinds", "in": "query", "description": "Comma-separated dependency,hierarchy,related,fixes,duplicate. Empty selects none; omitted selects all. Connectivity and hop expansion use these kinds before the node bound.", "schema": { "type": "string" } },
+          { "name": "include_isolated", "in": "query", "description": "Strict true or false. False hides isolated matching seeds before budgeting, except explicit focus, unique exact-ID search and unresolved identities. Exact typed IDs include full/padded PROJECT-NUMBER, compact PROJECTNUMBER and numeric suffixes unique in the project-scoped strict inventory. Project case is exact; ambiguous numeric/compact matches are not guessed. Exact typed identity matches rank before other query matches at the node cap but still satisfy all other filters. Omitted retains legacy projection. Selected endpoint pairs receive budget together where possible; truncated reports omitted eligible nodes. Focus depth is undirected BFS hops (0-8), not layout columns; project-wide queries use all matching seeds and at least one boundary hop.", "schema": { "type": "boolean" } },
+          { "name": "filters", "in": "query", "description": "JSON-encoded string-to-string map using tasks/list filter grammar, including q, status, priority, type, assignee, tags, sprints, due, recent, needs, custom fields, deletion, sort_by and order. Invalid explicit values fail closed. Matching tasks are selected before max_nodes; referenced nonmatching endpoints and a filtered-out focus root remain context with matches_filter=false.", "schema": { "type": "string", "contentMediaType": "application/json" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Graph with explicit scope and integrity diagnostics",
+            "content": { "application/json": { "schema": {
+              "type": "object", "properties": { "data": { "$ref": "#/components/schemas/RelationshipGraphResponse" } }, "required": ["data"]
+            } } }
+          },
+          "400": { "description": "Invalid query or unavailable safe snapshot" },
+          "500": { "description": "Storage or serialization failure" }
+        }
+      }
+    },
+    "/api/relationships/check": {
+      "get": {
+        "summary": "Check relationship integrity without mutation",
+        "parameters": [ { "name": "project", "in": "query", "schema": { "type": "string" } } ],
+        "responses": {
+          "200": {
+            "description": "Structured findings, snapshot revision and inventory completeness",
+            "content": { "application/json": { "schema": {
+              "type": "object", "properties": { "data": { "$ref": "#/components/schemas/RelationshipCheckResponse" } }, "required": ["data"]
+            } } }
+          },
+          "400": { "description": "Invalid scope or unavailable safe snapshot" },
+          "500": { "description": "Storage or serialization failure" }
+        }
+      }
+    },
+    "/api/relationships/mutate": {
+      "post": {
+        "summary": "Atomically add, remove or change one relationship",
+        "description": "Applies one category operation relative to source and target, maintaining stored reciprocal assertions under coordinated multi-file exclusion. Removing an edge clears both assertions. Changing depends_on to blocks reverses dependency direction; change_kind requires from_kind. Occupied singular destinations require expected_current. Other relationship kinds and metadata remain untouched. New invalid targets, self-links, cycles and parent conflicts are rejected before publication.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelationshipMutationRequest" } } } },
+        "responses": {
+          "200": {
+            "description": "Change receipt; genuine no-ops do not write or emit mutation events",
+            "content": { "application/json": { "schema": {
+              "type": "object", "properties": { "data": { "$ref": "#/components/schemas/RelationshipMutationResponse" } }, "required": ["data"]
+            } } }
+          },
+          "400": { "description": "Invalid relationship, stale replacement guard or safety refusal" },
+          "404": { "description": "Task not found" },
+          "500": { "description": "Storage or serialization failure" }
+        }
+      }
+    },
+    "/api/relationships/repair": {
+      "post": {
+        "summary": "Preview or explicitly apply conservative relationship repairs",
+        "description": "Preview is the default. Explicit apply requires the unchanged preview revision. Repairs only proven duplicates/aliases and unambiguous reciprocal assertions on writable active tasks. Restoring a mirror can undo an intentional manual one-sided deletion; review the preview. Never guesses missing targets, deletes edges, chooses parents, breaks cycles or restores tombstones. Repair is maintenance, not a request to change task statuses or launch agent jobs.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelationshipRepairRequest" } } } },
+        "responses": {
+          "200": {
+            "description": "Repair preview or applied receipt with remaining diagnostics",
+            "content": { "application/json": { "schema": {
+              "type": "object", "properties": { "data": { "$ref": "#/components/schemas/RelationshipRepairResponse" } }, "required": ["data"]
+            } } }
+          },
+          "400": { "description": "Invalid scope, stale revision or safety refusal" },
+          "500": { "description": "Storage or serialization failure" }
+        }
+      }
+    },
     "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
@@ -745,7 +821,7 @@
     "/api/tasks/suggest": {
       "get": {
         "summary": "Suggest tasks by text query",
-        "description": "Returns a lightweight list of matching tasks for quick lookups. Results are limited to a maximum of 50 items (default 20).",
+        "description": "Returns a lightweight list of matching tasks for shared quick lookups. Exact canonical task IDs and exact numeric suffixes rank before ID prefixes/substrings and textual matches; padded numeric aliases preserve project identity and case. Ties use natural project/numeric-ID ordering. Relevance is applied before the maximum of 50 results (default 20), without changing explicit task-list sort behavior.",
         "parameters": [
           {
             "name": "q",
@@ -4377,6 +4453,132 @@
           "deleted",
           "still_referenced"
         ]
+      },
+      "RelationshipKind": {
+        "type": "string",
+        "enum": ["dependency", "hierarchy", "related", "fixes", "duplicate"]
+      },
+      "RelationshipField": {
+        "type": "string",
+        "enum": ["depends_on", "blocks", "related", "parent", "children", "fixes", "duplicate_of"]
+      },
+      "RelationshipNode": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": ["string", "null"] },
+          "status": { "type": ["string", "null"] },
+          "project": { "type": "string" },
+          "state": { "type": "string", "enum": ["active", "external", "deleted", "missing", "ambiguous", "unreadable"] },
+          "is_done": { "type": "boolean" },
+          "matches_filter": { "type": "boolean" },
+          "task": { "$ref": "#/components/schemas/RelationshipTaskSummary" }
+        },
+        "required": ["id", "title", "status", "project", "state", "is_done", "matches_filter"]
+      },
+      "RelationshipTaskSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" }, "title": { "type": "string" },
+          "status": { "type": "string" }, "priority": { "type": "string" }, "task_type": { "type": "string" },
+          "task_state": { "$ref": "#/components/schemas/TaskStateDTO" },
+          "reporter": { "type": ["string", "null"] }, "assignee": { "type": ["string", "null"] },
+          "effort": { "type": ["string", "null"] }, "due_date": { "type": ["string", "null"] },
+          "created": { "type": "string" }, "modified": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "sprints": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+          "custom_fields": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["id", "title", "status", "priority", "task_type", "tags", "sprints", "created", "modified", "custom_fields"]
+      },
+      "RelationshipProvenance": {
+        "type": "object",
+        "properties": { "task_id": { "type": "string" }, "field": { "type": "string" }, "value": { "type": "string" } },
+        "required": ["task_id", "field", "value"]
+      },
+      "RelationshipEdge": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "kind": { "$ref": "#/components/schemas/RelationshipKind" },
+          "provenance": { "type": "array", "items": { "$ref": "#/components/schemas/RelationshipProvenance" } }
+        },
+        "required": ["source", "target", "kind", "provenance"]
+      },
+      "RelationshipIssue": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Opaque canonical diagnostic identity. Refresh before repair; the server resolves safety and scope." },
+          "code": { "type": "string" }, "severity": { "type": "string" }, "message": { "type": "string" },
+          "tasks": { "type": "array", "items": { "type": "string" } }, "repairable": { "type": "boolean" }
+        },
+        "required": ["id", "code", "severity", "message", "tasks", "repairable"]
+      },
+      "RelationshipGraphRequest": {
+        "type": "object",
+        "properties": {
+          "project": { "type": ["string", "null"] }, "task_id": { "type": ["string", "null"] },
+          "relationship_kinds": { "type": ["array", "null"], "items": { "$ref": "#/components/schemas/RelationshipKind" } },
+          "include_isolated": { "type": ["boolean", "null"] },
+          "depth": { "type": ["integer", "null"], "minimum": 0, "maximum": 8 },
+          "max_nodes": { "type": ["integer", "null"], "minimum": 1, "maximum": 500 },
+          "filters": { "type": "object", "additionalProperties": { "type": "string" }, "default": {} }
+        }
+      },
+      "RelationshipGraphResponse": {
+        "type": "object",
+        "properties": {
+          "nodes": { "type": "array", "items": { "$ref": "#/components/schemas/RelationshipNode" } },
+          "edges": { "type": "array", "items": { "$ref": "#/components/schemas/RelationshipEdge" } },
+          "issues": { "type": "array", "items": { "$ref": "#/components/schemas/RelationshipIssue" } },
+          "revision": { "type": "string" }, "complete": { "type": "boolean" }, "truncated": { "type": "boolean" }
+        },
+        "required": ["nodes", "edges", "issues", "revision", "complete", "truncated"]
+      },
+      "RelationshipCheckResponse": {
+        "type": "object",
+        "properties": {
+          "issues": { "type": "array", "items": { "$ref": "#/components/schemas/RelationshipIssue" } },
+          "revision": { "type": "string" }, "complete": { "type": "boolean" }
+        },
+        "required": ["issues", "revision", "complete"]
+      },
+      "RelationshipMutationRequest": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string" }, "target": { "type": "string" },
+          "kind": { "$ref": "#/components/schemas/RelationshipField" },
+          "operation": { "type": "string", "enum": ["add", "remove", "change_kind"] },
+          "from_kind": { "anyOf": [ { "$ref": "#/components/schemas/RelationshipField" }, { "type": "null" } ] },
+          "expected_current": { "type": ["string", "null"] }
+        },
+        "required": ["source", "target", "kind", "operation"]
+      },
+      "RelationshipMutationResponse": {
+        "type": "object",
+        "properties": {
+          "changed": { "type": "boolean" }, "changed_tasks": { "type": "array", "items": { "type": "string" } },
+          "revision": { "type": "string" }
+        },
+        "required": ["changed", "changed_tasks", "revision"]
+      },
+      "RelationshipRepairRequest": {
+        "type": "object",
+        "properties": {
+          "project": { "type": ["string", "null"] }, "apply": { "type": "boolean", "default": false },
+          "issue_ids": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Exact diagnostic IDs to preview/apply. Omitted or empty preserves batch-all-safe combined normalization. Unknown, stale, unsafe or out-of-project-scope IDs fail closed. Revision binds project, sorted unique selected IDs and full inventory bytes. Selected responses contain only selected diagnostics before/after; changed_tasks contains only necessary assertion changes. Alias-only repair substitutes the selected raw spelling without deduplicating; duplicate-only repair keeps the first stored spelling without canonicalizing; missing-mirror-only repair adds only that counterpart without normalizing existing entries. Multiple selected actions are deterministic regardless of ID order; selected aliases are substituted before selected deduplication. Unselected diagnostic types are not opportunistically repaired." },
+          "revision": { "type": ["string", "null"] }
+        }
+      },
+      "RelationshipRepairResponse": {
+        "type": "object",
+        "properties": {
+          "applied": { "type": "boolean" }, "changed_tasks": { "type": "array", "items": { "type": "string" } },
+          "revision": { "type": "string" }, "issues": { "type": "array", "items": { "$ref": "#/components/schemas/RelationshipIssue" } }
+        },
+        "required": ["applied", "changed_tasks", "revision", "issues"]
       },
       "TaskRelationships": {
         "type": "object",

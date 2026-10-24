@@ -375,14 +375,79 @@ pub enum TaskReferenceKindRemove {
 }
 
 #[derive(Args, Deserialize, Debug)]
+#[command(args_conflicts_with_subcommands = true, arg_required_else_help = true)]
 pub struct TaskRelationshipsArgs {
     /// Task ID (with or without project prefix)
-    pub id: String,
+    pub id: Option<String>,
 
     /// Filter by relationship kind (repeat to include multiple)
-    #[arg(long = "kind", value_enum)]
+    #[arg(long = "kind", value_enum, requires = "id")]
     #[serde(default)]
     pub kinds: Vec<RelationshipKind>,
+
+    #[command(subcommand)]
+    pub action: Option<TaskRelationshipsAction>,
+}
+
+#[derive(Subcommand, Deserialize, Debug)]
+pub enum TaskRelationshipsAction {
+    /// Check relationship integrity without changing files
+    Check,
+    /// Preview conservative repairs, or apply a revision-guarded preview
+    Repair {
+        #[arg(long, conflicts_with = "dry_run", requires = "expected_revision")]
+        apply: bool,
+        #[arg(long, conflicts_with = "apply")]
+        dry_run: bool,
+        #[arg(long, requires = "apply")]
+        expected_revision: Option<String>,
+        /// Select exact diagnostic IDs; omitted repairs all safe findings
+        #[arg(long = "issue-id")]
+        #[serde(default)]
+        issue_ids: Vec<String>,
+    },
+    /// Read a bounded canonical relationship graph
+    Graph {
+        #[arg(long)]
+        root: Option<String>,
+        #[arg(long, default_value_t = 3)]
+        depth: usize,
+        #[arg(long, default_value_t = 200, value_parser = parse_positive_usize)]
+        max_nodes: usize,
+        /// Canonical edge kinds (repeat); omitted includes every kind
+        #[arg(long = "relationship-kind", value_parser = ["dependency", "hierarchy", "related", "fixes", "duplicate"])]
+        #[serde(default)]
+        relationship_kinds: Vec<String>,
+        #[arg(long, action = clap::ArgAction::Set)]
+        include_isolated: Option<bool>,
+    },
+    /// Add a relationship relative to the source task, including its reciprocal
+    Add {
+        id: String,
+        target: String,
+        #[arg(long, value_enum)]
+        kind: RelationshipKind,
+        #[arg(long)]
+        expected_current: Option<String>,
+    },
+    /// Remove a relationship and its reciprocal where applicable
+    Remove {
+        id: String,
+        target: String,
+        #[arg(long, value_enum)]
+        kind: RelationshipKind,
+    },
+    /// Change a relationship field relative to the same source and target tasks
+    Move {
+        id: String,
+        target: String,
+        #[arg(long, value_enum)]
+        from: RelationshipKind,
+        #[arg(long, value_enum)]
+        to: RelationshipKind,
+        #[arg(long)]
+        expected_current: Option<String>,
+    },
 }
 
 #[derive(Args, Debug)]

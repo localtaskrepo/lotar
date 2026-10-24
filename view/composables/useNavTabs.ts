@@ -14,6 +14,7 @@ export const NAV_TABS: NavTabDefinition[] = [
     { label: 'Sprints', path: '/sprints' },
     { label: 'Boards', path: '/boards' },
     { label: 'Calendar', path: '/calendar' },
+    { label: 'Dependencies', path: '/dependencies' },
     { label: 'Insights', path: '/insights' },
     { label: 'Agents', path: '/agents' },
     { label: 'Automations', path: '/automations' },

@@ -91,6 +91,17 @@ describe('TaskPanelHost external lifecycle reactivity (DEV-92)', () => {
     expect(toastMock).not.toHaveBeenCalledWith(expect.stringContaining('permanently deleted'))
   })
 
+  it('does not treat navigation from a deleted task to another active task as a restore', async () => {
+    store.upsert(makeTask('A-1', { deleted_at: '2026-10-05T10:00:00Z' }))
+    store.upsert(makeTask('A-2'))
+    controller.openTaskPanel({ taskId: 'A-1' })
+    await nextTick()
+    controller.openTaskPanel({ taskId: 'A-2' })
+    await nextTick()
+    expect(stubProps().taskId).toBe('A-2')
+    expect(stubProps().lifecycleReload).toBe(0)
+  })
+
   it('an external hard deletion of the open task closes the panel with a toast', async () => {
     store.upsert(makeTask('A-1'))
     controller.openTaskPanel({ taskId: 'A-1' })

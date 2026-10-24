@@ -6,6 +6,8 @@ import App from '../App.vue'
 import logoLight from '../assets/branding/lotar-logo.svg'
 import logoDark from '../assets/branding/lotar-logo-dark.svg'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
+import { NAV_TABS, useNavTabs } from '../composables/useNavTabs'
+import Preferences from '../pages/Preferences.vue'
 
 vi.mock('../composables/useTaskStore', () => ({
   useTaskStore: () => ({
@@ -26,6 +28,8 @@ function createTestRouter() {
     routes: [
       { path: '/', component: { template: '<div />' } },
       { path: '/insights', component: { template: '<div />' } },
+      { path: '/dependencies', component: { template: '<h1>Dependencies route</h1>' } },
+      { path: '/preferences', component: Preferences },
       { path: '/task/:id', component: { template: '<div />' } },
     ],
   })
@@ -60,6 +64,50 @@ function findActivityButton(wrapper: ReturnType<typeof mount>) {
 }
 
 describe('App shell', () => {
+  it('shares the navigation registry and toggles Dependencies without blocking its URL', async () => {
+    const { hiddenTabs } = useNavTabs()
+    const previous = new Set(hiddenTabs.value)
+    hiddenTabs.value = new Set()
+    const wrapper = await mountApp('/preferences')
+    try {
+      expect(wrapper.findAll('.nav__link').map((link) => link.attributes('href')))
+        .toEqual([...NAV_TABS.map((tab) => tab.path), '/preferences'])
+      const link = wrapper.get('.nav__link[href="/dependencies"]')
+      expect(link.text()).toBe('Dependencies')
+      const label = wrapper.findAll('label').find((item) => item.text() === 'Dependencies')
+      expect(label).toBeDefined()
+      const checkbox = label!.get('input')
+      expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+      await checkbox.setValue(false)
+      expect(wrapper.find('.nav__link[href="/dependencies"]').exists()).toBe(false)
+      expect(JSON.parse(localStorage.getItem('lotar.preferences.hiddenTabs')!)).toEqual(['/dependencies'])
+      for (const text of ['Reset saved columns and sorting', 'Clear last used filter']) {
+        await wrapper.findAll('button').find((button) => button.text() === text)!.trigger('click')
+      }
+      expect(wrapper.find('.nav__link[href="/dependencies"]').exists()).toBe(false)
+      expect(JSON.parse(localStorage.getItem('lotar.preferences.hiddenTabs')!)).toEqual(['/dependencies'])
+      await wrapper.vm.$router.push('/dependencies')
+      await flushPromises()
+      expect(wrapper.text()).toContain('Dependencies route')
+      expect(wrapper.find('.nav__link[href="/dependencies"]').exists()).toBe(false)
+      await wrapper.vm.$router.push('/preferences')
+      await flushPromises()
+      await wrapper.findAll('label').find((item) => item.text() === 'Dependencies')!.get('input').setValue(true)
+      await wrapper.get('.nav__link[href="/dependencies"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('.nav__link[href="/dependencies"]').classes()).toContain('active')
+    } finally {
+      wrapper.unmount()
+      hiddenTabs.value = previous
+    }
+  })
+
+  it('keeps Tasks active on task detail URLs', async () => {
+    const wrapper = await mountApp('/task/DEV-7')
+    expect(wrapper.get('.nav__link[href="/"]').classes()).toContain('active')
+    wrapper.unmount()
+  })
+
   it('renders supplied light and dark branding with one accessible home link', async () => {
     const wrapper = await mountApp('/insights')
     const brand = wrapper.find('a.brand')

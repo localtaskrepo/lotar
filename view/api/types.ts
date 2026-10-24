@@ -3,6 +3,64 @@ export type TaskStatus = string
 export type Priority = string
 export type TaskType = string
 
+export type RelationshipKind = 'dependency' | 'hierarchy' | 'related' | 'fixes' | 'duplicate'
+export type RelationshipField = 'depends_on' | 'blocks' | 'related' | 'parent' | 'children' | 'fixes' | 'duplicate_of'
+export interface RelationshipGraphRequest {
+  project?: string
+  task_id?: string
+  depth?: number
+  max_nodes?: number
+  relationship_kinds?: RelationshipKind[]
+  include_isolated?: boolean
+  filters?: Record<string, string>
+}
+export type RelationshipTaskSummary = Pick<TaskDTO, 'id' | 'title' | 'status' | 'task_state' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'created' | 'modified' | 'custom_fields'>
+export interface RelationshipNode {
+  id: string
+  title: string | null
+  status: string | null
+  project: string
+  state: 'active' | 'external' | 'deleted' | 'missing' | 'ambiguous' | 'unreadable'
+  is_done: boolean
+  matches_filter: boolean
+  task?: RelationshipTaskSummary
+}
+export interface RelationshipProvenance { task_id: string; field: string; value: string }
+export interface RelationshipEdge {
+  source: string
+  target: string
+  kind: RelationshipKind
+  provenance: RelationshipProvenance[]
+}
+export interface RelationshipIssue {
+  id?: string
+  code: string
+  severity: string
+  message: string
+  tasks: string[]
+  repairable: boolean
+}
+export interface RelationshipGraphResponse {
+  nodes: RelationshipNode[]
+  edges: RelationshipEdge[]
+  issues: RelationshipIssue[]
+  revision: string
+  complete: boolean
+  truncated: boolean
+}
+export interface RelationshipCheckResponse { issues: RelationshipIssue[]; revision: string; complete: boolean }
+export interface RelationshipMutationRequest {
+  source: string
+  target: string
+  kind: RelationshipField
+  operation: 'add' | 'remove' | 'change_kind'
+  from_kind?: RelationshipField
+  expected_current?: string
+}
+export interface RelationshipMutationResponse { changed: boolean; changed_tasks: string[]; revision: string }
+export interface RelationshipRepairRequest { project?: string; issue_ids?: string[]; apply?: boolean; revision?: string }
+export interface RelationshipRepairResponse { applied: boolean; changed_tasks: string[]; revision: string; issues: RelationshipIssue[] }
+
 export type TaskDueBucket = 'today' | 'soon' | 'later' | 'overdue'
 
 /**

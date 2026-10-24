@@ -388,13 +388,13 @@ const filterOptions = useFilterOptions(() => items.value, () => project.value, {
   scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value,
 })
 const draggingId = ref<string>('')
-const filter = ref<Record<string, string>>({})
+const filter = ref<Record<string, string>>(typeof route.query.q === 'string' ? { q: route.query.q } : {})
 const filterBarRef = ref<{ clear?: () => void } | null>(null)
 const columnsDialogOpen = ref(false)
 const fieldsMenuOpen = ref(false)
 const filterPayload = computed(() => ({
   ...filter.value,
-  project: project.value || '',
+  ...(project.value || Object.prototype.hasOwnProperty.call(route.query, 'project') ? { project: project.value } : {}),
 }))
 const { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
   routePath: '/boards',
@@ -924,8 +924,8 @@ onMounted(async () => {
   await refreshBoardTasks()
 })
 
-watch(() => route.query, async (q) => {
-  project.value = (q as any).project ? String((q as any).project) : ''
+watch(() => route.query.project, async (value) => {
+  project.value = value ? String(value) : ''
   await refreshConfig(project.value)
   await refreshBoardTasks()
   boardLayout.load()

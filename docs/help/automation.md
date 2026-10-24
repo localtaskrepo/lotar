@@ -110,6 +110,14 @@ on:
 - `run`: execute a command when the action fires
 - `comment`: add a comment to the task
 
+Relationship actions use the shared relationship mutation rules: adding or
+removing `depends_on`, `blocks`, or `related` also updates its reciprocal
+assertion. Dependency evaluation includes incoming `blocks` declarations from
+legacy one-sided data, not only a task's stored `depends_on` array. Missing,
+deleted, or unreadable prerequisites remain unresolved. Each prerequisite is
+evaluated against its own project's done-state policy. Relationship repair is
+maintenance and does not itself request a status change or agent launch.
+
 ### Assignee tokens for actions
 
 - `@assignee`, `@reporter`, `@assignee_or_reporter`, `@me`

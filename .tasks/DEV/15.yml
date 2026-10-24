@@ -1,10 +1,11 @@
 title: Dependency consistency check command
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.772608+00:00
-modified: 2026-09-06T13:12:54.019780+00:00
+modified: 2026-10-23T00:02:07.535105+00:00
 comments:
 - date: 2026-09-06T11:21:52.675067+00:00
   text: 'Backlog reconciliation: Remains Todo for a dependency consistency checker. Current relationships command lists stored data; sprint integrity checks are a different model. Define dangling IDs, self-links, cycles and reciprocal consistency. Any repair mode requires explicit semantics and DEV-55 transaction discipline.'
@@ -12,6 +13,16 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 16: Add dependency concistency check command
+- date: 2026-10-22T22:59:34.968273+00:00
+  text: 'Approved implementation plan: define canonical typed relationship edges with stored provenance; enforce reciprocal depends_on/blocks, related, parent/children through one fresh locked multi-file mutation planner; retain directional fixes/duplicate_of with computed incoming links. Add strict inventory diagnostics, separate cycle kinds, coherent graph reads, explicit safe repair preview/application with revision checks, no repair-on-read or heuristic target/deletion/parent selection. Integrate create/update/CLI/REST/MCP/automation, preserve unrelated legacy invalid data and no-op bytes. Deliver accessible editing under DEV-8 and graph under DEV-9. Inspect existing verification CLI/hook support and create follow-up if absent. Verification: targeted nextest/API/UI/browser regressions, synchronized Rust/TS/OpenAPI/help, full lint/test/fresh smoke. Preserve pre-existing Cargo.toml and DEV-137 changes; no Git writes or hook installation.'
+- date: 2026-10-22T23:11:21.175735+00:00
+  text: 'Milestone: confirmed no unified verify command; created DEV-138 for read-only combined dependency/config/scanner gate and self-use through project pre-commit. Existing hook uses stash/fmt/add/checkout and is not being run or reconfigured. REST graph/check/mutate/repair adapters and four MCP tools now route to shared core; OpenAPI/help and boundary regression tests added, pending compilation against core implementation. Corrected planned mutation contract to distinguish seven source-relative categories from five canonical graph edge kinds, so depends_on-to-blocks reversal is one expressible atomic operation. Core and frontend/CLI implementation ongoing; no tests claimed passed yet.'
+- date: 2026-10-23T00:02:07.484555+00:00
+  text: |-
+    Outcome: completed shared typed relationship model, strict inventory/checker, revision-scoped safe repair preview/application, bounded graph API, and atomic source-relative add/remove/category conversion. Maintains depends_on/blocks, parent/children and symmetric related assertions; directional fixes/duplicate remain computed incoming edges. Normal create/prepared-create/whole-map update, CLI, REST, MCP and automation share validation and coordinated publication. New cycles/invalid targets/parent conflicts rejected; unrelated legacy metadata edits and no-op bytes preserved. Coherent reads refuse recovery; metadata synchronization only inside existing roots. Automation deltas now compose on fresh locked state; exact-case padded aliases deduplicate/remove canonically. External manifest drift before or during publication refuses/rolls back. Relative-root discovery fixed. Independent review findings resolved; follow-up review no remaining high-risk finding.
+    Evidence: core/transport targeted84/84, CLI9/9, REST/OpenAPI/MCP contracts26/26; new desktop/mobile browser scenarios4/4 on final fresh build. Full npm test:agent passed Rust1580/143 binaries, frontend955/85 files, release26. Full smoke against just-built final artifact passed298/74 files. Final lint:agent passed frontend typecheck, all-target/all-feature Clippy-Dwarnings and formatting. Strengthened old DEV59 composition fixture to distinct prerequisite/dependent targets (previous fixture formed newly forbidden cycle), retained composition/dedup and added inverse assertions; targeted11/11 and full tests passed. Final diff whitespace check clean. Global and DEV config validation valid; modified-file scan preview found no TODOs. Actual DEV checker complete=true,37 existing missing Related mirrors, no errors; no legacy repair applied.
+    Remaining: DEV-138 tracks unified hook-friendly verify/config/dependency/scan command and own safe hook integration; no unified verify exists yet. Current mutating precommit hook not run or installed/reconfigured. Reads may initialize ignored advisory lock/coordinator metadata only, never absent roots or task/config/history/journal data; writable synchronization locations required, busy/pending context explicit unavailable. Noncooperating external edits outside advisory guarantee; tombstone mirror removal requires restore first. Local capability limits recorded:46 Git-required Rust tests excluded,25 smoke skips, existing Vue inject warnings; no native Windows or remote CI run. No Git mutations, user-server restarts or publication.
+    Guidance: no durable instruction finding; existing task/model/API/MCP/help docs and Rust/TS/OpenAPI contracts synchronized. Preserved unrelated user Cargo.toml version bump and DEV-137; Cargo.lock reflects existing0.9.2 version.
 description: |-
   Migrated checklist requirements:
   Provide a dependency consistency-check command, distinct from listing relationships or sprint integrity checks. Define dangling IDs, self-links, cycles and reciprocal consistency diagnostics; any repair mode needs explicit safe semantics.
@@ -31,3 +42,29 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-22T22:59:34.937137+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T22:59:34.968273+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T23:11:21.175735+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T00:02:07.484555+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T00:02:07.535105+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

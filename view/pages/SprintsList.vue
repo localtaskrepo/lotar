@@ -5,6 +5,7 @@
         <h1>Sprints</h1>
       </div>
       <div class="row split-actions" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+        <a :href="`/dependencies${project ? '?project=' + encodeURIComponent(project) : ''}`">Dependencies</a>
         <UiButton
           icon-only
           type="button"
@@ -955,7 +956,7 @@ const form = reactive({
   notes: '',
   skip_defaults: false,
 })
-const filter = ref<Record<string, string>>({})
+const filter = ref<Record<string, string>>(typeof route.query.q === 'string' ? { q: route.query.q } : {})
 // Initialize from the route at setup so the FilterBar's first emit echoes the
 // real project instead of a transient empty value that would strip ?project=
 // from the URL before onMounted runs.
@@ -963,7 +964,7 @@ const project = ref<string>(route.query.project ? String(route.query.project) : 
 const filterBarRef = ref<{ clear?: () => void } | null>(null)
 const filterPayload = computed(() => ({
   ...filter.value,
-  project: project.value || '',
+  ...(project.value || Object.prototype.hasOwnProperty.call(route.query, 'project') ? { project: project.value } : {}),
 }))
 const { onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
   routePath: '/sprints',

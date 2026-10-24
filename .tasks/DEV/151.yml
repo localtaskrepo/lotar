@@ -1,0 +1,52 @@
+title: Scope graph issue repairs and make connected-task projection consistent
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T00:32:20.097197+00:00
+modified: 2026-10-24T01:38:51.861156+00:00
+comments:
+- date: 2026-10-24T00:32:20.171830+00:00
+  text: 'Plan: sharedbackend owner handles issue identity/selectedrepair scope andgraphkinds/isolate prelimit selection; graphUIowner handlesFixevent/emptyplot/queryextension/rangeexplanation; parentmovesShowunlinked toggleinsideFilterspanel alignedDepthandwiresselectedpreview+browser. Existing graphselectsfirst100matchingrecords beforeedgeexpansion, soisolatesconsumeallbudgetthenclienthidesmost; inspectactualDEV54read-onlycomparison. Stageislongestprerequisite orderingrankwithinreturnedgraph, depthlimitsBFSdistancefromroot/matches, so2hops mayinclude4columns. Preservecoherentlocks/writerboundaries/revisionguard/externalread-only andno bulkrepair. Rust/TS/OpenAPI/MCP/CLIconstructorssyncwhenDTOextends. FullQA andexactclosure, indexuntouched.'
+- date: 2026-10-24T01:02:50.178244+00:00
+  text: 'Integrationtargetevidence: firstfresh18cases15passed inclselectedcardFixBpreviewreadbytes+sameIDsapply leavesCunfixed, budget6 connected3despite12recentisolates, fourstageswith2hopchain, settledemptyplot. Failures: mobileRange/Showbuttonwrap nowintentionalfullwidthstack testmatchesresponsivepattern; typednumericstandalone2 removedbynewserverincludeisolatedfalse (backendownerfixrequestedpreserveuniqueexactexception); pendingrootrawwindowYdiff49 whileplotTopidentical79.859 duebrowseranchor—correctedassertvisualplotTopstable/no topresetandstrictinneraxes/height, unchangedquickdelayedcasepasses. ScopeCardreadonlyreviewfoundalias-onlyalso dedup viajointnormalizer; backendownerimplementingtypedrawactions soonlyselecteddiagchanges(defaultbatchsame), no unsafebulk. UpdatedUI/RESTquerytest useskindsCSV notJSONproperty, helperscleanunroutewait toavoidroutedteardownrejection. KeepInProgress untilnewbackendrelease+finalfresh QA.'
+- date: 2026-10-24T01:28:12.229425+00:00
+  text: 'Backendfinalrelease: typedRepairAction(aliasraw/duplicate/mirror) nowdiagnosticexact—aliaspreservesmultiplicity,duplicatepreservesfirstspelling,mirrorleavesneighborssamefielduntouched; defaultbatchjointnormalizationunchanged. Reviewfollowupresolved/nofindings;82/82defaultandallfeature plusclippy/fmtpass. Uniqueexactfull/padded/compact/numericisolatedquery preservedbeforecap/noambiguityguess/filteroverride. ActualnewCLIread-onlysameconditions: connectedunfilteredDEV20nodes20edgescomplete vsrootDEV5410nodes9edgescomplete; subsetcontained, legacybefore100nodes0depedge truncated bugfixed. Fresh18browser17pass1generalexplorationpoll timedunderhighimportload(410saggregateimports/worker); unchangedsinglefile/singlecasepassed8s. All3newcaseproofselectedBnotC, connectedbudgetand4stage2hop passed. ParentoldwindowYassertcorrectedtoactualplotTop: docanchorchanged49pxbutplotTopidentical79.859/innerscrollsame; retainedstrictvisual/noPageTop guarantees andcleanupunroutewait. MobileShowtoggle nowintentionalfullwidthstack,desktopalignedRange. Fullgatesnext. No realtaskrepair/indexwrite/serverrestart.'
+- date: 2026-10-24T01:38:51.834373+00:00
+  text: |-
+    Outcomecomplete: repairablegraphproblemcards haveFix preview actions, busy/stale/idguards andunsafeManualreview. OpaqueissueIDs resolvedserver-side; selectedpreview/applybindsameIDs/project/fullinventoryrevision, unknownunsafe/outscope/stale refused. Alias-onlyrawactionpreservesduplicates, duplicate-onlykeepsfirstspelling, mirror-onlydoesnotnormalizeotherfieldentries; defaultbatchunchanged. UIselectedpreviewexplicitOnlythisproblem, unchangedtaskbytesbeforeconfirm, exactlychosenendpointupdatedafterconfirm withotherunfixedproblemleft. Previewscrollmarginkeepsscope/confirmationbelowstickyheader. Show unlinked tasks returnedinsideFiltersalignedConnectionrange (mobileintentionalstack), noheadercontrol. Acceptedemptyplotsclearedwithoutdestroyingpendingviewport. Newgraphkinds/include-isolatedselectionbeforebudget excludesrecentisolates, allocatesendpointpairs/context beforebudgetexhausts, preservesfocal/typedunique/unresolvedandfilter/sort semantics; max1/odd limits explicittruncated. RealDEVbeforeunfiltered100nodesdep0truncatedvs54focused43dep20; afterconnecteddepconditionsunfiltered20nodes20edgescomplete and54focused10nodes9edgescomplete/subset, realdataunmodified. Hopvsstagehelpclarifiedandfourstage2hopfixtureproved. Rust/TS/OpenAPI/MCP/CLI/help synchronized; newCLI --relationship-kind/--include-isolated/--issue-id.
+    Verification: backend78initial+13MCPallfeature, correctedfinal82defaultANDallfeatures/clippygreen; reviewP2alias+duplicateconflationreproduced/fixedandre-reviewno findings. ParentPage/Graphtarget96andtypecheckgreen. Exactnumericisolatedq2regressionredthenfixed forall6IDforms/ambiguity/case/filters/no-taskwrite. All18focusedbrowsercasestogetherpassed includingselectedBnotCreadbytes/constantIDs,12recentisolatescap6select3connected,noemptysmallscope,alignment/sort/autocomplete/nav/SSE andstage4range2. Oneoriginalexplorationpolltimeout underhighhostimportload passedunchangedwhenfiletargeted; no budgets/isolation/concurrencymodified. VisualscrollproofusesplotTopstable whilebrowseranchoringadjustedwindowY49; strictplotaxes/height/noPageTopretained, routeteardownwaitfixpreventsunhandledhandlers. Mobile/wide/sticky-preview screenshots inspected,capturegone. Finalwarning-freealltarget/allfeaturelint/typecheck/fmt; normalCItestbuildthenunchangedtest:agent Rust1612/144binaries,frontend1103/89files,release26passed. Finalfreshbuildfullsmoke312/74filespassed, whitespaceclean.
+    Remaining: no knownscopedblocker; no liveprojectrepair or user-server restart. Updatedbackendmustbeloadedtousenewselection/scopedrepairIDs (oldservernotrestarted). Existing46Gitrequiredexclusions/25smokeskips/Vueinjectwarnings, advisoryexternaleditlimits andnativeWindows/remoteCInotrun recordednotpasses. UserstagedindexandunrelatedCargo/tickets preserved; currentfollowup+trackingunstaged. No Gitconfig/hooks/staging/commits/newdeps/sessions/worktrees/bulkrepair. No durableinstructionfinding; reuse/contract/visualguidanceapplied.
+description: 'Developer follow-up: per-problem safe Fix button, Show unlinked tasks toggle backinside Filters, no empty settled diagram, explain2hops vs4stages, fewerunfilteredconnectedtasks thanfocusedDEV54. Extend safe repair to target selectedissue IDs withpreview/revision/confirmation andno unrelatedwrites; unsafeissuesmanualreview. Fixselected-kind connected matching selection BEFORE maxnodes (budgetnotwastedonrecentisolates/unsupportedboundaries), preservefocal/diagnostic/typedIDexceptionsandexplicitlimits. UIrequest types+includeisolated toserver, useclearconnection-rangevsorderingcolumntext. No realtaskrepair/Git/server/deps changes; testscontractsync browser/visual/fullgatesandpreserveindex.'
+history:
+- at: 2026-10-24T00:32:20.143511+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T00:32:20.171830+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T01:02:50.178244+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T01:28:12.229425+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T01:38:51.834373+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T01:38:51.861156+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

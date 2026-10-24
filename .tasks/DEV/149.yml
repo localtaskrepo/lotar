@@ -1,0 +1,58 @@
+title: Fix dependency snapshot contention and root drill-down consistency
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-23T20:38:36.687142+00:00
+modified: 2026-10-23T21:05:47.519887+00:00
+comments:
+- date: 2026-10-23T20:38:36.766725+00:00
+  text: 'Plan: bounded backend owner shared-read snapshot locking/contention tests; graph/history owner root+panel drilldown and connection geometry; parent sharedsearch-height fix and browser/fullverification. Currentread_lock uses try_lock_exclusive for readers, so competingreads can surfaceEAGAIN. Preserve fresh validation/manifest/journal failclosed and writersafety; no frontendfakecleanfallback. Rootnavigation shouldbeonehistoryentry root+q+taskPanel andBack restoreprior root/panel, no listreload. Consistent36pxtoken withborderbox acrosssharedbars. Preserveindex/userwork andrealdata.'
+- date: 2026-10-23T20:46:00.420365+00:00
+  text: 'Shared sizing evidence: FilterBar searchhadborderbox butnoheight/minheighttoken, whileUiButtonusedcontrol-height. Addedtokenheight/minheightatsharedclass(fail-firstCSScontractred→green), no page-specificheightfork. FocusedFilterBar73passed; freshbrowser unifiedfilter2casesdesktop/mobile nowmeasuresearchvsfilterbutton sameheight<1px onTasks/Boards/Calendar/Sprints/Dependencies, filtergrammar/popup/custom/date/dataimmutabilityassertionsretained. Backendlock andgraph/historyboundedownersstillfinishingtargetedtests; currentrecordnotcomplete.'
+- date: 2026-10-23T20:52:45.943789+00:00
+  text: 'Milestone: shared snapshotlocks +bounded500mscontention/release-wholeset fix passed54relationship+15transport/CLI tests/clippy/fmt. Actualrepo parallelcheckandDEV54graph reads bothsuccessful/complete withsamehash;37oldRelatedmirrorsunapplied. Newrealbrowser13-case selection had11pass incl24parallelgraph/check reads+navigateaway/back andconnectionbounds/intrinsicrowrightgutter/nooverlap; bothdesktop/mobile rootchains failedlastBack. IndependentreviewidentifiedrealFilterBar qecho issuingreplace competingwithpush; graph/historyownerfixingwithREALFilterBar routerregression(no stub). KeepInProgress. Sharedheightfreshbrowser passed5pagesat2viewports, noAPI/source data writes. Finalgatesafterhistoryecho fix.'
+- date: 2026-10-23T21:00:58.938963+00:00
+  text: 'Integrationcomplete: realFilterBar controlledq/defaultorder echo nowdoesnotwriteroute whenmeaningunchanged, soatomicpushretainsoriginhistory. RealFilterBar memoryrouter regressionred→green107targeted, genuineedits/root-onlyclear preserved. Fresh13browsercasespassboth1440/390 chains sourceRoot→cardB(rootB+detailsB)→relatedA(rootA+detailsA)→BackB→closekeepsB→BackoriginalA, stablePage searchDOM. Concurrent24graph/checkrequests acrossaway/back all200/complete, actualrepo parallelreadscompletewithsamehash (old37mirrorsleft). Connectionsrowsintrinsicandwrap, portsactual300px/lane-awarecanvasbounds pathsallinside; visualfoundframe still1340px for732pxcanvas, newredbrowserguardthenfitmax-content/max100%fix. Finalfresh13/13pass, frameonlycanvas+chrome andrightcontentgutter<=64, rowunusedrightspace<=2; screenshotsdesktop/mobileinspected theninstrumentationremoved. No arrowslabelsreintroduced; pendingjournals/externalmutationfailfast safetyretained. Fullgatesnext, indexuntouched.'
+- date: 2026-10-23T21:05:47.496192+00:00
+  text: |-
+    Outcomecomplete: shared FilterBar searchusescontrol-heightheight/minheight+borderbox, samebuttonsizeacrossTasks/Board/Calendar/Sprints/Dependenciesdesktop/mobile. Snapshotreadsnowsharedlocks, concurrentreadersallowed/exclusivewritersretained; transient500msboundedwait releasesallpartiallocksandrediscoversmanifests, unsupported/persistentbusy/pendingjournalfailclosed, externalcontextinsideownmutationremainsfailfast. Symlink/FIFO/nonregularlocksrefusedwithoutdatarecovery. Actualrepo parallelcheck/DEV54readscompletewithsamehash,37legacywarningsunapplied. Rootdrillactivationatomicpush(root/q/taskPanel)opensdetails andBack/Forward restorespreviousroot/panel; closekeepscurrentroot. NarrowrelatednavigationbranchonlyDependencies; modifierlinksandotherpagehistorysafe. Parentdefault-filterecho nowsemanticno-op toavoidcompetingreplacecancelingpush; REALFilterBar memoryrouterred→green protectsorigin. Connectionrowsintrinsicbounded/wrapping, actual300pxports/lane-awarecolspacing/canvasbounds fitself/reverse/parallel/deep paths. Diagramframefitsroutedwidth(max100%/overflow), removes600pxunusedgutter caughtbyred1340pxframe/732pxcanvasbrowserguard. Legend/types/accessibilitykept, noarrowtextrestored. Docsupdated.
+    Evidence: sharedstylesred→green73targeted, backend54relationship+15transportCLI/clippy/fmt, graph/history107targeted+typecheck. Real13dependencybrowsercasespass plus2sharedfiltercaseseachchecking5pagesatdesktop/mobile. APIstress24parallelgraph/checkreadsduringaway/backall200/complete, RootA→cardB→relatedA→BackB→closeB→BackoriginalA underrealFilterBar+stablePageDOM, pathbboxinsidecanvas/rightgutter<=64/rowsunused<=2/framefitscanvas+scrollchrome, wide/mobile screenshotsinspected. Firstfresh13run11pass2Backfail independentlyreviewed; fixedwithoutweakeningassertions. Reviewnoadditionallock/geometryfindings. Final warning-freelint:agent(alltargets/allfeatures/typecheck/fmt), full test:agent Rust1599/144binaries, frontend1089/89files, release26passed; finalfreshbuildfullsmoke307/74filespassed. Finaldiffcheckclean, temporarycapturecodegone, scheduledwaitcancelledwhenworkercompleted.
+    Limits: normalreadercontentionremoved; lockwaitbudgetnotFS/schedulingtimeout, persistentwriters>budgetexplicitunavailable; advisorylocksnotexternaleditorcontrol. Existing46gitrequiredexclusions/25smokeskips/VuewarningsnativeWindows/remoteCIlimitsrecordednotpassed. No testbudgets/retries/concurrencyrelaxed. Userindexandunrelatedworkpreserved; thesefollowupchanges/trackingunstaged. No staging/commit/Gitconfig/hook/serverrestart/bulkrepair/newdeps/AgentManager sessions. Backendlockfixrequiresupdatedbinaryloadedbyexistingserver; didnotrestartit. No durableinstructionfinding, existingguidanceapplied.
+description: 'Developer follow-up: shared search input/filter-button height mismatch; relationship snapshot try-exclusive lock fails busy during back/navigation concurrent reads; connection layout overwide/broken right margin; clicking task should drill root and open details with Back restoring previous root. Fix shared FilterBar token sizing, coherent concurrent read coordination with bounded writer contention without recovery/write weakening, compact connection rows/accurate diagram bounds, atomic router root+panel navigation preserving filters/callbacks/modifier links. Deterministic concurrency and real browser history/nav/sizing/geometry regression; full lint/test/build-first smoke; preserve staging/unrelated data, no Git/server/hook changes or bulkrepair.'
+history:
+- at: 2026-10-23T20:38:36.739227+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-23T20:38:36.766725+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T20:46:00.420365+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T20:52:45.943789+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T21:00:58.938963+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T21:05:47.496192+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T21:05:47.519887+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

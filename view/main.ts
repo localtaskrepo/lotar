@@ -6,6 +6,7 @@ import AutomationView from './pages/AutomationView.vue'
 import Board from './pages/Board.vue'
 import Calendar from './pages/Calendar.vue'
 import ConfigView from './pages/ConfigView.vue'
+import Dependencies from './pages/Dependencies.vue'
 import NotFound from './pages/NotFound.vue'
 import Preferences from './pages/Preferences.vue'
 import ProjectInsights from './pages/ProjectInsights.vue'
@@ -30,6 +31,7 @@ const router = createRouter({
     { path: '/boards', component: Board },
     { path: '/calendar', component: Calendar },
     { path: '/insights', component: ProjectInsights },
+    { path: '/dependencies', component: Dependencies },
     { path: '/agents', component: AgentJobs },
     { path: '/automations', component: AutomationView },
     { path: '/sync', component: SyncHub },

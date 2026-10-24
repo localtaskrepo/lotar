@@ -1,15 +1,26 @@
 title: Dependency graph visualization for related/blocked tickets
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.740478+00:00
-modified: 2026-09-06T13:12:53.888840+00:00
+modified: 2026-10-23T00:02:07.606922+00:00
 comments:
 - date: 2026-09-06T13:12:53.888840+00:00
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 10: Dependency graph visualization for related/blocked tickets (e.g., graph view in TODO.md or UI).
+- date: 2026-10-22T23:01:12.645568+00:00
+  text: 'Approved plan: authoritative backend typed graph projection from DEV-15 with bounded task neighborhood, prerequisite-to-dependent arrows, optional related/hierarchy layers, clear missing/deleted/ambiguous/unreadable and cycle/partial states. Navigable task nodes with accessible list/mobile default, full graph page preserving URL context and suitable sprint/project entry point. Reuse shared SSE/cache scope safety; no graph assembled from arbitrary paginated task lists. Vue/SVG first version without new graph runtime dependency. Contract synchronization, UI/browser regressions and final shared gates.'
+- date: 2026-10-22T23:32:29.752666+00:00
+  text: 'UI milestone: task-neighborhood graph and dedicated /dependencies page with URL root/project/depth/layers, accessible synchronized list + SVG links/keyboard navigation, mobile list default, cycle highlighting/text and explicit unresolved/deleted/external read-only markers. All five canonical edge layers available; project/sprint entry links added. Safe repair preview and explicit confirmation use preview revision, invalidate on scope/SSE changes. Browser 4/4 targeted pass on fresh artifact, including read-only cycle/missing/deleted rendering and reciprocal repair preview byte-preservation. Source/data coherence and final lint/test/fresh smoke gates still pending; not Done yet.'
+- date: 2026-10-23T00:02:07.515075+00:00
+  text: |-
+    Outcome: completed authoritative bounded dependency graph in Relationships tab and dedicated /dependencies page, with project/sprint entry links. Canonical prerequisite-to-dependent arrows, provenance, five optional edge layers, synchronized accessible task/edge list, SVG click/keyboard navigation, mobile list default, cycle marking/text and missing/deleted/ambiguous/unreadable/external-readonly states. Full-page root/project/depth/layer scope persists in URL; page has one URL-backed layer control, task-panel local toggles retained. Safe repair preview explains scope and possible manual inverse-deletion restoration; explicit confirmation uses fresh preview token and stale scope/SSE invalidation.
+    Evidence: DependencyGraph/Dependencies targeted28/28 and frontend typecheck passed; four final fresh Chromium scenarios cover desktop/mobile navigation with preserved graph URL, cycle/missing/deleted read-only rendering, preview byte-preservation and explicit reciprocal repair. Full final suite green:1580 Rust/955 frontend/26 release/298 smoke; warning-free lint/fmt. Published API shape synchronized Rust/TS/OpenAPI, four new MCP tools tested. Independent backend review resolved all3 findings and follow-up found none in scope.
+    Remaining: bounded first-version diagram, not a general graph editor; partial output explicit. Existing37 DEV Related missing mirrors left unapplied. Remote CI/native Windows and existing local capability limits documented DEV-15. DEV-138 owns unified validation hook; no existing hook execution/Git config changes or user-server restart.
+    Guidance: no durable instruction finding; relevant existing docs updated.
 description: |-
   Migrated checklist requirements:
   Provide a dependency graph for related/blocked tickets with explicit edge direction and navigation. The retired checklist was only a suggested display location; use an agreed UI or export/report surface rather than recreating that backlog file. Define cycle and missing-target display behavior.
@@ -25,3 +36,29 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-22T23:01:12.618264+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-22T23:01:12.645568+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-22T23:32:29.752666+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T00:02:07.515075+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T00:02:07.606922+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

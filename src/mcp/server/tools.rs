@@ -44,6 +44,63 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_task_delete_tool(enum_hints),
         make_task_restore_tool(enum_hints),
         make_task_list_tool(enum_hints),
+        json!({
+            "name": "relationship_graph",
+            "description": "Read a bounded typed relationship graph. Dependency arrows point from prerequisite to dependent. relationship_kinds selects canonical connectivity before budgeting; include_isolated=false hides isolated seeds except explicit focus, unique exact IDs and unresolved diagnostics. Omitted options retain legacy projection. Depth is undirected BFS hops (0-8), not layout columns; project-wide queries use all matching seeds with at least one boundary hop. Missing/deleted/ambiguous/unreadable nodes and global integrity issues remain explicit; complete/truncated report inventory/projection limits. Never repairs files.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project": {"type": ["string", "null"]},
+                    "task_id": {"type": ["string", "null"]},
+                    "depth": {"type": ["integer", "null"], "minimum": 0, "maximum": 8},
+                    "max_nodes": {"type": ["integer", "null"], "minimum": 1, "maximum": 500},
+                    "relationship_kinds": {"type": ["array", "null"], "items": {"type": "string", "enum": ["dependency", "hierarchy", "related", "fixes", "duplicate"]}},
+                    "include_isolated": {"type": ["boolean", "null"]},
+                    "filters": {"type": "object", "additionalProperties": {"type": "string"}}
+                },
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "relationship_check",
+            "description": "Inspect relationship integrity without changing files. Returns structured issues and a diagnostic snapshot revision; incomplete inventory is never a clean result. Obtain an apply token from relationship_repair preview, not from this check revision.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"project": {"type": ["string", "null"]}},
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "relationship_mutate",
+            "description": "Atomically add, remove, or change one relationship category and its reciprocal assertions. source is the focused task, target the linked task. change_kind requires from_kind. Occupied parent/duplicate replacement requires the expected current value. Does not replace unrelated relationships.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "source": {"type": "string"},
+                    "target": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["depends_on", "blocks", "related", "parent", "children", "fixes", "duplicate_of"]},
+                    "operation": {"type": "string", "enum": ["add", "remove", "change_kind"]},
+                    "from_kind": {"type": ["string", "null"], "enum": ["depends_on", "blocks", "related", "parent", "children", "fixes", "duplicate_of", null]},
+                    "expected_current": {"type": ["string", "null"]}
+                },
+                "required": ["source", "target", "kind", "operation"],
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "relationship_repair",
+            "description": "Preview conservative relationship repairs by default. Explicit apply=true requires the unchanged preview revision. Repairs only proven duplicates/aliases and unambiguous reciprocal assertions; adding a mirror can restore an intentionally manually deleted side. Never guesses targets, breaks cycles, chooses parents, or restores deleted tasks.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project": {"type": ["string", "null"]},
+                    "apply": {"type": "boolean", "default": false},
+                    "issue_ids": {"type": "array", "items": {"type": "string"}, "description": "Exact diagnostic IDs to repair. Omitted or empty repairs all safe issues in project scope. Unknown, stale, unsafe, or out-of-scope IDs are rejected."},
+                    "revision": {"type": ["string", "null"]}
+                },
+                "additionalProperties": false
+            }
+        }),
         make_sprint_list_tool(),
         make_sprint_get_tool(),
         make_sprint_create_tool(),

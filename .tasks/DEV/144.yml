@@ -1,0 +1,21 @@
+title: Adding tags doesn't show added tags
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-23T17:10:39.863681+00:00
+modified: 2026-10-23T17:10:58.202480+00:00
+description: In the task panel when going into the "Add tag" dialog, the dialog obscures the are where you would see tags in the panel, plus the page is in the background behind a dark filter, so it's very hard to make out what tag was added. Either the dialog can't be model and is placed where the button is, by default opening away from the tags area (limited by top border), or the tags need to be shown in the dialog itself.
+history:
+- at: 2026-10-23T17:10:56.586135+00:00
+  actor: mallox
+  changes:
+  - field: task_type
+    old: Feature
+    new: Bug
+- at: 2026-10-23T17:10:58.202480+00:00
+  actor: mallox
+  changes:
+  - field: priority
+    old: Medium
+    new: Low

@@ -1,0 +1,47 @@
+title: Refine relationship editing and dependency view discoverability
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-23T01:32:44.432702+00:00
+modified: 2026-10-23T02:00:34.012228+00:00
+comments:
+- date: 2026-10-23T01:32:54.626889+00:00
+  text: 'Plan: compact seven relationship categories into short rows, task chips with secondary actions, on-demand category add controls, and collapsed lazy graph preview. Expose Dependencies through existing NAV_TABS/preferences mechanism (parallel bounded ownership). Move Fix relationships into visible page toolbar, auto-check integrity summary, keep explicit safe preview/apply and stale-scope guards. Reduce duplicate graph/task/edge/issue prose through disclosures rather than remove accessible information. Targeted unit and real desktop/mobile browser tests, then full required gates. No backend/schema changes, Git mutations, user-server restart or bulk repair.'
+- date: 2026-10-23T01:54:37.515292+00:00
+  text: 'Milestone: compact row/chip editor implemented with one on-demand add/actions area, focus restoration, short empty states, and collapsed lazy graph preview (no graph request merely opening tab). Standalone graph avoids always duplicating diagram+text; lists remain default on mobile and expandable on desktop. Dependencies now in shared NAV_TABS and Preferences persisted hide/show/reset/direct-link behavior; app nav consumes registry and prevents brand/Task-button overlap with horizontal overflow. Top header Fix relationships opens existing explicit scope/revision preview, never silent apply. Check remains on-demand rather than adding redundant background validation requests. Successful repair SSE receipt preserved. Targeted unit/typecheck and five real browser scenarios pass; screenshots inspected desktop/mobile, empty editor about383/407px. Browser geometry asserts <480px and no toolbar/tab or nav/Task-button overlap. Temporary screenshot instrumentation removed. Full required gates next; no backend/API changes or bulk repair.'
+- date: 2026-10-23T02:00:33.987144+00:00
+  text: |-
+    Outcome: refined Relationships into compact category rows and task chips, one on-demand Add/actions editor, keyboard Escape/focus restoration, and collapsed lazy dependency preview. Preserved drag/drop and guarded atomic moves; opening tab sends no graph request. Full Dependencies page now has prominent Fix relationships header action, explicit scope/revision-bound preview/confirmation, compact issue details and correct success receipt through its own SSE updates. Diagram/text duplication reduced with accessible disclosure lists (mobile list default). Dependencies added to shared NAV_TABS and main nav; Preferences hide/show persists across reload, preserves existing hidden choices and direct URL access. Header brand/Task button protected from crowded-nav overlap. Existing help/preferences docs updated.
+    Evidence: targeted navigation before-fix3fail reproduced missingtab, then22/22pass; focused combined88pass, additional focus/safe-repair cases included final suite. Five real Chromium browser cases pass on desktop1440px/mobile390px plus default1280px nav: atomic moves, drag vs mobile control, no stale-map/attachment POSTs, lazy graph, repair confirmation/SSE success, hide/show persistence and hidden direct access. Screenshots inspected; compact empty editor about383px desktop/407px mobile. Added <480px and toolbar-vs-tabs/nav-vs-Task geometry regressions. Visual inspection caught legacy absolute toolbar inheritance and header shrink collisions; both fixed. Initial temporary screenshot selector incorrect, corrected then removed all capture instrumentation. Full final lint:agent passed Vue typecheck/alltarget-allfeatureClippy-Dwarnings/fmt. Full test:agent Rust1580/143binaries, frontend967/85files, release26 passed. Build-first full smoke299/74files passed. Final diff whitespace clean.
+    Remaining: no UI blocker; no backend/API/schema changes or bulk task repair in this follow-up, DEV-138 hook scope unchanged. Preserved prior uncommitted dependency work and unrelated Cargo/DEV-137 changes. No staging/commits/Git config/hook changes/user-server restart. Existing local limits:46 Git-required exclusions,25 smoke skips and Vue inject test warnings; no native Windows or remote CI execution. No assertions/deadlines/concurrency weakened.
+    Guidance: no durable instruction correction; applied existing visual verification guidance with actual desktop/mobile screenshots.
+description: 'Follow-up to DEV-8/DEV-9 after developer UI feedback: relationship tab is too bulky. Compact categories/chips with on-demand add and secondary controls, preserve keyboard/touch and native drag/drop safety, remove always-expanded embedded graph and repetitive descriptions. Add Dependencies to actual top navigation and Preferences visibility registry with persistence/reset/direct URL behavior. Make existing safe-repair capability obvious through a Fix relationships action and compact integrity summary on dependency page; retain preview, scope warning and explicit revision-bound apply, no silent repair. Refine dependency view information density using established components. Verify targeted UI, desktop/mobile browser flows and final lint/test/fresh smoke gates. Preserve existing uncommitted dependency implementation and unrelated Cargo/DEV-137 work.'
+history:
+- at: 2026-10-23T01:32:54.596144+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-23T01:32:54.626889+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T01:54:37.515292+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T02:00:33.987144+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T02:00:34.012228+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

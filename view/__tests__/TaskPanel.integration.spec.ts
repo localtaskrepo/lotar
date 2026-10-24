@@ -82,6 +82,7 @@ const apiFixtures = vi.hoisted(() => {
     })
 
     const taskHistoryMock = vi.fn(async () => clone(baseCommits))
+    const relationshipMutateMock = vi.fn(async (_payload: any) => ({ changed: true, changed_tasks: ['DEMO-123'], revision: 'r2' }))
     const suggestTasksMock = vi.fn(async () => [
         { id: 'DEMO-777', title: 'Suggested work item' },
     ])
@@ -143,6 +144,7 @@ const apiFixtures = vi.hoisted(() => {
         getTaskMock.mockReset()
         updateTaskMock.mockReset()
         taskHistoryMock.mockReset()
+        relationshipMutateMock.mockClear()
         suggestTasksMock.mockReset()
         referenceSnippetMock.mockReset()
         addCommentMock.mockReset()
@@ -233,6 +235,7 @@ const apiFixtures = vi.hoisted(() => {
         getTaskMock,
         updateTaskMock,
         taskHistoryMock,
+        relationshipMutateMock,
         suggestTasksMock,
         referenceSnippetMock,
         addCommentMock,
@@ -250,6 +253,8 @@ vi.mock('../api/client', () => ({
         whoami: vi.fn(async () => 'tester'),
         getTask: apiFixtures.getTaskMock,
         updateTask: apiFixtures.updateTaskMock,
+        relationshipMutate: apiFixtures.relationshipMutateMock,
+        relationshipGraph: vi.fn(async () => ({ nodes: [], edges: [], issues: [], revision: 'r1', complete: true, truncated: false })),
         setStatus: apiFixtures.setStatusMock,
         addTask: vi.fn(),
         addComment: apiFixtures.addCommentMock,
@@ -481,7 +486,7 @@ describe('TaskPanel integration safeguards', () => {
         wrapper.unmount()
     })
 
-    it('only commits relationship changes when values differ from baseline', async () => {
+    it('adds relationship chips atomically without saving a stale whole map', async () => {
         vi.useFakeTimers()
         const wrapper = await mountTaskPanel()
         apiFixtures.updateTaskMock.mockClear()
@@ -491,30 +496,30 @@ describe('TaskPanel integration safeguards', () => {
         await relationshipsTab!.trigger('click')
         await nextTick()
 
-        const dependsInput = wrapper.find('input[placeholder="IDs comma separated"]')
+        await wrapper.get('section[aria-label="Depends on"] .relationship-add-toggle').trigger('click')
+        const dependsInput = wrapper.find('section[aria-label="Depends on"] input')
         expect(dependsInput.exists()).toBe(true)
 
         await dependsInput.trigger('blur')
         await flushPromises()
         expect(apiFixtures.updateTaskMock).not.toHaveBeenCalled()
 
-        await dependsInput.trigger('focus')
         await dependsInput.setValue('99')
         await nextTick()
 
         vi.runAllTimers()
         await flushPromises()
 
-        const suggestionItems = wrapper.findAll('.task-panel__relation-suggest li')
+        const suggestionItems = wrapper.findAll('section[aria-label="Depends on"] [role="option"] button')
         expect(suggestionItems.length).toBeGreaterThan(0)
 
-        await suggestionItems[0]!.trigger('mousedown')
+        apiFixtures.getTaskMock.mockImplementation(async () => apiFixtures.clone({ ...apiFixtures.state.task, relationships: { ...apiFixtures.state.task.relationships, depends_on: ['DEMO-101', 'DEMO-777'] } }))
+        await suggestionItems[0]!.trigger('click')
         await flushPromises()
 
-        expect(apiFixtures.updateTaskMock).toHaveBeenCalledTimes(1)
-        const payload = apiFixtures.updateTaskMock.mock.calls[0]![1]!
-        expect(payload).toHaveProperty('relationships')
-        expect(payload.relationships.depends_on).toContain('DEMO-777')
+        expect(apiFixtures.updateTaskMock).not.toHaveBeenCalled()
+        expect(apiFixtures.relationshipMutateMock).toHaveBeenCalledExactlyOnceWith({ source: 'DEMO-123', target: 'DEMO-777', kind: 'depends_on', operation: 'add' })
+        expect(wrapper.get('section[aria-label="Depends on"]').text()).toContain('DEMO-777')
 
         wrapper.unmount()
     })

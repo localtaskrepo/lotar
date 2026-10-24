@@ -50,7 +50,6 @@ interface UseTaskPanelPersistenceOptions {
     applyTask: (data: TaskDTO) => void
     applyTaskCustomFields: (values: Record<string, unknown>) => void
     applyRelationshipsFromTask: (task: TaskDTO | null | undefined) => void
-    snapshotRelationshipsBaselineFromTask: (task: TaskDTO | null | undefined) => void
     validate: () => boolean
     closePanel: () => void
     resetActivity: () => void
@@ -327,7 +326,6 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 break
             case 'relationships':
                 options.applyRelationshipsFromTask(server)
-                options.snapshotRelationshipsBaselineFromTask(server)
                 break
             default: break
         }

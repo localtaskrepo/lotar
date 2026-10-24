@@ -17,18 +17,29 @@
 
 <script setup lang="ts">
 import type { TaskDTO } from '../api/types'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
+import { routerKey } from 'vue-router'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
 import { isDeletedTask } from '../utils/text'
 import { showToast } from './toast'
 import TaskPanel from './TaskPanel.vue'
 
-const { state: panelState, closeTaskPanel, notifyCreated, notifyUpdated } = useTaskPanelController()
+const { state: panelState, closeTaskPanel, notifyCreated, notifyUpdated, setNavigatedTask } = useTaskPanelController()
+const router = inject(routerKey, null)
+watch(() => router?.currentRoute.value.query.taskPanel, (id, previous) => {
+  if (typeof id === 'string') setNavigatedTask(id)
+  else if (previous) closeTaskPanel()
+}, { immediate: true })
 const store = useTaskStore()
 
 function handleClose() {
   closeTaskPanel()
+  const route = router?.currentRoute.value
+  if (router && route?.query.taskPanel) {
+    const { taskPanel: _, ...query } = route.query
+    void router.replace({ path: route.path, query, hash: route.hash })
+  }
 }
 
 function handleCreated(task: TaskDTO) {
@@ -70,7 +81,8 @@ const lifecycleState = computed<PanelLifecycle>(() => {
 /** Bumped when the open panel must reload its task (external delete/restore). */
 const lifecycleTick = ref(0)
 
-watch(lifecycleState, (state, previous) => {
+watch([lifecycleState, () => panelState.taskId], ([state, id], [previous, previousId]) => {
+  if (id !== previousId) return
   if (previous === undefined || previous === state) return
   if (previous === 'inactive') return // first observation of this panel session
   if (state === 'inactive' || state === 'unknown') return

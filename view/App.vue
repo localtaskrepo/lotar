@@ -111,32 +111,15 @@ function openGlobalNewTask() {
   })
 }
 
-type NavItem = {
-  label: string
-  path: string
-  matches?: (currentPath: string) => boolean
-}
-
-const navItems: NavItem[] = [
-  { label: 'Tasks', path: '/', matches: (current) => current === '/' || current.startsWith('/task/') },
-  { label: 'Sprints', path: '/sprints' },
-  { label: 'Boards', path: '/boards' },
-  { label: 'Calendar', path: '/calendar' },
-  { label: 'Insights', path: '/insights' },
-  { label: 'Agents', path: '/agents' },
-  { label: 'Automations', path: '/automations' },
-  { label: 'Sync', path: '/sync' },
-  { label: 'Scan', path: '/scan' },
-  { label: 'Config', path: '/config' },
+const { visibleTabs } = useNavTabs()
+const visibleNavItems = computed(() => [
+  ...visibleTabs.value,
   { label: 'Preferences', path: '/preferences' },
-]
+])
 
-const { isTabVisible } = useNavTabs()
-const visibleNavItems = computed(() => navItems.filter((item) => isTabVisible(item.path)))
-
-function isActive(item: NavItem) {
+function isActive(item: { path: string }) {
   const currentPath = route.path
-  return item.matches ? item.matches(currentPath) : currentPath === item.path
+  return currentPath === item.path || (item.path === '/' && currentPath.startsWith('/task/'))
 }
 
 function go(path: string) {
@@ -165,9 +148,20 @@ watch(
    hidden by preference. Mobile collapses it to an icon-only button. */
 .brand-group {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
+}
+
+.nav {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.nav > * {
+  flex-shrink: 0;
 }
 
 .brand {

@@ -1,0 +1,16 @@
+title: Add unified read-only repository verification and pre-commit integration
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-22T23:01:12.527704+00:00
+modified: 2026-10-23T00:02:51.786860+00:00
+comments:
+- date: 2026-10-23T00:02:51.786860+00:00
+  text: 'Integration handoff: DEV-15,DEV-8,DEV-9 implemented and verified Done. Reuse services::relationships::check and nested task relationships check (nonzero for errors/incomplete, warning-only zero); do not parse display text. Shared graph/check/repair/mutate APIs and MCP tools now available. Actual self-use: DEV inventory complete with37 existing missing Related mirrors left unapplied; global+DEV config validate pass; scan --dry-run --modified-only found no TODOs. Scan preview still lacks fail-on-findings/staged-index semantics, so no unified verify/hook gate was claimed implemented. Existing checked-in precommit stashes/formats/stages/checkouts and was NOT run or reconfigured. Own project safe hook adoption/replacement stays explicit acceptance criterion here. Verification reads may initialize ignored advisory synchronization metadata inside existing roots only (no absent roots or task/config/history/journal mutation); define immutable staged-snapshot behavior and warning policy for unified gate. Preserve Git/index/config/stash and partially staged files; installation remains separately authorized. No Git/config/hook changes made in dependency work.'
+description: Requested alongside DEV-15/DEV-8/DEV-9. No top-level verify/validate command exists; config validate and scan --dry-run are separate. Implement one hook-friendly verification command reusing shared dependency integrity, global/all relevant project configuration validation, and scanner consistency checks. Deterministic JSON/text findings and exit 0 for clean, nonzero for blocking findings or execution failure; define warning policy and scanner fail-on-findings semantics rather than parsing preview text. Verification must never repair relationships, create tasks, rewrite source/configuration, stage/stash/checkout files or change Git config. Explicitly define working-tree versus staged/index validation and partial staging/cross-project target semantics; modified-only scanning is not staged validation. Replace or separate current .githooks/pre-commit mutating stash/fmt/add/checkout workflow with read-only validation and use the unified gate in this project. Existing local core.hooksPath=.githooks is not new authorization to install/change Git config. Test clean/failing exits, unreadable/corrupt/incomplete inputs, and exact no-write/index/config/stash invariants including partially staged files. Keep hook installation permission-gated. DEV-15 supplies dependency checker; ordinary scan writes and dry-run findings currently exit zero, so existing commands alone are not a complete pre-commit gate.
+history:
+- at: 2026-10-23T00:02:51.786860+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -21,7 +21,17 @@ impl TasksDirectoryResolver {
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,
     ) -> Result<Self, String> {
-        Self::resolve_internal(explicit_path, global_config_tasks_folder, None)
+        Self::resolve_internal(explicit_path, global_config_tasks_folder, None, true)
+    }
+
+    /// Resolve existing workspace context without creating explicit or
+    /// environment-selected directories. Inspection callers decide how to report
+    /// an absent workspace rather than initializing it as a side effect.
+    pub fn resolve_read_only(
+        explicit_path: Option<&str>,
+        global_config_tasks_folder: Option<&str>,
+    ) -> Result<Self, String> {
+        Self::resolve_internal(explicit_path, global_config_tasks_folder, None, false)
     }
 
     /// Resolve with home directory override (primarily for testing)
@@ -38,6 +48,7 @@ impl TasksDirectoryResolver {
             explicit_path,
             global_config_tasks_folder,
             home_config_override,
+            true,
         )
     }
 
@@ -47,12 +58,13 @@ impl TasksDirectoryResolver {
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,
         home_config_override: Option<PathBuf>,
+        create_missing: bool,
     ) -> Result<Self, String> {
         // 1. Command line flag takes highest priority
         if let Some(path) = explicit_path {
             let path_buf = PathBuf::from(path);
             // Create directory if it doesn't exist (for --tasks-dir support)
-            if !path_buf.exists() {
+            if create_missing && !path_buf.exists() {
                 fs::create_dir_all(&path_buf)
                     .map_err(|e| format!("Failed to create tasks directory {}: {}", path, e))?;
             }
@@ -96,7 +108,7 @@ impl TasksDirectoryResolver {
             }
 
             // If no existing directory found in parents, create at the specified path
-            if !path_buf.exists() {
+            if create_missing && !path_buf.exists() {
                 fs::create_dir_all(&path_buf).map_err(|e| {
                     format!(
                         "Failed to create tasks directory from LOTAR_TASKS_DIR {}: {}",

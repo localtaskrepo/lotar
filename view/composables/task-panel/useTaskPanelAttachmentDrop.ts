@@ -9,6 +9,7 @@ import {
     readTaskPanelShowLinksInAttachmentsPreference,
 } from '../../utils/preferences'
 import { extractDroppedUrls, isFileDrag, isLinkDrag } from '../../utils/taskAttachments'
+import { relationshipMime } from '../../utils/relationships'
 import type { TaskPanelReferenceMutationsApi } from './useTaskPanelReferenceMutations'
 
 export interface TaskPanelAttachmentPreferences {
@@ -122,6 +123,7 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
     }
 
     function isAttachmentDrag(event: DragEvent): boolean {
+        if (Array.from(event.dataTransfer?.types ?? []).includes(relationshipMime)) return false
         if (!preferences.showAttachments.value) return false
         if (isFileDrag(event)) return true
         if (preferences.showLinksInAttachments.value && isLinkDrag(event)) return true
@@ -153,6 +155,7 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
     }
 
     async function onAttachmentsDrop(event: DragEvent) {
+        if (Array.from(event.dataTransfer?.types ?? []).includes(relationshipMime)) return
         if (attachmentsUploading.value || addingLinkReferences.value) return
 
         const hasFiles = isFileDrag(event)

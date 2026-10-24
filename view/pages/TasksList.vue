@@ -635,6 +635,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageL
 
 async function syncPaginationUrl(nav: 'push' | 'replace' = 'push') {
   const q: Record<string, string> = { ...filter.value }
+  if (typeof route.query.taskPanel === 'string') q.taskPanel = route.query.taskPanel
   if (pageOffset.value > 0) q.offset = String(pageOffset.value)
   else delete q.offset
   suppressRouteSync = true
@@ -703,6 +704,7 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   const { serverFilter: builtFilter, normalized: qnorm, extras: extraQuery } = buildServerFilter(q, '')
   if (qnorm.project) builtFilter.project = qnorm.project
   const nextQuery: Record<string, string> = { ...extraQuery, ...qnorm }
+  if (typeof route.query.taskPanel === 'string') nextQuery.taskPanel = route.query.taskPanel
   if (pageOffset.value > 0) {
     nextQuery.offset = String(pageOffset.value)
   }
@@ -1421,7 +1423,7 @@ onMounted(async () => {
   pageOffset.value = clampOffset(queryInt(route.query.offset, 0))
   const initialFilter = Object.fromEntries(
     Object.entries(route.query)
-      .filter(([key]) => key !== 'offset')
+      .filter(([key]) => key !== 'offset' && key !== 'taskPanel')
       .map(([k, v]) => [k, queryString(v)]),
   )
   // An explicit ?sort_by= wins for this visit; otherwise restore the sort
@@ -1431,7 +1433,12 @@ onMounted(async () => {
     if (saved.sort_by) initialFilter.sort_by = saved.sort_by
     if (saved.order) initialFilter.order = saved.order
   }
-  filter.value = initialFilter
+  suppressFilterWatch = true
+  try {
+    filter.value = initialFilter
+  } finally {
+    suppressFilterWatch = false
+  }
   await refreshProjects()
   await refreshSprints(true)
   await applyFilter(filter.value, 'replace')
@@ -1491,15 +1498,17 @@ watch(bulk, (value) => {
 })
 
 watch(
-  () => route.query,
-  (query) => {
+  // Overlay history is independent of the list query, including pending edits.
+  () => JSON.stringify(Object.entries(route.query).filter(([key]) => key !== 'taskPanel').sort(([a], [b]) => a.localeCompare(b))),
+  () => {
     if (disposed || suppressRouteSync) return
     if (debounceTimer) clearTimeout(debounceTimer)
 
+    const query = route.query
     const nextOffset = clampOffset(queryInt((query as any).offset, 0))
     const nextFilter = Object.fromEntries(
       Object.entries(query)
-        .filter(([key]) => key !== 'offset')
+        .filter(([key]) => key !== 'offset' && key !== 'taskPanel')
         .map(([k, v]) => [k, queryString(v)]),
     )
 

@@ -129,8 +129,15 @@ impl CommandHandler for TaskHandler {
                 DueDateHandler::execute(args, project, resolver, renderer)
             }
             TaskAction::Relationships(rel_args) => {
+                if let Some(action) = rel_args.action {
+                    return crate::cli::handlers::relationships::execute_action(
+                        action, project, resolver, renderer,
+                    );
+                }
                 let handler_args = RelationshipsHandlerArgs {
-                    task_id: rel_args.id,
+                    task_id: rel_args
+                        .id
+                        .ok_or("A task ID or relationship subcommand is required")?,
                     kinds: rel_args.kinds,
                     explicit_project: project.map(|s| s.to_string()),
                 };

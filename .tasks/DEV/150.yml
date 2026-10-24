@@ -1,0 +1,65 @@
+title: Contain wide dependency diagrams and preserve drill-down viewport
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-23T22:33:20.373266+00:00
+modified: 2026-10-24T00:17:15.267865+00:00
+comments:
+- date: 2026-10-23T22:33:20.445108+00:00
+  text: 'Plan: graph/loading owner constrains intrinsicwidth and preserves stable geometry/scroll duringrootreload with explicitbusy state; parent adds isolatedvisibilitycheckbox+URLscope and browserdelayedAPI tests. ExistinguseRelationshipGraph watch setsgraph=null onanyquerychange, removingplotandcollapsingheight; max-content childgrid min-auto canexpandparent before maxwidthresolves. Do not maskpageoverflow withbodyoverflowhidden ordisplaystalescopeasfresh; boundeddata/renderauthority andhistory preserved. Defaultisolatesoff with selectedkindconnectivity, explicitfocus/searchmatch/unresolvedcontext exempt. FullQA andexactticketclosure, indexpreserved.'
+- date: 2026-10-23T22:51:40.802881+00:00
+  text: 'Milestone: nine-stageoldbrowserred graph3534px>page1495px, newpage/componentminmax0+minwidth0 withboundedinternaloverflow passes1600/1024/390andactualhorizontalpan. Defaultisolatesoff control URLisolated1 excludedbackendfilters; focus/exactmatch/unresolvedconnections kept, selectedkindincidence governsisolates, ALTstandalonetestexplicitlyoptins. Retainedacceptedquery/oldgraph inert+ariahidden andcountsnotfresh duringdelayedroot, no staleactivation; firstbrowserdelayedbranchreloadkeptpage/plotheight andpendingaxes. Independentreviewcaughtstageheaderdoublecount retainedcanvasgrows228→256 perrefresh; redunitfixedbysimplifyingtoONLY retainedviewportheight. Parentdeepstagecounterexample rednewfocus1477pxoffscreen witholdscroll-minextents; removedfakeblankcanvas minWidth/minHeight, naturalinnerclampafteraccept keepsnewfocusvisible whilepage/plotheightheld. Fresh15/15browsercasespassed withdeeprank8delay, no-overflow/inert/pendingpositions/acceptedrootintersection, alloldhistory/SSE/sort/repair tests. Screenshotsdesktop/mobileinspected; temporarycapturegone. Unitsworker100/4files,parentfullUI1095beforefinalsmallfix/target89afterfix,typecheckpassed. Fullgatesnext, no backend/API/data/index/serverchanges.'
+- date: 2026-10-23T23:24:21.126090+00:00
+  text: 'QAprogress/limits: warning-freeallfeaturelint/typecheck/fmtpassed (3m08hostrun), Rustinventory60s build/list timeouttwiceunchanged beforetests; normalcargo build--profileci--tests completed1m39(no runnerdeadlinechange). Thenoldagent-outputtest timed15s infullrun; unchangedisolatedpassed2.5s andfullRustunchangedrerun1599/1599passed. Frontendfullrun workerstartup~11.46s vsusual~0.35s,183srun with25timeouts/cascadeassertionsacross7unrelatedfiles. No sourcepolicy/assertion/deadline/concurrency/isolation changes; isolatedoldCalendar casepassed. Parentfocusednew89 andbrowser15alreadygreen. KeepInProgress pendingfullUI/release/freshsmoke aftershortscheduledenvironmentwait; donotclaimuncheckedgatespassed.'
+- date: 2026-10-23T23:51:21.661576+00:00
+  text: 'DeveloperaddedscopedUIrefinementwhilefinalverificationpending: responsive multipleConnectionscardsperrow; restyleProblems cards; replaceisolatescheckbox withalignedstatefulviewtoggle. SameInProgressfollowup, no extraticket/historyreopen. Existinglint/Rustpassed, fullUI+smokependingenvironmentwait; newUIwillverifytargetedthenfullunchangedgates. Preserveallstaging/userwork.'
+- date: 2026-10-24T00:13:33.782835+00:00
+  text: 'AddedUIoutcome: Connectionsfullwidthresponsiveauto-fillgrid nowshowsmultipleintrinsicconnectioncardsperrow(4on1440capture), retainsnoemptyspaceinsideeachcardandmobilewrap. Problemsrestyledboundedresponsivecards withfriendlytitles, explicitError/Warning/Info text+colorborder, descriptions, review/safefixguidance andtasklinksusingexistingdrillhandler. Unlinked tasks is36pxoutlined/pressedUiButton inFilterBaractions, alignswithFilterstoggleinsteadmisalignedpanelcheckbox; samerouteisolated1prop anddefaultoff. Unitregressions updatedtarget90passed,typecheckpassed; nativebrowsernewgeometrychecks confirmmultiplecolumns/toggleheight+desktopalignment, issuecardsaccessibleseverity/no rawbullets. Fresh15 selection14pass1 expectedoldrawcycletext; testnowassertsCircular dependencyfriendlytitle, isolatedcasepassesquick. Wide/mobile/screenshotsinspectconnectiongrid/problemcards, temporarycapturecodegone. Fullfrontend/release/smokegatespendingrerunoriginalsettings; Rust1599alreadycurrentbackendpass.'
+- date: 2026-10-24T00:17:15.186398+00:00
+  text: |-
+    Outcomecomplete: nine-stagegraphscontainedbypage/componentminmax0/minwidth0andinternaloverflow(desktop/tablet/mobile), no bodyoverflowmask. Defaultunconnectedhiddenbasedonvisiblekindincidence; explicitfocal/exactmatch/diagnosticcontext preserved, URLisolated1showsoverridewithoutbackendfilterleak. Developeraddedrefinement: Unlinked tasks nowaligned36pxpressed-stateUiButton intoolbar; Connectionsresponsivegridmultiplecardsperrowwithintrinsicboundeditems; Problemsresponsiveboundedcardswithfriendlytitles, Error/Warning/Info badges, descriptions/tasklinks andsafe-fix/manualguidance. Oldsnapshot acceptedqueryretainedinactive/inertduringrootloads withnocurrentcounts/staleactivation; latestresponsegenauthoritative, errorsclearlyinactive. Outerplotheightretainednotcanvasminextents: reviewerheaderinflationred228→256fixed, deepstagehiddenrootred1477pxoffscreenfixedbynaturalinnerscrollclamp. Newfocusedcardvisible,pageheight/positionheld, previousviewremainsstablewhileAPIheld. ExistingdrillBack,SSE,sort,repair fields preserved. No backend/API/schema/datachanges or newdeps; helpupdated.
+    Verification: actualold9stagegraph3534>1495browserred→green, wide1600/1024/mobile390internalpan/nohorizontalpageoverflow. Delayeddeeprank8testheldrealAPI:plotDOMsameheight/axes/pagewhilebusy,inert+ariahidden;acceptedrootvisible,pageheightnotcollapse,andafterdetailsclosepagepositionheld. Defaultisolates/optinURLtoggle/alignment, multipleConnectionssamerow/nontouching/boundedwidth+withinrowpadding, Problemsseveritycards/read-onlybytes allverified. Worker100/4files; parent89target then90withnewpresentation, finalfrontend1097/89filesgreen. Freshfocused15browserpassedbeforeaddedUI; addedUI14pass1obsoletecycle-codeexpectation correctedtofriendlyCircular dependency, quickcasepassed; finalbuild-firstfullsmoke309/74filespassed. Actualdesktop/mobile screenshotreview, captureinstrumentationremoved. Independentviewportfollowupnoremainingfindings afterextent simplification.
+    QAhistorytransparent: allfeaturelint/typecheck/fmtpassedinitial/final. Rustinventory60slistingcoldbuildtimedtwice; normalcargo build--profileci--tests warmcompleted(no deadlinechange). Oldagentexit15stimeoutisolatedpassed2.5s,unchangedfullRust1599/144binariespassed. FullUIunderhostslow11.46sworkerstartuphad25timeouts/cascades7unrelatedfiles; unchangedCalendarisolatedpass, afterscheduledpause/followupUIfinalfull1097passedwith~444msstartup, release26passed. No assertions/deadlines/retries/concurrency/isolation/gates weakened; earlierfailuresnotreportedpassed. No Rust changes afteritsfullpass, laterfrontend/docs-only editsverifiedfreshlint/UI/release/smoke. Existing46Gitexclusions/25smokeskips/Vuewarnings/nativeWindows/remoteCIlimitsunchangedandnotpasses.
+    Handoff: userstagedindex/unrelatedCargo/tickets preserved; followupwork/trackingunstaged. No Gitwrites/commits/serverrestart/hooks/bulkrepair/sessions/deps. No durableinstructionfinding; appliedexistingvisual/verificationguidance. AllrequestedUIadditionsandoriginalviewportgoalcomplete.
+description: 'Developer follow-up: many-stage graph overflows container/page width; root drill-down collapses height/jumps page and plot scroll; isolated tickets should be hidden unless explicitly included. Fix nested grid/flex intrinsic sizing with internal plot scrolling, coherent loading/viewport preservation without mislabeling stale data as new scope, and Include tasks without relationships filter defaultoff. Connectivity judged using selected relationship kinds, keep explicitroot/exact-ID match and unresolved diagnosticcontext appropriately. Preserve sort/history/Back/SSE/repair/staged work. Add delayed-response and many-stage/viewport browser regressions, visual inspection and full required gates; no backend/API/taskdata/Git/server changes/newdeps.'
+history:
+- at: 2026-10-23T22:33:20.416870+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-23T22:33:20.445108+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T22:51:40.802881+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T23:24:21.126090+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-23T23:51:21.661576+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T00:13:33.782835+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T00:17:15.186398+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T00:17:15.267865+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

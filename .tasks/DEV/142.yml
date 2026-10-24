@@ -1,0 +1,9 @@
+title: Option to sync search inputs
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-23T17:06:50.930419+00:00
+description: If you're working on a filter on a topic and want to switch between views you may want to use the same filter everywhere. We should offer that option in the web-ui so users can turn this on or off.
+tags:
+- web-ui
