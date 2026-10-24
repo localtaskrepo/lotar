@@ -6,7 +6,7 @@
         <p class="muted">Compare global defaults with per-project overrides, edit safely, and see where each value comes from.</p>
       </div>
       <div class="page-actions">
-        <UiSelect v-model="project" class="scope-select" aria-label="Project scope">
+        <UiSelect :key="scopeSelectKey" :model-value="project" class="scope-select" aria-label="Project scope" @update:model-value="requestScope">
           <option value="">Global defaults</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
@@ -56,9 +56,39 @@
     </div>
 
     <div v-if="inspectData" class="config-body">
+      <nav class="config-nav" aria-label="Configuration sections">
+        <ul class="config-nav__list">
+          <li v-for="entry in visibleSections" :key="entry.id">
+            <a
+              :href="sectionHref(entry.id)"
+              :class="['config-nav__link', { 'config-nav__link--active': entry.id === activeSection }]"
+              :aria-current="entry.id === activeSection ? 'page' : undefined"
+              :data-section-link="entry.id"
+              :title="entry.summary"
+              @click.prevent="selectSection(entry.id)"
+            >
+              <span class="config-nav__label">{{ entry.label }}</span>
+              <span v-if="sectionErrorIds.has(entry.id)" class="config-nav__badge config-nav__badge--error" title="Has errors">
+                !<span class="config-nav__sr">(has errors)</span>
+              </span>
+              <span v-else-if="sectionDirtyIds.has(entry.id)" class="config-nav__badge config-nav__badge--dirty" title="Unsaved changes">
+                <span class="config-nav__sr">(unsaved changes)</span>
+              </span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
       <div class="config-main">
-        <div class="config-grid">
-          <div v-if="isGlobal" class="config-grid__item">
+        <section
+          v-show="activeSection === 'general'"
+          :id="`config-section-general`"
+          class="config-section"
+          data-section="general"
+          :aria-label="sectionLabel('general')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('general') }}</h2>
+          <div v-if="isGlobal" class="config-section__item">
             <ConfigServerSection
               v-model="form.serverPort"
               v-model:web-ui-path="form.webUiPath"
@@ -68,45 +98,246 @@
               :field-source-class="serverPortSourceClass"
               @validate="validateField('server_port')"
             />
-          </div>
-
-          <div v-if="isGlobal" class="config-grid__item">
-            <ConfigGroup title="Project defaults" description="Applied when new tasks are created without explicit overrides.">
+                    </div>
+          <div v-if="!isGlobal" class="config-section__item">
+            <ConfigGroup title="Project" :description="projectOverviewDescription">
               <div class="field-grid">
                 <div class="field">
-                  <label class="field-label">
-                    <span>Default project prefix</span>
-                    <span v-if="sourceFor('default_project')" :class="['provenance', provenanceClass(sourceFor('default_project'))]">{{ provenanceLabel(sourceFor('default_project')) }}</span>
-                  </label>
-                  <UiInput v-model="form.defaultProject" maxlength="20" @blur="validateField('default_project')" placeholder="ACME" />
-                  <p v-if="errors.default_project" class="field-error">{{ errors.default_project }}</p>
-                </div>
-                <div class="field">
-                  <label class="field-label">
-                    <span>Default priority</span>
-                    <span v-if="sourceFor('default_priority')" :class="['provenance', provenanceClass(sourceFor('default_priority'))]">{{ provenanceLabel(sourceFor('default_priority')) }}</span>
-                  </label>
-                  <UiSelect v-model="form.defaultPriority" @change="validateField('default_priority')">
-                    <option v-for="option in priorityOptions" :key="option" :value="option">{{ option }}</option>
-                  </UiSelect>
-                  <p v-if="errors.default_priority" class="field-error">{{ errors.default_priority }}</p>
-                </div>
-                <div class="field">
-                  <label class="field-label">
-                    <span>Default status</span>
-                    <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">{{ provenanceLabel(sourceFor('default_status')) }}</span>
-                  </label>
-                  <UiSelect v-model="form.defaultStatus" @change="validateField('default_status')">
-                    <option value="">First status{{ statusOptions[0] ? ` (${statusOptions[0]})` : '' }}</option>
-                    <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
-                  </UiSelect>
-                  <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
+                  <label class="field-label" for="config-project-name">Project name</label>
+                  <UiInput id="config-project-name" v-model="form.projectName" maxlength="100" @blur="validateField('project_name')" :placeholder="currentProject?.name || 'Project display name'" />
+                  <p v-if="errors.project_name" class="field-error">{{ errors.project_name }}</p>
                 </div>
               </div>
             </ConfigGroup>
           </div>
+        </section>
 
-          <div class="config-grid__item">
+        <section
+          v-show="activeSection === 'defaults'"
+          :id="`config-section-defaults`"
+          class="config-section"
+          data-section="defaults"
+          :aria-label="sectionLabel('defaults')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('defaults') }}</h2>
+          <div class="config-section__item">
+            <ConfigDefaultsSection
+              :description="isGlobal ? 'Applied when a task is created without these values.' : 'Override defaults for new tasks in this project; inherit keeps the global value.'"
+              :is-global="isGlobal"
+              :errors="errors"
+              v-model:default-project="form.defaultProject"
+              v-model:default-status="form.defaultStatus"
+              v-model:default-priority="form.defaultPriority"
+              v-model:default-reporter="form.defaultReporter"
+              v-model:default-assignee="form.defaultAssignee"
+              v-model:default-tags="form.defaultTags"
+              :status-options="statusOptions"
+              :priority-options="priorityOptions"
+              :tag-suggestions="tagSuggestions"
+              :source-for="sourceFor"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              @validate="validateField"
+            />
+          </div>
+        </section>
+
+        <section
+          v-show="activeSection === 'workflow'"
+          :id="`config-section-workflow`"
+          class="config-section"
+          data-section="workflow"
+          :aria-label="sectionLabel('workflow')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('workflow') }}</h2>
+          <div class="config-section__item">
+            <ConfigWorkflowSection
+              :description="workflowDescription"
+              v-model:issue-states="form.issueStates"
+              v-model:issue-types="form.issueTypes"
+              v-model:issue-priorities="form.issuePriorities"
+              v-model:issue-done-states="form.issueDoneStates"
+              :status-suggestions="statusSuggestions"
+              :type-suggestions="typeSuggestions"
+              :priority-suggestions="prioritySuggestions"
+              :issue-states-error="errors.issue_states"
+              :issue-types-error="errors.issue_types"
+              :issue-priorities-error="errors.issue_priorities"
+              :issue-done-states-error="errors.issue_done_states"
+              :issue-states-source="sourceFor('issue_states')"
+              :issue-types-source="sourceFor('issue_types')"
+              :issue-priorities-source="sourceFor('issue_priorities')"
+              :issue-done-states-source="sourceFor('issue_done_states')"
+              :automatic-label="doneStatesAutomaticLabel"
+              :effective-summary="doneStatesEffectiveSummary"
+              :effective-done-labels="effectiveDoneLabels"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              @validate="validateField"
+            />
+                    </div>
+        </section>
+
+        <section
+          v-show="activeSection === 'fields'"
+          :id="`config-section-fields`"
+          class="config-section"
+          data-section="fields"
+          :aria-label="sectionLabel('fields')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('fields') }}</h2>
+          <div class="config-section__item">
+            <ConfigTaxonomySection
+              :description="taxonomyDescription"
+              :is-global="isGlobal"
+              v-model:tags-mode="form.tagsMode"
+              v-model:tags="form.tags"
+              v-model:custom-fields-mode="form.customFieldsMode"
+              v-model:custom-fields="form.customFields"
+              :global-tags="inspectData.global_effective?.tags ?? []"
+              :global-custom-fields="inspectData.global_effective?.custom_fields ?? []"
+              :tags-error="errors.tags"
+              :custom-fields-error="errors.custom_fields"
+              :tags-source="sourceFor('tags')"
+              :custom-fields-source="sourceFor('custom_fields')"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              @validate="validateField"
+            />
+                    </div>
+        </section>
+
+        <section
+          v-show="activeSection === 'people'"
+          :id="`config-section-people`"
+          class="config-section"
+          data-section="people"
+          :aria-label="sectionLabel('people')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('people') }}</h2>
+          <div class="config-section__item">
+            <ConfigPeopleSection
+              :description="peopleDescription"
+              :is-global="isGlobal"
+              v-model:members="form.members"
+              v-model:strict-members="form.strictMembers"
+              v-model:auto-populate-members="form.autoPopulateMembers"
+              v-model:review-reviewers="form.reviewReviewers"
+              :members-error="errors.members"
+              :review-reviewers-error="errors.review_reviewers"
+              :global-members="inspectData.global_effective?.members ?? []"
+              :source-for="sourceFor"
+              :toggle-select-options="toggleSelectOptions"
+              :global-toggle-summary="globalToggleSummary"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              @validate="validateField"
+            />
+                    </div>
+        </section>
+
+        <section
+          v-show="activeSection === 'automation'"
+          :id="`config-section-automation`"
+          class="config-section"
+          data-section="automation"
+          :aria-label="sectionLabel('automation')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('automation') }}</h2>
+          <div class="config-section__item">
+            <ConfigAutomationSection
+              :description="automationDescription"
+              :group-source="sourceFor('auto_set_reporter')"
+              :is-global="isGlobal"
+              v-model:auto-set-reporter="form.autoSetReporter"
+              v-model:auto-assign-on-status="form.autoAssignOnStatus"
+              v-model:auto-codeowners-assign="form.autoCodeownersAssign"
+              v-model:auto-tags-from-path="form.autoTagsFromPath"
+              v-model:auto-branch-infer-type="form.autoBranchInferType"
+              v-model:auto-branch-infer-status="form.autoBranchInferStatus"
+              v-model:auto-branch-infer-priority="form.autoBranchInferPriority"
+              v-model:auto-identity="form.autoIdentity"
+              v-model:auto-identity-git="form.autoIdentityGit"
+              :toggle-select-options="toggleSelectOptions"
+              :global-toggle-summary="globalToggleSummary"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              :source-for="sourceFor"
+            />
+                    </div>
+          <div class="config-section__item">
+            <ConfigGroup title="Automation rules" :description="automationRulesDescription">
+              <AutomationRulesEditor
+                v-model="automationScopeYaml"
+                :effective-yaml="automationEffectiveYaml"
+                :loading="automationLoading"
+                :error="automationError"
+                :source-label="automationSourceLabel"
+                :scope-hint="isGlobal ? 'Edit .tasks/automation.yml. Leave it empty to clear the scoped file.' : `Edit .tasks/${project}/automation.yml. Leave it empty to inherit from higher scopes.`"
+              />
+            </ConfigGroup>
+                    </div>
+        </section>
+
+        <section
+          v-show="activeSection === 'git'"
+          :id="`config-section-git`"
+          class="config-section"
+          data-section="git"
+          :aria-label="sectionLabel('git')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('git') }}</h2>
+          <div class="config-section__item">
+            <ConfigScanningSection
+              :description="scanningDescription"
+              :is-global="isGlobal"
+              v-model:scan-signal-words="form.scanSignalWords"
+              v-model:scan-ticket-patterns="form.scanTicketPatterns"
+              v-model:scan-enable-ticket-words="form.scanEnableTicketWords"
+              v-model:scan-enable-mentions="form.scanEnableMentions"
+              v-model:scan-strip-attributes="form.scanStripAttributes"
+              :toggle-select-options="toggleSelectOptions"
+              :global-toggle-summary="globalToggleSummary"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              :source-for="sourceFor"
+              :scan-signal-words-error="errors.scan_signal_words"
+              :scan-ticket-patterns-error="errors.scan_ticket_patterns"
+              :signal-words-source="sourceFor('scan_signal_words')"
+              :ticket-patterns-source="sourceFor('scan_ticket_patterns')"
+              @validate="validateField"
+            />
+                    </div>
+          <div class="config-section__item">
+            <ConfigBranchAliasSection
+              :description="branchAliasDescription"
+              :is-global="isGlobal"
+              v-model:type-entries="form.branchTypeAliases"
+              v-model:status-entries="form.branchStatusAliases"
+              v-model:priority-entries="form.branchPriorityAliases"
+              :type-error="errors.branch_type_aliases"
+              :status-error="errors.branch_status_aliases"
+              :priority-error="errors.branch_priority_aliases"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              :source-for="sourceFor"
+              @add="addAliasEntry"
+              @remove="removeAliasEntry"
+              @clear="clearAliasField"
+              @validate="validateField"
+            />
+                    </div>
+        </section>
+
+        <section
+          v-show="activeSection === 'storage'"
+          :id="`config-section-storage`"
+          class="config-section"
+          data-section="storage"
+          :aria-label="sectionLabel('storage')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('storage') }}</h2>
+          <div class="config-section__item">
             <ConfigGroup title="Attachments" :description="isGlobal ? 'Where uploaded files are stored. Relative paths resolve under .tasks.' : 'Override attachment settings for this project (leave blank to inherit global).'">
               <div class="field-grid">
                 <div class="field">
@@ -132,177 +363,8 @@
                 </div>
               </div>
             </ConfigGroup>
-          </div>
-
-          <div v-if="!isGlobal" class="config-grid__item">
-            <ConfigGroup title="Project overview" :description="projectOverviewDescription">
-              <div class="field-grid">
-                <div class="field">
-                  <label class="field-label">Project name</label>
-                  <UiInput v-model="form.projectName" maxlength="100" @blur="validateField('project_name')" :placeholder="currentProject?.name || 'Project display name'" />
-                  <p v-if="errors.project_name" class="field-error">{{ errors.project_name }}</p>
-                </div>
-                <div class="field">
-                  <label class="field-label">
-                    <span>Default priority</span>
-                    <span v-if="sourceFor('default_priority')" :class="['provenance', provenanceClass(sourceFor('default_priority'))]">{{ provenanceLabel(sourceFor('default_priority')) }}</span>
-                  </label>
-                  <UiSelect v-model="form.defaultPriority" @change="validateField('default_priority')">
-                    <option value="">(inherit global)</option>
-                    <option v-for="option in priorityOptions" :key="option" :value="option">{{ option }}</option>
-                  </UiSelect>
-                  <p v-if="errors.default_priority" class="field-error">{{ errors.default_priority }}</p>
-                </div>
-                <div class="field">
-                  <label class="field-label">
-                    <span>Default status</span>
-                    <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">{{ provenanceLabel(sourceFor('default_status')) }}</span>
-                  </label>
-                  <UiSelect v-model="form.defaultStatus" @change="validateField('default_status')">
-                    <option value="">(inherit global)</option>
-                    <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
-                  </UiSelect>
-                  <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
-                </div>
-              </div>
-            </ConfigGroup>
-          </div>
-
-          <div class="config-grid__item">
-            <ConfigPeopleSection
-              :description="peopleDescription"
-              :is-global="isGlobal"
-              v-model:default-reporter="form.defaultReporter"
-              v-model:default-assignee="form.defaultAssignee"
-              v-model:default-tags="form.defaultTags"
-              v-model:members="form.members"
-              v-model:strict-members="form.strictMembers"
-              v-model:auto-populate-members="form.autoPopulateMembers"
-              v-model:review-reviewers="form.reviewReviewers"
-              :members-error="errors.members"
-              :review-reviewers-error="errors.review_reviewers"
-              :global-members="inspectData.global_effective?.members ?? []"
-              :source-for="sourceFor"
-              :toggle-select-options="toggleSelectOptions"
-              :global-toggle-summary="globalToggleSummary"
-              :tag-suggestions="tagSuggestions"
-              :default-reporter-error="errors.default_reporter"
-              :default-assignee-error="errors.default_assignee"
-              :default-tags-error="errors.default_tags"
-              :provenance-label="provenanceLabel"
-              :provenance-class="provenanceClass"
-              :default-reporter-source="sourceFor('default_reporter')"
-              :default-assignee-source="sourceFor('default_assignee')"
-              :default-tags-source="sourceFor('default_tags')"
-              @validate="validateField"
-            />
-          </div>
-
-          <div class="config-grid__item">
-            <ConfigTaxonomySection
-              :description="taxonomyDescription"
-              :is-global="isGlobal"
-              v-model:tags-mode="form.tagsMode"
-              v-model:tags="form.tags"
-              v-model:custom-fields-mode="form.customFieldsMode"
-              v-model:custom-fields="form.customFields"
-              :global-tags="inspectData.global_effective?.tags ?? []"
-              :global-custom-fields="inspectData.global_effective?.custom_fields ?? []"
-              :tags-error="errors.tags"
-              :custom-fields-error="errors.custom_fields"
-              :tags-source="sourceFor('tags')"
-              :custom-fields-source="sourceFor('custom_fields')"
-              :provenance-label="provenanceLabel"
-              :provenance-class="provenanceClass"
-              @validate="validateField"
-            />
-          </div>
-
-          <div class="config-grid__item">
-            <ConfigWorkflowSection
-              :description="workflowDescription"
-              v-model:issue-states="form.issueStates"
-              v-model:issue-types="form.issueTypes"
-              v-model:issue-priorities="form.issuePriorities"
-              v-model:issue-done-states="form.issueDoneStates"
-              :status-suggestions="statusSuggestions"
-              :type-suggestions="typeSuggestions"
-              :priority-suggestions="prioritySuggestions"
-              :issue-states-error="errors.issue_states"
-              :issue-types-error="errors.issue_types"
-              :issue-priorities-error="errors.issue_priorities"
-              :issue-done-states-error="errors.issue_done_states"
-              :issue-states-source="sourceFor('issue_states')"
-              :issue-types-source="sourceFor('issue_types')"
-              :issue-priorities-source="sourceFor('issue_priorities')"
-              :issue-done-states-source="sourceFor('issue_done_states')"
-              :automatic-label="doneStatesAutomaticLabel"
-              :effective-summary="doneStatesEffectiveSummary"
-              :effective-done-labels="effectiveDoneLabels"
-              :provenance-label="provenanceLabel"
-              :provenance-class="provenanceClass"
-              @validate="validateField"
-            />
-          </div>
-
-          <div class="config-grid__item">
-            <ConfigAutomationSection
-              :description="automationDescription"
-              :group-source="sourceFor('auto_set_reporter')"
-              :is-global="isGlobal"
-              v-model:auto-set-reporter="form.autoSetReporter"
-              v-model:auto-assign-on-status="form.autoAssignOnStatus"
-              v-model:auto-codeowners-assign="form.autoCodeownersAssign"
-              v-model:auto-tags-from-path="form.autoTagsFromPath"
-              v-model:auto-branch-infer-type="form.autoBranchInferType"
-              v-model:auto-branch-infer-status="form.autoBranchInferStatus"
-              v-model:auto-branch-infer-priority="form.autoBranchInferPriority"
-              v-model:auto-identity="form.autoIdentity"
-              v-model:auto-identity-git="form.autoIdentityGit"
-              :toggle-select-options="toggleSelectOptions"
-              :global-toggle-summary="globalToggleSummary"
-              :provenance-label="provenanceLabel"
-              :provenance-class="provenanceClass"
-              :source-for="sourceFor"
-            />
-          </div>
-
-          <div class="config-grid__item">
-            <ConfigGroup title="Automation rules" :description="automationRulesDescription">
-              <AutomationRulesEditor
-                v-model="automationScopeYaml"
-                :effective-yaml="automationEffectiveYaml"
-                :loading="automationLoading"
-                :error="automationError"
-                :source-label="automationSourceLabel"
-                :scope-hint="isGlobal ? 'Edit .tasks/automation.yml. Leave it empty to clear the scoped file.' : `Edit .tasks/${project}/automation.yml. Leave it empty to inherit from higher scopes.`"
-              />
-            </ConfigGroup>
-          </div>
-
-          <div class="config-grid__item">
-            <ConfigScanningSection
-              :description="scanningDescription"
-              :is-global="isGlobal"
-              v-model:scan-signal-words="form.scanSignalWords"
-              v-model:scan-ticket-patterns="form.scanTicketPatterns"
-              v-model:scan-enable-ticket-words="form.scanEnableTicketWords"
-              v-model:scan-enable-mentions="form.scanEnableMentions"
-              v-model:scan-strip-attributes="form.scanStripAttributes"
-              :toggle-select-options="toggleSelectOptions"
-              :global-toggle-summary="globalToggleSummary"
-              :provenance-label="provenanceLabel"
-              :provenance-class="provenanceClass"
-              :source-for="sourceFor"
-              :scan-signal-words-error="errors.scan_signal_words"
-              :scan-ticket-patterns-error="errors.scan_ticket_patterns"
-              :signal-words-source="sourceFor('scan_signal_words')"
-              :ticket-patterns-source="sourceFor('scan_ticket_patterns')"
-              @validate="validateField"
-            />
-          </div>
-
-          <div class="config-grid__item">
+                    </div>
+          <div class="config-section__item">
             <ConfigGroup title="Sync reports" :description="isGlobal ? 'Where sync runs write their reports. Relative paths resolve under .tasks.' : 'Override sync report settings for this project (leave blank to inherit global).'">
               <div class="field-grid" data-testid="config-sync-reports">
                 <div class="field">
@@ -323,9 +385,18 @@
               </div>
               <p class="field-hint">Remotes and field mappings are managed on the <a href="/sync">Sync page</a>.</p>
             </ConfigGroup>
-          </div>
+                    </div>
+        </section>
 
-          <div class="config-grid__item">
+        <section
+          v-show="activeSection === 'agents'"
+          :id="`config-section-agents`"
+          class="config-section"
+          data-section="agents"
+          :aria-label="sectionLabel('agents')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('agents') }}</h2>
+          <div class="config-section__item">
             <ConfigAgentSection
               :description="isGlobal ? 'Defaults for agent jobs started from LoTaR.' : 'Override agent job settings for this project. Blank values and Inherit use the global settings.'"
               :is-global="isGlobal"
@@ -350,9 +421,18 @@
               :provenance-class="provenanceClass"
               @validate="validateField"
             />
-          </div>
+                    </div>
+        </section>
 
-          <div v-if="isGlobal" class="config-grid__item">
+        <section v-if="isGlobal"
+          v-show="activeSection === 'sprints'"
+          :id="`config-section-sprints`"
+          class="config-section"
+          data-section="sprints"
+          :aria-label="sectionLabel('sprints')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('sprints') }}</h2>
+          <div class="config-section__item">
             <ConfigSprintSection
               v-model:length="form.sprintLength"
               v-model:overdue-after="form.sprintOverdueAfter"
@@ -365,29 +445,9 @@
               :provenance-class="provenanceClass"
               @validate="validateField"
             />
-          </div>
+                    </div>
+        </section>
 
-          <div class="config-grid__item">
-            <ConfigBranchAliasSection
-              :description="branchAliasDescription"
-              :is-global="isGlobal"
-              v-model:type-entries="form.branchTypeAliases"
-              v-model:status-entries="form.branchStatusAliases"
-              v-model:priority-entries="form.branchPriorityAliases"
-              :type-error="errors.branch_type_aliases"
-              :status-error="errors.branch_status_aliases"
-              :priority-error="errors.branch_priority_aliases"
-              :provenance-label="provenanceLabel"
-              :provenance-class="provenanceClass"
-              :source-for="sourceFor"
-              @add="addAliasEntry"
-              @remove="removeAliasEntry"
-              @clear="clearAliasField"
-              @validate="validateField"
-            />
-          </div>
-
-        </div>
       </div>
     </div>
 
@@ -480,6 +540,22 @@
     </UiModal>
 
     <UiModal
+      :open="discardPrompt !== null"
+      size="sm"
+      aria-label="Discard unsaved changes"
+      @close="resolveDiscard(false)"
+    >
+      <div class="dialog-card discard-card" data-testid="config-discard-dialog">
+        <h2>Discard unsaved changes?</h2>
+        <p class="muted">{{ discardPrompt?.message }}</p>
+        <footer class="dialog-actions">
+          <UiButton variant="ghost" type="button" @click="resolveDiscard(false)">Keep editing</UiButton>
+          <UiButton variant="danger" type="button" @click="resolveDiscard(true)">Discard changes</UiButton>
+        </footer>
+      </div>
+    </UiModal>
+
+    <UiModal
       :open="helpOpen"
       size="lg"
       aria-label="Configuration help"
@@ -518,12 +594,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import ConfigAgentSection from '../components/ConfigAgentSection.vue'
 import ConfigAutomationSection from '../components/ConfigAutomationSection.vue'
 import ConfigBranchAliasSection from '../components/ConfigBranchAliasSection.vue'
+import ConfigDefaultsSection from '../components/ConfigDefaultsSection.vue'
 import ConfigGroup from '../components/ConfigGroup.vue'
 import ConfigPeopleSection from '../components/ConfigPeopleSection.vue'
 import ConfigScanningSection from '../components/ConfigScanningSection.vue'
@@ -543,6 +621,7 @@ import { useConfigForm } from '../composables/useConfigForm'
 import { refreshCompletionPoliciesForScope } from '../composables/useCompletionPolicy'
 import { useConfigScope } from '../composables/useConfigScope'
 import { notifyProjectsChanged } from '../composables/useProjects'
+import { CONFIG_SECTIONS, dirtySections, errorSections, resolveSection, sectionsForScope, type ConfigSectionId } from '../utils/configSections'
 import { formatProjectLabel } from '../utils/projectLabels'
 import { detectPrefixConflict, normalizePrefixInput, suggestUniquePrefix, validateProjectName, validateProjectPrefix } from '../utils/projectPrefix'
 
@@ -867,6 +946,86 @@ async function loadAutomation() {
 const automationDirty = computed(() => automationScopeYaml.value !== automationBaselineYaml.value)
 const hasChanges = computed(() => isDirty.value || automationDirty.value)
 
+// ---- Section navigation (DEV-19) -------------------------------------------
+// Every section stays mounted (v-show), so switching sections never loses
+// unsaved values; the URL carries ?section= next to ?project=.
+const route = useRoute()
+const router = useRouter()
+const visibleSections = computed(() => sectionsForScope(isGlobal.value))
+const activeSection = computed<ConfigSectionId>(() => resolveSection(route.query.section, isGlobal.value))
+
+function sectionLabel(id: ConfigSectionId) {
+  return CONFIG_SECTIONS.find((section) => section.id === id)?.label ?? id
+}
+
+
+function sectionHref(id: ConfigSectionId) {
+  return router.resolve({ query: { ...route.query, section: id } }).href
+}
+
+function selectSection(id: ConfigSectionId) {
+  if (id === activeSection.value && route.query.section === id) return
+  void router.replace({ query: { ...route.query, section: id } })
+}
+
+// Keep the active entry visible in the scrolling tab strip at phone width.
+watch([activeSection, () => !!inspectData.value], async ([id, ready]) => {
+  if (!ready) return
+  await nextTick()
+  const link = document.querySelector<HTMLElement>(`.config-nav [data-section-link="${id}"]`)
+  link?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+}, { immediate: true })
+
+const sectionDirtyIds = computed(() => {
+  const dirty = dirtySections(snapshotForm(), baseline.value)
+  if (automationDirty.value) dirty.add('automation')
+  return dirty
+})
+const sectionErrorIds = computed(() => errorSections(errors))
+
+// ---- Unsaved-change guards --------------------------------------------------
+type DiscardPrompt = { message: string; resolve: (discard: boolean) => void }
+const discardPrompt = ref<DiscardPrompt | null>(null)
+const scopeSelectKey = ref(0)
+
+function confirmDiscard(message: string): Promise<boolean> {
+  if (!hasChanges.value) return Promise.resolve(true)
+  discardPrompt.value?.resolve(false)
+  return new Promise((resolve) => {
+    discardPrompt.value = { message, resolve }
+  })
+}
+
+function resolveDiscard(discard: boolean) {
+  const prompt = discardPrompt.value
+  discardPrompt.value = null
+  prompt?.resolve(discard)
+}
+
+async function requestScope(next: string) {
+  if (next === project.value) return
+  const label = next ? projects.value.find((p) => p.prefix === next)?.name || next : 'Global defaults'
+  if (await confirmDiscard(`Switching to ${label} discards the changes you have not saved.`)) {
+    project.value = next
+  } else {
+    // Re-render the select so it shows the scope that is still active.
+    scopeSelectKey.value += 1
+  }
+}
+
+onBeforeRouteLeave(() => confirmDiscard('Leaving this page discards the changes you have not saved.'))
+
+function warnBeforeUnload(event: BeforeUnloadEvent) {
+  if (!hasChanges.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', warnBeforeUnload)
+  discardPrompt.value?.resolve(false)
+})
+
 const automationSourceLabel = computed(() => {
   switch (automationSource.value) {
     case 'project':
@@ -897,6 +1056,8 @@ async function save() {
   const hasConfigChanges = Object.keys(payload).length > 0
   if (hasConfigChanges && !validateAll()) {
     showToast('Fix validation errors before saving.')
+    const failing = visibleSections.value.find((section) => sectionErrorIds.value.has(section.id))
+    if (failing) selectSection(failing.id)
     return
   }
   if (!hasConfigChanges && !automationDirty.value) {
@@ -1061,39 +1222,129 @@ watch(
   margin-bottom: 6px;
 }
 
+/* Section navigation (DEV-19): sticky menu beside one visible section. */
 .config-body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.config-nav {
+  position: sticky;
+  top: 16px;
+}
+
+.config-nav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 2px;
+}
+
+.config-nav__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--color-fg);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.config-nav__link:hover {
+  background: color-mix(in oklab, var(--color-fg) 6%, transparent);
+}
+
+.config-nav__link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.config-nav__link--active {
+  background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+  color: var(--color-fg);
+  font-weight: 600;
+}
+
+.config-nav__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.config-nav__badge--dirty {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.config-nav__badge--error {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.config-nav__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .config-main {
+  min-width: 0;
+}
+
+.config-section {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 880px;
 }
 
-.config-grid {
-  column-width: 420px;
-  column-gap: 20px;
-  width: 100%;
+.config-section__item {
+  min-width: 0;
 }
 
-.config-grid__item {
-  display: inline-block;
-  width: 100%;
-  break-inside: avoid;
-  margin-bottom: 20px;
-}
-
-.config-grid__item--full {
-  column-span: all;
+.discard-card h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
 }
 
 @media (max-width: 960px) {
-  .config-grid {
-    column-width: auto;
-    column-count: 1;
+  .config-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .config-nav {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0 -4px;
+    padding: 4px;
+    background: var(--color-bg, var(--bg));
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .config-nav__list {
+    flex-direction: row;
+    gap: 4px;
   }
 }
 

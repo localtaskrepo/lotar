@@ -224,7 +224,7 @@ function defineShots(demo) {
                 await settle(page, 600);
             },
         },
-        { name: 'config', path: '/config' },
+        { name: 'config', path: '/config?section=workflow' },
     ];
 }
 

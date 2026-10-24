@@ -1,66 +1,6 @@
 <template>
-  <ConfigGroup title="People &amp; defaults" :description="description">
+  <ConfigGroup title="People" :description="description">
     <div class="field-grid">
-      <div class="field">
-        <label class="field-label">
-          <span>Default reporter</span>
-          <span
-            v-if="defaultReporterSource"
-            :class="['provenance', provenanceClass(defaultReporterSource)]"
-          >
-            {{ provenanceLabel(defaultReporterSource) }}
-          </span>
-        </label>
-        <UiInput
-          v-model="defaultReporter"
-          maxlength="100"
-          placeholder="@me"
-          @blur="handleBlur('default_reporter')"
-        />
-        <p v-if="defaultReporterError" class="field-error">{{ defaultReporterError }}</p>
-      </div>
-
-      <div class="field">
-        <label class="field-label">
-          <span>Default assignee</span>
-          <span
-            v-if="defaultAssigneeSource"
-            :class="['provenance', provenanceClass(defaultAssigneeSource)]"
-          >
-            {{ provenanceLabel(defaultAssigneeSource) }}
-          </span>
-        </label>
-        <UiInput
-          v-model="defaultAssignee"
-          maxlength="100"
-          placeholder="Optional"
-          @blur="handleBlur('default_assignee')"
-        />
-        <p v-if="defaultAssigneeError" class="field-error">{{ defaultAssigneeError }}</p>
-      </div>
-
-      <div class="field field--full">
-        <label class="field-label">
-          <span>Default tags</span>
-          <span
-            v-if="defaultTagsSource"
-            :class="['provenance', provenanceClass(defaultTagsSource)]"
-          >
-            {{ provenanceLabel(defaultTagsSource) }}
-          </span>
-        </label>
-        <ChipListField
-          v-model="defaultTags"
-          :suggestions="tagSuggestions"
-          placeholder="Add a tag"
-          add-label="Add tag"
-          composer-label="Tag"
-          empty-label="No default tags"
-          @update:modelValue="handleTagsUpdate"
-        />
-        <p v-if="defaultTagsError" class="field-error">{{ defaultTagsError }}</p>
-      </div>
-
       <div class="field field--full" data-testid="config-members">
         <label class="field-label">
           <span>Members</span>
@@ -133,11 +73,7 @@ import type { ToggleField, ToggleValue } from '../composables/useConfigForm'
 import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
 import ConfigToggleField from './ConfigToggleField.vue'
-import UiInput from './UiInput.vue'
 
-const defaultReporter = defineModel<string>('defaultReporter', { required: true })
-const defaultAssignee = defineModel<string>('defaultAssignee', { required: true })
-const defaultTags = defineModel<string[]>('defaultTags', { required: true })
 const members = defineModel<string[]>('members', { required: true })
 const strictMembers = defineModel<ToggleValue>('strictMembers', { required: true })
 const autoPopulateMembers = defineModel<ToggleValue>('autoPopulateMembers', { required: true })
@@ -145,15 +81,8 @@ const reviewReviewers = defineModel<string[]>('reviewReviewers', { required: tru
 const {
   description,
   isGlobal,
-  tagSuggestions = [],
-  defaultReporterError = null,
-  defaultAssigneeError = null,
-  defaultTagsError = null,
   provenanceLabel,
   provenanceClass,
-  defaultReporterSource,
-  defaultAssigneeSource,
-  defaultTagsSource,
   membersError = null,
   reviewReviewersError = null,
   globalMembers = [],
@@ -163,15 +92,8 @@ const {
 } = defineProps<{
   description: string
   isGlobal: boolean
-  tagSuggestions?: string[]
-  defaultReporterError?: string | null
-  defaultAssigneeError?: string | null
-  defaultTagsError?: string | null
   provenanceLabel: (source: ConfigSource | undefined) => string
   provenanceClass: (source: ConfigSource | undefined) => string
-  defaultReporterSource?: ConfigSource
-  defaultAssigneeSource?: ConfigSource
-  defaultTagsSource?: ConfigSource
   membersError?: string | null
   reviewReviewersError?: string | null
   globalMembers?: string[]
@@ -187,16 +109,8 @@ function toggleHint(field: ToggleField) {
 }
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'default_reporter' | 'default_assignee' | 'default_tags' | 'members' | 'review_reviewers'): void
+  (e: 'validate', field: 'members' | 'review_reviewers'): void
 }>()
-
-function handleBlur(field: 'default_reporter' | 'default_assignee') {
-  emit('validate', field)
-}
-
-function handleTagsUpdate() {
-  emit('validate', 'default_tags')
-}
 </script>
 
 <style scoped>

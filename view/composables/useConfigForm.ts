@@ -445,7 +445,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     const projectOverviewDescription = computed(() =>
         projectExists.value
-            ? 'Project overrides stored on disk. Rename the project or adjust default workflow values here.'
+            ? 'The display name shown for this project.'
             : 'No project config file yet. Enter values to create one; otherwise the project inherits everything.',
     )
 

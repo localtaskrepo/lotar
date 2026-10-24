@@ -277,7 +277,7 @@ describe.concurrent('DEV-21 done-state policy (actual backend)', () => {
 
     it('edits inheritance and preserves an explicit choice equal to the automatic global policy', async ({ expect }) => {
         await withDoneStatesFixture(async ({ url }) => {
-            await withPage(`${url}/config`, async (page) => {
+            await withPage(`${url}/config?section=workflow`, async (page) => {
                 const scope = page.getByLabel('Project scope');
                 await scope.selectOption('BETA');
                 const mode = page.getByLabel('Done states mode');

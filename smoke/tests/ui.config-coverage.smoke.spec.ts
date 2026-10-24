@@ -30,7 +30,7 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
         try {
             const server = await startLotarServer(workspace);
             try {
-                await withPage(`${server.url}/config`, async (page) => {
+                await withPage(`${server.url}/config?section=fields`, async (page) => {
                     await page.getByLabel('Project scope').selectOption('ALPHA');
                     const mode = page.getByTestId('config-custom-fields').getByRole('combobox');
                     await expect.poll(() => mode.inputValue()).toBe('inherit');
@@ -75,14 +75,21 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                     // A freshly loaded page is clean.
                     await expect.poll(() => meta.textContent()).toContain('Last updated');
 
+                    // Settings live in separate sections (DEV-19); edits survive switching.
+                    const section = (id: string) => page.locator(`[data-section-link="${id}"]`).click();
+                    await section('sprints');
                     await page.getByTestId('config-sprints').getByLabel(/^Length/).fill('2w');
                     await page.getByLabel('Capacity (points)').fill('30');
+                    await section('people');
                     const members = page.getByTestId('config-members');
                     await members.getByRole('button', { name: /add member/i }).click();
                     await members.getByRole('textbox').fill('alice');
                     await members.getByRole('textbox').press('Enter');
+                    await section('storage');
                     await page.getByTestId('config-sync-reports').getByRole('checkbox').uncheck();
+                    await section('agents');
                     await page.getByLabel('Context file extension').fill('.ctx');
+                    expect(await page.locator('.config-nav__badge--dirty').count()).toBe(4);
 
                     const saved = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/config/set');
                     await page.getByRole('button', { name: 'Save changes', exact: true }).click();

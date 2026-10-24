@@ -1,10 +1,11 @@
 title: 'Config UI: rebuild with per-section submenus'
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.793695+00:00
-modified: 2026-09-06T13:12:54.111626+00:00
+modified: 2026-10-24T21:49:21.710123+00:00
 comments:
 - date: 2026-09-06T11:21:52.707792+00:00
   text: 'Backlog reconciliation: Remains Todo: ConfigView has section components in a grid, not the requested per-section navigation/submenus. Remaining acceptance is actual section navigation and editing-state behavior. DEV-53 config safety is unrelated completion, and DEV-69 only owns dialog accessibility.'
@@ -12,6 +13,10 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 20: Config UI should be rebuilt using a submenu for each section, rather than one giant view with all configs tiled.
+- date: 2026-10-24T21:36:04.377732+00:00
+  text: 'Design (agreed scope: proper reorganization). Navigation: left section menu on desktop, horizontally scrolling tab strip at phone width; one section visible at a time; save bar stays global. Routing: /config?project=<PREFIX>&section=<id>; unknown/unavailable section falls back to the first; project switches keep the section. Sections (fields regrouped by intent, not by old tiles): General (global: server port, web UI folder; project: project name), New tasks (default project prefix [global], default status, priority, reporter, assignee, tags), Workflow (statuses, types, priorities, done states), Tags & fields (allowed tags, custom fields), People (members, strict, auto-add, reviewers [project]), Automation (behavior toggles + automation rules), Git & scanning (scanning, branch aliases), Files & sync (attachments, sync reports), Agents, Sprints (global only). Edit state: sections stay mounted (v-show) so unsaved values and open composers survive switching; menu marks sections with unsaved changes and with validation errors; a failed save jumps to the first section with errors. Switching project scope or leaving the page with unsaved changes asks for confirmation (also beforeunload). Checks: Vitest for section mapping/routing/guards, browser screenshots 1280/390, smoke updates for specs that drive the config page.'
+- date: 2026-10-24T21:49:21.683357+00:00
+  text: 'Outcome: Config page rebuilt as section navigation per the recorded design. Left menu (sticky) on desktop, scrolling tab strip below 960px with the active tab scrolled into view; /config?project=<P>&section=<id>, unknown or scope-unavailable sections fall back to General, scope switches keep the section. Sections regroup fields by intent: General, New tasks (new ConfigDefaultsSection merges the old ''Project defaults'', ''Project overview'' defaults and People default reporter/assignee/tags), Workflow, Tags & fields, People, Automation (+rules), Git & scanning, Files & sync, Agents, Sprints (global only). Sections stay mounted (v-show) so unsaved values survive switching; the menu marks sections with unsaved changes (dot) and validation errors (!), and a blocked save jumps to the first failing section. Switching scope or leaving the route with unsaved changes opens a ''Discard unsaved changes?'' dialog (Keep editing / Discard changes); beforeunload warns too. Field-to-section map lives in view/utils/configSections.ts. README config screenshots regenerated (scripts/screenshots.mjs now captures the Workflow section). Evidence: view/__tests__/ConfigView.sections.spec.ts (6: every form field mapped exactly once, fallback rules, ?section routing + edits kept across sections + dirty markers, global-only hiding across scope switch, discard dialog for scope switch and route leave incl. keep/discard paths, save jumps to failing section); smoke ui.config-coverage now navigates sections and asserts four dirty markers; ui.done-states opens ?section=workflow; screenshots 1280/390 light+dark, no horizontal overflow. Gates: lint:agent clean; test:agent 1667 Rust + 1118 UI + release pass; test:smoke:agent 82 files / 342 tests pass. Guidance: no durable finding.'
 description: |-
   Migrated checklist requirements:
   Replace the giant tiled configuration view with actual per-section submenu/navigation behavior. Existing extracted section components are partial infrastructure, not this navigation design. Preserve edit state and define project/section routing before implementation.
@@ -31,3 +36,25 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-24T21:36:04.341735+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T21:36:04.377732+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T21:49:21.683357+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T21:49:21.710123+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
