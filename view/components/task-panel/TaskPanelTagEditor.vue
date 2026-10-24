@@ -56,6 +56,33 @@
               </UiButton>
             </header>
             <div class="task-panel__tag-dialog-body">
+              <!-- The modal hides the panel's tag list, so show the task's tags here. -->
+              <section class="task-panel__tag-dialog-current" aria-labelledby="task-panel-tag-dialog-current-label">
+                <span id="task-panel-tag-dialog-current-label" class="muted">Current tags</span>
+                <div
+                  class="task-panel__tags-list"
+                  data-testid="tag-dialog-current"
+                  aria-live="polite"
+                >
+                  <span
+                    v-for="tag in tags"
+                    :key="tag"
+                    :class="['tag', 'task-panel__tag', { 'task-panel__tag--recent': tag === lastAddedTag }]"
+                  >
+                    <span class="task-panel__tag-label">{{ tag }}</span>
+                    <button
+                      type="button"
+                      class="task-panel__tag-remove"
+                      :aria-label="`Remove ${tag}`"
+                      :title="`Remove ${tag}`"
+                      @click="removeTag(tag)"
+                    >
+                      <IconGlyph name="close" aria-hidden="true" />
+                    </button>
+                  </span>
+                  <span v-if="!tags.length" class="muted task-panel__tags-empty">No tags yet</span>
+                </div>
+              </section>
               <label class="task-panel-dialog__field" for="task-panel-tags-input">
                 <span class="muted">Tag</span>
                 <UiInput
@@ -140,6 +167,7 @@ const tagsInput = ref('')
 const tagHint = ref('')
 const composerActive = ref(false)
 const tagDialogOpen = ref(false)
+const lastAddedTag = ref('')
 const tagDialogInputRef = ref<{ focus: () => void } | null>(null)
 const TAG_SUGGESTION_LIMIT = 8
 
@@ -222,6 +250,7 @@ function closeTagDialog() {
   tagsInput.value = ''
   tagHint.value = ''
   tagActiveIndex.value = -1
+  lastAddedTag.value = ''
 }
 
 function handleTagDialogSubmit() {
@@ -286,6 +315,7 @@ function addTag(tag: string): boolean {
   const next = [...props.tags, valueToAdd]
   emit('update:tags', next)
   emit('discoveredTags', [valueToAdd])
+  lastAddedTag.value = valueToAdd
   tagHint.value = ''
   tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
   return true

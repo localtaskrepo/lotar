@@ -70,6 +70,17 @@ describe.concurrent('UI edit-tags row action', () => {
                             .locator('.task-panel__tag-label', { hasText: tag })
                             .count(),
                     ).toBeGreaterThan(0);
+
+                    // DEV-144: the modal hides the panel's tag list, so the dialog
+                    // lists the task's tags itself, including newly added ones.
+                    const current = page.getByTestId('tag-dialog-current');
+                    await current.locator('.task-panel__tag-label', { hasText: tag }).waitFor();
+                    await page.fill('#task-panel-tags-input', 'smoke-added');
+                    await page.keyboard.press('Enter');
+                    await current
+                        .locator('.task-panel__tag--recent .task-panel__tag-label', { hasText: 'smoke-added' })
+                        .waitFor({ timeout: 10_000 });
+                    expect(await current.locator('.task-panel__tag').count()).toBe(2);
                 });
             } finally {
                 await server.stop();

@@ -1,10 +1,16 @@
 title: Adding tags doesn't show added tags
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-23T17:10:39.863681+00:00
-modified: 2026-10-23T17:10:58.202480+00:00
+modified: 2026-10-24T03:21:58.664129+00:00
+comments:
+- date: 2026-10-24T03:15:40.316146+00:00
+  text: 'Reproduced: the modal Manage tags dialog covers the panel tag list under a dim overlay. Plan: take the ticket''s second option and show the task''s current tags (removable chips, polite live region) inside the dialog, so each add/remove is visible without closing it. Verify with Vitest on TaskPanelTagEditor and a browser screenshot.'
+- date: 2026-10-24T03:21:58.642892+00:00
+  text: 'Outcome: took the ticket''s second option. The Manage tags dialog now lists the task''s current tags (removable chips in a polite live region, ''No tags yet'' when empty) above the input, and the most recently added tag gets an accent border, so adds/removes are visible while the modal covers the panel. Evidence: browser screenshot at 1280; new Vitest case ''shows the task tags inside the tag dialog as they are added and removed'' in view/__tests__/TaskPanel.integration.spec.ts (16/16 pass); smoke/tests/ui.edit-tags.smoke.spec.ts extended to add a tag in the dialog and see it listed and highlighted (pass). Remaining: none; full gates at end of batch. Guidance: no durable finding.'
 description: In the task panel when going into the "Add tag" dialog, the dialog obscures the are where you would see tags in the panel, plus the page is in the background behind a dark filter, so it's very hard to make out what tag was added. Either the dialog can't be model and is placed where the button is, by default opening away from the tags area (limited by top border), or the tags need to be shown in the dialog itself.
 history:
 - at: 2026-10-23T17:10:56.586135+00:00
@@ -19,3 +25,25 @@ history:
   - field: priority
     old: Medium
     new: Low
+- at: 2026-10-24T03:15:40.288630+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T03:15:40.316146+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:21:58.642892+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T03:21:58.664129+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -486,6 +486,33 @@ describe('TaskPanel integration safeguards', () => {
         wrapper.unmount()
     })
 
+    it('shows the task tags inside the tag dialog as they are added and removed', async () => {
+        const wrapper = await mountTaskPanel()
+
+        await wrapper.get('[data-testid="tags-add"]').trigger('click')
+        await nextTick()
+        const tagDialog = wrapper.get('[data-testid="tag-dialog"]')
+        const current = () => wrapper.get('[data-testid="tag-dialog-current"]')
+        expect(current().text()).toContain('No tags yet')
+
+        const tagInput = tagDialog.get('#task-panel-tags-input')
+        await tagInput.setValue('alpha')
+        await tagInput.trigger('keydown', { key: 'Enter' })
+        await flushPromises()
+
+        const added = current().findAll('.task-panel__tag')
+        expect(added.map((chip) => chip.get('.task-panel__tag-label').text())).toEqual(['alpha'])
+        expect(added[0]!.classes()).toContain('task-panel__tag--recent')
+        expect(current().attributes('aria-live')).toBe('polite')
+
+        await current().get('button[aria-label="Remove alpha"]').trigger('click')
+        await flushPromises()
+        expect(current().findAll('.task-panel__tag')).toHaveLength(0)
+        expect((wrapper.vm as any).form.tags).toEqual([])
+
+        wrapper.unmount()
+    })
+
     it('adds relationship chips atomically without saving a stale whole map', async () => {
         vi.useFakeTimers()
         const wrapper = await mountTaskPanel()

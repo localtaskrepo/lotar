@@ -1752,6 +1752,16 @@ details.task-panel__group:not([open]) {
   gap: var(--space-3, 0.75rem);
 }
 
+.task-panel__tag-dialog-current {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+}
+
+.task-panel__tag--recent {
+  border-color: var(--color-accent, var(--accent));
+}
+
 .task-panel__tag-suggestions {
   list-style: none;
   margin: 0;
