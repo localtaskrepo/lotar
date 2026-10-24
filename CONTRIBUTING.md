@@ -22,6 +22,7 @@ Notes:
 
 - Use `cargo nextest` via `npm test` / `npm run test:rust` (legacy `cargo test` is intentionally discouraged here).
 - The web UI is under `view/` and is bundled into `target/web`.
+- Optional fast git hooks (formatting and lint checks, no test runs): `npm run hooks:install`. See [.githooks/SETUP.md](.githooks/SETUP.md).
 
 ## Local development
 

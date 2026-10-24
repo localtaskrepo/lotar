@@ -278,6 +278,9 @@ jobs:
     - name: Verify release ticket links and page rendering
       run: npm run test:release
 
+    - name: Verify git hooks stay read-only
+      run: npm run test:hooks
+
   smoke_tests:
     name: Smoke Tests
     runs-on: ubuntu-latest

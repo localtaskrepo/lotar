@@ -1,89 +1,79 @@
 #!/usr/bin/env bash
-# Git pre-commit hook for LoTaR.
+# Git pre-commit hook for LoTaR (DEV-162).
 #
-# Goals:
-# - Keep commits fast (avoid compiles/tests).
-# - Auto-fix formatting (no manual re-run loop).
-# - Never accidentally stage unrelated changes (preserve partial staging).
+# Read-only and fast: checks only the files being committed and never
+# formats, stages, stashes or checks out anything. Fix findings with
+# `npm run fmt` (formatting) or by hand (lint), then commit again.
+#
+# Install: npm run hooks:install   Bypass once: git commit --no-verify
 
 set -euo pipefail
 
 export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 
-repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -z "$repo_root" ]; then
-  exit 0
-fi
-
+repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [ ! -f "Cargo.toml" ]; then
-  exit 0
-fi
-
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "❌ cargo not found in PATH"
-  echo "💡 Install Rust tooling: https://rustup.rs/"
-  exit 1
-fi
-
-tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t lotar-precommit)"
-cleanup() { rm -rf "$tmpdir"; }
-trap cleanup EXIT
-
-staged_rs_list="$tmpdir/staged-rs.txt"
-touch "$staged_rs_list"
-
-# Collect currently staged Rust files.
+# Same scopes as `cargo fmt`, `npm run fmt:js` (Prettier) and `eslint .`.
+rust_files=()
+prettier_files=()
+eslint_files=()
 while IFS= read -r -d '' file; do
   case "$file" in
-    *.rs) printf '%s\n' "$file" >>"$staged_rs_list" ;;
+    *.rs) rust_files+=("$file") ;;
+  esac
+  case "$file" in
+    view/*.ts | view/*.vue | smoke/*.ts | scripts/*.mjs) prettier_files+=("$file") ;;
+    *.mjs | *.mts) [[ "$file" == */* ]] || prettier_files+=("$file") ;;
+  esac
+  case "$file" in
+    *.ts | *.vue | *.mjs | *.mts | *.cjs | *.js) eslint_files+=("$file") ;;
   esac
 done < <(git diff --cached --name-only -z --diff-filter=ACMR)
 
-if [ ! -s "$staged_rs_list" ]; then
+web_files=("${prettier_files[@]+"${prettier_files[@]}"}" "${eslint_files[@]+"${eslint_files[@]}"}")
+if [ "${#rust_files[@]}" -eq 0 ] && [ "${#eslint_files[@]}" -eq 0 ] && [ "${#prettier_files[@]}" -eq 0 ]; then
   exit 0
 fi
 
-# If there are unstaged or untracked changes, stash them to preserve partial staging.
-need_stash=0
-if ! git diff --quiet --exit-code; then
-  need_stash=1
-elif [ -n "$(git ls-files --others --exclude-standard 2>/dev/null || true)" ]; then
-  need_stash=1
+# The checks read the working-tree copy; say so when it differs from what
+# is staged so a partially staged file is not silently misjudged.
+partial=()
+for file in "${rust_files[@]+"${rust_files[@]}"}" "${eslint_files[@]+"${eslint_files[@]}"}"; do
+  if ! git diff --quiet -- "$file"; then
+    partial+=("$file")
+  fi
+done
+if [ "${#partial[@]}" -gt 0 ]; then
+  echo "note: checking the working-tree version of partially staged files: ${partial[*]}"
 fi
 
-if [ "$need_stash" -eq 1 ]; then
-  git stash push -q --keep-index -u -m "lotar pre-commit" || true
-fi
+failed=0
 
-# Format the workspace (should be quick).
-echo "Running cargo fmt --all..."
-cargo fmt --all
-
-# Stage only the Rust files that were staged before formatting.
-while IFS= read -r file; do
-  [ -n "$file" ] || continue
-  if [ -f "$file" ]; then
-    git add -- "$file"
-  fi
-done < "$staged_rs_list"
-
-# Revert any formatting-only changes to other files.
-while IFS= read -r -d '' changed; do
-  if grep -Fxq "$changed" "$staged_rs_list"; then
-    continue
-  fi
-  git checkout -- "$changed" >/dev/null 2>&1 || true
-done < <(git diff --name-only -z)
-
-if [ "$need_stash" -eq 1 ]; then
-  if ! git stash pop -q; then
-    echo ""
-    echo "❌ Failed to re-apply unstaged changes after formatting."
-    echo "💡 Resolve the conflicts, then commit again."
+if [ "${#rust_files[@]}" -gt 0 ]; then
+  if ! command -v rustfmt >/dev/null 2>&1; then
+    echo "error: rustfmt not found; install the toolchain from rust-toolchain.toml" >&2
     exit 1
   fi
+  if ! rustfmt --check --edition 2024 "${rust_files[@]}" >/dev/null 2>&1; then
+    echo "✗ Rust formatting: run 'cargo fmt --all' (files: ${rust_files[*]})"
+    failed=1
+  fi
 fi
 
-exit 0
+if [ "${#web_files[@]}" -gt 0 ]; then
+  if [ ! -d node_modules ]; then
+    echo "note: node_modules missing; skipped Prettier/ESLint (run 'npm ci')"
+  else
+    if [ "${#prettier_files[@]}" -gt 0 ] && ! npx --no-install prettier --check --log-level warn "${prettier_files[@]}"; then
+      echo "✗ Frontend formatting: run 'npm run fmt:js'"
+      failed=1
+    fi
+    if [ "${#eslint_files[@]}" -gt 0 ] && ! npx --no-install eslint --cache --cache-location node_modules/.cache/eslint/ --no-warn-ignored "${eslint_files[@]}"; then
+      echo "✗ ESLint findings above"
+      failed=1
+    fi
+  fi
+fi
+
+exit "$failed"

@@ -1,24 +1,26 @@
-# Git Hooks Setup
+# Git Hooks
 
-To enable automatic code quality checks and fixes:
+Opt-in, read-only checks that finish in seconds. CI runs the full test,
+build and smoke suites; these hooks only catch the common slips early.
 
 ```bash
-git config core.hooksPath .githooks
+npm run hooks:install   # sets git config core.hooksPath .githooks
 ```
 
-## What the hooks do:
+**pre-commit** checks only the staged files and never formats, stages or
+stashes anything:
+- Rust: `rustfmt --check` on staged `.rs` files
+- Frontend: Prettier check and ESLint on staged TypeScript/Vue/JS files
 
-**Pre-commit hook:**
-- ✅ Fast: runs `cargo fmt --all`
-- ✅ Safe staging: re-stages only the Rust files that were already staged (preserves partial staging)
-- ❌ Blocks commits only if it cannot re-apply your unstaged changes cleanly
+Fix formatting with `npm run fmt`, then commit again. The checks read the
+working-tree copy; the hook says so when a file is only partially staged.
 
-**Pre-push hook:**
-- ✅ Validates formatting, lints, build, and full test suite
-- ❌ Blocks pushes if any quality checks fail
+**pre-push** checks what the push changes, Rust and frontend in parallel:
+- Rust files changed: `cargo fmt --check`, clippy on lib and bins (`-D warnings`)
+- Frontend files changed: vue-tsc typecheck, ESLint, Prettier check
+- Nothing else changed (docs, tasks): no checks
 
-## Bypass (not recommended):
-```bash
-git commit --no-verify  # Skip pre-commit
-git push --no-verify    # Skip pre-push
-```
+The pre-push checks read the working tree, so commit or stash unrelated
+edits first if they would fail on their own.
+
+Bypass once with `git commit --no-verify` or `git push --no-verify`.

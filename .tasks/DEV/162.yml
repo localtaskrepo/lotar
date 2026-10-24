@@ -1,0 +1,31 @@
+title: Make git hooks fast and check-only
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:44:19.777009+00:00
+modified: 2026-10-24T23:27:23.687598+00:00
+comments:
+- date: 2026-10-24T23:27:23.640567+00:00
+  text: 'Outcome: hooks are read-only and fast. pre-commit checks only staged files with the same scopes as cargo fmt / npm run fmt:js / eslint . (rustfmt --check --edition 2024, Prettier --check, ESLint with cache); it never formats, stages, stashes or checks out, and notes when a partially staged file is checked from the working tree. pre-push reads the pushed ref ranges (base = remote sha, or merge-base with origin/main for new branches), runs Rust checks (cargo fmt --check, clippy lib+bins -D warnings) only when Rust/Cargo files changed and frontend checks (vue-tsc, ESLint, Prettier) only when frontend files changed, in parallel; docs/task-only pushes skip everything. Dropped from pre-push per developer direction: release build check, full nextest run, cargo audit (CI covers these; cargo-deny follows in DEV-163). Opt-in install: npm run hooks:install (no git config was changed by this work). Timing on this repo: worst-case pre-push (Rust + frontend changed) ~25s, previously several minutes; pre-commit with no code files <0.1s, with code files ~2s. Evidence: scripts/tests/git-hooks.test.mjs (5 cases in throwaway repos: clean pass with identical status/index/stash, unformatted Rust+TS rejected and left unchanged, ESLint finding on a partially staged file, docs-only push skips in <5s, frontend-only push runs only frontend checks) wired as npm run test:hooks, into npm test/test:agent and CI ui_tests (contract test updated); real pre-push caught an unformatted file during development. Docs: .githooks/SETUP.md, CONTRIBUTING.md. Related: DEV-138 (unified task-data verify command) remains open and separate. Guidance: no durable finding.'
+description: 'Pre-commit stashes, formats and re-stages (mutating; conflicted during DEV-137 work) and only covers Rust; pre-push runs a release build, the full nextest suite and cargo audit (minutes) yet skips frontend checks. Developer direction (2026-10-24): no multi-minute QA step on every commit/push; CI plus the pre-release CI review is the full gate. Make hooks read-only and fast: staged-file format/lint checks on commit, quick lint/typecheck on push; document opt-in install. Related: DEV-138 (unified task-data verify command) stays separate.'
+history:
+- at: 2026-10-24T23:23:17.425755+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T23:27:23.640567+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:27:23.687598+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -247,6 +247,7 @@ fn ui_job_typechecks_lints_and_format_checks_the_frontend() {
         ("npm run lint:frontend", "the vue-tsc typecheck"),
         ("npm run lint:js", "ESLint"),
         ("npm run fmt:js:check", "the Prettier check"),
+        ("npm run test:hooks", "the git hook tests"),
     ] {
         assert!(
             runs.iter().any(|run| run.contains(script)),
