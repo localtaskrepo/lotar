@@ -17,7 +17,7 @@ jobs:
       contents: read
     steps:
       - name: Verify latest QA run for this commit is green
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -41,7 +41,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -62,7 +62,7 @@ jobs:
           fi
 
       - name: Create or update release (no assets yet)
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
@@ -115,7 +115,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
@@ -131,7 +131,7 @@ jobs:
           shared-key: release-${{ matrix.os }}-${{ matrix.rust_target }}
 
       - name: Write Node version file
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');
@@ -144,7 +144,7 @@ jobs:
             }
 
       - name: Setup Node (for web build)
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.node-version'
           cache: 'npm'
@@ -240,7 +240,7 @@ jobs:
           "$hash  $name.zip" | Out-File -FilePath "$name.sha256" -Encoding ascii
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign artifact (non-Windows)
         if: matrix.os != 'windows-latest'
@@ -266,7 +266,7 @@ jobs:
 
       - name: Create GitHub Release (append assets, tar.gz)
         if: matrix.os != 'windows-latest'
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -279,7 +279,7 @@ jobs:
 
       - name: Create GitHub Release (append assets, zip)
         if: matrix.os == 'windows-latest'
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -298,12 +298,12 @@ jobs:
       contents: write
     steps:
       - name: Checkout release renderer
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref }}
           persist-credentials: false
       - name: Add quick download links and commit list
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -422,7 +422,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Collect release metadata
         id: release_meta
@@ -465,7 +465,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout tap repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: localtaskrepo/homebrew-lotar
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -556,7 +556,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout scoop bucket repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: localtaskrepo/scoop-lotar
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
