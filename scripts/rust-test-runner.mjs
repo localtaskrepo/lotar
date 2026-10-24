@@ -583,7 +583,6 @@ export async function main({
         stderr.write(`rust-test-runner: warning: ${warning}\n`);
     }
 
-    let inventory = null;
     if (plan.gitlessSelected) {
         stderr.write(
             `rust-test-runner: Git capability unavailable (${probe.reason}); selecting profile ${GITLESS_PROFILE}.\n` +
@@ -594,7 +593,6 @@ export async function main({
             if (listArgs !== null) {
                 const listing = await runInventoryList(listArgs);
                 const names = parseListTestNames(listing);
-                inventory = names;
                 stderr.write(
                     `excluded git_required tests (${names.length}) across the selected targets:\n` +
                         `${names.map((name) => `  ${name}`).join('\n')}\n`,

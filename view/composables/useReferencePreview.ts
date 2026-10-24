@@ -183,7 +183,7 @@ export function useReferencePreview() {
         const spaceAbove = Math.max(0, normalizedAnchorTop - GAP)
 
         const preferAbove = spaceBelow < 200 && spaceAbove > spaceBelow
-        let top = normalizedAnchorTop
+        let top: number
         if (preferAbove) {
             top = Math.max(minTop, normalizedAnchorTop - GAP - desiredHeight)
         } else {

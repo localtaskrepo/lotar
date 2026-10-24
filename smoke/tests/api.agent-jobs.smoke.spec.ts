@@ -257,7 +257,7 @@ describe.concurrent('Agent job smoke tests', () => {
                         gate,
                         path.join(workspace.root, '.logs'),
                     );
-                    throw new Error(`${(error as Error).message}\n${evidence}`);
+                    throw new Error(`${(error as Error).message}\n${evidence}`, { cause: error });
                 }
 
                 const runningEnvelope = await waitForJobStatus(server.url, jobId, ['running']);
@@ -346,6 +346,7 @@ describe.concurrent('Agent job smoke tests', () => {
             await gate.dispose();
             await agents.dispose();
             if (!bodyFailed && unfinished.length > 0) {
+                // eslint-disable-next-line no-unsafe-finally -- only throws when the test body passed, so no failure is masked
                 throw new Error(`gate children did not finish after release: ${unfinished.join(', ')}`);
             }
         }

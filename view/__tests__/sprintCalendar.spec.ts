@@ -75,9 +75,9 @@ describe('sprint calendar helpers', () => {
         ]
         const schedule = buildSprintSchedule(sprints, rangeStart, rangeEnd)
         expect(Object.keys(schedule)).toHaveLength(3)
-        const firstDay = schedule[toDateKey(new Date('2024-03-10T00:00:00Z'))]?.[0]!
+        const firstDay = schedule[toDateKey(new Date('2024-03-10T00:00:00Z'))]?.[0]
         expect(firstDay?.isStart).toBe(false)
-        const lastDay = schedule[toDateKey(new Date('2024-03-12T00:00:00Z'))]?.[0]!
+        const lastDay = schedule[toDateKey(new Date('2024-03-12T00:00:00Z'))]?.[0]
         expect(lastDay?.isEnd).toBe(false)
     })
 

@@ -530,7 +530,7 @@ describe.concurrent('CLI automation smoke scenarios', () => {
     it('async run action does not block the task update and completes after release', async () => {
         const gate = await createGateFixture('lotar-smoke-async-run-');
         const workspace = await SmokeWorkspace.create();
-        let drainIncomplete: readonly string[] = [];
+        let drainIncomplete: readonly string[];
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);

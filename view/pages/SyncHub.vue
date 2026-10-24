@@ -524,7 +524,6 @@ async function loadScopeConfig(scopeKey: SyncScope = scope.value) {
   }
 }
 
-const globalRemotes = computed<Record<string, SyncRemoteConfig>>(() => scopedInspect.value?.global_raw?.remotes ?? {})
 const projectRemotes = computed<Record<string, SyncRemoteConfig>>(() => scopedInspect.value?.project_raw?.remotes ?? {})
 const effectiveRemotes = computed<Record<string, SyncRemoteConfig>>(() => scopedInspect.value?.effective?.remotes ?? {})
 

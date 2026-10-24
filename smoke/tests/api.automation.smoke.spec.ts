@@ -867,7 +867,7 @@ ${indentBlock(
         // workspace is disposed) and asserted after it: probe-delivered
         // proves the descendant really wrote to the inherited stderr AFTER
         // the primary exited, released proves the owned child finished.
-        let probeOutcome: 'delivered' | 'epipe' | 'missing' = 'missing';
+        let probeOutcome: 'delivered' | 'epipe' | 'missing';
         let releasedSeen = false;
         try {
             server = await startLotarServer(workspace);

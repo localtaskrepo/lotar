@@ -302,18 +302,24 @@ function resetTables() {
         localStorage.removeItem(k)
       }
     }
-  } catch {}
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data).
+  }
 }
 
 function clearSavedFilters() {
   const filterKeys = ['lotar.tasks.filter', 'lotar.sprints.filter', 'lotar.calendar.filter', 'lotar.boards.filter']
   try {
     for (const key of filterKeys) localStorage.removeItem(key)
-  } catch {}
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data).
+  }
   // Backwards compatibility: older builds may have used sessionStorage.
   try {
     for (const key of filterKeys) sessionStorage.removeItem(key)
-  } catch {}
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data).
+  }
 }
 </script>
 

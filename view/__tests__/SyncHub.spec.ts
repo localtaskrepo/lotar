@@ -702,7 +702,6 @@ describe('SyncHub scope isolation', () => {
         ;(api.syncPull as any).mockReturnValueOnce(pullB.promise)
         await rowButton(remoteRow(wrapper, 'other'), 'Pull').trigger('click')
         await flushPromises()
-        const runB = (api.syncPull as any).mock.calls[1][0].client_run_id as string
 
         listHandler = async (params) => {
             if (params?.limit === 200) {

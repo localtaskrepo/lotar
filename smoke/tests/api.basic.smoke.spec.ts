@@ -31,7 +31,7 @@ describe.concurrent('API smoke harness', () => {
         const workspace = await SmokeWorkspace.create();
 
         try {
-            const first = await workspace.addTask('API List Task A');
+            await workspace.addTask('API List Task A');
             const second = await workspace.addTask('API List Task B');
 
             await workspace.runLotar(['status', second.id, 'done']);

@@ -253,6 +253,14 @@ jobs:
     - name: Typecheck frontend
       run: npm run lint:frontend
 
+    # Existing explicit `any`s in app code are listed in
+    # eslint-suppressions.json; new ones fail (DEV-161).
+    - name: Lint frontend
+      run: npm run lint:js
+
+    - name: Check frontend formatting
+      run: npm run fmt:js:check
+
     - name: Run Vitest suite
       run: npm run test:ui
 

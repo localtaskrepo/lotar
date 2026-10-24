@@ -20,8 +20,8 @@
 <script setup lang="ts">
 import UiButton from './UiButton.vue'
 
-const props = defineProps<{ title: string; description?: string; primaryLabel?: string; secondaryLabel?: string }>()
-const emit = defineEmits<{ (e: 'primary'): void; (e: 'secondary'): void }>()
+defineProps<{ title: string; description?: string; primaryLabel?: string; secondaryLabel?: string }>()
+defineEmits<{ (e: 'primary'): void; (e: 'secondary'): void }>()
 </script>
 
 <style scoped>

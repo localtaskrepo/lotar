@@ -158,10 +158,9 @@ export class SmokeWorkspace {
         // while the expected path is missing is a mismatch and fails fast
         // instead of being adopted.
         const deadline = Date.now() + 5_000;
-        let unexpectedFiles: string[] = [];
         while (!(await fs.pathExists(candidatePath))) {
             const nextFiles = await this.listTaskFiles();
-            unexpectedFiles = nextFiles.filter((file) => !existingFiles.has(file));
+            const unexpectedFiles = nextFiles.filter((file) => !existingFiles.has(file));
             if (unexpectedFiles.length > 0) {
                 throw new Error(
                     `lotar reported task ${id} (expected ${candidatePath}) but only unexpected task file(s) appeared: ${unexpectedFiles.join(', ')}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,

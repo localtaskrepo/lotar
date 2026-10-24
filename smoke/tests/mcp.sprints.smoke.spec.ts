@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { callTool, extractToolPayload, withMcpClient } from '../helpers/mcp-harness.js';
+import { callTool, withMcpClient } from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 describe.concurrent('MCP sprint smoke scenarios', () => {
@@ -30,11 +30,13 @@ describe.concurrent('MCP sprint smoke scenarios', () => {
                 expect(summaryText).toContain('Deleted');
 
                 const detailsText = content?.[1]?.text ?? '{}';
-                let details: Record<string, any> = {};
+                let details: Record<string, any>;
                 try {
                     details = JSON.parse(detailsText);
                 } catch (error) {
-                    throw new Error(`Failed to parse MCP delete payload: ${detailsText}\n${String(error)}`);
+                    throw new Error(`Failed to parse MCP delete payload: ${detailsText}\n${String(error)}`, {
+                        cause: error,
+                    });
                 }
 
                 expect(details.deleted).toBe(true);

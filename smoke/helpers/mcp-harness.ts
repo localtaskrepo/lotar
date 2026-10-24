@@ -234,7 +234,7 @@ export function extractToolPayload(source: McpFrame | McpClientLike | any): unkn
         try {
             return JSON.parse(entry.text);
         } catch (error) {
-            throw new Error(`Failed to parse MCP payload JSON: ${entry.text}\n${String(error)}`);
+            throw new Error(`Failed to parse MCP payload JSON: ${entry.text}\n${String(error)}`, { cause: error });
         }
     }
 

@@ -94,6 +94,7 @@ async function writeAgentLauncher(dir: string, script: string, args: readonly st
  */
 export function windowsLauncherContent(script: string, args: readonly string[]): string {
     for (const value of [nodeExecutable(), script, ...args]) {
+        // eslint-disable-next-line no-control-regex -- control characters are exactly what must be rejected
         if (/["%\x00-\x1f\x7f]/.test(value) || value.endsWith('\\')) {
             throw new Error(
                 'Windows fixture launcher values cannot contain quotes, percent signs, control characters, or a trailing backslash',
@@ -301,7 +302,7 @@ export async function createGateFixture(prefix = 'lotar-smoke-gate-'): Promise<G
             `completed=${fs.pathExistsSync(sentinelPath(`completed-${label}.sentinel`))}`,
             `release=${fs.pathExistsSync(releasePath)}`,
         ].join(' ');
-        let extra = '';
+        let extra: string;
         try {
             const sentinels = fs
                 .readdirSync(dir)

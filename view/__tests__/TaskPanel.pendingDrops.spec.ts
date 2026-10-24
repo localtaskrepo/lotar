@@ -240,7 +240,7 @@ const mountPanel = async (taskId: string) => {
 const dispatchFileDrop = async (wrapper: ReturnType<typeof mount>, files: File[], uriList = '') => {
     const dataTransfer = {
         files,
-        items: files.map((file) => ({ kind: 'file' })),
+        items: files.map(() => ({ kind: 'file' })),
         types: uriList ? ['Files', 'text/uri-list'] : ['Files'],
         getData: (type: string) => (type === 'text/uri-list' ? uriList : ''),
     }

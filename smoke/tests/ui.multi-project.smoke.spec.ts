@@ -24,7 +24,7 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
             );
             await workspace.write(path.join(apiDir, 'src', 'lib.rs'), '// lib');
 
-            const frontendTask = await workspace.addTask(frontendTitle, {
+            await workspace.addTask(frontendTitle, {
                 cwd: path.join(workspace.root, frontendDir),
             });
             const apiTask = await workspace.addTask(apiTitle, {
@@ -78,7 +78,7 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
                 cwd: path.join(workspace.root, frontendDir),
             });
 
-            const overrideTask = await workspace.addTask(overrideTitle, {
+            await workspace.addTask(overrideTitle, {
                 cwd: path.join(workspace.root, frontendDir),
                 args: ['--project=QA'],
             });

@@ -621,7 +621,7 @@
 </template>
 
 <script setup lang="ts">
-import { Teleport, Transition, computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type {
   ConfigInspectResult,
@@ -788,7 +788,8 @@ const {
   attachmentsDir,
 } = useTaskPanelState(props, emit)
 
-const taskId = computed(() => (task.id || '').trim())
+// Named apart from the taskId prop, which it would otherwise shadow.
+const panelTaskId = computed(() => (task.id || '').trim())
 
 // -- DEV-92: deleted (trash) task mode --------------------------------------
 
@@ -944,7 +945,7 @@ async function loadSyncConfig(prefix: string | null) {
 }
 
 watch(
-  taskId,
+  panelTaskId,
   (value) => {
     const prefix = projectPrefixOfTaskId(value)
     loadSyncConfig(prefix)
@@ -987,7 +988,7 @@ const {
 } = useTaskPanelAttachmentDrop({
   task,
   mode,
-  taskId,
+  taskId: panelTaskId,
   isDeleted,
   isOpen: () => props.open,
   targetTaskId: () => props.taskId,
@@ -1078,7 +1079,7 @@ function startEditingDescription() {
   })
 }
 
-function onDescriptionFocusOut(event: FocusEvent) {
+function onDescriptionFocusOut(_event: FocusEvent) {
   if (!editingDescription.value) return
 
   descriptionFocusoutTick.value += 1
@@ -1332,7 +1333,7 @@ function closeSyncDialog(force?: boolean | Event) {
 
 async function submitSyncDialog() {
   if (syncDialogSubmitting.value) return
-  const id = taskId.value
+  const id = panelTaskId.value
   if (!id) {
     showToast('Save the task before syncing')
     return

@@ -374,6 +374,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     } catch (error) {
                         throw new Error(
                             `${(error as Error).message}; start=${startReturnedAfterMs}ms card=${cardObservedAfterMs}ms logs=${logsOpenedAfterMs}ms phase=${phaseObservedAfterMs}ms; ${gate.diagnostics('stream')}; jobs=${JSON.stringify(await fetchJobsViaApi(server.url, task.id))}`,
+                            { cause: error },
                         );
                     }
 
@@ -434,6 +435,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
             await gate.dispose();
             await agents.dispose();
             if (!bodyFailed && unfinished.length > 0) {
+                // eslint-disable-next-line no-unsafe-finally -- only throws when the test body passed, so no failure is masked
                 throw new Error(`gate children did not finish after release: ${unfinished.join(', ')}`);
             }
         }

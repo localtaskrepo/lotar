@@ -405,7 +405,7 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
     })
 
     it('contains Tab focus within the nested sprint dialog', async () => {
-        const wrapper = await mountCreatePanel({ initialSprint: 101 }, { realTeleport: true })
+        await mountCreatePanel({ initialSprint: 101 }, { realTeleport: true })
 
         const trigger = document.querySelector('button[aria-label="Assign sprint"]') as HTMLButtonElement
         trigger.click()
@@ -436,7 +436,7 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
                 resolveAdd = resolve
             }),
         )
-        const wrapper = await mountCreatePanel({ taskId: 'DEMO-200' }, { realTeleport: true })
+        await mountCreatePanel({ taskId: 'DEMO-200' }, { realTeleport: true })
         await flushPromises()
 
         const trigger = document.querySelector('button[aria-label="Assign sprint"]') as HTMLButtonElement

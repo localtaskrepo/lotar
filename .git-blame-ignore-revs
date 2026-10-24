@@ -1,0 +1,6 @@
+# Formatting-only commits for `git blame --ignore-revs-file` (GitHub uses this
+# file automatically). Enable locally with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# DEV-161 Format TypeScript and Vue code with Prettier
+0969766de894e3838e7816568a2427a555d7c166

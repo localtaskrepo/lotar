@@ -496,8 +496,6 @@ const {
   tags: configuredTags,
   members,
 } = useConfig()
-const statusOptions = computed(() => [...(statuses.value || [])])
-const priorityOptions = computed(() => [...(priorities.value || [])])
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()

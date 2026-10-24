@@ -52,7 +52,7 @@ function makeTask(id: string, overrides: Record<string, unknown> = {}) {
 describe('TaskPanelHost external lifecycle reactivity (DEV-92)', () => {
     let store: ReturnType<typeof useTaskStore>
     let controller: ReturnType<typeof useTaskPanelController>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     let wrapper: any
 
     const stubProps = () => wrapper.findComponent({ name: 'TaskPanel' }).props()

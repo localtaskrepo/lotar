@@ -35,7 +35,7 @@ LoTaR is a Rust workspace with a Vue front-end bundle. The CLI, REST server, MCP
 ## Build & release
 
 - Front-end: `npm ci && npm run build:web` compiles the SPA into `target/web`. Smoke tests (`npm run smoke`) depend on this build.
-- Backend: `npm run lint` runs typechecking, Clippy, and formatting checks; `npm test` runs Nextest with Cargo profile `ci`, then Vitest.
+- Backend: `npm run lint` runs typechecking, ESLint, Clippy, and Rust/Prettier formatting checks; `npm test` runs Nextest with Cargo profile `ci`, then Vitest.
 - Release: `npm run build` builds and compresses the SPA, then runs `cargo build --release`. The binary embeds `target/web-embed` with `include_dir!` (see `src/web_server.rs`).
 - Smoke: `npm run smoke` rebuilds via `npm run build:smoke`, producing `target/smoke/lotar`, then executes the smoke suite. No separate release build is needed.
 

@@ -391,7 +391,9 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                 await gate.waitForStarted('shim', 10_000);
             } catch (error) {
                 const outcome = await exit;
-                throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`);
+                throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`, {
+                    cause: error,
+                });
             }
 
             const boot = await readBootSentinel(gate.dir, 'shim');
@@ -449,7 +451,9 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                 await gate.waitForStarted('fwd', 10_000);
             } catch (error) {
                 const outcome = await exit;
-                throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`);
+                throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`, {
+                    cause: error,
+                });
             }
 
             const boot = await readBootSentinel(gate.dir, 'fwd');
@@ -523,7 +527,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                     }),
                 ]);
                 const detail = outcome ? `; wrapper exit=${outcome.code} stderr=${outcome.stderr}` : '';
-                throw new Error(`${(error as Error).message}${detail}`);
+                throw new Error(`${(error as Error).message}${detail}`, { cause: error });
             }
 
             const boot = await readBootSentinel(gate.dir, 'conflict');

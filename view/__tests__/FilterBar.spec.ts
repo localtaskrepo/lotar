@@ -230,7 +230,6 @@ describe('FilterBar', () => {
         await wrapper.find('[data-testid="filter-status"]').trigger('click')
         await nextTick()
 
-        const invert = wrapper.find('button.filter-bar__menu-action')
         // First action button might be Clear depending on initial selection; pick the one labeled Invert.
         const invertBtn = wrapper.findAll('button.filter-bar__menu-action').find((b) => b.text().includes('Invert'))
         expect(invertBtn).toBeTruthy()

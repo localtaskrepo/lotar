@@ -16,7 +16,7 @@ export function generateProjectPrefix(name: string): string {
         return cleaned.toUpperCase()
     }
     const normalized = cleaned.toUpperCase()
-    if (/[\-_.\s]/.test(normalized)) {
+    if (/[-_.\s]/.test(normalized)) {
         return normalized
             .split(/[-_.\s]+/)
             .filter((segment) => segment.length > 0)

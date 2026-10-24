@@ -83,15 +83,13 @@ type ToggleOption = { value: ToggleValue; label: string }
 
 type ValidateField = 'scan_signal_words' | 'scan_ticket_patterns'
 
-type ToggleFieldMap = 'scanEnableTicketWords' | 'scanEnableMentions' | 'scanStripAttributes'
-
 const scanSignalWords = defineModel<string[]>('scanSignalWords', { required: true })
 const scanTicketPatterns = defineModel<string[]>('scanTicketPatterns', { required: true })
 const scanEnableTicketWords = defineModel<ToggleValue>('scanEnableTicketWords', { required: true })
 const scanEnableMentions = defineModel<ToggleValue>('scanEnableMentions', { required: true })
 const scanStripAttributes = defineModel<ToggleValue>('scanStripAttributes', { required: true })
 
-const props = defineProps<{
+defineProps<{
   description: string
   isGlobal: boolean
   toggleSelectOptions: (field: ToggleField) => ToggleOption[]

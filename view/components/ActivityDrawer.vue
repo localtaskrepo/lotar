@@ -91,7 +91,7 @@ import UiCard from './UiCard.vue'
 import { titleCase } from '../utils/text'
 
 const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ (e: 'close'): void }>()
+defineEmits<{ (e: 'close'): void }>()
 
 const { openTaskPanel } = useTaskPanelController()
 

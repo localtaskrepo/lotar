@@ -495,7 +495,7 @@ describe('UI DEV-66 Insights and activity feed query isolation', () => {
                     // REST mutation (explicit SSE, no watcher dependence): the
                     // task-derived views converge automatically — no manual
                     // refresh — while the cached stats overview must NOT move.
-                    let seen = lists.urls.length;
+                    const seen = lists.urls.length;
                     await apiMutate(server, '/api/tasks/update', { id: baseTask.id, status: 'Done' });
                     await lists.waitForNextRequest(seen);
                     await expect.poll(() => distributionCount(page, 'Status distribution', 'Done')).toBe('1');

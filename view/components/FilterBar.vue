@@ -881,7 +881,9 @@ onMounted(async () => {
         customFilters.value = customFieldsFrom(saved)
       }
     }
-  } catch {}
+  } catch {
+    // A corrupt saved filter state falls back to the defaults set above.
+  }
   // Publish changes queued during initialization only after the full restore.
   // This also covers a lone project selected before the field watcher existed.
   if (

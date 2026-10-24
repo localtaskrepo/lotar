@@ -424,7 +424,7 @@
 </template>
 
 <script setup lang="ts">
-import { Teleport, Transition, computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { api } from '../../api/client'
 import type { ConfigInspectResult, ReferenceSnippet, SyncAuthProfile, SyncRemoteConfig } from '../../api/types'
 import IconGlyph from '../IconGlyph.vue'

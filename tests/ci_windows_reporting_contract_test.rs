@@ -234,7 +234,7 @@ fn smoke_job_caches_the_headless_browser_per_playwright_version() {
 }
 
 #[test]
-fn ui_job_typechecks_the_frontend() {
+fn ui_job_typechecks_lints_and_format_checks_the_frontend() {
     let workflow: serde_yaml_ng::Value =
         serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
     let runs: Vec<&str> = workflow["jobs"]["ui_tests"]["steps"]
@@ -243,8 +243,14 @@ fn ui_job_typechecks_the_frontend() {
         .iter()
         .filter_map(|step| step["run"].as_str())
         .collect();
-    assert!(
-        runs.iter().any(|run| run.contains("npm run lint:frontend")),
-        "ui_tests must run the vue-tsc typecheck: {runs:?}"
-    );
+    for (script, purpose) in [
+        ("npm run lint:frontend", "the vue-tsc typecheck"),
+        ("npm run lint:js", "ESLint"),
+        ("npm run fmt:js:check", "the Prettier check"),
+    ] {
+        assert!(
+            runs.iter().any(|run| run.contains(script)),
+            "ui_tests must run {purpose}: {runs:?}"
+        );
+    }
 }

@@ -14,6 +14,7 @@ async function readSprintMembership(workspace: SmokeWorkspace, sprintId: string)
     } catch (error) {
         throw new Error(
             `sprint file ${sprintFile} must exist while polling membership (sprints are created before the server starts): ${(error as Error).message}`,
+            { cause: error },
         );
     }
     const sprint = parse(raw) as { tasks?: string[] };

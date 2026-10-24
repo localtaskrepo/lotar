@@ -87,7 +87,7 @@ const relativeTime = (value: string) => formatRelativeTime(value)
 const modifiedInfo = computed(() => {
   const raw = (props.task.modified || '').trim()
   if (!raw) return null
-  let parsed: Date | null = null
+  let parsed: Date | null
   try {
     const d = new Date(raw)
     parsed = Number.isFinite(d.getTime()) ? d : null
@@ -108,7 +108,7 @@ const dueInfo = computed(() => {
   const startToday = startOfLocalDay(new Date())
   const startDue = startOfLocalDay(parsed)
   const diffDays = Math.round((startDue.getTime() - startToday.getTime()) / 86_400_000)
-  let context = ''
+  let context: string
   let tone: 'overdue' | 'due-today' | 'soon' | null = null
   if (diffDays < 0) {
     context = `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} ago`

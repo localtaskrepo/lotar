@@ -505,7 +505,7 @@ import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
 import { sortTasks } from '../utils/taskSort'
-import { formatMember, memberColor, memberInitials } from '../utils/member'
+import { memberColor, memberInitials } from '../utils/member'
 import { statusEnteredAt } from '../utils/taskHistory'
 
 const route = useRoute()
@@ -566,7 +566,6 @@ const filterPayload = computed(() => ({
 }))
 const {
   hasFilters,
-  sanitizeFilterInput,
   onFilterUpdate,
   clearFilters: clearFiltersAction,
 } = useProjectFilterSync(project, filter, {
@@ -574,7 +573,7 @@ const {
 })
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
-const { sprintLookup, sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
+const { sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
 
 const sprintFilterOptions = useSprintFilterOptions(sprints)
 
@@ -675,7 +674,7 @@ function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
 function taskModifiedInfo(task: TaskDTO): string {
   const raw = (task.modified || '').trim()
   if (!raw) return ''
-  let parsed: Date | null = null
+  let parsed: Date | null
   try {
     const d = new Date(raw)
     parsed = Number.isFinite(d.getTime()) ? d : null
@@ -757,8 +756,6 @@ const columnsData = computed(() => {
   }
   return ordered
 })
-
-const columns = computed(() => columnsData.value.map((item) => item.label))
 
 // DEV-130: per-project board layout (column order, stacked and hidden
 // statuses, per-column WIP limits and card rules).

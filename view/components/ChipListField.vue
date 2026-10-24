@@ -102,7 +102,7 @@ type ChipClassValue = string | Record<string, boolean> | Array<string | Record<s
 
 const props = withDefaults(
   defineProps<{
-    modelValue: string[]
+    modelValue?: string[]
     placeholder?: string
     emptyLabel?: string
     addLabel?: string
@@ -152,7 +152,7 @@ const useCustomComposer = computed(() => !!slots.composer)
 const canCommit = computed(() => !!draft.value.trim())
 const chipWrapperClass = computed(() => (props.chipClass === undefined ? 'chip-field__chip' : props.chipClass))
 
-function normalize(raw: string): string {
+function normalizeValue(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) return ''
   return props.normalize ? props.normalize(trimmed) : trimmed
@@ -197,7 +197,7 @@ function handleAddClick() {
 }
 
 function commit(value: string) {
-  const normalized = normalize(value)
+  const normalized = normalizeValue(value)
   if (!normalized) return
   if (!props.allowDuplicates && values.value.includes(normalized)) {
     draft.value = ''

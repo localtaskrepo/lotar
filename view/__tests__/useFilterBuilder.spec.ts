@@ -100,7 +100,7 @@ describe('buildServerFilter', () => {
     })
 
     it('normalizes the field: alias and forwards invalid sort values raw', () => {
-        const { serverFilter, normalized } = buildServerFilter({ sort_by: 'field:Risk' }, '')
+        const { serverFilter } = buildServerFilter({ sort_by: 'field:Risk' }, '')
         expect(serverFilter.sort_by).toBe('custom:Risk')
 
         // Invalid values reach the server untouched so its strict parser

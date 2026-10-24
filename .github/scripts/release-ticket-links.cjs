@@ -19,6 +19,7 @@ function number(value) {
 }
 
 function safePath(path) {
+  // eslint-disable-next-line no-control-regex -- control characters make a path unsafe
   return typeof path === 'string' && !/[\\\x00-\x1f\x7f]/.test(path)
     && path.split('/').every((part) => part && part !== '.' && part !== '..');
 }
@@ -70,7 +71,7 @@ function encodeSegment(value) {
 
 function escapeText(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/[\\`*{}\[\]()#+!|~_$]/g, '\\$&');
+    .replace(/[\\`*{}[\]()#+!|~_$]/g, '\\$&');
 }
 
 // Only preserve explicit HTTP(S) inline links, never arbitrary Markdown destinations.
@@ -120,6 +121,7 @@ function inlineLinkAt(text, start, brackets) {
 }
 
 function linkTicketReferences(subject, snapshot) {
+  // eslint-disable-next-line no-control-regex -- control characters are collapsed to spaces
   const text = String(subject).replace(/[\r\n\u2028\u2029\x00-\x1f\x7f]+/g, ' ');
   const canLink = snapshot?.tickets instanceof Map && SHA.test(snapshot.revision);
   // Match label delimiters once, including escapes, rather than rescanning an
@@ -144,7 +146,7 @@ function linkTicketReferences(subject, snapshot) {
       const before = text[start - 1] || '';
       const after = text[start + raw.length] || '';
       result += escapeText(value.slice(end, match.index));
-      const pathBoundary = /[\/\\@\p{Mark}]/u.test(before + after)
+      const pathBoundary = /[/\\@\p{Mark}]/u.test(before + after)
         || before === '.' || (after === '.' && /[\p{Alphabetic}\p{Number}_-]/u.test(text[start + raw.length + 1] || ''));
       if (path && safePath(path) && path.startsWith(`.tasks/${prefix}/`) && !pathBoundary) {
         const url = `https://github.com/${encodeSegment(snapshot.owner)}/${encodeSegment(snapshot.repo)}/blob/${snapshot.revision}/${path.split('/').map(encodeSegment).join('/')}`;

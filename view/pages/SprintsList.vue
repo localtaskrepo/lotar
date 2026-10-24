@@ -818,7 +818,6 @@ import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import UiPagination from '../components/UiPagination.vue'
-import UiSelect from '../components/UiSelect.vue'
 import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog.vue'
 import { showToast } from '../components/toast'
 import { useConfig } from '../composables/useConfig'
@@ -838,7 +837,6 @@ import {
   fromDateTimeInputValue,
   parseTaskDate,
   safeTimestamp,
-  startOfLocalDay,
   toDateTimeInputValue,
 } from '../utils/date'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'

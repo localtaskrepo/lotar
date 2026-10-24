@@ -45,6 +45,7 @@ async function* charsOf(text: string): AsyncIterable<string> {
     }
 }
 
+// eslint-disable-next-line require-yield -- deliberately never yields, like a mute server
 async function* silentStream(): AsyncIterable<string> {
     // Never yields and never ends, like a server that stays mute.
     await new Promise<never>(() => {});

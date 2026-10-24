@@ -43,21 +43,6 @@ export interface TaskPanelEmit {
 
 type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'references'
 
-interface CommitEntry {
-    commit: string
-    author: string
-    email: string
-    date: string
-    message: string
-}
-
-type SprintAssignmentSummary = {
-    id: number
-    label: string
-    state: string
-    missing: boolean
-}
-
 export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPanelEmit) {
     const mode = computed(() => (props.taskId && props.taskId !== 'new' ? 'edit' : 'create'))
 

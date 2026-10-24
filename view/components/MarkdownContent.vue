@@ -1,4 +1,5 @@
 <template>
+  <!-- eslint-disable-next-line vue/no-v-html -- html comes from renderMarkdown, which sanitizes with DOMPurify -->
   <div class="markdown-content" v-html="html"></div>
 </template>
 

@@ -1,0 +1,31 @@
+title: Add ESLint and Prettier for the TypeScript and Vue code
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T22:44:19.743300+00:00
+modified: 2026-10-24T23:20:51.089815+00:00
+comments:
+- date: 2026-10-24T23:20:51.043807+00:00
+  text: 'Outcome: two commits. (1) 0969766 Prettier formatting pass: .prettierrc.json encodes the measured house style (view/: no semicolons, single quotes, 2-space Vue, 4-space TS; smoke/, scripts/, root *.mjs/*.mts: semicolons; printWidth 120); 14 multi-statement inline Vue handlers became arrow functions because with semi:false Prettier removes the '';'' Vue relies on to split statements (compile error otherwise); a @ts-expect-error moved onto the offending property; 7 DependencyGraph CSS-source regexes now tolerate line breaks. Listed in .git-blame-ignore-revs. (2) ESLint flat config (eslint.config.mjs: @eslint/js + typescript-eslint + eslint-plugin-vue recommended, eslint-config-prettier last; reportUnusedDisableDirectives=error). Disabled style-only Vue rules (attribute order/hyphenation, camelCase events, multi-word names, require-default-prop); no-mutating-props shallowOnly for the shared task-panel form; _-prefixed unused allowed; no-undef off for TS/Vue; no-explicit-any off in tests/smoke and an error in app code with the 221 existing occurrences bulk-suppressed in eslint-suppressions.json (new ones fail; verified with a probe). Fixed ~95 real findings: dead code (unused imports/vars/helpers incl. SmartListChips review-chip leftovers, Calendar/Board/ProjectInsights/SprintsList helpers), two vue/no-dupe-keys collisions (ChipListField normalize -> normalizeValue; TaskPanel computed taskId -> panelTaskId, which shadowed the prop), required props with defaults made optional, empty catches documented, caught errors attached as cause in smoke helpers, useless initial assignments, reasoned disables for intentional control-char regexes/no-unsafe-finally/require-yield/v-html (DOMPurify)/Vue SFC shim. Scope: ''eslint .'' also covers .github/scripts and config files. Scripts: lint:js, fmt:js, fmt:js:check; npm run fmt and npm run lint/lint:agent include them; CI ui_tests runs lint:js and fmt:js:check (contract test updated). Timing: ESLint ~7.5s, Prettier check ~9s. Docs: AGENTS.md lint line, developers/main.md, developers/testing.md, frontend instructions (arrow-function handler rule), testing-strategy skill. Evidence: lint:agent clean; vue-tsc clean; test:ui 1120/1120; scripts/tests all pass; test:release 26/26; full smoke on the formatted UI passed 342/343 with one ui.query-isolation failure that passed 5/5 in isolation (load timing; rechecked in the final full run). Guidance: AGENTS.md lint line and frontend instructions updated for the new tools and the handler pitfall.'
+description: 'view/ and smoke/ have only vue-tsc: no linter or formatter, style drifts (semicolons in 29/44 components), ~150 any casts in app code untracked. Add ESLint (flat config, eslint-plugin-vue, typescript-eslint) and Prettier configured to match the prevailing style, a formatting-only pass, npm scripts, and wire both into npm run lint and CI. Keep checks fast (seconds).'
+history:
+- at: 2026-10-24T23:01:04.090596+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-24T23:20:51.043807+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-24T23:20:51.089815+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

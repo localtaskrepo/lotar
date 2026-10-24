@@ -6,9 +6,6 @@ const routeState = vi.hoisted(() => ({ query: {} as Record<string, any>, hash: '
 const sprintsState = vi.hoisted(() => ({
     sprintsRef: null as null | { value: any[] },
 }))
-const tasksState = {
-    tasksRef: null as null | { value: any[] },
-}
 
 vi.mock('vue-router', () => ({
     useRoute: () => routeState,

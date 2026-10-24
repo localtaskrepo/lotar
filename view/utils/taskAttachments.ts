@@ -115,7 +115,6 @@ export function normalizeUrlCandidate(candidate: string): string | null {
 
     if (!/^https?:\/\//i.test(value)) return null
     try {
-        // eslint-disable-next-line no-new
         new URL(value)
     } catch {
         return null

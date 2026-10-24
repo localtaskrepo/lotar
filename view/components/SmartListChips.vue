@@ -55,24 +55,12 @@ function normalize(s: string) {
 function isBlockedLike(s: string) {
   return normalize(s).includes('blocked')
 }
-function isReviewLike(s: string) {
-  const v = normalize(s)
-  return v.includes('review') || v.includes('verify')
-}
 
 const blocked = computed(() => (props.statuses || []).find(isBlockedLike) || '')
-const reviewList = computed(() => {
-  const found = (props.statuses || []).filter(isReviewLike)
-  return found.length ? found : []
-})
 
 const isMine = computed(() => (props.value?.assignee || '') === '@me')
 const isUnassigned = computed(() => (props.value?.assignee || '') === '__none__')
 const isBlocked = computed(() => !!blocked.value && (props.value?.status || '') === blocked.value)
-const isReview = computed(() => {
-  const want = reviewList.value.join(',')
-  return !!want && (props.value?.status || '') === want
-})
 const showDueSoonChip = computed(() => props.enableDueSoon !== false)
 const showRecentChip = computed(() => props.enableRecent !== false)
 
@@ -103,11 +91,6 @@ function toggleUnassigned() {
 function toggleBlocked() {
   if (!blocked.value) return
   patch({ status: isBlocked.value ? '' : blocked.value })
-}
-function toggleReview() {
-  const want = reviewList.value.join(',')
-  if (!want) return
-  patch({ status: isReview.value ? '' : want })
 }
 
 function toggleDueSoon() {

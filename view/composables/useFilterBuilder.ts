@@ -1,7 +1,7 @@
 import { computed, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { TaskListFilter } from '../api/types'
-import { normalizeSortBy, normalizeSortOrder } from '../utils/taskSort'
+import { normalizeSortBy } from '../utils/taskSort'
 
 const BUILTIN_QUERY_KEYS = new Set([
     'q',

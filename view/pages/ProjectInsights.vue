@@ -758,12 +758,6 @@ function isoDay(date: Date) {
   return date.toISOString().slice(0, 10)
 }
 
-function toBreakdownArray(map: Record<string, number>, denominator: number) {
-  return Object.entries(map)
-    .map(([label, count]) => ({ label, count, percent: denominator ? Math.round((count / denominator) * 100) : 0 }))
-    .sort((a, b) => b.count - a.count)
-}
-
 function buildBreakdown(
   tasksArray: TaskDTO[],
   labelFor: (task: TaskDTO) => string,
@@ -990,7 +984,7 @@ watch(routeTags, (value) => {
   applyTagFilters(value)
 })
 
-watch(selectedProject, async (value) => {
+watch(selectedProject, async () => {
   if (!mounted.value) return
   await syncRoute()
   await refreshData()

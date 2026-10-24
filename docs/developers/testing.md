@@ -6,8 +6,8 @@ These commands keep CI and local development aligned. Treat them as the required
 
 | Step | Command | Purpose |
 | --- | --- | --- |
-| Format Rust | `cargo fmt --all` | Applies Rust formatting. The format check is part of `npm run lint`, not `npm test`. |
-| Lint front-end + back-end | `npm run lint` | Runs `vue-tsc`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo fmt --all --check`, matching CI. |
+| Format code | `npm run fmt` | Applies `cargo fmt` and Prettier (TypeScript, Vue, smoke tests, scripts). The format checks are part of `npm run lint`, not `npm test`. |
+| Lint front-end + back-end | `npm run lint` | Runs `vue-tsc`, ESLint (`npm run lint:js`), the Prettier check (`npm run fmt:js:check`), `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo fmt --all --check`, matching CI. Existing explicit `any`s in app code are listed in `eslint-suppressions.json`; remove entries as they are fixed with `npx eslint . --prune-suppressions`. |
 | Test suites | `npm test` | Runs `cargo nextest run --cargo-profile ci` followed by Vitest (`view/vitest.config.ts`). It does not run lint or formatting checks. |
 | Smoke tests | `npm run smoke` | Runs `npm run build:smoke` (SPA plus Rust profile `smoke`) before the specs under `smoke/tests/`. The binary is `target/smoke/lotar`. Check build output for warnings as well as test failures. |
 

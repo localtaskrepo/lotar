@@ -140,7 +140,7 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         try {
             const updated = await options.reconcile()
             if (alive && request === generation && updated) applyRelationshipsFromTask(updated)
-        } catch (cause) {
+        } catch {
             if (!failure)
                 failure = new Error(
                     'Relationship request completed, but reconciliation failed. Reload relationships before retrying.',

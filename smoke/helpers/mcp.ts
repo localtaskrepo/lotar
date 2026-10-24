@@ -474,7 +474,7 @@ export class FramedMcpClient implements McpClientLike {
             const bodyBuffer = this.buffer.subarray(bodyStart, bodyStart + length);
             this.buffer = this.buffer.subarray(bodyStart + length);
             const bodyText = bodyBuffer.toString('utf8');
-            let message: any = null;
+            let message: any;
             try {
                 message = JSON.parse(bodyText);
             } catch {

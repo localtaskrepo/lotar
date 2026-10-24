@@ -97,7 +97,6 @@ describe('TaskTable', () => {
 
         const buttons = wrapper.findAll('button.header-button')
         const priorityButton = buttons.find((b) => b.text().includes('Priority'))!
-        const statusButton = buttons.find((b) => b.text().includes('Status'))!
         const statusTh = wrapper.findAll('th').find((th) => th.text().includes('Status'))!
 
         const dt = makeDataTransfer()

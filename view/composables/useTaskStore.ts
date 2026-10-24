@@ -317,13 +317,13 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
     // SSE connection handle
     let sseHandle: ReturnType<typeof useSse> | null = null
-    let sseCleaners: Array<() => void> = []
+    const sseCleaners: Array<() => void> = []
 
     // Debounce tracker for single-task fetches: fswatcher task_updated
     // (ID-only) events fetch the strict task; task_deleted events reconcile
     // through the trash endpoint (the event is metadata-only for BOTH soft
     // and hard deletes, so only the server can distinguish them).
-    let pendingFetches = new Map<string, { timer: ReturnType<typeof setTimeout>; includeDeleted: boolean }>()
+    const pendingFetches = new Map<string, { timer: ReturnType<typeof setTimeout>; includeDeleted: boolean }>()
 
     function scheduleFetchOne(id: string, includeDeleted: boolean) {
         const existing = pendingFetches.get(id)

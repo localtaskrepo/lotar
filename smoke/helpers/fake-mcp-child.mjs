@@ -91,6 +91,7 @@ async function handle(request) {
         }
         case 'die': {
             process.exit(Number(request?.params?.code ?? 1));
+            break;
         }
         case 'exit-after': {
             respond(request, { bye: true });

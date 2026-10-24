@@ -19,7 +19,8 @@ excludeAgent: ["code-review"]
 
 ## Tests + lint
 
-- Typecheck/lint frontend: `npm run lint:frontend`.
+- Typecheck frontend: `npm run lint:frontend`; lint: `npm run lint:js`; format: `npm run fmt:js` (Prettier).
+- Multi-statement inline handlers must be arrow functions (`@click="() => { a(); b() }"`): Prettier drops semicolons, and Vue cannot split statements without them.
 - UI unit tests: `npm run test:ui` (see the `testing-strategy` skill for targeting).
 
 ## Change discipline

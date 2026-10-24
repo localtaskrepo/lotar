@@ -491,12 +491,6 @@ function endOfGrid(d: Date) {
   const w = e.getDay()
   return new Date(e.getFullYear(), e.getMonth(), e.getDate() + (6 - w))
 }
-function startOfDay(date: Date) {
-  return startOfLocalDay(date)
-}
-function parseDateLike(value?: string | null) {
-  return parseTaskDate(value)
-}
 const sprintSchedule = computed(() => {
   if (!showSprints.value) return {} as Record<string, SprintCalendarDayEntry[]>
   return buildSprintSchedule(sprintList.value, startOfGrid(cursor.value), endOfGrid(cursor.value))

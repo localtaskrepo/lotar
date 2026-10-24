@@ -212,17 +212,17 @@ type HistoryEvent = {
 const props = withDefaults(
   defineProps<{
     open: boolean
-    sprints: SprintListItem[]
+    sprints?: SprintListItem[]
     selectedSprintId: number | null
     summary?: SprintSummaryReportResponse
-    summaryLoading: boolean
-    summaryError: string | null
+    summaryLoading?: boolean
+    summaryError?: string | null
     burndown?: SprintBurndownResponse
     velocity?: SprintVelocityResponse
-    loading: boolean
-    error: string | null
-    velocityLoading: boolean
-    velocityError: string | null
+    loading?: boolean
+    error?: string | null
+    velocityLoading?: boolean
+    velocityError?: string | null
     activeTab: TabKey
     burndownMetric: SprintMetric
     velocityMetric: SprintMetric
@@ -401,7 +401,7 @@ const historyEvents = computed<HistoryEvent[]>(() => {
     })
   }
 
-  return events.sort((a, b) => a.order - b.order).map(({ order, ...rest }) => rest)
+  return events.sort((a, b) => a.order - b.order).map(({ order: _order, ...rest }) => rest)
 })
 
 const historyEmptyMessage = computed(() => {

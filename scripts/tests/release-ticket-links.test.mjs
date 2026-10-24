@@ -125,7 +125,7 @@ test('preserves safe links and images with quoted titles and angle destinations'
         '![DEV-62](https://example.com/image "DEV-63 image")',
         '[DEV-62](<https://example.com/DEV-63> "Angle destination")',
         "![DEV-62](<https://example.com/image> 'Image title')",
-        '[DEV-62](https://example.com/a "A \\\"quoted\\\" title")',
+        '[DEV-62](https://example.com/a "A \\"quoted\\" title")',
     ]) {
         const result = linkTicketReferences(input, snapshot());
         assert.equal(result, input);
