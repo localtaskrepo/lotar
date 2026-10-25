@@ -68,9 +68,9 @@
         @update:value="onFilterUpdate"
       >
         <template #actions>
-          <label class="board-chips-row__field">
-            <span class="board-chips-row__label">Group by</span>
-            <select v-model="groupBy" class="input board-chips-row__groupby" data-testid="board-groupby">
+          <label class="toolbar-field">
+            <span class="toolbar-field__label">Group by</span>
+            <select v-model="groupBy" class="input toolbar-select" data-testid="board-groupby">
               <option value="none">None</option>
               <option value="assignee">Assignee</option>
               <option value="priority">Priority</option>
@@ -78,11 +78,11 @@
             </select>
           </label>
           <div class="board-chips-row__sort">
-            <label class="board-chips-row__field">
-              <span class="board-chips-row__label">Sort by</span>
+            <label class="toolbar-field">
+              <span class="toolbar-field__label">Sort by</span>
               <select
                 :value="boardSort.effectiveKey.value"
-                class="input board-chips-row__sortby"
+                class="input toolbar-select"
                 data-testid="board-sortby"
                 @change="boardSort.setKey(($event.target as HTMLSelectElement).value as BoardSortKey)"
               >
@@ -1361,32 +1361,11 @@ onUnmounted(() => {
   margin-left: auto;
 }
 
-.board-chips-row__groupby,
-.board-chips-row__sortby {
-  font-size: var(--text-sm, 0.875rem);
-  padding: 0 var(--space-4, 1rem);
-  height: var(--control-height);
-  min-height: var(--control-height);
-  line-height: var(--line-tight, 1.25);
-}
-
 /* Sort field and direction read as one control. */
 .board-chips-row__sort {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1, 0.25rem);
-}
-
-.board-chips-row__field {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2, 0.5rem);
-}
-
-.board-chips-row__label {
-  font-size: var(--text-sm, 0.875rem);
-  color: var(--color-muted);
-  white-space: nowrap;
 }
 
 .board-chips-row__sortdir {

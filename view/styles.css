@@ -382,6 +382,35 @@ p {
 	}
 }
 
+/* Second-row page controls (DEV-186): a muted label beside a control, and
+   selects that match button height with the native dropdown arrow. */
+.toolbar-field {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2, 0.5rem);
+	min-width: 0;
+	max-width: 100%;
+}
+
+.toolbar-field__label {
+	font-size: var(--text-sm, 0.875rem);
+	color: var(--color-muted);
+	white-space: nowrap;
+}
+
+select.input.toolbar-select {
+	appearance: auto;
+	flex: 0 1 auto;
+	width: auto;
+	min-width: 0;
+	max-width: 100%;
+	font-size: var(--text-sm, 0.875rem);
+	padding: 0 var(--space-4, 1rem);
+	height: var(--control-height);
+	min-height: var(--control-height);
+	line-height: var(--line-tight, 1.25);
+}
+
 .btn.icon-only.small,
 .btn.small.icon-only {
 	padding: 0;

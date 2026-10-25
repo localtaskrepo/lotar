@@ -921,6 +921,10 @@ watch(showSprints, (enabled, previous) => {
 .calendar-month-nav {
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+  min-width: 0;
 }
 .filter-card {
   display: flex;
@@ -1040,6 +1044,11 @@ watch(showSprints, (enabled, previous) => {
   min-width: 170px;
   justify-content: center;
   font-weight: 600;
+}
+@media (max-width: 640px) {
+  .month-picker__trigger {
+    min-width: 132px;
+  }
 }
 .month-picker__popover {
   position: absolute;

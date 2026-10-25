@@ -62,9 +62,14 @@
         @update:value="updateFilters"
       >
         <template #actions>
-          <label class="dependency-sort"
-            >Sort by
-            <UiSelect aria-label="Sort tasks" :model-value="filter.sort_by || 'modified'" @update:model-value="setSort">
+          <label class="toolbar-field">
+            <span class="toolbar-field__label">Sort by</span>
+            <select
+              class="input toolbar-select"
+              aria-label="Sort tasks"
+              :value="filter.sort_by || 'modified'"
+              @change="setSort(($event.target as HTMLSelectElement).value)"
+            >
               <option value="id">ID</option>
               <option value="title">Title</option>
               <option value="priority">Priority</option>
@@ -72,8 +77,8 @@
               <option value="due">Due date</option>
               <option value="created">Created</option>
               <option value="modified">Updated</option>
-            </UiSelect></label
-          >
+            </select>
+          </label>
           <UiButton
             :disabled="busy"
             :title="`Validate all relationships in ${scope.project ? `project ${scope.project}` : 'the workspace'}, not only this graph`"
@@ -704,17 +709,10 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: var(--text-xs);
 }
-.dependency-depth-picker :deep(.input),
-.dependency-sort :deep(.input) {
+.dependency-depth-picker :deep(.input) {
   box-sizing: border-box;
   height: var(--control-height);
   min-height: var(--control-height);
-}
-.dependency-sort {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  font-size: var(--text-sm);
 }
 .dependency-help {
   margin: 0;

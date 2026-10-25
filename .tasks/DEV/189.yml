@@ -1,0 +1,24 @@
+title: Align second-row page controls and Dependencies header with other pages
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T04:06:19.826067+00:00
+modified: 2026-10-25T04:06:19.923816+00:00
+comments:
+- date: 2026-10-25T04:06:19.884422+00:00
+  text: 'Done. Dependencies controls were not aligned like other pages. Fixes: PageHeader aligns title-row controls with the title (not title+subtitle), so every page''s controls sit at the same height; shared global .toolbar-field/.toolbar-field__label/.toolbar-select (muted label, 36px, native arrow, content width, shrinkable) now used by Board group/sort, Dependencies sort (was a UiSelect without arrow, dark label), Sync scope, Automations scope, Insights project and Config scope (excluded from config-form custom chevron); Insights tag filter at control height; Calendar month navigation wraps on phones. Removed board-only control classes. Regression found and fixed during verification: an earlier CSS cut left ''.dependency-depth-picker :deep(.input),'' dangling onto .dependency-help (Connection range lost its 36px height); audited all removed selectors since DEV-185. Restored Config''s scope-select class used by tests. New smoke ui.page-header.smoke.spec.ts checks all 12 pages at 1280/390: title/control alignment, 36px second-row controls, one label colour, no overflow. Verified: lint:agent, all UI tests (1156), full smoke 346/347 with one DEV-170 load flake (ui.insights-isolation) passing 3/3 in isolation.'
+history:
+- at: 2026-10-25T04:06:19.884422+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T04:06:19.923816+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

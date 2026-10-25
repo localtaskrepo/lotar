@@ -9,9 +9,9 @@
       <template #title>Sync</template>
       <template #subtitle>Review sync configuration and run manual syncs with status reporting.</template>
       <template #toolbar>
-        <label class="scope-picker" for="sync-scope">
-          <span class="muted">Scope</span>
-          <UiSelect id="sync-scope" v-model="project">
+        <label class="toolbar-field" for="sync-scope">
+          <span class="toolbar-field__label">Scope</span>
+          <UiSelect id="sync-scope" v-model="project" class="toolbar-select">
             <option value="">Global</option>
             <option v-for="entry in projects" :key="entry.prefix" :value="entry.prefix">
               {{ formatProjectLabel(entry) }}
@@ -1864,12 +1864,6 @@ async function handleReload() {
   flex-direction: column;
   gap: 16px;
   padding-bottom: 48px;
-}
-
-.scope-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2, 0.5rem);
 }
 
 .sync-dashboard {

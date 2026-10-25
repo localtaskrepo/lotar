@@ -14,7 +14,7 @@
       </template>
       <template #toolbar>
         <div class="insights-controls">
-          <UiSelect v-if="!hasSingleProject" v-model="selectedProject" style="min-width: 220px">
+          <UiSelect v-if="!hasSingleProject" v-model="selectedProject" class="toolbar-select">
             <option value="">All projects</option>
             <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
           </UiSelect>
@@ -1105,18 +1105,11 @@ onMounted(async () => {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.insights-controls > .ui-select {
-  flex: 0 0 220px;
-  min-width: 220px;
-}
-.insights-controls :is(.ui-select, .input, .btn) {
-  min-height: 2.25rem;
-  height: 2.25rem;
+.insights-controls :is(.input, .btn):not(.toolbar-select) {
+  min-height: var(--control-height);
+  height: var(--control-height);
   padding-top: 0;
   padding-bottom: 0;
-}
-.insights-controls .ui-select {
-  padding-right: calc(var(--space-3, 0.75rem) + 16px);
 }
 .tag-filter {
   position: relative;
@@ -1129,8 +1122,9 @@ onMounted(async () => {
 .tag-filter .input {
   flex: 1 1 auto;
   width: 100%;
-  min-height: 2.25rem;
-  height: 2.25rem;
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  height: var(--control-height);
   padding-top: 0;
   padding-bottom: 0;
 }

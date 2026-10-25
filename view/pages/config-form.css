@@ -63,7 +63,7 @@
   box-sizing: border-box;
 }
 
-.config-page select.input {
+.config-page select.input:not(.toolbar-select) {
   appearance: none;
   padding-right: 34px;
   background-color: color-mix(in oklab, var(--color-surface) 96%, transparent);

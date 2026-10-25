@@ -9,7 +9,7 @@
       <template #title>Automations</template>
       <template #subtitle>Configure rules that trigger actions automatically.</template>
       <template #toolbar>
-        <UiSelect v-model="project" aria-label="Project scope" style="min-width: 200px">
+        <UiSelect v-model="project" aria-label="Project scope" class="toolbar-select">
           <option value="">Global rules</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">
             {{ formatProjectLabel(p) }}

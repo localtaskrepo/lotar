@@ -71,7 +71,8 @@ const emit = defineEmits<{ (e: 'clear'): void; (e: 'reload'): void }>()
 .app-page-header__row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  /* Controls line up with the title, not the title plus subtitle. */
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: var(--space-2, 0.5rem);
 }
@@ -85,6 +86,11 @@ const emit = defineEmits<{ (e: 'clear'): void; (e: 'reload'): void }>()
 
 .app-page-header__title {
   margin: 0;
+  min-height: var(--control-height);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 0.3em;
 }
 
 .app-page-header__subtitle {

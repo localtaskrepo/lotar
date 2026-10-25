@@ -14,7 +14,7 @@
         <UiSelect
           :key="scopeSelectKey"
           :model-value="project"
-          class="scope-select"
+          class="scope-select toolbar-select"
           aria-label="Project scope"
           @update:model-value="requestScope"
         >
@@ -1260,14 +1260,6 @@ watch(
 
 .new-project-button:hover .icon-glyph {
   color: inherit;
-}
-
-.scope-select {
-  min-width: 200px;
-  min-height: var(--field-height);
-  height: var(--field-height);
-  padding-top: 0;
-  padding-bottom: 0;
 }
 
 .alert {
