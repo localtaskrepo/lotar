@@ -4,4 +4,32 @@ priority: Medium
 type: Chore
 reporter: mallox
 created: 2026-10-25T02:35:38.565868+00:00
+modified: 2026-10-25T18:40:49.423860+00:00
+comments:
+- date: 2026-10-25T18:40:49.423860+00:00
+  text: |-
+    Design notes (investigation only, nothing implemented; needs discussion before building).
+
+    Goal, phase 1: sync and link GitHub issues with DEV tickets. Phase 2: bring GitHub comments into tickets (needs its own design).
+
+    What exists today: provider github remotes with pull/push, field mappings (title, description->body, status->state, tags->labels, assignee), references as link identity (a synced task gets a github reference), a recovery journal, manual runs only (CLI, Sync page, MCP). Comments are not synced in either direction.
+
+    Gaps found:
+    1. Push has no local selection: it takes every task in the project. Pushing DEV today would create ~194 issues (164 already Done) and notify every watcher. Needs a push-side filter in remote config (e.g. push_filter using the task query syntax, or only tasks tagged public / not Done), and probably an explicit opt-in per task.
+    2. Identity mapping: local member 'mallox' vs GitHub login 'mallocator'; assignee mapping needs a member->login table (or skip assignee).
+    3. Labels: GitHub labels are bug/enhancement/documentation etc.; DEV types are Bug/Feature/Chore. Value maps can cover this; the issue forms already apply bug/enhancement.
+    4. Conflicts: pull and push are each authoritative for mapped fields, so a field edited on both sides between runs is last-run-wins. Acceptable for phase 1 if documented.
+    5. Release notes: .github/scripts/release-ticket-links.cjs links tickets to their YAML at the release commit; once tickets carry a github reference it could link the issue instead.
+
+    Questions to decide:
+    - Direction: GitHub as public intake (pull new issues into DEV) plus push of only open/public DEV tickets? Or link-only (attach references, no field sync) as the first step?
+    - Which DEV tickets become public issues: all open ones, or opt-in via a tag?
+    - Closing: should Done close the issue (state_reason completed) and should closing an issue on GitHub move the ticket?
+    - Comments (phase 2): import GitHub comments as ticket comments with author/date and a source marker? One-way only (GitHub -> ticket) to keep internal agent notes private? How to dedupe/edit/delete?
+    - Run mode: keep manual, or a scheduled workflow that opens a PR with ticket changes (scheduled commits straight to main would clash with one-commit-per-ticket history).
 description: We should sync back and forth between github and dev tickets
+history:
+- at: 2026-10-25T18:40:49.423860+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

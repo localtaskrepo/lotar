@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in LoTaR does not work the way the docs say it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please check [open issues](https://github.com/localtaskrepo/lotar/issues) first; for security problems use a [private advisory](https://github.com/localtaskrepo/lotar/security/advisories/new) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        I ran `lotar status DEMO-3 Done` and expected ..., but ...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Ideally starting from an empty repository, so we can follow along.
+      placeholder: |
+        1. git init demo && cd demo
+        2. lotar add "Example" --type bug
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did it happen?
+      multiple: true
+      options:
+        - CLI
+        - Web UI (lotar serve)
+        - REST API
+        - MCP server
+        - Agent jobs or automation
+        - Jira or GitHub sync
+        - TODO scanner
+        - Install or upgrade
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: LoTaR version
+      description: Output of `lotar --version`.
+      placeholder: lotar 0.9.1
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and install method
+      placeholder: macOS 15 via Homebrew, Windows 11 via Scoop, Docker, built from source, ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Anything relevant, ideally from a run with `--verbose`. Remove tokens and personal data first.
+      render: shell

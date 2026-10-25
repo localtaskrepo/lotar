@@ -36,6 +36,7 @@
     "smoke:ui": "npm run build:web && bash -lc 'set -euo pipefail; LOTAR_WEB_UI_EMBEDDED=0 LOTAR_WEB_UI_PATH=\"$PWD/target/web\" npm run test:smoke:quick'",
     "playwright:install": "npx playwright install --with-deps chromium",
     "seed:test-tasks": "node scripts/generate-test-tasks.mjs",
+    "site:build": "node scripts/build-site.mjs",
     "screenshots": "npm run build:smoke && node scripts/screenshots.mjs",
     "clean": "cargo clean && rm -rf node_modules",
     "hooks:install": "git config core.hooksPath .githooks",

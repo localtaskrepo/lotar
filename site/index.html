@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>LoTaR – the issue tracker that lives in your repo</title>
+        <meta
+            name="description"
+            content="LoTaR is a git-native issue tracker: tasks are YAML files in your repository, with a CLI, a local web UI, a REST API and an MCP server, and it can run your coding agents on tasks in isolated git worktrees."
+        />
+        <meta name="theme-color" content="#0b1622" />
+        <link rel="icon" href="assets/branding/favicon.ico" sizes="any" />
+        <link rel="icon" href="assets/branding/lotar-app-icon.svg" type="image/svg+xml" />
+        <link rel="canonical" href="https://localtaskrepo.github.io/lotar/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="LoTaR – the issue tracker that lives in your repo" />
+        <meta
+            property="og:description"
+            content="Tasks as plain YAML next to your code, a local web UI, an MCP server, and coding agents that work your tasks in their own git worktrees."
+        />
+        <meta property="og:url" content="https://localtaskrepo.github.io/lotar/" />
+        <meta property="og:image" content="https://localtaskrepo.github.io/lotar/assets/social-preview.png" />
+        <meta property="og:image:width" content="1280" />
+        <meta property="og:image:height" content="640" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <link rel="stylesheet" href="style.css" />
+        <script src="main.js" defer></script>
+    </head>
+    <body>
+        <a class="skip-link" href="#main">Skip to content</a>
+
+        <header class="site-header">
+            <div class="wrap site-header__inner">
+                <a class="brand" href="./" aria-label="LoTaR home">
+                    <img src="assets/branding/lotar-logo-dark.svg" alt="LoTaR" width="120" height="32" />
+                </a>
+                <nav class="site-nav" aria-label="Main">
+                    <a href="#features">Features</a>
+                    <a href="#install">Install</a>
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/index.md">Docs</a>
+                    <a href="https://github.com/localtaskrepo/lotar/discussions">Community</a>
+                    <a class="site-nav__github" href="https://github.com/localtaskrepo/lotar">
+                        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                            <path
+                                fill="currentColor"
+                                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                            />
+                        </svg>
+                        <span>GitHub</span>
+                    </a>
+                </nav>
+            </div>
+        </header>
+
+        <main id="main">
+            <section class="hero">
+                <div class="wrap hero__inner">
+                    <div class="hero__copy">
+                        <p class="hero__eyebrow">
+                            <span>Open source</span><span aria-hidden="true">·</span><span>MIT</span
+                            ><span class="hero__version" data-latest-version hidden></span>
+                        </p>
+                        <h1>The issue tracker that lives in your repo, and runs your coding agents.</h1>
+                        <p class="hero__lead">
+                            LoTaR keeps tasks as plain YAML files in <code>.tasks/</code>, versioned and reviewed with
+                            your code. A CLI, a local web UI, a REST API and an MCP server all work on the same files.
+                            Assign a task to an agent and LoTaR runs it in its own git worktree, streams the log, and
+                            hands the work back for review.
+                        </p>
+                        <div class="hero__actions">
+                            <a class="button button--primary" href="#install">Get started</a>
+                            <a class="button button--ghost" href="https://github.com/localtaskrepo/lotar"
+                                >View on GitHub</a
+                            >
+                        </div>
+                        <ul class="pill-list" aria-label="What's included">
+                            <li>CLI</li>
+                            <li>Web UI</li>
+                            <li>REST API</li>
+                            <li>MCP</li>
+                            <li>Agents</li>
+                            <li>Sprints</li>
+                        </ul>
+                    </div>
+                    <figure class="hero__shot">
+                        <img
+                            src="assets/screenshots/hero-agent-loop.webp"
+                            width="1600"
+                            height="1000"
+                            alt="Assigning a task to the claude agent profile in the web UI: the job starts in its own git worktree, its log streams live, and automation moves the task to NeedsReview"
+                        />
+                    </figure>
+                </div>
+            </section>
+
+            <section class="principles" aria-labelledby="principles-title">
+                <div class="wrap">
+                    <h2 id="principles-title" class="visually-hidden">Why LoTaR</h2>
+                    <ul class="principles__grid">
+                        <li>
+                            <h3>Tasks are files</h3>
+                            <p>
+                                One YAML file per task, next to your code. Branch it, diff it, and review a task change
+                                in the same pull request as the fix.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Nothing to host</h3>
+                            <p>
+                                No database and no account. It works offline, and every change has an author and a
+                                commit in git history.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Built for agents</h3>
+                            <p>
+                                Coding agents read and update tasks through MCP, and LoTaR can run Claude Code, Codex,
+                                Copilot CLI or Gemini CLI on a task for you.
+                            </p>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="features" class="features" aria-labelledby="features-title">
+                <div class="wrap">
+                    <h2 id="features-title">Everything works on the same files</h2>
+
+                    <article class="feature">
+                        <div class="feature__copy">
+                            <h3>Agents and automation</h3>
+                            <p>
+                                Set up an agent profile once, then assign tasks to it like a teammate. Each job runs the
+                                agent CLI in a dedicated worktree on its own branch, with the output streamed live.
+                                Automation rules decide what happens when a job starts, finishes or fails.
+                            </p>
+                            <pre><code><span class="c"># .tasks/automation.yml</span>
+<span class="k">automation</span>:
+  <span class="k">rules</span>:
+    - <span class="k">name</span>: Agent lifecycle
+      <span class="k">when</span>: { <span class="k">assignee</span>: <span class="s">"@agent"</span> }
+      <span class="k">on</span>:
+        <span class="k">job_completed</span>: { <span class="k">set</span>: { <span class="k">status</span>: NeedsReview } }</code></pre>
+                            <a class="more" href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/agent.md"
+                                >Agent jobs guide</a
+                            >
+                        </div>
+                        <picture class="feature__shot">
+                            <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/agents-dark.webp" />
+                            <img
+                                src="assets/screenshots/agents-light.webp"
+                                width="1600"
+                                height="1000"
+                                loading="lazy"
+                                alt="Agent jobs page with a running claude job, its worktree branch, and the live log"
+                            />
+                        </picture>
+                    </article>
+
+                    <article class="feature feature--flip">
+                        <div class="feature__copy">
+                            <h3>A local web UI</h3>
+                            <p>
+                                <code>lotar serve</code> opens a task list, a board with WIP limits, sprints with
+                                burndown and velocity, a calendar, and insights for every role on the team. Changes from
+                                the CLI or an agent show up live.
+                            </p>
+                            <a class="more" href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/serve.md"
+                                >Web UI and server</a
+                            >
+                        </div>
+                        <picture class="feature__shot">
+                            <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/board-dark.webp" />
+                            <img
+                                src="assets/screenshots/board-light.webp"
+                                width="1600"
+                                height="1000"
+                                loading="lazy"
+                                alt="Board view with Todo, InProgress, NeedsReview, Blocked and Done columns"
+                            />
+                        </picture>
+                    </article>
+
+                    <ul class="gallery" aria-label="More of the web UI">
+                        <li>
+                            <picture>
+                                <source
+                                    media="(prefers-color-scheme: dark)"
+                                    srcset="assets/screenshots/sprints-dark.webp"
+                                />
+                                <img
+                                    src="assets/screenshots/sprints-light.webp"
+                                    width="1600"
+                                    height="1000"
+                                    loading="lazy"
+                                    alt=""
+                                />
+                            </picture>
+                            <span>Sprints and burndown</span>
+                        </li>
+                        <li>
+                            <picture>
+                                <source
+                                    media="(prefers-color-scheme: dark)"
+                                    srcset="assets/screenshots/calendar-dark.webp"
+                                />
+                                <img
+                                    src="assets/screenshots/calendar-light.webp"
+                                    width="1600"
+                                    height="1000"
+                                    loading="lazy"
+                                    alt=""
+                                />
+                            </picture>
+                            <span>Calendar of due dates</span>
+                        </li>
+                        <li>
+                            <picture>
+                                <source
+                                    media="(prefers-color-scheme: dark)"
+                                    srcset="assets/screenshots/insights-dark.webp"
+                                />
+                                <img
+                                    src="assets/screenshots/insights-light.webp"
+                                    width="1600"
+                                    height="1000"
+                                    loading="lazy"
+                                    alt=""
+                                />
+                            </picture>
+                            <span>Insights</span>
+                        </li>
+                    </ul>
+
+                    <div class="feature-grid">
+                        <article>
+                            <h3>MCP server</h3>
+                            <p>
+                                <code>lotar mcp</code> lets agents in your editor or terminal list, create and update
+                                tasks, manage sprints and read config, without scraping CLI output.
+                            </p>
+                            <pre><code>{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"lotar"</span>: { <span class="s">"command"</span>: <span class="s">"lotar"</span>, <span class="s">"args"</span>: [<span class="s">"mcp"</span>] }
+  }
+}</code></pre>
+                        </article>
+                        <article>
+                            <h3>TODO scanner</h3>
+                            <p>
+                                <code>lotar scan</code> turns <code>TODO</code> and <code>FIXME</code> comments into
+                                tasks, writes the task ID back into the comment, and follows the line when code moves.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>Git history and stats</h3>
+                            <p>
+                                Every task change is a commit. See the commits that touched a task, and report churn,
+                                activity and authors straight from git.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>Your own workflow</h3>
+                            <p>
+                                Define states, types, priorities and custom fields per project, or start from the
+                                default, agile or kanban template.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>Jira and GitHub sync <span class="badge">beta</span></h3>
+                            <p>
+                                Pull issues into local tasks or push changes back, with field mappings per remote.
+                                Credentials stay out of the repository.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>REST API</h3>
+                            <p>
+                                The same operations over HTTP, described by an
+                                <a href="https://github.com/localtaskrepo/lotar/blob/main/docs/openapi.json"
+                                    >OpenAPI spec</a
+                                >, with live updates over server-sent events.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="task-file" aria-labelledby="task-file-title">
+                <div class="wrap task-file__inner">
+                    <div>
+                        <h2 id="task-file-title">A task is a file you can read</h2>
+                        <p>
+                            Tasks live in one folder per project. Status changes, comments and references are part of
+                            the file, so a pull request shows exactly what changed about the work, not just the code.
+                        </p>
+                        <pre class="tree"><code>.tasks/
+├── config.yml        <span class="c"># states, types, members, agents</span>
+├── automation.yml    <span class="c"># optional rules</span>
+├── @sprints/1.yml
+└── ATLS/
+    ├── 26.yml
+    └── 27.yml</code></pre>
+                    </div>
+                    <pre><code><span class="c"># .tasks/ATLS/26.yml</span>
+<span class="k">title</span>: Offline edits are lost when reconnecting mid-sync
+<span class="k">status</span>: Done
+<span class="k">priority</span>: Critical
+<span class="k">type</span>: Bug
+<span class="k">assignee</span>: marco
+<span class="k">due_date</span>: 2026-09-29
+<span class="k">tags</span>: [sync, customer]
+<span class="k">references</span>:
+  - <span class="k">link</span>: https://github.com/atlas-notes/atlas/pull/412
+  - <span class="k">code</span>: web/src/sync/queue.ts#20-33
+<span class="k">history</span>:
+  - <span class="k">at</span>: 2026-09-28T15:12:00Z
+    <span class="k">actor</span>: priya
+    <span class="k">changes</span>: [{ <span class="k">field</span>: status, <span class="k">old</span>: NeedsReview, <span class="k">new</span>: Done }]</code></pre>
+                </div>
+            </section>
+
+            <section id="install" class="install" aria-labelledby="install-title">
+                <div class="wrap">
+                    <h2 id="install-title">Get started in a minute</h2>
+                    <div class="install__grid">
+                        <div class="install__step">
+                            <h3><span class="step">1</span> Install</h3>
+                            <div class="tabs" data-tabs>
+                                <div class="tabs__list" role="tablist" aria-label="Install method">
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-brew"
+                                        aria-controls="panel-brew"
+                                        aria-selected="true"
+                                    >
+                                        macOS
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-scoop"
+                                        aria-controls="panel-scoop"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                    >
+                                        Windows
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-docker"
+                                        aria-controls="panel-docker"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                    >
+                                        Docker
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-binary"
+                                        aria-controls="panel-binary"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                    >
+                                        Binaries
+                                    </button>
+                                </div>
+                                <div class="tabs__panel" role="tabpanel" id="panel-brew" aria-labelledby="tab-brew">
+                                    <div class="command">
+                                        <code>brew tap localtaskrepo/lotar &amp;&amp; brew install lotar</code>
+                                        <button type="button" class="copy" data-copy>Copy</button>
+                                    </div>
+                                </div>
+                                <div
+                                    class="tabs__panel"
+                                    role="tabpanel"
+                                    id="panel-scoop"
+                                    aria-labelledby="tab-scoop"
+                                    hidden
+                                >
+                                    <div class="command">
+                                        <code
+                                            >scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar; scoop
+                                            install lotar</code
+                                        >
+                                        <button type="button" class="copy" data-copy>Copy</button>
+                                    </div>
+                                </div>
+                                <div
+                                    class="tabs__panel"
+                                    role="tabpanel"
+                                    id="panel-docker"
+                                    aria-labelledby="tab-docker"
+                                    hidden
+                                >
+                                    <div class="command">
+                                        <code
+                                            >docker run --rm -v "$PWD":/workspace -v "$PWD/.tasks":/tasks -w /workspace
+                                            mallox/lotar list</code
+                                        >
+                                        <button type="button" class="copy" data-copy>Copy</button>
+                                    </div>
+                                </div>
+                                <div
+                                    class="tabs__panel"
+                                    role="tabpanel"
+                                    id="panel-binary"
+                                    aria-labelledby="tab-binary"
+                                    hidden
+                                >
+                                    <p>
+                                        Signed binaries for Linux, macOS and Windows are on
+                                        <a href="https://github.com/localtaskrepo/lotar/releases/latest"
+                                            >GitHub Releases</a
+                                        >. To build from source, see the
+                                        <a href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/install.md"
+                                            >install guide</a
+                                        >.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="install__step">
+                            <h3><span class="step">2</span> Use it in any repository</h3>
+                            <div class="command command--block">
+                                <code
+                                    >lotar add "Fix the login redirect loop" --type bug --priority high lotar list lotar
+                                    serve --open</code
+                                >
+                                <button type="button" class="copy" data-copy>Copy</button>
+                            </div>
+                            <p class="install__note">
+                                The first command creates <code>.tasks/</code>. Commit it with your code.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="community" aria-labelledby="community-title">
+                <div class="wrap">
+                    <h2 id="community-title">Join in</h2>
+                    <ul class="community__grid">
+                        <li>
+                            <a href="https://github.com/localtaskrepo/lotar/discussions">
+                                <strong>Discussions</strong>
+                                <span>Ask questions, share ideas, and show what you built.</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/localtaskrepo/lotar/issues/new/choose">
+                                <strong>Issues</strong>
+                                <span>Report a bug or propose a change.</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/localtaskrepo/lotar/blob/main/CONTRIBUTING.md">
+                                <strong>Contributing</strong>
+                                <span>Set up a dev build, run the tests, open a pull request.</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/localtaskrepo/lotar/releases">
+                                <strong>Releases</strong>
+                                <span>What changed in each version.</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <div class="wrap site-footer__inner">
+                <img src="assets/branding/lotar-symbol.svg" alt="" width="28" height="28" />
+                <p>
+                    LoTaR is open source under the
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/LICENSE">MIT license</a>.
+                </p>
+                <nav aria-label="Footer">
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/CODE_OF_CONDUCT.md">Code of conduct</a>
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/SECURITY.md">Security</a>
+                    <a href="https://github.com/localtaskrepo">GitHub organization</a>
+                </nav>
+            </div>
+        </footer>
+    </body>
+</html>

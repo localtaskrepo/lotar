@@ -7,6 +7,8 @@
 
 <p align="center"><b>A git-native issue tracker that lives in your repo, and can run your coding agents for you.</b></p>
 
+<p align="center"><a href="https://localtaskrepo.github.io/lotar/">Homepage</a> · <a href="docs/help/index.md">Docs</a> · <a href="https://github.com/localtaskrepo/lotar/discussions">Discussions</a></p>
+
 <p align="center">
   <a href="https://github.com/localtaskrepo/lotar/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/localtaskrepo/lotar"></a>
   <a href="https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml/badge.svg"></a>
@@ -211,7 +213,7 @@ history:
 
 ## Contributing
 
-Bug reports and pull requests are welcome in [issues](https://github.com/localtaskrepo/lotar/issues); report security problems through a [private advisory](https://github.com/localtaskrepo/lotar/security/advisories/new). Development setup, test commands, and conventions are in [AGENTS.md](AGENTS.md) and [docs/developers/](docs/developers/README.md). After UI changes, `npm run screenshots` regenerates every image in this README using an isolated demo workspace.
+Questions and ideas are welcome in [Discussions](https://github.com/localtaskrepo/lotar/discussions), and bug reports and pull requests in [issues](https://github.com/localtaskrepo/lotar/issues/new/choose); report security problems privately as described in [SECURITY.md](SECURITY.md). Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Development setup, test commands, and conventions are in [AGENTS.md](AGENTS.md) and [docs/developers/](docs/developers/README.md). After UI changes, `npm run screenshots` regenerates every image in this README using an isolated demo workspace.
 
 Full regeneration needs a Git-capable environment. `npm run screenshots -- --no-git` refreshes the non-Git UI screenshots while preserving the existing agent, hero, commit-history and terminal media.
 

@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest a change that would make LoTaR fit your workflow better.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Not sure yet whether it's a feature or a question? [Ideas in Discussions](https://github.com/localtaskrepo/lotar/discussions/categories/ideas) are a good place to start.
+  - type: textarea
+    id: workflow
+    attributes:
+      label: What are you trying to do?
+      description: The workflow you want to improve, in your own words.
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: What gets in the way today?
+      description: Where LoTaR's current behaviour falls short, and any workaround you use now.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: A rough idea is enough. Commands, config or screens you picture are welcome.
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Constraints such as repository size, monorepos, CI use, or the agents you work with.

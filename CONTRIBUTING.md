@@ -1,6 +1,8 @@
 # Contributing
 
-Thanks for helping improve LoTaR.
+Thanks for helping improve LoTaR. Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+Not sure where to start? Questions and ideas are welcome in [Discussions](https://github.com/localtaskrepo/lotar/discussions), and bugs or concrete proposals in [issues](https://github.com/localtaskrepo/lotar/issues/new/choose).
 
 ## Quick dev setup
 
@@ -49,3 +51,5 @@ If you change any REST request/response shapes, keep these in sync:
 - Prefer small, focused PRs.
 - Include tests for behavior changes.
 - Update docs alongside user-facing changes.
+- History stays linear: rebase onto `main` rather than merging it into your branch.
+- The project's own backlog lives in [`.tasks/DEV/`](.tasks/DEV). Coding agents working in this repo follow [AGENTS.md](AGENTS.md).

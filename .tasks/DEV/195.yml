@@ -1,0 +1,24 @@
+title: Set up community files, About box and project homepage
+status: InProgress
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T18:33:12.480525+00:00
+modified: 2026-10-25T18:45:12.598117+00:00
+comments:
+- date: 2026-10-25T18:45:12.561336+00:00
+  text: 'Done in repo: CODE_OF_CONDUCT.md (Contributor Covenant 2.0, contact mallox@pyxzl.net), SECURITY.md, issue forms (bug, feature, chooser with Q&A/security/docs links), PR template, SUPPORT/CONTRIBUTING/README updates, homepage in site/ (build: npm run site:build -> target/site; published by .github/workflows/pages.yml). Done on GitHub: org profile repo localtaskrepo/.github (welcome README + default CoC/SECURITY/SUPPORT), org description, lotar About description and 15 topics, delete-branch-on-merge on, merge commits off, private vulnerability reporting on for homebrew-lotar and scoop-lotar, welcome discussion rewritten. Verified: homepage at 1280/390px in light and dark (no overflow, no console errors), lint, YAML validity, local links, scripts tests (84). Next: after this commit is pushed and the Homepage workflow deploys, set the lotar homepage URL and the org website to https://localtaskrepo.github.io/lotar/. Manual (web UI only): upload docs/assets/social-preview.png as the repo social preview, pin the welcome discussion, pin lotar and autospec on the org page.'
+history:
+- at: 2026-10-25T18:45:12.561336+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T18:45:12.598117+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
