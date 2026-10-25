@@ -8,9 +8,6 @@
         </p>
       </div>
       <div class="controls row insights-controls">
-        <a :href="`/dependencies${selectedProject ? '?project=' + encodeURIComponent(selectedProject) : ''}`"
-          >Dependencies</a
-        >
         <div
           v-if="hasSingleProject"
           class="input insights-project-static"

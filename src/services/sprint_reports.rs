@@ -875,7 +875,7 @@ pub fn summarize_sprint_tasks(
             .then(a.id.cmp(&b.id))
     });
 
-    blocked_tasks.sort_by(|a, b| a.id.cmp(&b.id));
+    blocked_tasks.sort_by(|a, b| crate::storage::compare_task_ids(&a.id, &b.id));
 
     let status_breakdown: Vec<SprintReviewStatusMetric> = status_counts
         .into_values()

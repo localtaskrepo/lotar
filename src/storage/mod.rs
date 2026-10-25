@@ -20,4 +20,4 @@ pub mod transaction;
 
 // Re-export commonly used types and operations for convenience
 pub use filter::{DeletionFilter, TaskFilter};
-pub use identity::{TaskId, TaskLocation};
+pub use identity::{TaskId, TaskLocation, compare_task_ids};

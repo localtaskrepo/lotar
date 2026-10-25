@@ -845,6 +845,19 @@ function hasMeaningfulIncoming(value?: Record<string, string>): boolean {
   return false
 }
 
+/**
+ * Coming back to the project the filter was saved for (browser Back keeps
+ * only `?project=` in the URL) restores that saved filter; any other routed
+ * value still takes precedence over storage.
+ */
+function isReturnToSavedProject(value: Record<string, string> | undefined, saved: Record<string, unknown>): boolean {
+  const incomingProject = value?.project
+  if (!incomingProject || saved.project !== incomingProject) return false
+  return Object.entries(value).every(
+    ([key, raw]) => key === 'project' || key === 'order' || key === 'sort_by' || typeof raw !== 'string',
+  )
+}
+
 // Persist last used filter to localStorage for convenience
 const FILTER_KEY = computed(() => props.storageKey || 'lotar.tasks.filter')
 onMounted(async () => {
@@ -856,30 +869,28 @@ onMounted(async () => {
   if (unmounted) return
   filtersHydrated = true
   try {
-    const hasIncoming = hasMeaningfulIncoming(props.value)
-    if (!hasIncoming) {
-      const saved = storageGetJson<Record<string, unknown>>(FILTER_KEY.value)
-      if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
-        const asText = (v: unknown) => (typeof v === 'string' ? v : '')
-        query.value = asText(saved.q)
-        searchDraft.value = query.value
-        project.value = asText(saved.project)
-        status.value = asText(saved.status)
-        priority.value = asText(saved.priority)
-        type.value = asText(saved.type)
-        sprintFilter.value = asText(saved.sprints)
-        assignee.value = asText(saved.assignee)
-        tags.value = asText(saved.tags)
-        dueDate.value = asText(saved.due)
-        recent.value = asText(saved.recent)
-        needs.value = asText(saved.needs)
-        deletion.value = normalizeDeletionValue(saved.deletion)
-        // Sort persistence has a single owner: the page's per-project sort
-        // storage (`lotar.tasks.sort::*`). Deliberately do NOT restore
-        // sort_by/order from this snapshot — a stale one must never override
-        // the page-restored sort on a plain route reload.
-        customFilters.value = customFieldsFrom(saved)
-      }
+    const saved = storageGetJson<Record<string, unknown>>(FILTER_KEY.value)
+    const usable = saved && typeof saved === 'object' && !Array.isArray(saved)
+    if (usable && (!hasMeaningfulIncoming(props.value) || isReturnToSavedProject(props.value, saved))) {
+      const asText = (v: unknown) => (typeof v === 'string' ? v : '')
+      query.value = asText(saved.q)
+      searchDraft.value = query.value
+      project.value = asText(saved.project)
+      status.value = asText(saved.status)
+      priority.value = asText(saved.priority)
+      type.value = asText(saved.type)
+      sprintFilter.value = asText(saved.sprints)
+      assignee.value = asText(saved.assignee)
+      tags.value = asText(saved.tags)
+      dueDate.value = asText(saved.due)
+      recent.value = asText(saved.recent)
+      needs.value = asText(saved.needs)
+      deletion.value = normalizeDeletionValue(saved.deletion)
+      // Sort persistence has a single owner: the page's per-project sort
+      // storage (`lotar.tasks.sort::*`). Deliberately do NOT restore
+      // sort_by/order from this snapshot — a stale one must never override
+      // the page-restored sort on a plain route reload.
+      customFilters.value = customFieldsFrom(saved)
     }
   } catch {
     // A corrupt saved filter state falls back to the defaults set above.

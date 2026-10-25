@@ -7,8 +7,8 @@
 //! the canonical-ID ascending tiebreak.
 //!
 //! Contract:
-//! - Default order: `modified` descending, ties broken by canonical task ID
-//!   lexical ascending (the tiebreak never flips with `order`).
+//! - Default order: `modified` descending, ties broken by natural task ID
+//!   order ascending (`A-2` before `A-10`; the tiebreak never flips with `order`).
 //! - Explicit invalid enum values (`order`, `sort_by`, `due`, `recent`,
 //!   `needs`, `sprints`, config enums) are errors; nothing fails open.
 //! - Due smart filters bucket by the task's local calendar date computed
@@ -593,7 +593,7 @@ fn compare_by_spec<T: TaskSortFields + ?Sized>(
             SortKey::Sprints => a.sprints().cmp(&b.sprints()),
             SortKey::Type => a.type_str().cmp(&b.type_str()),
             SortKey::Project => project_prefix_of(id_a).cmp(&project_prefix_of(id_b)),
-            SortKey::Id => id_a.cmp(id_b),
+            SortKey::Id => crate::storage::compare_task_ids(id_a, id_b),
         },
         SortSpec::Custom(name) => a.custom_field_value(name).cmp(&b.custom_field_value(name)),
     }
@@ -610,7 +610,7 @@ pub fn sort_tasks<T: TaskSortFields>(tasks: &mut [(String, T)], spec: &SortSpec,
             primary
         };
         if primary == Ordering::Equal {
-            id_a.cmp(id_b)
+            crate::storage::compare_task_ids(id_a, id_b)
         } else {
             primary
         }
@@ -812,7 +812,7 @@ mod tests {
         );
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         // Missing custom values sort first (empty-string semantics, CLI
-        // parity); equal values tie on canonical ID lexical asc.
+        // parity); equal values tie on natural ID order asc.
         assert_eq!(ids, vec!["A-10", "C-1", "B-2", "A-2"]);
 
         sort_tasks(

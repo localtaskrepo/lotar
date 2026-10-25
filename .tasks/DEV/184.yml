@@ -1,0 +1,7 @@
+title: Show project name instead of prefix
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-25T03:10:57.163420+00:00
+description: Almost everywhere we show the project prefix and don't show the project name, which would probably be nicer to see.

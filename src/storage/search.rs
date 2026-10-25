@@ -174,7 +174,7 @@ impl StorageSearch {
             }
         }
         // Deterministic order
-        results.sort_by(|a, b| a.0.cmp(&b.0));
+        results.sort_by(|a, b| super::compare_task_ids(&a.0, &b.0));
         results
     }
 

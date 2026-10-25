@@ -376,7 +376,7 @@ const query = computed(() => ({
 }))
 const { graph, error, loading, refresh, acceptedQuery, stale } = useRelationshipGraph(query)
 const scope = computed<RelationshipGraphRequest>(() => acceptedQuery.value || query.value)
-defineExpose({ refresh })
+defineExpose({ refresh, loading })
 const relationLabels: Record<RelationshipKind, string> = {
   dependency: 'blocks',
   hierarchy: 'parent of',

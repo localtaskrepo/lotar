@@ -67,6 +67,33 @@ impl fmt::Display for TaskIdError {
 
 impl std::error::Error for TaskIdError {}
 
+/// Natural task ID order: project prefix, then the numeric suffix by value
+/// (`A-2` before `A-10`, padding ignored), then the exact spelling. An ID
+/// without a numeric suffix is compared as a whole, as its own prefix.
+/// Total and overflow-free, so it is safe for sorting any ID strings.
+pub fn compare_task_ids(a: &str, b: &str) -> std::cmp::Ordering {
+    fn split(id: &str) -> (&str, Option<&str>) {
+        match id.rsplit_once('-') {
+            Some((prefix, suffix))
+                if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) =>
+            {
+                let digits = suffix.trim_start_matches('0');
+                (prefix, Some(digits))
+            }
+            _ => (id, None),
+        }
+    }
+    let (prefix_a, number_a) = split(a);
+    let (prefix_b, number_b) = split(b);
+    prefix_a
+        .cmp(prefix_b)
+        .then_with(|| match (number_a, number_b) {
+            (Some(x), Some(y)) => x.len().cmp(&y.len()).then_with(|| x.cmp(y)),
+            (x, y) => x.is_some().cmp(&y.is_some()),
+        })
+        .then_with(|| a.cmp(b))
+}
+
 impl TaskId {
     /// Parse a task ID canonically: the FINAL dash-separated segment must be
     /// the numeric suffix and the remaining prefix must be a valid project
@@ -429,5 +456,40 @@ mod tests {
             Err(TaskLookupError::NotFound(_))
         ));
         assert_eq!(resolve_numeric(&root, "1").unwrap().full_id(), "TP-1");
+    }
+}
+
+#[cfg(test)]
+mod natural_order_tests {
+    use super::compare_task_ids;
+
+    #[test]
+    fn task_ids_sort_by_prefix_then_number() {
+        let mut ids = vec![
+            "B-1",
+            "A-10",
+            "A-2",
+            "A-002",
+            "A-1",
+            "AB-3",
+            "A",
+            "A-x",
+            "A-99999999999999999999999",
+        ];
+        ids.sort_by(|a, b| compare_task_ids(a, b));
+        assert_eq!(
+            ids,
+            vec![
+                "A",
+                "A-1",
+                "A-002",
+                "A-2",
+                "A-10",
+                "A-99999999999999999999999",
+                "A-x",
+                "AB-3",
+                "B-1",
+            ]
+        );
     }
 }

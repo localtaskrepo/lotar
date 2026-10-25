@@ -5,7 +5,6 @@
         <h1>Sprints</h1>
       </div>
       <div class="row split-actions" style="gap: 8px; align-items: center; flex-wrap: wrap">
-        <a :href="`/dependencies${project ? '?project=' + encodeURIComponent(project) : ''}`">Dependencies</a>
         <UiButton
           icon-only
           type="button"
@@ -841,7 +840,7 @@ import {
 } from '../utils/date'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { projectOf } from '../utils/text'
-import { colKeyToSortBy, sortTasks as sortTasksByContract } from '../utils/taskSort'
+import { colKeyToSortBy, compareTaskIds, sortTasks as sortTasksByContract } from '../utils/taskSort'
 import {
   storageGet,
   storageGetFlag,
@@ -1568,7 +1567,7 @@ const sortedBacklogTasks = computed(() => {
   return [...backlogTasks.value].sort((a, b) => {
     const difference = (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity)
     if (difference) return difference
-    return canonicalIdCompare(a.id, b.id)
+    return compareTaskIds(a.id, b.id)
   })
 })
 
@@ -2797,20 +2796,9 @@ function sortTasks(list: TaskDTO[] | undefined | null) {
 function getSortedTasksForSprint(id: number) {
   if (isSprintManual(id))
     return [...getTasksForSprint(id)].sort(
-      (a, b) =>
-        (a.sprint_order?.[id] ?? Infinity) - (b.sprint_order?.[id] ?? Infinity) || canonicalIdCompare(a.id, b.id),
+      (a, b) => (a.sprint_order?.[id] ?? Infinity) - (b.sprint_order?.[id] ?? Infinity) || compareTaskIds(a.id, b.id),
     )
   return sortTasks(getTasksForSprint(id))
-}
-
-function canonicalIdCompare(a: string, b: string) {
-  // Match the server's code-point ordering rather than UTF-16 or locale order.
-  const left = Array.from(a, (char) => char.codePointAt(0)!)
-  const right = Array.from(b, (char) => char.codePointAt(0)!)
-  for (let index = 0; index < Math.min(left.length, right.length); index++) {
-    if (left[index] !== right[index]) return left[index]! - right[index]!
-  }
-  return left.length - right.length
 }
 
 function parseNumberInput(value: unknown): number | null {

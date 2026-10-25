@@ -343,7 +343,7 @@ fn export_applies_smart_filters_and_global_order() {
 }
 
 #[test]
-fn modified_ties_break_on_canonical_id_asc_even_in_desc_order() {
+fn modified_ties_break_on_natural_id_asc_even_in_desc_order() {
     let fx = Fixture::new("QC");
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref());
 
@@ -353,11 +353,11 @@ fn modified_ties_break_on_canonical_id_asc_even_in_desc_order() {
 
     let api = api();
     let (_, ids) = rest_list_all(&api, &[("project", "QC"), ("order", "desc")], 50);
-    // Lexical canonical-ID tiebreak: QC-10 < QC-2.
-    assert_ids(&ids, &ids_prefixed("QC", &[10, 2]));
+    // Natural ID tiebreak: QC-2 < QC-10.
+    assert_ids(&ids, &ids_prefixed("QC", &[2, 10]));
 
     let (_, ids) = rest_list_all(&api, &[("project", "QC"), ("order", "asc")], 50);
-    assert_ids(&ids, &ids_prefixed("QC", &[10, 2]));
+    assert_ids(&ids, &ids_prefixed("QC", &[2, 10]));
 }
 
 #[test]

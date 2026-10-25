@@ -57,7 +57,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         apply_unknown_key_filters(&mut tasks, &uf, &cfg);
 
         // Smart filters + deterministic global ordering (default modified desc,
-        // canonical-ID lexical asc tiebreak), then pagination.
+        // natural task ID asc tiebreak), then pagination.
         crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
 
         let total = tasks.len();

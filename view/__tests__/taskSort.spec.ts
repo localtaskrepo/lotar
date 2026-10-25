@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TaskDTO } from '../api/types'
 import {
     colKeyToSortBy,
+    compareTaskIds,
     compareTasks,
     customFieldValue,
     customValueToString,
@@ -175,16 +176,16 @@ describe('custom field values', () => {
 })
 
 describe('sortTasks', () => {
-    it('defaults to modified desc in the caller and breaks ties by canonical ID lexical ASC', () => {
+    it('defaults to modified desc in the caller and breaks ties by natural ID ASC', () => {
         const tasks = [
             task({ id: 'A-2', modified: '2026-01-01T11:00:00Z' }),
             task({ id: 'A-10', modified: '2026-01-01T11:00:00Z' }),
             task({ id: 'A-1', modified: '2026-01-02T11:00:00Z' }),
         ]
         const sorted = sortTasks(tasks, 'modified', 'desc')
-        expect(sorted.map((t) => t.id)).toEqual(['A-1', 'A-10', 'A-2'])
+        expect(sorted.map((t) => t.id)).toEqual(['A-1', 'A-2', 'A-10'])
         const asc = sortTasks(tasks, 'modified', 'asc')
-        expect(asc.map((t) => t.id)).toEqual(['A-10', 'A-2', 'A-1'])
+        expect(asc.map((t) => t.id)).toEqual(['A-2', 'A-10', 'A-1'])
     })
 
     it('sorts custom fields with nested access and deterministic missing placement', () => {
@@ -326,5 +327,22 @@ describe('sortTasks', () => {
         const snapshot = tasks.map((t) => t.id)
         sortTasks(tasks, 'id', 'asc')
         expect(tasks.map((t) => t.id)).toEqual(snapshot)
+    })
+})
+
+describe('compareTaskIds', () => {
+    it('orders by prefix, then number, matching the backend', () => {
+        const ids = ['B-1', 'A-10', 'A-2', 'A-002', 'A-1', 'AB-3', 'A', 'A-x', 'A-99999999999999999999999']
+        expect([...ids].sort(compareTaskIds)).toEqual([
+            'A',
+            'A-1',
+            'A-002',
+            'A-2',
+            'A-10',
+            'A-99999999999999999999999',
+            'A-x',
+            'AB-3',
+            'B-1',
+        ])
     })
 })

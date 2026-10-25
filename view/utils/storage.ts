@@ -59,3 +59,21 @@ export function storageRemove(key: string): void {
         // ignore availability errors
     }
 }
+
+/** Session-scoped JSON read (per tab, cleared when the tab closes). */
+export function sessionGetJson<T>(key: string): T | null {
+    try {
+        const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(key) : null
+        return raw ? (JSON.parse(raw) as T) : null
+    } catch {
+        return null
+    }
+}
+
+export function sessionSetJson(key: string, value: unknown): void {
+    try {
+        if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, JSON.stringify(value))
+    } catch {
+        // ignore quota / availability errors
+    }
+}

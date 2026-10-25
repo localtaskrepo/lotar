@@ -10,15 +10,15 @@ export type BoardSortKey =
 type BoardSortOption = { value: BoardSortKey; label: string; defaultDir: TaskSortOrder }
 
 const BASE_OPTIONS: BoardSortOption[] = [
-    { value: 'modified', label: 'Sort by last modified', defaultDir: 'desc' },
-    { value: 'created', label: 'Sort by created', defaultDir: 'desc' },
-    { value: 'priority', label: 'Sort by priority', defaultDir: 'desc' },
-    { value: 'due', label: 'Sort by due date', defaultDir: 'asc' },
-    { value: 'effort', label: 'Sort by effort', defaultDir: 'desc' },
-    { value: 'title', label: 'Sort by title', defaultDir: 'asc' },
-    { value: 'id', label: 'Sort by ID', defaultDir: 'asc' },
-    { value: 'assignee', label: 'Sort by assignee', defaultDir: 'asc' },
-    { value: 'type', label: 'Sort by type', defaultDir: 'asc' },
+    { value: 'modified', label: 'Last modified', defaultDir: 'desc' },
+    { value: 'created', label: 'Created', defaultDir: 'desc' },
+    { value: 'priority', label: 'Priority', defaultDir: 'desc' },
+    { value: 'due', label: 'Due date', defaultDir: 'asc' },
+    { value: 'effort', label: 'Effort', defaultDir: 'desc' },
+    { value: 'title', label: 'Title', defaultDir: 'asc' },
+    { value: 'id', label: 'ID', defaultDir: 'asc' },
+    { value: 'assignee', label: 'Assignee', defaultDir: 'asc' },
+    { value: 'type', label: 'Type', defaultDir: 'asc' },
 ]
 const SPRINT_OPTION: BoardSortOption = { value: 'sprint', label: 'Sprint order', defaultDir: 'asc' }
 

@@ -2040,7 +2040,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let storage = Storage::new(&resolver.path.clone());
     let mut tasks = TaskService::list(&storage, &filter);
     // Smart filters + deterministic global ordering (default modified desc,
-    // canonical-ID lexical asc tiebreak) BEFORE pagination so pages are
+    // natural task ID asc tiebreak) BEFORE pagination so pages are
     // stable and match the REST list/export order.
     crate::services::task_query::apply(&mut tasks, &query_options, chrono::Utc::now());
     let tasks = tasks.into_iter().map(|(_, t)| t).collect::<Vec<_>>();

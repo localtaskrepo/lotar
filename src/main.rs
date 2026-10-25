@@ -837,7 +837,7 @@ fn main() {
                     }
 
                     // Sort stable by id for determinism
-                    items.sort_by(|a, b| a.id.cmp(&b.id));
+                    items.sort_by(|a, b| lotar::storage::compare_task_ids(&a.id, &b.id));
 
                     match renderer.format {
                         output::OutputFormat::Json => {

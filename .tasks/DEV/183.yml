@@ -1,0 +1,7 @@
+title: Allow tickets to be moved to different project
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-25T03:09:51.512208+00:00
+description: Once a ticket is created, there's no way to move it to another project. We want to support this on all interfaces.

@@ -3,7 +3,7 @@
     <header class="dependencies-header">
       <div>
         <h1>
-          Dependencies <span v-if="scope.project" class="muted">- {{ scope.project }}</span>
+          Dependencies <span v-if="scope.project" class="muted">— {{ scope.project }}</span>
         </h1>
         <p class="muted">Explore prerequisites, dependents, and connected tasks.</p>
       </div>
@@ -15,6 +15,41 @@
           >{{ scope.project ? 'Validate project' : 'Validate workspace' }}</UiButton
         >
         <UiButton :disabled="busy" @click="previewRepair()"><IconGlyph name="edit" />Fix relationships</UiButton>
+        <ColumnsMenu
+          :open="fieldsMenuOpen"
+          :options="cardFields.fieldOptions.value"
+          :is-visible="cardFields.isVisible"
+          :set-visible="cardFields.toggleColumn"
+          label="Card fields"
+          @update:open="fieldsMenuOpen = $event"
+          @reset="cardFields.resetColumns"
+        >
+          <template #trigger="{ open, toggle }"
+            ><UiButton
+              type="button"
+              aria-label="Configure card fields"
+              title="Choose details displayed on task cards"
+              :aria-expanded="open"
+              @click="toggle"
+              ><IconGlyph name="list" aria-hidden="true" /><span>Fields</span></UiButton
+            ></template
+          >
+        </ColumnsMenu>
+        <UiButton
+          icon-only
+          aria-label="Clear filters"
+          title="Clear filters"
+          :disabled="!hasFilters && !scope.root"
+          @click="clearFilters"
+          ><IconGlyph name="close"
+        /></UiButton>
+        <ReloadButton
+          :disabled="graphLoading"
+          :loading="graphLoading"
+          label="Refresh dependencies"
+          title="Refresh dependencies"
+          @click="graphRef?.refresh()"
+        />
       </div>
     </header>
     <div class="filter-card">
@@ -41,7 +76,7 @@
       >
         <template #actions>
           <label class="dependency-sort"
-            >Sort
+            >Sort by
             <UiSelect aria-label="Sort tasks" :model-value="filter.sort_by || 'modified'" @update:model-value="setSort">
               <option value="id">ID</option>
               <option value="title">Title</option>
@@ -52,34 +87,6 @@
               <option value="modified">Updated</option>
             </UiSelect></label
           >
-          <ColumnsMenu
-            :open="fieldsMenuOpen"
-            :options="cardFields.fieldOptions.value"
-            :is-visible="cardFields.isVisible"
-            :set-visible="cardFields.toggleColumn"
-            label="Card fields"
-            @update:open="fieldsMenuOpen = $event"
-            @reset="cardFields.resetColumns"
-          >
-            <template #trigger="{ open, toggle }"
-              ><UiButton
-                class="responsive-action"
-                aria-label="Configure card fields"
-                title="Choose details displayed on task cards"
-                :aria-expanded="open"
-                @click="toggle"
-                ><IconGlyph name="columns" /><span class="responsive-action__label">Fields</span></UiButton
-              ></template
-            >
-          </ColumnsMenu>
-          <UiButton
-            icon-only
-            aria-label="Clear filters"
-            title="Clear filters"
-            :disabled="!hasFilters && !scope.root"
-            @click="clearFilters"
-            ><IconGlyph name="close"
-          /></UiButton>
         </template>
         <template #panel>
           <div class="dependency-view-options" role="group" aria-label="Graph display controls">
@@ -233,6 +240,7 @@ import type {
   RelationshipRepairResponse,
 } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
+import ReloadButton from '../components/ReloadButton.vue'
 import DependencyGraph from '../components/DependencyGraph.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -368,7 +376,8 @@ const { hasFilters, onFilterUpdate } = useProjectFilterSync(project, filter)
 function loadedGraph(result: RelationshipGraphResponse) {
   graphNodes.value = result.nodes
 }
-const graphRef = ref<{ refresh: () => void } | null>(null)
+const graphRef = ref<{ refresh: () => void; loading: boolean } | null>(null)
+const graphLoading = computed(() => graphRef.value?.loading ?? false)
 let routeRequest = 0
 function writeRoute(next: Record<string, string | number | undefined>) {
   const base = pendingQuery.value || route.query
@@ -656,6 +665,8 @@ onBeforeUnmount(() => {
 }
 .dependencies-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .dependency-view-options {

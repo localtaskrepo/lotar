@@ -14,6 +14,29 @@
           <IconGlyph name="columns" aria-hidden="true" />
           <span>Columns</span>
         </UiButton>
+        <ColumnsMenu
+          :open="fieldsMenuOpen"
+          :options="boardFieldsOptions"
+          :is-visible="boardFields.isVisible"
+          :set-visible="boardFields.toggleColumn"
+          label="Card fields"
+          @update:open="fieldsMenuOpen = $event"
+          @reset="boardFields.resetColumns"
+        >
+          <template #trigger="{ open, toggle }">
+            <UiButton
+              class="board-fields-button"
+              type="button"
+              aria-label="Configure card fields"
+              title="Choose which fields appear on cards"
+              :aria-expanded="open"
+              @click="toggle"
+            >
+              <IconGlyph name="list" aria-hidden="true" />
+              <span>Fields</span>
+            </UiButton>
+          </template>
+        </ColumnsMenu>
         <UiButton
           icon-only
           type="button"
@@ -54,52 +77,29 @@
         @update:value="onFilterUpdate"
       >
         <template #actions>
-          <ColumnsMenu
-            :open="fieldsMenuOpen"
-            :options="boardFieldsOptions"
-            :is-visible="boardFields.isVisible"
-            :set-visible="boardFields.toggleColumn"
-            label="Card fields"
-            @update:open="fieldsMenuOpen = $event"
-            @reset="boardFields.resetColumns"
-          >
-            <template #trigger="{ open, toggle }">
-              <UiButton
-                class="responsive-action"
-                type="button"
-                aria-label="Configure card fields"
-                title="Choose which fields appear on cards"
-                :aria-expanded="open"
-                @click="toggle"
-              >
-                <IconGlyph name="columns" aria-hidden="true" />
-                <span class="responsive-action__label">Fields</span>
-              </UiButton>
-            </template>
-          </ColumnsMenu>
-          <select
-            v-model="groupBy"
-            class="input board-chips-row__groupby"
-            aria-label="Group cards by"
-            data-testid="board-groupby"
-          >
-            <option value="none">No grouping</option>
-            <option value="assignee">Group by assignee</option>
-            <option value="priority">Group by priority</option>
-            <option value="type">Group by type</option>
-          </select>
-          <div class="board-chips-row__sort">
-            <select
-              :value="boardSort.effectiveKey.value"
-              class="input board-chips-row__sortby"
-              aria-label="Sort cards by"
-              data-testid="board-sortby"
-              @change="boardSort.setKey(($event.target as HTMLSelectElement).value as BoardSortKey)"
-            >
-              <option v-for="option in boardSort.options.value" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
+          <label class="board-chips-row__field">
+            <span class="board-chips-row__label">Group by</span>
+            <select v-model="groupBy" class="input board-chips-row__groupby" data-testid="board-groupby">
+              <option value="none">None</option>
+              <option value="assignee">Assignee</option>
+              <option value="priority">Priority</option>
+              <option value="type">Type</option>
             </select>
+          </label>
+          <div class="board-chips-row__sort">
+            <label class="board-chips-row__field">
+              <span class="board-chips-row__label">Sort by</span>
+              <select
+                :value="boardSort.effectiveKey.value"
+                class="input board-chips-row__sortby"
+                data-testid="board-sortby"
+                @change="boardSort.setKey(($event.target as HTMLSelectElement).value as BoardSortKey)"
+              >
+                <option v-for="option in boardSort.options.value" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
             <UiButton
               icon-only
               type="button"
@@ -524,7 +524,14 @@ import { useConfig } from '../composables/useConfig'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { MS_PER_DAY } from '../utils/date'
-import { storageGet, storageSet } from '../utils/storage'
+import {
+  sessionGetJson,
+  sessionSetJson,
+  storageGet,
+  storageGetJson,
+  storageSet,
+  storageSetJson,
+} from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
@@ -643,26 +650,51 @@ function selectTask(id: string) {
   selectedTaskId.value = selectedTaskId.value === id ? '' : id
 }
 
-// -- Collapsible groups ---------------------------------------------------
-const collapsedGroups = ref<Set<string>>(new Set())
+// -- Collapsible groups (persisted per project and grouping) ---------------
+function collapsedKey() {
+  return `lotar.boardCollapsed::${project.value}::${groupBy.value}`
+}
+function loadCollapsed(): Set<string> {
+  const saved = storageGetJson<unknown>(collapsedKey())
+  return new Set(Array.isArray(saved) ? saved.filter((label): label is string => typeof label === 'string') : [])
+}
+const collapsedGroups = ref<Set<string>>(loadCollapsed())
+function setCollapsed(next: Set<string>) {
+  collapsedGroups.value = next
+  storageSetJson(collapsedKey(), [...next])
+}
 function toggleGroup(label: string) {
   const next = new Set(collapsedGroups.value)
   if (next.has(label)) next.delete(label)
   else next.add(label)
-  collapsedGroups.value = next
+  setCollapsed(next)
 }
 
 // -- Progressive disclosure (virtual scrolling) ---------------------------
+// "Show more" is kept for this tab while the filter is unchanged, so leaving
+// and returning to the board keeps the expanded columns.
 const COLUMN_PAGE_SIZE = 30
-const columnExpansion = ref<Record<string, number>>({})
+function expansionKey() {
+  return `lotar.boardExpansion::${project.value}`
+}
+function filterSignature() {
+  return JSON.stringify(Object.entries(filter.value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+}
+function loadExpansion(): Record<string, number> {
+  const saved = sessionGetJson<{ filter?: string; columns?: Record<string, number> }>(expansionKey())
+  return saved?.filter === filterSignature() && saved.columns ? saved.columns : {}
+}
+const columnExpansion = ref<Record<string, number>>(loadExpansion())
 function visibleLimit(st: string): number {
   return columnExpansion.value[st] || COLUMN_PAGE_SIZE
 }
 function showMore(st: string) {
   columnExpansion.value = { ...columnExpansion.value, [st]: visibleLimit(st) + COLUMN_PAGE_SIZE }
+  sessionSetJson(expansionKey(), { filter: filterSignature(), columns: columnExpansion.value })
 }
+/** Re-read for the current project and filter (empty unless saved for it). */
 function resetExpansion() {
-  columnExpansion.value = {}
+  columnExpansion.value = loadExpansion()
 }
 
 function startOfDay(date: Date) {
@@ -1041,6 +1073,7 @@ function countOf(col: BoardColumnDescriptor): number {
 
 watch(groupBy, () => {
   saveGroupBy()
+  collapsedGroups.value = loadCollapsed()
 })
 
 const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
@@ -1188,7 +1221,7 @@ watch(
     boardLayout.load()
     groupBy.value = loadGroupBy()
     boardSort.reload()
-    collapsedGroups.value = new Set()
+    collapsedGroups.value = loadCollapsed()
     resetExpansion()
   },
 )
@@ -1365,6 +1398,18 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1, 0.25rem);
+}
+
+.board-chips-row__field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+.board-chips-row__label {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-muted);
+  white-space: nowrap;
 }
 
 .board-chips-row__sortdir {

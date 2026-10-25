@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
+import { scrollBehavior } from './utils/routerScroll'
 import AgentJobs from './pages/AgentJobs.vue'
 import AutomationView from './pages/AutomationView.vue'
 import Board from './pages/Board.vue'
@@ -25,6 +26,7 @@ if (typeof window !== 'undefined') {
 
 const router = createRouter({
     history: createWebHistory(),
+    scrollBehavior,
     routes: [
         { path: '/', component: TasksList },
         { path: '/sprints', component: SprintsList },

@@ -8,7 +8,7 @@ import { projectOf } from './text'
  * `sort_by` accepts the CLI sort fields plus `custom:<name>` (the CLI spells
  * the custom form `field:<name>`; both prefixes are accepted here). `order`
  * is `asc` or `desc` and defaults to `desc` with `sort_by=modified`. Ties
- * always break by canonical task ID lexical ASC, independent of `order`.
+ * always break by natural task ID ASC (A-2 before A-10), independent of `order`.
  *
  * The comparator mirrors the backend field-by-field, including where missing
  * values land (effort and due dates sort after present values in `asc`;
@@ -295,6 +295,44 @@ function cmpStr(a: string, b: string): number {
     return a < b ? -1 : a > b ? 1 : 0
 }
 
+function splitTaskId(id: string): [prefix: string, digits: string | null] {
+    const dash = id.lastIndexOf('-')
+    const suffix = dash >= 0 ? id.slice(dash + 1) : ''
+    if (!suffix || !/^[0-9]+$/.test(suffix)) return [id, null]
+    return [id.slice(0, dash), suffix.replace(/^0+/, '')]
+}
+
+/**
+ * Natural task ID order, matching the backend's `compare_task_ids`: project
+ * prefix, then the numeric suffix by value (`A-2` before `A-10`, padding
+ * ignored), then the exact spelling. IDs without a numeric suffix compare as
+ * a whole, as their own prefix.
+ */
+export function compareTaskIds(a: string, b: string): number {
+    const [prefixA, digitsA] = splitTaskId(a)
+    const [prefixB, digitsB] = splitTaskId(b)
+    const byPrefix = cmpCodePoints(prefixA, prefixB)
+    if (byPrefix) return byPrefix
+    if (digitsA !== null && digitsB !== null) {
+        if (digitsA.length !== digitsB.length) return digitsA.length - digitsB.length
+        const byNumber = cmpStr(digitsA, digitsB)
+        if (byNumber) return byNumber
+    } else if (digitsA !== digitsB) {
+        return digitsA === null ? -1 : 1
+    }
+    return cmpCodePoints(a, b)
+}
+
+/** Code-point order, like Rust's `str::cmp` (UTF-16 order differs above U+FFFF). */
+function cmpCodePoints(a: string, b: string): number {
+    const left = Array.from(a, (char) => char.codePointAt(0)!)
+    const right = Array.from(b, (char) => char.codePointAt(0)!)
+    for (let index = 0; index < Math.min(left.length, right.length); index++) {
+        if (left[index] !== right[index]) return left[index]! - right[index]!
+    }
+    return left.length - right.length
+}
+
 // ---------------------------------------------------------------------------
 // RFC3339 instants at nanosecond precision (JS Date only keeps milliseconds)
 // ---------------------------------------------------------------------------
@@ -507,7 +545,7 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number
         case 'project':
             return cmpStr(projectOf(a.id), projectOf(b.id))
         case 'id':
-            return cmpStr(a.id, b.id)
+            return compareTaskIds(a.id, b.id)
         case 'title':
             return cmpStr(a.title ?? '', b.title ?? '')
         case 'tags':
@@ -523,7 +561,7 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number
 
 /**
  * Deterministic global sort: primary key in `order` direction, ties broken by
- * canonical task ID lexical ASC regardless of direction. Returns a new array.
+ * natural task ID ASC regardless of direction. Returns a new array.
  */
 export function sortTasks<T extends TaskDTO>(tasks: readonly T[], sortBy: TaskSortBy, order: TaskSortOrder): T[] {
     const dir = order === 'asc' ? 1 : -1
@@ -531,7 +569,7 @@ export function sortTasks<T extends TaskDTO>(tasks: readonly T[], sortBy: TaskSo
     arr.sort((a, b) => {
         const primary = compareTasks(a, b, sortBy) * dir
         if (primary !== 0) return primary
-        return cmpStr(a.id, b.id)
+        return compareTaskIds(a.id, b.id)
     })
     return arr
 }

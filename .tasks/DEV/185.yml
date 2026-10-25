@@ -1,0 +1,24 @@
+title: 'Board: natural ID sort, labelled sort/group controls, keep view state when returning'
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T03:13:49.533117+00:00
+modified: 2026-10-25T03:26:21.340016+00:00
+comments:
+- date: 2026-10-25T03:26:21.302859+00:00
+  text: 'Done. (1) Natural task ID order everywhere: storage::compare_task_ids (Rust) and compareTaskIds (TS) order by prefix, then numeric suffix, then spelling; used for sort_by=id and the default tiebreak in task_query (REST/MCP/CLI lists), sprint reports, CLI listing, search results, the shared UI sort and Sprints manual-order ties. Docs/openapi/MCP descriptions updated. (2) Board controls use ''Group by'' / ''Sort by'' labels with short options. (3) Board state now survives leaving and returning: FilterBar restores the saved filter when the URL only carries the same ?project= (browser Back); collapsed swimlanes saved per project+grouping; ''Show more'' expansion kept per tab for the unchanged filter; router scrollBehavior restores scroll on Back/Forward. (4) User follow-ups: board Fields button moved to the header next to Columns (list icon); removed in-page Dependencies links on Sprints and Insights (task panel ''open in graph'' link kept); Dependencies header now has Fields, Clear filters and a Reload button. Tests: Rust natural_order_tests, taskSort compareTaskIds, smoke ui.board-state (nav link + Back), ui.board-sort. Verified: lint:agent, test:agent (1691 Rust, 1154 UI), full smoke 344/345 with one DEV-170 load flake passing 3/3 in isolation; later UI-only edits re-verified with all UI tests and 56 board/dependencies/insights/sprints smoke tests.'
+history:
+- at: 2026-10-25T03:26:21.302859+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T03:26:21.340016+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

@@ -1,0 +1,7 @@
+title: Sync tickets with GitHub
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-25T02:35:38.565868+00:00
+description: We should sync back and forth between github and dev tickets

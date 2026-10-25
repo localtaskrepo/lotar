@@ -414,7 +414,7 @@ export interface TaskUpdate {
  * `assignee`, `reporter`, `type`, `project`, `id`, `title`, `tags`,
  * `sprints`) or `custom:<name>` for a custom field (the CLI accepts
  * `field:<name>` as an alias). Omitted defaults to `modified`. Ties break by
- * canonical task ID lexical ASC.
+ * natural task ID ASC (A-2 before A-10).
  */
 export type TaskSortBy = string
 
