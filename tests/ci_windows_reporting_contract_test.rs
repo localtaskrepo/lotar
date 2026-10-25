@@ -319,3 +319,27 @@ fn every_workflow_action_is_pinned_to_a_commit_sha() {
         }
     }
 }
+
+#[test]
+fn release_signing_stays_on_cosign_v2() {
+    // The release signs with --output-signature/--output-certificate (.sig
+    // and .pem assets); Cosign v3 needs --bundle instead, so the installer
+    // must not fall back to its default Cosign version (DEV-171).
+    let workflow: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str(include_str!("../.github/workflows/release.yml")).unwrap();
+    let installers: Vec<&serde_yaml_ng::Value> = workflow["jobs"]
+        .as_mapping()
+        .unwrap()
+        .values()
+        .flat_map(|job| job["steps"].as_sequence().into_iter().flatten())
+        .filter(|step| action(step) == Some("sigstore/cosign-installer"))
+        .collect();
+    assert!(!installers.is_empty(), "release.yml installs cosign");
+    for step in installers {
+        let release = step["with"]["cosign-release"].as_str().unwrap_or("");
+        assert!(
+            release.starts_with("v2."),
+            "cosign-release must pin the v2 line, got {release:?}"
+        );
+    }
+}

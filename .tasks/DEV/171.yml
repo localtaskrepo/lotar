@@ -1,0 +1,31 @@
+title: Keep release signing on Cosign v2 when updating cosign-installer
+status: Done
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-24T23:59:48.245258+00:00
+modified: 2026-10-25T00:00:24.703443+00:00
+comments:
+- date: 2026-10-25T00:00:24.676715+00:00
+  text: 'Outcome: release.yml''s Install cosign step now passes cosign-release: v2.6.5 (latest Cosign v2 patch; current installer v3 defaulted to v2.5.2), so applying Dependabot #47 (installer v4, default Cosign v3.0.6) keeps the existing sign-blob --output-signature/--output-certificate flow and the documented .sig/.pem assets. New contract test release_signing_stays_on_cosign_v2 fails if any cosign-installer step in release.yml drops the v2 pin. Committed before #47 so no commit has broken release signing. Evidence: contract binary 6/6; test:release 26/26. Remaining: verified only statically; the first tagged release exercises signing. Moving to Cosign v3 bundles (.sigstore.json, docs/help/install.md verification steps) is a separate decision. Guidance: no durable finding.'
+description: 'Dependabot PR #47 bumps sigstore/cosign-installer v3 -> v4, whose default Cosign is v3.0.6. Cosign v3 ''sign-blob'' requires --bundle, but release.yml signs with --output-signature/--output-certificate and docs/help/install.md promises .sig/.pem assets, so the next release would fail at signing (PR CI does not run release.yml). Pin cosign-release to the v2 line explicitly before applying #47 and guard it with a workflow contract test. Moving to Cosign v3 bundles is a separate decision (changes published assets and verification docs).'
+history:
+- at: 2026-10-24T23:59:57.374183+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T00:00:24.676715+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T00:00:24.703443+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

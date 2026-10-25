@@ -241,6 +241,11 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        # Pinned to the Cosign v2 line: the signing steps below produce the
+        # .sig/.pem assets documented in docs/help/install.md, and Cosign v3
+        # requires --bundle for sign-blob (DEV-171).
+        with:
+          cosign-release: "v2.6.5"
 
       - name: Sign artifact (non-Windows)
         if: matrix.os != 'windows-latest'
