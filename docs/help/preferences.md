@@ -33,6 +33,10 @@ Each page with a search box (Tasks, Boards, Calendar, Sprints, Insights and Depe
 
 Select **Clear last used filter** to remove the saved search and filters of every page (`lotar.tasks.filter`, `lotar.sprints.filter`, `lotar.calendar.filter`, `lotar.boards.filter`, `lotar.insights.filter`, `lotar.dependencies.filter` and `lotar.shared.filter`) from localStorage and legacy sessionStorage. It does not delete saved-filter presets or repository data. An explicit URL query can still restore filters on the next visit.
 
+## Keyboard
+
+**Single-key shortcuts** (on by default) lets `c`, `/`, `?` and `g` followed by a letter work anywhere outside text fields (see [keyboard shortcuts](serve.md)). Turn it off if single keys get in the way of a screen reader, voice control or your own key bindings; **Ctrl+K** (**⌘K** on a Mac) still opens the command palette. The choice is stored in `localStorage` (`lotar.preferences.shortcuts.singleKey`).
+
 ## Tasks List
 
 Use **Default page size** (25, 50, 100, or 200; default 50) for Tasks and the independent Sprint/backlog pagers. It is browser-scoped; an explicit Tasks URL page size takes precedence. See [list pagination](./list.md#pagination) for the separate CLI contract.

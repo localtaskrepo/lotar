@@ -114,6 +114,21 @@
         </UiCard>
 
         <UiCard>
+          <h3>Keyboard</h3>
+          <div class="col" style="gap: 10px">
+            <label class="row" style="gap: 8px; align-items: center">
+              <input v-model="singleKeyShortcuts" type="checkbox" data-testid="preferences-single-key-shortcuts" />
+              Single-key shortcuts
+            </label>
+            <p class="muted" style="margin: 0">
+              <kbd>c</kbd> new task, <kbd>/</kbd> search, <kbd>g</kbd> then a letter to change pages, and
+              <kbd>?</kbd> for the full list. Turn them off if they get in the way of a screen reader or voice control;
+              {{ paletteLabel }} opens the command palette either way.
+            </p>
+          </div>
+        </UiCard>
+
+        <UiCard>
           <h3>Tasks list</h3>
           <div class="col" style="gap: 8px">
             <label class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
@@ -163,10 +178,12 @@ import UiInput from '../components/UiInput.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { NAV_TABS, useNavTabs } from '../composables/useNavTabs'
 import { getContrastingColor } from '../utils/color'
+import { paletteShortcutLabel } from '../utils/keyboardShortcuts'
 import {
   DEFAULT_STARTUP_DESTINATION,
   DEFAULT_TASKS_PAGE_SIZE,
   readShareFiltersPreference,
+  readSingleKeyShortcutsPreference,
   readStartupDestination,
   readTaskPanelAutoDetectLinksPreference,
   SHARED_FILTER_STORAGE_KEY,
@@ -175,6 +192,7 @@ import {
   readTasksPageSizePreference,
   STARTUP_DESTINATION_OPTIONS,
   storeShareFiltersPreference,
+  storeSingleKeyShortcutsPreference,
   storeStartupDestination,
   storeTaskPanelAutoDetectLinksPreference,
   storeTaskPanelShowAttachmentsPreference,
@@ -206,6 +224,8 @@ const showLinksInAttachments = ref(true)
 const autoDetectLinks = ref(true)
 
 const shareFilters = ref(false)
+const singleKeyShortcuts = ref(true)
+const paletteLabel = paletteShortcutLabel()
 
 const tasksPageSizeOptions = [25, 50, 100, 200]
 const tasksPageSize = ref(String(DEFAULT_TASKS_PAGE_SIZE))
@@ -230,6 +250,7 @@ onMounted(() => {
 
   tasksPageSize.value = String(readTasksPageSizePreference())
   shareFilters.value = readShareFiltersPreference()
+  singleKeyShortcuts.value = readSingleKeyShortcutsPreference()
 
   showAttachments.value = readTaskPanelShowAttachmentsPreference()
   showLinksInAttachments.value = readTaskPanelShowLinksInAttachmentsPreference()
@@ -271,6 +292,10 @@ watch(startupDestination, (value) => {
 
 watch(shareFilters, (value) => {
   storeShareFiltersPreference(!!value)
+})
+
+watch(singleKeyShortcuts, (value) => {
+  storeSingleKeyShortcutsPreference(!!value)
 })
 
 watch(showAttachments, (value) => {

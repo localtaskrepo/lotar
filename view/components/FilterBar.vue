@@ -417,7 +417,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useId, watch, watchEffect } from 'vue'
 import { listFromCsv } from '../composables/useFilterBuilder'
-import { filterStorageKey } from '../utils/preferences'
+import { filterStorageKey, readSingleKeyShortcutsPreference } from '../utils/preferences'
 import { storageGetJson, storageRemove, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import {
@@ -830,7 +830,7 @@ function onDocumentKeydown(event: KeyboardEvent) {
   // `/` focuses the filter search from anywhere outside a text field.
   const target = event.target as HTMLElement | null
   const editing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
-  if (event.key === '/' && !editing) {
+  if (event.key === '/' && !editing && readSingleKeyShortcutsPreference()) {
     event.preventDefault()
     searchInput.value?.focus()
   }

@@ -1,7 +1,37 @@
 title: Keyboard shortcuts
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-24T22:10:46.431255+00:00
+modified: 2026-10-25T23:42:49.750289+00:00
+comments:
+- date: 2026-10-25T23:33:56.296202+00:00
+  text: 'Plan: (1) command palette on Ctrl+K / Cmd+K (also from inside text fields): jump to any page, actions (new task, theme, activity, shortcuts help), and live task lookup by ID/title via /api/tasks/suggest that opens the task panel; keyboard-only combobox/listbox. (2) global single-key shortcuts when not typing and no dialog is open: c new task, g+letter go to a page (t s b c d i a u y n o p), ? shortcuts reference; / keeps focusing page search. (3) Preferences toggle to turn single-key shortcuts off (WCAG 2.1.4), Ctrl/Cmd+K always on. (4) top-bar button showing the palette shortcut for discoverability. Unit tests, smoke, docs.'
+- date: 2026-10-25T23:42:49.717694+00:00
+  text: 'Done. Command palette (CommandPalette.vue) on Ctrl+K / Cmd+K (works inside text fields) and a top-bar button: Go to every page (with g-shortcut hints), actions (new task, activity, shortcuts, light/dark/system theme), live task lookup via /api/tasks/suggest (task IDs listed first when the query looks like one) that opens the task panel; ARIA combobox/listbox with arrows, Home/End, Enter, Esc. Global shortcuts (useGlobalShortcuts): c new task, ? reference dialog (KeyboardShortcutsDialog.vue), g + t/s/b/c/d/i/a/u/y/n/o/p; never while typing or when a panel/dialog is open. Preferences > Keyboard toggles single-key shortcuts (also gates the existing /), Ctrl/Cmd+K always works (WCAG 2.1.4). One shared kbd style. Verified: unit spec (helpers, sequences, typing/busy/off, palette filter/task lookup/arrows), smoke ui.keyboard-shortcuts (palette nav, g c, ?, c, task by ID, preference off), screenshots light/dark/390px. Gates: lint, 1712 Rust + 1209 UI, 349 smoke.'
 description: 'Keyboard shortcuts and a command palette for power users. '
+history:
+- at: 2026-10-25T23:33:56.256913+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T23:33:56.296202+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T23:42:49.717694+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T23:42:49.750289+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

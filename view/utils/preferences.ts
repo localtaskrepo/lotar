@@ -11,6 +11,7 @@ const TASK_PANEL_SHOW_LINKS_IN_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.sh
 const TASK_PANEL_AUTO_DETECT_LINKS_KEY = 'lotar.preferences.taskPanel.autoDetectLinks'
 
 const SHARE_FILTERS_KEY = 'lotar.preferences.filters.shareAcrossPages'
+export const SINGLE_KEY_SHORTCUTS_KEY = 'lotar.preferences.shortcuts.singleKey'
 /** Saved search and filters used by every page when sharing is on (DEV-142). */
 export const SHARED_FILTER_STORAGE_KEY = 'lotar.shared.filter'
 
@@ -114,6 +115,15 @@ export function readShareFiltersPreference(): boolean {
 
 export function storeShareFiltersPreference(value: boolean) {
     storeBooleanPreference(SHARE_FILTERS_KEY, value)
+}
+
+/** Single-key shortcuts (`c`, `?`, `g` + letter); Ctrl/Cmd+K always works (DEV-158). */
+export function readSingleKeyShortcutsPreference(): boolean {
+    return readBooleanPreference(SINGLE_KEY_SHORTCUTS_KEY, true)
+}
+
+export function storeSingleKeyShortcutsPreference(value: boolean) {
+    storeBooleanPreference(SINGLE_KEY_SHORTCUTS_KEY, value)
 }
 
 /** Where a page's FilterBar saves its search and filters: its own key, or the shared one. */
