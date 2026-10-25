@@ -1,0 +1,24 @@
+title: Fix intermittent failure in the mobile filter panel smoke test
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T19:04:04.106710+00:00
+modified: 2026-10-25T19:04:04.184692+00:00
+comments:
+- date: 2026-10-25T19:04:04.156480+00:00
+  text: 'CI run 40220761333 (efac6cc) failed ui.filter-panel ''uses one search input and preserves scoped filters on mobile'' at line 167: after Clear search the test counted ''Beta task'' immediately. Clearing the text starts a new task query, and TasksList intentionally shows a loader (never the previous key''s rows) until it lands, so the count can be 0 for a moment. Fix: poll the count like the neighbouring assertions. Verified: spec passed 3 extra local runs; full smoke 346/346; the next CI run (a0b0479) was green.'
+history:
+- at: 2026-10-25T19:04:04.156480+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T19:04:04.184692+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

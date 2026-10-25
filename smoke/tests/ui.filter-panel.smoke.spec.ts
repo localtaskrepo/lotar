@@ -164,7 +164,8 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         expect(await clearSearch.count()).toBe(0);
                         expect(await search.evaluate((el) => el === document.activeElement)).toBe(true);
                         expect(await page.getByTestId('filter-chips').textContent()).toContain('beta release');
-                        expect(await page.getByText('Beta task', { exact: true }).count()).toBe(1);
+                        // Clearing the text starts a new query, which shows a loader until it lands.
+                        await expect.poll(() => page.getByText('Beta task', { exact: true }).count()).toBe(1);
                         await search.fill('tags:ui');
                         await search.press('Enter');
                         await expect
