@@ -25,7 +25,7 @@ Accent choices are stored in `localStorage` (`lotar.accent`). Disable the toggle
 
 ## Table Layout Reset
 
-Use **Reset saved columns and sorting** to clear saved columns, column order, and sort settings for both Tasks and Sprints across projects. It removes the `lotar.taskTable.columns*`, `lotar.taskTable.columnOrder*`, `lotar.taskTable.sort*`, and corresponding `lotar.sprints.*` keys, plus `lotar.boardFields*` and `lotar.calendarHoverFields*`. It does not reset theme, accent, page size, hidden tabs, or repository data.
+Use **Reset saved columns and sorting** to clear saved columns, column order, and sort settings for both Tasks and Sprints across projects. It removes the `lotar.taskTable.columns*`, `lotar.taskTable.columnOrder*`, `lotar.taskTable.sort*`, and corresponding `lotar.sprints.*` keys, plus `lotar.boardFields*`, `lotar.boardSort*` and `lotar.calendarHoverFields*`. It does not reset theme, accent, page size, hidden tabs, or repository data.
 
 ## Filter Reset
 

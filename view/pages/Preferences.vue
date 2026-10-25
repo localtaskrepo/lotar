@@ -293,6 +293,7 @@ function resetTables() {
     'lotar.sprints.sort',
     'lotar.sprints.columnOrder',
     'lotar.boardFields',
+    'lotar.boardSort',
     'lotar.calendarHoverFields',
   ]
   try {

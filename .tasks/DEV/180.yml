@@ -1,0 +1,33 @@
+title: Board needs sorting
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T00:50:47.034594+00:00
+modified: 2026-10-25T02:31:38.725209+00:00
+comments:
+- date: 2026-10-25T02:13:35.712662+00:00
+  text: 'Analysis: Board.vue sorts every column by modified (direction from filter.order) via the shared sortTasks contract (view/utils/taskSort.ts: priority, status, effort, due, created, modified, assignee, reporter, type, id, title, tags, sprints, custom:*). Sprints already have Manual order backed by task.sprint_order[sprint] in task YAML. Options: (A) sort dropdown + direction on the board reusing sortTasks, persisted with the per-project board layout, plus a ''Sprint order'' option when the board is filtered to one sprint (reuses sprint_order, no new data); (B) a board-wide manual rank field: every drag rewrites task YAML (git churn/merge conflicts), position is ambiguous across status columns, and it duplicates sprint ordering. Recommendation: A.'
+- date: 2026-10-25T02:31:38.658525+00:00
+  text: 'Done (option A, chosen by the developer). Board chips row has a sort menu (last modified default, created, priority by configured order, due, effort, title, ID, assignee, type) plus an asc/desc toggle with per-field default direction, saved per project (lotar.boardSort::<PROJECT>, cleared by Preferences reset). ''Sprint order'' appears while the filter selects exactly one sprint and follows the Sprints page manual order (sprint file task list order, exposed as task.sprint_order); correction to the analysis: that order lives in @sprints/N.yml, not task YAML, and the board never writes. FilterBar''s duplicate Sort direction is hidden on the board. Card rule ''max visible'' still keeps the most recently modified cards but shows them in the chosen order. Priority sort uses configured order because the shared table sort compares priority names alphabetically (possible follow-up for Tasks/Sprints tables). Tests: useBoardSort.spec.ts (8), smoke ui.board-sort.smoke.spec.ts (sort/direction/persistence/sprint order/no writes) with screenshots in target/smoke-artifacts/board-sort. Verified: lint:agent, test:agent (1690 Rust, 1153 UI), smoke 344/344. Docs: help/serve.md Boards, help/preferences.md reset.'
+description: |-
+  There's currently no way to sort tickets in the board view.
+  Question is should this behave like a sprint as well where you can reorder the tickets in custom priority order or do we just provide a view with different ordering and grouping options?
+history:
+- at: 2026-10-25T02:13:35.712662+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T02:31:38.658525+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T02:31:38.725209+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

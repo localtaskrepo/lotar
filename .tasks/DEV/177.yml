@@ -1,0 +1,9 @@
+title: Better Release Ordering
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-25T00:22:37.376652+00:00
+description: |-
+  The feature page currently shows all tickets in an order that could be improved.
+  Features should come first, bug fixes second, and then chores, followed by any others should there be any.

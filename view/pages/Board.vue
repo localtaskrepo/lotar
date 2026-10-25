@@ -48,6 +48,7 @@
         :custom-field-options="availableCustomFields"
         :value="filterPayload"
         :show-status="false"
+        :show-order="false"
         emit-project-key
         storage-key="lotar.boards.filter"
         @update:value="onFilterUpdate"
@@ -87,6 +88,31 @@
             <option value="priority">Group by priority</option>
             <option value="type">Group by type</option>
           </select>
+          <div class="board-chips-row__sort">
+            <select
+              :value="boardSort.effectiveKey.value"
+              class="input board-chips-row__sortby"
+              aria-label="Sort cards by"
+              data-testid="board-sortby"
+              @change="boardSort.setKey(($event.target as HTMLSelectElement).value as BoardSortKey)"
+            >
+              <option v-for="option in boardSort.options.value" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+            <UiButton
+              icon-only
+              type="button"
+              class="board-chips-row__sortdir"
+              data-testid="board-sortdir"
+              :disabled="!boardSort.directional.value"
+              :aria-label="sortDirLabel"
+              :title="sortDirLabel"
+              @click="boardSort.toggleDir()"
+            >
+              <IconGlyph :name="boardSort.dir.value === 'asc' ? 'chevron-up' : 'chevron-down'" aria-hidden="true" />
+            </UiButton>
+          </div>
         </template>
       </FilterBar>
     </div>
@@ -490,6 +516,7 @@ import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
+import { useBoardSort, type BoardSortKey } from '../composables/useBoardSort'
 import { computeBoardLanes, useBoardLayout, type BoardLane, type BoardLayout } from '../composables/useBoardLayout'
 import BoardColumnsDialog from '../components/BoardColumnsDialog.vue'
 import { useCompletionPolicy, completionStatusKey, normalizeStatusKey } from '../composables/useCompletionPolicy'
@@ -504,7 +531,6 @@ import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
-import { sortTasks } from '../utils/taskSort'
 import { memberColor, memberInitials } from '../utils/member'
 import { statusEnteredAt } from '../utils/taskHistory'
 
@@ -591,6 +617,15 @@ const groupBy = ref<GroupByMode>(loadGroupBy())
 function saveGroupBy() {
   storageSet(groupByKey(), groupBy.value)
 }
+
+// -- Card order (DEV-180, persisted per project) --------------------------
+const boardSort = useBoardSort(project, filter)
+const sortDirLabel = computed(() => {
+  if (!boardSort.directional.value) return 'Sprint order follows the Sprints page'
+  return boardSort.dir.value === 'asc'
+    ? 'Ascending order (click for descending)'
+    : 'Descending order (click for ascending)'
+})
 
 // -- Initial loading --------------------------------------------------------
 // Per-current-handle first load: the loader covers the loading, queued-idle,
@@ -782,8 +817,7 @@ const partitionedBoardTasks = computed<{ configured: Record<string, TaskDTO[]>; 
   const activeProject = project.value
   // Smart filters (due/recent/needs/assignee) are applied server-side by the
   // hydrate; only the deterministic display order is applied here.
-  const { normalized } = buildServerFilter(filter.value, activeProject)
-  const sorted = sortTasks(items.value || [], 'modified', normalized.order === 'asc' ? 'asc' : 'desc')
+  const sorted = boardSort.apply(items.value || [], priorities.value)
   const configured: Record<string, TaskDTO[]> = {}
   for (const { label } of columnsData.value) configured[label] = []
   const other: TaskDTO[] = []
@@ -831,8 +865,14 @@ function applyCardRules(groups: Record<string, TaskDTO[]>) {
       })
     }
     if (rules.maxVisible) {
-      filtered.sort((a, b) => b.modified.localeCompare(a.modified))
-      filtered = filtered.slice(0, rules.maxVisible)
+      // Keep the most recently modified cards, shown in the board's sort order.
+      const keep = new Set(
+        [...filtered]
+          .sort((a, b) => b.modified.localeCompare(a.modified))
+          .slice(0, rules.maxVisible)
+          .map((task) => task.id),
+      )
+      filtered = filtered.filter((task) => keep.has(task.id))
     }
     result[label] = filtered
   })
@@ -1147,6 +1187,7 @@ watch(
     await refreshBoardTasks()
     boardLayout.load()
     groupBy.value = loadGroupBy()
+    boardSort.reload()
     collapsedGroups.value = new Set()
     resetExpansion()
   },
@@ -1310,12 +1351,25 @@ onUnmounted(() => {
   margin-left: auto;
 }
 
-.board-chips-row__groupby {
+.board-chips-row__groupby,
+.board-chips-row__sortby {
   font-size: var(--text-sm, 0.875rem);
   padding: 0 var(--space-4, 1rem);
   height: var(--control-height);
   min-height: var(--control-height);
   line-height: var(--line-tight, 1.25);
+}
+
+/* Sort field and direction read as one control. */
+.board-chips-row__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+.board-chips-row__sortdir {
+  height: var(--control-height);
+  min-height: var(--control-height);
 }
 
 .task-header {
