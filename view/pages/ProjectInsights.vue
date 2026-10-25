@@ -190,6 +190,9 @@ const LENSES: Array<{ key: LensKey; label: string; note: string; component: Comp
   },
 ]
 
+/** URL keys holding this page's view state; they survive project changes. */
+const VIEW_QUERY_KEYS = ['view', 'period', 'from', 'to']
+
 const route = useRoute()
 const router = useRouter()
 const store = useTaskStore()
@@ -220,6 +223,7 @@ const {
   clearFilters: clearFiltersAction,
 } = useProjectFilterSync(project, filter, {
   routePath: '/insights',
+  keepQuery: VIEW_QUERY_KEYS,
 })
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
@@ -291,7 +295,7 @@ function writeViewQuery() {
   if (disposed || route.path !== '/insights') return
   const next: Record<string, string> = {}
   for (const [key, value] of Object.entries(route.query)) {
-    if (typeof value === 'string' && !['view', 'period', 'from', 'to'].includes(key)) next[key] = value
+    if (typeof value === 'string' && !VIEW_QUERY_KEYS.includes(key)) next[key] = value
   }
   next.view = activeLens.value
   next.period = period.value
@@ -299,7 +303,7 @@ function writeViewQuery() {
     if (customFrom.value) next.from = customFrom.value
     if (customTo.value) next.to = customTo.value
   }
-  const same = ['view', 'period', 'from', 'to'].every((key) => (route.query[key] ?? undefined) === next[key])
+  const same = VIEW_QUERY_KEYS.every((key) => (route.query[key] ?? undefined) === next[key])
   if (!same) void router.replace({ path: '/insights', query: next })
 }
 function setLens(key: LensKey) {

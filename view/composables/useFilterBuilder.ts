@@ -103,6 +103,8 @@ export function useProjectFilterSync(
         onProjectChange?: (project: string) => void
         /** When set (and no onProjectChange), keep ?project= in the URL in sync on this path. */
         routePath?: string
+        /** Other query keys (page view state) that survive a project change. */
+        keepQuery?: readonly string[]
     },
 ) {
     const hasFilters = computed(() =>
@@ -116,7 +118,13 @@ export function useProjectFilterSync(
         const desired = nextProject || ''
         const current = typeof route.query.project === 'string' ? route.query.project : ''
         if (current === desired) return
-        router.push({ path: options?.routePath ?? route.path, query: desired ? { project: desired } : {} })
+        const query: Record<string, string> = {}
+        for (const key of options?.keepQuery ?? []) {
+            const value = route.query[key]
+            if (typeof value === 'string') query[key] = value
+        }
+        if (desired) query.project = desired
+        router.push({ path: options?.routePath ?? route.path, query })
     }
 
     function resolveProjectSelection(requested: string | undefined) {

@@ -102,6 +102,8 @@ td.alert {
 .task-table__task {
   width: 100%;
   max-width: 0;
+  /* Never collapse below the ID plus some title; narrow screens scroll instead. */
+  min-width: 11rem;
 }
 
 .task-table__link {

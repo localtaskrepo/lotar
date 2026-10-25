@@ -1,0 +1,24 @@
+title: Insights links lose their view and period; task tables overlap on phones
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T07:19:42.988686+00:00
+modified: 2026-10-25T07:19:53.471681+00:00
+comments:
+- date: 2026-10-25T07:19:53.445364+00:00
+  text: 'Cause 1: useProjectFilterSync replaced the whole query with {project} when the filter bar set the project (e.g. the default project on load), so /insights?view=team&period=90d fell back to Overview / 30 days. Fix: keepQuery option; Insights keeps view/period/from/to. Other pages unchanged. Cause 2: TaskTable''s title cell (width 100%, max-width 0) collapsed to 0 at 390px so IDs overlapped the next column; added min-width 11rem so the table scrolls in its card. Verified: useProjectFilterSync.route.spec.ts, Playwright deep-link check and 390px screenshot.'
+history:
+- at: 2026-10-25T07:19:53.445364+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T07:19:53.471681+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
