@@ -1,4 +1,3 @@
-// Auto-generated from stats_handler.rs.
 #[expect(
     clippy::too_many_arguments,
     reason = "one parameter per CLI flag; this handler forwards them unchanged"
@@ -15,40 +14,21 @@ pub(crate) fn run(
 ) -> Result<(), String> {
     let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
-    let scope_project = if global {
-        None
-    } else {
-        project
-            .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
-            .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
-    };
+    let scope_project = super::common::scope_project(global, project, resolver);
 
-    let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-        Some(p) => p,
-        None => {
-            match renderer.format {
-                crate::output::OutputFormat::Json => {
-                    let obj = serde_json::json!({
-                        "status": "ok",
-                        "action": "stats.activity",
-                        "since": since_dt.to_rfc3339(),
-                        "until": until_dt.to_rfc3339(),
-                        "global": global,
-                        "project": scope_project,
-                        "items": Vec::<serde_json::Value>::new(),
-                        "note": "Not in a git repository; returning empty set",
-                    });
-                    renderer.emit_json(&obj);
-                }
-                _ => renderer.emit_warning("Not in a git repository; returning empty set"),
-            }
-            return Ok(());
-        }
+    let mut header = super::common::window_header(
+        "stats.activity",
+        since_dt,
+        until_dt,
+        global,
+        scope_project.as_deref(),
+    );
+    header.insert("group_by".into(), serde_json::json!(group_by));
+    let Some(git) = super::common::git_window(resolver, renderer, header.clone())? else {
+        return Ok(());
     };
-    let tasks_abs = resolver.path.clone();
-    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
-        .unwrap_or_else(|| tasks_abs.clone());
+    let repo_root = &git.repo_root;
+    let tasks_rel = git.tasks_rel();
 
     let gb = match group_by {
         "author" => crate::services::audit_service::GroupBy::Author,
@@ -59,7 +39,7 @@ pub(crate) fn run(
     };
 
     let items = crate::services::audit_service::AuditService::list_activity(
-        &repo_root,
+        repo_root,
         &tasks_rel,
         since_dt,
         until_dt,
@@ -68,45 +48,19 @@ pub(crate) fn run(
     )?;
     let limited: Vec<_> = items.into_iter().take(limit).collect();
 
-    match renderer.format {
-        crate::output::OutputFormat::Json => {
-            let json_items: Vec<_> = limited
-                .iter()
-                .map(|i| {
-                    serde_json::json!({
-                        "key": i.key,
-                        "count": i.count,
-                        "last_date": i.last_date.to_rfc3339(),
-                    })
-                })
-                .collect();
-            let obj = serde_json::json!({
-                "status": "ok",
-                "action": "stats.activity",
-                "group_by": group_by,
-                "since": since_dt.to_rfc3339(),
-                "until": until_dt.to_rfc3339(),
-                "global": global,
-                "project": scope_project,
-                "count": json_items.len(),
-                "items": json_items,
-            });
-            renderer.emit_json(&obj);
-        }
-        _ => {
-            if limited.is_empty() {
-                renderer.emit_success("No activity in the selected window.");
-            } else {
-                for i in &limited {
-                    renderer.emit_raw_stdout(format_args!(
-                        "{:>6}  {}  {}",
-                        i.count,
-                        i.key,
-                        i.last_date.to_rfc3339(),
-                    ));
-                }
-            }
-        }
-    }
+    super::common::emit_items(
+        renderer,
+        header,
+        &limited,
+        |i| {
+            serde_json::json!({
+                "key": i.key,
+                "count": i.count,
+                "last_date": i.last_date.to_rfc3339(),
+            })
+        },
+        |i| format!("{:>6}  {}  {}", i.count, i.key, i.last_date.to_rfc3339()),
+        "No activity in the selected window.",
+    );
     Ok(())
 }

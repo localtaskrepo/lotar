@@ -1,4 +1,3 @@
-// Auto-generated from stats_handler.rs.
 use crate::cli::args::stats::StatsAgeDistribution;
 
 #[expect(
@@ -13,22 +12,9 @@ pub(crate) fn run(
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
-    // Determine scope (project or global)
-    let scope_project = if global {
-        None
-    } else {
-        project
-            .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
-            .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
-    };
+    let scope_project = super::common::scope_project(global, project, resolver);
 
-    // Load tasks snapshot
-    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-    let filter = crate::api_types::TaskListFilter {
-        project: scope_project.clone(),
-        ..Default::default()
-    };
-    let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
+    let tasks = super::common::list_tasks(scope_project.as_deref(), resolver);
     // ...existing code...
 
     // Now is reference point

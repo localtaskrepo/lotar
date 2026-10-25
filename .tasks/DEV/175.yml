@@ -1,0 +1,25 @@
+title: Cover SprintAnalyticsDialog and share CLI stats handler code
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T00:19:58.086126+00:00
+modified: 2026-10-25T01:05:17.673896+00:00
+comments:
+- date: 2026-10-25T01:05:17.628373+00:00
+  text: 'Done. Added stats/common.rs helpers (scope_project, list_tasks, header/window_header, git_window with the shared not-in-git-repo result, ranked_counts, tally, emit_items) and a shared status_durations/duration_items in status.rs; all 13 stats handlers use them. jscpd duplication in src/cli/handlers/stats: 34% -> 16% (remaining is mostly fn signatures); 2453 -> ~2100 lines. JSON changes: stats.activity no-git result now includes group_by; tie order in ranked lists is count desc then key. Added view/__tests__/SprintAnalyticsDialog.spec.ts (13 tests: open/close, tabs, refresh, burndown metric availability/placeholder, velocity fallback/focus averages/loading/error, history ordering/empty). Verified: clippy clean, stats nextest 102/102, vue-tsc clean.'
+description: SprintAnalyticsDialog.vue has 0% test coverage. jscpd flags duplicated query/print code across CLI stats handlers (comments/custom, history/status, activity/authors). Add a dialog test and extract shared stats helpers.
+history:
+- at: 2026-10-25T01:05:17.628373+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T01:05:17.673896+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

@@ -1,4 +1,3 @@
-// Auto-generated from stats_handler.rs.
 #[expect(
     clippy::too_many_arguments,
     reason = "one parameter per CLI flag; this handler forwards them unchanged"
@@ -17,51 +16,24 @@ pub(crate) fn run_changed(
     let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
     // Determine scope (project or global)
-    let scope_project = if global {
-        None
-    } else {
-        // Use explicit CLI project if given, otherwise default/effective project name
-        project
-            .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
-            .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
-    };
+    let scope_project = super::common::scope_project(global, project, resolver);
 
-    // Resolve repo root and tasks dir relative path
-    let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-        Some(p) => p,
-        None => {
-            // Outside a git repo: emit empty result
-            match renderer.format {
-                crate::output::OutputFormat::Json => {
-                    let obj = serde_json::json!({
-                        "status": "ok",
-                        "action": "stats.changed",
-                        "since": since_dt.to_rfc3339(),
-                        "until": until_dt.to_rfc3339(),
-                        "global": global,
-                        "project": scope_project,
-                        "items": Vec::<serde_json::Value>::new(),
-                        "note": "Not in a git repository; returning empty set",
-                    });
-                    renderer.emit_json(&obj);
-                }
-                _ => {
-                    renderer.emit_warning("Not in a git repository; returning empty set");
-                }
-            }
-            return Ok(());
-        }
+    let header = super::common::window_header(
+        "stats.changed",
+        since_dt,
+        until_dt,
+        global,
+        scope_project.as_deref(),
+    );
+    let Some(git) = super::common::git_window(resolver, renderer, header.clone())? else {
+        return Ok(());
     };
-
-    // Compute tasks path relative to repo root
-    let tasks_abs = resolver.path.clone();
-    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
-        .unwrap_or_else(|| tasks_abs.clone());
+    let repo_root = &git.repo_root;
+    let tasks_rel = git.tasks_rel();
 
     // Call audit service to list changed tasks
     let items = crate::services::audit_service::AuditService::list_changed_tasks(
-        &repo_root,
+        repo_root,
         &tasks_rel,
         since_dt,
         until_dt,
@@ -73,51 +45,33 @@ pub(crate) fn run_changed(
     let limited: Vec<_> = items.into_iter().take(limit).collect();
 
     // Render
-    match renderer.format {
-        crate::output::OutputFormat::Json => {
-            let json_items: Vec<_> = limited
-                .iter()
-                .map(|i| {
-                    serde_json::json!({
-                        "id": i.id,
-                        "project": i.project,
-                        "file": i.file,
-                        "last_commit": i.last_commit,
-                        "last_author": i.last_author,
-                        "last_date": i.last_date.to_rfc3339(),
-                        "commits": i.commits,
-                    })
-                })
-                .collect();
-            let obj = serde_json::json!({
-                "status": "ok",
-                "action": "stats.changed",
-                "since": since_dt.to_rfc3339(),
-                "until": until_dt.to_rfc3339(),
-                "global": global,
-                "project": scope_project,
-                "count": json_items.len(),
-                "items": json_items,
-            });
-            renderer.emit_json(&obj);
-        }
-        _ => {
-            if limited.is_empty() {
-                renderer.emit_success("No tickets changed in the selected window.");
-            } else {
-                for i in &limited {
-                    renderer.emit_raw_stdout(format_args!(
-                        "{}  {}  {}  {}  {}",
-                        i.last_date.to_rfc3339(),
-                        i.id,
-                        i.project,
-                        i.last_author,
-                        i.last_commit,
-                    ));
-                }
-            }
-        }
-    }
+    super::common::emit_items(
+        renderer,
+        header,
+        &limited,
+        |i| {
+            serde_json::json!({
+                "id": i.id,
+                "project": i.project,
+                "file": i.file,
+                "last_commit": i.last_commit,
+                "last_author": i.last_author,
+                "last_date": i.last_date.to_rfc3339(),
+                "commits": i.commits,
+            })
+        },
+        |i| {
+            format!(
+                "{}  {}  {}  {}  {}",
+                i.last_date.to_rfc3339(),
+                i.id,
+                i.project,
+                i.last_author,
+                i.last_commit
+            )
+        },
+        "No tickets changed in the selected window.",
+    );
     Ok(())
 }
 
@@ -137,56 +91,31 @@ pub(crate) fn run_churn(
 ) -> Result<(), String> {
     let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
-    let mut scope_project = if global {
-        None
-    } else {
-        project
-            .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
-            .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
-    };
+    let mut scope_project = super::common::scope_project(global, project, resolver);
 
-    let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-        Some(p) => p,
-        None => {
-            match renderer.format {
-                crate::output::OutputFormat::Json => {
-                    let obj = serde_json::json!({
-                        "status": "ok",
-                        "action": "stats.churn",
-                        "since": since_dt.to_rfc3339(),
-                        "until": until_dt.to_rfc3339(),
-                        "global": global,
-                        "project": scope_project,
-                        "items": Vec::<serde_json::Value>::new(),
-                        "note": "Not in a git repository; returning empty set",
-                    });
-                    renderer.emit_json(&obj);
-                }
-                _ => renderer.emit_warning("Not in a git repository; returning empty set"),
-            }
-            return Ok(());
-        }
+    let mut header = super::common::window_header(
+        "stats.churn",
+        since_dt,
+        until_dt,
+        global,
+        scope_project.as_deref(),
+    );
+    let Some(git) = super::common::git_window(resolver, renderer, header.clone())? else {
+        return Ok(());
     };
-    let tasks_abs = resolver.path.clone();
-    // Fall back to the tasks directory name to stay repo-relative
-    let tasks_rel =
-        crate::utils::git::repo_relative_path(&repo_root, &tasks_abs).unwrap_or_else(|| {
-            tasks_abs
-                .file_name()
-                .map(std::path::PathBuf::from)
-                .unwrap_or(tasks_abs.clone())
-        });
+    let repo_root = &git.repo_root;
+    let tasks_rel = git.tasks_rel_or_name();
 
     // If an inferred project path doesn't exist locally, widen to global to be forgiving in new repos/tests
     if let Some(ref p) = scope_project
-        && !tasks_abs.join(p).exists()
+        && !git.tasks_abs().join(p).exists()
     {
         scope_project = None;
     }
+    header.insert("project".into(), serde_json::json!(scope_project));
 
     let mut items = crate::services::audit_service::AuditService::list_changed_tasks(
-        &repo_root,
+        repo_root,
         &tasks_rel,
         since_dt,
         until_dt,
@@ -201,49 +130,31 @@ pub(crate) fn run_churn(
     });
     let limited: Vec<_> = items.into_iter().take(limit).collect();
 
-    match renderer.format {
-        crate::output::OutputFormat::Json => {
-            let json_items: Vec<_> = limited
-                .iter()
-                .map(|i| {
-                    serde_json::json!({
-                        "id": i.id,
-                        "project": i.project,
-                        "file": i.file,
-                        "last_date": i.last_date.to_rfc3339(),
-                        "commits": i.commits,
-                        "last_author": i.last_author,
-                        "last_commit": i.last_commit,
-                    })
-                })
-                .collect();
-            let obj = serde_json::json!({
-                "status": "ok",
-                "action": "stats.churn",
-                "since": since_dt.to_rfc3339(),
-                "until": until_dt.to_rfc3339(),
-                "global": global,
-                "project": scope_project,
-                "count": json_items.len(),
-                "items": json_items,
-            });
-            renderer.emit_json(&obj);
-        }
-        _ => {
-            if limited.is_empty() {
-                renderer.emit_success("No churn detected in the selected window.");
-            } else {
-                for i in &limited {
-                    renderer.emit_raw_stdout(format_args!(
-                        "{:>4}  {}  {}  {}",
-                        i.commits,
-                        i.id,
-                        i.project,
-                        i.last_date.to_rfc3339(),
-                    ));
-                }
-            }
-        }
-    }
+    super::common::emit_items(
+        renderer,
+        header,
+        &limited,
+        |i| {
+            serde_json::json!({
+                "id": i.id,
+                "project": i.project,
+                "file": i.file,
+                "last_date": i.last_date.to_rfc3339(),
+                "commits": i.commits,
+                "last_author": i.last_author,
+                "last_commit": i.last_commit,
+            })
+        },
+        |i| {
+            format!(
+                "{:>4}  {}  {}  {}",
+                i.commits,
+                i.id,
+                i.project,
+                i.last_date.to_rfc3339()
+            )
+        },
+        "No churn detected in the selected window.",
+    );
     Ok(())
 }

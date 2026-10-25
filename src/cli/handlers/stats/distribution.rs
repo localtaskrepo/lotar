@@ -1,4 +1,3 @@
-// Auto-generated from stats_handler.rs.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "parsed CLI arguments are moved in from the command"
@@ -11,22 +10,8 @@ pub(crate) fn run(
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
-    // Determine scope
-    let scope_project = if global {
-        None
-    } else {
-        project
-            .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
-            .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
-    };
-
-    // Load tasks
-    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-    let filter = crate::api_types::TaskListFilter {
-        project: scope_project.clone(),
-        ..Default::default()
-    };
-    let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
+    let scope_project = super::common::scope_project(global, project, resolver);
+    let tasks = super::common::list_tasks(scope_project.as_deref(), resolver);
 
     use std::collections::HashMap;
     let mut freq: HashMap<String, usize> = HashMap::new();
@@ -67,9 +52,8 @@ pub(crate) fn run(
         }
     }
 
-    let mut items: Vec<(String, usize)> = freq.into_iter().filter(|(k, _)| !k.is_empty()).collect();
-    items.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-    let limited: Vec<_> = items.into_iter().take(limit).collect();
+    let limited =
+        super::common::ranked_counts(freq.into_iter().filter(|(k, _)| !k.is_empty()), limit);
 
     let field_name = match field {
         crate::cli::args::stats::StatsDistributionField::Status => "status",
@@ -81,32 +65,15 @@ pub(crate) fn run(
         crate::cli::args::stats::StatsDistributionField::Tag => "tag",
     };
 
-    match renderer.format {
-        crate::output::OutputFormat::Json => {
-            let json_items: Vec<_> = limited
-                .iter()
-                .map(|(key, count)| serde_json::json!({"key": key, "count": count}))
-                .collect();
-            let obj = serde_json::json!({
-                "status": "ok",
-                "action": "stats.distribution",
-                "field": field_name,
-                "global": global,
-                "project": scope_project,
-                "count": json_items.len(),
-                "items": json_items,
-            });
-            renderer.emit_json(&obj);
-        }
-        _ => {
-            if limited.is_empty() {
-                renderer.emit_success("No items found for the selected field.");
-            } else {
-                for (key, count) in &limited {
-                    renderer.emit_raw_stdout(format_args!("{:>6}  {}", count, key));
-                }
-            }
-        }
-    }
+    let mut header = super::common::header("stats.distribution", global, scope_project.as_deref());
+    header.insert("field".into(), serde_json::json!(field_name));
+    super::common::emit_items(
+        renderer,
+        header,
+        &limited,
+        |(key, count)| serde_json::json!({"key": key, "count": count}),
+        |(key, count)| format!("{:>6}  {}", count, key),
+        "No items found for the selected field.",
+    );
     Ok(())
 }

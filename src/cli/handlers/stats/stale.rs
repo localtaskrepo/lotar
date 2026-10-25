@@ -1,4 +1,3 @@
-// Auto-generated from stats_handler.rs.
 pub(crate) fn run(
     threshold: &str,
     limit: usize,
@@ -8,42 +7,15 @@ pub(crate) fn run(
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
     // Determine scope
-    let scope_project = if global {
-        None
-    } else {
-        project
-            .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
-            .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
-    };
+    let scope_project = super::common::scope_project(global, project, resolver);
 
-    // Repo root
-    let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let repo_root = match crate::utils::git::find_repo_root(&cwd) {
-        Some(p) => p,
-        None => {
-            match renderer.format {
-                crate::output::OutputFormat::Json => {
-                    let obj = serde_json::json!({
-                        "status": "ok",
-                        "action": "stats.stale",
-                        "threshold": threshold,
-                        "global": global,
-                        "project": scope_project,
-                        "items": Vec::<serde_json::Value>::new(),
-                        "note": "Not in a git repository; returning empty set",
-                    });
-                    renderer.emit_json(&obj);
-                }
-                _ => renderer.emit_warning("Not in a git repository; returning empty set"),
-            }
-            return Ok(());
-        }
+    let mut header = super::common::header("stats.stale", global, scope_project.as_deref());
+    header.insert("threshold".into(), serde_json::json!(threshold));
+    let Some(git) = super::common::git_window(resolver, renderer, header.clone())? else {
+        return Ok(());
     };
-
-    // tasks dir relative
-    let tasks_abs = resolver.path.clone();
-    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
-        .unwrap_or_else(|| tasks_abs.clone());
+    let repo_root = &git.repo_root;
+    let tasks_rel = git.tasks_rel();
 
     // Parse threshold (Nd or Nw)
     fn parse_threshold_to_duration(s: &str) -> Result<chrono::Duration, String> {
@@ -73,7 +45,7 @@ pub(crate) fn run(
     let since_epoch = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH);
     let until_now = now;
     let mut items = crate::services::audit_service::AuditService::list_changed_tasks(
-        &repo_root,
+        repo_root,
         &tasks_rel,
         since_epoch,
         until_now,
@@ -87,46 +59,29 @@ pub(crate) fn run(
     items.sort_by_key(|a| a.last_date);
     let limited: Vec<_> = items.into_iter().take(limit).collect();
 
-    match renderer.format {
-        crate::output::OutputFormat::Json => {
-            let json_items: Vec<_> = limited
-                .iter()
-                .map(|i| {
-                    serde_json::json!({
-                        "id": i.id,
-                        "project": i.project,
-                        "file": i.file,
-                        "last_date": i.last_date.to_rfc3339(),
-                        "age_days": ((now - i.last_date).num_days()),
-                    })
-                })
-                .collect();
-            let obj = serde_json::json!({
-                "status": "ok",
-                "action": "stats.stale",
-                "threshold": threshold,
-                "global": global,
-                "project": scope_project,
-                "count": json_items.len(),
-                "items": json_items,
-            });
-            renderer.emit_json(&obj);
-        }
-        _ => {
-            if limited.is_empty() {
-                renderer.emit_success("No stale tickets over the threshold.");
-            } else {
-                for i in &limited {
-                    renderer.emit_raw_stdout(format_args!(
-                        "{:>6}d  {}  {}  {}",
-                        (now - i.last_date).num_days(),
-                        i.id,
-                        i.project,
-                        i.last_date.to_rfc3339(),
-                    ));
-                }
-            }
-        }
-    }
+    super::common::emit_items(
+        renderer,
+        header,
+        &limited,
+        |i| {
+            serde_json::json!({
+                "id": i.id,
+                "project": i.project,
+                "file": i.file,
+                "last_date": i.last_date.to_rfc3339(),
+                "age_days": ((now - i.last_date).num_days()),
+            })
+        },
+        |i| {
+            format!(
+                "{:>6}d  {}  {}  {}",
+                (now - i.last_date).num_days(),
+                i.id,
+                i.project,
+                i.last_date.to_rfc3339()
+            )
+        },
+        "No stale tickets over the threshold.",
+    );
     Ok(())
 }
