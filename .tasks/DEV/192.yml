@@ -1,0 +1,24 @@
+title: Split the Insights page into lens components and share chart helpers
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T06:33:16.550698+00:00
+modified: 2026-10-25T07:19:26.948922+00:00
+comments:
+- date: 2026-10-25T07:19:26.925168+00:00
+  text: 'Split view/pages/ProjectInsights.vue (1747 -> ~500 lines) into a provide/inject context (components/insights/insightsContext.ts: ranges, timelines, core sets, deltas, drill-downs), six lens components under components/insights/lenses/, a SeriesTable component, and chartFrame.ts (ticks, label thinning, tooltip placement, width/hover state) shared by ColumnChart and TrendChart. Added chartFrame.spec.ts. Verified: vue-tsc, eslint, ProjectInsights/insightsMetrics/chartFrame specs, Insights smoke spec, and screenshots of every lens at 1280 and 390px.'
+history:
+- at: 2026-10-25T07:19:26.925168+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T07:19:26.948922+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

@@ -87,7 +87,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
+import { labelStride, niceTicks, seriesColor, tooltipX, useChartFrame } from './chartFrame'
 
 export interface TrendSeries {
   label: string
@@ -104,37 +105,9 @@ const props = withDefaults(
   { height: 180 },
 )
 
-const COLORS = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)']
-const colorOf = (index: number) => COLORS[index] ?? 'var(--viz-muted)'
+const colorOf = seriesColor
 
-const host = ref<HTMLElement | null>(null)
-const tooltip = ref<HTMLElement | null>(null)
-const width = ref(600)
-const tooltipWidth = ref(140)
-const active = ref<number | null>(null)
-let observer: ResizeObserver | null = null
-
-onMounted(() => {
-  const measure = () => {
-    const measured = host.value?.clientWidth
-    if (measured) width.value = Math.max(240, Math.floor(measured))
-  }
-  measure()
-  if (typeof ResizeObserver !== 'undefined' && host.value) {
-    observer = new ResizeObserver(measure)
-    observer.observe(host.value)
-  }
-})
-onBeforeUnmount(() => observer?.disconnect())
-watch(
-  () => props.labels.join('|'),
-  () => (active.value = null),
-)
-watch(active, async (value) => {
-  if (value === null) return
-  await nextTick()
-  if (tooltip.value) tooltipWidth.value = tooltip.value.offsetWidth
-})
+const { host, tooltip, width, tooltipWidth, active } = useChartFrame(() => props.labels, 140)
 
 const plot = { top: 16, right: 12, bottom: 24, left: 40 }
 const plotHeight = computed(() => props.height - plot.top - plot.bottom)
@@ -143,16 +116,7 @@ const step = computed(() => (width.value - plot.left - plot.right) / Math.max(1,
 const xOf = (index: number) =>
   plot.left + (props.labels.length > 1 ? index * step.value : (width.value - plot.left - plot.right) / 2)
 
-const ticks = computed(() => {
-  const max = Math.max(0, ...props.series.flatMap((entry) => entry.values))
-  if (max <= 0) return [0, 1]
-  const raw = max / 4
-  const power = 10 ** Math.floor(Math.log10(raw))
-  const tickStep = Math.max(1, Math.round([1, 2, 5, 10].map((m) => m * power).find((c) => c >= raw) ?? power * 10))
-  const out = [0]
-  while (out[out.length - 1]! < max) out.push(out[out.length - 1]! + tickStep)
-  return out
-})
+const ticks = computed(() => niceTicks(Math.max(0, ...props.series.flatMap((entry) => entry.values))))
 const yMax = computed(() => ticks.value[ticks.value.length - 1] || 1)
 const yOf = (value: number) => plot.top + plotHeight.value * (1 - value / yMax.value)
 
@@ -166,10 +130,7 @@ function areaPath(index: number) {
   return `${linePath(index)} L${xOf(values.length - 1)},${yOf(0)} L${xOf(0)},${yOf(0)} Z`
 }
 
-const labelStep = computed(() => {
-  const longest = Math.max(1, ...props.labels.map((label) => label.length))
-  return Math.max(1, Math.ceil((longest * 7 + 12) / Math.max(1, step.value)))
-})
+const labelStep = computed(() => labelStride(props.labels, step.value))
 
 /** The crosshair snaps to the nearest period. */
 function onPointer(event: PointerEvent) {
@@ -182,7 +143,7 @@ function onPointer(event: PointerEvent) {
 const tooltipLeft = computed(() => {
   if (active.value === null) return 0
   const x = xOf(active.value)
-  return x + 12 + tooltipWidth.value <= width.value ? x + 12 : Math.max(0, x - 12 - tooltipWidth.value)
+  return tooltipX(x + 12, x - 12, tooltipWidth.value, width.value)
 })
 </script>
 

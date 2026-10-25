@@ -84,7 +84,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
+import { labelStride, niceTicks, seriesColor, tooltipX, useChartFrame } from './chartFrame'
 
 export interface ColumnSeries {
   label: string
@@ -123,40 +124,9 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: 'select', index: number): void }>()
 
-const COLORS = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)']
-const colorOf = (index: number) =>
-  props.series[index]?.muted ? 'var(--viz-muted)' : (COLORS[index] ?? 'var(--viz-muted)')
+const colorOf = (index: number) => (props.series[index]?.muted ? 'var(--viz-muted)' : seriesColor(index))
 
-const host = ref<HTMLElement | null>(null)
-const tooltip = ref<HTMLElement | null>(null)
-const width = ref(600)
-const tooltipWidth = ref(160)
-const active = ref<number | null>(null)
-let observer: ResizeObserver | null = null
-
-onMounted(() => {
-  const measure = () => {
-    const measured = host.value?.clientWidth
-    if (measured) width.value = Math.max(240, Math.floor(measured))
-  }
-  measure()
-  if (typeof ResizeObserver !== 'undefined' && host.value) {
-    observer = new ResizeObserver(measure)
-    observer.observe(host.value)
-  }
-})
-onBeforeUnmount(() => observer?.disconnect())
-
-// A new period or filter replaces the labels: drop a stale hover.
-watch(
-  () => props.labels.join('|'),
-  () => (active.value = null),
-)
-watch(active, async (value) => {
-  if (value === null) return
-  await nextTick()
-  if (tooltip.value) tooltipWidth.value = tooltip.value.offsetWidth
-})
+const { host, tooltip, width, tooltipWidth, active } = useChartFrame(() => props.labels, 160)
 
 const plot = { top: 8, right: 8, bottom: 24, left: 40 }
 const plotHeight = computed(() => props.height - plot.top - plot.bottom)
@@ -166,20 +136,14 @@ function totalAt(index: number) {
   return props.series.reduce((sum, entry) => sum + (entry.values[index] ?? 0), 0)
 }
 
-/** Clean tick step: 1, 2 or 5 times a power of ten, at most four gridlines. */
-const ticks = computed(() => {
-  const max = props.stacked
-    ? Math.max(0, ...props.labels.map((_, index) => totalAt(index)))
-    : Math.max(0, ...props.series.flatMap((entry) => entry.values))
-  if (max <= 0) return [0, 1]
-  const raw = max / 4
-  const power = 10 ** Math.floor(Math.log10(raw))
-  let step = [1, 2, 5, 10].map((m) => m * power).find((candidate) => candidate >= raw) ?? power * 10
-  if (props.integer) step = Math.max(1, Math.round(step))
-  const out: number[] = [0]
-  while (out[out.length - 1]! < max) out.push(out[out.length - 1]! + step)
-  return out
-})
+const ticks = computed(() =>
+  niceTicks(
+    props.stacked
+      ? Math.max(0, ...props.labels.map((_, index) => totalAt(index)))
+      : Math.max(0, ...props.series.flatMap((entry) => entry.values)),
+    props.integer,
+  ),
+)
 const yMax = computed(() => ticks.value[ticks.value.length - 1] || 1)
 const yOf = (value: number) => plot.top + plotHeight.value * (1 - value / yMax.value)
 
@@ -231,19 +195,13 @@ function segmentsAt(index: number) {
   return out
 }
 
-/** Show every nth x label so labels never collide. */
-const labelStep = computed(() => {
-  const longest = Math.max(1, ...props.labels.map((label) => label.length))
-  return Math.max(1, Math.ceil((longest * 7 + 12) / band.value))
-})
+const labelStep = computed(() => labelStride(props.labels, band.value))
 
 /** Right of the column, or left when it would overflow the chart. */
 const tooltipLeft = computed(() => {
   if (active.value === null) return 0
   const center = bandCenter(active.value)
-  const right = center + band.value / 2 + 4
-  if (right + tooltipWidth.value <= width.value) return right
-  return Math.max(0, center - band.value / 2 - 4 - tooltipWidth.value)
+  return tooltipX(center + band.value / 2 + 4, center - band.value / 2 - 4, tooltipWidth.value, width.value)
 })
 
 function formatTick(value: number) {

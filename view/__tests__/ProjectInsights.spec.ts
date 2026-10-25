@@ -78,7 +78,7 @@ describe('ProjectInsights', () => {
 
     async function mountInsights() {
         const { default: ProjectInsights } = await import('../pages/ProjectInsights.vue')
-        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub } } })
+        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub, RouterLink: true } } })
         await flushPromises()
         return wrapper
     }
@@ -202,7 +202,7 @@ describe('ProjectInsights', () => {
         const slow = deferred<{ total: number; tasks: TaskDTO[] }>()
         api.listTasks.mockReturnValue(slow.promise)
         const { default: ProjectInsights } = await import('../pages/ProjectInsights.vue')
-        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub } } })
+        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub, RouterLink: true } } })
         await flushPromises()
         // The user navigates elsewhere while the first load is still running.
         routeState.path = '/sprints'
@@ -218,7 +218,7 @@ describe('ProjectInsights', () => {
         const late = deferred<{ total: number; tasks: TaskDTO[] }>()
         api.listTasks.mockReturnValue(late.promise)
         _resetTaskStore()
-        const second = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub } } })
+        const second = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub, RouterLink: true } } })
         await flushPromises()
         second.unmount()
         routerReplace.mockClear()
