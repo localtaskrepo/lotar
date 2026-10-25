@@ -1,7 +1,37 @@
 title: Insight page forces focus after delay
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-25T03:30:03.274294+00:00
+modified: 2026-10-25T04:36:14.983226+00:00
+comments:
+- date: 2026-10-25T04:12:52.727238+00:00
+  text: 'Root cause: ProjectInsights onMounted awaits a slow sequential refresh (tasks, then per-project stats, then the git-based activity feed), then calls syncRoute() when route.path !== ''/insights'' -> router.replace(''/insights'') pulls the user back after they navigated away; selectedProject/tags watchers can repeat it. Fix is part of the DEV-91 rewrite: no route writes unless the page is mounted and on /insights, and load only the task query (history-based metrics replace the git activity feed and per-project stats calls).'
+- date: 2026-10-25T04:36:14.883639+00:00
+  text: 'Done with DEV-91. Fixed: route writes only happen while mounted and on /insights; loading is a single task query (no sequential stats/feed chain). Regression tests: unit (navigate away mid-load / unmount mid-load issue no router calls) and smoke (leave during a held first load, stay on /sprints).'
 description: When switching to the insights page, it takes a few seconds to load (which could be improved as well). If you navigate away during this loading time the page will grab focus again once loaded, sometimes multiple times in a row.
+history:
+- at: 2026-10-25T04:12:52.690788+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T04:12:52.727238+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T04:36:14.883639+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T04:36:14.983226+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

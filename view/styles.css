@@ -993,3 +993,36 @@ main {
 .task-rows-leave-to {
 	opacity: 0;
 }
+
+/* Chart palette (DEV-91). Categorical slots validated for colour-vision
+   deficiency against the card surfaces in both themes; always use them in
+   this order. Light slots 3-4 are below 3:1 on the surface, so charts using
+   them keep direct labels or a table view. */
+:root,
+html[data-theme="light"] {
+	--viz-1: #2a78d6;
+	--viz-2: #eb6834;
+	--viz-3: #1baf7a;
+	--viz-4: #eda100;
+	--viz-muted: #c3c2b7;
+	--viz-grid: color-mix(in oklab, var(--color-border) 70%, transparent);
+	--viz-axis: var(--color-border-strong);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--viz-1: #3987e5;
+		--viz-2: #d95926;
+		--viz-3: #199e70;
+		--viz-4: #c98500;
+		--viz-muted: #4a4a46;
+	}
+}
+
+html[data-theme="dark"] {
+	--viz-1: #3987e5;
+	--viz-2: #d95926;
+	--viz-3: #199e70;
+	--viz-4: #c98500;
+	--viz-muted: #4a4a46;
+}

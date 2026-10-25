@@ -1,1275 +1,1388 @@
 <template>
-  <section class="col" style="gap: 16px">
+  <section class="col insights" style="gap: 16px">
     <PageHeader
-      clear-label="Clear tag filters"
-      :can-clear="tagFilters.length > 0"
+      clear-label="Clear filters"
+      :can-clear="hasFilters"
       reload-label="Refresh insights"
-      :reloading="refreshing"
-      @clear="clearTagFilter"
-      @reload="refreshData({ forceStats: true })"
+      :reloading="loadingTasks"
+      @clear="clearFilters"
+      @reload="refreshTasks()"
     >
-      <template #title>Insights</template>
-      <template v-if="selectedProject" #subtitle>
-        Health overview for <strong>{{ projectDisplayName }}</strong>
+      <template #title>
+        Insights
+        <span v-if="project" class="muted">— {{ project }}</span>
       </template>
-      <template #toolbar>
-        <div class="insights-controls">
-          <UiSelect v-if="!hasSingleProject" v-model="selectedProject" class="toolbar-select">
-            <option value="">All projects</option>
-            <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
-          </UiSelect>
-          <div class="tag-filter">
-            <UiInput
-              v-model="tagFilterInput"
-              placeholder="Filter tags (comma separated)"
-              @focus="onTagFilterFocus"
-              @blur="onTagFilterBlur"
-              @keydown="onTagFilterKeydown"
-              @input="onTagFilterInput"
-            />
-            <ul v-if="tagSuggestionsVisible" class="tag-suggestions" role="listbox" aria-label="Tag suggestions">
-              <li v-for="(entry, index) in tagSuggestionEntries" :key="entry.value" class="tag-suggestions__item">
-                <button
-                  type="button"
-                  class="tag-suggestion"
-                  :class="{ active: tagActiveIndex === index }"
-                  role="option"
-                  :aria-selected="tagActiveIndex === index"
-                  @mousedown.prevent
-                  @click.prevent="selectTagSuggestion(entry.value)"
-                  @mouseenter="tagActiveIndex = index"
-                >
-                  <span class="tag-suggestion__label">
-                    <span
-                      v-for="(part, partIndex) in entry.parts"
-                      :key="partIndex"
-                      :class="['tag-suggestion__part', { match: part.match }]"
-                    >
-                      {{ part.text }}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </template>
+      <template #subtitle>{{ subtitle }}</template>
     </PageHeader>
 
-    <UiCard>
-      <div class="summary-grid">
-        <div v-for="tile in summaryTiles" :key="tile.label" :class="['summary-tile', { highlight: tile.highlight }]">
-          <span class="summary-label">{{ tile.label }}</span>
-          <strong class="summary-value">{{ tile.display }}</strong>
-        </div>
-      </div>
-    </UiCard>
-
-    <div v-if="tasksLoading || refreshing" style="margin: 12px 0">
-      <UiLoader>Loading insights…</UiLoader>
+    <div class="filter-card">
+      <FilterBar
+        ref="filterBarRef"
+        :statuses="statuses"
+        :priorities="priorities"
+        :types="types"
+        :sprint-options="sprintFilterOptions"
+        :custom-presets="customFilterPresets"
+        :tag-options="filterOptions.tags"
+        :assignee-options="filterOptions.assignees"
+        :custom-field-values="filterOptions.customFieldValues"
+        :custom-field-options="availableCustomFields"
+        :value="filterPayload"
+        :show-order="false"
+        emit-project-key
+        storage-key="lotar.insights.filter"
+        @update:value="onFilterUpdate"
+      >
+        <template #actions>
+          <label class="toolbar-field">
+            <span class="toolbar-field__label">Period</span>
+            <select
+              class="input toolbar-select"
+              data-testid="insights-period"
+              :value="period"
+              @change="setPeriod(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="option in PERIOD_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </template>
+      </FilterBar>
     </div>
 
-    <template v-else>
-      <div v-if="tasksError && hasTaskSnapshot" class="insights-refresh-error" role="alert">
-        <span class="insights-refresh-error__message">Refresh failed: {{ tasksError }}</span>
-        <UiButton variant="ghost" type="button" :disabled="refreshing" @click="retry">Retry</UiButton>
-      </div>
-      <UiEmptyState
-        v-if="tasksError && !hasTaskSnapshot"
-        title="We couldn't load tasks"
-        :description="tasksError"
-        primary-label="Retry"
-        @primary="retry"
-      />
-      <template v-else>
-        <div v-if="!filteredTasks.length" class="muted" style="padding: 24px; text-align: center">
-          No tasks match the current filters.
+    <nav class="insights-tabs" role="tablist" aria-label="Insight views">
+      <button
+        v-for="lens in LENSES"
+        :id="`insights-tab-${lens.key}`"
+        :key="lens.key"
+        type="button"
+        role="tab"
+        class="insights-tab"
+        :class="{ active: activeLens === lens.key }"
+        :aria-selected="activeLens === lens.key"
+        :aria-controls="`insights-panel-${lens.key}`"
+        :tabindex="activeLens === lens.key ? 0 : -1"
+        :data-testid="`insights-tab-${lens.key}`"
+        @click="setLens(lens.key)"
+        @keydown.right.prevent="stepLens(1)"
+        @keydown.left.prevent="stepLens(-1)"
+      >
+        {{ lens.label }}
+      </button>
+    </nav>
+
+    <div v-if="loadError && !tasks.length" class="card refresh-error" role="alert">
+      <span>Insights could not load: {{ loadError }}</span>
+      <UiButton variant="ghost" type="button" @click="refreshTasks()">Retry</UiButton>
+    </div>
+    <div v-else-if="initialLoading" style="margin: 12px 0"><UiLoader>Loading insights…</UiLoader></div>
+
+    <div
+      v-else
+      :id="`insights-panel-${activeLens}`"
+      class="insights-panel"
+      :class="{ 'insights-panel--refreshing': loadingTasks }"
+      role="tabpanel"
+      :aria-labelledby="`insights-tab-${activeLens}`"
+    >
+      <p class="insights-lens-note muted">{{ activeLensInfo.note }}</p>
+
+      <!-- Overview: leadership summary -->
+      <template v-if="activeLens === 'overview'">
+        <div class="stat-row">
+          <StatTile label="Open" :value="fmt(open.length)" caption="Right now" clickable @select="openTasks({})" />
+          <StatTile
+            label="Completed"
+            :value="fmt(completed.length)"
+            :delta="delta(completed.length, completedPrev.length, 'up')"
+          />
+          <StatTile
+            label="Created"
+            :value="fmt(created.length)"
+            :delta="delta(created.length, createdPrev.length, null)"
+          />
+          <StatTile
+            label="Median lead time"
+            :value="formatDays(leadP50)"
+            hint="Creation to done, for work completed in the period"
+            :delta="durationDelta(leadP50, leadP50Prev)"
+          />
+          <StatTile
+            label="Overdue"
+            :value="fmt(overdue.length)"
+            :tone="overdue.length ? 'alert' : 'neutral'"
+            caption="Right now"
+            clickable
+            @select="openTasks({ due: 'overdue' })"
+          />
+          <StatTile
+            label="On time"
+            :value="onTimeRate === null ? '—' : pct(onTimeRate)"
+            :caption="onTimeCaption"
+            hint="Completed tasks with a due date that finished by the end of their due day"
+          />
         </div>
-        <div v-else class="insights-grid">
-          <UiCard>
-            <div class="card-head">
-              <h3>Status distribution</h3>
-              <small class="muted">Click a segment to drill into Tasks</small>
-            </div>
-            <div class="row" style="gap: 16px; flex-wrap: wrap; align-items: center">
-              <PieChart :data="statusPieData" :legend="false" :size="160" @select="onStatusSelect" />
-              <table class="distribution">
-                <tbody>
-                  <tr v-for="item in statusBreakdown" :key="item.label" @click="openTaskList({ status: item.raw })">
-                    <th>{{ item.label }}</th>
-                    <td>{{ item.count }}</td>
-                    <td class="muted">{{ item.percent }}%</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </UiCard>
+        <div class="chart-grid">
+          <ChartCard
+            class="span-2"
+            title="Created vs completed"
+            :subtitle="`Per ${bucketUnit}, ${periodLabel.toLowerCase()}`"
+            :empty="!created.length && !completed.length"
+          >
+            <ColumnChart
+              :labels="bucketLabels"
+              :series="flowSeries"
+              :summary="`Created and completed tasks per ${bucketUnit}`"
+            />
+            <template #table>
+              <SeriesTable :labels="bucketLabels" :series="flowSeries" />
+            </template>
+          </ChartCard>
+          <ChartCard
+            title="Needs attention"
+            subtitle="Open work that may be stuck or at risk"
+            :empty="!attention.length"
+            empty-text="Nothing needs attention."
+          >
+            <BarList :rows="attention" label="Needs attention" clickable @select="openAttention" />
+          </ChartCard>
+          <ChartCard title="Open by status" :empty="!open.length">
+            <BarList
+              :rows="openByStatus"
+              label="Open tasks by status"
+              clickable
+              @select="(key) => openTasks({ status: key })"
+            />
+          </ChartCard>
+          <ChartCard title="Open by priority" :empty="!open.length">
+            <BarList
+              :rows="openByPriority"
+              label="Open tasks by priority"
+              clickable
+              @select="(key) => openTasks({ priority: key })"
+            />
+          </ChartCard>
+          <ChartCard title="Open by type" :empty="!open.length">
+            <BarList
+              :rows="openByType"
+              label="Open tasks by type"
+              clickable
+              @select="(key) => openTasks({ type: key })"
+            />
+          </ChartCard>
+        </div>
+      </template>
 
-          <UiCard>
-            <div class="card-head">
-              <h3>Priority mix</h3>
-              <small class="muted">Breakdown across all tasks in scope</small>
-            </div>
-            <table class="distribution">
-              <tbody>
-                <tr v-for="item in priorityBreakdown" :key="item.label" @click="openTaskList({ priority: item.raw })">
-                  <th>{{ item.label }}</th>
-                  <td>{{ item.count }}</td>
-                  <td class="muted">{{ item.percent }}%</td>
-                </tr>
-                <tr v-if="!priorityBreakdown.length">
-                  <td colspan="3" class="muted">No priority data</td>
-                </tr>
-              </tbody>
-            </table>
-          </UiCard>
+      <!-- Delivery: flow and speed -->
+      <template v-else-if="activeLens === 'delivery'">
+        <div class="stat-row">
+          <StatTile
+            :label="`Throughput per ${bucketUnit}`"
+            :value="fmt(throughputPerBucket, 1)"
+            :delta="delta(completed.length, completedPrev.length, 'up')"
+          />
+          <StatTile label="In progress" :value="fmt(wip.length)" caption="Started and not done" />
+          <StatTile
+            label="Cycle time (median)"
+            :value="formatDays(cycleP50)"
+            hint="First status change to done"
+            :delta="durationDelta(cycleP50, cycleP50Prev)"
+          />
+          <StatTile
+            label="Cycle time (85th pct.)"
+            :value="formatDays(cycleP85)"
+            hint="85% of work finished within this time"
+          />
+          <StatTile label="Lead time (median)" :value="formatDays(leadP50)" hint="Creation to done" />
+        </div>
+        <div class="chart-grid">
+          <ChartCard
+            class="span-2"
+            title="Throughput"
+            :subtitle="`Tasks completed per ${bucketUnit}`"
+            :empty="!completed.length"
+          >
+            <ColumnChart
+              :labels="bucketLabels"
+              :series="throughputSeries"
+              :summary="`Completed tasks per ${bucketUnit}`"
+            />
+            <template #table>
+              <SeriesTable :labels="bucketLabels" :series="throughputSeries" />
+            </template>
+          </ChartCard>
+          <ChartCard
+            title="Cycle time distribution"
+            subtitle="Work completed in the period"
+            :empty="!cycleValues.length"
+            empty-text="No completed work with a recorded start."
+          >
+            <ColumnChart
+              :labels="cycleBinLabels"
+              :series="cycleBinSeries"
+              summary="Number of completed tasks per cycle time range"
+            />
+            <template #table>
+              <SeriesTable :labels="cycleBinLabels" :series="cycleBinSeries" />
+            </template>
+          </ChartCard>
+          <ChartCard
+            title="Time in status"
+            subtitle="Average per task completed in the period"
+            :empty="!statusTimes.length"
+          >
+            <BarList :rows="statusTimes" label="Average time in status" />
+          </ChartCard>
+          <ChartCard
+            class="span-2"
+            title="Aging work in progress"
+            subtitle="Longest in their current status; flagged when older than the 85th percentile cycle time"
+            :empty="!wip.length"
+            empty-text="Nothing is in progress."
+          >
+            <TaskTable :rows="agingRows" :columns="agingColumns" @open="openTask" />
+          </ChartCard>
+        </div>
+        <p class="insights-footnote muted">
+          Sprint burndown, velocity and health live on the
+          <RouterLink :to="{ path: '/sprints', query: project ? { project } : {} }">Sprints</RouterLink> page.
+        </p>
+      </template>
 
-          <UiCard>
-            <div class="card-head">
-              <h3>Work types</h3>
-              <small class="muted">Categorised by task type</small>
-            </div>
-            <table class="distribution">
-              <tbody>
-                <tr v-for="item in typeBreakdown" :key="item.label" @click="openTaskList({ type: item.raw })">
-                  <th>{{ item.label }}</th>
-                  <td>{{ item.count }}</td>
-                  <td class="muted">{{ item.percent }}%</td>
-                </tr>
-                <tr v-if="!typeBreakdown.length">
-                  <td colspan="3" class="muted">No type data</td>
-                </tr>
-              </tbody>
-            </table>
-          </UiCard>
-
-          <UiCard>
-            <div class="card-head">
-              <h3>Assignee load</h3>
-              <small class="muted">Who owns the current work</small>
-            </div>
-            <table class="distribution">
-              <tbody>
-                <tr v-for="item in assigneeBreakdown" :key="item.label" @click="openTaskList({ assignee: item.raw })">
-                  <th>{{ item.label }}</th>
-                  <td>{{ item.count }}</td>
-                  <td class="muted">{{ item.percent }}%</td>
-                </tr>
-                <tr v-if="!assigneeBreakdown.length">
-                  <td colspan="3" class="muted">No assignee data</td>
-                </tr>
-              </tbody>
-            </table>
-          </UiCard>
-
-          <UiCard class="activity-card">
-            <div class="card-head" style="align-items: flex-start">
-              <div class="col" style="gap: 4px">
-                <h3>Activity trend</h3>
-                <small class="muted">Tasks updated per day (last {{ windowDays }} days)</small>
-              </div>
-              <div class="chart-controls" role="group" aria-label="Select activity window">
-                <UiButton
-                  v-for="days in timeWindows"
-                  :key="days"
-                  variant="ghost"
-                  :class="{ active: windowDays === days }"
-                  type="button"
-                  @click="windowDays = days"
-                >
-                  {{ days }}d
-                </UiButton>
-              </div>
-            </div>
-            <div class="chart-scroll" ref="activityChartHost">
-              <UiLoader v-if="activityFeedLoading" style="margin: 12px 0">Loading activity…</UiLoader>
-              <div v-else-if="activityFeedError" class="muted" style="padding: 12px 0">{{ activityFeedError }}</div>
-              <BarChart
-                v-else
-                :series="activitySeries"
-                :width="activityChartRenderWidth"
-                :height="180"
-                :key="activityChartKey"
-              />
-            </div>
-            <div class="muted" style="margin-top: 8px">
-              Average {{ formatDecimal(averageUpdatesPerDay) }} updates / day
-            </div>
-          </UiCard>
-
-          <UiCard>
-            <div class="card-head">
-              <h3>Due date outlook</h3>
-              <small class="muted">Stay ahead of upcoming deadlines</small>
-            </div>
-            <table class="distribution">
-              <tbody>
-                <tr
-                  v-for="item in dueDateBreakdown"
-                  :key="item.label"
-                  :class="{ clickable: item.raw }"
-                  @click="item.raw ? openDueFilter(item.raw) : null"
-                >
-                  <th>{{ item.label }}</th>
-                  <td>{{ item.count }}</td>
-                  <td class="muted">{{ item.percent }}%</td>
-                </tr>
-                <tr v-if="!dueDateBreakdown.length">
-                  <td colspan="3" class="muted">No due date information</td>
-                </tr>
-              </tbody>
-            </table>
-          </UiCard>
-
-          <UiCard v-if="!selectedProject">
-            <div class="card-head">
-              <h3>Projects overview</h3>
-              <small class="muted">Quick snapshot across teams</small>
-            </div>
-            <table class="distribution">
+      <!-- Team: workload and contribution -->
+      <template v-else-if="activeLens === 'team'">
+        <div class="stat-row">
+          <StatTile label="People with open work" :value="fmt(assignees.length)" />
+          <StatTile
+            label="Unassigned"
+            :value="fmt(unassignedOpen.length)"
+            :tone="unassignedOpen.length ? 'alert' : 'neutral'"
+            caption="Open tasks without an assignee"
+            clickable
+            @select="openTasks({ assignee: '__none__' })"
+          />
+          <StatTile
+            label="Active contributors"
+            :value="fmt(activity.length)"
+            :caption="`Made changes, ${periodLabel.toLowerCase()}`"
+          />
+          <StatTile label="Open per person" :value="fmt(openPerPerson, 1)" caption="Average across assignees" />
+        </div>
+        <ChartCard
+          title="Workload"
+          subtitle="Open work per person and what they finished in the period"
+          :empty="!people.length"
+        >
+          <div class="people-table">
+            <table>
               <thead>
                 <tr>
-                  <th>Project</th>
-                  <th>Active</th>
-                  <th>Last update</th>
+                  <th scope="col">Person</th>
+                  <th scope="col" class="numeric">Open</th>
+                  <th scope="col" class="numeric">In progress</th>
+                  <th scope="col" class="numeric">Overdue</th>
+                  <th scope="col" class="numeric">Completed</th>
+                  <th scope="col" class="numeric">Cycle time</th>
+                  <th scope="col" class="numeric">Open effort</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="summary in projectSummaries" :key="summary.prefix">
-                  <th style="font-weight: 600">
-                    <button class="link-btn" type="button" @click="selectProject(summary.prefix)">
-                      {{ summary.name }}
+                <tr v-for="person in people" :key="person.key">
+                  <td>
+                    <button type="button" class="link-button" @click="openTasks({ assignee: person.filter })">
+                      {{ person.label }}
                     </button>
-                    <div class="muted">{{ summary.prefix }}</div>
-                  </th>
-                  <td>{{ summary.open_count }}</td>
-                  <td>{{ summary.last_update }}</td>
-                </tr>
-                <tr v-if="!projectSummaries.length">
-                  <td colspan="3" class="muted">No projects available</td>
+                  </td>
+                  <td class="numeric">{{ person.open }}</td>
+                  <td class="numeric">{{ person.inProgress }}</td>
+                  <td class="numeric" :class="{ alert: person.overdue > 0 }">{{ person.overdue }}</td>
+                  <td class="numeric">{{ person.completed }}</td>
+                  <td class="numeric">{{ formatDays(person.cycle) }}</td>
+                  <td class="numeric">{{ person.effort }}</td>
                 </tr>
               </tbody>
             </table>
-          </UiCard>
+          </div>
+        </ChartCard>
+        <div class="chart-grid">
+          <ChartCard title="Completed per person" :subtitle="periodLabel" :empty="!completedByPerson.length">
+            <BarList
+              :rows="completedByPerson"
+              label="Completed tasks per person"
+              clickable
+              @select="(key) => openTasks({ assignee: key === 'Unassigned' ? '__none__' : key })"
+            />
+          </ChartCard>
+          <ChartCard
+            title="Activity per person"
+            subtitle="Status changes, edits and comments"
+            :empty="!activity.length"
+          >
+            <BarList :rows="activityRows" label="Changes per person" />
+          </ChartCard>
         </div>
       </template>
-    </template>
+
+      <!-- Planning: deadlines and scope -->
+      <template v-else-if="activeLens === 'planning'">
+        <div class="stat-row">
+          <StatTile
+            label="Overdue"
+            :value="fmt(overdue.length)"
+            :tone="overdue.length ? 'alert' : 'neutral'"
+            clickable
+            @select="openTasks({ due: 'overdue' })"
+          />
+          <StatTile
+            label="Due within 7 days"
+            :value="fmt(dueSoon.length)"
+            clickable
+            @select="openTasks({ due: 'soon' })"
+          />
+          <StatTile
+            label="No due date"
+            :value="fmt(noDueDate.length)"
+            caption="Open tasks"
+            clickable
+            @select="openTasks({ needs: 'due' })"
+          />
+          <StatTile label="Open effort" :value="openEffortText" :caption="openEffortCaption" />
+          <StatTile
+            label="Unestimated"
+            :value="fmt(open.length - openEffort.estimated)"
+            caption="Open tasks without effort"
+            clickable
+            @select="openTasks({ needs: 'effort' })"
+          />
+        </div>
+        <div class="chart-grid">
+          <ChartCard title="Due date outlook" subtitle="Open work by deadline" :empty="!open.length">
+            <BarList :rows="dueOutlook" label="Open work by deadline" clickable @select="openDueBucket" />
+          </ChartCard>
+          <ChartCard
+            title="Scope by tag"
+            subtitle="Open tasks per tag"
+            :empty="!openByTag.length"
+            empty-text="No tagged open work."
+          >
+            <BarList
+              :rows="openByTag"
+              label="Open tasks per tag"
+              clickable
+              @select="(key) => key !== 'No tag' && openTasks({ tags: key })"
+            />
+          </ChartCard>
+          <ChartCard
+            class="span-2"
+            title="Upcoming deadlines"
+            subtitle="Open work due in the next 14 days, and anything overdue"
+            :empty="!upcoming.length"
+            empty-text="No deadlines in the next 14 days."
+          >
+            <TaskTable :rows="upcomingRows" :columns="upcomingColumns" :limit="12" @open="openTask" />
+          </ChartCard>
+          <ChartCard class="span-2" title="Completed by type" :subtitle="periodLabel" :empty="!completed.length">
+            <BarList :rows="completedByType" label="Completed tasks by type" />
+          </ChartCard>
+        </div>
+      </template>
+
+      <!-- Quality: bugs -->
+      <template v-else-if="activeLens === 'quality'">
+        <p v-if="!bugTypesPresent" class="insights-callout">
+          No bug-type tasks match this view. Quality tracks tasks whose type is named like Bug, Defect, Incident or
+          Regression.
+        </p>
+        <div class="stat-row">
+          <StatTile
+            label="Open bugs"
+            :value="fmt(openBugs.length)"
+            :tone="openBugs.length ? 'alert' : 'neutral'"
+            :clickable="bugTypesPresent"
+            @select="openTasks({ type: bugTypeFilter })"
+          />
+          <StatTile
+            label="Reported"
+            :value="fmt(bugsReported.length)"
+            :delta="delta(bugsReported.length, bugsReportedPrev.length, 'down')"
+          />
+          <StatTile
+            label="Fixed"
+            :value="fmt(bugsFixed.length)"
+            :delta="delta(bugsFixed.length, bugsFixedPrev.length, 'up')"
+          />
+          <StatTile label="Time to fix (median)" :value="formatDays(bugFixP50)" hint="Reported to done" />
+          <StatTile
+            label="Bug share"
+            :value="bugShare === null ? '—' : pct(bugShare)"
+            caption="Of new work in the period"
+          />
+        </div>
+        <div class="chart-grid">
+          <ChartCard
+            class="span-2"
+            title="Reported vs fixed"
+            :subtitle="`Bugs per ${bucketUnit}`"
+            :empty="!bugsReported.length && !bugsFixed.length"
+          >
+            <ColumnChart
+              :labels="bucketLabels"
+              :series="bugSeries"
+              :summary="`Bugs reported and fixed per ${bucketUnit}`"
+            />
+            <template #table>
+              <SeriesTable :labels="bucketLabels" :series="bugSeries" />
+            </template>
+          </ChartCard>
+          <ChartCard title="Open bugs by priority" :empty="!openBugs.length">
+            <BarList
+              :rows="openBugsByPriority"
+              label="Open bugs by priority"
+              clickable
+              @select="(key) => openTasks({ type: bugTypeFilter, priority: key })"
+            />
+          </ChartCard>
+          <ChartCard title="Oldest open bugs" :empty="!openBugs.length" empty-text="No open bugs.">
+            <TaskTable :rows="oldestBugRows" :columns="oldestBugColumns" @open="openTask" />
+          </ChartCard>
+        </div>
+      </template>
+
+      <!-- My work: the signed-in person -->
+      <template v-else>
+        <p v-if="!me" class="insights-callout">
+          Your identity could not be resolved. Set a default reporter or a git user name to see your own work here.
+        </p>
+        <template v-else>
+          <div class="stat-row">
+            <StatTile
+              label="Assigned to me"
+              :value="fmt(myOpen.length)"
+              caption="Open"
+              clickable
+              @select="openTasks({ assignee: '@me' })"
+            />
+            <StatTile label="In progress" :value="fmt(myWip.length)" />
+            <StatTile
+              label="Overdue"
+              :value="fmt(myOverdue.length)"
+              :tone="myOverdue.length ? 'alert' : 'neutral'"
+              clickable
+              @select="openTasks({ assignee: '@me', due: 'overdue' })"
+            />
+            <StatTile label="Due within 7 days" :value="fmt(myDueSoon.length)" />
+            <StatTile label="Completed" :value="fmt(myCompleted.length)" :caption="periodLabel" />
+          </div>
+          <div class="chart-grid">
+            <ChartCard
+              class="span-2"
+              title="My open work"
+              subtitle="Soonest deadline first, then priority"
+              :empty="!myOpen.length"
+              empty-text="Nothing assigned to you is open."
+            >
+              <TaskTable :rows="myOpenRows" :columns="myOpenColumns" :limit="15" @open="openTask" />
+            </ChartCard>
+            <ChartCard
+              class="span-2"
+              title="Recently completed"
+              :subtitle="periodLabel"
+              :empty="!myCompleted.length"
+              empty-text="Nothing completed in this period."
+            >
+              <TaskTable :rows="myCompletedRows" :columns="myCompletedColumns" @open="openTask" />
+            </ChartCard>
+          </div>
+        </template>
+      </template>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import PageHeader from '../components/PageHeader.vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, ref, watch, watchEffect } from 'vue'
+import { computed, defineComponent, h, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
-import type { ProjectDTO, ProjectStatsDTO, TaskDTO, TaskListFilter } from '../api/types'
-import BarChart from '../components/BarChart.vue'
-import PieChart from '../components/PieChart.vue'
-import { showToast } from '../components/toast'
+import type { TaskDTO } from '../api/types'
+import FilterBar from '../components/FilterBar.vue'
+import BarList, { type BarRow } from '../components/insights/BarList.vue'
+import ChartCard from '../components/insights/ChartCard.vue'
+import ColumnChart from '../components/insights/ColumnChart.vue'
+import StatTile, { type StatDelta } from '../components/insights/StatTile.vue'
+import TaskTable, { type TaskTableRow } from '../components/insights/TaskTable.vue'
+import PageHeader from '../components/PageHeader.vue'
 import UiButton from '../components/UiButton.vue'
-import UiCard from '../components/UiCard.vue'
-import UiEmptyState from '../components/UiEmptyState.vue'
-import UiInput from '../components/UiInput.vue'
 import UiLoader from '../components/UiLoader.vue'
-import UiSelect from '../components/UiSelect.vue'
-import { useActivity } from '../composables/useActivity'
-import type { ActivityFeedHandle } from '../composables/useActivity'
 import { useCompletionPolicy } from '../composables/useCompletionPolicy'
-import { useProjects } from '../composables/useProjects'
-import { useTaskStore } from '../composables/useTaskStore'
-import type { TaskQueryHandle } from '../composables/useTaskStore'
-import { parseTaskDate } from '../utils/date'
-import { useSuggestList } from '../composables/useSuggestList'
-import { formatMember } from '../utils/member'
-import { formatProjectLabel } from '../utils/projectLabels'
+import { useConfig } from '../composables/useConfig'
+import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { useFilterOptions } from '../composables/useFilterOptions'
+import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
+import { useTaskPanelController } from '../composables/useTaskPanelController'
+import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
+import {
+  activityByActor,
+  bucketsFor,
+  buildTimeline,
+  changeRatio,
+  countBy,
+  countPerBucket,
+  cycleDays,
+  DAY_MS,
+  daysInCurrentStatus,
+  durationHistogram,
+  effortTotals,
+  formatDays,
+  inRange,
+  isBugType,
+  isPeriodKey,
+  leadDays,
+  metDueDate,
+  orderByConfigured,
+  percentile,
+  PERIOD_OPTIONS,
+  periodRange,
+  previousRange,
+  timeInStatus,
+  type CompletionLookup,
+  type CountEntry,
+  type PeriodKey,
+  type TaskTimeline,
+} from '../utils/insightsMetrics'
+import { storageGet, storageSet } from '../utils/storage'
 
 defineOptions({ name: 'ProjectInsights' })
 
-const router = useRouter()
+type LensKey = 'overview' | 'delivery' | 'team' | 'planning' | 'quality' | 'mine'
+
+const LENSES: Array<{ key: LensKey; label: string; note: string }> = [
+  {
+    key: 'overview',
+    label: 'Overview',
+    note: 'The headline numbers for leadership: how much is open, what got done and what needs attention.',
+  },
+  {
+    key: 'delivery',
+    label: 'Delivery',
+    note: 'For engineering managers and scrum masters: throughput, cycle time and work that is getting old.',
+  },
+  {
+    key: 'team',
+    label: 'Team',
+    note: 'For team leads: who is carrying how much work, what each person finished and where help is needed.',
+  },
+  {
+    key: 'planning',
+    label: 'Planning',
+    note: 'For product and project managers: deadlines, estimates and where the open scope sits.',
+  },
+  {
+    key: 'quality',
+    label: 'Quality',
+    note: 'For QA and support: bugs reported against bugs fixed, and how long fixes take.',
+  },
+  { key: 'mine', label: 'My work', note: 'Your own open work, deadlines and what you completed.' },
+]
+
 const route = useRoute()
-
-const { projects, refresh: refreshProjects } = useProjects()
+const router = useRouter()
 const store = useTaskStore()
-// DEV-66: Insights owns a retained DEV-65 query handle for its exact task
-// filter instead of mutating the store's global active query.
-const taskQueryHandle = shallowRef<TaskQueryHandle | null>(null)
-const tasksLoading = computed(() => taskQueryHandle.value?.status.value === 'loading')
-// D1: the task query's own error/snapshot state drives the failure UX — a
-// failed scope is distinct from a truly empty one.
-const tasksError = computed(() => taskQueryHandle.value?.error.value ?? null)
-const hasTaskSnapshot = computed(() => taskQueryHandle.value?.hasSnapshot.value ?? false)
-
-const singleProject = computed(() => (projects.value.length === 1 ? projects.value[0] : null))
-const hasSingleProject = computed(() => !!singleProject.value)
-
-const selectedProject = ref<string>('')
-const tagFilterInput = ref<string>('')
-const windowDays = ref<number>(30)
-const timeWindows = [14, 30, 60, 90]
-
-const projectStats = ref<ProjectStatsDTO | null>(null)
-const projectStatsMap = reactive<Record<string, ProjectStatsDTO>>({})
-
-const refreshing = ref(false)
-const lastUpdated = ref<Date | null>(null)
-// DEV-66: orchestration generations — a newer project/window refresh
-// supersedes older runs, whose successes, errors, and finally blocks must
-// not publish under the new scope.
-let refreshGeneration = 0
-let refreshInFlight = 0
-// D2: set on unmount; every asynchronous continuation must check it (or its
-// run generation) before issuing further requests, adopting handles,
-// publishing state, or toasting.
-let insightsDisposed = false
-const projectStatsRequests = new Map<string, number>()
-
-function isStaleRun(generation: number): boolean {
-  return insightsDisposed || generation !== refreshGeneration
-}
-const mounted = ref(false)
-
-const tasksBase = computed<TaskDTO[]>(() => taskQueryHandle.value?.tasks.value ?? [])
-// DEV-21: shared per-project completion policy so the overdue tile, the due
-// breakdown, and the TasksList `due=overdue` drill-down agree (terminal
-// tasks are never overdue; due-today is not overdue).
-const completion = useCompletionPolicy({ tasks: () => tasksBase.value })
-const tagFilters = computed<string[]>(() => parseTagInput(tagFilterInput.value))
-const tagFiltersNormalized = computed<string[]>(() => tagFilters.value.map((tag) => normaliseTag(tag)))
-
-const tagInputFocused = ref(false)
-let tagBlurTimer: ReturnType<typeof setTimeout> | null = null
-const TAG_SUGGESTION_LIMIT = 8
-
-const tagSuggestionCandidates = computed(() => {
-  const map = new Map<string, string>()
-  tasksBase.value.forEach((task) => {
-    ;(task.tags || []).forEach((tag) => {
-      const trimmed = (tag || '').trim()
-      if (!trimmed) return
-      const key = trimmed.toLowerCase()
-      if (!map.has(key)) map.set(key, trimmed)
-    })
-  })
-  if (tasksBase.value.some((task) => !task.tags || !task.tags.length)) {
-    map.set('untagged', 'Untagged')
-  }
-  ;(projectStats.value?.tags_top || []).forEach((tag) => {
-    const trimmed = (tag || '').trim()
-    if (!trimmed) return
-    const key = trimmed.toLowerCase()
-    if (!map.has(key)) map.set(key, trimmed)
-  })
-  return Array.from(map.values()).sort((a, b) => a.localeCompare(b))
-})
-
-const availableTagSuggestions = computed(() => {
-  if (!tagSuggestionCandidates.value.length) return [] as string[]
-  const selected = new Set(tagFiltersNormalized.value)
-  return tagSuggestionCandidates.value.filter((tag) => !selected.has(normaliseTag(tag)))
-})
-
-const activeTagQuery = computed(() => {
-  const raw = tagFilterInput.value
-  const parts = raw.split(',')
-  if (!parts.length) return ''
-  const trailingEmpty = raw.trim().endsWith(',')
-  const current = trailingEmpty ? '' : parts[parts.length - 1]
-  return (current ?? '').trim()
-})
-
+const { openTaskPanel } = useTaskPanelController()
 const {
-  activeIndex: tagActiveIndex,
-  list: tagSuggestionList,
-  entries: tagSuggestionEntries,
-  visible: tagSuggestionsVisible,
-  handleKeydown: handleTagSuggestKeydown,
-} = useSuggestList({
-  candidates: availableTagSuggestions,
-  query: () => activeTagQuery.value,
-  active: () => tagInputFocused.value,
-  limit: TAG_SUGGESTION_LIMIT,
+  statuses,
+  priorities,
+  types,
+  customFields: availableCustomFields,
+  refresh: refreshConfig,
+  scope: configScope,
+  tags: configuredTags,
+  members,
+} = useConfig()
+const { sprints, refresh: refreshSprints } = useSprints()
+const sprintFilterOptions = useSprintFilterOptions(sprints)
+
+// -- Filters and data --------------------------------------------------------
+const project = ref<string>(typeof route.query.project === 'string' ? route.query.project : '')
+const filter = ref<Record<string, string>>({})
+const filterBarRef = ref<{ clear?: () => void } | null>(null)
+const filterPayload = computed(() => ({
+  ...filter.value,
+  ...(project.value || Object.prototype.hasOwnProperty.call(route.query, 'project') ? { project: project.value } : {}),
+}))
+const {
+  hasFilters,
+  onFilterUpdate,
+  clearFilters: clearFiltersAction,
+} = useProjectFilterSync(project, filter, {
+  routePath: '/insights',
 })
+const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
-const activityChartHost = ref<HTMLElement | null>(null)
-const activityChartWidth = ref(640)
-let activityResizeObserver: ResizeObserver | null = null
-// DEV-66: the activity chart reads its own keyed feed handle, scoped to the
-// selected project/window, so other consumers (activity drawer, different
-// windows) can never contaminate or drop this data.
-const ACTIVITY_FEED_LIMIT = 400
-const activityFeedHandle = shallowRef<ActivityFeedHandle | null>(null)
-const activityFeed = computed(() => activityFeedHandle.value?.items.value ?? [])
-const activityFeedLoading = computed(() => activityFeedHandle.value?.loading.value ?? false)
-const activityFeedError = computed(() => activityFeedHandle.value?.error.value ?? null)
+// One live task query (shared store, all pages, kept current over SSE).
+const query = shallowRef<TaskQueryHandle | null>(null)
+function adoptQuery(handle: TaskQueryHandle) {
+  if (query.value?.key === handle.key) return
+  query.value?.release()
+  handle.retain()
+  query.value = handle
+}
+const tasks = computed<TaskDTO[]>(() => (query.value?.tasks.value ?? []).filter((task) => !task.deleted_at))
+const loadingTasks = computed(() => query.value?.status.value === 'loading')
+const loadError = computed(() => query.value?.error.value ?? null)
+const initialLoading = computed(() => !query.value || (loadingTasks.value && !query.value.hasSnapshot.value))
 
-function currentTaskFilter(): TaskListFilter {
-  return selectedProject.value ? { project: selectedProject.value } : {}
+const filterOptions = useFilterOptions(
+  () => tasks.value,
+  () => project.value,
+  { scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value },
+)
+
+let disposed = false
+async function refreshTasks() {
+  if (disposed) return
+  const { serverFilter } = buildServerFilter(filter.value, project.value)
+  adoptQuery(store.getQuery(serverFilter))
+  await query.value!.refresh()
 }
 
-function adoptTaskQuery(): TaskQueryHandle {
-  const next = store.getQuery(currentTaskFilter())
-  const current = taskQueryHandle.value
-  if (current && current.key === next.key) return current
-  next.retain()
-  current?.release()
-  taskQueryHandle.value = next
-  return next
+let filterDebounce: ReturnType<typeof setTimeout> | null = null
+watch(filter, () => {
+  if (filterDebounce) clearTimeout(filterDebounce)
+  filterDebounce = setTimeout(() => void refreshTasks(), 150)
+})
+watch(project, async (value) => {
+  await refreshConfig(value)
+  await refreshTasks()
+})
+
+function clearFilters() {
+  clearFiltersAction(filterBarRef)
 }
 
-const { getFeedQuery } = useActivity()
-
-function adoptActivityFeedQuery(): ActivityFeedHandle {
-  const next = getFeedQuery({
-    project: selectedProject.value || undefined,
-    windowDays: windowDays.value,
-    limit: ACTIVITY_FEED_LIMIT,
-  })
-  const current = activityFeedHandle.value
-  if (current && current.key === next.key) {
-    // getFeedQuery acquires ownership; re-adopting the same scope must not leak it.
-    next.release()
-    return current
-  }
-  current?.release()
-  activityFeedHandle.value = next
-  return next
+// -- View state: lens and period (URL first, then this browser) --------------
+function readLens(): LensKey {
+  const candidate = route.query.view ?? storageGet('lotar.insights.view')
+  return LENSES.some((lens) => lens.key === candidate) ? (candidate as LensKey) : 'overview'
 }
-
-function updateActivityChartWidth(widthOverride?: number) {
-  const host = activityChartHost.value
-  if (!host) return
-  const measured = typeof widthOverride === 'number' ? widthOverride : host.getBoundingClientRect().width
-  if (!measured || Number.isNaN(measured)) return
-  activityChartWidth.value = Math.max(1, Math.floor(measured))
+function readPeriod(): PeriodKey {
+  const candidate = route.query.period ?? storageGet('lotar.insights.period')
+  return isPeriodKey(candidate) ? candidate : '30d'
 }
+const activeLens = ref<LensKey>(readLens())
+const period = ref<PeriodKey>(readPeriod())
+const activeLensInfo = computed(() => LENSES.find((lens) => lens.key === activeLens.value)!)
 
-watch(activityChartHost, (el) => {
-  if (el) {
-    updateActivityChartWidth()
-  }
+/** Only ever rewrite the URL while this page is the one being shown (DEV-187). */
+function writeViewQuery() {
+  if (disposed || route.path !== '/insights') return
+  if (route.query.view === activeLens.value && route.query.period === period.value) return
+  void router.replace({ path: '/insights', query: { ...route.query, view: activeLens.value, period: period.value } })
+}
+function setLens(key: LensKey) {
+  activeLens.value = key
+  storageSet('lotar.insights.view', key)
+  writeViewQuery()
+}
+function stepLens(direction: number) {
+  const index = LENSES.findIndex((lens) => lens.key === activeLens.value)
+  const next = LENSES[(index + direction + LENSES.length) % LENSES.length]!
+  setLens(next.key)
+  document.getElementById(`insights-tab-${next.key}`)?.focus()
+}
+function setPeriod(value: string) {
+  if (!isPeriodKey(value)) return
+  period.value = value
+  storageSet('lotar.insights.period', value)
+  writeViewQuery()
+}
+watch(
+  () => [route.query.view, route.query.period],
+  () => {
+    if (disposed || route.path !== '/insights') return
+    activeLens.value = readLens()
+    period.value = readPeriod()
+  },
+)
+
+// -- Identity for "My work" --------------------------------------------------
+const me = ref('')
+
+// -- Time ---------------------------------------------------------------------
+const now = ref(Date.now())
+let clock: ReturnType<typeof setInterval> | null = null
+watch(tasks, () => (now.value = Date.now()))
+
+const range = computed(() => periodRange(period.value, now.value, tasks.value))
+const prevRange = computed(() => previousRange(range.value))
+const comparable = computed(() => period.value !== 'all')
+const periodLabel = computed(() => PERIOD_OPTIONS.find((option) => option.value === period.value)!.label)
+const buckets = computed(() => bucketsFor(range.value))
+const bucketLabels = computed(() => buckets.value.map((bucket) => bucket.label))
+const bucketUnit = computed(() => {
+  const span = (range.value.end - range.value.start) / DAY_MS
+  return span <= 14 ? 'day' : span <= 120 ? 'week' : 'month'
 })
-const projectDisplayName = computed(() => {
-  if (!selectedProject.value) return 'All projects'
-  const project = projects.value.find((p) => p.prefix === selectedProject.value)
-  return project ? project.name : selectedProject.value
+
+const subtitle = computed(() => {
+  const scope = project.value ? `project ${project.value}` : 'all projects'
+  return `${fmt(tasks.value.length)} tasks in ${scope} · ${periodLabel.value.toLowerCase()}`
 })
 
-watchEffect(() => {
-  const p = singleProject.value
-  if (!p) return
-  const prefix = (p.prefix ?? '').trim()
-  if (!prefix) return
-  if (selectedProject.value !== prefix) {
-    selectedProject.value = prefix
-  }
-})
+// -- Timelines and core sets ------------------------------------------------
+const completion = useCompletionPolicy({ tasks: () => tasks.value })
+const lookup: CompletionLookup = {
+  isTaskDone: (task) => completion.isTaskDone(task),
+  isDoneStatus: (prefix, status) => completion.isDoneStatus(prefix, status),
+}
+const timelines = computed<TaskTimeline[]>(() => tasks.value.map((task) => buildTimeline(task, lookup)))
+const openTimelines = computed(() => timelines.value.filter((timeline) => !timeline.isDone))
+const open = computed(() => openTimelines.value.map((timeline) => timeline.task))
+const completed = computed(() => timelines.value.filter((timeline) => inRange(timeline.doneAt, range.value)))
+const completedPrev = computed(() => timelines.value.filter((timeline) => inRange(timeline.doneAt, prevRange.value)))
+const created = computed(() => timelines.value.filter((timeline) => inRange(timeline.created, range.value)))
+const createdPrev = computed(() => timelines.value.filter((timeline) => inRange(timeline.created, prevRange.value)))
+const overdue = computed(() => open.value.filter((task) => completion.isTaskOverdue(task)))
+const dueSoon = computed(() =>
+  open.value.filter((task) => ['today', 'soon'].includes(completion.dueBucketFor(task) ?? '')),
+)
+const noDueDate = computed(() => open.value.filter((task) => !task.due_date))
 
-const filteredTasks = computed(() => {
-  if (!tagFiltersNormalized.value.length) return tasksBase.value
-  const requiredTags = tagFiltersNormalized.value.filter((tag) => tag !== 'untagged')
-  return tasksBase.value.filter((task) => {
-    const tags = (task.tags || []).map((tag) => normaliseTag(tag)).filter((tag) => tag.length > 0)
-    if (!requiredTags.length) return tags.length === 0
-    return requiredTags.every((filterTag: string) => tags.includes(filterTag))
-  })
-})
+/** Started (left its initial status and not moved back) and not done. */
+function isInProgress(timeline: TaskTimeline) {
+  if (timeline.isDone || timeline.startedAt === null) return false
+  const first = (timeline.task.history ?? [])
+    .flatMap((entry) => entry.changes ?? [])
+    .find((change) => change.field === 'status')
+  return !first?.old || first.old !== timeline.task.status
+}
+const wip = computed(() => openTimelines.value.filter(isInProgress))
 
-const totalTasks = computed(() => filteredTasks.value.length)
-const uniqueStatusCount = computed(() => {
-  const set = new Set<string>()
-  filteredTasks.value.forEach((task) => set.add((task.status || 'Unspecified').trim().toLowerCase()))
-  return set.size
-})
-const assignedTasks = computed(() => filteredTasks.value.filter((t) => !!t.assignee).length)
-const unassignedTasks = computed(() => filteredTasks.value.filter((t) => !t.assignee).length)
-const taggedTasks = computed(() => filteredTasks.value.filter((t) => (t.tags || []).length > 0).length)
-const overdueTasks = computed(() => filteredTasks.value.filter((t) => completion.isTaskOverdue(t)).length)
+// -- Durations -----------------------------------------------------------------
+const values = (list: TaskTimeline[], pick: (timeline: TaskTimeline) => number | null) =>
+  list.map(pick).filter((value): value is number => value !== null)
+const cycleValues = computed(() => values(completed.value, cycleDays))
+const leadValues = computed(() => values(completed.value, leadDays))
+const cycleP50 = computed(() => percentile(cycleValues.value, 50))
+const cycleP85 = computed(() => percentile(cycleValues.value, 85))
+const cycleP50Prev = computed(() => percentile(values(completedPrev.value, cycleDays), 50))
+const leadP50 = computed(() => percentile(leadValues.value, 50))
+const leadP50Prev = computed(() => percentile(values(completedPrev.value, leadDays), 50))
+const cycleHistogram = computed(() => durationHistogram(cycleValues.value))
+const cycleBinLabels = computed(() => cycleHistogram.value.map((bin) => bin.label))
+const cycleBinSeries = computed(() => [{ label: 'Tasks', values: cycleHistogram.value.map((bin) => bin.count) }])
+const throughputPerBucket = computed(() => completed.value.length / Math.max(1, buckets.value.length))
 
-const noDueDateTasks = computed(() => filteredTasks.value.filter((t) => !t.due_date).length)
-
-const statusBreakdown = computed(() =>
-  buildBreakdown(
-    filteredTasks.value,
-    (t) => normaliseLabel(t.status),
-    (t) => t.status || '',
+const createdSeries = computed(() =>
+  countPerBucket(
+    created.value.map((timeline) => timeline.created),
+    buckets.value,
   ),
 )
-const priorityBreakdown = computed(() =>
-  buildBreakdown(
-    filteredTasks.value,
-    (t) => normaliseLabel(t.priority),
-    (t) => t.priority || '',
+const completedSeries = computed(() =>
+  countPerBucket(
+    completed.value.map((timeline) => timeline.doneAt),
+    buckets.value,
   ),
 )
-const typeBreakdown = computed(() =>
-  buildBreakdown(
-    filteredTasks.value,
-    (t) => normaliseLabel(t.task_type),
-    (t) => t.task_type || '',
-  ),
-)
-const assigneeBreakdown = computed(() =>
-  buildBreakdown(
-    filteredTasks.value,
-    (t) => (t.assignee ? formatMember(t.assignee) : 'Unassigned'),
-    (t) => t.assignee || '',
-  ),
-)
-
-const statusPieData = computed(() =>
-  statusBreakdown.value.map((item) => ({ label: item.label, value: item.count, raw: item.raw })),
-)
-
-const activitySeries = computed(() => {
-  const now = new Date()
-  const start = new Date(now)
-  start.setDate(now.getDate() - (windowDays.value - 1))
-  const startIso = isoDay(start)
-  const endIso = isoDay(now)
-  const visibleTasks = new Set(filteredTasks.value.map((task) => task.id))
-  const dayBuckets = new Map<string, Record<string, number>>()
-
-  activityFeed.value.forEach((item) => {
-    if (!visibleTasks.has(item.task_id)) return
-    item.history.forEach((entry) => {
-      const entryDate = new Date(entry.at)
-      if (Number.isNaN(entryDate.getTime())) return
-      const iso = isoDay(entryDate)
-      if (iso < startIso || iso > endIso) return
-      const bucket = dayBuckets.get(iso) ?? {}
-      entry.changes.forEach((change) => {
-        const kind = (change.kind || 'other').toLowerCase()
-        bucket[kind] = (bucket[kind] ?? 0) + 1
-      })
-      dayBuckets.set(iso, bucket)
-    })
-  })
-
-  const series: Array<{ key: string; total: number; count: number; breakdown: Record<string, number> }> = []
-  for (let i = 0; i < windowDays.value; i += 1) {
-    const date = new Date(start)
-    date.setDate(start.getDate() + i)
-    const iso = isoDay(date)
-    const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    const breakdown = dayBuckets.get(iso) ?? {}
-    const total = Object.values(breakdown).reduce((sum, value) => sum + value, 0)
-    series.push({ key: label, total, count: total, breakdown: { ...breakdown } })
-  }
-  return series
-})
-
-const totalActivityInWindow = computed(() => activitySeries.value.reduce((acc, item) => acc + item.total, 0))
-const averageUpdatesPerDay = computed(() => (windowDays.value ? totalActivityInWindow.value / windowDays.value : 0))
-const activityChartKey = computed(() =>
-  [
-    selectedProject.value || 'all',
-    windowDays.value,
-    tagFiltersNormalized.value.join('|') || 'none',
-    filteredTasks.value.length,
-    activityFeed.value.length,
-    totalActivityInWindow.value,
-  ].join(':'),
-)
-const activityChartRenderWidth = computed(() => {
-  const width = Math.round(activityChartWidth.value)
-  return width > 0 ? width : 320
-})
-
-const projectSummaries = computed(() =>
-  projects.value.map((project: ProjectDTO) => {
-    const stats = projectStatsMap[project.prefix]
-    return {
-      prefix: project.prefix,
-      name: project.name,
-      open_count: stats?.open_count ?? 0,
-      last_update: formatRelativeTimestamp(stats?.recent_modified ?? null),
-    }
-  }),
-)
-
-const lastUpdatedText = computed(() => {
-  if (!lastUpdated.value) return '—'
-  return lastUpdated.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-})
-
-const summaryTiles = computed(() => [
-  { label: 'Total tasks', display: formatNumber(totalTasks.value) },
-  { label: 'Statuses', display: formatNumber(uniqueStatusCount.value) },
-  { label: 'Tagged', display: formatNumber(taggedTasks.value) },
-  { label: 'Assigned', display: formatNumber(assignedTasks.value) },
-  { label: 'Unassigned', display: formatNumber(unassignedTasks.value) },
-  { label: 'No due date', display: formatNumber(noDueDateTasks.value) },
-  { label: 'Overdue', display: formatNumber(overdueTasks.value), highlight: overdueTasks.value > 0 },
-  { label: 'Activity (avg/day)', display: formatDecimal(averageUpdatesPerDay.value) },
-  { label: 'Updated', display: lastUpdatedText.value },
+const flowSeries = computed(() => [
+  { label: 'Created', values: createdSeries.value },
+  { label: 'Completed', values: completedSeries.value },
 ])
+const throughputSeries = computed(() => [{ label: 'Completed', values: completedSeries.value }])
 
-const dueDateBreakdown = computed(() => {
-  if (!filteredTasks.value.length) return [] as Array<{ label: string; count: number; percent: number; raw: string }>
-  let overdue = 0
-  let finishedPastDue = 0
-  let dueToday = 0
-  let dueSoon = 0
-  let dueLater = 0
-  let missing = 0
-  filteredTasks.value.forEach((task) => {
-    if (!task.due_date) {
-      missing += 1
-      return
-    }
-    // Shared predicate: terminal tasks past due have no bucket (they must not
-    // inflate Overdue), and a done task due today still counts as due today.
-    const bucket = completion.dueBucketFor(task)
-    if (bucket === 'overdue') {
-      overdue += 1
-    } else if (bucket === 'today') {
-      dueToday += 1
-    } else if (bucket === 'soon') {
-      dueSoon += 1
-    } else if (bucket === 'later') {
-      dueLater += 1
-    } else if (!parseTaskDate(task.due_date)) {
-      // Unparseable due value: cannot classify any further than "has a date".
-      missing += 1
-    } else if (completion.isTaskDone(task)) {
-      // Terminal past due: excluded from Overdue by contract — but visible,
-      // so the rows explain the whole denominator instead of silently
-      // vanishing from the outlook.
-      finishedPastDue += 1
-    }
-    // Remaining null-bucket tasks with a parseable due (stale/unclassifiable
-    // metadata) stay excluded; the Overdue tile/drilldown stay authoritative.
-  })
-  const total = filteredTasks.value.length
-  const rows = [
-    { label: 'Overdue', count: overdue, raw: 'overdue' },
-    // No drill-down vocabulary exists for this class — deliberately not
-    // clickable (raw: '') rather than inventing a server filter value.
-    { label: 'Finished (past due)', count: finishedPastDue, raw: '' },
-    { label: 'Due today', count: dueToday, raw: 'today' },
-    { label: 'Due in next 7 days', count: dueSoon, raw: 'soon' },
-    { label: 'Due later', count: dueLater, raw: 'later' },
-    { label: 'No due date', count: missing, raw: 'missing' },
-  ]
-  return rows
-    .filter((row) => row.count > 0)
-    .map((row) => ({ ...row, percent: total ? Math.round((row.count / total) * 100) : 0 }))
-})
+const onTimeResults = computed(() =>
+  completed.value.map(metDueDate).filter((value): value is boolean => value !== null),
+)
+const onTimeRate = computed(() =>
+  onTimeResults.value.length ? onTimeResults.value.filter(Boolean).length / onTimeResults.value.length : null,
+)
+const onTimeCaption = computed(() =>
+  onTimeResults.value.length ? `${onTimeResults.value.length} with a due date` : 'No completed work had a due date',
+)
 
-function onTagFilterFocus() {
-  if (tagBlurTimer) {
-    clearTimeout(tagBlurTimer)
-    tagBlurTimer = null
-  }
-  tagInputFocused.value = true
-  tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
+// -- Breakdowns ----------------------------------------------------------------
+function rows(entries: CountEntry[], mutedKey = '(none)'): BarRow[] {
+  return entries.map((entry) => ({
+    key: entry.key,
+    label: entry.key,
+    value: entry.count,
+    muted: entry.key === mutedKey,
+  }))
 }
+const openByStatus = computed(() =>
+  rows(
+    orderByConfigured(
+      countBy(open.value, (task) => task.status),
+      statuses.value,
+    ),
+  ),
+)
+const openByPriority = computed(() =>
+  rows(
+    orderByConfigured(
+      countBy(open.value, (task) => task.priority),
+      [...priorities.value].reverse(),
+    ),
+  ),
+)
+const openByType = computed(() =>
+  rows(
+    orderByConfigured(
+      countBy(open.value, (task) => task.task_type),
+      types.value,
+    ),
+  ),
+)
+const openByTag = computed(() =>
+  rows(
+    countBy(open.value, (task) => (task.tags?.length ? task.tags : null), 'No tag'),
+    'No tag',
+  ),
+)
+const completedByType = computed(() =>
+  rows(
+    countBy(
+      completed.value.map((timeline) => timeline.task),
+      (task) => task.task_type,
+    ),
+  ),
+)
 
-function onTagFilterBlur() {
-  if (tagBlurTimer) {
-    clearTimeout(tagBlurTimer)
-    tagBlurTimer = null
-  }
-  tagBlurTimer = setTimeout(() => {
-    tagInputFocused.value = false
-    tagActiveIndex.value = -1
-    tagBlurTimer = null
-  }, 120)
-}
-
-function onTagFilterInput() {
-  tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
-}
-
-function onTagFilterKeydown(event: KeyboardEvent) {
-  handleTagSuggestKeydown(event, {
-    onCommit: (active) => {
-      if (active !== undefined) {
-        selectTagSuggestion(active)
-      } else {
-        applyTagFilters(parseTagInput(tagFilterInput.value))
-      }
+const staleCutoff = computed(() => now.value - 14 * DAY_MS)
+const stale = computed(() => open.value.filter((task) => Date.parse(task.modified) < staleCutoff.value))
+const unassignedOpen = computed(() => open.value.filter((task) => !task.assignee))
+const topPriority = computed(() => priorities.value[priorities.value.length - 1] ?? '')
+const urgentUnassigned = computed(() =>
+  unassignedOpen.value.filter((task) => topPriority.value && task.priority === topPriority.value),
+)
+const attention = computed<BarRow[]>(() =>
+  [
+    { key: 'overdue', label: 'Overdue', value: overdue.value.length, alert: true },
+    {
+      key: 'urgent-unassigned',
+      label: `${topPriority.value || 'Top priority'}, unassigned`,
+      value: urgentUnassigned.value.length,
+      alert: true,
     },
-    onEscape: () => {
-      tagInputFocused.value = false
+    {
+      key: 'stale',
+      label: 'No update in 14 days',
+      value: stale.value.length,
+      hint: 'Open tasks not modified for two weeks',
     },
-  })
+    { key: 'unassigned', label: 'Unassigned', value: unassignedOpen.value.length },
+  ].filter((row) => row.value > 0),
+)
+function openAttention(key: string) {
+  if (key === 'overdue') openTasks({ due: 'overdue' })
+  else if (key === 'urgent-unassigned') openTasks({ assignee: '__none__', priority: topPriority.value })
+  else if (key === 'unassigned') openTasks({ assignee: '__none__' })
+  else openTasks({})
 }
 
-function currentTagTokens() {
-  const raw = tagFilterInput.value
-  if (!raw) return [] as string[]
-  const parts = raw.split(',')
-  if (!parts.length) return [] as string[]
-  const trailingEmpty = raw.trim().endsWith(',')
-  const tokens = trailingEmpty ? parts : parts.slice(0, -1)
-  return tokens.map((part) => part.trim()).filter((part) => part.length > 0)
-}
+const statusTimes = computed<BarRow[]>(() =>
+  timeInStatus(timelines.value, range.value, lookup).map((entry) => ({
+    key: entry.status,
+    label: entry.status,
+    value: entry.days,
+    display: formatDays(entry.days),
+    hint: `${entry.tasks} tasks`,
+  })),
+)
 
-function selectTagSuggestion(tag: string) {
-  const base = currentTagTokens()
-  applyTagFilters([...base, tag])
-  tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
-}
+const agingColumns = [
+  { key: 'status', label: 'Status' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'age', label: 'In status', numeric: true },
+]
+const agingRows = computed<TaskTableRow[]>(() =>
+  wip.value
+    .map((timeline) => ({ task: timeline.task, age: daysInCurrentStatus(timeline.task, now.value) ?? 0 }))
+    .sort((a, b) => b.age - a.age)
+    .map(({ task, age }) => ({
+      id: task.id,
+      title: task.title,
+      cells: { status: task.status, assignee: task.assignee || '—', age: formatDays(age) },
+      alert: cycleP85.value !== null && age > cycleP85.value ? ['age'] : [],
+    })),
+)
 
-function openDueFilter(key: string) {
-  if (key === 'missing') {
-    openTaskList({ needs: 'due' })
-    return
-  }
-  if (key === 'overdue' || key === 'today' || key === 'soon' || key === 'later') {
-    openTaskList({ due: key })
-  }
+// -- Team -----------------------------------------------------------------------
+interface PersonRow {
+  key: string
+  label: string
+  filter: string
+  open: number
+  inProgress: number
+  overdue: number
+  completed: number
+  cycle: number | null
+  effort: string
 }
-
-function parseTagInput(input: string): string[] {
-  return input
-    .split(/[\s,]+/)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0)
+function effortText(list: TaskDTO[]): string {
+  const totals = effortTotals(list)
+  const parts = []
+  if (totals.hours) parts.push(`${Math.round(totals.hours)}h`)
+  if (totals.points) parts.push(`${Math.round(totals.points * 10) / 10}pt`)
+  return parts.join(' + ') || '—'
 }
-
-function normaliseTag(tag: string): string {
-  return tag.trim().toLowerCase()
-}
-
-function normaliseLabel(value?: string | null) {
-  if (!value) return 'Unspecified'
-  return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-function isoDay(date: Date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function buildBreakdown(
-  tasksArray: TaskDTO[],
-  labelFor: (task: TaskDTO) => string,
-  rawFor: (task: TaskDTO) => string,
-  limit = 12,
-) {
-  const counts: Record<string, { count: number; raw: string }> = {}
-  tasksArray.forEach((task) => {
-    const label = labelFor(task)
-    const raw = rawFor(task)
-    if (!counts[label]) counts[label] = { count: 0, raw }
-    counts[label].count += 1
-  })
-  const denominator = tasksArray.length || 0
-  return Object.entries(counts)
-    .map(([label, entry]) => ({
-      label,
-      count: entry.count,
-      raw: entry.raw,
-      percent: denominator ? Math.round((entry.count / denominator) * 100) : 0,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit)
-}
-
-function formatDecimal(value: number) {
-  return value ? value.toFixed(1) : '0.0'
-}
-
-function formatNumber(value: number) {
-  return value.toLocaleString()
-}
-
-function formatRelativeTimestamp(value: string | null | undefined) {
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  const now = new Date()
-  const diffMs = now.getTime() - parsed.getTime()
-  const diffMinutes = Math.round(diffMs / (60 * 1000))
-  if (diffMinutes <= 0) return 'just now'
-  if (diffMinutes < 60) return `${diffMinutes} min ago`
-  const diffHours = Math.round(diffMinutes / 60)
-  if (diffHours < 24) return `${diffHours} hr${diffHours === 1 ? '' : 's'} ago`
-  const diffDays = Math.round(diffHours / 24)
-  if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
-  const diffMonths = Math.round(diffDays / 30)
-  if (diffMonths < 12) return `${diffMonths} mo${diffMonths === 1 ? '' : 's'} ago`
-  const diffYears = Math.round(diffMonths / 12)
-  return `${diffYears} yr${diffYears === 1 ? '' : 's'} ago`
-}
-
-async function refreshData(opts: { forceStats?: boolean } = {}) {
-  if (insightsDisposed) return
-  const generation = ++refreshGeneration
-  refreshInFlight += 1
-  refreshing.value = true
-  try {
-    await adoptTaskQuery().refresh()
-    if (isStaleRun(generation)) return
-    await loadSelectedProjectStats(generation)
-    if (isStaleRun(generation)) return
-    if (!selectedProject.value) await ensureProjectStatsMap({ force: opts.forceStats === true })
-    if (isStaleRun(generation)) return
-    await refreshActivityFeedWindow()
-    if (isStaleRun(generation)) return
-    lastUpdated.value = new Date()
-  } catch (error: any) {
-    if (isStaleRun(generation)) return
-    showToast(error?.message || 'Failed to refresh insights')
-  } finally {
-    refreshInFlight -= 1
-    if (refreshInFlight === 0) refreshing.value = false
-  }
-}
-
-async function retry() {
-  await refreshData({ forceStats: true })
-}
-
-async function refreshActivityFeedWindow() {
-  if (insightsDisposed) return
-  await adoptActivityFeedQuery().refresh()
-}
-
-function applyTagFilters(next: string[]) {
-  const deduped: string[] = []
-  const seen = new Set<string>()
-  next.forEach((tag) => {
-    const trimmed = tag.trim()
-    if (!trimmed) return
-    const normalised = normaliseTag(trimmed)
-    if (seen.has(normalised)) return
-    seen.add(normalised)
-    deduped.push(trimmed)
-  })
-  tagFilterInput.value = deduped.join(', ')
-}
-
-function clearTagFilter() {
-  applyTagFilters([])
-}
-
-async function fetchProjectStats(prefix: string): Promise<ProjectStatsDTO | null> {
-  const generation = (projectStatsRequests.get(prefix) ?? 0) + 1
-  projectStatsRequests.set(prefix, generation)
-  try {
-    const stats = await api.projectStats(prefix)
-    if (insightsDisposed || projectStatsRequests.get(prefix) !== generation) return null
-    projectStatsMap[prefix] = stats
-    return stats
-  } catch (error: unknown) {
-    if (insightsDisposed || projectStatsRequests.get(prefix) !== generation) return null
-    throw error
-  }
-}
-
-async function loadSelectedProjectStats(generation: number) {
-  const project = selectedProject.value
-  if (!project) {
-    if (!isStaleRun(generation)) projectStats.value = null
-    return
-  }
-  try {
-    const stats = await fetchProjectStats(project)
-    if (!stats) return
-    if (isStaleRun(generation) || selectedProject.value !== project) return
-    projectStats.value = stats
-  } catch (error: any) {
-    if (isStaleRun(generation) || selectedProject.value !== project) return
-    showToast(error?.message || 'Failed to load project stats')
-  }
-}
-
-async function ensureProjectStatsMap(opts: { force?: boolean } = {}) {
-  if (insightsDisposed) return
-  const prefixes = opts.force
-    ? projects.value.map((project) => project.prefix)
-    : projects.value.filter((project) => !projectStatsMap[project.prefix]).map((project) => project.prefix)
-  if (!prefixes.length) return
-  await Promise.all(
-    prefixes.map(async (prefix) => {
-      try {
-        await fetchProjectStats(prefix)
-      } catch (error: any) {
-        if (insightsDisposed) return
-        showToast(error?.message || `Failed to load stats for ${prefix}`)
+const people = computed<PersonRow[]>(() => {
+  const keys = new Set<string>()
+  for (const task of open.value) keys.add(task.assignee || '')
+  for (const timeline of completed.value) keys.add(timeline.task.assignee || '')
+  const wipIds = new Set(wip.value.map((timeline) => timeline.task.id))
+  const overdueIds = new Set(overdue.value.map((task) => task.id))
+  return [...keys]
+    .map((key) => {
+      const mine = open.value.filter((task) => (task.assignee || '') === key)
+      const done = completed.value.filter((timeline) => (timeline.task.assignee || '') === key)
+      return {
+        key: key || '(unassigned)',
+        label: key || 'Unassigned',
+        filter: key || '__none__',
+        open: mine.length,
+        inProgress: mine.filter((task) => wipIds.has(task.id)).length,
+        overdue: mine.filter((task) => overdueIds.has(task.id)).length,
+        completed: done.length,
+        cycle: percentile(values(done, cycleDays), 50),
+        effort: effortText(mine),
       }
-    }),
-  )
-}
-
-function openTaskList(filters: Record<string, string | string[]>) {
-  const query: Record<string, string> = {}
-  if (selectedProject.value) query.project = selectedProject.value
-  if (tagFilters.value.length) query.tags = tagFilters.value.join(',')
-  Object.entries(filters).forEach(([key, value]) => {
-    if (Array.isArray(value)) {
-      if (value.length) query[key] = value.join(',')
-    } else if (value) {
-      query[key] = value
-    }
-  })
-  router.push({ path: '/', query })
-}
-
-function onStatusSelect(payload: unknown) {
-  if (!payload || typeof payload !== 'object') return
-  const candidate = payload as { raw?: unknown }
-  if (typeof candidate.raw !== 'string' || !candidate.raw.trim()) return
-  openTaskList({ status: candidate.raw })
-}
-
-function selectProject(prefix: string) {
-  selectedProject.value = prefix
-}
-
-const routeProject = computed(() => {
-  const value = route.query.project
-  return typeof value === 'string' ? value : ''
-})
-
-const routeTags = computed(() => {
-  const value = route.query.tags
-  const values = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : []
-  return values
-    .map((entry) => decodeURIComponent(String(entry)))
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0)
-})
-
-function haveSameTags(a: string[], b: string[]) {
-  if (a.length !== b.length) return false
-  const left = [...a].map((tag) => normaliseTag(tag)).sort()
-  const right = [...b].map((tag) => normaliseTag(tag)).sort()
-  return left.every((value, index) => value === right[index])
-}
-
-function buildRouteQuery() {
-  const query: Record<string, string> = {}
-  Object.entries(route.query).forEach(([key, value]) => {
-    if (key === 'project' || key === 'tags') return
-    if (Array.isArray(value)) return
-    if (value != null) query[key] = String(value)
-  })
-  if (selectedProject.value) query.project = selectedProject.value
-  if (tagFilters.value.length) query.tags = tagFilters.value.join(',')
-  return query
-}
-
-async function syncRoute() {
-  const query = buildRouteQuery()
-  await router.replace({ path: '/insights', query })
-}
-
-watch(routeProject, (value) => {
-  if (!mounted.value) return
-  if (value !== selectedProject.value) selectedProject.value = value
-})
-
-watch(routeTags, (value) => {
-  if (!mounted.value) return
-  if (haveSameTags(value, tagFilters.value)) return
-  applyTagFilters(value)
-})
-
-watch(selectedProject, async () => {
-  if (!mounted.value) return
-  await syncRoute()
-  await refreshData()
-})
-
-watch(tagFilters, async (value) => {
-  if (!mounted.value) return
-  if (haveSameTags(value, routeTags.value)) return
-  await syncRoute()
-})
-
-watch(projects, () => {
-  if (!mounted.value) return
-  ensureProjectStatsMap()
-})
-
-watch(windowDays, async () => {
-  if (!mounted.value) return
-  await refreshActivityFeedWindow()
-})
-
-onBeforeUnmount(() => {
-  // Invalidate every in-flight orchestration first: a slow task query (or
-  // stats/feed request) resolving after unmount must not continue the run,
-  // adopt new handles, publish state, or toast.
-  insightsDisposed = true
-  refreshGeneration += 1
-  if (tagBlurTimer) {
-    clearTimeout(tagBlurTimer)
-    tagBlurTimer = null
-  }
-  taskQueryHandle.value?.release()
-  taskQueryHandle.value = null
-  activityFeedHandle.value?.release()
-  activityFeedHandle.value = null
-  if (activityResizeObserver) {
-    activityResizeObserver.disconnect()
-    activityResizeObserver = null
-  }
-})
-
-onMounted(async () => {
-  await refreshProjects()
-  if (routeProject.value) {
-    selectedProject.value = routeProject.value
-  }
-  if (routeTags.value.length) {
-    applyTagFilters(routeTags.value)
-  }
-  adoptTaskQuery()
-  adoptActivityFeedQuery()
-  await refreshData()
-  mounted.value = true
-  if (route.path !== '/insights') {
-    await syncRoute()
-  }
-  await nextTick()
-  updateActivityChartWidth()
-  if (typeof window !== 'undefined' && typeof ResizeObserver !== 'undefined') {
-    activityResizeObserver = new ResizeObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.target === activityChartHost.value) {
-          updateActivityChartWidth(entry.contentRect?.width)
-        }
-      })
     })
-    if (activityChartHost.value) {
-      activityResizeObserver.observe(activityChartHost.value)
-    }
+    .sort(
+      (a, b) =>
+        Number(a.label === 'Unassigned') - Number(b.label === 'Unassigned') ||
+        b.open - a.open ||
+        a.label.localeCompare(b.label),
+    )
+})
+const assignees = computed(() => people.value.filter((person) => person.label !== 'Unassigned' && person.open > 0))
+const openPerPerson = computed(() =>
+  assignees.value.length ? assignees.value.reduce((sum, person) => sum + person.open, 0) / assignees.value.length : 0,
+)
+const completedByPerson = computed(() =>
+  rows(
+    countBy(
+      completed.value.map((timeline) => timeline.task),
+      (task) => task.assignee,
+      'Unassigned',
+    ),
+    'Unassigned',
+  ),
+)
+const activity = computed(() => activityByActor(tasks.value, range.value))
+const activityRows = computed(() => rows(activity.value, '(unknown)'))
+
+// -- Planning -------------------------------------------------------------------
+const openEffort = computed(() => effortTotals(open.value))
+const openEffortText = computed(() => effortText(open.value))
+const openEffortCaption = computed(() => `${openEffort.value.estimated} of ${open.value.length} open tasks estimated`)
+const dueOutlook = computed<BarRow[]>(() => {
+  const counts = { overdue: 0, today: 0, soon: 0, later: 0 }
+  for (const task of open.value) {
+    const bucket = completion.dueBucketFor(task)
+    if (bucket) counts[bucket] += 1
   }
+  return [
+    { key: 'overdue', label: 'Overdue', value: counts.overdue, alert: counts.overdue > 0 },
+    { key: 'today', label: 'Due today', value: counts.today },
+    { key: 'soon', label: 'Next 7 days', value: counts.soon },
+    { key: 'later', label: 'Later', value: counts.later },
+    { key: 'none', label: 'No due date', value: noDueDate.value.length, muted: true },
+  ]
+})
+function openDueBucket(key: string) {
+  if (key === 'none') openTasks({ needs: 'due' })
+  else openTasks({ due: key })
+}
+const upcoming = computed(() =>
+  open.value
+    .filter((task) => {
+      const bucket = completion.dueBucketFor(task)
+      if (bucket === 'overdue' || bucket === 'today' || bucket === 'soon') return true
+      const due = task.due_date ? Date.parse(task.due_date) : NaN
+      return !Number.isNaN(due) && due <= now.value + 14 * DAY_MS
+    })
+    .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? '')),
+)
+const upcomingColumns = [
+  { key: 'due', label: 'Due' },
+  { key: 'status', label: 'Status' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'assignee', label: 'Assignee' },
+]
+const upcomingRows = computed<TaskTableRow[]>(() =>
+  upcoming.value.map((task) => ({
+    id: task.id,
+    title: task.title,
+    cells: {
+      due: formatDue(task.due_date),
+      status: task.status,
+      priority: task.priority,
+      assignee: task.assignee || '—',
+    },
+    alert: completion.isTaskOverdue(task) ? ['due'] : [],
+  })),
+)
+
+// -- Quality --------------------------------------------------------------------
+const isBug = (task: TaskDTO) => isBugType(task.task_type)
+const bugTypes = computed(() => [...new Set(tasks.value.filter(isBug).map((task) => task.task_type))])
+const bugTypesPresent = computed(() => bugTypes.value.length > 0)
+const bugTypeFilter = computed(() => bugTypes.value.join(','))
+const openBugs = computed(() => open.value.filter(isBug))
+const bugsReported = computed(() => created.value.filter((timeline) => isBug(timeline.task)))
+const bugsReportedPrev = computed(() => createdPrev.value.filter((timeline) => isBug(timeline.task)))
+const bugsFixed = computed(() => completed.value.filter((timeline) => isBug(timeline.task)))
+const bugsFixedPrev = computed(() => completedPrev.value.filter((timeline) => isBug(timeline.task)))
+const bugFixP50 = computed(() => percentile(values(bugsFixed.value, leadDays), 50))
+const bugShare = computed(() => (created.value.length ? bugsReported.value.length / created.value.length : null))
+const bugSeries = computed(() => [
+  {
+    label: 'Reported',
+    values: countPerBucket(
+      bugsReported.value.map((timeline) => timeline.created),
+      buckets.value,
+    ),
+  },
+  {
+    label: 'Fixed',
+    values: countPerBucket(
+      bugsFixed.value.map((timeline) => timeline.doneAt),
+      buckets.value,
+    ),
+  },
+])
+const openBugsByPriority = computed(() =>
+  rows(
+    orderByConfigured(
+      countBy(openBugs.value, (task) => task.priority),
+      [...priorities.value].reverse(),
+    ),
+  ),
+)
+const oldestBugColumns = [
+  { key: 'priority', label: 'Priority' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'age', label: 'Age', numeric: true },
+]
+const oldestBugRows = computed<TaskTableRow[]>(() =>
+  openBugs.value
+    .map((task) => ({ task, age: (now.value - Date.parse(task.created)) / DAY_MS }))
+    .sort((a, b) => b.age - a.age)
+    .map(({ task, age }) => ({
+      id: task.id,
+      title: task.title,
+      cells: { priority: task.priority, assignee: task.assignee || '—', age: formatDays(age) },
+    })),
+)
+
+// -- My work --------------------------------------------------------------------
+const isMine = (task: TaskDTO) => !!me.value && task.assignee === me.value
+const myOpen = computed(() => open.value.filter(isMine))
+const myWip = computed(() => wip.value.filter((timeline) => isMine(timeline.task)))
+const myOverdue = computed(() => overdue.value.filter(isMine))
+const myDueSoon = computed(() => dueSoon.value.filter(isMine))
+const myCompleted = computed(() =>
+  completed.value.filter((timeline) => isMine(timeline.task)).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0)),
+)
+const priorityRank = computed(() => new Map(priorities.value.map((label, index) => [label.toLowerCase(), index])))
+const myOpenColumns = [
+  { key: 'status', label: 'Status' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'due', label: 'Due' },
+]
+const myOpenRows = computed<TaskTableRow[]>(() =>
+  [...myOpen.value]
+    .sort(
+      (a, b) =>
+        (a.due_date || '9999').localeCompare(b.due_date || '9999') ||
+        (priorityRank.value.get(b.priority.toLowerCase()) ?? -1) -
+          (priorityRank.value.get(a.priority.toLowerCase()) ?? -1),
+    )
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      cells: { status: task.status, priority: task.priority, due: formatDue(task.due_date) },
+      alert: completion.isTaskOverdue(task) ? ['due'] : [],
+    })),
+)
+const myCompletedColumns = [
+  { key: 'done', label: 'Completed' },
+  { key: 'cycle', label: 'Cycle time', numeric: true },
+]
+const myCompletedRows = computed<TaskTableRow[]>(() =>
+  myCompleted.value.map((timeline) => ({
+    id: timeline.task.id,
+    title: timeline.task.title,
+    cells: {
+      done: formatDue(new Date(timeline.doneAt!).toISOString()),
+      cycle: formatDays(cycleDays(timeline)),
+    },
+  })),
+)
+
+// -- Formatting and navigation ----------------------------------------------
+const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
+function fmt(value: number, digits = 0) {
+  const factor = 10 ** digits
+  return numberFormat.format(Math.round(value * factor) / factor)
+}
+function pct(ratio: number) {
+  return `${Math.round(ratio * 100)}%`
+}
+const dayFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+function formatDue(value: string | null | undefined) {
+  if (!value) return '—'
+  const at = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value)
+  return Number.isNaN(at.getTime()) ? value : dayFormat.format(at)
+}
+
+/** Change vs the previous period; `goodWhen` says which direction is good news. */
+function delta(current: number, previous: number, goodWhen: 'up' | 'down' | null): StatDelta | null {
+  if (!comparable.value) return null
+  const ratio = changeRatio(current, previous)
+  const direction = current > previous ? 'up' : current < previous ? 'down' : 'flat'
+  const tone = direction === 'flat' || !goodWhen ? 'neutral' : direction === goodWhen ? 'good' : 'bad'
+  const vs = `vs previous ${periodLabel.value.replace(/^Last /, '').toLowerCase()}`
+  // Percentages of tiny baselines mislead ("1300%"); show the difference instead.
+  if (ratio === null || previous < 10) {
+    const diff = current - previous
+    return { text: `${diff === 0 ? 'No change' : `${diff > 0 ? '+' : '−'}${Math.abs(diff)}`} ${vs}`, direction, tone }
+  }
+  return { text: `${direction === 'flat' ? 'No change' : pct(Math.abs(ratio))} ${vs}`, direction, tone }
+}
+function durationDelta(current: number | null, previous: number | null): StatDelta | null {
+  if (!comparable.value || current === null || previous === null) return null
+  const direction = current > previous ? 'up' : current < previous ? 'down' : 'flat'
+  return {
+    text: direction === 'flat' ? 'No change' : `was ${formatDays(previous)}`,
+    direction,
+    tone: direction === 'flat' ? 'neutral' : direction === 'down' ? 'good' : 'bad',
+  }
+}
+
+function openTasks(extra: Record<string, string>) {
+  const target: Record<string, string> = { ...filter.value }
+  if (project.value) target.project = project.value
+  for (const [key, value] of Object.entries(extra)) if (value) target[key] = value
+  void router.push({ path: '/', query: target })
+}
+function openTask(id: string) {
+  openTaskPanel({ taskId: id })
+}
+
+// Plain table view for column charts (every value readable without hover).
+const SeriesTable = defineComponent({
+  props: {
+    labels: { type: Array as () => string[], required: true },
+    series: { type: Array as () => Array<{ label: string; values: number[] }>, required: true },
+  },
+  setup(props) {
+    return () =>
+      h('table', { class: 'series-table' }, [
+        h(
+          'thead',
+          h('tr', [
+            h('th', { scope: 'col' }, ''),
+            ...props.series.map((entry) => h('th', { scope: 'col', class: 'numeric' }, entry.label)),
+          ]),
+        ),
+        h(
+          'tbody',
+          props.labels.map((label, index) =>
+            h('tr', [
+              h('th', { scope: 'row' }, label),
+              ...props.series.map((entry) => h('td', { class: 'numeric' }, String(entry.values[index] ?? 0))),
+            ]),
+          ),
+        ),
+      ])
+  },
+})
+
+// -- Lifecycle --------------------------------------------------------------
+onMounted(async () => {
+  clock = setInterval(() => (now.value = Date.now()), 60_000)
+  void api
+    .whoami()
+    .then((value) => {
+      if (!disposed) me.value = (value || '').trim()
+    })
+    .catch(() => undefined)
+  void Promise.resolve(refreshSprints()).catch(() => undefined)
+  await refreshConfig(project.value)
+  await refreshTasks()
+  writeViewQuery()
+})
+
+onUnmounted(() => {
+  disposed = true
+  if (filterDebounce) clearTimeout(filterDebounce)
+  if (clock) clearInterval(clock)
+  query.value?.release()
+  query.value = null
 })
 </script>
+
 <style scoped>
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-}
-.summary-tile {
+.filter-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border-radius: var(--radius-base);
-  background: color-mix(in oklab, var(--bg) 92%, transparent);
-}
-.summary-tile.highlight {
-  border: 1px solid var(--color-danger);
-}
-.summary-label {
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.summary-value {
-  font-size: 1.4rem;
-  font-weight: 700;
-}
-.insights-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
-}
-.insights-refresh-error {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-base);
-  color: var(--color-danger-strong, var(--color-danger));
 }
-.insights-refresh-error__message {
-  font-size: 13px;
-}
-.card-head {
+
+.insights-tabs {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-1, 0.25rem);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
 }
-.card-head h3 {
+
+.insights-tab {
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.insights-tab:hover {
+  color: var(--color-fg);
+}
+
+.insights-tab.active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-fg);
+  font-weight: 600;
+}
+
+.insights-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.insights-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+  transition: opacity 150ms ease;
+}
+
+.insights-panel--refreshing {
+  opacity: 0.6;
+}
+
+.insights-lens-note {
   margin: 0;
+  font-size: var(--text-sm, 0.875rem);
 }
-.insights-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3, 0.75rem);
 }
-.insights-controls :is(.input, .btn):not(.toolbar-select) {
-  min-height: var(--control-height);
-  height: var(--control-height);
-  padding-top: 0;
-  padding-bottom: 0;
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3, 0.75rem);
 }
-.tag-filter {
-  position: relative;
-  flex: 0 0 220px;
-  width: 220px;
-  min-width: 220px;
-  max-width: 220px;
-  display: flex;
-}
-.tag-filter .input {
-  flex: 1 1 auto;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: var(--control-height);
-  height: var(--control-height);
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.activity-card {
+
+.chart-grid > .span-2 {
   grid-column: span 2;
 }
-.activity-card .chart-scroll {
-  width: 100%;
-}
-@media (max-width: 960px) {
-  .activity-card {
-    grid-column: span 1;
+
+@media (max-width: 900px) {
+  .chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chart-grid > .span-2 {
+    grid-column: auto;
   }
 }
-.chart-scroll {
-  width: 100%;
-  overflow-x: hidden;
-  padding: 8px 0 12px;
+
+.insights-callout {
+  margin: 0;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-left: 3px solid var(--color-warning);
+  background: color-mix(in oklab, var(--color-warning) 10%, transparent);
+  font-size: var(--text-sm, 0.875rem);
 }
-.chart-scroll canvas {
-  display: block;
-  width: 100% !important;
+
+.insights-footnote {
+  margin: 0;
+  font-size: var(--text-sm, 0.875rem);
 }
-.chart-controls {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+
+.people-table {
+  overflow-x: auto;
 }
-.chart-controls .ghost {
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-}
-.chart-controls .ghost.active {
-  background: color-mix(in oklab, var(--color-accent) 20%, transparent);
-  border-color: color-mix(in oklab, var(--color-accent) 60%, transparent);
-}
-.distribution {
+
+.people-table table,
+:deep(.series-table) {
   width: 100%;
   border-collapse: collapse;
+  font-size: var(--text-sm, 0.875rem);
 }
-.distribution th,
-.distribution td {
-  padding: 6px 0;
+
+.people-table th,
+.people-table td,
+:deep(.series-table) th,
+:deep(.series-table) td {
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  border-bottom: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
   text-align: left;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  white-space: nowrap;
 }
-.distribution tr {
-  cursor: pointer;
+
+.people-table thead th,
+:deep(.series-table) thead th {
+  font-weight: 500;
+  color: var(--color-muted);
 }
-.distribution tr:not(.clickable) {
-  cursor: default;
+
+.people-table .numeric,
+:deep(.series-table) .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
-.distribution tr:hover {
-  background: color-mix(in oklab, var(--bg) 75%, transparent);
-}
-.tag-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.tag-chip {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-  background: transparent;
-  cursor: pointer;
-}
-.tag-chip:hover {
-  background: color-mix(in oklab, var(--color-accent) 12%, transparent);
-}
-.tag-chip.active {
-  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
-  border-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
-}
-@media (max-width: 960px) {
-  .insights-header {
-    flex-direction: column;
-  }
-  /* In column direction the 280px flex-basis would become the title block's
-     height, creating a large gap; reset it to its content size. */
-  .insights-header > .col {
-    flex-basis: auto;
-  }
-  .insights-controls {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-  }
-}
-.tag-suggestions {
-  position: absolute;
-  z-index: var(--z-popover);
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: var(--surface);
-  border-radius: var(--radius-base);
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-  box-shadow: var(--shadow-popover);
-  margin: 0;
-  padding: 4px;
-  list-style: none;
-  max-height: 220px;
-  overflow-y: auto;
-}
-.tag-suggestions__item + .tag-suggestions__item {
-  margin-top: 2px;
-}
-.tag-suggestion {
-  width: 100%;
-  text-align: left;
-  padding: 6px 10px;
-  border-radius: var(--radius-md);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  display: flex;
-  gap: 4px;
-}
-.tag-suggestion:hover,
-.tag-suggestion.active {
-  background: color-mix(in oklab, var(--color-accent) 16%, transparent);
-  color: var(--color-strong);
-}
-.tag-suggestion__part.match {
+
+.people-table td.alert {
+  color: var(--color-danger-strong);
   font-weight: 600;
-  color: var(--color-accent-strong);
 }
-.tag-suggestion__label {
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-}
-.link-btn {
-  background: none;
-  border: none;
+
+.link-button {
   padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
   font: inherit;
-  color: var(--color-accent);
+  text-align: left;
   cursor: pointer;
 }
-.link-btn:hover {
+
+.link-button:hover {
   text-decoration: underline;
+}
+
+.link-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-left: 3px solid var(--color-danger);
 }
 </style>

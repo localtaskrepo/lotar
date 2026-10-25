@@ -149,11 +149,6 @@
       "count": 4
     }
   },
-  "view/pages/ProjectInsights.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
   "view/pages/ScanView.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 4

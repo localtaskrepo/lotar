@@ -81,7 +81,7 @@ automation:
   <tr>
     <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/sprints-dark.webp"><img src="docs/assets/screenshots/sprints-light.webp" alt="Sprint burndown chart for the active sprint"></picture></td>
     <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/calendar-dark.webp"><img src="docs/assets/screenshots/calendar-light.webp" alt="Calendar with task due dates"></picture></td>
-    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/insights-dark.webp"><img src="docs/assets/screenshots/insights-light.webp" alt="Project insights with status, priority, and assignee breakdowns"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/insights-dark.webp"><img src="docs/assets/screenshots/insights-light.webp" alt="Insights overview with headline numbers and a created vs completed trend"></picture></td>
   </tr>
 </table>
 

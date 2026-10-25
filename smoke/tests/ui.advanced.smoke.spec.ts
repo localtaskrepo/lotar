@@ -130,26 +130,18 @@ describe.concurrent.skipIf(!gitAvailable())('UI advanced smoke scenarios', () =>
                     await loader.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => null);
                     await loader.waitFor({ state: 'detached', timeout: 15_000 }).catch(() => null);
 
-                    const summary = page.locator('.summary-grid');
-                    await page.waitForSelector('.summary-grid', { timeout: 15_000 });
-                    const summaryText = (await summary.innerText()).toLowerCase();
-                    expect(summaryText).toContain('total tasks');
-                    expect(summaryText).toContain('tagged');
-
-                    const totalValueHandle = await page.waitForFunction(
-                        () => {
-                            const el = document.querySelector('.summary-grid .summary-tile strong');
-                            if (!el) return null;
-                            const raw = el.textContent?.trim();
-                            if (!raw) return null;
-                            const parsed = Number.parseInt(raw, 10);
-                            return Number.isFinite(parsed) ? parsed : null;
-                        },
-                        {},
-                        { timeout: 15_000 },
-                    );
-                    const totalTasksValue = await totalValueHandle.jsonValue();
-                    expect(totalTasksValue as number).toBeGreaterThanOrEqual(3);
+                    // Three tasks were created and one was marked done in git
+                    // history: Overview shows the open work and the completion.
+                    const tile = (label: string) =>
+                        page
+                            .locator('.stat-tile')
+                            .filter({
+                                has: page.locator('.stat-tile__label', { hasText: new RegExp(`^\\s*${label}\\s*$`) }),
+                            })
+                            .locator('.stat-tile__value');
+                    await expect.poll(async () => (await tile('Open').textContent())?.trim()).toBe('2');
+                    await expect.poll(async () => (await tile('Completed').textContent())?.trim()).toBe('1');
+                    expect(await page.locator('.chart-card').count()).toBeGreaterThanOrEqual(4);
 
                     const waitForRefreshData = waitForInsightsData(page);
                     await page.locator('button[aria-label="Refresh insights"]').click();

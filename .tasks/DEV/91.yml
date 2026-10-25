@@ -1,7 +1,37 @@
 title: Insights page is missing filters
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-09-13T16:31:45.693630+00:00
+modified: 2026-10-25T04:36:14.926576+00:00
+comments:
+- date: 2026-10-25T04:12:52.751255+00:00
+  text: 'Plan (developer asked for a full Insights rework covering all roles): replace the page. Data = one live task query (shared store, all pages, SSE) filtered by the standard FilterBar (project, status, priority, type, assignee, tags, sprints, custom fields, search) + a Period selector (7/30/90/180/365 days, all time) with comparison to the previous period. Metrics computed client-side from task history in view/utils/insightsMetrics.ts (unit tested): created vs completed flow, throughput, cycle/lead time percentiles + histogram, WIP and aging WIP, time in status, due buckets, on-time rate, stale work, workload per assignee, activity per actor, bug inflow/outflow and time to resolve, effort totals. Lenses (tabs, in URL): Overview (leadership), Delivery (eng manager/scrum master), Team (people lead), Planning (product/PM), Quality (QA), My work (individual). Small accessible SVG components (stat tile, column chart with tooltips + table view, bar list, task table) using a validated palette. Every list/bar links to tasks or the filtered Tasks list.'
+- date: 2026-10-25T04:36:14.844812+00:00
+  text: 'Done. Insights rebuilt from scratch. Filters: the standard FilterBar (project incl. all projects, status, priority, type, assignee, tags, sprints, custom fields, search, due/needs) plus a Period selector (7/30/90 days, 6/12 months, all time) with comparison to the previous period (absolute difference under 10, else %). Data: one live, project-scoped task query; metrics from task history in view/utils/insightsMetrics.ts (14 unit tests): created vs completed, throughput, cycle/lead time p50/p85 + distribution, WIP and aging WIP (flagged past p85), time in status, due outlook, on-time rate, stale/unassigned/urgent attention list, workload per person (open, in progress, overdue, completed, cycle, effort), activity per actor, bugs reported vs fixed, time to fix, bug share, effort totals (hours and points kept separate). Views (tabs, in URL + localStorage): Overview, Delivery, Team, Planning, Quality, My work. Components in view/components/insights (StatTile, ChartCard with chart/table toggle, ColumnChart with tooltips/keyboard, BarList, TaskTable); chart palette tokens --viz-* validated for colour-vision deficiency on both theme surfaces. Counts and rows drill into the Tasks list or open the task. Old per-project stats and git activity feed calls removed (page now loads from one query). Tests: ProjectInsights.spec.ts rewritten (7), smoke ui.insights.smoke.spec.ts (scoping, live SSE update, remembered view/period, DEV-187), ui.advanced and ui.done-states updated; old ui.insights-isolation spec removed (its activity-chart/stats features no longer exist). README Insights screenshots regenerated; help/serve.md updated. Verified: lint:agent, test:agent (1691 Rust, 1163 UI), full smoke 346/346.'
 description: The insights page currently only allows to filter by project and tags, however, there are more filters that make sense, such as filtering between time intervals, and potentially other filters that make sense.
+history:
+- at: 2026-10-25T04:12:52.633966+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T04:12:52.751255+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T04:36:14.844812+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T04:36:14.926576+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -239,12 +239,18 @@ describe.concurrent('DEV-21 done-state policy (actual backend)', () => {
             const overdue = await api<TaskPage>(url, '/api/tasks/list?project=ALPHA&due=overdue&limit=200');
             expect(overdue.total).toBe(2);
             await withPage(`${url}/insights?project=ALPHA`, async (page) => {
-                const tile = page.locator('.summary-tile').filter({ hasText: 'Overdue' });
-                await expect.poll(async () => (await tile.locator('.summary-value').textContent())?.trim()).toBe('2');
-                const drilldown = page.locator(
-                    'xpath=//h3[normalize-space()="Due date outlook"]/following::table[1]//tbody/tr[th="Overdue"]',
-                );
-                expect((await drilldown.locator('td').first().textContent())?.trim()).toBe('2');
+                const tile = page
+                    .locator('.stat-tile')
+                    .filter({ has: page.locator('.stat-tile__label', { hasText: /^\s*Overdue\s*$/ }) });
+                await expect
+                    .poll(async () => (await tile.locator('.stat-tile__value').textContent())?.trim())
+                    .toBe('2');
+                // Planning's due date outlook drills into the same task query.
+                await page.getByTestId('insights-tab-planning').click();
+                const drilldown = page
+                    .getByRole('list', { name: 'Open work by deadline' })
+                    .getByRole('button', { name: /Overdue/ });
+                expect((await drilldown.locator('.bar-list__value').textContent())?.trim()).toBe('2');
                 await drilldown.click();
                 await page.waitForURL((next) => next.pathname === '/' && next.searchParams.get('due') === 'overdue');
                 const rows = page.locator('table tbody tr');
