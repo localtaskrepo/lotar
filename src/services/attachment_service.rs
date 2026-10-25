@@ -198,12 +198,7 @@ impl AttachmentService {
         task_id: &str,
         stored_name: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
+        ReferenceService::parse_task_id(task_id)?;
         let name = Self::validate_managed_name(stored_name)?.to_string();
 
         // Reference-only detach: works for missing/stale blobs (idempotent
@@ -450,12 +445,7 @@ impl AttachmentService {
         task_id: &str,
         stored_name: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
+        ReferenceService::parse_task_id(task_id)?;
         let name = Self::validate_managed_name(stored_name)?.to_string();
 
         ReferenceService::commit_reference_change(

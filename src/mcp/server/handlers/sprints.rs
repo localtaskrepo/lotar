@@ -5,7 +5,8 @@ use super::super::hints::{EnumHints, enum_hints_to_value, make_enum_error_data};
 use super::super::{
     JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_BACKLOG_LIMIT, MCP_DEFAULT_SPRINT_LIST_LIMIT,
     MCP_MAX_BACKLOG_LIMIT, MCP_MAX_CURSOR, MCP_MAX_SPRINT_LIST_LIMIT, domain_service_error, err,
-    integrity_value, ok, parse_cursor_value, parse_limit_value,
+    integrity_value, internal_error, ok, parse_cursor_value, parse_limit_value, resolve_tasks_dir,
+    text_result,
 };
 use crate::api_types::{
     SprintCreateRequest, SprintCreateResponse, SprintListItem, SprintUpdateRequest,
@@ -16,13 +17,13 @@ use crate::services::sprint_assignment::{self, SprintBacklogOptions};
 use crate::services::sprint_integrity;
 use crate::services::sprint_metrics::SprintBurndownMetric;
 use crate::services::sprint_reports::{compute_sprint_burndown, compute_sprint_summary};
-use crate::services::sprint_service::SprintService;
-use crate::services::sprint_status;
+use crate::services::sprint_service::{
+    SprintService, sprint_from_create_request, sprint_record_to_list_item,
+};
 use crate::services::sprint_velocity::{
     DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
 };
 use crate::storage::manager::Storage;
-use crate::storage::sprint::{Sprint, SprintCapacity, SprintPlan};
 use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
@@ -119,117 +120,8 @@ fn parse_sprint_id(params: &Value) -> Result<u32, &'static str> {
     }
 }
 
-fn sprint_record_to_list_item(
-    record: &crate::services::sprint_service::SprintRecord,
-    reference: chrono::DateTime<Utc>,
-) -> SprintListItem {
-    let lifecycle = sprint_status::derive_status(&record.sprint, reference);
-    let plan = record.sprint.plan.as_ref();
-    let capacity = plan.and_then(|plan| plan.capacity.as_ref());
-    SprintListItem {
-        id: record.id,
-        label: record
-            .sprint
-            .plan
-            .as_ref()
-            .and_then(|plan| plan.label.clone()),
-        display_name: sprint_assignment::sprint_display_name(record),
-        created: record.sprint.created.clone(),
-        modified: record.sprint.modified.clone(),
-        state: lifecycle.state.as_str().to_string(),
-        planned_start: lifecycle.planned_start.map(|dt| dt.to_rfc3339()),
-        planned_end: lifecycle.planned_end.map(|dt| dt.to_rfc3339()),
-        actual_start: lifecycle.actual_start.map(|dt| dt.to_rfc3339()),
-        actual_end: lifecycle.actual_end.map(|dt| dt.to_rfc3339()),
-        computed_end: lifecycle.computed_end.map(|dt| dt.to_rfc3339()),
-        goal: plan.and_then(|plan| plan.goal.clone()),
-        plan_length: plan.and_then(|plan| plan.length.clone()),
-        overdue_after: plan.and_then(|plan| plan.overdue_after.clone()),
-        notes: plan.and_then(|plan| plan.notes.clone()),
-        capacity_points: capacity.and_then(|cap| cap.points),
-        capacity_hours: capacity.and_then(|cap| cap.hours),
-        warnings: lifecycle
-            .warnings
-            .iter()
-            .map(|warning| warning.message())
-            .collect(),
-    }
-}
-
-fn clean_opt_string(input: Option<String>) -> Option<String> {
-    input.and_then(|value| {
-        let trimmed = value.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
-    })
-}
-
-fn sprint_from_create_request(payload: &SprintCreateRequest) -> Sprint {
-    let mut plan = SprintPlan::default();
-
-    if let Some(label) = clean_opt_string(payload.label.clone()) {
-        plan.label = Some(label);
-    }
-    if let Some(goal) = clean_opt_string(payload.goal.clone()) {
-        plan.goal = Some(goal);
-    }
-    if let Some(length) = clean_opt_string(payload.plan_length.clone()) {
-        plan.length = Some(length);
-    }
-    if let Some(ends_at) = clean_opt_string(payload.ends_at.clone()) {
-        plan.ends_at = Some(ends_at);
-    }
-    if let Some(starts_at) = clean_opt_string(payload.starts_at.clone()) {
-        plan.starts_at = Some(starts_at);
-    }
-    if payload.capacity_points.is_some() || payload.capacity_hours.is_some() {
-        plan.capacity = Some(SprintCapacity {
-            points: payload.capacity_points,
-            hours: payload.capacity_hours,
-        });
-    }
-    if let Some(overdue_after) = clean_opt_string(payload.overdue_after.clone()) {
-        plan.overdue_after = Some(overdue_after);
-    }
-    if let Some(notes) = clean_opt_string(payload.notes.clone()) {
-        plan.notes = Some(notes);
-    }
-
-    let mut sprint = Sprint::default();
-    if !plan_has_values(&plan) {
-        sprint.plan = None;
-    } else {
-        sprint.plan = Some(plan);
-    }
-    sprint
-}
-
-fn plan_has_values(plan: &SprintPlan) -> bool {
-    plan.label.is_some()
-        || plan.goal.is_some()
-        || plan.length.is_some()
-        || plan.ends_at.is_some()
-        || plan.starts_at.is_some()
-        || plan.capacity.is_some()
-        || plan.overdue_after.is_some()
-        || plan.notes.is_some()
-}
-
 pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let include_integrity = req
         .params
@@ -284,24 +176,14 @@ pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
                 payload.insert("missing_sprints".to_string(), Value::Array(Vec::new()));
             }
             let payload = Value::Object(payload);
-            return ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            );
+            return text_result(req.id, &payload);
         }
     };
 
     let records = match SprintService::list(&storage) {
         Ok(records) => records,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load sprints: {}", error)})),
-            );
+            return internal_error(req.id, format!("Failed to load sprints: {}", error));
         }
     };
 
@@ -360,12 +242,7 @@ pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 
     let payload = Value::Object(payload);
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_sprint_get(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -374,17 +251,7 @@ pub(crate) fn handle_sprint_get(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(msg) => return err(req.id, -32602, msg, None),
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let storage = Storage::new(&resolver.path);
     let record = match SprintService::get(&storage, sprint_id) {
@@ -398,37 +265,17 @@ pub(crate) fn handle_sprint_get(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": error.to_string()})),
-            );
+            return internal_error(req.id, error.to_string());
         }
     };
 
     let item = sprint_record_to_list_item(&record, Utc::now());
     let payload = json!({"status": "ok", "sprint": item});
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_sprint_create(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let body: SprintCreateRequest = match serde_json::from_value(req.params.clone()) {
         Ok(payload) => payload,
@@ -438,12 +285,7 @@ pub(crate) fn handle_sprint_create(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
         Ok(cfg) => cfg,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", error)})),
-            );
+            return internal_error(req.id, format!("Failed to load config: {}", error));
         }
     };
 
@@ -473,12 +315,7 @@ pub(crate) fn handle_sprint_create(req: JsonRpcRequest) -> JsonRpcResponse {
         applied_defaults: outcome.applied_defaults.clone(),
     };
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &response)
 }
 
 pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -487,17 +324,7 @@ pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(msg) => return err(req.id, -32602, msg, None),
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let mut params = req.params.clone();
     if let Value::Object(ref mut obj) = params {
@@ -536,12 +363,7 @@ pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
             .collect(),
     };
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &response)
 }
 
 pub(crate) fn handle_sprint_summary(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -550,17 +372,7 @@ pub(crate) fn handle_sprint_summary(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(msg) => return err(req.id, -32602, msg, None),
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let storage = Storage::new(&resolver.path.clone());
     let record = match SprintService::get(&storage, sprint_id) {
@@ -574,24 +386,14 @@ pub(crate) fn handle_sprint_summary(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": error.to_string()})),
-            );
+            return internal_error(req.id, error.to_string());
         }
     };
 
     let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
         Ok(cfg) => cfg,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", error)})),
-            );
+            return internal_error(req.id, format!("Failed to load config: {}", error));
         }
     };
 
@@ -610,17 +412,7 @@ pub(crate) fn handle_sprint_burndown(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(msg) => return err(req.id, -32602, msg, None),
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let storage = Storage::new(&resolver.path.clone());
     let record = match SprintService::get(&storage, sprint_id) {
@@ -634,24 +426,14 @@ pub(crate) fn handle_sprint_burndown(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": error.to_string()})),
-            );
+            return internal_error(req.id, error.to_string());
         }
     };
 
     let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
         Ok(cfg) => cfg,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", error)})),
-            );
+            return internal_error(req.id, format!("Failed to load config: {}", error));
         }
     };
 
@@ -700,17 +482,7 @@ pub(crate) fn handle_sprint_velocity(req: JsonRpcRequest) -> JsonRpcResponse {
         None => SprintBurndownMetric::Points,
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let storage = match Storage::try_open(&resolver.path.clone()) {
         Some(storage) => storage,
@@ -725,36 +497,21 @@ pub(crate) fn handle_sprint_velocity(req: JsonRpcRequest) -> JsonRpcResponse {
                 average_completion_ratio: None,
             };
             let payload = empty.to_payload(include_active);
-            return ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            );
+            return text_result(req.id, &payload);
         }
     };
 
     let records = match SprintService::list(&storage) {
         Ok(records) => records,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load sprints: {}", error)})),
-            );
+            return internal_error(req.id, format!("Failed to load sprints: {}", error));
         }
     };
 
     let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
         Ok(cfg) => cfg,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", error)})),
-            );
+            return internal_error(req.id, format!("Failed to load config: {}", error));
         }
     };
 
@@ -766,69 +523,38 @@ pub(crate) fn handle_sprint_velocity(req: JsonRpcRequest) -> JsonRpcResponse {
     let computed = compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
     let payload = computed.to_payload(include_active);
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
-pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
-    let mut storage = Storage::new(&resolver.path.clone());
-    let mut records = match SprintService::list(&storage) {
-        Ok(records) => records,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load sprints: {}", e)})),
-            );
-        }
-    };
+/// What sprint membership tools (add/remove) share: storage, sprint records
+/// after the optional missing-sprint cleanup, the task ids and the sprint.
+struct MembershipRequest {
+    storage: Storage,
+    records: Vec<crate::services::sprint_service::SprintRecord>,
+    integrity: sprint_integrity::IntegrityCheck,
+    tasks: Vec<String>,
+    sprint_ref: Option<String>,
+}
 
+fn membership_request(req: &JsonRpcRequest) -> Result<MembershipRequest, JsonRpcResponse> {
+    let id = || req.id.clone();
+    let resolver = resolve_tasks_dir(&req.id)?;
+    let mut storage = Storage::new(&resolver.path);
+    let mut records = SprintService::list(&storage)
+        .map_err(|e| internal_error(id(), format!("Failed to load sprints: {}", e)))?;
     let cleanup_missing = req
         .params
         .get("cleanup_missing")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-
-    let integrity = match sprint_integrity::check_missing_sprints(
-        &mut storage,
-        &mut records,
-        cleanup_missing,
-        None,
-    ) {
-        Ok(check) => check,
-        Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!(
-                    "Failed to clean up sprint references: {}",
-                    error
-                )})),
-            );
-        }
-    };
-
+    let integrity =
+        sprint_integrity::check_missing_sprints(&mut storage, &mut records, cleanup_missing, None)
+            .map_err(|e| {
+                internal_error(id(), format!("Failed to clean up sprint references: {}", e))
+            })?;
     let Some(raw_tasks) = req.params.get("tasks") else {
-        return err(req.id, -32602, "Missing required field: tasks", None);
+        return Err(err(id(), -32602, "Missing required field: tasks", None));
     };
-
     let tasks: Vec<String> = match raw_tasks {
         Value::String(value) => {
             let trimmed = value.trim();
@@ -846,19 +572,47 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
             .map(|s| s.to_string())
             .collect(),
         _ => {
-            return err(
-                req.id,
+            return Err(err(
+                id(),
                 -32602,
                 "tasks must be a string or array of strings",
                 None,
-            );
+            ));
         }
     };
+    let sprint_ref =
+        parse_sprint_reference(&req.params).map_err(|msg| err(id(), -32602, msg, None))?;
+    Ok(MembershipRequest {
+        storage,
+        records,
+        integrity,
+        tasks,
+        sprint_ref,
+    })
+}
 
-    let sprint_ref = match parse_sprint_reference(&req.params) {
-        Ok(v) => v,
-        Err(msg) => return err(req.id, -32602, msg, None),
-    };
+/// Response fields every sprint membership tool returns.
+fn membership_payload(
+    outcome: &crate::services::sprint_assignment::SprintAssignmentOutcome,
+) -> serde_json::Map<String, Value> {
+    let mut payload = serde_json::Map::new();
+    payload.insert("status".into(), json!("ok"));
+    payload.insert("action".into(), json!(outcome.action.as_str()));
+    payload.insert("sprint_id".into(), json!(outcome.sprint_id));
+    payload.insert("sprint_label".into(), json!(outcome.sprint_label));
+    payload.insert("modified".into(), json!(outcome.modified));
+    payload.insert("unchanged".into(), json!(outcome.unchanged));
+    payload
+}
+
+pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
+    let MembershipRequest {
+        mut storage,
+        mut records,
+        integrity,
+        tasks,
+        sprint_ref,
+    } = try_rpc!(membership_request(&req));
 
     let allow_closed = req
         .params
@@ -885,38 +639,7 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(msg) => return err(req.id, -32602, msg.as_str(), None),
     };
 
-    let mut payload = serde_json::Map::new();
-    payload.insert("status".to_string(), Value::String("ok".to_string()));
-    payload.insert(
-        "action".to_string(),
-        Value::String(outcome.action.as_str().to_string()),
-    );
-    payload.insert("sprint_id".to_string(), Value::from(outcome.sprint_id));
-    if let Some(label) = outcome.sprint_label.clone() {
-        payload.insert("sprint_label".to_string(), Value::String(label));
-    } else {
-        payload.insert("sprint_label".to_string(), Value::Null);
-    }
-    payload.insert(
-        "modified".to_string(),
-        Value::Array(
-            outcome
-                .modified
-                .iter()
-                .map(|id| Value::String(id.clone()))
-                .collect(),
-        ),
-    );
-    payload.insert(
-        "unchanged".to_string(),
-        Value::Array(
-            outcome
-                .unchanged
-                .iter()
-                .map(|id| Value::String(id.clone()))
-                .collect(),
-        ),
-    );
+    let mut payload = membership_payload(&outcome);
     let reassignment_messages: Vec<String> = outcome
         .replaced
         .iter()
@@ -980,90 +703,13 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
-    let mut storage = Storage::new(&resolver.path.clone());
-    let mut records = match SprintService::list(&storage) {
-        Ok(records) => records,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load sprints: {}", e)})),
-            );
-        }
-    };
-
-    let cleanup_missing = req
-        .params
-        .get("cleanup_missing")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    let integrity = match sprint_integrity::check_missing_sprints(
-        &mut storage,
-        &mut records,
-        cleanup_missing,
-        None,
-    ) {
-        Ok(check) => check,
-        Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!(
-                    "Failed to clean up sprint references: {}",
-                    error
-                )})),
-            );
-        }
-    };
-
-    let Some(raw_tasks) = req.params.get("tasks") else {
-        return err(req.id, -32602, "Missing required field: tasks", None);
-    };
-
-    let tasks: Vec<String> = match raw_tasks {
-        Value::String(value) => {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                Vec::new()
-            } else {
-                vec![trimmed.to_string()]
-            }
-        }
-        Value::Array(values) => values
-            .iter()
-            .filter_map(|v| v.as_str())
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect(),
-        _ => {
-            return err(
-                req.id,
-                -32602,
-                "tasks must be a string or array of strings",
-                None,
-            );
-        }
-    };
-
-    let sprint_ref = match parse_sprint_reference(&req.params) {
-        Ok(v) => v,
-        Err(msg) => return err(req.id, -32602, msg, None),
-    };
+    let MembershipRequest {
+        mut storage,
+        mut records,
+        integrity,
+        tasks,
+        sprint_ref,
+    } = try_rpc!(membership_request(&req));
 
     let outcome = match sprint_assignment::remove_tasks(
         &mut storage,
@@ -1075,38 +721,7 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(msg) => return err(req.id, -32602, msg.as_str(), None),
     };
 
-    let mut payload = serde_json::Map::new();
-    payload.insert("status".to_string(), Value::String("ok".to_string()));
-    payload.insert(
-        "action".to_string(),
-        Value::String(outcome.action.as_str().to_string()),
-    );
-    payload.insert("sprint_id".to_string(), Value::from(outcome.sprint_id));
-    if let Some(label) = outcome.sprint_label.clone() {
-        payload.insert("sprint_label".to_string(), Value::String(label));
-    } else {
-        payload.insert("sprint_label".to_string(), Value::Null);
-    }
-    payload.insert(
-        "modified".to_string(),
-        Value::Array(
-            outcome
-                .modified
-                .iter()
-                .map(|id| Value::String(id.clone()))
-                .collect(),
-        ),
-    );
-    payload.insert(
-        "unchanged".to_string(),
-        Value::Array(
-            outcome
-                .unchanged
-                .iter()
-                .map(|id| Value::String(id.clone()))
-                .collect(),
-        ),
-    );
+    let mut payload = membership_payload(&outcome);
     payload.insert(
         "missing_sprints".to_string(),
         Value::Array(
@@ -1123,26 +738,11 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
     }
     let payload = Value::Object(payload);
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let mut storage = Storage::new(&resolver.path.clone());
 
     let sprint_id = match req.params.get("sprint_id") {
@@ -1202,12 +802,7 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": error.to_string()})),
-            );
+            return internal_error(req.id, error.to_string());
         }
     };
 
@@ -1236,12 +831,7 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
     let mut records = match SprintService::list(&storage) {
         Ok(records) => records,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": error.to_string()})),
-            );
+            return internal_error(req.id, error.to_string());
         }
     };
 
@@ -1373,17 +963,7 @@ pub(crate) fn handle_sprint_reorder(req: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let project = req
         .params
@@ -1502,22 +1082,14 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
             if let Some(hints) = enum_hints.as_ref() {
                 payload["enumHints"] = enum_hints_to_value(hints);
             }
-            return ok(
-                req.id,
-                json!({"content": [{"type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into())}]}),
-            );
+            return text_result(req.id, &payload);
         }
     };
 
     let mut records = match SprintService::list(&storage) {
         Ok(records) => records,
         Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load sprints: {}", e)})),
-            );
+            return internal_error(req.id, format!("Failed to load sprints: {}", e));
         }
     };
 
@@ -1529,14 +1101,9 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
     ) {
         Ok(check) => check,
         Err(error) => {
-            return err(
+            return internal_error(
                 req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!(
-                    "Failed to clean up sprint references: {}",
-                    error
-                )})),
+                format!("Failed to clean up sprint references: {}", error),
             );
         }
     };
@@ -1590,10 +1157,5 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let payload = Value::Object(payload);
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }

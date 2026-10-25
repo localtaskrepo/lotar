@@ -80,12 +80,7 @@ impl ReferenceService {
     where
         F: FnOnce(&mut Task, &mut Vec<String>) -> bool,
     {
-        let parsed = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?;
-        if parsed.project.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-        let canonical = parsed.canonical();
+        let canonical = Self::parse_task_id(task_id)?.canonical();
         TaskService::ensure_local_task(storage, task_id)?;
 
         let root_path = storage.root_path.clone();
@@ -181,22 +176,8 @@ impl ReferenceService {
         task_id: &str,
         url: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-
-        let trimmed = url.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError("Missing url".to_string()));
-        }
-        if trimmed.len() > 4096 {
-            return Err(LoTaRError::ValidationError(
-                "Link reference is too long (max 4096 characters)".to_string(),
-            ));
-        }
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(url, "Missing url", Some("Link reference"))?;
         let lower = trimmed.to_ascii_lowercase();
         if lower.starts_with("javascript:")
             || lower.starts_with("data:")
@@ -206,29 +187,7 @@ impl ReferenceService {
                 "Link reference protocol is not allowed".to_string(),
             ));
         }
-
-        let target = trimmed.to_string();
-        Self::commit_reference_change(
-            storage,
-            task_id,
-            "link",
-            true,
-            move |task, changed_values| {
-                let already = task
-                    .references
-                    .iter()
-                    .any(|r| r.link.as_deref() == Some(target.as_str()));
-                if already {
-                    return false;
-                }
-                task.references.push(ReferenceEntry {
-                    link: Some(target.clone()),
-                    ..Default::default()
-                });
-                changed_values.push(target.clone());
-                true
-            },
-        )
+        Self::add_reference(storage, task_id, LINK, trimmed.to_string())
     }
 
     pub fn detach_link_reference(
@@ -236,35 +195,9 @@ impl ReferenceService {
         task_id: &str,
         url: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-
-        let trimmed = url.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError("Missing url".to_string()));
-        }
-
-        let target = trimmed.to_string();
-        Self::commit_reference_change(
-            storage,
-            task_id,
-            "link",
-            false,
-            move |task, changed_values| {
-                let before_len = task.references.len();
-                task.references
-                    .retain(|r| r.link.as_deref() != Some(target.as_str()));
-                if task.references.len() == before_len {
-                    return false;
-                }
-                changed_values.push(target.clone());
-                true
-            },
-        )
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(url, "Missing url", None)?;
+        Self::remove_reference(storage, task_id, LINK, trimmed.to_string())
     }
 
     pub fn attach_code_reference(
@@ -273,24 +206,8 @@ impl ReferenceService {
         task_id: &str,
         code: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-
-        let trimmed = code.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Missing code reference".to_string(),
-            ));
-        }
-        if trimmed.len() > 4096 {
-            return Err(LoTaRError::ValidationError(
-                "Code reference is too long (max 4096 characters)".to_string(),
-            ));
-        }
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(code, "Missing code reference", Some("Code reference"))?;
 
         let (raw_path, start_line, end_line) = Self::split_reference(trimmed);
         if raw_path.trim().is_empty() {
@@ -309,9 +226,7 @@ impl ReferenceService {
         // Store targets are rejected like `file` references: unresolvable
         // paths fall through to the snippet reader, which reports the
         // missing file; existing store blobs fail closed here.
-        let repo_root_canonical = repo_root
-            .canonicalize()
-            .unwrap_or_else(|_| repo_root.to_path_buf());
+        let repo_root_canonical = canonical_root(repo_root);
         if let Ok(resolved) = Self::resolve_path(&repo_root_canonical, &raw_path) {
             Self::ensure_outside_attachments_store(&storage.root_path, &resolved)
                 .map_err(LoTaRError::ValidationError)?;
@@ -332,28 +247,7 @@ impl ReferenceService {
         } else {
             snippet.path.clone()
         };
-
-        Self::commit_reference_change(
-            storage,
-            task_id,
-            "code",
-            true,
-            move |task, changed_values| {
-                let already = task
-                    .references
-                    .iter()
-                    .any(|r| r.code.as_deref() == Some(normalized.as_str()));
-                if already {
-                    return false;
-                }
-                task.references.push(ReferenceEntry {
-                    code: Some(normalized.clone()),
-                    ..Default::default()
-                });
-                changed_values.push(normalized.clone());
-                true
-            },
-        )
+        Self::add_reference(storage, task_id, CODE, normalized)
     }
 
     pub fn detach_code_reference(
@@ -361,50 +255,24 @@ impl ReferenceService {
         task_id: &str,
         code: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(code, "Missing code reference", None)?;
 
-        let trimmed = code.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Missing code reference".to_string(),
-            ));
-        }
-
+        // Match the stored form whether it was saved as `#2-3` or `#L2-L3`.
         let mut candidates = vec![trimmed.to_string()];
         if let Some((path_part, anchor_part)) = trimmed.split_once('#') {
             let numbers = Self::extract_numbers(anchor_part);
             if let Some(start) = numbers.first().copied() {
-                let end = numbers.get(1).copied();
-                let canonical_no_l = if let Some(end) = end {
-                    if end != start {
-                        format!("{}#{}-{}", path_part.trim(), start, end)
-                    } else {
-                        format!("{}#{}", path_part.trim(), start)
-                    }
-                } else {
-                    format!("{}#{}", path_part.trim(), start)
-                };
-
-                let canonical_with_l = if let Some(end) = end {
-                    if end != start {
-                        format!("{}#L{}-L{}", path_part.trim(), start, end)
-                    } else {
-                        format!("{}#L{}", path_part.trim(), start)
-                    }
-                } else {
-                    format!("{}#L{}", path_part.trim(), start)
-                };
-
-                candidates.push(canonical_no_l);
-                candidates.push(canonical_with_l);
+                let path = path_part.trim();
+                let end = numbers.get(1).copied().filter(|end| *end != start);
+                for marker in ["", "L"] {
+                    candidates.push(match end {
+                        Some(end) => format!("{path}#{marker}{start}-{marker}{end}"),
+                        None => format!("{path}#{marker}{start}"),
+                    });
+                }
             }
         }
-
         candidates.sort();
         candidates.dedup();
 
@@ -436,72 +304,10 @@ impl ReferenceService {
         kind: &str,
         value: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-
-        let trimmed = value.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Missing reference value".to_string(),
-            ));
-        }
-        if trimmed.len() > 4096 {
-            return Err(LoTaRError::ValidationError(
-                "Reference value is too long (max 4096 characters)".to_string(),
-            ));
-        }
-
-        let normalized = match kind.trim().to_ascii_lowercase().as_str() {
-            "jira" => normalize_jira_reference(trimmed),
-            "github" => normalize_github_reference(trimmed),
-            other => {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Unsupported reference kind: {}",
-                    other
-                )));
-            }
-        };
-
-        let field_kind = kind.trim().to_ascii_lowercase();
-        let kind_label = field_kind.clone();
-        Self::commit_reference_change(
-            storage,
-            task_id,
-            &kind_label,
-            true,
-            move |task, changed_values| {
-                let already = if field_kind == "jira" {
-                    task.references
-                        .iter()
-                        .any(|r| r.jira.as_deref() == Some(normalized.as_str()))
-                } else {
-                    task.references
-                        .iter()
-                        .any(|r| r.github.as_deref() == Some(normalized.as_str()))
-                };
-                if already {
-                    return false;
-                }
-                let entry = if field_kind == "jira" {
-                    ReferenceEntry {
-                        jira: Some(normalized.clone()),
-                        ..Default::default()
-                    }
-                } else {
-                    ReferenceEntry {
-                        github: Some(normalized.clone()),
-                        ..Default::default()
-                    }
-                };
-                task.references.push(entry);
-                changed_values.push(normalized.clone());
-                true
-            },
-        )
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(value, "Missing reference value", Some("Reference value"))?;
+        let (slot, normalized) = platform_reference(kind, trimmed)?;
+        Self::add_reference(storage, task_id, slot, normalized)
     }
 
     pub fn detach_platform_reference(
@@ -510,54 +316,10 @@ impl ReferenceService {
         kind: &str,
         value: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-
-        let trimmed = value.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Missing reference value".to_string(),
-            ));
-        }
-
-        let normalized = match kind.trim().to_ascii_lowercase().as_str() {
-            "jira" => normalize_jira_reference(trimmed),
-            "github" => normalize_github_reference(trimmed),
-            other => {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Unsupported reference kind: {}",
-                    other
-                )));
-            }
-        };
-
-        let field_kind = kind.trim().to_ascii_lowercase();
-        let kind_label = field_kind.clone();
-        Self::commit_reference_change(
-            storage,
-            task_id,
-            &kind_label,
-            false,
-            move |task, changed_values| {
-                let before_len = task.references.len();
-                if field_kind == "jira" {
-                    task.references
-                        .retain(|r| r.jira.as_deref() != Some(normalized.as_str()));
-                } else {
-                    task.references
-                        .retain(|r| r.github.as_deref() != Some(normalized.as_str()));
-                }
-                if task.references.len() == before_len {
-                    return false;
-                }
-                changed_values.push(normalized.clone());
-                true
-            },
-        )
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(value, "Missing reference value", None)?;
+        let (slot, normalized) = platform_reference(kind, trimmed)?;
+        Self::remove_reference(storage, task_id, slot, normalized)
     }
 
     pub fn attach_file_reference(
@@ -566,58 +328,14 @@ impl ReferenceService {
         task_id: &str,
         file: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-
-        let trimmed = file.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Missing file reference".to_string(),
-            ));
-        }
-        if trimmed.len() > 4096 {
-            return Err(LoTaRError::ValidationError(
-                "File reference is too long (max 4096 characters)".to_string(),
-            ));
-        }
-
-        let repo_root_canonical = repo_root
-            .canonicalize()
-            .unwrap_or_else(|_| repo_root.to_path_buf());
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(file, "Missing file reference", Some("File reference"))?;
+        let repo_root_canonical = canonical_root(repo_root);
         let resolved = Self::resolve_path(&repo_root_canonical, trimmed)
             .map_err(LoTaRError::ValidationError)?;
-        Self::ensure_outside_attachments_store(&storage.root_path, &resolved)
-            .map_err(LoTaRError::ValidationError)?;
-        let rel = resolved
-            .strip_prefix(&repo_root_canonical)
-            .unwrap_or(&resolved);
-        let normalized = Self::normalize_path_for_display(rel);
-
-        Self::commit_reference_change(
-            storage,
-            task_id,
-            "file",
-            true,
-            move |task, changed_values| {
-                let already = task
-                    .references
-                    .iter()
-                    .any(|r| r.file.as_deref() == Some(normalized.as_str()));
-                if already {
-                    return false;
-                }
-                task.references.push(ReferenceEntry {
-                    file: Some(normalized.clone()),
-                    ..Default::default()
-                });
-                changed_values.push(normalized.clone());
-                true
-            },
-        )
+        let normalized =
+            Self::repo_relative_outside_store(storage, &repo_root_canonical, &resolved)?;
+        Self::add_reference(storage, task_id, FILE, normalized)
     }
 
     pub fn detach_file_reference(
@@ -626,51 +344,85 @@ impl ReferenceService {
         task_id: &str,
         file: &str,
     ) -> LoTaRResult<ReferenceMutationOutcome> {
-        let derived = crate::storage::TaskId::parse(task_id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
-            .project;
-        if derived.trim().is_empty() {
-            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-        }
-
-        let trimmed = file.trim();
-        if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Missing file reference".to_string(),
-            ));
-        }
-
-        let repo_root_canonical = repo_root
-            .canonicalize()
-            .unwrap_or_else(|_| repo_root.to_path_buf());
+        Self::parse_task_id(task_id)?;
+        let trimmed = required_value(file, "Missing file reference", None)?;
+        let repo_root_canonical = canonical_root(repo_root);
+        // A path that no longer resolves is matched as typed.
         let normalized = match Self::resolve_path(&repo_root_canonical, trimmed) {
             Ok(resolved) => {
-                Self::ensure_outside_attachments_store(&storage.root_path, &resolved)
-                    .map_err(LoTaRError::ValidationError)?;
-                let rel = resolved
-                    .strip_prefix(&repo_root_canonical)
-                    .unwrap_or(&resolved);
-                Self::normalize_path_for_display(rel)
+                Self::repo_relative_outside_store(storage, &repo_root_canonical, &resolved)?
             }
             Err(_) => trimmed.to_string(),
         };
+        Self::remove_reference(storage, task_id, FILE, normalized)
+    }
 
-        Self::commit_reference_change(
-            storage,
-            task_id,
-            "file",
-            false,
-            move |task, changed_values| {
-                let before_len = task.references.len();
-                task.references
-                    .retain(|r| r.file.as_deref() != Some(normalized.as_str()));
-                if task.references.len() == before_len {
-                    return false;
-                }
-                changed_values.push(normalized.clone());
-                true
-            },
-        )
+    /// Display path of `resolved` relative to the repository, refusing
+    /// targets inside a managed attachments store.
+    fn repo_relative_outside_store(
+        storage: &Storage,
+        repo_root_canonical: &Path,
+        resolved: &Path,
+    ) -> LoTaRResult<String> {
+        Self::ensure_outside_attachments_store(&storage.root_path, resolved)
+            .map_err(LoTaRError::ValidationError)?;
+        let rel = resolved
+            .strip_prefix(repo_root_canonical)
+            .unwrap_or(resolved);
+        Ok(Self::normalize_path_for_display(rel))
+    }
+
+    /// Add `value` to the slot unless an identical reference already exists.
+    fn add_reference(
+        storage: &mut Storage,
+        task_id: &str,
+        slot: ReferenceSlot,
+        value: String,
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
+        Self::commit_reference_change(storage, task_id, slot.kind, true, move |task, changed| {
+            if task
+                .references
+                .iter()
+                .any(|r| (slot.get)(r) == Some(value.as_str()))
+            {
+                return false;
+            }
+            let mut entry = ReferenceEntry::default();
+            (slot.set)(&mut entry, value.clone());
+            task.references.push(entry);
+            changed.push(value);
+            true
+        })
+    }
+
+    /// Remove every reference whose slot holds exactly `value`.
+    fn remove_reference(
+        storage: &mut Storage,
+        task_id: &str,
+        slot: ReferenceSlot,
+        value: String,
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
+        Self::commit_reference_change(storage, task_id, slot.kind, false, move |task, changed| {
+            let before_len = task.references.len();
+            task.references
+                .retain(|r| (slot.get)(r) != Some(value.as_str()));
+            if task.references.len() == before_len {
+                return false;
+            }
+            changed.push(value);
+            true
+        })
+    }
+
+    /// Parse a task id, rejecting ids without a project prefix. Checked
+    /// before any value validation so a bad id is always reported first.
+    pub(crate) fn parse_task_id(task_id: &str) -> LoTaRResult<crate::storage::TaskId> {
+        let parsed = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?;
+        if parsed.project.trim().is_empty() {
+            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
+        }
+        Ok(parsed)
     }
 
     /// Repository `file` references must never point into the configured
@@ -935,6 +687,77 @@ impl ReferenceService {
     }
 }
 
+/// One typed slot of a `ReferenceEntry` (link, code, file, jira, github).
+#[derive(Clone, Copy)]
+struct ReferenceSlot {
+    kind: &'static str,
+    get: fn(&ReferenceEntry) -> Option<&str>,
+    set: fn(&mut ReferenceEntry, String),
+}
+
+const LINK: ReferenceSlot = ReferenceSlot {
+    kind: "link",
+    get: |r| r.link.as_deref(),
+    set: |r, v| r.link = Some(v),
+};
+const CODE: ReferenceSlot = ReferenceSlot {
+    kind: "code",
+    get: |r| r.code.as_deref(),
+    set: |r, v| r.code = Some(v),
+};
+const FILE: ReferenceSlot = ReferenceSlot {
+    kind: "file",
+    get: |r| r.file.as_deref(),
+    set: |r, v| r.file = Some(v),
+};
+const JIRA: ReferenceSlot = ReferenceSlot {
+    kind: "jira",
+    get: |r| r.jira.as_deref(),
+    set: |r, v| r.jira = Some(v),
+};
+const GITHUB: ReferenceSlot = ReferenceSlot {
+    kind: "github",
+    get: |r| r.github.as_deref(),
+    set: |r, v| r.github = Some(v),
+};
+
+const MAX_REFERENCE_LEN: usize = 4096;
+
+/// The trimmed value, or `missing` when blank. With a `label`, values over
+/// the length cap are rejected too (detach accepts any stored length).
+fn required_value<'a>(value: &'a str, missing: &str, label: Option<&str>) -> LoTaRResult<&'a str> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(LoTaRError::ValidationError(missing.to_string()));
+    }
+    if let Some(label) = label
+        && trimmed.len() > MAX_REFERENCE_LEN
+    {
+        return Err(LoTaRError::ValidationError(format!(
+            "{label} is too long (max {MAX_REFERENCE_LEN} characters)"
+        )));
+    }
+    Ok(trimmed)
+}
+
+fn canonical_root(repo_root: &Path) -> PathBuf {
+    repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.to_path_buf())
+}
+
+/// The slot and normalized value for a `jira` or `github` reference.
+fn platform_reference(kind: &str, value: &str) -> LoTaRResult<(ReferenceSlot, String)> {
+    match kind.trim().to_ascii_lowercase().as_str() {
+        "jira" => Ok((JIRA, normalize_jira_reference(value))),
+        "github" => Ok((GITHUB, normalize_github_reference(value))),
+        other => Err(LoTaRError::ValidationError(format!(
+            "Unsupported reference kind: {}",
+            other
+        ))),
+    }
+}
+
 fn trim_platform_prefix(value: &str, prefix: &str) -> String {
     let trimmed = value.trim();
     let lower = trimmed.to_ascii_lowercase();
@@ -1059,19 +882,7 @@ mod tests {
             TaskCreate {
                 title: "Link reference test".to_string(),
                 project: Some("DEMO".to_string()),
-                status: None,
-                priority: None,
-                task_type: None,
-                reporter: None,
-                assignee: None,
-                due_date: None,
-                effort: None,
-                description: None,
-                tags: vec![],
-                acceptance_criteria: vec![],
-                relationships: None,
-                custom_fields: None,
-                sprints: vec![],
+                ..TaskCreate::default()
             },
         )
         .unwrap();
@@ -1170,19 +981,7 @@ mod tests {
             TaskCreate {
                 title: "Link reference scheme test".to_string(),
                 project: Some("DEMO".to_string()),
-                status: None,
-                priority: None,
-                task_type: None,
-                reporter: None,
-                assignee: None,
-                due_date: None,
-                effort: None,
-                description: None,
-                tags: vec![],
-                acceptance_criteria: vec![],
-                relationships: None,
-                custom_fields: None,
-                sprints: vec![],
+                ..TaskCreate::default()
             },
         )
         .unwrap();
@@ -1211,19 +1010,7 @@ mod tests {
             TaskCreate {
                 title: "Link reference safety test".to_string(),
                 project: Some("DEMO".to_string()),
-                status: None,
-                priority: None,
-                task_type: None,
-                reporter: None,
-                assignee: None,
-                due_date: None,
-                effort: None,
-                description: None,
-                tags: vec![],
-                acceptance_criteria: vec![],
-                relationships: None,
-                custom_fields: None,
-                sprints: vec![],
+                ..TaskCreate::default()
             },
         )
         .unwrap();
@@ -1255,19 +1042,7 @@ mod tests {
             TaskCreate {
                 title: "Code reference test".to_string(),
                 project: Some("DEMO".to_string()),
-                status: None,
-                priority: None,
-                task_type: None,
-                reporter: None,
-                assignee: None,
-                due_date: None,
-                effort: None,
-                description: None,
-                tags: vec![],
-                acceptance_criteria: vec![],
-                relationships: None,
-                custom_fields: None,
-                sprints: vec![],
+                ..TaskCreate::default()
             },
         )
         .unwrap();

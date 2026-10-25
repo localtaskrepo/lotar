@@ -558,3 +558,143 @@ fn apply_sprint_defaults(sprint: &mut Sprint, defaults: &SprintDefaultsConfig) -
 
     applied.into_iter().collect()
 }
+
+// -- Request and response mapping shared by the REST API, MCP and CLI --------
+
+/// Build a new sprint from a create request. Text fields are trimmed and
+/// dropped when blank; notes keep their formatting. The plan is omitted
+/// when nothing was provided.
+pub fn sprint_from_create_request(payload: &crate::api_types::SprintCreateRequest) -> Sprint {
+    let mut plan = SprintPlan::default();
+
+    if let Some(label) = clean_opt_string(payload.label.clone()) {
+        plan.label = Some(label);
+    }
+    if let Some(goal) = clean_opt_string(payload.goal.clone()) {
+        plan.goal = Some(goal);
+    }
+    if let Some(length) = clean_opt_string(payload.plan_length.clone()) {
+        plan.length = Some(length);
+    }
+    if let Some(ends_at) = clean_opt_string(payload.ends_at.clone()) {
+        plan.ends_at = Some(ends_at);
+    }
+    if let Some(starts_at) = clean_opt_string(payload.starts_at.clone()) {
+        plan.starts_at = Some(starts_at);
+    }
+    if let Some(points) = payload.capacity_points {
+        plan.capacity
+            .get_or_insert_with(SprintCapacity::default)
+            .points = Some(points);
+    }
+    if let Some(hours) = payload.capacity_hours {
+        plan.capacity
+            .get_or_insert_with(SprintCapacity::default)
+            .hours = Some(hours);
+    }
+    if let Some(overdue_after) = clean_opt_string(payload.overdue_after.clone()) {
+        plan.overdue_after = Some(overdue_after);
+    }
+    if let Some(notes) = payload
+        .notes
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+    {
+        plan.notes = Some(notes);
+    }
+
+    let mut sprint = Sprint::default();
+    if plan_has_values(&plan) {
+        sprint.plan = Some(plan);
+    }
+    sprint
+}
+
+/// List view of a stored sprint, with its lifecycle derived at `reference`.
+pub fn sprint_record_to_list_item(
+    record: &SprintRecord,
+    reference: chrono::DateTime<Utc>,
+) -> crate::api_types::SprintListItem {
+    let lifecycle = crate::services::sprint_status::derive_status(&record.sprint, reference);
+    let plan = record.sprint.plan.as_ref();
+    let capacity = plan.and_then(|plan| plan.capacity.as_ref());
+    crate::api_types::SprintListItem {
+        id: record.id,
+        label: record
+            .sprint
+            .plan
+            .as_ref()
+            .and_then(|plan| plan.label.clone()),
+        display_name: crate::services::sprint_assignment::sprint_display_name(record),
+        created: record.sprint.created.clone(),
+        modified: record.sprint.modified.clone(),
+        state: lifecycle.state.as_str().to_string(),
+        planned_start: lifecycle.planned_start.map(|dt| dt.to_rfc3339()),
+        planned_end: lifecycle.planned_end.map(|dt| dt.to_rfc3339()),
+        actual_start: lifecycle.actual_start.map(|dt| dt.to_rfc3339()),
+        actual_end: lifecycle.actual_end.map(|dt| dt.to_rfc3339()),
+        computed_end: lifecycle.computed_end.map(|dt| dt.to_rfc3339()),
+        goal: plan.and_then(|plan| plan.goal.clone()),
+        plan_length: plan.and_then(|plan| plan.length.clone()),
+        overdue_after: plan.and_then(|plan| plan.overdue_after.clone()),
+        notes: plan.and_then(|plan| plan.notes.clone()),
+        capacity_points: capacity.and_then(|capacity| capacity.points),
+        capacity_hours: capacity.and_then(|capacity| capacity.hours),
+        warnings: lifecycle
+            .warnings
+            .iter()
+            .map(|warning| warning.message())
+            .collect(),
+    }
+}
+
+fn plan_has_values(plan: &SprintPlan) -> bool {
+    plan.label.is_some()
+        || plan.goal.is_some()
+        || plan.length.is_some()
+        || plan.ends_at.is_some()
+        || plan.starts_at.is_some()
+        || plan.capacity.is_some()
+        || plan.overdue_after.is_some()
+        || plan.notes.is_some()
+}
+
+fn clean_opt_string(input: Option<String>) -> Option<String> {
+    input.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+#[cfg(test)]
+mod request_mapping_tests {
+    use super::*;
+    use crate::api_types::SprintCreateRequest;
+
+    #[test]
+    fn create_request_trims_fields_keeps_notes_and_drops_blanks() {
+        let sprint = sprint_from_create_request(&SprintCreateRequest {
+            label: Some("  Sprint 7 ".into()),
+            goal: Some("   ".into()),
+            capacity_hours: Some(30),
+            notes: Some("  - indented note\n".into()),
+            ..SprintCreateRequest::default()
+        });
+        let plan = sprint.plan.expect("plan");
+        assert_eq!(plan.label.as_deref(), Some("Sprint 7"));
+        assert_eq!(plan.goal, None);
+        assert_eq!(plan.notes.as_deref(), Some("  - indented note\n"));
+        let capacity = plan.capacity.expect("capacity");
+        assert_eq!((capacity.points, capacity.hours), (None, Some(30)));
+
+        let blank = sprint_from_create_request(&SprintCreateRequest {
+            notes: Some(" \n".into()),
+            ..SprintCreateRequest::default()
+        });
+        assert!(blank.plan.is_none());
+    }
+}

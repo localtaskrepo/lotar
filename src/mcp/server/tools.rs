@@ -27,6 +27,79 @@ fn append_hint_descriptions(tool: &mut Value, sections: &[(&[String], &str)]) {
     }
 }
 
+/// The configured value list a field hint draws from.
+#[derive(Clone, Copy)]
+enum Hint {
+    Projects,
+    Statuses,
+    Priorities,
+    Types,
+    Members,
+    Tags,
+    CustomFields,
+}
+
+impl Hint {
+    fn values(self, hints: &EnumHints) -> &[String] {
+        match self {
+            Hint::Projects => &hints.projects,
+            Hint::Statuses => &hints.statuses,
+            Hint::Priorities => &hints.priorities,
+            Hint::Types => &hints.types,
+            Hint::Members => &hints.members,
+            Hint::Tags => &hints.tags,
+            Hint::CustomFields => &hints.custom_fields,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Hint::Projects => "projects",
+            Hint::Statuses => "statuses",
+            Hint::Priorities => "priorities",
+            Hint::Types => "types",
+            Hint::Members => "members",
+            Hint::Tags => "tags",
+            Hint::CustomFields => "custom fields",
+        }
+    }
+}
+
+/// Field hints for `(field, list, accepts_multiple)` entries; empty without hints.
+fn enum_field_hints(
+    enum_hints: Option<&EnumHints>,
+    fields: &[(&str, Hint, bool)],
+) -> JsonMap<String, Value> {
+    let mut field_hints = JsonMap::new();
+    for (field, list, multiple) in fields {
+        insert_field_hint(
+            &mut field_hints,
+            field,
+            enum_hints.map(|h| list.values(h)),
+            *multiple,
+        );
+    }
+    field_hints
+}
+
+/// Append "Available <label>: ..." sentences for `lists` to the tool description.
+fn describe_enum_hints(tool: &mut Value, enum_hints: Option<&EnumHints>, lists: &[Hint]) {
+    if let Some(hints) = enum_hints {
+        let sections: Vec<(&[String], &str)> = lists
+            .iter()
+            .map(|list| (list.values(hints), list.label()))
+            .collect();
+        append_hint_descriptions(tool, &sections);
+    }
+}
+
+/// Reference kinds accepted by the reference tools.
+fn reference_kinds() -> Vec<String> {
+    ["link", "file", "code", "jira", "github", "attachment"]
+        .map(String::from)
+        .to_vec()
+}
+
 pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
     vec![
         make_whoami_tool(),
@@ -160,22 +233,8 @@ fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
-    );
-    let kinds = vec![
-        "link".to_string(),
-        "file".to_string(),
-        "code".to_string(),
-        "jira".to_string(),
-        "github".to_string(),
-        "attachment".to_string(),
-    ];
-    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    let mut field_hints = enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]);
+    insert_field_hint(&mut field_hints, "kind", Some(&reference_kinds()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
 }
@@ -197,22 +256,8 @@ fn make_task_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
-    );
-    let kinds = vec![
-        "link".to_string(),
-        "file".to_string(),
-        "code".to_string(),
-        "jira".to_string(),
-        "github".to_string(),
-        "attachment".to_string(),
-    ];
-    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    let mut field_hints = enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]);
+    insert_field_hint(&mut field_hints, "kind", Some(&reference_kinds()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
 }
@@ -284,71 +329,36 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "status",
-        enum_hints.map(|h| h.statuses.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "priority",
-        enum_hints.map(|h| h.priorities.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "type",
-        enum_hints.map(|h| h.types.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "reporter",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "assignee",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "tags",
-        enum_hints.map(|h| h.tags.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "custom_fields",
-        enum_hints.map(|h| h.custom_fields.as_slice()),
-        false,
-    );
-    attach_field_hints(&mut tool, field_hints);
-
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(
-            &mut tool,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(
+            enum_hints,
             &[
-                (hints.projects.as_slice(), "projects"),
-                (hints.statuses.as_slice(), "statuses"),
-                (hints.priorities.as_slice(), "priorities"),
-                (hints.types.as_slice(), "types"),
-                (hints.members.as_slice(), "members"),
-                (hints.tags.as_slice(), "tags"),
-                (hints.custom_fields.as_slice(), "custom fields"),
+                ("project", Hint::Projects, false),
+                ("status", Hint::Statuses, false),
+                ("priority", Hint::Priorities, false),
+                ("type", Hint::Types, false),
+                ("reporter", Hint::Members, false),
+                ("assignee", Hint::Members, false),
+                ("tags", Hint::Tags, true),
+                ("custom_fields", Hint::CustomFields, false),
             ],
-        );
-    }
+        ),
+    );
+
+    describe_enum_hints(
+        &mut tool,
+        enum_hints,
+        &[
+            Hint::Projects,
+            Hint::Statuses,
+            Hint::Priorities,
+            Hint::Types,
+            Hint::Members,
+            Hint::Tags,
+            Hint::CustomFields,
+        ],
+    );
 
     tool
 }
@@ -372,18 +382,12 @@ fn make_task_get_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
 
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
-    }
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
     tool
 }
@@ -492,64 +496,34 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "patch.status",
-        enum_hints.map(|h| h.statuses.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "patch.priority",
-        enum_hints.map(|h| h.priorities.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "patch.type",
-        enum_hints.map(|h| h.types.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "patch.reporter",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "patch.assignee",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "patch.tags",
-        enum_hints.map(|h| h.tags.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "patch.custom_fields",
-        enum_hints.map(|h| h.custom_fields.as_slice()),
-        false,
-    );
-    attach_field_hints(&mut tool, field_hints);
-
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(
-            &mut tool,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(
+            enum_hints,
             &[
-                (hints.statuses.as_slice(), "statuses"),
-                (hints.priorities.as_slice(), "priorities"),
-                (hints.types.as_slice(), "types"),
-                (hints.members.as_slice(), "members"),
-                (hints.tags.as_slice(), "tags"),
-                (hints.custom_fields.as_slice(), "custom fields"),
+                ("patch.status", Hint::Statuses, false),
+                ("patch.priority", Hint::Priorities, false),
+                ("patch.type", Hint::Types, false),
+                ("patch.reporter", Hint::Members, false),
+                ("patch.assignee", Hint::Members, false),
+                ("patch.tags", Hint::Tags, true),
+                ("patch.custom_fields", Hint::CustomFields, false),
             ],
-        );
-    }
+        ),
+    );
+
+    describe_enum_hints(
+        &mut tool,
+        enum_hints,
+        &[
+            Hint::Statuses,
+            Hint::Priorities,
+            Hint::Types,
+            Hint::Members,
+            Hint::Tags,
+            Hint::CustomFields,
+        ],
+    );
 
     tool
 }
@@ -573,18 +547,12 @@ fn make_task_delete_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
 
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
-    }
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
     tool
 }
@@ -604,18 +572,12 @@ fn make_task_restore_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
 
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
-    }
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
     tool
 }
@@ -733,70 +695,35 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "status",
-        enum_hints.map(|h| h.statuses.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "assignee",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "priority",
-        enum_hints.map(|h| h.priorities.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "type",
-        enum_hints.map(|h| h.types.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "tag",
-        enum_hints.map(|h| h.tags.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "tags",
-        enum_hints.map(|h| h.tags.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "custom_fields",
-        enum_hints.map(|h| h.custom_fields.as_slice()),
-        false,
-    );
-    attach_field_hints(&mut tool, field_hints);
-
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(
-            &mut tool,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(
+            enum_hints,
             &[
-                (hints.projects.as_slice(), "projects"),
-                (hints.statuses.as_slice(), "statuses"),
-                (hints.priorities.as_slice(), "priorities"),
-                (hints.types.as_slice(), "types"),
-                (hints.tags.as_slice(), "tags"),
-                (hints.members.as_slice(), "members"),
+                ("project", Hint::Projects, false),
+                ("status", Hint::Statuses, true),
+                ("assignee", Hint::Members, false),
+                ("priority", Hint::Priorities, true),
+                ("type", Hint::Types, true),
+                ("tag", Hint::Tags, false),
+                ("tags", Hint::Tags, true),
+                ("custom_fields", Hint::CustomFields, false),
             ],
-        );
-    }
+        ),
+    );
+
+    describe_enum_hints(
+        &mut tool,
+        enum_hints,
+        &[
+            Hint::Projects,
+            Hint::Statuses,
+            Hint::Priorities,
+            Hint::Types,
+            Hint::Tags,
+            Hint::Members,
+        ],
+    );
 
     tool
 }
@@ -931,38 +858,19 @@ fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "status",
-        enum_hints.map(|h| h.statuses.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(
+            enum_hints,
+            &[
+                ("status", Hint::Statuses, false),
+                ("priority", Hint::Priorities, false),
+                ("type", Hint::Types, false),
+                ("reporter", Hint::Members, false),
+                ("assignee", Hint::Members, false),
+            ],
+        ),
     );
-    insert_field_hint(
-        &mut field_hints,
-        "priority",
-        enum_hints.map(|h| h.priorities.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "type",
-        enum_hints.map(|h| h.types.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "reporter",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "assignee",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    attach_field_hints(&mut tool, field_hints);
 
     tool
 }
@@ -1002,22 +910,8 @@ fn make_task_bulk_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
-    );
-    let kinds = vec![
-        "link".to_string(),
-        "file".to_string(),
-        "code".to_string(),
-        "jira".to_string(),
-        "github".to_string(),
-        "attachment".to_string(),
-    ];
-    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    let mut field_hints = enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]);
+    insert_field_hint(&mut field_hints, "kind", Some(&reference_kinds()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
 }
@@ -1040,22 +934,8 @@ fn make_task_bulk_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
-    );
-    let kinds = vec![
-        "link".to_string(),
-        "file".to_string(),
-        "code".to_string(),
-        "jira".to_string(),
-        "github".to_string(),
-        "attachment".to_string(),
-    ];
-    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    let mut field_hints = enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]);
+    insert_field_hint(&mut field_hints, "kind", Some(&reference_kinds()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
 }
@@ -1320,44 +1200,24 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "status",
-        enum_hints.map(|h| h.statuses.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "tag",
-        enum_hints.map(|h| h.tags.as_slice()),
-        true,
-    );
-    insert_field_hint(
-        &mut field_hints,
-        "assignee",
-        enum_hints.map(|h| h.members.as_slice()),
-        false,
-    );
-    attach_field_hints(&mut tool, field_hints);
-
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(
-            &mut tool,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(
+            enum_hints,
             &[
-                (hints.projects.as_slice(), "projects"),
-                (hints.statuses.as_slice(), "statuses"),
-                (hints.tags.as_slice(), "tags"),
-                (hints.members.as_slice(), "members"),
+                ("project", Hint::Projects, false),
+                ("status", Hint::Statuses, true),
+                ("tag", Hint::Tags, true),
+                ("assignee", Hint::Members, false),
             ],
-        );
-    }
+        ),
+    );
+
+    describe_enum_hints(
+        &mut tool,
+        enum_hints,
+        &[Hint::Projects, Hint::Statuses, Hint::Tags, Hint::Members],
+    );
 
     tool
 }
@@ -1398,9 +1258,7 @@ fn make_project_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
-    }
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
     tool
 }
@@ -1417,18 +1275,12 @@ fn make_project_stats_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "name",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("name", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
 
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
-    }
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
     tool
 }
@@ -1447,18 +1299,12 @@ fn make_config_show_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
 
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
-    }
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
     tool
 }
@@ -1479,18 +1325,12 @@ fn make_config_set_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
 
-    if let Some(hints) = enum_hints {
-        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
-    }
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
     tool
 }
@@ -1519,14 +1359,10 @@ fn make_sync_pull_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
     tool
 }
 
@@ -1554,14 +1390,10 @@ fn make_sync_push_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    let mut field_hints = JsonMap::new();
-    insert_field_hint(
-        &mut field_hints,
-        "project",
-        enum_hints.map(|h| h.projects.as_slice()),
-        false,
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
     );
-    attach_field_hints(&mut tool, field_hints);
     tool
 }
 

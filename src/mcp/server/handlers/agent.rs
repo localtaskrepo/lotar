@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use super::super::{JsonRpcRequest, JsonRpcResponse, domain_service_error, err, ok};
+use super::super::{JsonRpcRequest, JsonRpcResponse, domain_service_error, err, text_result};
 use crate::api_types::AgentJobCreateRequest;
 use crate::services::agent_job_service::AgentJobService;
 use crate::workspace::TasksDirectoryResolver;
@@ -52,12 +52,7 @@ pub(crate) fn handle_agent_run(req: JsonRpcRequest) -> JsonRpcResponse {
     match AgentJobService::start_job(create_req, &resolver) {
         Ok(job) => {
             let payload = serde_json::to_value(&job).unwrap_or(json!({}));
-            ok(
-                req.id,
-                json!({
-                    "content": [{"type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_default()}]
-                }),
-            )
+            text_result(req.id, &payload)
         }
         // Bad ticket/runner/profile and job-registry rejections are expected
         // domain failures -> isError tool results; internal faults stay -32603.
@@ -74,12 +69,7 @@ pub(crate) fn handle_agent_status(req: JsonRpcRequest) -> JsonRpcResponse {
     match AgentJobService::get_job(&id) {
         Some(job) => {
             let payload = serde_json::to_value(&job).unwrap_or(json!({}));
-            ok(
-                req.id,
-                json!({
-                    "content": [{"type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_default()}]
-                }),
-            )
+            text_result(req.id, &payload)
         }
         None => err(req.id, -32000, "Job not found", None),
     }
@@ -94,12 +84,7 @@ pub(crate) fn handle_agent_list_jobs(req: JsonRpcRequest) -> JsonRpcResponse {
         "jobs": jobs,
         "queue_stats": queue_stats,
     });
-    ok(
-        req.id,
-        json!({
-            "content": [{"type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_default()}]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_agent_cancel(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -111,12 +96,7 @@ pub(crate) fn handle_agent_cancel(req: JsonRpcRequest) -> JsonRpcResponse {
     match AgentJobService::cancel_job(&id) {
         Ok(Some(job)) => {
             let payload = json!({ "cancelled": true, "job": job });
-            ok(
-                req.id,
-                json!({
-                    "content": [{"type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_default()}]
-                }),
-            )
+            text_result(req.id, &payload)
         }
         Ok(None) => err(req.id, -32000, "Job not found", None),
         Err(e) => domain_service_error(req.id, "Agent cancel failed", &e),
@@ -136,12 +116,7 @@ pub(crate) fn handle_agent_send_message(req: JsonRpcRequest) -> JsonRpcResponse 
     match AgentJobService::send_message(&id, &message) {
         Ok(job) => {
             let payload = serde_json::to_value(&job).unwrap_or(json!({}));
-            ok(
-                req.id,
-                json!({
-                    "content": [{"type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_default()}]
-                }),
-            )
+            text_result(req.id, &payload)
         }
         Err(e) => domain_service_error(req.id, "Agent send message failed", &e),
     }

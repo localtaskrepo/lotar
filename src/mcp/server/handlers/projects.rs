@@ -2,23 +2,13 @@ use serde_json::{Value, json};
 
 use super::super::{
     JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_PROJECT_LIST_LIMIT, MCP_MAX_CURSOR,
-    MCP_MAX_PROJECT_LIST_LIMIT, err, ok, parse_cursor_value, parse_limit_value,
+    MCP_MAX_PROJECT_LIST_LIMIT, err, ok, parse_cursor_value, parse_limit_value, resolve_tasks_dir,
+    text_result,
 };
 use crate::services::project_service::ProjectService;
-use crate::workspace::TasksDirectoryResolver;
 
 pub(crate) fn handle_project_list(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let storage = crate::storage::manager::Storage::new(&resolver.path);
     let mut projects = ProjectService::list(&storage);
     projects.sort_by(|a, b| a.prefix.cmp(&b.prefix));
@@ -96,23 +86,8 @@ pub(crate) fn handle_project_stats(req: JsonRpcRequest) -> JsonRpcResponse {
     let Some(name) = req.params.get("name").and_then(|v| v.as_str()) else {
         return err(req.id, -32602, "Missing name", None);
     };
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let storage = crate::storage::manager::Storage::new(&resolver.path);
     let stats = ProjectService::stats(&storage, name);
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&stats).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &stats)
 }

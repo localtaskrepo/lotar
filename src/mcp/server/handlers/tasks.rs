@@ -2,8 +2,8 @@ use serde_json::{Value, json};
 
 use super::super::hints::{EnumHints, enum_hints_to_value, make_enum_error_data};
 use super::super::{
-    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_TASK_LIST_LIMIT, MCP_MAX_TASK_LIST_LIMIT, err, ok,
-    parse_cursor_value, parse_limit_value,
+    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_TASK_LIST_LIMIT, MCP_MAX_TASK_LIST_LIMIT, err,
+    internal_error, ok, parse_cursor_value, parse_limit_value, resolve_tasks_dir, text_result,
 };
 use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
 use crate::cli::project::ProjectResolver;
@@ -16,7 +16,6 @@ use crate::storage::manager::Storage;
 use crate::types::TaskRelationships;
 use crate::utils::git::find_repo_root;
 use crate::utils::identity;
-use crate::workspace::TasksDirectoryResolver;
 use std::collections::BTreeMap;
 
 /// Strict `sprints` parsing for task_list (DEV-57): accepts the flexible
@@ -367,17 +366,7 @@ fn task_mutation_error(
 }
 
 pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let title = match req.params.get("title").and_then(|v| v.as_str()) {
         Some(s) if !s.trim().is_empty() => s.to_string(),
@@ -549,12 +538,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     match TaskService::create(&mut storage, dto) {
         Ok(task) => {
             let response_body = make_task_create_payload(&task, &req.params, enum_hints.as_ref());
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&response_body).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            )
+            text_result(req.id, &response_body)
         }
         Err(e) => task_mutation_error(req.id, e, -32000, "Task create failed", None),
     }
@@ -659,17 +643,7 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
         .get("include_deleted")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let storage = Storage::new(&resolver.path);
     let outcome = if include_deleted {
         TaskService::get_including_deleted(&storage, id, project)
@@ -677,12 +651,7 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
         TaskService::get(&storage, id, project)
     };
     match outcome {
-        Ok(task) => ok(
-            req.id,
-            json!({
-                "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
-            }),
-        ),
+        Ok(task) => text_result(req.id, &task),
         Err(e) => err(
             req.id,
             -32004,
@@ -696,17 +665,7 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
         return err(req.id, -32602, "Missing id", None);
     };
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let patch_val = req.params.get("patch").cloned().unwrap_or(json!({}));
     let patch = match parse_task_update_patch(req.id.clone(), &patch_val) {
         Ok(patch) => patch,
@@ -771,12 +730,7 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let mut storage = Storage::new(&resolver.path.clone());
     match TaskService::update(&mut storage, id, patch) {
-        Ok(task) => ok(
-            req.id,
-            json!({
-                "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
-            }),
-        ),
+        Ok(task) => text_result(req.id, &task),
         Err(e) => task_mutation_error(req.id, e, -32005, "Task update failed", None),
     }
 }
@@ -791,17 +745,7 @@ pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
         _ => return err(req.id, -32602, "Missing text", None),
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let mut storage = Storage::new(&resolver.path.clone());
 
@@ -817,12 +761,7 @@ pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
                     Some(json!({"message": format!("Task '{}' not found", id)})),
                 );
             }
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": msg})),
-            );
+            return internal_error(req.id, msg);
         }
     };
 
@@ -833,12 +772,7 @@ pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
         "task": dto,
     });
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -859,17 +793,7 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
         _ => return err(req.id, -32602, "Missing text", None),
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let mut storage = Storage::new(&resolver.path.clone());
 
@@ -888,12 +812,7 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
             if msg.contains("Invalid comment index") {
                 return err(req.id, -32602, "Invalid comment index", None);
             }
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": msg})),
-            );
+            return internal_error(req.id, msg);
         }
     };
 
@@ -905,12 +824,7 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
         "task": dto,
     });
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -936,17 +850,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     // Shape errors fail the whole call before any mutation; per-task enum
     // validation happens inside TaskService against each task's project.
@@ -977,12 +881,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
         "failed": failed,
     });
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -1009,17 +908,7 @@ pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcRespon
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let mut storage = Storage::new(&resolver.path.clone());
     let mut updated: Vec<TaskDTO> = Vec::new();
@@ -1048,12 +937,7 @@ pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcRespon
         "failed": failed,
     });
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 pub(crate) fn handle_task_bulk_reference_add(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -1093,17 +977,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let mut storage = Storage::new(&resolver.path.clone());
     // The repo root is resolved once but required only per arm: code ADD
@@ -1280,12 +1154,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         "failed": failed,
     });
 
-    ok(
-        req.id,
-        json!({
-            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-        }),
-    )
+    text_result(req.id, &payload)
 }
 
 /// Process ONE managed attachment reference item in a bulk batch. The
@@ -1355,26 +1224,14 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
         _ => return err(req.id, -32602, "Missing value", None),
     };
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let mut project_resolver = match ProjectResolver::new(&resolver) {
         Ok(r) => r,
         Err(e) => {
-            return err(
+            return internal_error(
                 req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to initialize project resolver: {}", e)})),
+                format!("Failed to initialize project resolver: {}", e),
             );
         }
     };
@@ -1565,12 +1422,7 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
                 "value": value,
                 "id": full_id,
             });
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            )
+            text_result(req.id, &payload)
         }
         Err(message) => err(
             req.id,
@@ -1595,17 +1447,7 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         .get("hard")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let mut storage = Storage::new(&resolver.path);
     match TaskService::delete_with_options(&mut storage, id, project, hard) {
         Ok(outcome) => {
@@ -1614,12 +1456,7 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
                 "hard": outcome.hard,
                 "warnings": outcome.warnings,
             });
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            )
+            text_result(req.id, &payload)
         }
         Err(e) => err(
             req.id,
@@ -1635,25 +1472,10 @@ pub(crate) fn handle_task_restore(req: JsonRpcRequest) -> JsonRpcResponse {
         return err(req.id, -32602, "Missing id", None);
     };
     let project = req.params.get("project").and_then(|v| v.as_str());
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let mut storage = Storage::new(&resolver.path);
     match TaskService::restore(&mut storage, id, project) {
-        Ok(task) => ok(
-            req.id,
-            json!({
-                "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
-            }),
-        ),
+        Ok(task) => text_result(req.id, &task),
         Err(e) => err(
             req.id,
             -32007,
@@ -1664,26 +1486,11 @@ pub(crate) fn handle_task_restore(req: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let cfg_mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
         Ok(m) => m,
         Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", e)})),
-            );
+            return internal_error(req.id, format!("Failed to load config: {}", e));
         }
     };
     let base_cfg = cfg_mgr.get_resolved_config();

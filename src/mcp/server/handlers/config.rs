@@ -1,9 +1,8 @@
 use serde_json::json;
 use std::collections::BTreeMap;
 
-use super::super::{JsonRpcRequest, JsonRpcResponse, err, ok};
+use super::super::{JsonRpcRequest, JsonRpcResponse, err, ok, resolve_tasks_dir, text_result};
 use crate::services::config_service::ConfigService;
-use crate::workspace::TasksDirectoryResolver;
 
 pub(crate) fn handle_config_show(req: JsonRpcRequest) -> JsonRpcResponse {
     let global = req
@@ -12,25 +11,10 @@ pub(crate) fn handle_config_show(req: JsonRpcRequest) -> JsonRpcResponse {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     let project = req.params.get("project").and_then(|v| v.as_str());
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let scope = if global { None } else { project };
     match ConfigService::show(&resolver, scope) {
-        Ok(val) => ok(
-            req.id,
-            json!({
-                "content": [ { "type": "text", "text": serde_json::to_string_pretty(&val).unwrap_or_else(|_| "{}".into()) } ]
-            }),
-        ),
+        Ok(val) => text_result(req.id, &val),
         Err(e) => err(
             req.id,
             -32001,
@@ -41,17 +25,7 @@ pub(crate) fn handle_config_show(req: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 pub(crate) fn handle_config_set(req: JsonRpcRequest) -> JsonRpcResponse {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let values = req
         .params
         .get("values")

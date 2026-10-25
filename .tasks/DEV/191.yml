@@ -1,0 +1,36 @@
+title: Remove duplicated backend code across MCP, REST, CLI and reference services
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T06:33:16.508835+00:00
+modified: 2026-10-25T08:09:54.547816+00:00
+comments:
+- date: 2026-10-25T07:19:26.854610+00:00
+  text: 'Added try_rpc!, internal_error, resolve_tasks_dir and text_result in src/mcp/server.rs and moved all MCP handlers onto them; extracted the shared sprint add/remove request parsing (membership_request/membership_payload). Also replaced 10 copies of the post-commit + task-updated SSE block in src/routes/tasks.rs with publish_reference_change. Rust duplication 4.80% -> ~4.2%. Verified: cargo clippy -D warnings clean; nextest MCP/reference/attachment/link suites (186) pass.'
+- date: 2026-10-25T08:09:54.547816+00:00
+  text: 'Widened (follow-up refactor run): reference_service attach/detach now share parse_task_id, required_value, a ReferenceSlot table and add_reference/remove_reference (attachment_service reuses parse_task_id); mcp/server/tools.rs hint wiring is table-driven (Hint enum, enum_field_hints, describe_enum_hints, reference_kinds) and tools/list output is byte-identical to before; sprint create mapping and list items moved to sprint_service and are shared by REST, MCP and CLI. Behaviour change: MCP sprint_create now keeps notes as typed (it trimmed them), matching REST and CLI. Rust duplication 4.80% -> ~3.5%.'
+history:
+- at: 2026-10-25T07:19:26.854610+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T07:19:26.889190+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T08:09:54.502827+00:00
+  actor: mallox
+  changes:
+  - field: title
+    old: 'Share MCP handler boilerplate: tasks dir resolution, internal errors, text results'
+    new: Remove duplicated backend code across MCP, REST, CLI and reference services
+- at: 2026-10-25T08:09:54.547816+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

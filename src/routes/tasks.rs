@@ -340,14 +340,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
     let mut storage = crate::storage::manager::Storage::new(&resolver.path);
     match attach_outcome {
         Ok(outcome) => {
-            ReferenceService::dispatch_post_commit(&mut storage, &outcome);
             // A no-op attach (already referenced; attached=false) changed
             // only the blob store, not the task, so it emits no task event.
-            if outcome.changed {
-                let actor =
-                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-            }
+            publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
             ok_json(
                 200,
                 json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached: outcome.changed, task: outcome.task }}),
@@ -449,12 +444,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         // are safe to run (the success path always changed the task).
         match removed {
             Ok((outcome, still_referenced, deleted)) => {
-                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                if outcome.changed {
-                    let actor =
-                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                }
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                 ok_json(
                     200,
                     json!({"data": crate::api_types::AttachmentRemoveResponse { task: outcome.task, deleted, still_referenced }}),
@@ -485,12 +475,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::attach_link_reference(&mut storage, &payload.id, &payload.url) {
                 Ok(outcome) => {
-                    ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                    if outcome.changed {
-                        let actor =
-                            crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                        crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                    }
+                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                     ok_json(
                         200,
                         json!({"data": crate::api_types::LinkReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
@@ -521,12 +506,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::detach_link_reference(&mut storage, &payload.id, &payload.url) {
             Ok(outcome) => {
-                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                if outcome.changed {
-                    let actor =
-                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                }
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                 ok_json(
                     200,
                     json!({"data": crate::api_types::LinkReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
@@ -564,12 +544,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 &payload.id,
 &payload.code,) {
                 Ok(outcome) => {
-                    ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                    if outcome.changed {
-                        let actor =
-                            crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                        crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                    }
+                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                     ok_json(
                         200,
                         json!({"data": crate::api_types::CodeReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
@@ -600,12 +575,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::detach_code_reference(&mut storage, &payload.id, &payload.code) {
             Ok(outcome) => {
-                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                if outcome.changed {
-                    let actor =
-                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                }
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                 ok_json(
                     200,
                     json!({"data": crate::api_types::CodeReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
@@ -643,12 +613,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 &payload.id,
 &payload.path,) {
                 Ok(outcome) => {
-                    ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                    if outcome.changed {
-                        let actor =
-                            crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                        crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                    }
+                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                     ok_json(
                         200,
                         json!({"data": crate::api_types::FileReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
@@ -686,12 +651,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 &payload.id,
 &payload.path,) {
             Ok(outcome) => {
-                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                if outcome.changed {
-                    let actor =
-                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                }
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                 ok_json(
                     200,
                     json!({"data": crate::api_types::FileReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
@@ -730,12 +690,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 &kind,
 &payload.value,) {
             Ok(outcome) => {
-                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                if outcome.changed {
-                    let actor =
-                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                }
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                 ok_json(
                     200,
                     json!({"data": crate::api_types::GenericReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
@@ -776,12 +731,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 &kind,
 &payload.value,) {
             Ok(outcome) => {
-                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                if outcome.changed {
-                    let actor =
-                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
-                }
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
                 ok_json(
                     200,
                     json!({"data": crate::api_types::GenericReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
@@ -1269,4 +1219,18 @@ fn parse_task_update_body(
         },
         sprints: parse_sprints_field(body)?,
     })
+}
+
+/// Post-commit hooks for a reference change, then the task event when the
+/// task actually changed. Call after any attachment store guard has dropped.
+fn publish_reference_change(
+    storage: &mut crate::storage::manager::Storage,
+    tasks_root: &std::path::Path,
+    outcome: &crate::services::reference_service::ReferenceMutationOutcome,
+) {
+    ReferenceService::dispatch_post_commit(storage, outcome);
+    if outcome.changed {
+        let actor = crate::utils::identity::resolve_current_user(Some(tasks_root));
+        crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+    }
 }

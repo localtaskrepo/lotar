@@ -1,7 +1,6 @@
-use super::super::{JsonRpcRequest, JsonRpcResponse, err, ok};
+use super::super::{JsonRpcRequest, JsonRpcResponse, err, ok, resolve_tasks_dir};
 use crate::errors::LoTaRError;
 use crate::services::sync_service::{SyncDirection, SyncOptions, SyncService};
-use crate::workspace::TasksDirectoryResolver;
 use serde_json::json;
 
 pub(crate) fn handle_sync_pull(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -38,17 +37,7 @@ fn handle_sync(req: JsonRpcRequest, direction: SyncDirection) -> JsonRpcResponse
     let write_report = req.params.get("write_report").and_then(|v| v.as_bool());
     let client_run_id = req.params.get("client_run_id").and_then(|v| v.as_str());
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": e})),
-            );
-        }
-    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let options = SyncOptions {
         remote: &remote,

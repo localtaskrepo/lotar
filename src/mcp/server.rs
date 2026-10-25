@@ -5,6 +5,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock, mpsc};
 use std::time::Duration;
 
+/// Unwrap a `Result<T, JsonRpcResponse>`, returning the error response.
+macro_rules! try_rpc {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(response) => return response,
+        }
+    };
+}
+
 mod handlers;
 mod hints;
 mod registry;
@@ -104,6 +114,30 @@ fn err(id: Option<Value>, code: i64, message: &str, data: Option<Value>) -> Json
             data,
         }),
     }
+}
+
+/// `-32603 Internal error`, with the cause in `data.message`.
+fn internal_error(id: Option<Value>, message: impl std::fmt::Display) -> JsonRpcResponse {
+    err(
+        id,
+        -32603,
+        "Internal error",
+        Some(json!({"message": message.to_string()})),
+    )
+}
+
+/// Resolve the tasks directory, or the standard internal-error response.
+fn resolve_tasks_dir(
+    id: &Option<Value>,
+) -> Result<crate::workspace::TasksDirectoryResolver, JsonRpcResponse> {
+    crate::workspace::TasksDirectoryResolver::resolve(None, None)
+        .map_err(|e| internal_error(id.clone(), e))
+}
+
+/// Tool result whose single text content is `payload` as pretty JSON.
+fn text_result(id: Option<Value>, payload: &impl Serialize) -> JsonRpcResponse {
+    let text = serde_json::to_string_pretty(payload).unwrap_or_else(|_| "{}".into());
+    ok(id, json!({"content": [{"type": "text", "text": text}]}))
 }
 
 /// Map a raw method spelling to its canonical wire method: snake_case tool
