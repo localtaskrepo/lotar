@@ -1,0 +1,25 @@
+title: Type the automation rule model in the UI and test the YAML/form conversion
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T00:19:58.052232+00:00
+modified: 2026-10-25T00:54:22.500889+00:00
+comments:
+- date: 2026-10-25T00:54:22.462468+00:00
+  text: 'Done. automationRules.ts now uses AutomationRecord = Record<string, unknown> with isRecord/asRecord narrowing; typed condition/change value builders; exported ConditionFieldOptionValue/SetFieldOptionValue for the editor. Removed all 55 no-explicit-any suppressions for these two files (eslint --prune-suppressions). Added automationRules.roundtrip.spec.ts (full rule form round trip incl. run/env/custom fields, any-match + shell run, unsupported shapes, yaml document round trip, max_iterations, bare lists, parse errors) and editor tests for move/duplicate/delete and max iterations. Note: single-item add/remove lists are canonicalised to scalars (Rust StringOrVec accepts both). Verified: vue-tsc clean, eslint clean, 25/25 targeted tests.'
+description: view/utils/automationRules.ts holds 53 of the 221 suppressed explicit anys (eslint-suppressions.json) and has ~52% line coverage; AutomationRulesEditor.vue ~54%. Introduce typed rule/condition/action models aligned with the Rust automation types, remove the any suppressions there, and add focused tests for parse/serialize round trips and editor flows.
+history:
+- at: 2026-10-25T00:54:22.462468+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T00:54:22.500889+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

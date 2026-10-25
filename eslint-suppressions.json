@@ -14,11 +14,6 @@
       "count": 3
     }
   },
-  "view/components/AutomationRulesEditor.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "view/components/BarChart.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
@@ -177,11 +172,6 @@
   "view/pages/TasksList.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 14
-    }
-  },
-  "view/utils/automationRules.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 53
     }
   },
   "view/utils/date.ts": {

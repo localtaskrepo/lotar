@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
+import { parseAutomationYamlDocument } from '../utils/automationRules'
 
 vi.mock('../components/UiModal.vue', () => ({
     default: {
@@ -204,6 +205,71 @@ describe('AutomationRulesEditor', () => {
         expect(chipField.exists()).toBe(true)
         expect(chipField.props('suggestions')).toEqual(['urgent', 'ready-for-review', 'needs-qa'])
 
+        wrapper.unmount()
+    })
+})
+
+describe('AutomationRulesEditor rule list actions', () => {
+    const twoRules = `automation:
+  max_iterations: 5
+  rules:
+    - name: First
+      on:
+        created:
+          set:
+            status: Todo
+    - name: Second
+      on:
+        assigned:
+          comment: Picked up
+`
+
+    function lastRuleNames(wrapper: ReturnType<typeof mount>) {
+        const emitted = wrapper.emitted('update:modelValue')
+        expect(emitted).toBeTruthy()
+        const yaml = emitted![emitted!.length - 1]![0] as string
+        const parsed = parseAutomationYamlDocument(yaml)
+        expect(parsed.maxIterations).toBe('5')
+        return parsed.rules.map((rule) => rule.name)
+    }
+
+    function ruleButton(wrapper: ReturnType<typeof mount>, ruleIndex: number, text: string) {
+        const card = wrapper.findAll('.automation-builder__rule-actions')[ruleIndex]!
+        return card.findAll('button').find((button) => button.text().includes(text))!
+    }
+
+    it.each([
+        ['Down', 0, ['Second', 'First']],
+        ['Up', 1, ['Second', 'First']],
+        ['Duplicate', 0, ['First', 'First', 'Second']],
+        ['Delete', 0, ['Second']],
+    ] as const)('%s on rule %i keeps max_iterations and reorders rules', async (action, index, expected) => {
+        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: twoRules } })
+        await flushPromises()
+
+        await ruleButton(wrapper, index, action).trigger('click')
+        expect(lastRuleNames(wrapper)).toEqual(expected)
+        wrapper.unmount()
+    })
+
+    it('disables moving past either end of the list', async () => {
+        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: twoRules } })
+        await flushPromises()
+
+        expect(ruleButton(wrapper, 0, 'Up').attributes('disabled')).toBeDefined()
+        expect(ruleButton(wrapper, 1, 'Down').attributes('disabled')).toBeDefined()
+        wrapper.unmount()
+    })
+
+    it('rewrites max_iterations without touching the rules', async () => {
+        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: twoRules } })
+        await flushPromises()
+
+        await wrapper.find('.automation-builder__max-iterations input').setValue('9')
+        const emitted = wrapper.emitted('update:modelValue')!
+        const parsed = parseAutomationYamlDocument(emitted[emitted.length - 1]![0] as string)
+        expect(parsed.maxIterations).toBe('9')
+        expect(parsed.rules.map((rule) => rule.name)).toEqual(['First', 'Second'])
         wrapper.unmount()
     })
 })

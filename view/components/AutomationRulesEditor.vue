@@ -316,7 +316,7 @@
                 >
                   <UiSelect
                     :model-value="getConditionFieldSelection(row)"
-                    @update:modelValue="(value) => handleConditionFieldChange(row, value as any)"
+                    @update:modelValue="(value) => handleConditionFieldChange(row, value as ConditionFieldOptionValue)"
                   >
                     <option v-for="option in automationConditionFieldOptions" :key="option.value" :value="option.value">
                       {{ option.label }}
@@ -604,7 +604,7 @@
                       >
                         <UiSelect
                           :model-value="getSetFieldSelection(row)"
-                          @update:modelValue="(value) => handleSetFieldChange(row, value as any)"
+                          @update:modelValue="(value) => handleSetFieldChange(row, value as SetFieldOptionValue)"
                         >
                           <option v-for="option in automationSetFieldOptions" :key="option.value" :value="option.value">
                             {{ option.label }}
@@ -906,6 +906,8 @@ import {
   type AutomationRuleDraft,
   type AutomationRunEnvDraft,
   type AutomationSetFieldDraft,
+  type ConditionFieldOptionValue,
+  type SetFieldOptionValue,
 } from '../utils/automationRules'
 import ChipListField from './ChipListField.vue'
 import IconGlyph from './IconGlyph.vue'
@@ -1307,11 +1309,11 @@ function findDraftEventAction(event: string): AutomationEventActionDraft | undef
   return dialogDraft.value.eventActions.find((entry) => entry.event === event)
 }
 
-function handleConditionFieldChange(row: AutomationConditionDraft, selection: any) {
+function handleConditionFieldChange(row: AutomationConditionDraft, selection: ConditionFieldOptionValue) {
   normalizeConditionFieldSelection(row, selection)
 }
 
-function handleSetFieldChange(row: AutomationSetFieldDraft, selection: any) {
+function handleSetFieldChange(row: AutomationSetFieldDraft, selection: SetFieldOptionValue) {
   normalizeSetFieldSelection(row, selection)
 }
 

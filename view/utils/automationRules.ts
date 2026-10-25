@@ -1,6 +1,18 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { listFromCsv } from '../composables/useFilterBuilder'
 
+/** A plain YAML mapping from an automation document. Values are untrusted
+ * user YAML, so they stay `unknown` until narrowed. */
+export type AutomationRecord = Record<string, unknown>
+
+function isRecord(value: unknown): value is AutomationRecord {
+    return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function asRecord(value: unknown): AutomationRecord {
+    return isRecord(value) ? value : {}
+}
+
 export type AutomationEventKey =
     | 'start'
     | 'created'
@@ -97,7 +109,7 @@ export interface AutomationRuleSummary {
 }
 
 export interface AutomationParsedDocument {
-    rules: Record<string, any>[]
+    rules: AutomationRecord[]
     maxIterations: string
     parseError: string | null
 }
@@ -113,7 +125,7 @@ type NamedOption<T extends string> = {
     label: string
 }
 
-type ConditionFieldOptionValue =
+export type ConditionFieldOptionValue =
     | 'status'
     | 'assignee'
     | 'reporter'
@@ -127,7 +139,7 @@ type ConditionFieldOptionValue =
     | 'custom_field'
     | 'other'
 
-type SetFieldOptionValue =
+export type SetFieldOptionValue =
     | 'status'
     | 'assignee'
     | 'reporter'
@@ -289,18 +301,17 @@ export function parseAutomationYamlDocument(yaml: string): AutomationParsedDocum
 
         const automation =
             parsed && typeof parsed === 'object' && 'automation' in parsed
-                ? (parsed as Record<string, any>).automation
+                ? (parsed as AutomationRecord).automation
                 : parsed
 
         if (Array.isArray(automation)) {
             return { rules: sanitizeRuleList(automation), maxIterations: '', parseError: null }
         }
 
-        const rules = Array.isArray((automation as Record<string, any> | undefined)?.rules)
-            ? sanitizeRuleList((automation as Record<string, any>).rules)
-            : []
+        const automationRecord = asRecord(automation)
+        const rules = Array.isArray(automationRecord.rules) ? sanitizeRuleList(automationRecord.rules) : []
 
-        const maxIterations = (automation as Record<string, any> | undefined)?.max_iterations
+        const maxIterations = automationRecord.max_iterations
         return {
             rules,
             maxIterations: maxIterations == null ? '' : String(maxIterations),
@@ -315,13 +326,13 @@ export function parseAutomationYamlDocument(yaml: string): AutomationParsedDocum
     }
 }
 
-export function buildAutomationYamlDocument(rules: Record<string, any>[], maxIterations = ''): string {
+export function buildAutomationYamlDocument(rules: AutomationRecord[], maxIterations = ''): string {
     const trimmedMaxIterations = maxIterations.trim()
     if (!rules.length && !trimmedMaxIterations) {
         return ''
     }
 
-    const automation: Record<string, any> = { rules }
+    const automation: AutomationRecord = { rules }
     if (trimmedMaxIterations) {
         const numeric = Number(trimmedMaxIterations)
         automation.max_iterations =
@@ -331,7 +342,7 @@ export function buildAutomationYamlDocument(rules: Record<string, any>[], maxIte
     return stringifyYaml({ automation })
 }
 
-export function summarizeAutomationRule(rule: Record<string, any>): AutomationRuleSummary {
+export function summarizeAutomationRule(rule: AutomationRecord): AutomationRuleSummary {
     const events = summarizeEvents(rule)
     const actions = summarizeActions(rule, events)
     const conditions = summarizeConditions(rule?.when)
@@ -344,7 +355,7 @@ export function summarizeAutomationRule(rule: Record<string, any>): AutomationRu
     }
 }
 
-export function getEditableRuleState(rule: Record<string, any>): AutomationEditableRuleState {
+export function getEditableRuleState(rule: AutomationRecord): AutomationEditableRuleState {
     const unsupportedReasons = collectUnsupportedRuleReasons(rule)
     return {
         editable: unsupportedReasons.length === 0,
@@ -364,8 +375,8 @@ export function createEmptyRuleDraft(): AutomationRuleDraft {
     }
 }
 
-export function buildAutomationRuleFromDraft(draft: AutomationRuleDraft): Record<string, any> {
-    const rule: Record<string, any> = {}
+export function buildAutomationRuleFromDraft(draft: AutomationRuleDraft): AutomationRecord {
+    const rule: AutomationRecord = {}
     if (draft.name.trim()) {
         rule.name = draft.name.trim()
     }
@@ -378,7 +389,7 @@ export function buildAutomationRuleFromDraft(draft: AutomationRuleDraft): Record
         rule.when = when
     }
 
-    const on: Record<string, any> = {}
+    const on: AutomationRecord = {}
     draft.eventActions.forEach((actionDraft) => {
         if (!actionDraft.enabled) return
         const action = buildActionFromDraft(actionDraft)
@@ -394,14 +405,14 @@ export function formatAutomationRuleLabel(summary: AutomationRuleSummary, index:
     return summary.name?.trim() || `Rule ${index + 1}`
 }
 
-function sanitizeRuleList(value: unknown[]): Record<string, any>[] {
+function sanitizeRuleList(value: unknown[]): AutomationRecord[] {
     return value
         .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
-        .map((entry) => compactAutomationRecord(cloneRecord(entry as Record<string, any>)))
+        .map((entry) => compactAutomationRecord(cloneRecord(entry as AutomationRecord)))
         .filter((entry) => Object.keys(entry).length > 0)
 }
 
-function summarizeEvents(rule: Record<string, any>): AutomationEventKey[] {
+function summarizeEvents(rule: AutomationRecord): AutomationEventKey[] {
     const on = rule?.on
     if (!on || typeof on !== 'object') return []
     return Object.keys(on)
@@ -411,7 +422,7 @@ function summarizeEvents(rule: Record<string, any>): AutomationEventKey[] {
 
 function summarizeConditions(when: unknown): string[] {
     if (!when || typeof when !== 'object' || Array.isArray(when)) return []
-    const conditionRecord = when as Record<string, any>
+    const conditionRecord = when as AutomationRecord
     const conditions: string[] = []
 
     for (const [key, value] of Object.entries(conditionRecord)) {
@@ -432,7 +443,7 @@ function summarizeConditions(when: unknown): string[] {
             for (const [field, change] of Object.entries(value)) {
                 const parts: string[] = []
                 if (change && typeof change === 'object' && !Array.isArray(change)) {
-                    const changeRecord = change as Record<string, any>
+                    const changeRecord = change as AutomationRecord
                     if (changeRecord.from != null) {
                         parts.push(`from ${summarizeFieldCondition(changeRecord.from)}`)
                     }
@@ -454,13 +465,12 @@ function summarizeConditions(when: unknown): string[] {
     return conditions
 }
 
-function summarizeActions(rule: Record<string, any>, events: AutomationEventKey[]): string[] {
+function summarizeActions(rule: AutomationRecord, events: AutomationEventKey[]): string[] {
     const on = rule?.on
     if (!on || typeof on !== 'object' || !events.length) return ['No actions']
     return events.flatMap((event) => {
         const action =
-            (on as Record<string, any>)[YAML_EVENT_KEYS[event]] ??
-            (on as Record<string, any>)[denormalizeEventKey(event)]
+            (on as AutomationRecord)[YAML_EVENT_KEYS[event]] ?? (on as AutomationRecord)[denormalizeEventKey(event)]
         const summary = summarizeAction(action)
         return summary.map((line) => `${EVENT_LABELS[event]}: ${line}`)
     })
@@ -468,7 +478,7 @@ function summarizeActions(rule: Record<string, any>, events: AutomationEventKey[
 
 function summarizeAction(action: unknown): string[] {
     if (!action || typeof action !== 'object' || Array.isArray(action)) return ['(empty)']
-    const record = action as Record<string, any>
+    const record = action as AutomationRecord
     const summary: string[] = []
 
     if (record.set && typeof record.set === 'object') {
@@ -503,7 +513,7 @@ function summarizeAction(action: unknown): string[] {
     if (record.run) {
         if (typeof record.run === 'string') {
             summary.push(`run: ${record.run}`)
-        } else if (typeof record.run === 'object') {
+        } else if (isRecord(record.run)) {
             const cmd = record.run.command || ''
             const args = Array.isArray(record.run.args) ? record.run.args.join(' ') : ''
             const line = [cmd, args].filter(Boolean).join(' ')
@@ -525,7 +535,7 @@ function summarizeFieldCondition(value: unknown): string {
         return String(value)
     }
 
-    const record = value as Record<string, any>
+    const record = value as AutomationRecord
     for (const operator of CONDITION_OPERATORS) {
         if (!(operator in record)) continue
         return `${operator} ${formatValue(record[operator])}`
@@ -539,7 +549,7 @@ function formatValue(value: unknown): string {
     return value == null ? '' : String(value)
 }
 
-function collectUnsupportedRuleReasons(rule: Record<string, any>): string[] {
+function collectUnsupportedRuleReasons(rule: AutomationRecord): string[] {
     const reasons: string[] = []
 
     for (const key of Object.keys(rule)) {
@@ -574,7 +584,7 @@ function collectUnsupportedWhenReasons(when: unknown, depth = 0): string[] {
     }
 
     const reasons: string[] = []
-    const record = when as Record<string, any>
+    const record = when as AutomationRecord
 
     if ('not' in record) {
         reasons.push('NOT conditions are currently YAML-only.')
@@ -601,7 +611,7 @@ function collectUnsupportedWhenReasons(when: unknown, depth = 0): string[] {
                 reasons.push(`Change condition for ${key} is invalid.`)
                 continue
             }
-            const changeRecord = value as Record<string, any>
+            const changeRecord = value as AutomationRecord
             if (changeRecord.from != null && !isSupportedFieldCondition(changeRecord.from)) {
                 reasons.push(`Change condition for ${key}.from uses an unsupported shape.`)
             }
@@ -635,7 +645,7 @@ function collectUnsupportedActionReasons(action: unknown, event: AutomationEvent
         return [`${EVENT_LABELS[event]} action is invalid.`]
     }
 
-    const record = action as Record<string, any>
+    const record = action as AutomationRecord
     const reasons: string[] = []
     for (const key of Object.keys(record)) {
         if (!SUPPORTED_ACTION_KEYS.has(key)) {
@@ -685,7 +695,7 @@ function collectUnsupportedActionReasons(action: unknown, event: AutomationEvent
         if (typeof record.run === 'string') {
             return reasons
         }
-        if (typeof record.run !== 'object' || Array.isArray(record.run)) {
+        if (!isRecord(record.run)) {
             reasons.push(`${EVENT_LABELS[event]} run action must be a string or command map.`)
             return reasons
         }
@@ -694,8 +704,8 @@ function collectUnsupportedActionReasons(action: unknown, event: AutomationEvent
                 reasons.push(`${EVENT_LABELS[event]} run.${key} is not editable in the builder.`)
             }
         }
-        if (record.run.env && typeof record.run.env === 'object' && !Array.isArray(record.run.env)) {
-            for (const value of Object.values(record.run.env as Record<string, unknown>)) {
+        if (isRecord(record.run.env)) {
+            for (const value of Object.values(record.run.env)) {
                 if (typeof value !== 'string') {
                     reasons.push(`${EVENT_LABELS[event]} run.env values must be strings.`)
                     break
@@ -731,9 +741,9 @@ function isScalarYamlValue(value: unknown): boolean {
     return ['string', 'number', 'boolean'].includes(typeof value) || value == null
 }
 
-function createRuleDraftFromRule(rule: Record<string, any>): AutomationRuleDraft {
+function createRuleDraftFromRule(rule: AutomationRecord): AutomationRuleDraft {
     const when = extractWhen(rule.when)
-    const on = rule.on && typeof rule.on === 'object' && !Array.isArray(rule.on) ? (rule.on as Record<string, any>) : {}
+    const on = rule.on && typeof rule.on === 'object' && !Array.isArray(rule.on) ? (rule.on as AutomationRecord) : {}
 
     return {
         name: typeof rule.name === 'string' ? rule.name : '',
@@ -757,7 +767,7 @@ function extractWhen(value: unknown): Pick<AutomationRuleDraft, 'matchMode' | 'c
         return { matchMode, conditions, changeConditions }
     }
 
-    const record = value as Record<string, any>
+    const record = value as AutomationRecord
     if (Array.isArray(record.any)) {
         matchMode = 'any'
         record.any.forEach((entry) => extractLeafConditions(entry, conditions, changeConditions))
@@ -777,7 +787,7 @@ function extractLeafConditions(
     changeConditions: AutomationChangeDraft[],
 ) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return
-    const record = value as Record<string, any>
+    const record = value as AutomationRecord
 
     if (record.custom_fields && typeof record.custom_fields === 'object') {
         for (const [key, fieldCondition] of Object.entries(record.custom_fields)) {
@@ -827,7 +837,7 @@ function conditionToDraft(value: unknown, field: string, scope: 'field' | 'custo
         }
     }
 
-    const record = value && typeof value === 'object' ? (value as Record<string, any>) : {}
+    const record = value && typeof value === 'object' ? (value as AutomationRecord) : {}
     const operator = CONDITION_OPERATORS.find((candidate) => candidate in record) ?? 'equals'
     return {
         id: nextRowId('condition'),
@@ -851,7 +861,7 @@ function extractEventActionDraft(event: AutomationEventKey, action: unknown): Au
         return createEventActionDraft(event)
     }
 
-    const record = action as Record<string, any>
+    const record = action as AutomationRecord
     const setFields: AutomationSetFieldDraft[] = []
     const addFields: AutomationListFieldDraft[] = []
     const removeFields: AutomationListFieldDraft[] = []
@@ -905,14 +915,14 @@ function extractEventActionDraft(event: AutomationEventKey, action: unknown): Au
     if (typeof record.run === 'string') {
         draft.runMode = 'shell'
         draft.runShell = record.run
-    } else if (record.run && typeof record.run === 'object' && !Array.isArray(record.run)) {
+    } else if (isRecord(record.run)) {
         draft.runMode = 'command'
         draft.runCommand = typeof record.run.command === 'string' ? record.run.command : ''
         draft.runArgs = Array.isArray(record.run.args) ? record.run.args.join(', ') : ''
         draft.runCwd = typeof record.run.cwd === 'string' ? record.run.cwd : ''
         draft.runWait = record.run.wait !== false
         draft.runIgnoreFailure = Boolean(record.run.ignore_failure)
-        draft.runEnv = Object.entries(record.run.env || {}).map(([key, value]) => ({
+        draft.runEnv = Object.entries(asRecord(record.run.env)).map(([key, value]) => ({
             id: nextRowId('env'),
             key,
             value: typeof value === 'string' ? value : '',
@@ -941,7 +951,7 @@ function createEventActionDraft(event: AutomationEventKey): AutomationEventActio
     }
 }
 
-function hasActionContent(value: Record<string, any>): boolean {
+function hasActionContent(value: AutomationRecord): boolean {
     return Boolean(
         value.comment ||
         value.run ||
@@ -951,7 +961,7 @@ function hasActionContent(value: Record<string, any>): boolean {
     )
 }
 
-function buildWhenFromDraft(draft: AutomationRuleDraft): Record<string, any> {
+function buildWhenFromDraft(draft: AutomationRuleDraft): AutomationRecord {
     const entries = buildWhenEntries(draft.conditions, draft.changeConditions)
     if (!entries.length) {
         return {}
@@ -967,8 +977,8 @@ function buildWhenFromDraft(draft: AutomationRuleDraft): Record<string, any> {
 function buildWhenEntries(
     conditions: AutomationConditionDraft[],
     changeConditions: AutomationChangeDraft[],
-): Record<string, any>[] {
-    const entries: Record<string, any>[] = []
+): AutomationRecord[] {
+    const entries: AutomationRecord[] = []
 
     conditions.forEach((condition) => {
         const fieldCondition = buildFieldConditionFromDraft(condition)
@@ -988,7 +998,7 @@ function buildWhenEntries(
     changeConditions.forEach((change) => {
         const field = change.field.trim()
         if (!field) return
-        const changeRecord: Record<string, any> = {}
+        const changeRecord: AutomationRecord = {}
         if (change.from.trim()) {
             changeRecord.from = parseChangeConditionValue(change.from)
         }
@@ -1003,7 +1013,7 @@ function buildWhenEntries(
     return entries
 }
 
-function buildFieldConditionFromDraft(condition: AutomationConditionDraft): any {
+function buildFieldConditionFromDraft(condition: AutomationConditionDraft): string | AutomationRecord | undefined {
     const value = condition.value.trim()
     if (!value && condition.operator !== 'exists') {
         return undefined
@@ -1024,7 +1034,7 @@ function buildFieldConditionFromDraft(condition: AutomationConditionDraft): any 
     }
 }
 
-function parseChangeConditionValue(value: string): any {
+function parseChangeConditionValue(value: string): string | string[] | undefined {
     const trimmed = value.trim()
     if (!trimmed) return undefined
     if (trimmed.includes(',')) {
@@ -1033,10 +1043,10 @@ function parseChangeConditionValue(value: string): any {
     return trimmed
 }
 
-function buildActionFromDraft(actionDraft: AutomationEventActionDraft): Record<string, any> {
-    const action: Record<string, any> = {}
-    const set: Record<string, any> = {}
-    const customFields: Record<string, any> = {}
+function buildActionFromDraft(actionDraft: AutomationEventActionDraft): AutomationRecord {
+    const action: AutomationRecord = {}
+    const set: AutomationRecord = {}
+    const customFields: AutomationRecord = {}
 
     actionDraft.setFields.forEach((entry) => {
         const value = entry.value.trim()
@@ -1076,7 +1086,7 @@ function buildActionFromDraft(actionDraft: AutomationEventActionDraft): Record<s
     }
 
     if (actionDraft.runMode === 'command' && actionDraft.runCommand.trim()) {
-        const run: Record<string, any> = {
+        const run: AutomationRecord = {
             command: actionDraft.runCommand.trim(),
         }
         const args = listFromCsv(actionDraft.runArgs)
@@ -1115,8 +1125,8 @@ function parseSetValue(field: string, value: string): string | string[] {
     return value
 }
 
-function buildListAction(entries: AutomationListFieldDraft[]): Record<string, any> {
-    return entries.reduce<Record<string, any>>((acc, entry) => {
+function buildListAction(entries: AutomationListFieldDraft[]): AutomationRecord {
+    return entries.reduce<AutomationRecord>((acc, entry) => {
         const value = entry.value.trim()
         if (!value) return acc
         const values = entry.field === 'sprint' ? value : listFromCsv(value)
@@ -1221,7 +1231,7 @@ export function getAutomationEventLabel(event: AutomationEventKey): string {
     return EVENT_LABELS[event]
 }
 
-function resolveActionForEvent(on: Record<string, any>, event: AutomationEventKey): unknown {
+function resolveActionForEvent(on: AutomationRecord, event: AutomationEventKey): unknown {
     return on[YAML_EVENT_KEYS[event]] ?? on[denormalizeEventKey(event)]
 }
 
@@ -1251,14 +1261,14 @@ function normalizeListField(rawKey: string): AutomationListFieldDraft['field'] {
     return (SUPPORTED_LIST_FIELDS.has(rawKey) ? rawKey : 'tags') as AutomationListFieldDraft['field']
 }
 
-function cloneRecord(value: Record<string, any>): Record<string, any> {
-    return JSON.parse(JSON.stringify(value)) as Record<string, any>
+function cloneRecord(value: AutomationRecord): AutomationRecord {
+    return JSON.parse(JSON.stringify(value)) as AutomationRecord
 }
 
-function compactAutomationRecord(value: Record<string, any>): Record<string, any> {
+function compactAutomationRecord(value: AutomationRecord): AutomationRecord {
     const compacted = compactAutomationValue(value)
     return compacted && typeof compacted === 'object' && !Array.isArray(compacted)
-        ? (compacted as Record<string, any>)
+        ? (compacted as AutomationRecord)
         : {}
 }
 
