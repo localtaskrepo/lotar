@@ -241,7 +241,10 @@
                             </p>
                             <pre><code>{
   <span class="s">"mcpServers"</span>: {
-    <span class="s">"lotar"</span>: { <span class="s">"command"</span>: <span class="s">"lotar"</span>, <span class="s">"args"</span>: [<span class="s">"mcp"</span>] }
+    <span class="s">"lotar"</span>: {
+      <span class="s">"command"</span>: <span class="s">"lotar"</span>,
+      <span class="s">"args"</span>: [<span class="s">"mcp"</span>]
+    }
   }
 }</code></pre>
                         </article>
@@ -370,7 +373,7 @@
                                 </div>
                                 <div class="tabs__panel" role="tabpanel" id="panel-brew" aria-labelledby="tab-brew">
                                     <div class="command">
-                                        <code>brew tap localtaskrepo/lotar &amp;&amp; brew install lotar</code>
+                                        <pre><code>brew tap localtaskrepo/lotar &amp;&amp; brew install lotar</code></pre>
                                         <button type="button" class="copy" data-copy>Copy</button>
                                     </div>
                                 </div>
@@ -382,10 +385,7 @@
                                     hidden
                                 >
                                     <div class="command">
-                                        <code
-                                            >scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar; scoop
-                                            install lotar</code
-                                        >
+                                        <pre><code>scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar; scoop install lotar</code></pre>
                                         <button type="button" class="copy" data-copy>Copy</button>
                                     </div>
                                 </div>
@@ -397,10 +397,7 @@
                                     hidden
                                 >
                                     <div class="command">
-                                        <code
-                                            >docker run --rm -v "$PWD":/workspace -v "$PWD/.tasks":/tasks -w /workspace
-                                            mallox/lotar list</code
-                                        >
+                                        <pre><code>docker run --rm -v "$PWD":/workspace -v "$PWD/.tasks":/tasks -w /workspace mallox/lotar list</code></pre>
                                         <button type="button" class="copy" data-copy>Copy</button>
                                     </div>
                                 </div>
@@ -426,10 +423,9 @@
                         <div class="install__step">
                             <h3><span class="step">2</span> Use it in any repository</h3>
                             <div class="command command--block">
-                                <code
-                                    >lotar add "Fix the login redirect loop" --type bug --priority high lotar list lotar
-                                    serve --open</code
-                                >
+                                <pre><code>lotar add "Fix the login redirect loop" --type bug --priority high
+lotar list
+lotar serve --open</code></pre>
                                 <button type="button" class="copy" data-copy>Copy</button>
                             </div>
                             <p class="install__note">

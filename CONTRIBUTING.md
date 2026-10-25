@@ -28,9 +28,14 @@ Notes:
 
 ## Local development
 
+Run the server and the UI dev server in two terminals:
+
 ```bash
-npm run dev
+# Terminal 1: the LoTaR server and REST API on port 8080
 cargo run -- serve --port 8080
+
+# Terminal 2: the web UI with hot reload; it proxies /api to port 8080
+npm run dev
 ```
 
 ## API contract changes

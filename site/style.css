@@ -630,13 +630,17 @@ section[id] {
     color: var(--code-fg);
 }
 
-.command code {
+.command pre {
     flex: 1;
     min-width: 0;
+    padding: 0;
+    border-radius: 0;
+    background: none;
     font-size: 13.5px;
     line-height: 1.7;
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
+    /* Commands never wrap: a break after a hyphen would split flags like --priority. */
+    overflow-x: auto;
+    white-space: pre;
 }
 
 .copy {

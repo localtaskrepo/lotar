@@ -1,14 +1,16 @@
 title: Set up community files, About box and project homepage
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-25T18:33:12.480525+00:00
-modified: 2026-10-25T18:45:12.598117+00:00
+modified: 2026-10-25T19:04:14.174006+00:00
 comments:
 - date: 2026-10-25T18:45:12.561336+00:00
   text: 'Done in repo: CODE_OF_CONDUCT.md (Contributor Covenant 2.0, contact mallox@pyxzl.net), SECURITY.md, issue forms (bug, feature, chooser with Q&A/security/docs links), PR template, SUPPORT/CONTRIBUTING/README updates, homepage in site/ (build: npm run site:build -> target/site; published by .github/workflows/pages.yml). Done on GitHub: org profile repo localtaskrepo/.github (welcome README + default CoC/SECURITY/SUPPORT), org description, lotar About description and 15 topics, delete-branch-on-merge on, merge commits off, private vulnerability reporting on for homebrew-lotar and scoop-lotar, welcome discussion rewritten. Verified: homepage at 1280/390px in light and dark (no overflow, no console errors), lint, YAML validity, local links, scripts tests (84). Next: after this commit is pushed and the Homepage workflow deploys, set the lotar homepage URL and the org website to https://localtaskrepo.github.io/lotar/. Manual (web UI only): upload docs/assets/social-preview.png as the repo social preview, pin the welcome discussion, pin lotar and autospec on the org page.'
+- date: 2026-10-25T19:04:14.148778+00:00
+  text: 'Review fixes after publishing: (1) homepage command blocks used <code> outside <pre>, so a formatter pass folded line breaks into them (three commands ran together; copying the Scoop/Docker commands would have pasted a line break mid-command). Now <pre><code>; commands scroll instead of wrapping so flags like --priority never split; MCP snippet reflowed to fit its card. Verified all four Copy buttons copy the exact command, no page overflow at 1280/390. (2) CONTRIBUTING ''cargo run -- serve --port 8080'' failed (two binaries): added default-run = "lotar" to Cargo.toml and explained the two-terminal dev setup; verified the command serves page and API. Cargo homepage now points to the site. (3) GitHub: lotar homepage and org website set to https://localtaskrepo.github.io/lotar/; homebrew-lotar and scoop-lotar descriptions, topics and homepage updated; org page links say ''LoTaR Discussions''; private localtaskrepo/.github-private member profile added (members saw GitHub''s onboarding checklist instead of the README); org .github now also provides default CONTRIBUTING, PR template and issue forms, bringing homebrew-lotar, scoop-lotar and autospec to 100% community health (lotar already 100%). Gates: lint, full smoke 346/346. Remaining, web UI only: enable organization Discussions with localtaskrepo/lotar as the source repository; upload docs/assets/social-preview.png as the repo social preview; pin lotar and autospec on the org page; pin the welcome discussion.'
 history:
 - at: 2026-10-25T18:45:12.561336+00:00
   actor: mallox
@@ -22,3 +24,13 @@ history:
     new: InProgress
   - field: assignee
     new: mallox
+- at: 2026-10-25T19:04:14.148778+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T19:04:14.174006+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
