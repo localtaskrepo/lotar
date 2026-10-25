@@ -12,7 +12,7 @@
       :height="height"
       :viewBox="`0 0 ${width} ${height}`"
       role="img"
-      :aria-label="ariaLabel"
+      :aria-label="summary"
     >
       <g class="column-chart__grid">
         <g v-for="tick in ticks" :key="tick">
@@ -23,15 +23,13 @@
         </g>
       </g>
       <line class="column-chart__baseline" :x1="plot.left" :x2="width - plot.right" :y1="yOf(0)" :y2="yOf(0)" />
-      <g v-for="(label, index) in labels" :key="`${label}-${index}`">
-        <path
-          v-for="(entry, s) in series"
-          :key="entry.label"
-          class="column-chart__bar"
-          :class="{ dim: active !== null && active !== index }"
-          :d="barPath(index, s)"
-          :fill="colorOf(s)"
-        />
+      <g
+        v-for="(label, index) in labels"
+        :key="`${label}-${index}`"
+        :class="{ dim: active !== null && active !== index, partial: partial[index] }"
+        class="column-chart__group"
+      >
+        <path v-for="segment in segmentsAt(index)" :key="segment.key" :d="segment.d" :fill="segment.color" />
         <text
           v-if="index % labelStep === 0"
           class="column-chart__xlabel"
@@ -41,45 +39,58 @@
         >
           {{ label }}
         </text>
-        <rect
-          class="column-chart__hit"
-          :x="plot.left + index * band"
-          :y="plot.top"
-          :width="band"
-          :height="plotHeight"
-          tabindex="0"
-          :aria-label="describe(index)"
-          @pointerenter="active = index"
-          @pointerleave="active = null"
-          @focus="active = index"
-          @blur="active = null"
-          @click="emit('select', index)"
-          @keydown.enter.prevent="emit('select', index)"
-        />
       </g>
+      <rect
+        v-for="(label, index) in labels"
+        :key="`hit-${label}-${index}`"
+        class="column-chart__hit"
+        :class="{ selectable }"
+        :x="plot.left + index * band"
+        :y="plot.top"
+        :width="band"
+        :height="plotHeight"
+        :tabindex="selectable ? 0 : undefined"
+        :role="selectable ? 'button' : undefined"
+        :aria-label="selectable ? describe(index) : undefined"
+        @pointerenter="active = index"
+        @pointerleave="active = null"
+        @focus="active = index"
+        @blur="active = null"
+        @click="selectable && emit('select', index)"
+        @keydown.enter.prevent="selectable && emit('select', index)"
+      />
     </svg>
     <div
-      v-if="active !== null"
+      v-if="active !== null && labels[active] !== undefined"
+      ref="tooltip"
       class="column-chart__tooltip"
       role="presentation"
       :style="{ left: `${tooltipLeft}px`, top: `${plot.top}px` }"
     >
-      <strong class="column-chart__tooltip-title">{{ labels[active] }}</strong>
+      <strong class="column-chart__tooltip-title">
+        {{ labels[active] }}<span v-if="partial[active]" class="muted"> (partial)</span>
+      </strong>
       <div v-for="(entry, s) in series" :key="entry.label" class="column-chart__tooltip-row">
         <span class="column-chart__key" :style="{ background: colorOf(s) }" aria-hidden="true"></span>
         <strong>{{ format(entry.values[active] ?? 0) }}</strong>
         <span class="muted">{{ entry.label }}</span>
+      </div>
+      <div v-if="stacked && series.length > 1" class="column-chart__tooltip-row column-chart__tooltip-total">
+        <strong>{{ format(totalAt(active)) }}</strong>
+        <span class="muted">Total</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 export interface ColumnSeries {
   label: string
   values: number[]
+  /** Fold-in series such as "Other": drawn in the neutral colour. */
+  muted?: boolean
 }
 
 const props = withDefaults(
@@ -93,17 +104,33 @@ const props = withDefaults(
     summary: string
     /** Counts: keep ticks on whole numbers. */
     integer?: boolean
+    /** Stack series into one column per label instead of grouping them. */
+    stacked?: boolean
+    /** Per label: only part of the period is inside the selected range. */
+    partial?: boolean[]
+    /** Columns are clickable (and keyboard focusable). */
+    selectable?: boolean
   }>(),
-  { height: 200, integer: true, format: (value: number) => String(Math.round(value * 10) / 10) },
+  {
+    height: 200,
+    integer: true,
+    stacked: false,
+    partial: () => [],
+    selectable: false,
+    format: (value: number) => String(Math.round(value * 10) / 10),
+  },
 )
 
 const emit = defineEmits<{ (e: 'select', index: number): void }>()
 
 const COLORS = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)']
-const colorOf = (index: number) => COLORS[index] ?? 'var(--viz-muted)'
+const colorOf = (index: number) =>
+  props.series[index]?.muted ? 'var(--viz-muted)' : (COLORS[index] ?? 'var(--viz-muted)')
 
 const host = ref<HTMLElement | null>(null)
+const tooltip = ref<HTMLElement | null>(null)
 const width = ref(600)
+const tooltipWidth = ref(160)
 const active = ref<number | null>(null)
 let observer: ResizeObserver | null = null
 
@@ -120,13 +147,30 @@ onMounted(() => {
 })
 onBeforeUnmount(() => observer?.disconnect())
 
+// A new period or filter replaces the labels: drop a stale hover.
+watch(
+  () => props.labels.join('|'),
+  () => (active.value = null),
+)
+watch(active, async (value) => {
+  if (value === null) return
+  await nextTick()
+  if (tooltip.value) tooltipWidth.value = tooltip.value.offsetWidth
+})
+
 const plot = { top: 8, right: 8, bottom: 24, left: 40 }
 const plotHeight = computed(() => props.height - plot.top - plot.bottom)
 const band = computed(() => (width.value - plot.left - plot.right) / Math.max(1, props.labels.length))
 
+function totalAt(index: number) {
+  return props.series.reduce((sum, entry) => sum + (entry.values[index] ?? 0), 0)
+}
+
 /** Clean tick step: 1, 2 or 5 times a power of ten, at most four gridlines. */
 const ticks = computed(() => {
-  const max = Math.max(0, ...props.series.flatMap((entry) => entry.values))
+  const max = props.stacked
+    ? Math.max(0, ...props.labels.map((_, index) => totalAt(index)))
+    : Math.max(0, ...props.series.flatMap((entry) => entry.values))
   if (max <= 0) return [0, 1]
   const raw = max / 4
   const power = 10 ** Math.floor(Math.log10(raw))
@@ -139,28 +183,52 @@ const ticks = computed(() => {
 const yMax = computed(() => ticks.value[ticks.value.length - 1] || 1)
 const yOf = (value: number) => plot.top + plotHeight.value * (1 - value / yMax.value)
 
+const columns = computed(() => (props.stacked ? 1 : Math.max(1, props.series.length)))
 const barWidth = computed(() => {
-  const count = Math.max(1, props.series.length)
-  const room = band.value * 0.72 - 2 * (count - 1)
-  return Math.max(2, Math.min(24, room / count))
+  const room = band.value * 0.72 - 2 * (columns.value - 1)
+  return Math.max(2, Math.min(24, room / columns.value))
 })
 
 function bandCenter(index: number) {
   return plot.left + band.value * (index + 0.5)
 }
 
-/** Column with a 4px rounded data end, square at the baseline. */
-function barPath(index: number, seriesIndex: number) {
-  const value = props.series[seriesIndex]?.values[index] ?? 0
-  if (value <= 0) return ''
-  const count = props.series.length
-  const groupWidth = count * barWidth.value + 2 * (count - 1)
-  const x0 = bandCenter(index) - groupWidth / 2 + seriesIndex * (barWidth.value + 2)
-  const x1 = x0 + barWidth.value
-  const base = yOf(0)
-  const top = yOf(value)
-  const r = Math.min(4, barWidth.value / 2, (base - top) / 2)
-  return `M${x0},${base} V${top + r} Q${x0},${top} ${x0 + r},${top} H${x1 - r} Q${x1},${top} ${x1},${top + r} V${base} Z`
+/** Rectangle with an optional 4px rounded top (the data end). */
+function shape(x0: number, x1: number, top: number, bottom: number, rounded: boolean) {
+  if (bottom - top <= 0) return ''
+  const r = rounded ? Math.min(4, (x1 - x0) / 2, bottom - top) : 0
+  return `M${x0},${bottom} V${top + r} Q${x0},${top} ${x0 + r},${top} H${x1 - r} Q${x1},${top} ${x1},${top + r} V${bottom} Z`
+}
+
+function segmentsAt(index: number) {
+  const out: Array<{ key: string; d: string; color: string }> = []
+  if (props.stacked) {
+    const x0 = bandCenter(index) - barWidth.value / 2
+    const x1 = x0 + barWidth.value
+    let lastNonZero = -1
+    props.series.forEach((entry, s) => {
+      if ((entry.values[index] ?? 0) > 0) lastNonZero = s
+    })
+    let base = 0
+    props.series.forEach((entry, s) => {
+      const value = entry.values[index] ?? 0
+      if (value <= 0) return
+      const bottom = yOf(base)
+      base += value
+      // 2px surface gap between stacked segments.
+      const top = yOf(base) + (s === lastNonZero ? 0 : 2)
+      out.push({ key: entry.label, d: shape(x0, x1, top, bottom, s === lastNonZero), color: colorOf(s) })
+    })
+    return out
+  }
+  const groupWidth = columns.value * barWidth.value + 2 * (columns.value - 1)
+  props.series.forEach((entry, s) => {
+    const value = entry.values[index] ?? 0
+    if (value <= 0) return
+    const x0 = bandCenter(index) - groupWidth / 2 + s * (barWidth.value + 2)
+    out.push({ key: entry.label, d: shape(x0, x0 + barWidth.value, yOf(value), yOf(0), true), color: colorOf(s) })
+  })
+  return out
 }
 
 /** Show every nth x label so labels never collide. */
@@ -169,10 +237,13 @@ const labelStep = computed(() => {
   return Math.max(1, Math.ceil((longest * 7 + 12) / band.value))
 })
 
+/** Right of the column, or left when it would overflow the chart. */
 const tooltipLeft = computed(() => {
   if (active.value === null) return 0
   const center = bandCenter(active.value)
-  return Math.min(Math.max(center + 12, 0), width.value - 180)
+  const right = center + band.value / 2 + 4
+  if (right + tooltipWidth.value <= width.value) return right
+  return Math.max(0, center - band.value / 2 - 4 - tooltipWidth.value)
 })
 
 function formatTick(value: number) {
@@ -181,10 +252,9 @@ function formatTick(value: number) {
 
 function describe(index: number) {
   const values = props.series.map((entry) => `${entry.label} ${props.format(entry.values[index] ?? 0)}`)
-  return `${props.labels[index]}: ${values.join(', ')}`
+  return `${props.labels[index]}${props.partial[index] ? ' (partial)' : ''}: ${values.join(', ')}`
 }
 
-const ariaLabel = computed(() => props.summary)
 const format = (value: number) => props.format(value)
 </script>
 
@@ -240,18 +310,25 @@ const format = (value: number) => props.format(value)
   stroke-width: 1;
 }
 
-.column-chart__bar {
+.column-chart__group {
   transition: opacity 120ms ease;
 }
 
-.column-chart__bar.dim {
+.column-chart__group.partial path {
+  opacity: 0.5;
+}
+
+.column-chart__group.dim {
   opacity: 0.45;
 }
 
 .column-chart__hit {
   fill: transparent;
-  cursor: pointer;
   outline: none;
+}
+
+.column-chart__hit.selectable {
+  cursor: pointer;
 }
 
 .column-chart__hit:focus-visible {
@@ -263,6 +340,7 @@ const format = (value: number) => props.format(value)
   position: absolute;
   z-index: 2;
   min-width: 140px;
+  max-width: 260px;
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 0.375rem);
@@ -283,6 +361,13 @@ const format = (value: number) => props.format(value)
   align-items: center;
   gap: var(--space-2, 0.5rem);
   font-variant-numeric: tabular-nums;
+}
+
+.column-chart__tooltip-total {
+  margin-top: var(--space-1, 0.25rem);
+  padding-top: var(--space-1, 0.25rem);
+  padding-left: 20px;
+  border-top: 1px solid var(--color-border);
 }
 
 .column-chart__key {

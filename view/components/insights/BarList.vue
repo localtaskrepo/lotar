@@ -2,12 +2,12 @@
   <ol class="bar-list" :aria-label="label">
     <li v-for="row in visibleRows" :key="row.key" class="bar-list__row">
       <component
-        :is="clickable ? 'button' : 'div'"
-        :type="clickable ? 'button' : undefined"
+        :is="isClickable(row) ? 'button' : 'div'"
+        :type="isClickable(row) ? 'button' : undefined"
         class="bar-list__item"
-        :class="{ 'bar-list__item--clickable': clickable }"
+        :class="{ 'bar-list__item--clickable': isClickable(row) }"
         :title="row.hint || undefined"
-        @click="clickable && emit('select', row.key)"
+        @click="isClickable(row) && emit('select', row.key)"
       >
         <span class="bar-list__label">
           <IconGlyph v-if="row.alert" name="flag" class="bar-list__alert" aria-hidden="true" />
@@ -23,12 +23,16 @@
         <span class="bar-list__value">{{ row.display ?? row.value }}</span>
       </component>
     </li>
-    <li v-if="hiddenCount > 0" class="bar-list__more muted">+ {{ hiddenCount }} more</li>
+    <li v-if="hiddenCount > 0 || expanded" class="bar-list__more">
+      <button type="button" class="bar-list__toggle" :aria-expanded="expanded" @click="expanded = !expanded">
+        {{ expanded ? 'Show fewer' : `Show ${hiddenCount} more` }}
+      </button>
+    </li>
   </ol>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import IconGlyph from '../IconGlyph.vue'
 
 export interface BarRow {
@@ -42,6 +46,8 @@ export interface BarRow {
   alert?: boolean
   /** De-emphasised (e.g. "unassigned", "none"). */
   muted?: boolean
+  /** Set false for rows with no matching drill-down. */
+  clickable?: boolean
 }
 
 const props = withDefaults(
@@ -56,8 +62,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: 'select', key: string): void }>()
 
-const visibleRows = computed(() => props.rows.slice(0, props.limit))
+const expanded = ref(false)
+const visibleRows = computed(() => (expanded.value ? props.rows : props.rows.slice(0, props.limit)))
 const hiddenCount = computed(() => Math.max(0, props.rows.length - props.limit))
+const isClickable = (row: BarRow) => props.clickable && row.clickable !== false
 const max = computed(() => Math.max(0, ...props.rows.map((row) => row.value)))
 
 function barPercent(value: number) {
@@ -77,6 +85,7 @@ function barPercent(value: number) {
 }
 
 .bar-list__item {
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(6rem, 34%) 1fr minmax(3rem, auto);
   align-items: center;
@@ -155,6 +164,20 @@ function barPercent(value: number) {
 
 .bar-list__more {
   padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+}
+
+.bar-list__toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-strong, var(--color-accent));
+  font: inherit;
   font-size: var(--text-xs, 0.75rem);
+  cursor: pointer;
+}
+
+.bar-list__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 </style>

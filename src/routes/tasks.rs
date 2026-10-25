@@ -30,7 +30,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage::new(&resolver.path);
 
-        let page = match crate::utils::pagination::parse_page_strict(&req.query, 50, 200) {
+        // Up to 1000 per page so full-list views (board, calendar, insights)
+        // need few requests: each request scans every task file.
+        let page = match crate::utils::pagination::parse_page_strict(&req.query, 50, 1000) {
             Ok(v) => v,
             Err(msg) => return bad_request(msg),
         };

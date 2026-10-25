@@ -5,7 +5,6 @@
  */
 import type { TaskDTO } from '../api/types'
 import { parseEffort } from './taskSort'
-import { statusEnteredAt } from './taskHistory'
 
 export const DAY_MS = 86_400_000
 
@@ -65,19 +64,44 @@ export function previousRange(range: Range): Range {
 // Task timelines
 // ---------------------------------------------------------------------------
 
+/** Status comparison key: case, spaces, `_` and `-` are ignored. */
+export function statusKey(value: string | null | undefined): string {
+    return (value ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_-]+/g, '')
+}
+
+export interface StatusChange {
+    at: number
+    old: string | null
+    next: string | null
+}
+
 export interface TaskTimeline {
     task: TaskDTO
     created: number | null
-    /** First status change: when work left its initial status. */
+    /** Status changes, oldest first. */
+    changes: StatusChange[]
+    /** Every history entry (time and actor), for activity metrics. */
+    entries: Array<{ at: number; actor: string }>
+    /** Key of the project's starting status (e.g. "todo"), when known. */
+    initialKey: string | null
+    /** First move into an active status (neither starting nor done). */
     startedAt: number | null
-    /** When the task last entered a done status (null while open). */
+    /** Start of the final done stretch (null while open). */
     doneAt: number | null
+    /** Moves from a done status back to an open one. */
+    reopenedAt: number[]
     isDone: boolean
+    /** Started, not done, and not moved back to the starting status. */
+    inProgress: boolean
 }
 
 export interface CompletionLookup {
     isTaskDone(task: TaskDTO): boolean
-    isDoneStatus(projectPrefix: string, status: string | null | undefined): boolean
+    /** Done status labels for this task (its own policy, as `isTaskDone` uses). */
+    doneLabels(task: TaskDTO): readonly string[]
 }
 
 export function projectOf(id: string): string {
@@ -85,33 +109,110 @@ export function projectOf(id: string): string {
     return dash > 0 ? id.slice(0, dash) : ''
 }
 
-function statusChanges(task: TaskDTO): Array<{ at: number; old: string | null; next: string | null }> {
-    const out: Array<{ at: number; old: string | null; next: string | null }> = []
+function readHistory(task: TaskDTO): { changes: StatusChange[]; entries: TaskTimeline['entries'] } {
+    const changes: StatusChange[] = []
+    const entries: TaskTimeline['entries'] = []
     for (const entry of Array.isArray(task.history) ? task.history : []) {
         const at = parseTime(entry?.at)
-        if (at === null || !Array.isArray(entry.changes)) continue
-        for (const change of entry.changes) {
-            if (change?.field === 'status') out.push({ at, old: change.old ?? null, next: change.new ?? null })
+        if (at === null) continue
+        entries.push({ at, actor: (entry.actor ?? '').trim() })
+        for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+            if (change?.field === 'status') changes.push({ at, old: change.old ?? null, next: change.new ?? null })
         }
     }
-    return out.sort((a, b) => a.at - b.at)
+    changes.sort((a, b) => a.at - b.at)
+    return { changes, entries }
 }
 
-export function buildTimeline(task: TaskDTO, completion: CompletionLookup): TaskTimeline {
-    const created = parseTime(task.created)
-    const changes = statusChanges(task)
-    const isDone = completion.isTaskDone(task)
-    const project = projectOf(task.id)
-    let doneAt: number | null = null
-    if (isDone) {
-        for (const change of changes) {
-            if (completion.isDoneStatus(project, change.next)) doneAt = change.at
+/**
+ * Each project's starting status, inferred from history: the status most
+ * tasks were in before their first recorded move.
+ */
+export function inferInitialStatuses(tasks: readonly TaskDTO[]): Map<string, string> {
+    const votes = new Map<string, Map<string, number>>()
+    for (const task of tasks) {
+        let first: { at: number; old: string | null } | null = null
+        for (const entry of Array.isArray(task.history) ? task.history : []) {
+            const at = parseTime(entry?.at)
+            if (at === null) continue
+            for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+                if (change?.field === 'status' && change.old && (!first || at < first.at))
+                    first = { at, old: change.old }
+            }
         }
-        // Done without a recorded transition: created done, or edited by hand.
-        doneAt ??= parseTime(task.modified) ?? created
+        if (!first) continue
+        const project = projectOf(task.id)
+        const tally = votes.get(project) ?? new Map<string, number>()
+        const key = statusKey(first.old)
+        tally.set(key, (tally.get(key) ?? 0) + 1)
+        votes.set(project, tally)
     }
-    const startedAt = changes.length ? changes[0]!.at : null
-    return { task, created, startedAt, doneAt, isDone }
+    const out = new Map<string, string>()
+    for (const [project, tally] of votes) {
+        const best = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
+        if (best) out.set(project, best[0])
+    }
+    return out
+}
+
+const timelineCache = new WeakMap<TaskDTO, { signature: string; timeline: TaskTimeline }>()
+
+/**
+ * Timeline of one task. Cached per task object: the task store replaces the
+ * object when a task changes, so unchanged tasks are never re-parsed.
+ */
+export function buildTimeline(
+    task: TaskDTO,
+    completion: CompletionLookup,
+    initialStatus: string | null = null,
+): TaskTimeline {
+    const isDone = completion.isTaskDone(task)
+    const doneKeys = new Set(completion.doneLabels(task).map(statusKey))
+    const signature = `${isDone}|${[...doneKeys].join(',')}|${initialStatus ?? ''}`
+    const cached = timelineCache.get(task)
+    if (cached && cached.signature === signature) return cached.timeline
+
+    const created = parseTime(task.created)
+    const { changes, entries } = readHistory(task)
+    const initialKey = changes.length ? statusKey(changes[0]!.old) || initialStatus : initialStatus
+    const isDoneKey = (key: string) => doneKeys.has(key)
+    const isActiveKey = (key: string) => !!key && key !== initialKey && !isDoneKey(key)
+
+    let startedAt: number | null = null
+    let inDone = changes.length ? isDoneKey(statusKey(changes[0]!.old)) : isDone
+    let doneCandidate: number | null = inDone ? created : null
+    const reopenedAt: number[] = []
+    for (const change of changes) {
+        const nextKey = statusKey(change.next)
+        if (startedAt === null && isActiveKey(nextKey)) startedAt = change.at
+        const nextDone = isDoneKey(nextKey)
+        if (nextDone && !inDone) doneCandidate = change.at
+        if (!nextDone && inDone) {
+            doneCandidate = null
+            reopenedAt.push(change.at)
+        }
+        inDone = nextDone
+    }
+    // Created straight into an active status: work started at creation.
+    if (startedAt === null && !changes.length && initialKey !== null && isActiveKey(statusKey(task.status))) {
+        startedAt = created
+    }
+    const doneAt = isDone ? (doneCandidate ?? (changes.length ? changes[changes.length - 1]!.at : created)) : null
+    const currentKey = statusKey(task.status)
+    const timeline: TaskTimeline = {
+        task,
+        created,
+        changes,
+        entries,
+        initialKey,
+        startedAt,
+        doneAt,
+        reopenedAt,
+        isDone,
+        inProgress: !isDone && startedAt !== null && currentKey !== initialKey,
+    }
+    timelineCache.set(task, { signature, timeline })
+    return timeline
 }
 
 /** Cycle time (start of work to done) in days, when both ends are known. */
@@ -142,6 +243,14 @@ export function percentile(values: readonly number[], p: number): number | null 
     return sorted[low]! + (sorted[high]! - sorted[low]!) * (rank - low)
 }
 
+/** Minimum samples before a percentile is shown or used for flagging. */
+export const MIN_PERCENTILE_SAMPLES = 5
+
+/** Percentile only when there are enough samples to mean something. */
+export function stablePercentile(values: readonly number[], p: number): number | null {
+    return values.length >= MIN_PERCENTILE_SAMPLES ? percentile(values, p) : null
+}
+
 /** Relative change from `previous` to `current`; null when undefined. */
 export function changeRatio(current: number, previous: number): number | null {
     if (previous === 0) return current === 0 ? 0 : null
@@ -152,6 +261,21 @@ export interface Bucket {
     start: number
     end: number
     label: string
+    /** Only part of this bucket lies inside the selected range. */
+    partial: boolean
+}
+
+export type BucketUnit = 'day' | 'week' | 'month'
+
+export function bucketUnitFor(range: Range): BucketUnit {
+    const days = (range.end - range.start) / DAY_MS
+    return days <= 14 ? 'day' : days <= 120 ? 'week' : 'month'
+}
+
+/** How many whole units the range spans (for "per week" rates). */
+export function unitsIn(range: Range, unit: BucketUnit): number {
+    const unitDays = unit === 'day' ? 1 : unit === 'week' ? 7 : 365.25 / 12
+    return Math.max(1, (range.end - range.start) / DAY_MS / unitDays)
 }
 
 const SHORT_DATE = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
@@ -167,23 +291,27 @@ function startOfLocalDay(at: number): number {
  * Split a range into chart buckets: days up to two weeks, weeks (starting
  * Monday) up to ~4 months, months beyond.
  */
+function bucket(start: number, end: number, label: string, range: Range): Bucket {
+    return { start, end, label, partial: start < range.start || end > range.end }
+}
+
 export function bucketsFor(range: Range): Bucket[] {
-    const days = (range.end - range.start) / DAY_MS
+    const unit = bucketUnitFor(range)
     const buckets: Bucket[] = []
-    if (days <= 14) {
+    if (unit === 'day') {
         for (let at = startOfLocalDay(range.start); at < range.end;) {
             const next = new Date(at)
             next.setDate(next.getDate() + 1)
-            buckets.push({ start: at, end: next.getTime(), label: SHORT_DATE.format(at) })
+            buckets.push(bucket(at, next.getTime(), SHORT_DATE.format(at), range))
             at = next.getTime()
         }
-    } else if (days <= 120) {
+    } else if (unit === 'week') {
         const first = new Date(startOfLocalDay(range.start))
         first.setDate(first.getDate() - ((first.getDay() + 6) % 7))
         for (let at = first.getTime(); at < range.end;) {
             const next = new Date(at)
             next.setDate(next.getDate() + 7)
-            buckets.push({ start: at, end: next.getTime(), label: SHORT_DATE.format(at) })
+            buckets.push(bucket(at, next.getTime(), SHORT_DATE.format(at), range))
             at = next.getTime()
         }
     } else {
@@ -192,7 +320,7 @@ export function bucketsFor(range: Range): Bucket[] {
         for (let at = first.getTime(); at < range.end;) {
             const next = new Date(at)
             next.setMonth(next.getMonth() + 1)
-            buckets.push({ start: at, end: next.getTime(), label: MONTH.format(at) })
+            buckets.push(bucket(at, next.getTime(), MONTH.format(at), range))
             at = next.getTime()
         }
     }
@@ -267,27 +395,32 @@ export function durationHistogram(days: readonly number[]): HistogramBin[] {
 }
 
 /**
- * Average days spent in each status by tasks completed in `range`, replayed
- * from history (creation to done). Done statuses are excluded.
+ * Average days per completed task spent in each status, for tasks completed
+ * in `range`, replayed from history (creation to done). Statuses are grouped
+ * case- and separator-insensitively; done statuses are excluded. `share` is
+ * the fraction of completed tasks that passed through the status.
  */
 export function timeInStatus(
     timelines: readonly TaskTimeline[],
     range: Range,
     completion: CompletionLookup,
-): Array<{ status: string; days: number; tasks: number }> {
-    const totals = new Map<string, { ms: number; tasks: Set<string> }>()
+): Array<{ status: string; days: number; share: number }> {
+    const totals = new Map<string, { label: string; ms: number; tasks: Set<string> }>()
+    let completedCount = 0
     for (const timeline of timelines) {
         if (!inRange(timeline.doneAt, range) || timeline.created === null) continue
-        const project = projectOf(timeline.task.id)
-        const changes = statusChanges(timeline.task)
-        let status = changes[0]?.old ?? (changes.length ? null : timeline.task.status)
+        completedCount += 1
+        const doneKeys = new Set(completion.doneLabels(timeline.task).map(statusKey))
+        const { changes } = timeline
+        let status = changes.length ? changes[0]!.old : timeline.task.status
         let cursor = timeline.created
         const add = (name: string | null, until: number) => {
-            if (!name || completion.isDoneStatus(project, name) || until <= cursor) return
-            const entry = totals.get(name) ?? { ms: 0, tasks: new Set<string>() }
+            const key = statusKey(name)
+            if (!key || doneKeys.has(key) || until <= cursor) return
+            const entry = totals.get(key) ?? { label: name!, ms: 0, tasks: new Set<string>() }
             entry.ms += until - cursor
             entry.tasks.add(timeline.task.id)
-            totals.set(name, entry)
+            totals.set(key, entry)
         }
         for (const change of changes) {
             if (change.at > timeline.doneAt!) break
@@ -297,15 +430,13 @@ export function timeInStatus(
         }
         add(status, timeline.doneAt!)
     }
-    return [...totals.entries()]
-        .map(([status, { ms, tasks }]) => ({ status, days: ms / DAY_MS / tasks.size, tasks: tasks.size }))
+    return [...totals.values()]
+        .map(({ label, ms, tasks }) => ({
+            status: label,
+            days: ms / DAY_MS / completedCount,
+            share: tasks.size / completedCount,
+        }))
         .sort((a, b) => b.days - a.days)
-}
-
-/** Days since an open task entered its current status. */
-export function daysInCurrentStatus(task: TaskDTO, now: number): number | null {
-    const since = statusEnteredAt(task, task.status)
-    return since === null ? null : Math.max(0, (now - since) / DAY_MS)
 }
 
 /** Whether a completed task met its due date (end of the due day, local). */
@@ -337,12 +468,12 @@ export function effortTotals(tasks: readonly TaskDTO[]): EffortTotals {
 }
 
 /** History entries per actor within `range` (comments, edits, moves). */
-export function activityByActor(tasks: readonly TaskDTO[], range: Range): CountEntry[] {
+export function activityByActor(timelines: readonly TaskTimeline[], range: Range): CountEntry[] {
     const counts = new Map<string, number>()
-    for (const task of tasks) {
-        for (const entry of Array.isArray(task.history) ? task.history : []) {
-            if (!inRange(parseTime(entry?.at), range)) continue
-            const actor = (entry.actor ?? '').trim() || '(unknown)'
+    for (const timeline of timelines) {
+        for (const entry of timeline.entries) {
+            if (!inRange(entry.at, range)) continue
+            const actor = entry.actor || '(unknown)'
             counts.set(actor, (counts.get(actor) ?? 0) + 1)
         }
     }
@@ -351,16 +482,32 @@ export function activityByActor(tasks: readonly TaskDTO[], range: Range): CountE
         .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
 }
 
-/** History entry timestamps within `range`, for activity trends. */
-export function activityTimes(tasks: readonly TaskDTO[], range: Range): number[] {
-    const times: number[] = []
-    for (const task of tasks) {
-        for (const entry of Array.isArray(task.history) ? task.history : []) {
-            const at = parseTime(entry?.at)
-            if (inRange(at, range)) times.push(at!)
+/**
+ * Open tasks at the end of each bucket (created before it, not yet done),
+ * for backlog trends. Reopened work counts as open from its reopening.
+ */
+export function openAtBucketEnds(
+    timelines: readonly TaskTimeline[],
+    buckets: readonly Bucket[],
+    now: number,
+): number[] {
+    return buckets.map((bucket) => {
+        const at = Math.min(bucket.end, now)
+        let open = 0
+        for (const timeline of timelines) {
+            if (timeline.created === null || timeline.created >= at) continue
+            if (timeline.doneAt !== null && timeline.doneAt < at) continue
+            open += 1
         }
-    }
-    return times
+        return open
+    })
+}
+
+/** Parse a due value; bare dates are local calendar days. */
+export function parseDue(value: string | null | undefined): number | null {
+    if (!value) return null
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(`${value}T00:00:00`).getTime()
+    return parseTime(value)
 }
 
 /** Bug-like task types (Bug, Defect, Incident, Regression...). */
@@ -371,7 +518,8 @@ export function isBugType(type: string | null | undefined): boolean {
 /** Format a day count compactly: "4h", "2.5d", "3w". */
 export function formatDays(days: number | null | undefined): string {
     if (days == null || !Number.isFinite(days)) return '—'
-    if (days < 1) return `${Math.max(1, Math.round(days * 24))}h`
+    if (days * 24 < 1) return '<1h'
+    if (days < 1) return `${Math.round(days * 24)}h`
     if (days < 14) return `${days < 10 ? Math.round(days * 10) / 10 : Math.round(days)}d`
     if (days < 90) return `${Math.round(days / 7)}w`
     return `${Math.round(days / 30)}mo`

@@ -420,7 +420,7 @@ fn rest_rejects_invalid_explicit_query_params() {
         ("sprints", "1,x"),
         ("sprints", "0"),
         ("limit", "0"),
-        ("limit", "201"),
+        ("limit", "1001"),
         ("limit", "abc"),
         ("offset", "-1"),
     ];

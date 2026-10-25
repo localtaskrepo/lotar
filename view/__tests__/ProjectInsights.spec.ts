@@ -40,6 +40,9 @@ vi.mock('vue-router', () => ({
     RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },
 }))
 
+// Renders the actions slot (Period) without the real filter bar.
+const FilterBarStub = { template: '<div class="filter-bar-stub"><slot name="actions" /></div>' }
+
 const DAY = 86_400_000
 const NOW = Date.parse('2026-01-05T12:00:00Z')
 const iso = (offset: number) => new Date(NOW + offset * DAY).toISOString()
@@ -75,7 +78,7 @@ describe('ProjectInsights', () => {
 
     async function mountInsights() {
         const { default: ProjectInsights } = await import('../pages/ProjectInsights.vue')
-        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: true } } })
+        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub } } })
         await flushPromises()
         return wrapper
     }
@@ -199,7 +202,7 @@ describe('ProjectInsights', () => {
         const slow = deferred<{ total: number; tasks: TaskDTO[] }>()
         api.listTasks.mockReturnValue(slow.promise)
         const { default: ProjectInsights } = await import('../pages/ProjectInsights.vue')
-        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: true } } })
+        wrapper = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub } } })
         await flushPromises()
         // The user navigates elsewhere while the first load is still running.
         routeState.path = '/sprints'
@@ -215,7 +218,7 @@ describe('ProjectInsights', () => {
         const late = deferred<{ total: number; tasks: TaskDTO[] }>()
         api.listTasks.mockReturnValue(late.promise)
         _resetTaskStore()
-        const second = mount(ProjectInsights, { global: { stubs: { FilterBar: true } } })
+        const second = mount(ProjectInsights, { global: { stubs: { FilterBar: FilterBarStub } } })
         await flushPromises()
         second.unmount()
         routerReplace.mockClear()
@@ -233,5 +236,70 @@ describe('ProjectInsights', () => {
         await retry!.trigger('click')
         await flushPromises()
         expect(tile('Open')).toBe('1')
+    })
+
+    it('limits open-work drill-downs to open statuses so the list matches the count', async () => {
+        api.listTasks.mockResolvedValue({
+            total: 3,
+            tasks: [task('A-1'), task('A-2', { status: 'Doing' }), task('A-3', { status: 'Done' })],
+        })
+        await mountInsights()
+        expect(tile('Open')).toBe('2')
+        const openTile = wrapper!.findAll('.stat-tile').find((el) => el.text().startsWith('Open'))!
+        await openTile.trigger('click')
+        const query = routerPush.mock.calls[routerPush.mock.calls.length - 1]![0].query
+        expect(query.status.split(',').sort()).toEqual(['Doing', 'Todo'])
+    })
+
+    it('keeps a custom date range in the URL and uses it for the numbers', async () => {
+        api.listTasks.mockResolvedValue({
+            total: 2,
+            tasks: [
+                task('A-1', {
+                    status: 'Done',
+                    history: [{ at: iso(-40), actor: 'ana', changes: [{ field: 'status', old: 'Todo', new: 'Done' }] }],
+                }),
+                task('A-2', {
+                    status: 'Done',
+                    history: [{ at: iso(-2), actor: 'ana', changes: [{ field: 'status', old: 'Todo', new: 'Done' }] }],
+                }),
+            ],
+        })
+        await mountInsights()
+        expect(tile('Completed')).toBe('1')
+        await wrapper!.get('[data-testid="insights-period"]').setValue('custom')
+        await flushPromises()
+        await wrapper!.get('[data-testid="insights-from"]').setValue('2025-11-01')
+        await wrapper!.get('[data-testid="insights-from"]').trigger('change')
+        await wrapper!.get('[data-testid="insights-to"]').setValue('2025-12-31')
+        await wrapper!.get('[data-testid="insights-to"]').trigger('change')
+        await flushPromises()
+        expect(routerReplace).toHaveBeenLastCalledWith({
+            path: '/insights',
+            query: { view: 'overview', period: 'custom', from: '2025-11-01', to: '2025-12-31' },
+        })
+        expect(tile('Completed')).toBe('1')
+        expect(wrapper!.text()).toContain('Up 1 vs previous period')
+    })
+
+    it('splits throughput by type into stacked series with an Other group', async () => {
+        const types = ['Feature', 'Bug', 'Chore', 'Spike', 'Docs']
+        api.listTasks.mockResolvedValue({
+            total: types.length,
+            tasks: types.map((type, index) =>
+                task(`A-${index + 1}`, {
+                    task_type: type,
+                    status: 'Done',
+                    history: [{ at: iso(-3), actor: 'ana', changes: [{ field: 'status', old: 'Todo', new: 'Done' }] }],
+                }),
+            ),
+        })
+        await mountInsights()
+        await openLens('delivery')
+        await wrapper!.get('[data-testid="insights-throughput-split"]').setValue('type')
+        await flushPromises()
+        const legend = wrapper!.findAll('.column-chart__legend li').map((li) => li.text())
+        expect(legend).toHaveLength(4)
+        expect(legend[3]).toBe('Other')
     })
 })

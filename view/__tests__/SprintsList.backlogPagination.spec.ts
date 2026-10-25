@@ -242,7 +242,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: 120,
             total: 120,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks: Array.from({ length: 120 }, (_, idx) => makeTask(idx + 1)),
         })
@@ -277,7 +277,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })
@@ -326,7 +326,7 @@ describe('SprintsList pagination', () => {
             { ...makeTask(1), id: '\u{10400}-1' },
             { ...makeTask(2), id: '\u{F900}-2' },
         ]
-        ;(api.listTasks as any).mockResolvedValue({ status: 'ok', tasks, count: 2, total: 2, limit: 200, offset: 0 })
+        ;(api.listTasks as any).mockResolvedValue({ status: 'ok', tasks, count: 2, total: 2, limit: 1000, offset: 0 })
         const wrapper = mount(SprintsList)
         try {
             await flushPromises()
@@ -353,7 +353,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })
@@ -386,7 +386,7 @@ describe('SprintsList pagination', () => {
             const tasks = Array.from({ length: 120 }, (_, index) =>
                 makeTask(index + 1, sprint === null ? [] : [sprint]),
             )
-            vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 120, limit: 200, offset: 0 })
+            vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 120, limit: 1000, offset: 0 })
             const wrapper = mount(SprintsList)
             await flushPromises()
             const group = wrapper.find(sprint === null ? '#backlog' : `[data-sprint-id="${sprint}"]`)
@@ -448,7 +448,7 @@ describe('SprintsList pagination', () => {
             sprintsRef.value = [makeSprint(1), makeSprint(2)]
             const tasks = [makeTask(1, [1, 2]), makeTask(2, [1]), makeTask(3)]
             const tasksBefore = JSON.parse(JSON.stringify(tasks))
-            vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 200, offset: 0 })
+            vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 1000, offset: 0 })
             const wrapper = mount(SprintsList)
             await flushPromises()
             const group = wrapper.find(sprint === null ? '#backlog' : '[data-sprint-id="1"]')
@@ -509,7 +509,7 @@ describe('SprintsList pagination', () => {
         const { api } = await import('../api/client')
         sprintsRef.value = [makeSprint(1)]
         const tasks = [makeTask(1), makeTask(2, [1])]
-        vi.mocked(api.listTasks).mockImplementation(async () => ({ tasks, total: 2, limit: 200, offset: 0 }))
+        vi.mocked(api.listTasks).mockImplementation(async () => ({ tasks, total: 2, limit: 1000, offset: 0 }))
         vi.mocked(api.sprintAdd).mockImplementation(async () => {
             tasks[0]!.sprints = [1]
             return { status: 'ok', modified: ['PRJ-001'], sprint_id: 1 } as any
@@ -592,7 +592,7 @@ describe('SprintsList pagination', () => {
         const { showToast } = await import('../components/toast')
         sprintsRef.value = sprint === null ? [] : [makeSprint(sprint)]
         const tasks = [makeTask(1, sprint === null ? [] : [sprint]), makeTask(2, sprint === null ? [] : [sprint])]
-        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 200, offset: 0 })
+        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 1000, offset: 0 })
         const wrapper = mount(SprintsList)
         await flushPromises()
         await wrapper
@@ -620,7 +620,7 @@ describe('SprintsList pagination', () => {
             { ...makeTask(1, [1, 2]), sprint_order: { 1: 1, 2: 2 } },
             { ...makeTask(2, [1, 2]), sprint_order: { 1: 2, 2: 1 } },
         ]
-        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 200, offset: 0 })
+        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 1000, offset: 0 })
         vi.mocked(api.reorderTasks).mockResolvedValue({
             status: 'ok',
             tasks: ['PRJ-002', 'PRJ-001'],
@@ -746,7 +746,7 @@ describe('SprintsList pagination', () => {
             tasks,
             total: 2,
             count: 2,
-            limit: 200,
+            limit: 1000,
             offset: 0,
         }))
         vi.mocked(api.sprintAdd).mockImplementation(async () => {
@@ -772,7 +772,7 @@ describe('SprintsList pagination', () => {
         const { api } = await import('../api/client')
         sprintsRef.value = [makeSprint(1)]
         const tasks = [makeTask(1), makeTask(2), makeTask(3, [1])]
-        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 200, offset: 0 })
+        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 3, limit: 1000, offset: 0 })
         let finish = () => {}
         const wrapper = mount(SprintsList)
         try {
@@ -812,7 +812,7 @@ describe('SprintsList pagination', () => {
         async (operation) => {
             const { api } = await import('../api/client')
             const tasks = [makeTask(1), makeTask(2), makeTask(3)]
-            const response = { tasks, total: 3, count: 3, limit: 200, offset: 0 }
+            const response = { tasks, total: 3, count: 3, limit: 1000, offset: 0 }
             vi.mocked(api.listTasks).mockResolvedValue(response)
             vi.mocked(api.reorderTasks).mockResolvedValue({
                 status: 'ok',
@@ -873,7 +873,7 @@ describe('SprintsList pagination', () => {
         localStorage.setItem('lotar.sprints.manualOrder', '[1]')
         sprintsRef.value = [{ ...makeSprint(1), state: 'complete' }]
         const tasks = [makeTask(1), makeTask(2, [1])]
-        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 200, offset: 0 })
+        vi.mocked(api.listTasks).mockResolvedValue({ tasks, total: 2, limit: 1000, offset: 0 })
         const wrapper = mount(SprintsList)
         await flushPromises()
         const transfer = dragTransfer()
@@ -933,7 +933,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })
@@ -973,7 +973,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })
@@ -1045,7 +1045,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })
@@ -1086,7 +1086,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })
@@ -1114,7 +1114,7 @@ describe('SprintsList pagination', () => {
             status: 'ok',
             count: 120,
             total: 120,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })
@@ -1148,7 +1148,7 @@ describe('SprintsList automatic sorting', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         })

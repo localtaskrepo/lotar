@@ -206,7 +206,7 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
             status: 'ok',
             count: 1,
             total: 1,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks: [makeTask('PRJ-001', [1])],
         })
@@ -292,7 +292,7 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
             status: 'ok',
             count: 1,
             total: 1,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks: [makeTask('PRJ-001', [1, 2])],
         })
@@ -340,7 +340,7 @@ describe('SprintsList no-op drop guards (DEV-102)', () => {
             status: 'ok',
             count: 1,
             total: 1,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks: [makeTask('PRJ-001', [1, 2])],
         })

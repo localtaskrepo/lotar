@@ -11,7 +11,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in rows.slice(0, limit)" :key="row.id">
+        <tr v-for="row in expanded ? rows : rows.slice(0, limit)" :key="row.id">
           <td class="task-table__task">
             <button type="button" class="task-table__link" @click="emit('open', row.id)">
               <span class="task-table__id">{{ row.id }}</span>
@@ -28,11 +28,18 @@
         </tr>
       </tbody>
     </table>
-    <p v-if="rows.length > limit" class="task-table__more muted">Showing {{ limit }} of {{ rows.length }}</p>
+    <p v-if="rows.length > limit" class="task-table__more muted">
+      {{ expanded ? `Showing all ${rows.length}` : `Showing ${limit} of ${rows.length}` }}
+      <button type="button" class="task-table__toggle" :aria-expanded="expanded" @click="expanded = !expanded">
+        {{ expanded ? 'Show fewer' : 'Show all' }}
+      </button>
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+
 export interface TaskTableRow {
   id: string
   title: string
@@ -52,6 +59,7 @@ withDefaults(
 )
 
 const emit = defineEmits<{ (e: 'open', id: string): void }>()
+const expanded = ref(false)
 </script>
 
 <style scoped>
@@ -128,6 +136,21 @@ td.alert {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.task-table__toggle {
+  margin-left: var(--space-2, 0.5rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-strong, var(--color-accent));
+  font: inherit;
+  cursor: pointer;
+}
+
+.task-table__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .task-table__empty,

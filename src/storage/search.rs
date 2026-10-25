@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 /// Cache the parsed task, not a promise that metadata uniquely identifies bytes.
 /// Content is read each time so equal-size edits, preserved timestamps and atomic
@@ -21,9 +21,10 @@ struct CachedTask {
 /// resident set without limit. Way above any real project's task count.
 const TASK_CACHE_MAX_ENTRIES: usize = 100_000;
 
-fn task_cache() -> &'static Mutex<HashMap<PathBuf, CachedTask>> {
-    static CACHE: OnceLock<Mutex<HashMap<PathBuf, CachedTask>>> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+/// Read-mostly: parallel searches take shared read locks for cache hits.
+fn task_cache() -> &'static RwLock<HashMap<PathBuf, CachedTask>> {
+    static CACHE: OnceLock<RwLock<HashMap<PathBuf, CachedTask>>> = OnceLock::new();
+    CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
 /// Search and filtering functionality for task storage
@@ -35,7 +36,7 @@ impl StorageSearch {
     pub fn load_task_file(path: &Path) -> Option<Task> {
         let content = fs::read_to_string(path).ok()?;
         let cache_key = path.to_path_buf();
-        if let Ok(cache) = task_cache().lock()
+        if let Ok(cache) = task_cache().read()
             && let Some(hit) = cache.get(&cache_key)
             && hit.content == content
         {
@@ -49,7 +50,7 @@ impl StorageSearch {
                 return None;
             }
         };
-        if let Ok(mut cache) = task_cache().lock() {
+        if let Ok(mut cache) = task_cache().write() {
             // Opportunistic size guard: drop the whole cache if it grew past
             // the bound rather than tracking LRU state. Rebuilding it is
             // cheap (one parse per file) and the case is pathological anyway.

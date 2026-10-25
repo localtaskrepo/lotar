@@ -185,7 +185,7 @@ function tasksResponse(tasks: any[]) {
         status: 'ok',
         count: tasks.length,
         total: tasks.length,
-        limit: 200,
+        limit: 1000,
         offset: 0,
         tasks,
     }

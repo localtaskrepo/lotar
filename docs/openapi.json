@@ -462,7 +462,7 @@
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
-        "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=7d (modified within the last 7 days, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>); order is asc|desc. Default: modified desc with a natural task ID ascending tiebreak (A-2 before A-10) that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-200).",
+        "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=7d (modified within the last 7 days, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>); order is asc|desc. Default: modified desc with a natural task ID ascending tiebreak (A-2 before A-10) that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-1000).",
         "parameters": [
           {
             "name": "deletion",
@@ -564,7 +564,7 @@
               "type": "integer",
               "format": "int32"
             },
-            "description": "Page size (synonyms: page_size, per_page). Must be between 1 and 200; out-of-range values return 400 instead of clamping."
+            "description": "Page size (synonyms: page_size, per_page). Must be between 1 and 1000; out-of-range values return 400 instead of clamping."
           },
           {
             "name": "offset",

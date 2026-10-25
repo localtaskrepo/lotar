@@ -62,7 +62,14 @@
 import { computed, shallowRef, triggerRef, type ComputedRef, type ShallowRef } from 'vue'
 import type { ApiClient } from '../api/client'
 import { api } from '../api/client'
-import type { TaskCreate, TaskDTO, TaskDeleteResponse, TaskListFilter, TaskUpdate } from '../api/types'
+import type {
+    TaskCreate,
+    TaskDTO,
+    TaskDeleteResponse,
+    TaskListFilter,
+    TaskListResponse,
+    TaskUpdate,
+} from '../api/types'
 import { isDeletedTask } from '../utils/text'
 import { registerTaskQueryInvalidator } from './useCompletionPolicy'
 import { useSse } from './useSse'
@@ -248,7 +255,10 @@ interface QueryEntry {
     lastSyncAt: ShallowRef<number>
 }
 
-const DEFAULT_PAGE_SIZE = 200
+// The server scans every task file per request, so full-list views fetch in
+// large pages, and fetch the pages after the first concurrently.
+const DEFAULT_PAGE_SIZE = 1000
+const PAGE_CONCURRENCY = 4
 const MAX_PAGES = 10_000
 /** Debounce for SSE-triggered authoritative refreshes of retained queries. */
 const LIVE_REFRESH_DEBOUNCE_MS = 250
@@ -590,28 +600,42 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         const ranks = new Map<string, number>()
 
         try {
-            let currentOffset = 0
-            let expectedTotal = 0
-            let pages = 0
-            while (pages < MAX_PAGES) {
-                pages += 1
-                const response = await client.listTasks({
-                    ...entry.filter,
-                    limit: pageSize,
-                    offset: currentOffset,
-                } as any)
-                if (generation !== entry.generation) return
+            const fetchPage = (offset: number) =>
+                client.listTasks({ ...entry.filter, limit: pageSize, offset } as TaskListFilter)
+            const applyBatch = (response: TaskListResponse | undefined) => {
                 const batch = Array.isArray(response?.tasks) ? response.tasks : []
-                expectedTotal = response?.total ?? expectedTotal
                 for (const task of batch) {
                     if (!task?.id) continue
                     applyResponseEntity(task, requestClock)
                     ranks.set(task.id, ranks.size)
                     ids.add(task.id)
                 }
-                if (batch.length === 0) break
-                currentOffset += batch.length
-                if (expectedTotal && currentOffset >= expectedTotal) break
+                return batch.length
+            }
+
+            const first = await fetchPage(0)
+            if (generation !== entry.generation) return
+            let expectedTotal = first?.total ?? 0
+            let currentOffset = applyBatch(first)
+            if (currentOffset > 0 && expectedTotal > currentOffset) {
+                // Remaining pages in parallel, applied in offset order so ranks
+                // (the server's order) stay stable.
+                const offsets: number[] = []
+                for (
+                    let offset = currentOffset;
+                    offset < expectedTotal && offsets.length < MAX_PAGES;
+                    offset += pageSize
+                ) {
+                    offsets.push(offset)
+                }
+                for (let index = 0; index < offsets.length; index += PAGE_CONCURRENCY) {
+                    const responses = await Promise.all(offsets.slice(index, index + PAGE_CONCURRENCY).map(fetchPage))
+                    if (generation !== entry.generation) return
+                    for (const response of responses) {
+                        expectedTotal = response?.total ?? expectedTotal
+                        currentOffset += applyBatch(response)
+                    }
+                }
             }
 
             if (generation !== entry.generation) return

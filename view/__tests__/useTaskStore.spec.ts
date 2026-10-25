@@ -111,7 +111,7 @@ describe('TaskStore', () => {
         })
 
         it('stops on empty batch', async () => {
-            mockClient.listTasks.mockResolvedValueOnce({ total: 0, limit: 200, offset: 0, tasks: [] })
+            mockClient.listTasks.mockResolvedValueOnce({ total: 0, limit: 1000, offset: 0, tasks: [] })
 
             await store.hydrateAll()
 
@@ -121,13 +121,13 @@ describe('TaskStore', () => {
         })
 
         it('passes filter through to API', async () => {
-            mockClient.listTasks.mockResolvedValue({ total: 0, limit: 200, offset: 0, tasks: [] })
+            mockClient.listTasks.mockResolvedValue({ total: 0, limit: 1000, offset: 0, tasks: [] })
             const filter: TaskListFilter = { project: 'ACME', status: ['Todo'] }
 
             await store.hydrateAll(filter)
 
             expect(mockClient.listTasks).toHaveBeenCalledWith(
-                expect.objectContaining({ project: 'ACME', status: ['Todo'], limit: 200, offset: 0 }),
+                expect.objectContaining({ project: 'ACME', status: ['Todo'], limit: 1000, offset: 0 }),
             )
         })
 
@@ -135,7 +135,7 @@ describe('TaskStore', () => {
             store.upsert(makeTask('OLD-1'))
             expect(store.count.value).toBe(1)
 
-            mockClient.listTasks.mockResolvedValueOnce({ total: 1, limit: 200, offset: 0, tasks: [makeTask('NEW-1')] })
+            mockClient.listTasks.mockResolvedValueOnce({ total: 1, limit: 1000, offset: 0, tasks: [makeTask('NEW-1')] })
             await store.hydrateAll({}, { clear: true })
 
             expect(store.count.value).toBe(1)
@@ -155,7 +155,7 @@ describe('TaskStore', () => {
             store.upsert(makeTask('KEEP-1'))
             mockClient.listTasks.mockResolvedValueOnce({
                 total: 1,
-                limit: 200,
+                limit: 1000,
                 offset: 0,
                 tasks: [makeTask('NEW-1')],
             })
@@ -194,7 +194,7 @@ describe('TaskStore', () => {
         it('rebuilds the ledger for a refiltered hydrate, dropping stale ranks', async () => {
             mockClient.listTasks.mockResolvedValueOnce({
                 total: 2,
-                limit: 200,
+                limit: 1000,
                 offset: 0,
                 tasks: [makeTask('A-1'), makeTask('A-2')],
             })
@@ -202,7 +202,7 @@ describe('TaskStore', () => {
 
             mockClient.listTasks.mockResolvedValueOnce({
                 total: 1,
-                limit: 200,
+                limit: 1000,
                 offset: 0,
                 tasks: [makeTask('B-9')],
             })
@@ -217,7 +217,7 @@ describe('TaskStore', () => {
         it('keeps existing ranks stable when SSE updates or deletes tasks', async () => {
             mockClient.listTasks.mockResolvedValueOnce({
                 total: 2,
-                limit: 200,
+                limit: 1000,
                 offset: 0,
                 tasks: [makeTask('P-1'), makeTask('P-2')],
             })
@@ -311,7 +311,7 @@ describe('TaskStore', () => {
             store.upsert(makeTask('OLD-1'))
             mockClient.listTasks.mockResolvedValueOnce({
                 total: 1,
-                limit: 200,
+                limit: 1000,
                 offset: 0,
                 tasks: [makeTask('FRESH-1')],
             })
@@ -638,7 +638,7 @@ describe('TaskStore', () => {
     }
 
     function listResponse(tasks: TaskDTO[], total = tasks.length) {
-        return { total, limit: 200, offset: 0, tasks }
+        return { total, limit: 1000, offset: 0, tasks }
     }
 
     describe('DEV-65 entity/query separation', () => {
@@ -872,7 +872,7 @@ describe('TaskStore', () => {
             expect(query.ids.value).not.toContain('T-1')
             // The authoritative refresh re-issued the query filter verbatim.
             expect(mockClient.listTasks).toHaveBeenLastCalledWith(
-                expect.objectContaining({ status: ['Todo'], limit: 200, offset: 0 }),
+                expect.objectContaining({ status: ['Todo'], limit: 1000, offset: 0 }),
             )
             query.release()
         })
@@ -1066,7 +1066,7 @@ describe('TaskStore', () => {
             // The single debounced refresh (remove + restore coalesced) re-issued
             // the retained query after the restore.
             expect(mockClient.listTasks).toHaveBeenLastCalledWith(
-                expect.objectContaining({ project: 'R', limit: 200, offset: 0 }),
+                expect.objectContaining({ project: 'R', limit: 1000, offset: 0 }),
             )
             expect(store._map.value.get('R-1')?.deleted_at).toBeUndefined()
             query.release()

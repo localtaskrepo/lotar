@@ -5,6 +5,7 @@
         <h3 :id="titleId" class="chart-card__title">{{ title }}</h3>
         <p v-if="subtitle" class="chart-card__subtitle">{{ subtitle }}</p>
       </div>
+      <div v-if="$slots.actions && !empty" class="chart-card__actions"><slot name="actions" /></div>
       <div v-if="$slots.table && !empty" class="chart-card__views" role="group" :aria-label="`${title} view`">
         <button
           type="button"
@@ -72,6 +73,13 @@ const view = ref<'chart' | 'table'>('chart')
 
 .chart-card__heading {
   min-width: 0;
+  margin-right: auto;
+}
+
+.chart-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
 }
 
 .chart-card__title {

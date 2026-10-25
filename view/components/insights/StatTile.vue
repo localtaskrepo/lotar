@@ -5,6 +5,7 @@
     class="stat-tile"
     :class="{ 'stat-tile--clickable': clickable, [`stat-tile--${tone}`]: tone !== 'neutral' }"
     :title="hint || undefined"
+    :aria-describedby="hint && (delta || caption) ? hintId : undefined"
     @click="clickable && emit('select')"
   >
     <span class="stat-tile__label">
@@ -16,11 +17,13 @@
       <span aria-hidden="true">{{ delta.direction === 'up' ? '▲' : delta.direction === 'down' ? '▼' : '•' }}</span>
       {{ delta.text }}
     </span>
-    <span v-else-if="caption" class="stat-tile__caption">{{ caption }}</span>
+    <span v-else-if="caption || hint" class="stat-tile__caption">{{ caption || hint }}</span>
+    <span v-if="hint && (delta || caption)" :id="hintId" class="sr-only">{{ hint }}</span>
   </component>
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import IconGlyph from '../IconGlyph.vue'
 
 export interface StatDelta {
@@ -46,6 +49,7 @@ withDefaults(
 )
 
 const emit = defineEmits<{ (e: 'select'): void }>()
+const hintId = useId()
 </script>
 
 <style scoped>
@@ -104,6 +108,15 @@ const emit = defineEmits<{ (e: 'select'): void }>()
 .stat-tile__caption {
   font-size: var(--text-xs, 0.75rem);
   color: var(--color-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .stat-tile__delta--good {

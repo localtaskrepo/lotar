@@ -242,7 +242,7 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
                 count: 0,
                 total: 0,
                 tasks: [],
-                limit: 200,
+                limit: 1000,
                 offset: 0,
             } as any)
             const { default: RealFilterBar } =
@@ -284,7 +284,7 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         } as any)
@@ -319,7 +319,7 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         } as any)
@@ -353,7 +353,7 @@ describe('SprintsList due smart filters and row styling (DEV-21)', () => {
             status: 'ok',
             count: tasks.length,
             total: tasks.length,
-            limit: 200,
+            limit: 1000,
             offset: 0,
             tasks,
         } as any)

@@ -1,0 +1,24 @@
+title: 'Insights quality pass: metric correctness, slicing by use case, backend load performance'
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T05:56:54.178789+00:00
+modified: 2026-10-25T06:20:39.518099+00:00
+comments:
+- date: 2026-10-25T06:20:39.484813+00:00
+  text: 'Done. Backend: /api/tasks/list max limit 200 -> 1000 (openapi/docs/tests updated); task store fetches full lists in 1000-task pages, follow-up pages 4 at a time; parse cache Mutex -> RwLock. Measured on 3000 tasks: full load 2.0s -> 0.33s. Profile showed each list request opens every task file (content-validated cache, kept deliberately), so fewer, larger requests is the win; a metadata-validated cache would cut per-request cost further but changes the DEV safety trade-off, not done. Metric correctness (independent review): done date = start of final done stretch from the task''s own done states (no modified fallback; done->done keeps first; reopen resets), start = first move into an active status (not initial, not done; created-active starts at creation), initial status inferred per project from history, status keys normalized, in-progress uses that; cycle P85 needs >=5 samples; aging measured from start of work; throughput per whole unit (partial buckets drawn lighter, marked in tooltips); time in status averaged over all completed tasks with share; contributors exclude unknown; deltas say Up/Down; throughput delta compares rates. Drill-downs now match counts: open-only drills add open statuses; Due soon matches server due=soon; Unestimated matches needs=effort; rows without a matching filter are not clickable. Perf: timelines cached per task object (WeakMap), people grouped in one pass, activity from cached entries; 3000 tasks: page ready ~0.6-0.85s, period switch ~35ms. Use-case additions: custom date range (URL from/to), open-work-over-time trend (Overview) and open-bugs trend (Quality), throughput split by type/priority/assignee/project (stacked, top 4 + Other), Open work by status/priority/type/assignee/tag selector, time-to-clear forecast and investment mix (Planning), reopened count (Quality), sortable workload table with oldest in progress (Team). A11y: chart columns only focusable when clickable, tooltips measured/flipped and reset on data change, hints visible or aria-describedby, expandable lists, tab Home/End and aria-controls only on the active tab. Tests: metrics 26, page 10; full lint/test (1691 Rust, 1175 UI)/smoke 346 green.'
+history:
+- at: 2026-10-25T06:20:39.484813+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T06:20:39.518099+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
