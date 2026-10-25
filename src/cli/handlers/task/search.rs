@@ -81,6 +81,7 @@ impl SearchHandler {
         if let Some(query) = args.query.as_ref()
             && !query.is_empty()
         {
+            crate::utils::text_search::SearchQuery::validate(query)?;
             task_filter.text_query = Some(query.clone());
         }
 

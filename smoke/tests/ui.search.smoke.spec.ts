@@ -4,8 +4,9 @@ import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
-// DEV-167: the Tasks page search uses the shared rules (every word, phrases,
-// exclusions, typos), and Best match orders the results by relevance.
+// DEV-167/DEV-197: the Tasks page search uses the shared rules (every word,
+// phrases, exclusions, typos, field scopes, regex), and Best match orders the
+// results by relevance.
 function seed(): Record<string, string> {
     const files: Record<string, string> = {
         '.tasks/config.yml': stringify({
@@ -78,6 +79,18 @@ describe('Task search (DEV-167)', () => {
                 expect(await bestMatch.getAttribute('aria-pressed')).toBe('true');
                 await bestMatch.click();
                 await expect.poll(ids).toEqual(['3', '2', '1']);
+
+                // DEV-197: field scopes and regular expressions, and a clear
+                // message for an invalid pattern.
+                await searchFor('title:/^login/');
+                await expect.poll(ids).toEqual(['3', '2']);
+                await searchFor('desc:oauth');
+                await expect.poll(ids).toEqual(['1']);
+                await searchFor('/fix(/');
+                const searchError = page.getByTestId('tasks-search-error');
+                await searchError.waitFor({ state: 'visible' });
+                expect(await searchError.textContent()).toContain('Invalid search pattern /fix(/');
+                expect(await page.getByRole('button', { name: 'Retry', exact: true }).count()).toBe(0);
 
                 // The toggle only exists while searching.
                 await page.getByRole('button', { name: 'Clear search', exact: true }).click();

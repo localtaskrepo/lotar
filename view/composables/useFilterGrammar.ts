@@ -376,7 +376,9 @@ function parseToken(
         words.push(whole.value.includes('"') ? whole.value : `"${whole.value}"`)
         return
     }
-    if (isUrlLike(raw)) {
+    // `/regex/` and `-/regex/` terms are search text even when the pattern
+    // contains `=` or `:` (DEV-197).
+    if (isUrlLike(raw) || /^-?\//.test(raw)) {
         words.push(raw)
         return
     }

@@ -95,6 +95,16 @@ automation:
 { "mcpServers": { "lotar": { "command": "lotar", "args": ["mcp"] } } }
 ```
 
+### Search
+
+`lotar list`, every search box in the web UI, the REST API and MCP share one search. Every word must match, in any order; quote a phrase, exclude with `-word`, and small typos are forgiven. Limit a term to one field with `title:`, `desc:` or `comment:`, use `/regular expressions/`, and order by best match on request. See [search text](docs/help/list.md#search-text).
+
+```bash
+lotar list 'login redirect -oauth'            # all words, one excluded
+lotar list 'title:/^fix/ comment:safari'      # field scopes and a regex
+lotar list 'redirct loop' --sort-by relevance # typo-tolerant, best match first
+```
+
 ### TODO scanner
 
 `lotar scan` turns `TODO`, `FIXME`, and similar comments into tasks, writes the new task ID back into the comment, and keeps a code reference on the task that follows the line when code moves. Preview first with `--dry-run`, or pick findings individually on the Scan page. See [Scan](docs/help/scan.md).
@@ -163,7 +173,7 @@ An honest snapshot as of October 2026. Rows marked **◀** are where LoTaR is be
 | Sprints and burndown | ✅ | ⚠️ milestones, no burndown | ⚠️ iterations, no burndown chart | ✅ |
 | Sync with other trackers | ⚠️ Jira and GitHub (beta) | ❌ | n/a | n/a |
 | TODO comment scanning | ✅ | ❌ | ❌ | ❌ |
-| Typo-tolerant search | ✅ all words, phrases, exclusions, typos, best-match sort | ✅ fuzzy search | ❌ | ❌ |
+| Typo-tolerant search | ✅ all words, phrases, exclusions, typos, field scopes, regex, best-match sort | ✅ fuzzy search | ❌ | ❌ |
 | **◀** Docs and decision records | ❌ | ✅ | ⚠️ wiki | ⚠️ via Confluence |
 
 Pick GitHub Issues or Jira when you need a hosted tracker for non-developers, permissions, and integrations. Pick LoTaR when you want tasks reviewed in the same pull request as the code, and agents working those tasks on your own machine.

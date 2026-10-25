@@ -1652,6 +1652,11 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         .get("search")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    if let Some(text) = text_query.as_deref()
+        && let Err(message) = crate::utils::text_search::SearchQuery::validate(text)
+    {
+        return err(req.id, -32602, &message, None);
+    }
 
     let mut custom_fields: BTreeMap<String, Vec<String>> = BTreeMap::new();
     if let Some(raw_fields) = req.params.get("custom_fields") {

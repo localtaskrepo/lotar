@@ -8,11 +8,20 @@
 //! - `"login redirect"` matches the exact phrase.
 //! - `-oauth` excludes tasks containing `oauth` (also `-"two words"`).
 //!
+//! - `/fix(es|ed)? #\d+/` is a regular expression (DEV-197), matched
+//!   case-insensitively against the original text of each field. It runs to
+//!   the first `/` followed by a space or the end, so it may contain spaces;
+//!   write `(?-i)` to make it case-sensitive.
+//! - `title:login`, `comment:"needs repro"` or `desc:/oauth2?/` limit a term
+//!   to one field (id, title, subtitle, desc/description, criteria/acceptance,
+//!   tag(s), ref(s)/reference(s), comment(s)); `-title:draft` excludes.
+//!
 //! Matching ignores case and common Latin accents (`uber` finds `über`), and
 //! keeps the old substring behaviour (`redir` finds `redirect`, `ATLS-2` finds
 //! the task ID). Words of four or more characters also tolerate typos: one
-//! edit, or two from eight characters (`redirct` finds `redirect`). Exclusions
-//! and phrases never use typo tolerance.
+//! edit, or two from eight characters (`redirct` finds `redirect`). Exclusions,
+//! phrases and regular expressions never use typo tolerance. Patterns use the
+//! Rust `regex` syntax, which always runs in linear time.
 //!
 //! Every match carries a score, so callers can order results by relevance:
 //! an exact ID beats an exact title, then a title starting with the query,
@@ -63,16 +72,30 @@ const EXACT_ID_BONUS: u32 = 1_000;
 const EXACT_TITLE_BONUS: u32 = 500;
 const TITLE_PREFIX_BONUS: u32 = 200;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Longest regular expression a search accepts.
+const MAX_PATTERN_CHARS: usize = 512;
+/// Compiled-size limit for a search pattern (bytes of program and DFA cache).
+const PATTERN_SIZE_LIMIT: usize = 1 << 20;
+
+#[derive(Clone, Debug)]
+enum Matcher {
+    /// Folded text, matched as a substring with typo tolerance.
+    Word(String),
+    /// Folded text with whitespace collapsed to single spaces.
+    Phrase(String),
+    Regex(regex::Regex),
+}
+
+#[derive(Clone, Debug)]
 struct Term {
-    /// Folded text; phrases have their whitespace collapsed to single spaces.
-    text: String,
-    phrase: bool,
+    matcher: Matcher,
     negated: bool,
+    /// Limits the term to these fields (`title:`, `comment:` and so on).
+    scope: Option<&'static [Field]>,
 }
 
 /// A parsed free-text query.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default)]
 pub struct SearchQuery {
     terms: Vec<Term>,
     /// The whole query, folded, for the exact-ID bonus.
@@ -129,60 +152,59 @@ impl Searchable for crate::api_types::TaskDTO {
 }
 
 impl SearchQuery {
+    /// Parse a query, treating an invalid regular expression as plain text.
+    /// Entry points validate with [`SearchQuery::try_parse`] first, so users
+    /// see the error instead.
     pub fn parse(raw: &str) -> Self {
+        Self::parse_with(raw, false).unwrap_or_default()
+    }
+
+    /// Parse a query, rejecting invalid or oversized regular expressions.
+    pub fn try_parse(raw: &str) -> Result<Self, String> {
+        Self::parse_with(raw, true)
+    }
+
+    /// Check a query without keeping it: the error explains a bad pattern.
+    pub fn validate(raw: &str) -> Result<(), String> {
+        Self::try_parse(raw).map(|_| ())
+    }
+
+    fn parse_with(raw: &str, strict: bool) -> Result<Self, String> {
+        let chars: Vec<char> = raw.chars().collect();
         let mut terms = Vec::new();
-        let mut chars = raw.chars().peekable();
-        while let Some(&c) = chars.peek() {
-            if c.is_whitespace() {
-                chars.next();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i].is_whitespace() {
+                i += 1;
                 continue;
             }
-            let mut negated = false;
-            if c == '-' {
-                chars.next();
-                match chars.peek() {
-                    // `-word` or `-"phrase"` excludes; a lone or doubled dash is text.
-                    Some(&next) if next == '"' || next.is_alphanumeric() => negated = true,
-                    _ => {
-                        let mut text = String::from("-");
-                        while let Some(&next) = chars.peek() {
-                            if next.is_whitespace() {
-                                break;
-                            }
-                            text.push(next);
-                            chars.next();
-                        }
-                        push_term(&mut terms, &text, false, false);
-                        continue;
-                    }
-                }
+            // `-word`, `-"phrase"`, `-/regex/` and `-title:x` exclude; a lone
+            // or doubled dash is text.
+            let negated = chars[i] == '-'
+                && chars
+                    .get(i + 1)
+                    .is_some_and(|&next| next == '"' || next == '/' || next.is_alphanumeric());
+            if negated {
+                i += 1;
             }
-            if chars.peek() == Some(&'"') {
-                chars.next();
-                let mut text = String::new();
-                for next in chars.by_ref() {
-                    if next == '"' {
-                        break;
-                    }
-                    text.push(next);
-                }
-                push_term(&mut terms, &text, true, negated);
-            } else {
-                let mut text = String::new();
-                while let Some(&next) = chars.peek() {
-                    if next.is_whitespace() {
-                        break;
-                    }
-                    text.push(next);
-                    chars.next();
-                }
-                push_term(&mut terms, &text, false, negated);
+            let scope = scope_prefix(&chars, i).map(|(fields, len)| {
+                i += len;
+                fields
+            });
+            let (matcher, next) = read_value(&chars, i, strict)?;
+            i = next;
+            if let Some(matcher) = matcher {
+                terms.push(Term {
+                    matcher,
+                    negated,
+                    scope,
+                });
             }
         }
-        Self {
+        Ok(Self {
             terms,
             whole: fold(raw.trim()),
-        }
+        })
     }
 
     /// True when the query has nothing to match (blank or only quotes).
@@ -228,20 +250,116 @@ impl SearchQuery {
     }
 }
 
-fn push_term(terms: &mut Vec<Term>, raw: &str, phrase: bool, negated: bool) {
-    let folded = fold(raw);
-    let text = if phrase {
-        folded.split_whitespace().collect::<Vec<_>>().join(" ")
-    } else {
-        folded
-    };
-    if !text.is_empty() {
-        terms.push(Term {
-            text,
-            phrase,
-            negated,
-        });
+/// A field prefix such as `title:` at `start`, with its length including the
+/// colon. Unknown names (`status:todo`, `http://`) stay ordinary text.
+fn scope_prefix(chars: &[char], start: usize) -> Option<(&'static [Field], usize)> {
+    let name_len = chars[start..]
+        .iter()
+        .take_while(|c| c.is_ascii_alphabetic())
+        .count();
+    let colon = start + name_len;
+    if name_len == 0 || chars.get(colon) != Some(&':') {
+        return None;
     }
+    // The value must follow directly: `title: x` is two plain words.
+    if chars.get(colon + 1).is_none_or(|c| c.is_whitespace()) {
+        return None;
+    }
+    let name: String = chars[start..colon]
+        .iter()
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let fields: &'static [Field] = match name.as_str() {
+        "id" => &[Field::Id],
+        "title" => &[Field::Title],
+        "subtitle" => &[Field::Subtitle],
+        "desc" | "description" => &[Field::Description],
+        "criteria" | "acceptance" => &[Field::AcceptanceCriteria],
+        "tag" | "tags" => &[Field::Tag],
+        "ref" | "refs" | "reference" | "references" => &[Field::Reference],
+        "comment" | "comments" => &[Field::Comment],
+        _ => return None,
+    };
+    Some((fields, name_len + 1))
+}
+
+/// Read one value at `start`: a quoted phrase, a `/regex/` or a word. Returns
+/// the matcher (none for blank input) and the index after the value.
+fn read_value(
+    chars: &[char],
+    start: usize,
+    strict: bool,
+) -> Result<(Option<Matcher>, usize), String> {
+    if chars.get(start) == Some(&'"') {
+        let end = chars[start + 1..]
+            .iter()
+            .position(|&c| c == '"')
+            .map_or(chars.len(), |offset| start + 1 + offset);
+        let text: String = chars[start + 1..end].iter().collect();
+        let phrase = collapse_whitespace(&fold(&text));
+        let matcher = (!phrase.is_empty()).then_some(Matcher::Phrase(phrase));
+        return Ok((matcher, (end + 1).min(chars.len())));
+    }
+    // A pattern starts right after the slash: `/ x/` and stray slashes are text.
+    if chars.get(start) == Some(&'/')
+        && chars.get(start + 1).is_some_and(|c| !c.is_whitespace())
+        && let Some(close) = regex_end(chars, start)
+    {
+        let pattern: String = chars[start + 1..close]
+            .iter()
+            .collect::<String>()
+            .replace("\\/", "/");
+        match compile_pattern(&pattern) {
+            Ok(regex) => return Ok((Some(Matcher::Regex(regex)), close + 1)),
+            Err(error) if strict => return Err(error),
+            // Lenient parsing searches for the text as typed.
+            Err(_) => {}
+        }
+    }
+    let end = chars[start..]
+        .iter()
+        .position(|c| c.is_whitespace())
+        .map_or(chars.len(), |offset| start + offset);
+    let word = fold(&chars[start..end].iter().collect::<String>());
+    Ok(((!word.is_empty()).then_some(Matcher::Word(word)), end))
+}
+
+/// Index of the `/` closing a pattern that opens at `start`: the first
+/// unescaped `/` followed by whitespace or the end. `None` for a lone `/`,
+/// `//` or text without a closing slash, which stay plain words.
+fn regex_end(chars: &[char], start: usize) -> Option<usize> {
+    let mut i = start + 1;
+    while i < chars.len() {
+        match chars[i] {
+            '\\' => i += 2,
+            '/' if chars.get(i + 1).is_none_or(|c| c.is_whitespace()) => {
+                return (i > start + 1).then_some(i);
+            }
+            _ => i += 1,
+        }
+    }
+    None
+}
+
+fn compile_pattern(pattern: &str) -> Result<regex::Regex, String> {
+    if pattern.chars().count() > MAX_PATTERN_CHARS {
+        return Err(format!(
+            "Search pattern is too long (max {MAX_PATTERN_CHARS} characters)"
+        ));
+    }
+    regex::RegexBuilder::new(pattern)
+        .case_insensitive(true)
+        .size_limit(PATTERN_SIZE_LIMIT)
+        .dfa_size_limit(PATTERN_SIZE_LIMIT)
+        .build()
+        .map_err(|error| {
+            // The library's message spans several lines with a caret marker;
+            // its last line names the problem.
+            let detail = error.to_string();
+            let reason = detail.lines().last().unwrap_or("invalid pattern").trim();
+            let reason = reason.strip_prefix("error: ").unwrap_or(reason);
+            format!("Invalid search pattern /{pattern}/: {reason}")
+        })
 }
 
 /// Lowercase text with common Latin accents removed and whitespace runs kept
@@ -290,18 +408,22 @@ fn fold_accent(c: char) -> Option<&'static str> {
     })
 }
 
-struct FoldedField {
+struct FoldedField<'a> {
     field: Field,
+    /// Folded text for words and phrases.
     text: String,
+    /// Original text for regular expressions.
+    raw: &'a str,
 }
 
-fn folded_fields(doc: &SearchDocument<'_>) -> Vec<FoldedField> {
+fn folded_fields<'a>(doc: &SearchDocument<'a>) -> Vec<FoldedField<'a>> {
     let mut fields = Vec::with_capacity(4 + doc.tags.len() + doc.comments.len());
-    let mut push = |field: Field, text: &str| {
+    let mut push = |field: Field, text: &'a str| {
         if !text.trim().is_empty() {
             fields.push(FoldedField {
                 field,
                 text: fold(text),
+                raw: text,
             });
         }
     };
@@ -340,31 +462,37 @@ fn folded_fields(doc: &SearchDocument<'_>) -> Vec<FoldedField> {
     fields
 }
 
-/// The best score a term earns in any field, or `None` when it matches none.
-/// Exact and substring matches are checked in every field before falling
-/// back to typo tolerance, which is the expensive part.
-fn best_match(term: &Term, fields: &[FoldedField]) -> Option<u32> {
+/// The best score a term earns in any field it may search, or `None` when
+/// it matches none. Exact and substring matches are checked in every field
+/// before falling back to typo tolerance, which is the expensive part.
+fn best_match(term: &Term, fields: &[FoldedField<'_>]) -> Option<u32> {
+    let in_scope =
+        |field: &&FoldedField<'_>| term.scope.is_none_or(|scope| scope.contains(&field.field));
     let mut best = None;
-    for field in fields {
-        let strength = if term.phrase {
-            collapse_whitespace(&field.text)
-                .contains(&term.text)
-                .then_some(Strength::Word)
-        } else {
-            substring_strength(&field.text, &term.text)
+    for field in fields.iter().filter(in_scope) {
+        let strength = match &term.matcher {
+            Matcher::Word(text) => substring_strength(&field.text, text),
+            Matcher::Phrase(text) => collapse_whitespace(&field.text)
+                .contains(text.as_str())
+                .then_some(Strength::Word),
+            Matcher::Regex(regex) => regex.is_match(field.raw).then_some(Strength::Word),
         };
         if let Some(strength) = strength {
             let points = field.field.weight() * strength as u32;
             best = Some(best.map_or(points, |current: u32| current.max(points)));
         }
     }
-    if best.is_some() || term.phrase || term.negated {
+    let Matcher::Word(text) = &term.matcher else {
+        return best;
+    };
+    if best.is_some() || term.negated {
         return best;
     }
-    let max_edits = typo_budget(&term.text)?;
-    let term_chars: Vec<char> = term.text.chars().collect();
+    let max_edits = typo_budget(text)?;
+    let term_chars: Vec<char> = text.chars().collect();
     fields
         .iter()
+        .filter(in_scope)
         .filter(|field| words(&field.text).any(|word| within_typos(&term_chars, word, max_edits)))
         .map(|field| field.field.weight() * Strength::Typo as u32)
         .max()
@@ -619,6 +747,97 @@ mod tests {
         assert!(matches("safari", &task));
         assert!(matches("offline", &task));
         assert!(matches("queue.ts", &task));
+    }
+
+    #[test]
+    fn regex_terms_match_original_text_case_insensitively() {
+        let tags = vec!["release-2.4".to_string()];
+        let task = doc(
+            "WEB-12",
+            "Fixes #142 in the Café login",
+            Some("Seen on Safari 17"),
+            &tags,
+        );
+        assert!(matches(r"/fix(es|ed)? #\d+/", &task));
+        assert!(matches("/café/", &task));
+        assert!(matches(r"/^fixes/", &task));
+        assert!(!matches(r"/^login/", &task));
+        assert!(matches(r"/safari \d+/", &task));
+        assert!(matches(r"/release-\d+\.\d+/", &task));
+        // Opt out of case-insensitivity inline.
+        assert!(!matches("/(?-i)FIXES/", &task));
+        assert!(matches("login -/firefox|chrome/", &task));
+        assert!(!matches("-/safari/", &task));
+    }
+
+    #[test]
+    fn regex_delimiters_leave_paths_and_slashes_as_text() {
+        let task = doc("WEB-12", "Route /api/tasks/list returns 500", None, &[]);
+        // Runs to the last slash before a space: the pattern is `api/tasks/list`.
+        assert!(matches("/api/tasks/list/", &task));
+        // No closing slash: a plain word.
+        assert!(matches("/api/tasks", &task));
+        let lone = SearchQuery::parse("/ //");
+        assert_eq!(lone.terms.len(), 2);
+        assert!(
+            lone.terms
+                .iter()
+                .all(|term| matches!(term.matcher, Matcher::Word(_)))
+        );
+    }
+
+    #[test]
+    fn invalid_patterns_are_errors_when_strict_and_text_when_lenient() {
+        let error = SearchQuery::try_parse("login /fix(/").unwrap_err();
+        assert!(
+            error.starts_with("Invalid search pattern /fix(/:"),
+            "{error}"
+        );
+        assert!(!error.contains('\n'), "{error}");
+        let long = format!("/{}/", "a".repeat(MAX_PATTERN_CHARS + 1));
+        assert!(
+            SearchQuery::try_parse(&long)
+                .unwrap_err()
+                .contains("too long")
+        );
+        assert!(SearchQuery::validate("/(a|b)+/ ok").is_ok());
+        // Lenient parsing keeps the text searchable as typed.
+        let task = doc("WEB-1", "Document /fix(/ syntax", None, &[]);
+        assert!(matches("/fix(/", &task));
+    }
+
+    #[test]
+    fn field_scopes_limit_terms_to_one_field() {
+        let comments = vec![TaskComment {
+            date: "2026-01-01".into(),
+            text: "Needs repro on Safari".into(),
+        }];
+        let tags = vec!["frontend".to_string()];
+        let task = SearchDocument {
+            id: "WEB-7",
+            title: "Login page",
+            subtitle: None,
+            description: Some("OAuth redirect"),
+            tags: &tags,
+            acceptance_criteria: &[],
+            comments: &comments,
+            references: &[],
+        };
+        assert!(matches("title:login", &task));
+        assert!(!matches("title:oauth", &task));
+        assert!(matches("desc:oauth", &task));
+        assert!(matches("DESCRIPTION:redirct", &task));
+        assert!(matches("comment:\"needs repro\"", &task));
+        assert!(matches("comments:/safari$/", &task));
+        assert!(matches("tag:front", &task));
+        assert!(matches("id:web-7", &task));
+        assert!(!matches("title:safari", &task));
+        assert!(matches("safari -title:safari", &task));
+        assert!(!matches("login -title:login", &task));
+        // Unknown names stay plain text, and so does `title:` followed by a
+        // space (a literal word that this task does not contain).
+        assert!(!matches("status:todo", &task));
+        assert!(!matches("title: login", &task));
     }
 
     #[test]

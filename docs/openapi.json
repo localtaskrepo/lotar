@@ -535,7 +535,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Free-text search: every word must match in any order; supports \"quoted phrases\", -word exclusions and typo tolerance (docs/help/list.md#search-text)."
+            "description": "Free-text search: every word must match in any order; supports \"quoted phrases\", -word exclusions, field scopes such as title:login, /regex/ terms and typo tolerance (docs/help/list.md#search-text). An invalid pattern returns 400."
           },
           {
             "name": "sort_by",
@@ -2802,7 +2802,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Free-text search: every word must match in any order; supports \"quoted phrases\", -word exclusions and typo tolerance (docs/help/list.md#search-text)."
+            "description": "Free-text search: every word must match in any order; supports \"quoted phrases\", -word exclusions, field scopes such as title:login, /regex/ terms and typo tolerance (docs/help/list.md#search-text). An invalid pattern returns 400."
           },
           {
             "name": "sprints",

@@ -549,7 +549,7 @@ const filterHelp = computed(() => [
     syntax: 'q="search words"',
     label: 'Search text',
     description:
-      'Plain words must all match, in any order. Quote a phrase, exclude with -word; small typos are forgiven. q= explicitly sets the search text.',
+      'Plain words must all match, in any order. Quote a phrase, exclude with -word, search one field with title:, desc: or comment:, or use /regex/; small typos are forgiven. q= explicitly sets the search text.',
     aliases: '',
   },
   { syntax: 'deletion=active', label: 'Visibility', description: 'active, deleted or all.', aliases: '' },

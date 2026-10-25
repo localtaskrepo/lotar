@@ -1,0 +1,36 @@
+title: Search with regex terms and field-scoped terms
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T21:56:55.817400+00:00
+modified: 2026-10-25T22:09:42.136190+00:00
+comments:
+- date: 2026-10-25T21:56:55.904444+00:00
+  text: 'Follow-up to DEV-167. Plan: in the shared search (src/utils/text_search.rs) add /pattern/ regex terms (Rust regex: linear time; case-insensitive by default, (?-i) to opt out; size and length limits; a regex runs until a closing / followed by space or end, so it may contain spaces and paths still read sensibly) and field-scoped terms field:value for id, title, subtitle, desc/description, criteria, tag(s), ref(s), comment(s), taking a word, "phrase" or /regex/, also negated (-title:oauth). Invalid patterns are errors at every entry point (REST 400, MCP invalid params, CLI error, suggest 400) instead of silently matching nothing. UI: search box keeps /regex/ tokens and scoped terms as search text (never custom-field assignments). Docs, unit + REST/CLI/MCP tests, smoke.'
+- date: 2026-10-25T22:09:42.107198+00:00
+  text: 'Done. /regex/ terms (case-insensitive, (?-i) to opt out, original text, may contain spaces, 512-char and 1 MiB compile limits, linear-time Rust regex) and field scopes id/title/subtitle/desc(ription)/criteria|acceptance/tag(s)/ref(s)|reference(s)/comment(s), also negated and combined with phrases or regex. Invalid patterns: REST 400, MCP -32602, CLI error, all with ''Invalid search pattern /x/: reason''; suggest stays lenient (half-typed patterns in pickers). UI: search box keeps /regex/ tokens and scoped terms as text; Tasks page shows ''Check your search'' with the reason instead of a retryable load error (other pages show the reason in their generic error). Verified: unit tests, tests/dev197_search_regex_scope_test.rs (REST/CLI/MCP), grammar spec, smoke ui.search (field scope, regex, error state), screenshots. Gates: lint, 1712 Rust + 1200 UI, 347 smoke.'
+history:
+- at: 2026-10-25T21:56:55.872523+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T21:56:55.904444+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T22:09:42.107198+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T22:09:42.136190+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

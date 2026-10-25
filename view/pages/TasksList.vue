@@ -183,6 +183,14 @@
     <div class="col" style="gap: 16px">
       <UiLoader v-if="loading && !hasTasks" size="md" />
       <UiEmptyState
+        v-else-if="searchError && !hasTasks"
+        title="Check your search"
+        :description="searchError"
+        secondary-label="Clear filters"
+        data-testid="tasks-search-error"
+        @secondary="resetFilters"
+      />
+      <UiEmptyState
         v-else-if="error && !hasTasks"
         title="We couldn't load tasks"
         :description="error"
@@ -460,6 +468,12 @@ const pendingNewQuery = computed(() => {
 })
 const loading = computed(() => tasksQuery.value?.status.value === 'loading' || pendingNewQuery.value)
 const error = computed(() => tasksQuery.value?.error.value ?? null)
+// DEV-197: an invalid /regex/ in the search is the user's to fix, not a load
+// failure to retry; show just the server's explanation.
+const searchError = computed(() => {
+  const match = /(Invalid search pattern .*|Search pattern is too long.*)$/.exec(error.value ?? '')
+  return match ? match[1] : null
+})
 const { openTaskPanel } = useTaskPanelController()
 
 const MAX_PAGE_LIMIT = 200

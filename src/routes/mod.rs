@@ -143,6 +143,11 @@ pub(crate) fn parse_task_query(
 > {
     use std::collections::BTreeSet;
 
+    // An invalid /regex/ term is a 400, never a search that silently finds nothing.
+    if let Some(text) = query.get("q") {
+        crate::utils::text_search::SearchQuery::validate(text)?;
+    }
+
     let parse_list = |key: &str| -> Vec<String> {
         query
             .get(key)

@@ -232,6 +232,13 @@ describe('parseFilterQuery free-text preservation', () => {
         expect(parsed.text).toBe('"status:todo"')
     })
 
+    it('keeps regex and field-scoped search terms as text (DEV-197)', () => {
+        const parsed = parseFilterQuery('status:todo /a=b|c:d/ -/x=y/ title:"login page" desc:/oauth2?/')
+        expect(parsed.filters).toEqual({ status: 'todo' })
+        expect(parsed.text).toBe('/a=b|c:d/ -/x=y/ title:"login page" desc:/oauth2?/')
+        expect(parsed.errors).toBeUndefined()
+    })
+
     it('passes phrases and exclusions through as search text (DEV-167)', () => {
         const parsed = parseFilterQuery('status:todo "login redirect" -oauth')
         expect(parsed.filters).toEqual({ status: 'todo' })
