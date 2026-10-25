@@ -21,9 +21,8 @@ use crate::workspace::TasksDirectoryResolver;
 use crate::{
     api_types::{
         ScanRequest, SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem,
-        SprintBacklogResponse, SprintCleanupMetric, SprintCleanupSummary, SprintCreateRequest,
-        SprintCreateResponse, SprintDeleteRequest, SprintDeleteResponse,
-        SprintIntegrityDiagnostics, SprintListItem, SprintListResponse, SprintUpdateRequest,
+        SprintBacklogResponse, SprintCreateRequest, SprintCreateResponse, SprintDeleteRequest,
+        SprintDeleteResponse, SprintListItem, SprintListResponse, SprintUpdateRequest,
         SprintUpdateResponse, SyncRequest, SyncValidateRequest,
     },
     types::TaskStatus,
@@ -59,42 +58,15 @@ mod sync;
 mod tasks;
 mod whoami;
 
-pub(super) fn make_cleanup_summary(
-    outcome: &sprint_integrity::SprintCleanupOutcome,
-) -> SprintCleanupSummary {
-    SprintCleanupSummary {
-        removed_references: outcome.removed_references,
-        updated_tasks: outcome.updated_tasks,
-        removed_by_sprint: outcome
-            .removed_by_sprint
-            .iter()
-            .map(|metric| SprintCleanupMetric {
-                sprint_id: metric.sprint_id,
-                count: metric.count,
-            })
-            .collect(),
-        remaining_missing: outcome.remaining_missing.clone(),
-    }
-}
-
-pub(super) fn make_integrity_payload(
-    baseline: &sprint_integrity::MissingSprintReport,
-    current: &sprint_integrity::MissingSprintReport,
-    cleanup: Option<&sprint_integrity::SprintCleanupOutcome>,
-) -> Option<SprintIntegrityDiagnostics> {
-    if baseline.missing_sprints.is_empty() && cleanup.is_none() {
-        return None;
-    }
-
-    Some(SprintIntegrityDiagnostics {
-        missing_sprints: current.missing_sprints.clone(),
-        tasks_with_missing: if baseline.tasks_with_missing > 0 {
-            Some(baseline.tasks_with_missing)
-        } else {
-            None
-        },
-        auto_cleanup: cleanup.map(make_cleanup_summary),
-    })
+/// Run the shared sprint integrity check for a request (DEV-173).
+pub(super) fn sprint_integrity_check(
+    storage: &mut crate::storage::manager::Storage,
+    records: &mut Vec<crate::services::sprint_service::SprintRecord>,
+    cleanup: bool,
+    target: Option<u32>,
+) -> Result<sprint_integrity::IntegrityCheck, HttpResponse> {
+    sprint_integrity::check_missing_sprints(storage, records, cleanup, target)
+        .map_err(|err| internal_error(format!("Failed to clean up sprint references: {err}")))
 }
 
 pub(super) fn sprint_record_to_list_item(

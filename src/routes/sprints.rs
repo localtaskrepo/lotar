@@ -64,7 +64,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
         let page_sprints = sprints[start..end].to_vec();
 
-        let integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+        let integrity = sprint_integrity::IntegrityCheck::unchanged(
+            sprint_integrity::detect_missing_sprints(&storage, &records),
+        );
         let payload = SprintListResponse {
             status: "ok".to_string(),
             total,
@@ -72,8 +74,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
             limit: page.limit,
             offset: page.offset,
             sprints: page_sprints,
-            missing_sprints: integrity_report.missing_sprints.clone(),
-            integrity: make_integrity_payload(&integrity_report, &integrity_report, None),
+            missing_sprints: integrity.after.missing_sprints.clone(),
+            integrity: integrity.diagnostics(),
         };
 
         ok_json(200, json!({"data": payload}))
@@ -131,24 +133,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let body: SprintAssignmentRequest = try_response!(parse_body(req));
 
-        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-        let baseline_report = integrity_report.clone();
-        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-        if body.cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-            match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
-                Ok(outcome) => {
-                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                    cleanup_outcome = Some(outcome);
-                }
-                Err(err) => {
-                    return internal_error(format!(
-                        "Failed to clean up sprint references: {}",
-                        err
-                    ));
-                }
-            }
-        }
+        let integrity = try_response!(sprint_integrity_check(
+            &mut storage,
+            &mut records,
+            body.cleanup_missing,
+            None
+        ));
 
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
         let outcome = match sprint_assignment::assign_tasks(
@@ -186,11 +176,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             unchanged: outcome.unchanged,
             replaced: replaced_payload,
             messages,
-            integrity: make_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ),
+            integrity: integrity.diagnostics(),
         };
         ok_json(200, json!({"data": response}))
     });
@@ -209,24 +195,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let body: SprintAssignmentRequest = try_response!(parse_body(req));
 
-        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-        let baseline_report = integrity_report.clone();
-        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-        if body.cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-            match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
-                Ok(outcome) => {
-                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                    cleanup_outcome = Some(outcome);
-                }
-                Err(err) => {
-                    return internal_error(format!(
-                        "Failed to clean up sprint references: {}",
-                        err
-                    ));
-                }
-            }
-        }
+        let integrity = try_response!(sprint_integrity_check(
+            &mut storage,
+            &mut records,
+            body.cleanup_missing,
+            None
+        ));
 
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
         let outcome = match sprint_assignment::remove_tasks(
@@ -262,11 +236,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             unchanged: outcome.unchanged,
             replaced: replaced_payload,
             messages,
-            integrity: make_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ),
+            integrity: integrity.diagnostics(),
         };
         ok_json(200, json!({"data": response}))
     });
@@ -300,28 +270,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-        let baseline_report = integrity_report.clone();
-        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-        if body.cleanup_missing {
-            match sprint_integrity::cleanup_missing_sprint_refs(
-                &mut storage,
-                &mut records,
-                Some(sprint_id),
-            ) {
-                Ok(outcome) => {
-                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                    cleanup_outcome = Some(outcome);
-                }
-                Err(err) => {
-                    return internal_error(format!(
-                        "Failed to clean up sprint references: {}",
-                        err
-                    ));
-                }
-            }
-        }
+        let integrity = try_response!(sprint_integrity_check(
+            &mut storage,
+            &mut records,
+            body.cleanup_missing,
+            Some(sprint_id)
+        ));
 
         let response = SprintDeleteResponse {
             status: "ok".to_string(),
@@ -332,19 +286,17 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 .plan
                 .as_ref()
                 .and_then(|plan| plan.label.clone()),
-            removed_references: cleanup_outcome
+            removed_references: integrity
+                .cleanup
                 .as_ref()
                 .map(|outcome| outcome.removed_references)
                 .unwrap_or(0),
-            updated_tasks: cleanup_outcome
+            updated_tasks: integrity
+                .cleanup
                 .as_ref()
                 .map(|outcome| outcome.updated_tasks)
                 .unwrap_or(0),
-            integrity: make_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ),
+            integrity: integrity.diagnostics(),
         };
         ok_json(200, json!({"data": response}))
     });
@@ -421,24 +373,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-        let baseline_report = integrity_report.clone();
-        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-        if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-            match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
-                Ok(outcome) => {
-                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                    cleanup_outcome = Some(outcome);
-                }
-                Err(err) => {
-                    return internal_error(format!(
-                        "Failed to clean up sprint references: {}",
-                        err
-                    ));
-                }
-            }
-        }
+        let integrity = try_response!(sprint_integrity_check(
+            &mut storage,
+            &mut records,
+            cleanup_missing,
+            None
+        ));
 
         let options = sprint_assignment::SprintBacklogOptions {
             project: req.query.get("project").cloned(),
@@ -472,12 +412,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
             count: tasks.len(),
             truncated: result.truncated,
             tasks,
-            missing_sprints: integrity_report.missing_sprints.clone(),
-            integrity: make_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ),
+            missing_sprints: integrity.after.missing_sprints.clone(),
+            integrity: integrity.diagnostics(),
         };
 
         ok_json(200, json!({"data": payload}))

@@ -1,0 +1,31 @@
+title: Move sprint integrity detection and cleanup into SprintService
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T00:19:58.018447+00:00
+modified: 2026-10-25T00:50:58.423696+00:00
+comments:
+- date: 2026-10-25T00:50:58.381499+00:00
+  text: 'Done. Added sprint_integrity::check_missing_sprints + IntegrityCheck (before/after/cleanup, diagnostics()). REST routes, MCP handlers and CLI (delete, list, AssignmentContext) now use it; removed make_cleanup_summary/make_integrity_payload and the MCP copies. JSON change: MCP sprint payloads now omit an empty missing_sprints list, matching REST. Verified: clippy clean, nextest sprint|mcp|integrity 202/202, sprint+MCP smoke 78/78.'
+description: The detect-missing-sprints, optional cleanup and report flow is implemented separately in src/routes/sprints.rs and the CLI sprint handlers (assignment/context.rs, reporting/list.rs, operations/maintenance.rs; jscpd also flags assignment/manage.rs). Provide one service-level flow used by REST, CLI and MCP so behavior cannot drift.
+history:
+- at: 2026-10-25T00:36:40.246724+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T00:50:58.381499+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T00:50:58.423696+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

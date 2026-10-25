@@ -5,7 +5,7 @@ use super::super::hints::{EnumHints, enum_hints_to_value, make_enum_error_data};
 use super::super::{
     JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_BACKLOG_LIMIT, MCP_DEFAULT_SPRINT_LIST_LIMIT,
     MCP_MAX_BACKLOG_LIMIT, MCP_MAX_CURSOR, MCP_MAX_SPRINT_LIST_LIMIT, domain_service_error, err,
-    make_mcp_integrity_payload, ok, parse_cursor_value, parse_limit_value,
+    integrity_value, ok, parse_cursor_value, parse_limit_value,
 };
 use crate::api_types::{
     SprintCreateRequest, SprintCreateResponse, SprintListItem, SprintUpdateRequest,
@@ -329,7 +329,7 @@ pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
                     .map(|id| Value::from(*id))
                     .collect(),
             ),
-            make_mcp_integrity_payload(&report, &report, None),
+            integrity_value(&sprint_integrity::IntegrityCheck::unchanged(report.clone())),
         )
     } else {
         (Value::Null, None)
@@ -805,29 +805,25 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-    let baseline_report = integrity_report.clone();
-    let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-    if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-        match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
-            Ok(outcome) => {
-                integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                cleanup_outcome = Some(outcome);
-            }
-            Err(error) => {
-                return err(
-                    req.id,
-                    -32603,
-                    "Internal error",
-                    Some(json!({"message": format!(
-                        "Failed to clean up sprint references: {}",
-                        error
-                    )})),
-                );
-            }
+    let integrity = match sprint_integrity::check_missing_sprints(
+        &mut storage,
+        &mut records,
+        cleanup_missing,
+        None,
+    ) {
+        Ok(check) => check,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!(
+                    "Failed to clean up sprint references: {}",
+                    error
+                )})),
+            );
         }
-    }
+    };
 
     let Some(raw_tasks) = req.params.get("tasks") else {
         return err(req.id, -32602, "Missing required field: tasks", None);
@@ -955,18 +951,15 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert(
         "missing_sprints".to_string(),
         Value::Array(
-            integrity_report
+            integrity
+                .after
                 .missing_sprints
                 .iter()
                 .map(|id| Value::from(*id))
                 .collect(),
         ),
     );
-    if let Some(integrity) = make_mcp_integrity_payload(
-        &baseline_report,
-        &integrity_report,
-        cleanup_outcome.as_ref(),
-    ) {
+    if let Some(integrity) = integrity_value(&integrity) {
         payload.insert("integrity".to_string(), integrity);
     }
 
@@ -1017,29 +1010,25 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-    let baseline_report = integrity_report.clone();
-    let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-    if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-        match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
-            Ok(outcome) => {
-                integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                cleanup_outcome = Some(outcome);
-            }
-            Err(error) => {
-                return err(
-                    req.id,
-                    -32603,
-                    "Internal error",
-                    Some(json!({"message": format!(
-                        "Failed to clean up sprint references: {}",
-                        error
-                    )})),
-                );
-            }
+    let integrity = match sprint_integrity::check_missing_sprints(
+        &mut storage,
+        &mut records,
+        cleanup_missing,
+        None,
+    ) {
+        Ok(check) => check,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!(
+                    "Failed to clean up sprint references: {}",
+                    error
+                )})),
+            );
         }
-    }
+    };
 
     let Some(raw_tasks) = req.params.get("tasks") else {
         return err(req.id, -32602, "Missing required field: tasks", None);
@@ -1121,18 +1110,15 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert(
         "missing_sprints".to_string(),
         Value::Array(
-            integrity_report
+            integrity
+                .after
                 .missing_sprints
                 .iter()
                 .map(|id| Value::from(*id))
                 .collect(),
         ),
     );
-    if let Some(integrity) = make_mcp_integrity_payload(
-        &baseline_report,
-        &integrity_report,
-        cleanup_outcome.as_ref(),
-    ) {
+    if let Some(integrity) = integrity_value(&integrity) {
         payload.insert("integrity".to_string(), integrity);
     }
     let payload = Value::Object(payload);
@@ -1259,36 +1245,30 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-    let baseline_report = integrity_report.clone();
-    let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-    if cleanup_missing {
-        match sprint_integrity::cleanup_missing_sprint_refs(
-            &mut storage,
-            &mut records,
-            Some(sprint_id),
-        ) {
-            Ok(outcome) => {
-                integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                cleanup_outcome = Some(outcome);
-            }
-            Err(error) => {
-                return err(
-                    req.id,
-                    -32603,
-                    "Failed to clean sprint references",
-                    Some(json!({"message": error.to_string()})),
-                );
-            }
+    let integrity = match sprint_integrity::check_missing_sprints(
+        &mut storage,
+        &mut records,
+        cleanup_missing,
+        Some(sprint_id),
+    ) {
+        Ok(check) => check,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Failed to clean sprint references",
+                Some(json!({"message": error.to_string()})),
+            );
         }
-    }
+    };
 
-    let removed_references = cleanup_outcome
+    let removed_references = integrity
+        .cleanup
         .as_ref()
         .map(|outcome| outcome.removed_references)
         .unwrap_or(0);
-    let updated_tasks = cleanup_outcome
+    let updated_tasks = integrity
+        .cleanup
         .as_ref()
         .map(|outcome| outcome.updated_tasks)
         .unwrap_or(0);
@@ -1305,8 +1285,9 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         } else {
             summary.push_str(" No dangling sprint references required cleanup.");
         }
-    } else if !integrity_report.missing_sprints.is_empty() {
-        let missing = integrity_report
+    } else if !integrity.after.missing_sprints.is_empty() {
+        let missing = integrity
+            .after
             .missing_sprints
             .iter()
             .map(|id| format!("#{}", id))
@@ -1336,11 +1317,7 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         "updated_tasks".to_string(),
         Value::from(updated_tasks as u64),
     );
-    if let Some(integrity) = make_mcp_integrity_payload(
-        &baseline_report,
-        &integrity_report,
-        cleanup_outcome.as_ref(),
-    ) {
+    if let Some(integrity) = integrity_value(&integrity) {
         payload.insert("integrity".to_string(), integrity);
     }
 
@@ -1544,29 +1521,25 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-    let baseline_report = integrity_report.clone();
-    let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
-
-    if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-        match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
-            Ok(outcome) => {
-                integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                cleanup_outcome = Some(outcome);
-            }
-            Err(error) => {
-                return err(
-                    req.id,
-                    -32603,
-                    "Internal error",
-                    Some(json!({"message": format!(
-                        "Failed to clean up sprint references: {}",
-                        error
-                    )})),
-                );
-            }
+    let integrity = match sprint_integrity::check_missing_sprints(
+        &mut storage,
+        &mut records,
+        cleanup_missing,
+        None,
+    ) {
+        Ok(check) => check,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!(
+                    "Failed to clean up sprint references: {}",
+                    error
+                )})),
+            );
         }
-    }
+    };
 
     let result = match sprint_assignment::fetch_backlog(&storage, &options) {
         Ok(result) => result,
@@ -1600,18 +1573,15 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert(
         "missing_sprints".to_string(),
         Value::Array(
-            integrity_report
+            integrity
+                .after
                 .missing_sprints
                 .iter()
                 .map(|id| Value::from(*id))
                 .collect(),
         ),
     );
-    if let Some(integrity) = make_mcp_integrity_payload(
-        &baseline_report,
-        &integrity_report,
-        cleanup_outcome.as_ref(),
-    ) {
+    if let Some(integrity) = integrity_value(&integrity) {
         payload.insert("integrity".to_string(), integrity);
     }
     if let Some(hints) = enum_hints.as_ref() {

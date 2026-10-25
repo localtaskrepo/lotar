@@ -35,6 +35,76 @@ pub struct SprintCleanupOutcome {
     pub remaining_missing: Vec<u32>,
 }
 
+/// Missing sprint references before and after an optional cleanup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntegrityCheck {
+    pub before: MissingSprintReport,
+    pub after: MissingSprintReport,
+    pub cleanup: Option<SprintCleanupOutcome>,
+}
+
+impl IntegrityCheck {
+    /// Diagnostics reported by REST and MCP responses; `None` when nothing
+    /// was missing and no cleanup ran.
+    pub fn diagnostics(&self) -> Option<crate::api_types::SprintIntegrityDiagnostics> {
+        if self.before.missing_sprints.is_empty() && self.cleanup.is_none() {
+            return None;
+        }
+        Some(crate::api_types::SprintIntegrityDiagnostics {
+            missing_sprints: self.after.missing_sprints.clone(),
+            tasks_with_missing: (self.before.tasks_with_missing > 0)
+                .then_some(self.before.tasks_with_missing),
+            auto_cleanup: self.cleanup.as_ref().map(|outcome| {
+                crate::api_types::SprintCleanupSummary {
+                    removed_references: outcome.removed_references,
+                    updated_tasks: outcome.updated_tasks,
+                    removed_by_sprint: outcome
+                        .removed_by_sprint
+                        .iter()
+                        .map(|metric| crate::api_types::SprintCleanupMetric {
+                            sprint_id: metric.sprint_id,
+                            count: metric.count,
+                        })
+                        .collect(),
+                    remaining_missing: outcome.remaining_missing.clone(),
+                }
+            }),
+        })
+    }
+
+    /// A check without cleanup (read-only callers).
+    pub fn unchanged(report: MissingSprintReport) -> Self {
+        Self {
+            after: report.clone(),
+            before: report,
+            cleanup: None,
+        }
+    }
+}
+
+/// Detect missing sprint references and, when `cleanup` is set, remove them
+/// and check again. Without a `target` the cleanup only runs when something
+/// is missing; with a target (a just-deleted sprint) it always runs for that
+/// sprint. The one implementation used by REST, CLI and MCP (DEV-173).
+pub fn check_missing_sprints(
+    storage: &mut Storage,
+    records: &mut Vec<SprintRecord>,
+    cleanup: bool,
+    target: Option<u32>,
+) -> LoTaRResult<IntegrityCheck> {
+    let before = detect_missing_sprints(storage, records);
+    if !cleanup || (target.is_none() && before.missing_sprints.is_empty()) {
+        return Ok(IntegrityCheck::unchanged(before));
+    }
+    let outcome = cleanup_missing_sprint_refs(storage, records, target)?;
+    let after = detect_missing_sprints(storage, records);
+    Ok(IntegrityCheck {
+        before,
+        after,
+        cleanup: Some(outcome),
+    })
+}
+
 pub fn detect_missing_sprints(storage: &Storage, records: &[SprintRecord]) -> MissingSprintReport {
     let existing_ids: HashSet<u32> = records.iter().map(|record| record.id).collect();
     // Integrity scans include tombstones (DEV-92): a deleted task's sprint

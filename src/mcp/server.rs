@@ -168,76 +168,12 @@ fn domain_service_error(
     }
 }
 
-fn make_mcp_cleanup_summary(
-    outcome: &crate::services::sprint_integrity::SprintCleanupOutcome,
-) -> Value {
-    let mut payload = serde_json::Map::new();
-    payload.insert(
-        "removed_references".to_string(),
-        Value::from(outcome.removed_references as u64),
-    );
-    payload.insert(
-        "updated_tasks".to_string(),
-        Value::from(outcome.updated_tasks as u64),
-    );
-    let removed: Vec<Value> = outcome
-        .removed_by_sprint
-        .iter()
-        .map(|metric| {
-            let mut item = serde_json::Map::new();
-            item.insert("sprint_id".to_string(), Value::from(metric.sprint_id));
-            item.insert("count".to_string(), Value::from(metric.count as u64));
-            Value::Object(item)
-        })
-        .collect();
-    payload.insert("removed_by_sprint".to_string(), Value::Array(removed));
-    payload.insert(
-        "remaining_missing".to_string(),
-        Value::Array(
-            outcome
-                .remaining_missing
-                .iter()
-                .map(|id| Value::from(*id))
-                .collect(),
-        ),
-    );
-    Value::Object(payload)
-}
-
-fn make_mcp_integrity_payload(
-    baseline: &crate::services::sprint_integrity::MissingSprintReport,
-    current: &crate::services::sprint_integrity::MissingSprintReport,
-    cleanup: Option<&crate::services::sprint_integrity::SprintCleanupOutcome>,
-) -> Option<Value> {
-    if baseline.missing_sprints.is_empty() && cleanup.is_none() {
-        return None;
-    }
-
-    let mut payload = serde_json::Map::new();
-    payload.insert(
-        "missing_sprints".to_string(),
-        Value::Array(
-            current
-                .missing_sprints
-                .iter()
-                .map(|id| Value::from(*id))
-                .collect(),
-        ),
-    );
-    if baseline.tasks_with_missing > 0 {
-        payload.insert(
-            "tasks_with_missing".to_string(),
-            Value::from(baseline.tasks_with_missing as u64),
-        );
-    }
-    if let Some(outcome) = cleanup {
-        payload.insert(
-            "auto_cleanup".to_string(),
-            make_mcp_cleanup_summary(outcome),
-        );
-    }
-
-    Some(Value::Object(payload))
+/// Sprint integrity diagnostics for MCP payloads; the same structure the
+/// REST API returns (DEV-173).
+fn integrity_value(check: &crate::services::sprint_integrity::IntegrityCheck) -> Option<Value> {
+    check
+        .diagnostics()
+        .and_then(|diagnostics| serde_json::to_value(diagnostics).ok())
 }
 
 fn enable_framed_output() {

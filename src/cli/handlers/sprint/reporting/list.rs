@@ -10,7 +10,7 @@ use crate::cli::handlers::sprint::shared::{
 };
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_analytics::SprintSummary;
-use crate::services::sprint_integrity::{self, MissingSprintReport, SprintCleanupOutcome};
+use crate::services::sprint_integrity::{self, MissingSprintReport};
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status;
 use crate::storage::manager::Storage;
@@ -46,33 +46,30 @@ pub(crate) fn handle_list(
 
     let mut storage_opt = Storage::try_open(tasks_root);
     let mut records: Vec<SprintRecord> = Vec::new();
-    let mut integrity = MissingSprintReport::default();
-    let mut baseline_integrity = integrity.clone();
-    let mut cleanup_summary: Option<SprintCleanupOutcome> = None;
-
-    if let Some(storage) = storage_opt.as_ref() {
-        records = SprintService::list(storage).map_err(|err| err.to_string())?;
-        integrity = sprint_integrity::detect_missing_sprints(storage, &records);
-        baseline_integrity = integrity.clone();
-    }
+    let mut check = sprint_integrity::IntegrityCheck::unchanged(MissingSprintReport::default());
 
     if let Some(storage) = storage_opt.as_mut() {
-        if !integrity.missing_sprints.is_empty() && list_args.cleanup_missing {
-            let outcome =
-                sprint_integrity::cleanup_missing_sprint_refs(storage, &mut records, None)
-                    .map_err(|err| err.to_string())?;
-            emit_cleanup_summary(renderer, &outcome, "listing sprints");
-            integrity = sprint_integrity::detect_missing_sprints(storage, &records);
-            cleanup_summary = Some(outcome);
+        records = SprintService::list(storage).map_err(|err| err.to_string())?;
+        check = sprint_integrity::check_missing_sprints(
+            storage,
+            &mut records,
+            list_args.cleanup_missing,
+            None,
+        )
+        .map_err(|err| err.to_string())?;
+        if let Some(outcome) = check.cleanup.as_ref() {
+            emit_cleanup_summary(renderer, outcome, "listing sprints");
         }
     } else if list_args.cleanup_missing {
         renderer.emit_warning(
             "Cannot clean up missing sprint references: no tasks workspace detected.",
         );
     }
+    let integrity = &check.after;
+    let cleanup_summary = check.cleanup.as_ref();
 
     if !list_args.cleanup_missing && !integrity.missing_sprints.is_empty() {
-        emit_missing_report(renderer, &integrity, "listing sprints");
+        emit_missing_report(renderer, integrity, "listing sprints");
     }
 
     if records.is_empty() {
@@ -85,9 +82,9 @@ pub(crate) fn handle_list(
                     sprints: Vec::new(),
                     missing_sprints: integrity.missing_sprints.clone(),
                     integrity: build_assignment_integrity(
-                        &baseline_integrity,
-                        &integrity,
-                        cleanup_summary.as_ref(),
+                        &check.before,
+                        integrity,
+                        cleanup_summary,
                     ),
                 };
                 renderer.emit_json(&payload);
@@ -122,11 +119,7 @@ pub(crate) fn handle_list(
                 truncated,
                 sprints: summaries,
                 missing_sprints: integrity.missing_sprints.clone(),
-                integrity: build_assignment_integrity(
-                    &baseline_integrity,
-                    &integrity,
-                    cleanup_summary.as_ref(),
-                ),
+                integrity: build_assignment_integrity(&check.before, integrity, cleanup_summary),
             };
             renderer.emit_json(&payload);
         }

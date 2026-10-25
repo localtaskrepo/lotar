@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::cli::args::sprint::SprintDeleteArgs;
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_assignment;
-use crate::services::sprint_integrity::{self, SprintCleanupOutcome};
+use crate::services::sprint_integrity;
 use crate::services::sprint_service::SprintService;
 use crate::storage::manager::Storage;
 use serde::Serialize;
@@ -63,28 +63,14 @@ pub(crate) fn handle_delete(
     }
 
     let mut records = SprintService::list(&storage).map_err(|err| err.to_string())?;
-    let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-    let baseline_report = integrity_report.clone();
-    let mut cleanup_outcome: Option<SprintCleanupOutcome> = None;
-
-    if delete_args.cleanup_missing {
-        match sprint_integrity::cleanup_missing_sprint_refs(
-            &mut storage,
-            &mut records,
-            Some(sprint_id),
-        ) {
-            Ok(outcome) => {
-                integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
-                cleanup_outcome = Some(outcome);
-            }
-            Err(err) => {
-                return Err(format!(
-                    "Failed to clean up missing sprint references: {}",
-                    err
-                ));
-            }
-        }
-    }
+    let integrity = sprint_integrity::check_missing_sprints(
+        &mut storage,
+        &mut records,
+        delete_args.cleanup_missing,
+        Some(sprint_id),
+    )
+    .map_err(|err| format!("Failed to clean up missing sprint references: {}", err))?;
+    let cleanup_outcome = integrity.cleanup.as_ref();
 
     match renderer.format {
         OutputFormat::Json => {
@@ -94,27 +80,25 @@ pub(crate) fn handle_delete(
                 sprint_id,
                 sprint_label,
                 removed_references: cleanup_outcome
-                    .as_ref()
                     .map(|outcome| outcome.removed_references)
                     .unwrap_or(0),
                 updated_tasks: cleanup_outcome
-                    .as_ref()
                     .map(|outcome| outcome.updated_tasks)
                     .unwrap_or(0),
                 integrity: build_assignment_integrity(
-                    &baseline_report,
-                    &integrity_report,
-                    cleanup_outcome.as_ref(),
+                    &integrity.before,
+                    &integrity.after,
+                    cleanup_outcome,
                 ),
             };
             renderer.emit_json(&payload);
         }
         _ => {
             renderer.emit_success(format_args!("Deleted {}.", display_name));
-            if let Some(outcome) = cleanup_outcome.as_ref() {
+            if let Some(outcome) = cleanup_outcome {
                 emit_cleanup_summary(renderer, outcome, "deleting the sprint");
             } else {
-                emit_missing_report(renderer, &integrity_report, "deleting the sprint");
+                emit_missing_report(renderer, &integrity.after, "deleting the sprint");
             }
         }
     }

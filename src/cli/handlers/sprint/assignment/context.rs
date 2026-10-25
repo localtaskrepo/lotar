@@ -2,15 +2,16 @@ use std::path::Path;
 
 use crate::cli::handlers::sprint::shared::{emit_cleanup_summary, emit_missing_report};
 use crate::output::OutputRenderer;
-use crate::services::sprint_integrity::{self, MissingSprintReport, SprintCleanupOutcome};
+use crate::services::sprint_integrity::{
+    self, IntegrityCheck, MissingSprintReport, SprintCleanupOutcome,
+};
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::storage::manager::Storage;
 
 pub(crate) struct AssignmentContext {
     pub(crate) storage: Storage,
     pub(crate) records: Vec<SprintRecord>,
-    baseline_integrity: MissingSprintReport,
-    integrity: MissingSprintReport,
+    integrity: IntegrityCheck,
 }
 
 impl AssignmentContext {
@@ -27,11 +28,11 @@ impl AssignmentContext {
     }
 
     pub(crate) fn baseline_integrity(&self) -> &MissingSprintReport {
-        &self.baseline_integrity
+        &self.integrity.before
     }
 
     pub(crate) fn integrity(&self) -> &MissingSprintReport {
-        &self.integrity
+        &self.integrity.after
     }
 
     pub(crate) fn reconcile_missing(
@@ -40,34 +41,31 @@ impl AssignmentContext {
         renderer: &OutputRenderer,
         context_label: &str,
     ) -> Result<Option<SprintCleanupOutcome>, String> {
-        if self.integrity.missing_sprints.is_empty() {
-            return Ok(None);
+        self.integrity = sprint_integrity::check_missing_sprints(
+            &mut self.storage,
+            &mut self.records,
+            cleanup_requested,
+            None,
+        )
+        .map_err(|err| err.to_string())?;
+        match self.integrity.cleanup.as_ref() {
+            Some(outcome) => emit_cleanup_summary(renderer, outcome, context_label),
+            None if !self.integrity.after.missing_sprints.is_empty() => {
+                emit_missing_report(renderer, &self.integrity.after, context_label);
+            }
+            None => {}
         }
-
-        if cleanup_requested {
-            let outcome = sprint_integrity::cleanup_missing_sprint_refs(
-                &mut self.storage,
-                &mut self.records,
-                None,
-            )
-            .map_err(|err| err.to_string())?;
-            emit_cleanup_summary(renderer, &outcome, context_label);
-            self.integrity = sprint_integrity::detect_missing_sprints(&self.storage, &self.records);
-            Ok(Some(outcome))
-        } else {
-            emit_missing_report(renderer, &self.integrity, context_label);
-            Ok(None)
-        }
+        Ok(self.integrity.cleanup.clone())
     }
 
     fn from_storage(storage: Storage) -> Result<Self, String> {
         let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
-        let integrity = sprint_integrity::detect_missing_sprints(&storage, &records);
+        // Detection runs in `reconcile_missing`, which every caller invokes
+        // before reading the integrity reports.
         Ok(Self {
             storage,
             records,
-            baseline_integrity: integrity.clone(),
-            integrity,
+            integrity: IntegrityCheck::unchanged(MissingSprintReport::default()),
         })
     }
 }
