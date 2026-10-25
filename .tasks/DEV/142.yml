@@ -1,9 +1,27 @@
 title: Option to sync search inputs
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-23T17:06:50.930419+00:00
+modified: 2026-10-25T23:22:25.149339+00:00
+comments:
+- date: 2026-10-25T23:22:25.115329+00:00
+  text: 'Done. Preferences > Filters: ''Use the same search and filters on every page'' (off by default, lotar.preferences.filters.shareAcrossPages). When on, every FilterBar (Tasks, Boards, Calendar, Sprints, Insights, Dependencies) saves and restores lotar.shared.filter instead of its page key; the key is read at save/restore time, so toggling applies on the next page visit, and turning it off returns each page to its own last filter. URL filters still win; clearing filters on a page clears the shared one. Also fixed ''Clear last used filter'', which missed the Insights and Dependencies keys (and now clears the shared key). Verified: FilterBar spec (off/on/off across two page keys), smoke ui.shared-filters (Preferences toggle, search on Tasks carried to Boards/Calendar/Sprints, off restores Boards'' own). Gates: lint, 1712 Rust + 1201 UI, 348 smoke.'
 description: If you're working on a filter on a topic and want to switch between views you may want to use the same filter everywhere. We should offer that option in the web-ui so users can turn this on or off.
 tags:
 - web-ui
+history:
+- at: 2026-10-25T23:22:25.115329+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T23:22:25.149339+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

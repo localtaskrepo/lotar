@@ -1,10 +1,10 @@
 title: Sync tickets with GitHub
 status: Todo
-priority: Medium
+priority: Low
 type: Chore
 reporter: mallox
 created: 2026-10-25T02:35:38.565868+00:00
-modified: 2026-10-25T18:40:49.423860+00:00
+modified: 2026-10-25T23:15:06.065529+00:00
 comments:
 - date: 2026-10-25T18:40:49.423860+00:00
   text: |-
@@ -33,3 +33,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-25T23:15:06.065529+00:00
+  actor: mallox
+  changes:
+  - field: priority
+    old: Medium
+    new: Low

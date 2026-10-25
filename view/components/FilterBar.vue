@@ -417,6 +417,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useId, watch, watchEffect } from 'vue'
 import { listFromCsv } from '../composables/useFilterBuilder'
+import { filterStorageKey } from '../utils/preferences'
 import { storageGetJson, storageRemove, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import {
@@ -859,8 +860,11 @@ function isReturnToSavedProject(value: Record<string, string> | undefined, saved
   )
 }
 
-// Persist last used filter to localStorage for convenience
-const FILTER_KEY = computed(() => props.storageKey || 'lotar.tasks.filter')
+// Persist last used filter to localStorage for convenience. With the "same
+// search and filters on every page" preference, all pages share one key
+// (DEV-142); it is read when saving and restoring, so a change applies on the
+// next page visited.
+const filterKey = () => filterStorageKey(props.storageKey || 'lotar.tasks.filter')
 onMounted(async () => {
   document.addEventListener('click', onDocumentClick, DOCUMENT_CLICK_OPTS)
   document.addEventListener('keydown', onDocumentKeydown)
@@ -870,7 +874,7 @@ onMounted(async () => {
   if (unmounted) return
   filtersHydrated = true
   try {
-    const saved = storageGetJson<Record<string, unknown>>(FILTER_KEY.value)
+    const saved = storageGetJson<Record<string, unknown>>(filterKey())
     const usable = saved && typeof saved === 'object' && !Array.isArray(saved)
     if (usable && (!hasMeaningfulIncoming(props.value) || isReturnToSavedProject(props.value, saved))) {
       const asText = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -1460,7 +1464,7 @@ function emitFilter(synchronousTask = false) {
   // Persist the snapshot WITHOUT the sort keys (see the restore note above):
   // the live emit carries them for the current page, the snapshot must not.
   const { sort_by: _snapshotSortBy, order: _snapshotOrder, ...snapshot } = v
-  storageSetJson(FILTER_KEY.value, snapshot)
+  storageSetJson(filterKey(), snapshot)
   emit('update:value', v)
 }
 function onClear(keepScope = false) {
@@ -1486,7 +1490,7 @@ function onClear(keepScope = false) {
   }
   deletion.value = 'active'
   customFilters.value = {}
-  storageRemove(FILTER_KEY.value)
+  storageRemove(filterKey())
   const empty: Record<string, string> = {}
   empty.order = order.value
   if (keepScope && (props.emitProjectKey || project.value)) empty.project = project.value

@@ -503,6 +503,42 @@ describe('FilterBar sort snapshot ownership (DEV-57)', () => {
         revisit.unmount()
     })
 
+    it('shares one saved search and filter across pages when the preference is on (DEV-142)', async () => {
+        const visit = async (storageKey: string, value: Record<string, string> = {}) => {
+            const wrapper = mount(FilterBar, { props: { value, storageKey } })
+            await flushPromises()
+            return wrapper
+        }
+        // Off (default): each page keeps its own.
+        let tasks = await visit('lotar.tasks.filter')
+        await tasks.setProps({ value: { q: 'login', status: 'todo' } })
+        await flushPromises()
+        tasks.unmount()
+        let board = await visit('lotar.boards.filter')
+        expect(lastValue(board).q).toBeUndefined()
+        board.unmount()
+
+        // On: the Board restores what the Tasks page saved, and vice versa.
+        localStorage.setItem('lotar.preferences.filters.shareAcrossPages', 'true')
+        tasks = await visit('lotar.tasks.filter')
+        await tasks.setProps({ value: { q: 'redirect', status: 'todo' } })
+        await flushPromises()
+        tasks.unmount()
+        expect(JSON.parse(localStorage.getItem('lotar.shared.filter') || '{}')).toMatchObject({
+            q: 'redirect',
+            status: 'todo',
+        })
+        board = await visit('lotar.boards.filter')
+        expect(lastValue(board)).toMatchObject({ q: 'redirect', status: 'todo' })
+        board.unmount()
+
+        // Turning it off again returns each page to its own saved filter.
+        localStorage.setItem('lotar.preferences.filters.shareAcrossPages', 'false')
+        tasks = await visit('lotar.tasks.filter')
+        expect(lastValue(tasks)).toMatchObject({ q: 'login', status: 'todo' })
+        tasks.unmount()
+    })
+
     it('persists snapshots without the sort keys while emitting them live', async () => {
         const wrapper = mount(FilterBar, { props: { value: {} } })
         await nextTick()

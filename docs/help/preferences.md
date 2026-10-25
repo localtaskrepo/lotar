@@ -27,9 +27,11 @@ Accent choices are stored in `localStorage` (`lotar.accent`). Disable the toggle
 
 Use **Reset saved columns and sorting** to clear saved columns, column order, and sort settings for both Tasks and Sprints across projects. It removes the `lotar.taskTable.columns*`, `lotar.taskTable.columnOrder*`, `lotar.taskTable.sort*`, and corresponding `lotar.sprints.*` keys, plus `lotar.boardFields*`, `lotar.boardSort*` and `lotar.calendarHoverFields*`. It does not reset theme, accent, page size, hidden tabs, or repository data.
 
-## Filter Reset
+## Filters
 
-Select **Clear last used filter** to remove `lotar.tasks.filter`, `lotar.sprints.filter`, `lotar.calendar.filter`, and `lotar.boards.filter` from localStorage and legacy sessionStorage. It does not delete saved-filter presets or repository data. An explicit URL query can still restore filters on the next visit.
+Each page with a search box (Tasks, Boards, Calendar, Sprints, Insights and Dependencies) remembers its last search and filters separately. Turn on **Use the same search and filters on every page** to keep one search and filter for all of them instead: search for something on Tasks, switch to Boards or Calendar, and the same search and filters are already applied. Clearing the filters on any page then clears them everywhere. Turning the option off returns each page to the search it last had on its own. The choice is stored in `localStorage` (`lotar.preferences.filters.shareAcrossPages`, off by default), and the shared search in `lotar.shared.filter`. A filter given in the URL still takes precedence when you open a page.
+
+Select **Clear last used filter** to remove the saved search and filters of every page (`lotar.tasks.filter`, `lotar.sprints.filter`, `lotar.calendar.filter`, `lotar.boards.filter`, `lotar.insights.filter`, `lotar.dependencies.filter` and `lotar.shared.filter`) from localStorage and legacy sessionStorage. It does not delete saved-filter presets or repository data. An explicit URL query can still restore filters on the next visit.
 
 ## Tasks List
 

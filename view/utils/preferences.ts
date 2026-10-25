@@ -10,6 +10,10 @@ const TASK_PANEL_SHOW_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showAttachm
 const TASK_PANEL_SHOW_LINKS_IN_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showLinksInAttachments'
 const TASK_PANEL_AUTO_DETECT_LINKS_KEY = 'lotar.preferences.taskPanel.autoDetectLinks'
 
+const SHARE_FILTERS_KEY = 'lotar.preferences.filters.shareAcrossPages'
+/** Saved search and filters used by every page when sharing is on (DEV-142). */
+export const SHARED_FILTER_STORAGE_KEY = 'lotar.shared.filter'
+
 const TASKS_PAGE_SIZE_KEY = 'lotar.preferences.tasks.pageSize'
 export const DEFAULT_TASKS_PAGE_SIZE = 50
 const TASKS_PAGE_SIZE_CHOICES = new Set([25, 50, 100, 200])
@@ -101,6 +105,20 @@ function readBooleanPreference(key: string, defaultValue: boolean): boolean {
 function storeBooleanPreference(key: string, value: boolean) {
     storageSetFlag(key, value)
     emitPreferencesChanged(key)
+}
+
+/** Whether Tasks, Boards, Calendar, Sprints, Insights and Dependencies share one search and filter. */
+export function readShareFiltersPreference(): boolean {
+    return readBooleanPreference(SHARE_FILTERS_KEY, false)
+}
+
+export function storeShareFiltersPreference(value: boolean) {
+    storeBooleanPreference(SHARE_FILTERS_KEY, value)
+}
+
+/** Where a page's FilterBar saves its search and filters: its own key, or the shared one. */
+export function filterStorageKey(pageKey: string): string {
+    return readShareFiltersPreference() ? SHARED_FILTER_STORAGE_KEY : pageKey
 }
 
 export function readTasksPageSizePreference(): number {

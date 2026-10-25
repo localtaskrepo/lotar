@@ -97,9 +97,19 @@
 
         <UiCard>
           <h3>Filters</h3>
-          <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
-            <UiButton @click="clearSavedFilters">Clear last used filter</UiButton>
-            <span class="muted">Removes the saved FilterBar state from this browser.</span>
+          <div class="col" style="gap: 10px">
+            <label class="row" style="gap: 8px; align-items: center">
+              <input v-model="shareFilters" type="checkbox" data-testid="preferences-share-filters" />
+              Use the same search and filters on every page
+            </label>
+            <p class="muted" style="margin: 0">
+              Tasks, Boards, Calendar, Sprints, Insights and Dependencies then keep one search and filter, so you can
+              switch views without setting it up again. When off, each page remembers its own.
+            </p>
+            <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
+              <UiButton @click="clearSavedFilters">Clear last used filter</UiButton>
+              <span class="muted">Removes the saved search and filters of every page from this browser.</span>
+            </div>
           </div>
         </UiCard>
 
@@ -156,12 +166,15 @@ import { getContrastingColor } from '../utils/color'
 import {
   DEFAULT_STARTUP_DESTINATION,
   DEFAULT_TASKS_PAGE_SIZE,
+  readShareFiltersPreference,
   readStartupDestination,
   readTaskPanelAutoDetectLinksPreference,
+  SHARED_FILTER_STORAGE_KEY,
   readTaskPanelShowAttachmentsPreference,
   readTaskPanelShowLinksInAttachmentsPreference,
   readTasksPageSizePreference,
   STARTUP_DESTINATION_OPTIONS,
+  storeShareFiltersPreference,
   storeStartupDestination,
   storeTaskPanelAutoDetectLinksPreference,
   storeTaskPanelShowAttachmentsPreference,
@@ -192,6 +205,8 @@ const showAttachments = ref(true)
 const showLinksInAttachments = ref(true)
 const autoDetectLinks = ref(true)
 
+const shareFilters = ref(false)
+
 const tasksPageSizeOptions = [25, 50, 100, 200]
 const tasksPageSize = ref(String(DEFAULT_TASKS_PAGE_SIZE))
 
@@ -214,6 +229,7 @@ onMounted(() => {
   startupDestination.value = readStartupDestination()
 
   tasksPageSize.value = String(readTasksPageSizePreference())
+  shareFilters.value = readShareFiltersPreference()
 
   showAttachments.value = readTaskPanelShowAttachmentsPreference()
   showLinksInAttachments.value = readTaskPanelShowLinksInAttachmentsPreference()
@@ -251,6 +267,10 @@ watch(accent, (value) => {
 
 watch(startupDestination, (value) => {
   storeStartupDestination(value)
+})
+
+watch(shareFilters, (value) => {
+  storeShareFiltersPreference(!!value)
 })
 
 watch(showAttachments, (value) => {
@@ -310,7 +330,15 @@ function resetTables() {
 }
 
 function clearSavedFilters() {
-  const filterKeys = ['lotar.tasks.filter', 'lotar.sprints.filter', 'lotar.calendar.filter', 'lotar.boards.filter']
+  const filterKeys = [
+    'lotar.tasks.filter',
+    'lotar.sprints.filter',
+    'lotar.calendar.filter',
+    'lotar.boards.filter',
+    'lotar.insights.filter',
+    'lotar.dependencies.filter',
+    SHARED_FILTER_STORAGE_KEY,
+  ]
   try {
     for (const key of filterKeys) localStorage.removeItem(key)
   } catch {
