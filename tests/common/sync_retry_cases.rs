@@ -1,149 +1,43 @@
+use super::test_support::{MockApi, RecordedRequest, recorder, workspace as fixture};
 use super::*;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, atomic::AtomicBool};
 
-struct MockRemote {
-    address: std::net::SocketAddr,
-    creates: Arc<AtomicU64>,
-    writes: Arc<AtomicU64>,
-    stopped: Arc<AtomicBool>,
-    thread: Option<std::thread::JoinHandle<()>>,
+fn is_create(request: &RecordedRequest) -> bool {
+    request.method == "POST"
+        && (request.path == "/rest/api/3/issue" || request.path == "/repos/org/repo/issues")
 }
 
-impl MockRemote {
-    fn new(provider: SyncProvider, ambiguous: bool) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let creates = Arc::new(AtomicU64::new(0));
-        let writes = Arc::new(AtomicU64::new(0));
-        let stopped = Arc::new(AtomicBool::new(false));
-        let (count, mutations, stop) = (creates.clone(), writes.clone(), stopped.clone());
-        let thread = std::thread::spawn(move || {
-            for stream in listener.incoming() {
-                let mut stream = stream.unwrap();
-                if stop.load(Ordering::SeqCst) {
-                    break;
-                }
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(5)))
-                    .unwrap();
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                let mut first = String::new();
-                reader.read_line(&mut first).unwrap();
-                let mut length = 0;
-                loop {
-                    let mut header = String::new();
-                    reader.read_line(&mut header).unwrap();
-                    if header == "\r\n" || header.is_empty() {
-                        break;
-                    }
-                    if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:")
-                    {
-                        length = value.trim().parse::<usize>().unwrap();
-                    }
-                }
-                reader.read_exact(&mut vec![0; length]).unwrap();
-                let parts: Vec<_> = first.split_whitespace().collect();
-                let method = parts[0];
-                let path = parts[1];
-                if method != "GET" {
-                    mutations.fetch_add(1, Ordering::SeqCst);
-                }
-                let is_create = method == "POST"
-                    && (path == "/rest/api/3/issue" || path == "/repos/org/repo/issues");
-                if is_create {
-                    count.fetch_add(1, Ordering::SeqCst);
-                    if ambiguous {
-                        continue;
-                    } // Remote committed, response connection lost.
-                }
-                let issue = match provider {
-                    SyncProvider::Jira => {
-                        json!({"key":"ENG-7", "fields":{"summary":"Sync safety"}})
-                    }
-                    SyncProvider::Github => {
-                        json!({"number":7, "title":"Sync safety", "state":"open"})
-                    }
-                };
-                let payload = if is_create {
-                    issue
-                } else if path.contains("/search/jql") {
-                    json!({"issues":[issue], "total":1})
-                } else if path.starts_with("/repos/org/repo/issues?") {
-                    json!([issue])
-                } else if path.contains("/issuetype/project") {
-                    json!([{"name":"Task"}])
-                } else if path.contains("/project/") {
-                    json!({"id":"1"})
-                } else {
-                    issue
-                }
-                .to_string();
-                write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", payload.len(), payload).unwrap();
-            }
-        });
-        Self {
-            address,
-            creates,
-            writes,
-            stopped,
-            thread: Some(thread),
+/// Remote that answers every call with issue #7 / ENG-7. With `ambiguous`,
+/// creates are committed (and counted) but the response is lost.
+fn mock_remote(provider: SyncProvider, ambiguous: bool) -> MockApi {
+    MockApi::start_with_drops(move |request| {
+        let create = is_create(request);
+        if create && ambiguous {
+            return None;
         }
-    }
-
-    fn client(&self, provider: SyncProvider) -> SyncClient {
-        SyncClient::new(AuthContext {
-            provider,
-            api_base: format!("http://{}", self.address),
-            auth_header: None,
-            user_agent: "sync-safety-test".into(),
-        })
-    }
-}
-
-impl Drop for MockRemote {
-    fn drop(&mut self) {
-        self.stopped.store(true, Ordering::SeqCst);
-        let _ = TcpStream::connect(self.address);
-        self.thread.take().unwrap().join().unwrap();
-    }
-}
-
-fn fixture(
-    provider: SyncProvider,
-) -> (tempfile::TempDir, TasksDirectoryResolver, SyncRemoteConfig) {
-    let temp = tempfile::tempdir().unwrap();
-    let resolver = TasksDirectoryResolver {
-        path: temp.path().to_path_buf(),
-        source: crate::workspace::TasksDirectorySource::CommandLineFlag,
-    };
-    fs::write(
-        crate::utils::paths::global_config_path(temp.path()),
-        "default.project: TEST\nauto.set.reporter: false\nauto.assign: false\n",
-    )
-    .unwrap();
-    let remote = SyncRemoteConfig {
-        provider,
-        project: (provider == SyncProvider::Jira).then(|| "ENG".into()),
-        repo: (provider == SyncProvider::Github).then(|| "org/repo".into()),
-        filter: None,
-        auth_profile: None,
-        mapping: HashMap::new(),
-    };
-    (temp, resolver, remote)
-}
-
-fn recorder(direction: SyncDirection, dry_run: bool) -> SyncReportRecorder {
-    SyncReportRecorder::new(SyncRunContext {
-        run_id: "test".into(),
-        started_at: Utc::now().to_rfc3339(),
-        direction,
-        provider: "test".into(),
-        remote: "test".into(),
-        project: Some("TEST".into()),
-        dry_run,
+        let issue = match provider {
+            SyncProvider::Jira => json!({"key":"ENG-7", "fields":{"summary":"Sync safety"}}),
+            SyncProvider::Github => json!({"number":7, "title":"Sync safety", "state":"open"}),
+        };
+        let path = request.path.as_str();
+        let payload = if create {
+            issue
+        } else if path.contains("/search/jql") {
+            json!({"issues":[issue], "total":1})
+        } else if path.starts_with("/repos/org/repo/issues?") {
+            json!([issue])
+        } else if path.contains("/issuetype/project") {
+            json!([{"name":"Task"}])
+        } else if path.contains("/project/") {
+            json!({"id":"1"})
+        } else {
+            issue
+        };
+        Some((200, payload))
     })
+}
+
+fn creates(server: &MockApi) -> u64 {
+    server.count(is_create)
 }
 
 fn local_task(resolver: &TasksDirectoryResolver) -> TaskDTO {
@@ -163,7 +57,7 @@ fn sync_creation_link_failure_recovers_once_both_providers_and_directions() {
     for provider in [SyncProvider::Github, SyncProvider::Jira] {
         for direction in [SyncDirection::Push, SyncDirection::Pull] {
             let (_temp, resolver, remote) = fixture(provider);
-            let server = MockRemote::new(provider, false);
+            let server = mock_remote(provider, false);
             let client = server.client(provider);
             let task = (direction == SyncDirection::Push).then(|| local_task(&resolver));
             let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
@@ -283,7 +177,7 @@ fn sync_creation_link_failure_recovers_once_both_providers_and_directions() {
                     .all(|id| id == "TEST-1")
             );
             assert_eq!(
-                server.creates.load(Ordering::SeqCst),
+                creates(&server),
                 u64::from(direction == SyncDirection::Push)
             );
             let tasks = TaskService::list(
@@ -306,7 +200,7 @@ fn sync_creation_link_failure_recovers_once_both_providers_and_directions() {
 fn sync_ambiguous_remote_success_is_persisted_and_fails_closed() {
     for provider in [SyncProvider::Github, SyncProvider::Jira] {
         let (_temp, resolver, remote) = fixture(provider);
-        let server = MockRemote::new(provider, true);
+        let server = mock_remote(provider, true);
         let client = server.client(provider);
         let task = local_task(&resolver);
         let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
@@ -367,7 +261,7 @@ fn sync_ambiguous_remote_success_is_persisted_and_fails_closed() {
                 "expected fail-closed invalid-id error, got: {error}"
             );
         }
-        assert_eq!(server.creates.load(Ordering::SeqCst), 1);
+        assert_eq!(creates(&server), 1);
     }
 }
 
@@ -376,7 +270,7 @@ fn sync_dry_run_never_writes_journal_tasks_or_remote() {
     for provider in [SyncProvider::Github, SyncProvider::Jira] {
         for direction in [SyncDirection::Push, SyncDirection::Pull] {
             let (_temp, resolver, remote) = fixture(provider);
-            let server = MockRemote::new(provider, false);
+            let server = mock_remote(provider, false);
             let client = server.client(provider);
             if direction == SyncDirection::Push {
                 local_task(&resolver);
@@ -421,7 +315,7 @@ fn sync_dry_run_never_writes_journal_tasks_or_remote() {
             }
             assert!(!resolver.path.join(".sync-pending.json").exists());
             assert!(!resolver.path.join(".sync-pending.lock").exists());
-            assert_eq!(server.writes.load(Ordering::SeqCst), 0);
+            assert_eq!(server.write_count(), 0);
             assert_eq!(
                 TaskService::list(&Storage::new(&resolver.path), &TaskListFilter::default()).len(),
                 before
@@ -435,7 +329,7 @@ fn sync_returned_identity_journal_failure_never_recreates() {
     for provider in [SyncProvider::Github, SyncProvider::Jira] {
         for direction in [SyncDirection::Push, SyncDirection::Pull] {
             let (_temp, resolver, remote) = fixture(provider);
-            let server = MockRemote::new(provider, false);
+            let server = mock_remote(provider, false);
             let client = server.client(provider);
             if direction == SyncDirection::Push {
                 local_task(&resolver);
@@ -491,7 +385,7 @@ fn sync_returned_identity_journal_failure_never_recreates() {
                     .contains("Indeterminate")
             );
             assert_eq!(
-                server.creates.load(Ordering::SeqCst),
+                creates(&server),
                 u64::from(direction == SyncDirection::Push)
             );
             assert_eq!(
@@ -505,7 +399,7 @@ fn sync_returned_identity_journal_failure_never_recreates() {
 #[test]
 fn sync_lock_scope_corruption_and_unreturned_local_id_fail_closed() {
     let (_temp, resolver, remote) = fixture(SyncProvider::Github);
-    let server = MockRemote::new(SyncProvider::Github, false);
+    let server = mock_remote(SyncProvider::Github, false);
     let client = server.client(SyncProvider::Github);
     let scope = pending_scope(&remote, &client);
     let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
@@ -547,7 +441,7 @@ fn sync_lock_scope_corruption_and_unreturned_local_id_fail_closed() {
 #[test]
 fn sync_dry_recovery_preserves_journal_and_rejects_cross_scope_linking() {
     let (_temp, resolver, remote) = fixture(SyncProvider::Github);
-    let server = MockRemote::new(SyncProvider::Github, false);
+    let server = mock_remote(SyncProvider::Github, false);
     let client = server.client(SyncProvider::Github);
     let scope = pending_scope(&remote, &client);
     let task = local_task(&resolver);
@@ -613,14 +507,14 @@ fn sync_dry_recovery_preserves_journal_and_rejects_cross_scope_linking() {
         determine_reference_state(&remote, &local),
         ReferenceState::None
     ));
-    assert_eq!(server.writes.load(Ordering::SeqCst), 0);
+    assert_eq!(server.write_count(), 0);
 }
 
 #[test]
 fn sync_loaded_journal_and_new_intents_use_storage_identity() {
     for provider in [SyncProvider::Github, SyncProvider::Jira] {
         let (_temp, resolver, remote) = fixture(provider);
-        let server = MockRemote::new(provider, true);
+        let server = mock_remote(provider, true);
         let client = server.client(provider);
         let task = local_task(&resolver);
         let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
@@ -676,7 +570,7 @@ fn sync_loaded_journal_and_new_intents_use_storage_identity() {
                 )
                 .is_err()
         );
-        assert_eq!(server.creates.load(Ordering::SeqCst), 1);
+        assert_eq!(creates(&server), 1);
 
         for invalid in ["TEST-nope", "TEST-999", "OTHER-1", "../TEST-1"] {
             journal.links[0].task_id = Some(invalid.into());
@@ -731,7 +625,7 @@ fn sync_replacement_io_failure_preserves_all_pending_intents() {
 
     for provider in [SyncProvider::Github, SyncProvider::Jira] {
         let (_temp, resolver, remote) = fixture(provider);
-        let server = MockRemote::new(provider, true);
+        let server = mock_remote(provider, true);
         let client = server.client(provider);
         local_task(&resolver);
         local_task(&resolver);
@@ -753,7 +647,7 @@ fn sync_replacement_io_failure_preserves_all_pending_intents() {
         )
         .unwrap();
         assert_eq!(journal.links.len(), 2);
-        assert_eq!(server.creates.load(Ordering::SeqCst), 2);
+        assert_eq!(creates(&server), 2);
         let before = fs::read(&journal.path).unwrap();
         let immutable = ImmutableJournal::new(&journal.path);
         journal.links[0].reference = Some(match provider {
@@ -788,6 +682,6 @@ fn sync_replacement_io_failure_preserves_all_pending_intents() {
                     .contains("Indeterminate")
             );
         }
-        assert_eq!(server.creates.load(Ordering::SeqCst), 2);
+        assert_eq!(creates(&server), 2);
     }
 }

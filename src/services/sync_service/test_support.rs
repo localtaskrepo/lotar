@@ -15,7 +15,10 @@ pub(super) struct RecordedRequest {
     pub(super) body: String,
 }
 
-type Route = dyn Fn(&RecordedRequest) -> (u16, JsonValue) + Send + Sync;
+/// A route's answer; `None` closes the connection without replying, like a
+/// remote that committed a change but lost the response.
+type Reply = Option<(u16, JsonValue)>;
+type Route = dyn Fn(&RecordedRequest) -> Reply + Send + Sync;
 
 pub(super) struct MockApi {
     address: std::net::SocketAddr,
@@ -27,6 +30,13 @@ pub(super) struct MockApi {
 impl MockApi {
     pub(super) fn start(
         route: impl Fn(&RecordedRequest) -> (u16, JsonValue) + Send + Sync + 'static,
+    ) -> Self {
+        Self::start_with_drops(move |request| Some(route(request)))
+    }
+
+    /// Like [`Self::start`], but the route may drop a request unanswered.
+    pub(super) fn start_with_drops(
+        route: impl Fn(&RecordedRequest) -> Reply + Send + Sync + 'static,
     ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
@@ -42,7 +52,9 @@ impl MockApi {
                 }
                 let request = read_request(&stream);
                 log.lock().unwrap().push(request.clone());
-                let (status, payload) = route(&request);
+                let Some((status, payload)) = route(&request) else {
+                    continue;
+                };
                 let body = payload.to_string();
                 let _ = write!(
                     stream,
@@ -68,8 +80,29 @@ impl MockApi {
         })
     }
 
+    pub(super) fn address(&self) -> std::net::SocketAddr {
+        self.address
+    }
+
     pub(super) fn requests(&self) -> Vec<RecordedRequest> {
         self.requests.lock().unwrap().clone()
+    }
+
+    /// Requests as `"METHOD /path?query"` lines, in arrival order.
+    pub(super) fn request_lines(&self) -> Vec<String> {
+        self.requests()
+            .iter()
+            .map(|request| format!("{} {}", request.method, request.path))
+            .collect()
+    }
+
+    /// Requests that change remote state (anything but GET).
+    pub(super) fn write_count(&self) -> u64 {
+        self.count(|request| request.method != "GET")
+    }
+
+    pub(super) fn count(&self, predicate: impl Fn(&RecordedRequest) -> bool) -> u64 {
+        self.requests().iter().filter(|r| predicate(r)).count() as u64
     }
 }
 

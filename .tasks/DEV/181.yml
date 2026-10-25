@@ -1,0 +1,24 @@
+title: Split sync mapping module and reuse the shared sync mock API in retry tests
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T01:53:28.609783+00:00
+modified: 2026-10-25T02:10:00.777736+00:00
+comments:
+- date: 2026-10-25T02:10:00.737210+00:00
+  text: 'Done. Split sync_service/mapping.rs (1.6k lines) into fields.rs (field values, custom field/task update helpers), references.rs (reference matching), payloads.rs (push payloads + change filtering), remote_fields.rs (reading Jira/GitHub issue fields); mapping.rs keeps the mapping rules (~625 lines incl. tests). Items moved verbatim. test_support::MockApi gained start_with_drops (lost responses), address(), request_lines(), write_count()/count(); sync_retry_cases.rs and sync_push_characterization.rs now use it plus the shared workspace/recorder helpers instead of their own TCP servers. Verified: lint:agent, test:agent (1690 Rust + 1145 UI), sync tests 71/71 incl. exact request-trace characterization; smoke 342/343 with one DEV-170 load flake (ui.sync-scope) passing 3/3 in isolation.'
+history:
+- at: 2026-10-25T02:10:00.737210+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T02:10:00.777736+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

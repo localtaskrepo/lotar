@@ -6,103 +6,23 @@
 //! provider-specific implementation before it was consolidated, so the shared
 //! orchestration must reproduce them exactly.
 
+use super::test_support::MockApi;
 use super::*;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
 
-struct ScriptedRemote {
-    address: std::net::SocketAddr,
-    requests: Arc<Mutex<Vec<String>>>,
-    stopped: Arc<AtomicBool>,
-    thread: Option<std::thread::JoinHandle<()>>,
-}
-
-impl ScriptedRemote {
-    /// `failures`: (method, path substring) pairs answered with HTTP 500.
-    fn new(provider: SyncProvider, failures: Vec<(&'static str, &'static str)>) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let requests = Arc::new(Mutex::new(Vec::new()));
-        let stopped = Arc::new(AtomicBool::new(false));
-        let (log, stop) = (requests.clone(), stopped.clone());
-        let thread = std::thread::spawn(move || {
-            for stream in listener.incoming() {
-                let mut stream = stream.unwrap();
-                if stop.load(Ordering::SeqCst) {
-                    break;
-                }
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(5)))
-                    .unwrap();
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                let mut first = String::new();
-                reader.read_line(&mut first).unwrap();
-                let mut length = 0;
-                loop {
-                    let mut header = String::new();
-                    reader.read_line(&mut header).unwrap();
-                    if header == "\r\n" || header.is_empty() {
-                        break;
-                    }
-                    if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:")
-                    {
-                        length = value.trim().parse::<usize>().unwrap();
-                    }
-                }
-                let mut body = vec![0; length];
-                reader.read_exact(&mut body).unwrap();
-                let parts: Vec<_> = first.split_whitespace().collect();
-                let (method, path) = (parts[0].to_string(), parts[1].to_string());
-                log.lock().unwrap().push(format!("{method} {path}"));
-
-                let failing = failures
-                    .iter()
-                    .any(|(m, p)| *m == method && path.contains(p));
-                let (status, payload) = if failing {
-                    ("500 Internal Server Error", json!({"message": "boom"}))
-                } else {
-                    ("200 OK", respond(provider, &method, &path))
-                };
-                let payload = payload.to_string();
-                write!(
-                    stream,
-                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                    payload.len(),
-                    payload
-                )
-                .unwrap();
-            }
-        });
-        Self {
-            address,
-            requests,
-            stopped,
-            thread: Some(thread),
+/// Remote answering with canned issues; `failures` lists (method, path
+/// substring) pairs that get HTTP 500.
+fn scripted_remote(provider: SyncProvider, failures: Vec<(&'static str, &'static str)>) -> MockApi {
+    MockApi::start(move |request| {
+        let (method, path) = (request.method.as_str(), request.path.as_str());
+        if failures
+            .iter()
+            .any(|(m, p)| *m == method && path.contains(p))
+        {
+            (500, json!({"message": "boom"}))
+        } else {
+            (200, respond(provider, method, path))
         }
-    }
-
-    fn client(&self, provider: SyncProvider) -> SyncClient {
-        SyncClient::new(AuthContext {
-            provider,
-            api_base: format!("http://{}", self.address),
-            auth_header: None,
-            user_agent: "sync-characterization-test".into(),
-        })
-    }
-
-    fn requests(&self) -> Vec<String> {
-        self.requests.lock().unwrap().clone()
-    }
-}
-
-impl Drop for ScriptedRemote {
-    fn drop(&mut self) {
-        self.stopped.store(true, Ordering::SeqCst);
-        let _ = TcpStream::connect(self.address);
-        self.thread.take().unwrap().join().unwrap();
-    }
+    })
 }
 
 fn respond(provider: SyncProvider, method: &str, path: &str) -> JsonValue {
@@ -213,7 +133,7 @@ struct Outcome {
 fn run_push(
     resolver: &TasksDirectoryResolver,
     remote: &SyncRemoteConfig,
-    server: Option<&ScriptedRemote>,
+    server: Option<&MockApi>,
     task_id: Option<&str>,
     dry_run: bool,
 ) -> Outcome {
@@ -237,7 +157,7 @@ fn run_push(
         },
     )
     .unwrap();
-    let host = server.map(|s| s.address.to_string()).unwrap_or_default();
+    let host = server.map(|s| s.address().to_string()).unwrap_or_default();
     let root = resolver.path.display().to_string();
     let scrub = |text: &str| {
         let text = text.replace(&root, "ROOT");
@@ -274,7 +194,7 @@ fn run_push(
     Outcome {
         entries,
         warnings: warnings.iter().map(|w| scrub(w)).collect(),
-        requests: server.map(ScriptedRemote::requests).unwrap_or_default(),
+        requests: server.map(MockApi::request_lines).unwrap_or_default(),
         journal: journal_state,
     }
 }
@@ -301,7 +221,7 @@ fn push_update_with_changes_both_providers() {
         let (_temp, resolver, remote) = fixture(provider);
         let (kind, reference) = reference_for(provider, 7);
         let id = task_with_reference(&resolver, "Local title", kind, Some(&reference));
-        let server = ScriptedRemote::new(provider, vec![]);
+        let server = scripted_remote(provider, vec![]);
         let out = run_push(&resolver, &remote, Some(&server), Some(&id), false);
         insta_like(provider, "update", &out);
     }
@@ -313,7 +233,7 @@ fn push_update_skips_when_remote_already_matches() {
         let (_temp, resolver, remote) = fixture(provider);
         let (kind, reference) = reference_for(provider, 7);
         let id = task_with_reference(&resolver, "Remote title", kind, Some(&reference));
-        let server = ScriptedRemote::new(provider, vec![]);
+        let server = scripted_remote(provider, vec![]);
         let out = run_push(&resolver, &remote, Some(&server), Some(&id), false);
         insta_like(provider, "update-no-diff", &out);
     }
@@ -329,7 +249,7 @@ fn push_update_fetch_failure_warns_and_still_updates() {
             SyncProvider::Jira => ("GET", "/rest/api/3/issue/ENG-7"),
             SyncProvider::Github => ("GET", "/repos/org/repo/issues/7"),
         };
-        let server = ScriptedRemote::new(provider, vec![fetch]);
+        let server = scripted_remote(provider, vec![fetch]);
         let out = run_push(&resolver, &remote, Some(&server), Some(&id), false);
         insta_like(provider, "update-fetch-fails", &out);
     }
@@ -347,7 +267,7 @@ fn push_update_failure_is_per_issue_and_later_tasks_continue() {
             SyncProvider::Jira => ("PUT", "/rest/api/3/issue/ENG-7"),
             SyncProvider::Github => ("PATCH", "/repos/org/repo/issues/7"),
         };
-        let server = ScriptedRemote::new(provider, vec![update]);
+        let server = scripted_remote(provider, vec![update]);
         let mut out = run_push(&resolver, &remote, Some(&server), None, false);
         // Task iteration order is not part of the contract; per-task results are.
         out.entries.sort();
@@ -379,7 +299,7 @@ fn push_create_follows_journal_order_and_links_reference() {
     for provider in [SyncProvider::Jira, SyncProvider::Github] {
         let (_temp, resolver, remote) = fixture(provider);
         let id = task_with_reference(&resolver, "New work", "", None);
-        let server = ScriptedRemote::new(provider, vec![]);
+        let server = scripted_remote(provider, vec![]);
         let out = run_push(&resolver, &remote, Some(&server), Some(&id), false);
         insta_like(provider, "create", &out);
         let (_, expected) = reference_for(provider, 9);
@@ -396,7 +316,7 @@ fn push_create_failure_leaves_indeterminate_pending_link() {
             SyncProvider::Jira => ("POST", "/rest/api/3/issue"),
             SyncProvider::Github => ("POST", "/repos/org/repo/issues"),
         };
-        let server = ScriptedRemote::new(provider, vec![create]);
+        let server = scripted_remote(provider, vec![create]);
         let out = run_push(&resolver, &remote, Some(&server), Some(&id), false);
         insta_like(provider, "create-fails", &out);
         assert!(stored_references(&resolver, &id).is_empty());

@@ -31,21 +31,29 @@ use crate::types::{CustomFieldValue, CustomFields, Priority, TaskStatus, TaskTyp
 use crate::workspace::TasksDirectoryResolver;
 
 mod client;
+mod fields;
 mod github;
 mod jira;
 mod journal;
 mod mapping;
+mod payloads;
 mod pull;
 mod push;
+mod references;
+mod remote_fields;
 mod report;
 
 use client::*;
+use fields::*;
 use github::*;
 use jira::*;
 use journal::*;
 use mapping::*;
+use payloads::*;
 use pull::*;
 use push::*;
+use references::*;
+use remote_fields::*;
 use report::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
