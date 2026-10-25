@@ -4,8 +4,9 @@ import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 // DEV-145: the description "Preview" toggle used to float over the top-right
-// corner of the textarea and cover the first line of text. It now sits
-// centered below the editor box without moving the Tags section.
+// corner of the textarea and cover the first line of text. It now sits in the
+// editor's bottom-right corner, in padding the textarea reserves for it, so it
+// stays attached to the box without covering text or moving the Tags section.
 describe.concurrent('UI description preview toggle', () => {
     for (const width of [1280, 390]) {
         it(`stays clear of the text and the layout at ${width}px`, async ({ expect }) => {
@@ -22,14 +23,26 @@ describe.concurrent('UI description preview toggle', () => {
                         await display.click();
                         const textarea = page.locator('.task-panel__description-body textarea');
                         await textarea.fill(
-                            'A first line long enough to reach the right edge of the description editor on every viewport width',
+                            Array.from(
+                                { length: 6 },
+                                (_, i) =>
+                                    `Line ${i + 1} is long enough to reach the right edge of the description editor on every viewport width`,
+                            ).join('\n'),
                         );
                         const toggle = page.getByTestId('description-preview-toggle');
                         const box = (await textarea.boundingBox())!;
                         const button = (await toggle.boundingBox())!;
 
-                        expect(button.y).toBeGreaterThanOrEqual(box.y + box.height);
-                        expect(Math.abs(button.x + button.width / 2 - (box.x + box.width / 2))).toBeLessThan(2);
+                        const paddingBottom = await textarea.evaluate((el) =>
+                            parseFloat(getComputedStyle(el).paddingBottom),
+                        );
+                        // Inside the box, hugging its bottom-right corner.
+                        expect(box.x + box.width - (button.x + button.width)).toBeGreaterThanOrEqual(0);
+                        expect(box.x + box.width - (button.x + button.width)).toBeLessThan(8);
+                        expect(box.y + box.height - (button.y + button.height)).toBeGreaterThanOrEqual(0);
+                        expect(box.y + box.height - (button.y + button.height)).toBeLessThan(8);
+                        // Below the last line of text (in the reserved padding).
+                        expect(button.y).toBeGreaterThanOrEqual(box.y + box.height - paddingBottom - 1);
                         // The toggle takes no layout space: Tags keeps the normal
                         // fieldset gap below the description editor.
                         const spacing = await page.evaluate(() => {

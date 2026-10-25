@@ -1,0 +1,24 @@
+title: Pin the description Preview toggle to the editor box
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T00:50:36.387402+00:00
+modified: 2026-10-25T00:51:03.692385+00:00
+comments:
+- date: 2026-10-25T00:51:03.650122+00:00
+  text: The description Preview toggle floated 1rem below the editor, over the Tags header row, so it looked aligned with Tags/Add tag. Pinned it inside the editor's bottom-right corner; textarea and preview reserve bottom padding so it never covers text and the layout does not shift. Updated ui.description-preview smoke spec (passes at 1280/390), TaskPanel tests 16/16, checked screenshots.
+history:
+- at: 2026-10-25T00:51:03.650122+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T00:51:03.692385+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

@@ -2082,13 +2082,13 @@ textarea {
   position: relative;
 }
 
-/* Centered just below the editor box, over the empty middle of the next
-   row (the Tags header), so it never covers text or pushes content down. */
+/* Pinned inside the editor's bottom-right corner. The textarea and preview
+   reserve bottom padding for it, so it never covers text or shifts layout. */
 .task-panel__description-controls {
+  --task-panel-description-controls-inset: var(--space-1, 0.25rem);
   position: absolute;
-  top: calc(100% + var(--space-3, 0.75rem) + var(--space-1, 0.25rem));
-  left: 50%;
-  transform: translateX(-50%);
+  right: var(--task-panel-description-controls-inset);
+  bottom: var(--task-panel-description-controls-inset);
   z-index: var(--z-control);
 }
 
@@ -2099,6 +2099,7 @@ textarea {
 
 .task-panel__description-body textarea {
   min-height: var(--task-panel-description-min-height);
+  padding-bottom: calc(1.75rem + var(--space-2, 0.5rem));
   resize: none;
   overflow: hidden;
 }
@@ -2115,6 +2116,7 @@ textarea {
   min-height: var(--task-panel-description-min-height);
   width: 100%;
   padding: var(--space-2, 0.5rem);
+  padding-bottom: calc(1.75rem + var(--space-2, 0.5rem));
   border-radius: var(--radius-md, 0.375rem);
   border: 1px solid var(--color-border, var(--border));
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 94%, transparent);
