@@ -1,84 +1,51 @@
 <template>
   <section class="col" style="gap: 16px">
-    <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px">
-      <h1>
-        Calendar <span v-if="project" class="muted">— {{ project }}</span>
-      </h1>
-      <div class="row calendar-controls">
-        <div class="row" style="gap: 6px; align-items: center">
-          <UiButton icon-only aria-label="Previous month" @click="prevMonth">
-            <IconGlyph name="chevron-left" />
-          </UiButton>
-          <div class="month-picker" ref="monthPickerRef">
+    <PageHeader
+      clear-label="Clear filters"
+      :can-clear="hasFilters"
+      reload-label="Refresh calendar data"
+      :reloading="loadingTasks"
+      @clear="clearFilters"
+      @reload="refreshAll"
+    >
+      <template #title>
+        Calendar
+        <span v-if="project" class="muted">— {{ project }}</span>
+      </template>
+      <template #view>
+        <ColumnsMenu
+          :open="fieldsMenuOpen"
+          :options="calendarHoverFieldOptions"
+          :is-visible="isCalendarHoverFieldVisible"
+          :set-visible="setCalendarHoverFieldVisible"
+          label="Hover card fields"
+          @update:open="fieldsMenuOpen = $event"
+          @reset="resetCalendarHoverFields"
+        >
+          <template #trigger="{ open, toggle }">
             <UiButton
+              class="responsive-action"
               type="button"
-              class="month-picker__trigger"
-              :aria-expanded="monthPickerOpen ? 'true' : 'false'"
-              aria-haspopup="dialog"
-              @click="toggleMonthPicker"
+              aria-label="Configure hover fields"
+              title="Choose which fields appear on hover"
+              :aria-expanded="open"
+              @click="toggle"
             >
-              {{ monthLabel }}
+              <IconGlyph name="list" aria-hidden="true" />
+              <span class="responsive-action__label">Fields</span>
             </UiButton>
-            <div v-if="monthPickerOpen" class="month-picker__popover" role="dialog" aria-label="Pick month and year">
-              <div class="month-picker__year-row">
-                <UiButton icon-only type="button" aria-label="Previous year" @click="stepPickerYear(-1)">
-                  <IconGlyph name="chevron-left" />
-                </UiButton>
-                <strong class="month-picker__year">{{ pickerYear }}</strong>
-                <UiButton icon-only type="button" aria-label="Next year" @click="stepPickerYear(1)">
-                  <IconGlyph name="chevron-right" />
-                </UiButton>
-              </div>
-              <div class="month-picker__grid">
-                <button
-                  v-for="(label, idx) in monthNames"
-                  :key="label"
-                  type="button"
-                  class="month-picker__month"
-                  :class="{
-                    active: pickerYear === cursor.getFullYear() && idx === cursor.getMonth(),
-                    current: pickerYear === today.getFullYear() && idx === today.getMonth(),
-                  }"
-                  @click="selectPickerMonth(idx)"
-                >
-                  {{ label }}
-                </button>
-              </div>
-            </div>
-          </div>
-          <UiButton icon-only aria-label="Next month" @click="nextMonth">
-            <IconGlyph name="chevron-right" />
-          </UiButton>
-          <UiButton @click="goToday">Today</UiButton>
-        </div>
+          </template>
+        </ColumnsMenu>
         <UiButton
           class="toggle-sprints"
-          variant="ghost"
           :class="{ active: showSprints }"
           :aria-pressed="showSprints ? 'true' : 'false'"
           @click="toggleSprints"
         >
-          {{ showSprints ? 'Hide sprint schedule' : 'Show sprint schedule' }}
+          Sprint schedule
         </UiButton>
-        <UiButton
-          icon-only
-          type="button"
-          aria-label="Clear filters"
-          title="Clear filters"
-          :disabled="!hasFilters"
-          @click="clearFilters"
-        >
-          <IconGlyph name="close" />
-        </UiButton>
-        <ReloadButton
-          :disabled="loadingTasks"
-          :loading="loadingTasks"
-          label="Refresh calendar data"
-          title="Refresh calendar data"
-          @click="refreshAll"
-        />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <div class="filter-card">
       <FilterBar
@@ -101,29 +68,52 @@
         @update:value="onFilterUpdate"
       >
         <template #actions>
-          <ColumnsMenu
-            :open="fieldsMenuOpen"
-            :options="calendarHoverFieldOptions"
-            :is-visible="isCalendarHoverFieldVisible"
-            :set-visible="setCalendarHoverFieldVisible"
-            label="Hover card fields"
-            @update:open="fieldsMenuOpen = $event"
-            @reset="resetCalendarHoverFields"
-          >
-            <template #trigger="{ open, toggle }">
+          <div class="row calendar-month-nav">
+            <UiButton icon-only aria-label="Previous month" @click="prevMonth">
+              <IconGlyph name="chevron-left" />
+            </UiButton>
+            <div class="month-picker" ref="monthPickerRef">
               <UiButton
-                class="responsive-action"
                 type="button"
-                aria-label="Configure hover fields"
-                title="Choose which fields appear on hover"
-                :aria-expanded="open"
-                @click="toggle"
+                class="month-picker__trigger"
+                :aria-expanded="monthPickerOpen ? 'true' : 'false'"
+                aria-haspopup="dialog"
+                @click="toggleMonthPicker"
               >
-                <IconGlyph name="columns" aria-hidden="true" />
-                <span class="responsive-action__label">Fields</span>
+                {{ monthLabel }}
               </UiButton>
-            </template>
-          </ColumnsMenu>
+              <div v-if="monthPickerOpen" class="month-picker__popover" role="dialog" aria-label="Pick month and year">
+                <div class="month-picker__year-row">
+                  <UiButton icon-only type="button" aria-label="Previous year" @click="stepPickerYear(-1)">
+                    <IconGlyph name="chevron-left" />
+                  </UiButton>
+                  <strong class="month-picker__year">{{ pickerYear }}</strong>
+                  <UiButton icon-only type="button" aria-label="Next year" @click="stepPickerYear(1)">
+                    <IconGlyph name="chevron-right" />
+                  </UiButton>
+                </div>
+                <div class="month-picker__grid">
+                  <button
+                    v-for="(label, idx) in monthNames"
+                    :key="label"
+                    type="button"
+                    class="month-picker__month"
+                    :class="{
+                      active: pickerYear === cursor.getFullYear() && idx === cursor.getMonth(),
+                      current: pickerYear === today.getFullYear() && idx === today.getMonth(),
+                    }"
+                    @click="selectPickerMonth(idx)"
+                  >
+                    {{ label }}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <UiButton icon-only aria-label="Next month" @click="nextMonth">
+              <IconGlyph name="chevron-right" />
+            </UiButton>
+            <UiButton @click="goToday">Today</UiButton>
+          </div>
         </template>
       </FilterBar>
     </div>
@@ -252,13 +242,13 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { TaskDTO } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
-import ReloadButton from '../components/ReloadButton.vue'
 import TaskHoverCard from '../components/TaskHoverCard.vue'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
@@ -928,23 +918,9 @@ watch(showSprints, (enabled, previous) => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.calendar-controls {
-  gap: 8px;
+.calendar-month-nav {
+  gap: 6px;
   align-items: center;
-  flex-wrap: wrap;
-}
-.calendar-controls :is(.ui-select, .btn) {
-  min-height: 2.25rem;
-  height: 2.25rem;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.calendar-controls .btn.icon-only {
-  width: 2.25rem;
-  height: 2.25rem;
-}
-.toggle-sprints {
-  border: 1px solid var(--border);
 }
 .filter-card {
   display: flex;

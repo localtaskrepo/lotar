@@ -1165,7 +1165,7 @@ describe('SyncHub scope validity (B1)', () => {
         ;(api.inspectConfig as any).mockReturnValue(failed.promise)
         const reloadButton = wrapper
             .findAll('button')
-            .find((b) => b.text() === 'Reload' && b.element.closest('.page-header') !== null)!
+            .find((b) => b.text() === 'Reload' && b.element.closest('.app-page-header') !== null)!
         await reloadButton.trigger('click')
         await flushPromises()
         failed.reject(new Error('transient failure'))

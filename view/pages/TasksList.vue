@@ -1,33 +1,46 @@
 <template>
   <section class="col" style="gap: 16px">
-    <div class="row" style="justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
-      <h1>
+    <PageHeader
+      clear-label="Clear filters"
+      :can-clear="hasFilters"
+      reload-label="Refresh tasks"
+      :reloading="loading"
+      @clear="clearFilters"
+      @reload="retry"
+    >
+      <template #title>
         Tasks
         <span class="muted" v-if="totalCount">
           <template v-if="pageOffset === 0 && pageEnd === totalCount">({{ totalCount }})</template>
           <template v-else>({{ pageStart }}–{{ pageEnd }} / {{ totalCount }})</template>
         </span>
-      </h1>
-      <div class="row split-actions" style="gap: 8px; align-items: center">
-        <UiButton
-          icon-only
-          type="button"
-          aria-label="Clear filters"
-          title="Clear filters"
-          :disabled="!hasFilters"
-          @click="clearFilters"
+      </template>
+      <template #view>
+        <ColumnsMenu
+          :open="columnsMenuOpen"
+          :options="fieldOptions"
+          :is-visible="isColumnVisible"
+          :set-visible="setColumnVisible"
+          label="Table columns"
+          @update:open="columnsMenuOpen = $event"
+          @reset="resetColumns"
         >
-          <IconGlyph name="close" />
-        </UiButton>
-        <ReloadButton
-          :disabled="loading"
-          :loading="loading"
-          label="Refresh tasks"
-          title="Refresh tasks"
-          @click="retry"
-        />
-      </div>
-    </div>
+          <template #trigger="{ open, toggle }">
+            <UiButton
+              type="button"
+              class="tasks-toolbar-btn"
+              title="Configure columns"
+              aria-label="Configure columns"
+              :aria-expanded="open"
+              @click="toggle"
+            >
+              <IconGlyph name="columns" aria-hidden="true" />
+              <span class="tasks-toolbar-btn__label">Columns</span>
+            </UiButton>
+          </template>
+        </ColumnsMenu>
+      </template>
+    </PageHeader>
     <div class="filter-card">
       <FilterBar
         ref="filterBarRef"
@@ -144,29 +157,6 @@
             <IconGlyph name="download" aria-hidden="true" />
             <span class="tasks-toolbar-btn__label">Export</span>
           </UiButton>
-          <ColumnsMenu
-            :open="columnsMenuOpen"
-            :options="fieldOptions"
-            :is-visible="isColumnVisible"
-            :set-visible="setColumnVisible"
-            label="Table columns"
-            @update:open="columnsMenuOpen = $event"
-            @reset="resetColumns"
-          >
-            <template #trigger="{ open, toggle }">
-              <UiButton
-                type="button"
-                class="tasks-toolbar-btn"
-                title="Configure columns"
-                aria-label="Configure columns"
-                :aria-expanded="open"
-                @click="toggle"
-              >
-                <IconGlyph name="columns" aria-hidden="true" />
-                <span class="tasks-toolbar-btn__label">Columns</span>
-              </UiButton>
-            </template>
-          </ColumnsMenu>
         </template>
       </FilterBar>
     </div>
@@ -399,6 +389,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
@@ -406,7 +397,6 @@ import type { TaskDTO } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
-import ReloadButton from '../components/ReloadButton.vue'
 import TaskTable from '../components/TaskTable.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'

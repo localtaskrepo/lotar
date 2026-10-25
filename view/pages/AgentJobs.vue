@@ -1,24 +1,14 @@
 <template>
   <section class="col" style="gap: 16px">
-    <header class="row" style="align-items: flex-start; justify-content: space-between">
-      <div class="col" style="gap: 4px">
-        <h1 style="margin: 0">Agent jobs</h1>
-        <p class="muted" style="margin: 0">Track active and recent agent runs grouped by ticket.</p>
-      </div>
-      <div class="row" style="gap: 8px">
+    <PageHeader reload-label="Refresh jobs" :reloading="loading" @reload="refresh()">
+      <template #title>Agent jobs</template>
+      <template #subtitle>Track active and recent agent runs grouped by ticket.</template>
+      <template #toolbar>
         <UiButton variant="danger" type="button" :disabled="loading || !hasCancelableJobs" @click="cancelAll">
           Stop all
         </UiButton>
-        <ReloadButton
-          :disabled="loading"
-          :loading="loading"
-          label="Refresh jobs"
-          title="Refresh jobs"
-          variant="ghost"
-          @click="refresh()"
-        />
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <!-- Queue Stats -->
     <UiCard v-if="queueStats" class="queue-stats-card">
@@ -210,11 +200,11 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { api } from '../api/client'
 import { formatDateTime } from '../utils/date'
 import type { AgentJob, AgentJobLogEntry, AgentQueueStats } from '../api/types'
-import ReloadButton from '../components/ReloadButton.vue'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'

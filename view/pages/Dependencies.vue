@@ -1,20 +1,19 @@
 <template>
   <section class="dependencies-page">
-    <header class="dependencies-header">
-      <div>
-        <h1>
-          Dependencies <span v-if="scope.project" class="muted">— {{ scope.project }}</span>
-        </h1>
-        <p class="muted">Explore prerequisites, dependents, and connected tasks.</p>
-      </div>
-      <div class="dependencies-actions">
-        <UiButton
-          :disabled="busy"
-          :title="`Validate all relationships in ${scope.project ? `project ${scope.project}` : 'the workspace'}, not only this graph`"
-          @click="checkIssues"
-          >{{ scope.project ? 'Validate project' : 'Validate workspace' }}</UiButton
-        >
-        <UiButton :disabled="busy" @click="previewRepair()"><IconGlyph name="edit" />Fix relationships</UiButton>
+    <PageHeader
+      clear-label="Clear filters"
+      :can-clear="hasFilters || !!scope.root"
+      reload-label="Refresh dependencies"
+      :reloading="graphLoading"
+      @clear="clearFilters"
+      @reload="graphRef?.refresh()"
+    >
+      <template #title>
+        Dependencies
+        <span v-if="scope.project" class="muted">— {{ scope.project }}</span>
+      </template>
+      <template #subtitle>Explore prerequisites, dependents, and connected tasks.</template>
+      <template #view>
         <ColumnsMenu
           :open="fieldsMenuOpen"
           :options="cardFields.fieldOptions.value"
@@ -26,32 +25,20 @@
         >
           <template #trigger="{ open, toggle }"
             ><UiButton
+              class="responsive-action"
               type="button"
               aria-label="Configure card fields"
               title="Choose details displayed on task cards"
               :aria-expanded="open"
               @click="toggle"
-              ><IconGlyph name="list" aria-hidden="true" /><span>Fields</span></UiButton
+              ><IconGlyph name="list" aria-hidden="true" /><span class="responsive-action__label"
+                >Fields</span
+              ></UiButton
             ></template
           >
         </ColumnsMenu>
-        <UiButton
-          icon-only
-          aria-label="Clear filters"
-          title="Clear filters"
-          :disabled="!hasFilters && !scope.root"
-          @click="clearFilters"
-          ><IconGlyph name="close"
-        /></UiButton>
-        <ReloadButton
-          :disabled="graphLoading"
-          :loading="graphLoading"
-          label="Refresh dependencies"
-          title="Refresh dependencies"
-          @click="graphRef?.refresh()"
-        />
-      </div>
-    </header>
+      </template>
+    </PageHeader>
     <div class="filter-card">
       <FilterBar
         ref="filterBarRef"
@@ -87,6 +74,13 @@
               <option value="modified">Updated</option>
             </UiSelect></label
           >
+          <UiButton
+            :disabled="busy"
+            :title="`Validate all relationships in ${scope.project ? `project ${scope.project}` : 'the workspace'}, not only this graph`"
+            @click="checkIssues"
+            >{{ scope.project ? 'Validate project' : 'Validate workspace' }}</UiButton
+          >
+          <UiButton :disabled="busy" @click="previewRepair()"><IconGlyph name="edit" />Fix relationships</UiButton>
         </template>
         <template #panel>
           <div class="dependency-view-options" role="group" aria-label="Graph display controls">
@@ -229,6 +223,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { api } from '../api/client'
@@ -240,7 +235,6 @@ import type {
   RelationshipRepairResponse,
 } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
-import ReloadButton from '../components/ReloadButton.vue'
 import DependencyGraph from '../components/DependencyGraph.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -649,25 +643,6 @@ onBeforeUnmount(() => {
 }
 .dependencies-page > * {
   min-width: 0;
-}
-.dependencies-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.dependencies-header h1 {
-  margin: 0 0 4px;
-}
-.dependencies-header p {
-  margin: 0;
-}
-.dependencies-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 .dependency-view-options {
   display: flex;

@@ -1,18 +1,26 @@
 <template>
   <section class="col" style="gap: 16px">
-    <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px">
-      <h1>
-        Boards <span v-if="project" class="muted">— {{ project }}</span>
-      </h1>
-      <div class="row board-controls">
+    <PageHeader
+      clear-label="Clear filters"
+      :can-clear="hasAnyFilters"
+      reload-label="Refresh board"
+      :reloading="loadingConfig || loadingTasks"
+      @clear="clearFilters"
+      @reload="refreshAll"
+    >
+      <template #title>
+        Boards
+        <span v-if="project" class="muted">— {{ project }}</span>
+      </template>
+      <template #view>
         <UiButton
-          class="board-columns-button"
+          class="board-columns-button responsive-action"
           type="button"
           data-testid="board-columns-button"
           @click="columnsDialogOpen = true"
         >
           <IconGlyph name="columns" aria-hidden="true" />
-          <span>Columns</span>
+          <span class="responsive-action__label">Columns</span>
         </UiButton>
         <ColumnsMenu
           :open="fieldsMenuOpen"
@@ -25,7 +33,7 @@
         >
           <template #trigger="{ open, toggle }">
             <UiButton
-              class="board-fields-button"
+              class="board-fields-button responsive-action"
               type="button"
               aria-label="Configure card fields"
               title="Choose which fields appear on cards"
@@ -33,29 +41,12 @@
               @click="toggle"
             >
               <IconGlyph name="list" aria-hidden="true" />
-              <span>Fields</span>
+              <span class="responsive-action__label">Fields</span>
             </UiButton>
           </template>
         </ColumnsMenu>
-        <UiButton
-          icon-only
-          type="button"
-          aria-label="Clear filters"
-          title="Clear filters"
-          :disabled="!hasAnyFilters"
-          @click="clearFilters"
-        >
-          <IconGlyph name="close" />
-        </UiButton>
-        <ReloadButton
-          :disabled="loadingConfig || loadingTasks"
-          :loading="loadingConfig || loadingTasks"
-          label="Refresh board"
-          title="Refresh board"
-          @click="refreshAll"
-        />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <div class="filter-card">
       <FilterBar
@@ -501,6 +492,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
@@ -509,7 +501,6 @@ import FilterBar from '../components/FilterBar.vue'
 import BoardCardMeta from '../components/BoardCardMeta.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import IconGlyph from '../components/IconGlyph.vue'
-import ReloadButton from '../components/ReloadButton.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
@@ -1349,20 +1340,6 @@ onUnmounted(() => {
 .column:focus {
   outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent);
   outline-offset: 2px;
-}
-.board-controls {
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.board-controls :is(.ui-select, .btn) {
-  min-height: var(--control-height);
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.board-controls .btn.icon-only {
-  width: var(--control-height);
-  height: var(--control-height);
 }
 .filter-card {
   display: flex;

@@ -1,13 +1,16 @@
 <template>
   <section class="config-page">
-    <header class="page-header card">
-      <div class="page-headings">
-        <h1>Configuration</h1>
-        <p class="muted">
-          Compare global defaults with per-project overrides, edit safely, and see where each value comes from.
-        </p>
-      </div>
-      <div class="page-actions">
+    <PageHeader reload-label="Reload configuration" :reloading="loading" @reload="handleReload">
+      <template #title>Configuration</template>
+      <template #subtitle>
+        Compare global defaults with per-project overrides, edit safely, and see where each value comes from.
+      </template>
+      <template #view>
+        <UiButton icon-only type="button" aria-label="Open help" title="Open help" @click="helpOpen = true">
+          <IconGlyph name="help" />
+        </UiButton>
+      </template>
+      <template #toolbar>
         <UiSelect
           :key="scopeSelectKey"
           :model-value="project"
@@ -22,25 +25,8 @@
           <IconGlyph name="plus" aria-hidden="true" />
           <span>New project</span>
         </UiButton>
-        <ReloadButton
-          :disabled="loading"
-          :loading="loading"
-          label="Reload configuration"
-          title="Reload configuration"
-          @click="handleReload"
-        />
-        <UiButton
-          icon-only
-          variant="ghost"
-          type="button"
-          aria-label="Open help"
-          title="Open help"
-          @click="helpOpen = true"
-        >
-          <IconGlyph name="help" />
-        </UiButton>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>
     <div v-else-if="loading" class="alert alert-info">Loading configuration…</div>
@@ -685,6 +671,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
@@ -702,7 +689,6 @@ import ConfigTaxonomySection from '../components/ConfigTaxonomySection.vue'
 import ConfigToggleField from '../components/ConfigToggleField.vue'
 import ConfigWorkflowSection from '../components/ConfigWorkflowSection.vue'
 import IconGlyph from '../components/IconGlyph.vue'
-import ReloadButton from '../components/ReloadButton.vue'
 import UiButton from '../components/UiButton.vue'
 import UiInput from '../components/UiInput.vue'
 import UiModal from '../components/UiModal.vue'
@@ -1257,27 +1243,6 @@ watch(
   gap: 16px;
   /* Room for the floating save bar so it never covers the last field. */
   padding-bottom: 120px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 20px;
-  flex-wrap: wrap;
-}
-
-.page-headings h1 {
-  margin: 0;
-  font-size: 26px;
-}
-
-.page-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
 }
 
 .new-project-button {

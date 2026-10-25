@@ -1,0 +1,7 @@
+title: New preview location changes create task position
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-25T03:32:30.133593+00:00
+description: the preview button was moved inside the details textbox of the task panel. When it shows up it changes the height of the details box, so that when you want to press on "create task" the unfocus event causes the details box to shrink in size and the button is then in a different location, which doesn't feel very smooth as a user. It means you click and then click again to create a task.

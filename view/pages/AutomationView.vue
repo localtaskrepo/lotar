@@ -1,28 +1,23 @@
 <template>
   <section class="col" style="gap: 16px">
-    <header class="row" style="align-items: flex-start; justify-content: space-between">
-      <div class="col" style="gap: 4px">
-        <h1 style="margin: 0">Automations</h1>
-        <p class="muted" style="margin: 0">Configure rules that trigger actions automatically.</p>
-      </div>
-      <div class="row" style="gap: 8px; flex-wrap: wrap">
+    <PageHeader
+      reload-label="Refresh automations"
+      :reloading="loading"
+      :reload-disabled="loading || savingRules"
+      @reload="refresh"
+    >
+      <template #title>Automations</template>
+      <template #subtitle>Configure rules that trigger actions automatically.</template>
+      <template #toolbar>
         <UiSelect v-model="project" aria-label="Project scope" style="min-width: 200px">
           <option value="">Global rules</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">
             {{ formatProjectLabel(p) }}
           </option>
         </UiSelect>
-        <UiButton variant="ghost" type="button" :disabled="loading" @click="openConfig"> Open config </UiButton>
-        <ReloadButton
-          :disabled="loading || savingRules"
-          :loading="loading"
-          label="Refresh automations"
-          title="Refresh automations"
-          variant="ghost"
-          @click="refresh"
-        />
-      </div>
-    </header>
+        <UiButton type="button" :disabled="loading" @click="openConfig">Open config</UiButton>
+      </template>
+    </PageHeader>
 
     <p v-if="projectsError" class="muted" style="margin: 0; font-size: 13px">
       Project list unavailable: {{ projectsError }}
@@ -198,12 +193,12 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { AutomationSimulateResponse, ConfigInspectResult, ProjectDTO } from '../api/types'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
-import ReloadButton from '../components/ReloadButton.vue'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiInput from '../components/UiInput.vue'

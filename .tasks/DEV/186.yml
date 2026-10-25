@@ -1,0 +1,24 @@
+title: Standardize page header controls across all pages
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T03:28:15.601843+00:00
+modified: 2026-10-25T03:43:25.802115+00:00
+comments:
+- date: 2026-10-25T03:43:25.757974+00:00
+  text: 'Done. New view/components/PageHeader.vue: title (+ optional subtitle), title-row controls in fixed order (view slot, Clear filters, Reload) and an optional second-row toolbar slot. All pages use it: Tasks/Sprints (Columns up; Bulk select, Export, + Sprint stay in filter row), Boards (Columns, Fields), Calendar (Fields + ''Sprint schedule'' toggle up; month navigation moved into the filter row), Dependencies (Fields up; Validate/Fix relationships next to Sort by in the filter row), Insights (''Clear tags'' became the standard clear; project picker + tag filter in toolbar; duplicate single-project label dropped since the subtitle names it), Agents (Stop all in toolbar; reload standard style), Automations (scope + Open config in toolbar), Sync (Scope in toolbar, extra header padding removed), Config (Help + Reload up; scope + New project in toolbar; header no longer a card), Scan, Preferences. View-option buttons collapse to icons on narrow screens everywhere; Fields uses the list icon, Columns the columns icon. Removed per-page header CSS. Docs: help/serve.md. Tests: PageHeader.spec.ts; Dependencies/SyncHub specs updated for new placement. Verified: lint:agent, test:agent (1691 Rust, 1154 UI + 2 new), full smoke 345/345, screenshots of all 12 pages at 1280 and 390px.'
+history:
+- at: 2026-10-25T03:43:25.757974+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T03:43:25.802115+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

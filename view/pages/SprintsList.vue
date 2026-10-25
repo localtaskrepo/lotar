@@ -1,29 +1,40 @@
 <template>
   <section class="col sprints-page" style="gap: 16px">
-    <header class="row header">
-      <div class="col" style="gap: 4px">
-        <h1>Sprints</h1>
-      </div>
-      <div class="row split-actions" style="gap: 8px; align-items: center; flex-wrap: wrap">
-        <UiButton
-          icon-only
-          type="button"
-          aria-label="Clear sprint filters"
-          title="Clear sprint filters"
-          :disabled="!filtersActive"
-          @click="clearFilters"
+    <PageHeader
+      clear-label="Clear sprint filters"
+      :can-clear="filtersActive"
+      reload-label="Refresh sprints"
+      :reloading="busy"
+      @clear="clearFilters"
+      @reload="handleManualRefresh"
+    >
+      <template #title>Sprints</template>
+      <template #view>
+        <ColumnsMenu
+          :open="columnMenuOpen"
+          :options="columnOptions"
+          :is-visible="isColumnVisible"
+          :set-visible="toggleColumn"
+          label="Table columns"
+          @update:open="columnMenuOpen = $event"
+          @reset="resetColumns"
         >
-          <IconGlyph name="close" />
-        </UiButton>
-        <ReloadButton
-          :disabled="busy"
-          :loading="busy"
-          label="Refresh sprints"
-          title="Refresh sprints"
-          @click="handleManualRefresh"
-        />
-      </div>
-    </header>
+          <template #trigger="{ open, toggle }">
+            <UiButton
+              class="responsive-action"
+              type="button"
+              aria-label="Configure columns"
+              title="Configure columns"
+              :aria-expanded="open"
+              @click="toggle"
+            >
+              <IconGlyph name="columns" aria-hidden="true" />
+              <span class="responsive-action__label">Columns</span>
+            </UiButton>
+          </template>
+        </ColumnsMenu>
+      </template>
+    </PageHeader>
 
     <div v-if="hasMissingSprints" class="alert warn">
       <p>
@@ -220,29 +231,6 @@
           />
         </template>
         <template #actions>
-          <ColumnsMenu
-            :open="columnMenuOpen"
-            :options="columnOptions"
-            :is-visible="isColumnVisible"
-            :set-visible="toggleColumn"
-            label="Table columns"
-            @update:open="columnMenuOpen = $event"
-            @reset="resetColumns"
-          >
-            <template #trigger="{ open, toggle }">
-              <UiButton
-                class="responsive-action"
-                type="button"
-                aria-label="Configure columns"
-                title="Configure columns"
-                :aria-expanded="open"
-                @click="toggle"
-              >
-                <IconGlyph name="columns" aria-hidden="true" />
-                <span class="responsive-action__label">Columns</span>
-              </UiButton>
-            </template>
-          </ColumnsMenu>
           <UiButton
             class="create-sprint-button"
             type="button"
@@ -792,6 +780,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -3197,17 +3186,6 @@ onUnmounted(() => {
 }
 .task-row--after > td {
   box-shadow: inset 0 -3px var(--color-primary, #4676d7);
-}
-
-.header {
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.header h1 {
-  margin-bottom: 0;
 }
 
 .alert.warn {

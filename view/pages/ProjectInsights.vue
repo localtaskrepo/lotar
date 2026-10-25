@@ -1,69 +1,60 @@
 <template>
   <section class="col" style="gap: 16px">
-    <div class="header row insights-header">
-      <div class="col" style="gap: 4px">
-        <h1>Insights</h1>
-        <p class="muted" v-if="selectedProject">
-          Health overview for <strong>{{ projectDisplayName }}</strong>
-        </p>
-      </div>
-      <div class="controls row insights-controls">
-        <div
-          v-if="hasSingleProject"
-          class="input insights-project-static"
-          aria-label="Project filter"
-          :title="singleProjectLabel"
-        >
-          <span class="insights-project-static__label">{{ singleProjectLabel }}</span>
-        </div>
-        <UiSelect v-else v-model="selectedProject" style="min-width: 220px">
-          <option value="">All projects</option>
-          <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
-        </UiSelect>
-        <div class="tag-filter">
-          <UiInput
-            v-model="tagFilterInput"
-            placeholder="Filter tags (comma separated)"
-            @focus="onTagFilterFocus"
-            @blur="onTagFilterBlur"
-            @keydown="onTagFilterKeydown"
-            @input="onTagFilterInput"
-          />
-          <ul v-if="tagSuggestionsVisible" class="tag-suggestions" role="listbox" aria-label="Tag suggestions">
-            <li v-for="(entry, index) in tagSuggestionEntries" :key="entry.value" class="tag-suggestions__item">
-              <button
-                type="button"
-                class="tag-suggestion"
-                :class="{ active: tagActiveIndex === index }"
-                role="option"
-                :aria-selected="tagActiveIndex === index"
-                @mousedown.prevent
-                @click.prevent="selectTagSuggestion(entry.value)"
-                @mouseenter="tagActiveIndex = index"
-              >
-                <span class="tag-suggestion__label">
-                  <span
-                    v-for="(part, partIndex) in entry.parts"
-                    :key="partIndex"
-                    :class="['tag-suggestion__part', { match: part.match }]"
-                  >
-                    {{ part.text }}
+    <PageHeader
+      clear-label="Clear tag filters"
+      :can-clear="tagFilters.length > 0"
+      reload-label="Refresh insights"
+      :reloading="refreshing"
+      @clear="clearTagFilter"
+      @reload="refreshData({ forceStats: true })"
+    >
+      <template #title>Insights</template>
+      <template v-if="selectedProject" #subtitle>
+        Health overview for <strong>{{ projectDisplayName }}</strong>
+      </template>
+      <template #toolbar>
+        <div class="insights-controls">
+          <UiSelect v-if="!hasSingleProject" v-model="selectedProject" style="min-width: 220px">
+            <option value="">All projects</option>
+            <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
+          </UiSelect>
+          <div class="tag-filter">
+            <UiInput
+              v-model="tagFilterInput"
+              placeholder="Filter tags (comma separated)"
+              @focus="onTagFilterFocus"
+              @blur="onTagFilterBlur"
+              @keydown="onTagFilterKeydown"
+              @input="onTagFilterInput"
+            />
+            <ul v-if="tagSuggestionsVisible" class="tag-suggestions" role="listbox" aria-label="Tag suggestions">
+              <li v-for="(entry, index) in tagSuggestionEntries" :key="entry.value" class="tag-suggestions__item">
+                <button
+                  type="button"
+                  class="tag-suggestion"
+                  :class="{ active: tagActiveIndex === index }"
+                  role="option"
+                  :aria-selected="tagActiveIndex === index"
+                  @mousedown.prevent
+                  @click.prevent="selectTagSuggestion(entry.value)"
+                  @mouseenter="tagActiveIndex = index"
+                >
+                  <span class="tag-suggestion__label">
+                    <span
+                      v-for="(part, partIndex) in entry.parts"
+                      :key="partIndex"
+                      :class="['tag-suggestion__part', { match: part.match }]"
+                    >
+                      {{ part.text }}
+                    </span>
                   </span>
-                </span>
-              </button>
-            </li>
-          </ul>
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
-        <UiButton v-if="tagFilters.length" variant="ghost" type="button" @click="clearTagFilter"> Clear tags </UiButton>
-        <ReloadButton
-          :disabled="refreshing"
-          :loading="refreshing"
-          label="Refresh insights"
-          title="Refresh insights"
-          @click="refreshData({ forceStats: true })"
-        />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <UiCard>
       <div class="summary-grid">
@@ -267,13 +258,13 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { ProjectDTO, ProjectStatsDTO, TaskDTO, TaskListFilter } from '../api/types'
 import BarChart from '../components/BarChart.vue'
 import PieChart from '../components/PieChart.vue'
-import ReloadButton from '../components/ReloadButton.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
@@ -310,10 +301,6 @@ const hasTaskSnapshot = computed(() => taskQueryHandle.value?.hasSnapshot.value 
 
 const singleProject = computed(() => (projects.value.length === 1 ? projects.value[0] : null))
 const hasSingleProject = computed(() => !!singleProject.value)
-const singleProjectLabel = computed(() => {
-  const p = singleProject.value
-  return p ? formatProjectLabel(p) : ''
-})
 
 const selectedProject = ref<string>('')
 const tagFilterInput = ref<string>('')
@@ -1055,12 +1042,6 @@ onMounted(async () => {
 })
 </script>
 <style scoped>
-.header h1 {
-  margin: 0;
-}
-.controls button {
-  white-space: nowrap;
-}
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1117,50 +1098,16 @@ onMounted(async () => {
 .card-head h3 {
   margin: 0;
 }
-.insights-header {
-  flex-direction: row;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.insights-header > .col {
-  flex: 1 1 280px;
-  min-width: 220px;
-}
 .insights-controls {
   display: flex;
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-  margin-left: auto;
   justify-content: flex-end;
-  min-width: 320px;
 }
 .insights-controls > .ui-select {
   flex: 0 0 220px;
   min-width: 220px;
-}
-.insights-controls > .insights-project-static {
-  flex: 0 0 220px;
-  min-width: 220px;
-  max-width: 220px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  border-color: transparent;
-  background: transparent;
-  color: var(--color-muted);
-  box-shadow: none;
-  cursor: default;
-}
-
-.insights-project-static__label {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
 }
 .insights-controls :is(.ui-select, .input, .btn) {
   min-height: 2.25rem;

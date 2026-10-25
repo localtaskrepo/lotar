@@ -1,6 +1,6 @@
 <template>
   <section class="preferences">
-    <h1>Preferences</h1>
+    <PageHeader><template #title>Preferences</template></PageHeader>
 
     <div class="preferences-layout">
       <div class="preference-column">
@@ -145,6 +145,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'

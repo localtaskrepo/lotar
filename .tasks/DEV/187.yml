@@ -1,0 +1,7 @@
+title: Insight page forces focus after delay
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-25T03:30:03.274294+00:00
+description: When switching to the insights page, it takes a few seconds to load (which could be improved as well). If you navigate away during this loading time the page will grab focus again once loaded, sometimes multiple times in a row.

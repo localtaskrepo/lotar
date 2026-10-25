@@ -1,10 +1,6 @@
 <template>
   <section class="scan-page">
-    <div class="scan-header">
-      <div class="scan-header__titles">
-        <h1>Scan</h1>
-      </div>
-    </div>
+    <PageHeader><template #title>Scan</template></PageHeader>
 
     <div class="scan-layout">
       <aside class="scan-sidebar">
@@ -290,6 +286,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import type {

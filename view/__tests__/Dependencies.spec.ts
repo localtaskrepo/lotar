@@ -459,7 +459,9 @@ describe('Full-scope dependency validation and safe repair', () => {
         const wrapper = create()
         await flushPromises()
         const graph = wrapper.getComponent(DependencyGraph).element
-        expect(wrapper.get('header').text()).toContain('Fix relationships')
+        // Page actions sit in the filter row; the title row holds view options (DEV-186).
+        expect(wrapper.get('.filter-card').text()).toContain('Fix relationships')
+        expect(wrapper.get('header').text()).not.toContain('Fix relationships')
         expect(mocks.repair).not.toHaveBeenCalled()
         await button(wrapper, 'Fix relationships').trigger('click')
         await flushPromises()

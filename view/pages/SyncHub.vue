@@ -1,28 +1,25 @@
 <template>
   <section class="sync-page">
-    <div class="page-header">
-      <div class="page-headings">
-        <h1>Sync</h1>
-        <p class="muted">Review sync configuration and run manual syncs with status reporting.</p>
-      </div>
-      <div class="page-actions">
-        <div class="scope-picker">
-          <label class="muted" for="sync-scope">Scope</label>
+    <PageHeader
+      reload-label="Reload sync settings"
+      :reloading="scopeLoading"
+      :reload-disabled="false"
+      @reload="handleReload"
+    >
+      <template #title>Sync</template>
+      <template #subtitle>Review sync configuration and run manual syncs with status reporting.</template>
+      <template #toolbar>
+        <label class="scope-picker" for="sync-scope">
+          <span class="muted">Scope</span>
           <UiSelect id="sync-scope" v-model="project">
             <option value="">Global</option>
             <option v-for="entry in projects" :key="entry.prefix" :value="entry.prefix">
               {{ formatProjectLabel(entry) }}
             </option>
           </UiSelect>
-        </div>
-        <ReloadButton
-          :loading="scopeLoading"
-          label="Reload sync settings"
-          title="Reload sync settings"
-          @click="handleReload"
-        />
-      </div>
-    </div>
+        </label>
+      </template>
+    </PageHeader>
 
     <p v-if="scopeLoadError" class="sync-error" data-testid="scope-load-error">{{ scopeLoadError }}</p>
 
@@ -440,6 +437,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { api } from '../api/client'
@@ -1868,35 +1866,10 @@ async function handleReload() {
   padding-bottom: 48px;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 20px;
-  flex-wrap: wrap;
-}
-
-.page-headings h1 {
-  margin: 0;
-  font-size: 26px;
-}
-
-.page-headings p {
-  margin: 4px 0 0;
-}
-
-.page-actions {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
 .scope-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
 }
 
 .sync-dashboard {
