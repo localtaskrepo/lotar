@@ -2,15 +2,8 @@ use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/jobs", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let payload: crate::api_types::AgentJobCreateRequest =
-            match serde_json::from_slice(&req.body) {
-                Ok(value) => value,
-                Err(err) => return bad_request(format!("Invalid body: {}", err)),
-            };
+        let resolver = try_response!(resolve_tasks_dir());
+        let payload: crate::api_types::AgentJobCreateRequest = try_response!(parse_body(req));
 
         match crate::services::agent_job_service::AgentJobService::start_job(payload, &resolver) {
             Ok(job) => ok_json(201, json!({"data": {"job": job}})),
@@ -65,11 +58,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/jobs/cancel -> cancel agent job
 
     api_server.register_handler("POST", "/api/jobs/cancel", |req: &HttpRequest| {
-        let payload: crate::api_types::AgentJobCancelRequest =
-            match serde_json::from_slice(&req.body) {
-                Ok(value) => value,
-                Err(err) => return bad_request(format!("Invalid body: {}", err)),
-            };
+        let payload: crate::api_types::AgentJobCancelRequest = try_response!(parse_body(req));
         match crate::services::agent_job_service::AgentJobService::cancel_job(&payload.id) {
             Ok(Some(job)) => ok_json(200, json!({"data": {"cancelled": true, "job": job}})),
             Ok(None) => not_found(format!("Job '{}' not found", payload.id)),
@@ -92,11 +81,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/jobs/message -> send message to agent job
 
     api_server.register_handler("POST", "/api/jobs/message", |req: &HttpRequest| {
-        let payload: crate::api_types::AgentJobMessageRequest =
-            match serde_json::from_slice(&req.body) {
-                Ok(value) => value,
-                Err(err) => return bad_request(format!("Invalid body: {}", err)),
-            };
+        let payload: crate::api_types::AgentJobMessageRequest = try_response!(parse_body(req));
         match crate::services::agent_job_service::AgentJobService::send_message(
             &payload.id,
             &payload.message,

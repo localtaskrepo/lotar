@@ -32,6 +32,18 @@ use chrono::Utc;
 use serde_json::json;
 use std::collections::BTreeMap;
 
+/// Unwrap a `Result<T, HttpResponse>` inside a route handler, returning the
+/// error response early (handlers return `HttpResponse`, so `?` is not
+/// available).
+macro_rules! try_response {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(response) => return response,
+        }
+    };
+}
+
 mod activity;
 mod agents;
 mod attachments;
@@ -205,8 +217,7 @@ pub(super) fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
 /// the same way as in the CLI (see `repo_relative_path`).
 pub(super) fn resolve_repo_tasks_paths()
 -> Result<(std::path::PathBuf, std::path::PathBuf), HttpResponse> {
-    let resolver = TasksDirectoryResolver::resolve(None, None)
-        .map_err(|e| internal(json!({"error": {"code": "INTERNAL", "message": e}})))?;
+    let resolver = TasksDirectoryResolver::resolve(None, None).map_err(internal_error)?;
     let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
     let repo_root = crate::utils::git::find_repo_root(&cwd)
         .ok_or_else(|| bad_request("Not inside a git repository".into()))?;
@@ -454,6 +465,72 @@ pub(super) fn internal(v: serde_json::Value) -> HttpResponse {
     ok_json(500, v)
 }
 
+/// 500 response in the shared `{"error": {"code": "INTERNAL", ...}}` envelope.
+pub(super) fn internal_error(message: impl std::fmt::Display) -> HttpResponse {
+    internal(json!({"error": {"code": "INTERNAL", "message": message.to_string()}}))
+}
+
+/// Resolve the tasks directory for a request, or the 500 response to return.
+pub(super) fn resolve_tasks_dir() -> Result<TasksDirectoryResolver, HttpResponse> {
+    TasksDirectoryResolver::resolve(None, None).map_err(internal_error)
+}
+
+/// Deserialize a JSON request body, or the 400 response to return.
+pub(super) fn parse_body<T: serde::de::DeserializeOwned>(
+    req: &HttpRequest,
+) -> Result<T, HttpResponse> {
+    serde_json::from_slice(&req.body).map_err(|e| bad_request(format!("Invalid body: {e}")))
+}
+
+/// Like [`parse_body`], but an empty body counts as `{}` for requests whose
+/// fields are all optional.
+pub(super) fn parse_body_or_empty<T: serde::de::DeserializeOwned>(
+    req: &HttpRequest,
+) -> Result<T, HttpResponse> {
+    if req.body.iter().all(u8::is_ascii_whitespace) {
+        return serde_json::from_value(json!({}))
+            .map_err(|e| bad_request(format!("Invalid body: {e}")));
+    }
+    parse_body(req)
+}
+
+/// Response for a configuration or automation write: broadcasts
+/// `config_updated` only for genuine writes (DEV-102; no-ops keep the stored
+/// bytes) and reports the validation outcome.
+pub(super) fn config_write_response(
+    resolver: &TasksDirectoryResolver,
+    updated: bool,
+    validation: &crate::config::validation::errors::ValidationResult,
+) -> HttpResponse {
+    if updated {
+        let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+        crate::api_events::emit_config_updated(actor.as_deref());
+    }
+    let strings = |items: &[crate::config::validation::errors::ValidationError]| {
+        items.iter().map(ToString::to_string).collect::<Vec<_>>()
+    };
+    ok_json(
+        200,
+        json!({
+            "data": {
+                "updated": updated,
+                "warnings": strings(&validation.warnings),
+                "info": strings(&validation.info),
+                "errors": strings(&validation.errors),
+            }
+        }),
+    )
+}
+
+/// Load the merged configuration for the tasks directory, or the 500
+/// response to return (configuration failures are server-side, DEV-58).
+pub(super) fn load_merged_config(
+    resolver: &TasksDirectoryResolver,
+) -> Result<crate::config::types::ResolvedConfig, HttpResponse> {
+    resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+        .map_err(|e| internal_error(format!("Failed to load config: {e}")))
+}
+
 #[expect(
     clippy::needless_pass_by_value,
     reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
@@ -482,7 +559,7 @@ pub(super) fn map_lotar_error(err: LoTaRError) -> HttpResponse {
         | LoTaRError::SprintNotFound(_)
         | LoTaRError::ProjectNotFound(_)) => not_found(err.to_string()),
         err @ (LoTaRError::SerializationError(_) | LoTaRError::IndexError(_)) => {
-            internal(json!({"error": {"code": "INTERNAL", "message": err.to_string()}}))
+            internal_error(err.to_string())
         }
         LoTaRError::IoError(io_err) => {
             let coordination_refusal = io_err.kind() == std::io::ErrorKind::WouldBlock
@@ -495,7 +572,7 @@ pub(super) fn map_lotar_error(err: LoTaRError) -> HttpResponse {
             if coordination_refusal {
                 bad_request(message)
             } else {
-                internal(json!({"error": {"code": "INTERNAL", "message": message}}))
+                internal_error(message)
             }
         }
     }

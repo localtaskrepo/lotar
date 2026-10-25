@@ -2,15 +2,12 @@ use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/agents/profiles", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let project = req.query.get("project").map(|s| s.as_str());
         let config = match crate::config::resolution::config_for_project(&resolver.path, project) {
             Ok(c) => c,
             Err(e) => {
-                return internal(json!({"error": {"code": "INTERNAL", "message": e.to_string()}}));
+                return internal_error(e.to_string());
             }
         };
 

@@ -2,10 +2,7 @@ use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/projects/create", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let name = body
@@ -54,10 +51,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/projects/list
 
     api_server.register_handler("GET", "/api/projects/list", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let page = match crate::utils::pagination::parse_page(&req.query, 200, 500) {
             Ok(v) => v,
@@ -87,10 +81,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return bad_request("Missing project".into()),
         };
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let stats = ProjectService::stats(&storage, &name);
         ok_json(200, json!({"data": stats}))

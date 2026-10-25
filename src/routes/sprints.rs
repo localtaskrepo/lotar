@@ -2,12 +2,7 @@ use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/sprints/backlog/order", |_req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(resolver) => resolver,
-            Err(error) => {
-                return internal(json!({"error": {"code": "INTERNAL", "message": error}}));
-            }
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage {
             root_path: resolver.path,
         };
@@ -17,16 +12,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
     api_server.register_handler("POST", "/api/sprints/order", |req: &HttpRequest| {
-        let body: crate::api_types::TaskOrderRequest = match serde_json::from_slice(&req.body) {
-            Ok(body) => body,
-            Err(error) => return bad_request(format!("Invalid body: {error}")),
-        };
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(resolver) => resolver,
-            Err(error) => {
-                return internal(json!({"error": {"code": "INTERNAL", "message": error}}));
-            }
-        };
+        let body: crate::api_types::TaskOrderRequest = try_response!(parse_body(req));
+        let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage {
             root_path: resolver.path,
         };
@@ -36,10 +23,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
     api_server.register_handler("GET", "/api/sprints/list", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let page = match crate::utils::pagination::parse_page(&req.query, 200, 500) {
             Ok(v) => v,
@@ -65,12 +49,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to load sprints: {}", err)
-                    }
-                }));
+                return internal_error(format!("Failed to load sprints: {}", err));
             }
         };
 
@@ -103,30 +82,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/sprints/create
 
     api_server.register_handler("POST", "/api/sprints/create", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
 
-        let body: SprintCreateRequest = match serde_json::from_slice(&req.body) {
-            Ok(payload) => payload,
-            Err(err) => return bad_request(format!("Invalid body: {}", err)),
-        };
+        let body: SprintCreateRequest = try_response!(parse_body(req));
 
-        let resolved_config =
-            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-                Ok(config) => config,
-                Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to load config: {}", err)
-                        }
-                    }));
-                }
-            };
+        let resolved_config = try_response!(load_merged_config(&resolver));
 
         let sprint = sprint_from_create_request(&body);
         let defaults = if body.skip_defaults {
@@ -158,27 +120,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/sprints/add
 
     api_server.register_handler("POST", "/api/sprints/add", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let mut records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to load sprints: {}", err)
-                    }
-                }));
+                return internal_error(format!("Failed to load sprints: {}", err));
             }
         };
 
-        let body: SprintAssignmentRequest = match serde_json::from_slice(&req.body) {
-            Ok(payload) => payload,
-            Err(err) => return bad_request(format!("Invalid body: {}", err)),
-        };
+        let body: SprintAssignmentRequest = try_response!(parse_body(req));
 
         let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
         let baseline_report = integrity_report.clone();
@@ -191,12 +142,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     cleanup_outcome = Some(outcome);
                 }
                 Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to clean up sprint references: {}", err)
-                        }
-                    }));
+                    return internal_error(format!(
+                        "Failed to clean up sprint references: {}",
+                        err
+                    ));
                 }
             }
         }
@@ -249,27 +198,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/sprints/remove
 
     api_server.register_handler("POST", "/api/sprints/remove", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let mut records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to load sprints: {}", err)
-                    }
-                }));
+                return internal_error(format!("Failed to load sprints: {}", err));
             }
         };
 
-        let body: SprintAssignmentRequest = match serde_json::from_slice(&req.body) {
-            Ok(payload) => payload,
-            Err(err) => return bad_request(format!("Invalid body: {}", err)),
-        };
+        let body: SprintAssignmentRequest = try_response!(parse_body(req));
 
         let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
         let baseline_report = integrity_report.clone();
@@ -282,12 +220,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     cleanup_outcome = Some(outcome);
                 }
                 Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to clean up sprint references: {}", err)
-                        }
-                    }));
+                    return internal_error(format!(
+                        "Failed to clean up sprint references: {}",
+                        err
+                    ));
                 }
             }
         }
@@ -338,16 +274,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/sprints/delete
 
     api_server.register_handler("POST", "/api/sprints/delete", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
 
-        let body: SprintDeleteRequest = match serde_json::from_slice(&req.body) {
-            Ok(payload) => payload,
-            Err(err) => return bad_request(format!("Invalid body: {}", err)),
-        };
+        let body: SprintDeleteRequest = try_response!(parse_body(req));
 
         let sprint_id = body.sprint;
         let existing = match SprintService::get(&storage, sprint_id) {
@@ -366,12 +296,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let mut records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to reload sprints: {}", err)
-                    }
-                }));
+                return internal_error(format!("Failed to reload sprints: {}", err));
             }
         };
 
@@ -390,15 +315,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     cleanup_outcome = Some(outcome);
                 }
                 Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!(
-                                "Failed to clean up sprint references: {}",
-                                err
-                            )
-                        }
-                    }));
+                    return internal_error(format!(
+                        "Failed to clean up sprint references: {}",
+                        err
+                    ));
                 }
             }
         }
@@ -432,10 +352,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/sprints/backlog
 
     api_server.register_handler("GET", "/api/sprints/backlog", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let mut storage = match crate::storage::manager::Storage::try_open(&resolver.path.clone()) {
             Some(storage) => storage,
@@ -500,12 +417,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let mut records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to load sprints: {}", err)
-                    }
-                }));
+                return internal_error(format!("Failed to load sprints: {}", err));
             }
         };
 
@@ -520,12 +432,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     cleanup_outcome = Some(outcome);
                 }
                 Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to clean up sprint references: {}", err)
-                        }
-                    }));
+                    return internal_error(format!(
+                        "Failed to clean up sprint references: {}",
+                        err
+                    ));
                 }
             }
         }
@@ -589,19 +499,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": e,
-                    }
-                }));
-            }
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
 
         let record = match SprintService::get(&storage, sprint_id) {
             Ok(record) => record,
@@ -610,18 +510,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(err) => return map_lotar_error(err),
         };
 
-        let resolved_config =
-            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-                Ok(cfg) => cfg,
-                Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to load config: {}", err),
-                        }
-                    }));
-                }
-            };
+        let resolved_config = try_response!(load_merged_config(&resolver));
 
         let summary = compute_sprint_summary(&storage, &record, &resolved_config, Utc::now());
         ok_json(200, json!({"data": summary.payload}))
@@ -643,19 +532,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": e,
-                    }
-                }));
-            }
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
 
         let record = match SprintService::get(&storage, sprint_id) {
             Ok(record) => record,
@@ -664,18 +543,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(err) => return map_lotar_error(err),
         };
 
-        let resolved_config =
-            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-                Ok(cfg) => cfg,
-                Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to load config: {}", err),
-                        }
-                    }));
-                }
-            };
+        let resolved_config = try_response!(load_merged_config(&resolver));
 
         let context = match compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now())
         {
@@ -689,17 +557,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/sprints/update
 
     api_server.register_handler("POST", "/api/sprints/update", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
 
-        let body: SprintUpdateRequest = match serde_json::from_slice(&req.body) {
-            Ok(payload) => payload,
-            Err(err) => return bad_request(format!("Invalid body: {}", err)),
-        };
+        let body: SprintUpdateRequest = try_response!(parse_body(req));
 
         if body.sprint == 0 {
             return bad_request("Sprint identifier must be provided".to_string());
@@ -730,10 +592,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/sprints/velocity
 
     api_server.register_handler("GET", "/api/sprints/velocity", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let include_active = req
             .query
@@ -791,12 +650,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": format!("Failed to load sprints: {}", err)
-                    }
-                }));
+                return internal_error(format!("Failed to load sprints: {}", err));
             }
         };
 
@@ -814,18 +668,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return ok_json(200, json!({"data": payload}));
         }
 
-        let resolved_config =
-            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-                Ok(config) => config,
-                Err(err) => {
-                    return internal(json!({
-                        "error": {
-                            "code": "INTERNAL",
-                            "message": format!("Failed to load config: {}", err)
-                        }
-                    }));
-                }
-            };
+        let resolved_config = try_response!(load_merged_config(&resolver));
 
         let options = VelocityOptions {
             limit,

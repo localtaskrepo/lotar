@@ -10,7 +10,7 @@ fn storage() -> Result<Storage, HttpResponse> {
         .map(|resolver| Storage {
             root_path: resolver.path,
         })
-        .map_err(|error| internal(json!({"error": {"code": "INTERNAL", "message": error}})))
+        .map_err(internal_error)
 }
 
 fn query_text(req: &HttpRequest, key: &str) -> Result<Option<String>, HttpResponse> {

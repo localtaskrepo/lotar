@@ -6,37 +6,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.trim().is_empty() => v.trim().to_string(),
             _ => return bad_request("Missing attachment path".into()),
         };
-        let download = req
-            .query
-            .get("download")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
+        let download = wants_download(req);
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-            Ok(c) => c,
-            // Configuration failures are server-side (DEV-58): 500 INTERNAL.
-            Err(e) => {
-                return internal(
-                    json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
-                )
-            }
-        };
-        let config = if let Some(project) = req.query.get("project").map(|s| s.as_str()) {
-            resolution::get_project_config(&base_config, project, resolver.path.as_path())
-                .unwrap_or(base_config)
-        } else {
-            base_config
-        };
-        let root =
-            match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
-                // Store-root resolution failures are server-side (DEV-58).
-                Ok(p) => p,
-                Err(e) => return map_lotar_error(e),
-            };
+        let root = try_response!(attachments_root(req));
 
         // Typed classification (DEV-58): unsafe paths stay 400s, a missing
         // blob is a 404, and root-resolution failures are 500s — no
@@ -44,13 +16,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let resolved = match AttachmentService::resolve_attachment_path_typed(&root, &rel) {
             Ok(p) => p,
             Err(crate::services::attachment_service::AttachmentPathError::Invalid(msg)) => {
-                return bad_request(msg.to_string())
+                return bad_request(msg.to_string());
             }
             Err(crate::services::attachment_service::AttachmentPathError::Missing) => {
-                return not_found("Attachment not found".into())
+                return not_found("Attachment not found".into());
             }
             Err(crate::services::attachment_service::AttachmentPathError::RootUnavailable(msg)) => {
-                return internal(json!({"error": {"code": "INTERNAL", "message": msg}}))
+                return internal_error(msg);
             }
         };
 
@@ -59,42 +31,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(_) => return not_found("Attachment not found".into()),
         };
 
-        let content_type = match resolved
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase()
-            .as_str()
-        {
-            "png" => "image/png",
-            "jpg" | "jpeg" => "image/jpeg",
-            "gif" => "image/gif",
-            "webp" => "image/webp",
-            "svg" => "image/svg+xml",
-            "pdf" => "application/pdf",
-            "txt" | "log" | "md" => "text/plain; charset=utf-8",
-            _ => "application/octet-stream",
-        };
-
         let stored_filename = resolved
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("attachment");
         let filename = AttachmentService::download_filename(stored_filename);
-        let disposition = if download {
-            format!("attachment; filename=\"{}\"", filename)
-        } else {
-            format!("inline; filename=\"{}\"", filename)
-        };
-
-        HttpResponse {
-            status: 200,
-            headers: vec![
-                ("Content-Type".to_string(), content_type.to_string()),
-                ("Content-Disposition".to_string(), disposition),
-            ],
-            body: bytes,
-        }
+        attachment_response(&resolved, bytes, &filename, download)
     });
 
     // GET /api/attachments/h/<hash>/<filename>
@@ -104,11 +46,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         "GET",
         "/api/attachments/h/{hash}/{filename}",
         |req: &HttpRequest| {
-            let download = req
-                .query
-                .get("download")
-                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                .unwrap_or(false);
+            let download = wants_download(req);
 
             let raw_path = req.path.trim_end_matches('/');
             let prefix = "/api/attachments/h";
@@ -124,33 +62,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 _ => return bad_request("Missing attachment hash".into()),
             };
 
-            let resolver = match TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-            };
-            let base_config =
-                match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-                    Ok(c) => c,
-                    // Configuration failures are server-side (DEV-58).
-                    Err(e) => {
-                        return internal(
-                            json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
-                        )
-                    }
-                };
-            let config = if let Some(project) = req.query.get("project").map(|s| s.as_str()) {
-                resolution::get_project_config(&base_config, project, resolver.path.as_path())
-                    .unwrap_or(base_config)
-            } else {
-                base_config
-            };
-            let root =
-                match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config)
-                {
-                    // Store-root resolution failures are server-side (DEV-58).
-                    Ok(p) => p,
-                    Err(e) => return map_lotar_error(e),
-                };
+            let root = try_response!(attachments_root(req));
 
             let resolved = match AttachmentService::find_attachment_by_hash(&root, hash_tag) {
                 Some(p) => p,
@@ -160,23 +72,6 @@ pub(super) fn register(api_server: &mut ApiServer) {
             let bytes = match std::fs::read(&resolved) {
                 Ok(b) => b,
                 Err(_) => return not_found("Attachment not found".into()),
-            };
-
-            let content_type = match resolved
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_ascii_lowercase()
-                .as_str()
-            {
-                "png" => "image/png",
-                "jpg" | "jpeg" => "image/jpeg",
-                "gif" => "image/gif",
-                "webp" => "image/webp",
-                "svg" => "image/svg+xml",
-                "pdf" => "application/pdf",
-                "txt" | "log" | "md" => "text/plain; charset=utf-8",
-                _ => "application/octet-stream",
             };
 
             // For Save Link As, browsers often use the URL path segment.
@@ -193,22 +88,68 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 computed
             };
 
-            let disposition = if download {
-                format!("attachment; filename=\"{}\"", filename)
-            } else {
-                format!("inline; filename=\"{}\"", filename)
-            };
-
-            HttpResponse {
-                status: 200,
-                headers: vec![
-                    ("Content-Type".to_string(), content_type.to_string()),
-                    ("Content-Disposition".to_string(), disposition),
-                ],
-                body: bytes,
-            }
+            attachment_response(&resolved, bytes, &filename, download)
         },
     );
 
     // POST /api/tasks/attachments/upload
+}
+
+fn wants_download(req: &HttpRequest) -> bool {
+    req.query
+        .get("download")
+        .is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+}
+
+/// Attachment store root for the request's `project` (or the global config).
+fn attachments_root(req: &HttpRequest) -> Result<std::path::PathBuf, HttpResponse> {
+    let resolver = resolve_tasks_dir()?;
+    let base_config = load_merged_config(&resolver)?;
+    let config = match req.query.get("project") {
+        Some(project) => {
+            resolution::get_project_config(&base_config, project, resolver.path.as_path())
+                .unwrap_or(base_config)
+        }
+        None => base_config,
+    };
+    // Store-root resolution failures are server-side (DEV-58).
+    AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config)
+        .map_err(map_lotar_error)
+}
+
+/// Serve an attachment inline or as a download with a content type derived
+/// from its extension.
+fn attachment_response(
+    path: &std::path::Path,
+    bytes: Vec<u8>,
+    filename: &str,
+    download: bool,
+) -> HttpResponse {
+    let extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let content_type = match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "pdf" => "application/pdf",
+        "txt" | "log" | "md" => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    };
+    let disposition = if download { "attachment" } else { "inline" };
+    HttpResponse {
+        status: 200,
+        headers: vec![
+            ("Content-Type".to_string(), content_type.to_string()),
+            (
+                "Content-Disposition".to_string(),
+                format!("{disposition}; filename=\"{filename}\""),
+            ),
+        ],
+        body: bytes,
+    }
 }

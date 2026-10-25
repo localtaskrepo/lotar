@@ -2,16 +2,9 @@ use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/sync/pull", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: SyncRequest = match serde_json::from_value(body) {
-            Ok(v) => v,
-            Err(e) => return bad_request(format!("Invalid body: {}", e)),
-        };
+        let payload: SyncRequest = try_response!(parse_body_or_empty(req));
 
         match SyncService::pull(
             &resolver,
@@ -25,26 +18,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
             payload.client_run_id.as_deref(),
         ) {
             Ok(result) => ok_json(200, json!({"data": result})),
-            Err(err) => match err {
-                LoTaRError::ValidationError(_) => bad_request(err.to_string()),
-                _ => internal(json!({"error": {"code": "INTERNAL", "message": err.to_string()}})),
-            },
+            Err(err) => map_lotar_error(err),
         }
     });
 
     // POST /api/sync/push
 
     api_server.register_handler("POST", "/api/sync/push", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: SyncRequest = match serde_json::from_value(body) {
-            Ok(v) => v,
-            Err(e) => return bad_request(format!("Invalid body: {}", e)),
-        };
+        let payload: SyncRequest = try_response!(parse_body_or_empty(req));
 
         match SyncService::push(
             &resolver,
@@ -58,26 +41,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
             payload.client_run_id.as_deref(),
         ) {
             Ok(result) => ok_json(200, json!({"data": result})),
-            Err(err) => match err {
-                LoTaRError::ValidationError(_) => bad_request(err.to_string()),
-                _ => internal(json!({"error": {"code": "INTERNAL", "message": err.to_string()}})),
-            },
+            Err(err) => map_lotar_error(err),
         }
     });
 
     // POST /api/sync/validate
 
     api_server.register_handler("POST", "/api/sync/validate", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: SyncValidateRequest = match serde_json::from_value(body) {
-            Ok(v) => v,
-            Err(e) => return bad_request(format!("Invalid body: {}", e)),
-        };
+        let payload: SyncValidateRequest = try_response!(parse_body_or_empty(req));
 
         match SyncService::validate(
             &resolver,
@@ -87,23 +60,17 @@ pub(super) fn register(api_server: &mut ApiServer) {
             payload.auth_profile.as_deref(),
         ) {
             Ok(result) => ok_json(200, json!({"data": result})),
-            Err(err) => match err {
-                LoTaRError::ValidationError(_) => bad_request(err.to_string()),
-                _ => internal(json!({"error": {"code": "INTERNAL", "message": err.to_string()}})),
-            },
+            Err(err) => map_lotar_error(err),
         }
     });
 
     // GET /api/sync/reports/list?project=PREFIX&limit=N&offset=N
 
     api_server.register_handler("GET", "/api/sync/reports/list", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
             Ok(mgr) => mgr,
-            Err(err) => return bad_request(format!("Failed to load config: {}", err)),
+            Err(err) => return internal_error(format!("Failed to load config: {err}")),
         };
         let project = req
             .query
@@ -154,17 +121,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/sync/reports/get?path=<relative>[&project=PREFIX]
 
     api_server.register_handler("GET", "/api/sync/reports/get", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let rel = match req.query.get("path") {
             Some(v) if !v.trim().is_empty() => v.trim().to_string(),
             _ => return bad_request("Missing report path".into()),
         };
         let mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
             Ok(mgr) => mgr,
-            Err(err) => return bad_request(format!("Failed to load config: {}", err)),
+            Err(err) => return internal_error(format!("Failed to load config: {err}")),
         };
         let project = req
             .query

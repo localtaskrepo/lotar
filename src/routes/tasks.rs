@@ -6,11 +6,8 @@ mod dev56_upload_coordination_cases;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/add", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let req_create = match parse_task_create_body(&body, req) {
             Ok(v) => v,
@@ -30,128 +27,116 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/tasks/list
 
     api_server.register_handler("GET", "/api/tasks/list", |req: &HttpRequest| {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-    };
-    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
 
-    let page = match crate::utils::pagination::parse_page_strict(&req.query, 50, 200) {
-        Ok(v) => v,
-        Err(msg) => return bad_request(msg),
-    };
-    // Load config for validation of status/priority/type
-    let cfg = match crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
-    {
-        Ok(c) => c,
-        Err(e) => {
-            return internal(
-                json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
-            );
-        }
-    };
+        let page = match crate::utils::pagination::parse_page_strict(&req.query, 50, 200) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
+        // Load config for validation of status/priority/type
+        let cfg = try_response!(load_merged_config(&resolver));
 
-    // Build filter + unknown-key map from query
-    let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
-        Ok(v) => v,
-        Err(msg) => return bad_request(msg),
-    };
+        // Build filter + unknown-key map from query
+        let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
 
-    // Shared strict executor (DEV-57): invalid explicit order/sort_by/due/
-    // recent/needs values are 400s, never silently ignored.
-    let options = match crate::services::task_query::parse_query_options(&req.query) {
-        Ok(v) => v,
-        Err(msg) => return bad_request(msg),
-    };
+        // Shared strict executor (DEV-57): invalid explicit order/sort_by/due/
+        // recent/needs values are 400s, never silently ignored.
+        let options = match crate::services::task_query::parse_query_options(&req.query) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
 
-    let tasks = TaskService::list(&storage, &filter);
+        let tasks = TaskService::list(&storage, &filter);
 
-    // Apply in-memory filters if any
-    let mut tasks = tasks; // shadow mutable
-    apply_unknown_key_filters(&mut tasks, &uf, &cfg);
+        // Apply in-memory filters if any
+        let mut tasks = tasks; // shadow mutable
+        apply_unknown_key_filters(&mut tasks, &uf, &cfg);
 
-    // Smart filters + deterministic global ordering (default modified desc,
-    // canonical-ID lexical asc tiebreak), then pagination.
-    crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
+        // Smart filters + deterministic global ordering (default modified desc,
+        // canonical-ID lexical asc tiebreak), then pagination.
+        crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
 
-    let total = tasks.len();
-    let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
-    let page_tasks = tasks[start..end]
-        .iter()
-        .map(|(_, task)| task.clone())
-        .collect::<Vec<_>>();
+        let total = tasks.len();
+        let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
+        let page_tasks = tasks[start..end]
+            .iter()
+            .map(|(_, task)| task.clone())
+            .collect::<Vec<_>>();
 
-    let payload = crate::api_types::TaskListResponse {
-        total,
-        limit: page.limit,
-        offset: page.offset,
-        tasks: page_tasks,
-    };
+        let payload = crate::api_types::TaskListResponse {
+            total,
+            limit: page.limit,
+            offset: page.offset,
+            tasks: page_tasks,
+        };
 
-    ok_json(200, json!({"data": payload}))
-});
+        ok_json(200, json!({"data": payload}))
+    });
 
     // GET /api/sprints/list
 
     api_server.register_handler("GET", "/api/tasks/export", |req: &HttpRequest| {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-    };
-    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-    let cfg = match crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
-    {
-        Ok(c) => c,
-        Err(e) => {
-            return internal(
-                json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
-            );
-        }
-    };
+        let resolver = try_response!(resolve_tasks_dir());
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
+        let cfg = try_response!(load_merged_config(&resolver));
 
-    let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
-        Ok(v) => v,
-        Err(msg) => return bad_request(msg),
-    };
-    // Export shares the full list grammar (DEV-57): every filter including
-    // the smart filters, the requested global order, and no pagination.
-    let options = match crate::services::task_query::parse_query_options(&req.query) {
-        Ok(v) => v,
-        Err(msg) => return bad_request(msg),
-    };
-    let mut tasks = TaskService::list(&storage, &filter);
-    apply_unknown_key_filters(&mut tasks, &uf, &cfg);
-    crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
+        let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
+        // Export shares the full list grammar (DEV-57): every filter including
+        // the smart filters, the requested global order, and no pagination.
+        let options = match crate::services::task_query::parse_query_options(&req.query) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
+        let mut tasks = TaskService::list(&storage, &filter);
+        apply_unknown_key_filters(&mut tasks, &uf, &cfg);
+        crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
 
-    // Build CSV (quoted where needed)
-    fn esc(s: &str) -> String {
-        let mut v = s.replace('"', "\"\"");
-        if v.contains(',') || v.contains('\n') || v.contains('\r') {
-            v = format!("\"{}\"", v);
+        // Build CSV (quoted where needed)
+        fn esc(s: &str) -> String {
+            let mut v = s.replace('"', "\"\"");
+            if v.contains(',') || v.contains('\n') || v.contains('\r') {
+                v = format!("\"{}\"", v);
+            }
+            v
         }
-        v
-    }
-    let mut wtr = String::from("id,title,status,priority,type,assignee,due_date,tags\n");
-    for (id, t) in tasks {
-        let vals = [
-            esc(&id),
-            esc(&t.title.replace('\n', " ")),
-            esc(&t.status.to_string()),
-            esc(&t.priority.to_string()),
-            esc(&t.task_type.to_string()),
-            esc(&t.assignee.unwrap_or_default()),
-            esc(&t.due_date.unwrap_or_default()),
-            esc(&t.tags.join(";")),
+        let mut wtr = String::from("id,title,status,priority,type,assignee,due_date,tags\n");
+        for (id, t) in tasks {
+            let vals = [
+                esc(&id),
+                esc(&t.title.replace('\n', " ")),
+                esc(&t.status.to_string()),
+                esc(&t.priority.to_string()),
+                esc(&t.task_type.to_string()),
+                esc(&t.assignee.unwrap_or_default()),
+                esc(&t.due_date.unwrap_or_default()),
+                esc(&t.tags.join(";")),
+            ];
+            wtr.push_str(&vals.join(","));
+            wtr.push('\n');
+        }
+        let headers = vec![
+            (
+                "Content-Type".to_string(),
+                "text/csv; charset=utf-8".to_string(),
+            ),
+            (
+                "Content-Disposition".to_string(),
+                "attachment; filename=tasks.csv".to_string(),
+            ),
         ];
-        wtr.push_str(&vals.join(","));
-        wtr.push('\n');
-    }
-    let headers = vec![
-        ("Content-Type".to_string(), "text/csv; charset=utf-8".to_string()),
-        ("Content-Disposition".to_string(), "attachment; filename=tasks.csv".to_string()),
-    ];
-    HttpResponse { status: 200, headers, body: wtr.into_bytes() }
-});
+        HttpResponse {
+            status: 200,
+            headers,
+            body: wtr.into_bytes(),
+        }
+    });
 
     // GET /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true]
 
@@ -172,10 +157,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 ));
             }
         };
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let outcome = if include_deleted {
             TaskService::get_including_deleted(
@@ -197,12 +179,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/attachments/upload", |req: &HttpRequest| {
     use base64::Engine;
 
-    let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-    let payload: crate::api_types::AttachmentUploadRequest = match serde_json::from_value(body)
-    {
-        Ok(v) => v,
-        Err(e) => return bad_request(format!("Invalid body: {}", e)),
-    };
+    let payload: crate::api_types::AttachmentUploadRequest = try_response!(parse_body_or_empty(req));
 
     if payload.id.trim().is_empty() {
         return bad_request("Missing task id".into());
@@ -214,20 +191,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
         return bad_request("Missing attachment content".into());
     }
 
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-    };
+    let resolver = try_response!(resolve_tasks_dir());
 
-    let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-        Ok(c) => c,
-        // Configuration failures are server-side (DEV-58): 500 INTERNAL.
-        Err(e) => {
-            return internal(
-                json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
-            )
-        }
-    };
+    let base_config = try_response!(load_merged_config(&resolver));
 
     // Apply per-project overrides using the canonical ID prefix (final
     // numeric suffix split, so hyphenated prefixes like ABC-OPS resolve fully)
@@ -336,9 +302,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             match AttachmentService::store_bytes(&root, &payload.filename, &bytes) {
                 Ok(result) => result,
                 Err(e) => {
-                    return internal(
-                        json!({"error": {"code": "INTERNAL", "message": e.to_string()}}),
-                    )
+                    return internal_error(e.to_string())
                 }
             };
 
@@ -397,12 +361,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     "POST",
     "/api/tasks/attachments/remove",
     |req: &HttpRequest| {
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: crate::api_types::AttachmentRemoveRequest =
-            match serde_json::from_value(body) {
-                Ok(v) => v,
-                Err(e) => return bad_request(format!("Invalid body: {}", e)),
-            };
+        let payload: crate::api_types::AttachmentRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
             return bad_request("Missing task id".into());
@@ -411,20 +370,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("Missing attachment path".into());
         }
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
-        let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
-            Ok(c) => c,
-            // Configuration failures are server-side (DEV-58): 500 INTERNAL.
-            Err(e) => {
-                return internal(
-                    json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
-                )
-            }
-        };
+        let base_config = try_response!(load_merged_config(&resolver));
 
         let config = match crate::storage::TaskId::parse(payload.id.trim()) {
             Ok(parsed) => resolution::get_project_config(
@@ -521,12 +469,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         "POST",
         "/api/tasks/references/link/add",
         |req: &HttpRequest| {
-            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-            let payload: crate::api_types::LinkReferenceAddRequest =
-                match serde_json::from_value(body) {
-                    Ok(v) => v,
-                    Err(e) => return bad_request(format!("Invalid body: {}", e)),
-                };
+            let payload: crate::api_types::LinkReferenceAddRequest = try_response!(parse_body_or_empty(req));
 
             if payload.id.trim().is_empty() {
                 return bad_request("Missing task id".into());
@@ -535,10 +478,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 return bad_request("Missing url".into());
             }
 
-            let resolver = match TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-            };
+            let resolver = try_response!(resolve_tasks_dir());
 
             let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::attach_link_reference(&mut storage, &payload.id, &payload.url) {
@@ -565,11 +505,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     "POST",
     "/api/tasks/references/link/remove",
     |req: &HttpRequest| {
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: crate::api_types::LinkReferenceRemoveRequest = match serde_json::from_value(body) {
-            Ok(v) => v,
-            Err(e) => return bad_request(format!("Invalid body: {}", e)),
-        };
+        let payload: crate::api_types::LinkReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
             return bad_request("Missing task id".into());
@@ -578,10 +514,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("Missing url".into());
         }
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::detach_link_reference(&mut storage, &payload.id, &payload.url) {
@@ -608,12 +541,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         "POST",
         "/api/tasks/references/code/add",
         |req: &HttpRequest| {
-            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-            let payload: crate::api_types::CodeReferenceAddRequest =
-                match serde_json::from_value(body) {
-                    Ok(v) => v,
-                    Err(e) => return bad_request(format!("Invalid body: {}", e)),
-                };
+            let payload: crate::api_types::CodeReferenceAddRequest = try_response!(parse_body_or_empty(req));
 
             if payload.id.trim().is_empty() {
                 return bad_request("Missing task id".into());
@@ -622,10 +550,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 return bad_request("Missing code reference".into());
             }
 
-            let resolver = match TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-            };
+            let resolver = try_response!(resolve_tasks_dir());
             let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
                 Some(root) => root,
                 None => return bad_request("Unable to locate git repository".into()),
@@ -659,11 +584,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     "POST",
     "/api/tasks/references/code/remove",
     |req: &HttpRequest| {
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: crate::api_types::CodeReferenceRemoveRequest = match serde_json::from_value(body) {
-            Ok(v) => v,
-            Err(e) => return bad_request(format!("Invalid body: {}", e)),
-        };
+        let payload: crate::api_types::CodeReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
             return bad_request("Missing task id".into());
@@ -672,10 +593,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("Missing code reference".into());
         }
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::detach_code_reference(&mut storage, &payload.id, &payload.code) {
@@ -702,12 +620,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         "POST",
         "/api/tasks/references/file/add",
         |req: &HttpRequest| {
-            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-            let payload: crate::api_types::FileReferenceAddRequest =
-                match serde_json::from_value(body) {
-                    Ok(v) => v,
-                    Err(e) => return bad_request(format!("Invalid body: {}", e)),
-                };
+            let payload: crate::api_types::FileReferenceAddRequest = try_response!(parse_body_or_empty(req));
 
             if payload.id.trim().is_empty() {
                 return bad_request("Missing task id".into());
@@ -716,10 +629,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 return bad_request("Missing file path".into());
             }
 
-            let resolver = match TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-            };
+            let resolver = try_response!(resolve_tasks_dir());
             let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
                 Some(root) => root,
                 None => return bad_request("Unable to locate git repository".into()),
@@ -753,12 +663,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     "POST",
     "/api/tasks/references/file/remove",
     |req: &HttpRequest| {
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: crate::api_types::FileReferenceRemoveRequest =
-            match serde_json::from_value(body) {
-                Ok(v) => v,
-                Err(e) => return bad_request(format!("Invalid body: {}", e)),
-            };
+        let payload: crate::api_types::FileReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
             return bad_request("Missing task id".into());
@@ -767,10 +672,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("Missing file path".into());
         }
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
             Some(root) => root,
             None => return bad_request("Unable to locate git repository".into()),
@@ -801,12 +703,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/tasks/references/add
 
     api_server.register_handler("POST", "/api/tasks/references/add", |req: &HttpRequest| {
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: crate::api_types::GenericReferenceAddRequest =
-            match serde_json::from_value(body) {
-                Ok(v) => v,
-                Err(e) => return bad_request(format!("Invalid body: {}", e)),
-            };
+        let payload: crate::api_types::GenericReferenceAddRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
             return bad_request("Missing task id".into());
@@ -823,10 +720,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("Reference kind must be jira or github".into());
         }
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::attach_platform_reference(&mut storage,
@@ -855,12 +749,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     "POST",
     "/api/tasks/references/remove",
     |req: &HttpRequest| {
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: crate::api_types::GenericReferenceRemoveRequest =
-            match serde_json::from_value(body) {
-                Ok(v) => v,
-                Err(e) => return bad_request(format!("Invalid body: {}", e)),
-            };
+        let payload: crate::api_types::GenericReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
             return bad_request("Missing task id".into());
@@ -877,10 +766,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("Reference kind must be jira or github".into());
         }
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::detach_platform_reference(&mut storage,
@@ -907,10 +793,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/tasks/suggest?q=TEXT[&project=PREFIX][&limit=N]
 
     api_server.register_handler("GET", "/api/tasks/suggest", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let q = req.query.get("q").cloned().unwrap_or_default();
         let project = req.query.get("project").cloned();
@@ -929,11 +812,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/tasks/update
 
     api_server.register_handler("POST", "/api/tasks/update", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
@@ -960,11 +840,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/tasks/status { id, status }
 
     api_server.register_handler("POST", "/api/tasks/status", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
@@ -996,11 +873,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/tasks/comment { id, text }
 
     api_server.register_handler("POST", "/api/tasks/comment", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.is_empty() => s.to_string(),
@@ -1024,11 +898,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/tasks/comment/update { id, index, text }
 
     api_server.register_handler("POST", "/api/tasks/comment/update", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.is_empty() => s.to_string(),
@@ -1063,16 +934,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/tasks/delete {id, hard?=false}
 
     api_server.register_handler("POST", "/api/tasks/delete", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let payload: crate::api_types::TaskDeleteRequest = match serde_json::from_value(body) {
-            Ok(v) => v,
-            Err(e) => return bad_request(format!("Invalid body: {}", e)),
-        };
+        let payload: crate::api_types::TaskDeleteRequest = try_response!(parse_body_or_empty(req));
         if payload.id.trim().is_empty() {
             return bad_request("Missing id".into());
         }
@@ -1107,10 +971,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // POST /api/tasks/restore {id}[?project=PREFIX]
 
     api_server.register_handler("POST", "/api/tasks/restore", |req: &HttpRequest| {
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
@@ -1140,10 +1001,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return bad_request("Missing id".into()),
         };
-        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
-            Ok(paths) => paths,
-            Err(resp) => return resp,
-        };
+        let (repo_root, tasks_rel) = try_response!(resolve_repo_tasks_paths());
         // Derive project and numeric from the canonical ID parse
         let parsed = match crate::storage::TaskId::parse(&id) {
             Ok(parsed) => parsed,
@@ -1156,7 +1014,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             &repo_root, &file_rel,
         ) {
             Ok(v) => v,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            Err(e) => return internal_error(e),
         };
         if let Some(limit_s) = req.query.get("limit")
             && let Ok(limit) = limit_s.parse::<usize>()
@@ -1179,10 +1037,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return bad_request("Missing commit".into()),
         };
-        let (repo_root, tasks_rel) = match resolve_repo_tasks_paths() {
-            Ok(paths) => paths,
-            Err(resp) => return resp,
-        };
+        let (repo_root, tasks_rel) = try_response!(resolve_repo_tasks_paths());
         let parsed = match crate::storage::TaskId::parse(&id) {
             Ok(parsed) => parsed,
             Err(_) => return bad_request("Invalid task id".into()),
@@ -1194,7 +1049,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             &repo_root, &commit, &file_rel,
         ) {
             Ok(diff) => ok_json(200, json!({"data": diff})),
-            Err(e) => internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            Err(e) => internal_error(e),
         }
     });
 }

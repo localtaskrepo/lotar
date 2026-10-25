@@ -21,10 +21,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             .map(normalize)
             .unwrap_or(default_context);
         let after = parse_ctx("after").map(normalize).unwrap_or(default_context);
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
             Some(root) => root,
             None => return bad_request("Unable to locate git repository".into()),
@@ -57,10 +54,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             .unwrap_or(20);
         let limit = limit.clamp(1, 200);
 
-        let resolver = match TasksDirectoryResolver::resolve(None, None) {
-            Ok(r) => r,
-            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-        };
+        let resolver = try_response!(resolve_tasks_dir());
         let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
             Some(root) => root,
             None => return bad_request("Unable to locate git repository".into()),

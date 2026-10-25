@@ -1,0 +1,31 @@
+title: Share REST route handler boilerplate and unify error responses
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T00:19:57.974+00:00
+modified: 2026-10-25T00:36:32.791561+00:00
+comments:
+- date: 2026-10-25T00:36:32.762504+00:00
+  text: 'Outcome: shared route helpers in src/routes/mod.rs: try_response! macro (early return of Result<_, HttpResponse> in handlers), internal_error(msg), resolve_tasks_dir(), load_merged_config(&resolver), parse_body::<T>(req), parse_body_or_empty::<T>(req) and config_write_response(resolver, updated, validation); attachments.rs gains attachments_root/wants_download/attachment_response; activity.rs gains activity_window. Replaced 94 hand-built INTERNAL envelopes, 56 resolver blocks, 13 config-load blocks, ~30 body-parse blocks, the duplicated config/automation write tails and the duplicated attachment download logic. Net -510 lines in src/routes (404+/914-); jscpd route duplication 10.7% -> 5.6% (remaining clones are the sprint integrity flow, DEV-173, and sync push/pull, DEV-176). The error envelope shape was already uniform ({error:{code,message}}); approved behavior changes: sync and scan errors now go through map_lotar_error (typed 400/404/500, ValidationError messages without the ''Validation error:'' prefix); sync reports config-load failures return 500 instead of 400 (server-side, DEV-58; OpenAPI already lists 500); endpoints that previously treated malformed JSON as {} now return 400 ''Invalid body'' (only an empty body counts as {}). No REST success shapes changed, so api_types/TS/OpenAPI need no update. Evidence: clippy clean; test:rust:agent 1670/1670; smoke api specs 29/29; full gates run at the end of this batch. Guidance: no durable finding.'
+description: 'jscpd (DEV-164 tooling review) found the largest Rust duplication in src/routes: 56 copies of resolver/storage setup and ~190 hand-built JSON error envelopes despite helpers in routes/mod.rs. Add shared helpers (resolve tasks dir/storage, one error envelope builder) and use them everywhere. Developer approved JSON format changes (2026-10-25): unify error envelopes into one shape and keep src/api_types.rs, view/api/types.ts, docs/openapi.json and help docs in sync.'
+history:
+- at: 2026-10-25T00:20:02.249864+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T00:36:32.762504+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T00:36:32.791561+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
