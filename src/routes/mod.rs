@@ -11,10 +11,15 @@ use crate::services::sprint_velocity::{
     DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
 };
 use crate::services::{
-    attachment_service::AttachmentService, automation_service::AutomationService,
-    config_service::ConfigService, project_service::ProjectService,
-    reference_service::ReferenceService, scan_service::ScanService, sprint_service::SprintService,
-    sync_service::SyncService, task_service::TaskService,
+    attachment_service::AttachmentService,
+    automation_service::AutomationService,
+    config_service::ConfigService,
+    project_service::ProjectService,
+    reference_service::ReferenceService,
+    scan_service::ScanService,
+    sprint_service::SprintService,
+    sync_service::{SyncDirection, SyncOptions, SyncService},
+    task_service::TaskService,
 };
 use crate::storage::sprint::{Sprint, SprintCapacity, SprintPlan};
 use crate::workspace::TasksDirectoryResolver;

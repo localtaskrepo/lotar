@@ -1,6 +1,6 @@
 use super::super::{JsonRpcRequest, JsonRpcResponse, err, ok};
 use crate::errors::LoTaRError;
-use crate::services::sync_service::{SyncDirection, SyncService};
+use crate::services::sync_service::{SyncDirection, SyncOptions, SyncService};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::json;
 
@@ -50,30 +50,17 @@ fn handle_sync(req: JsonRpcRequest, direction: SyncDirection) -> JsonRpcResponse
         }
     };
 
-    let outcome = match direction {
-        SyncDirection::Pull => SyncService::pull(
-            &resolver,
-            &remote,
-            project,
-            dry_run,
-            auth_profile,
-            task_id,
-            write_report,
-            include_report,
-            client_run_id,
-        ),
-        SyncDirection::Push => SyncService::push(
-            &resolver,
-            &remote,
-            project,
-            dry_run,
-            auth_profile,
-            task_id,
-            write_report,
-            include_report,
-            client_run_id,
-        ),
+    let options = SyncOptions {
+        remote: &remote,
+        project,
+        dry_run,
+        auth_profile,
+        task_id,
+        write_report,
+        include_report,
+        client_run_id,
     };
+    let outcome = SyncService::run(&resolver, direction, options);
 
     match outcome {
         Ok(result) => {

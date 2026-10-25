@@ -222,15 +222,19 @@ fn run_push(
     let mut recorder = new_recorder(dry_run);
     let mut warnings = Vec::new();
     perform_push(
-        resolver,
-        remote,
+        SyncTarget {
+            resolver,
+            remote,
+            task_id,
+            dry_run,
+        },
         Some("TEST"),
-        task_id,
-        dry_run,
         client.as_ref(),
-        &mut recorder,
-        &mut warnings,
-        &mut journal,
+        SyncSinks {
+            recorder: &mut recorder,
+            warnings: &mut warnings,
+            journal: &mut journal,
+        },
     )
     .unwrap();
     let host = server.map(|s| s.address.to_string()).unwrap_or_default();

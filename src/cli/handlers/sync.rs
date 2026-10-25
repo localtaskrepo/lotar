@@ -1,7 +1,7 @@
 use crate::cli::args::{SyncArgs, SyncCheckArgs};
 use crate::cli::project::ProjectResolver;
 use crate::output::{OutputFormat, OutputRenderer};
-use crate::services::sync_service::{SyncDirection, SyncService};
+use crate::services::sync_service::{SyncDirection, SyncOptions, SyncService};
 use crate::workspace::TasksDirectoryResolver;
 
 pub struct SyncHandler;
@@ -36,31 +36,15 @@ impl SyncHandler {
             }
         };
 
-        let result = match direction {
-            SyncDirection::Push => SyncService::push(
-                resolver,
-                &args.remote,
-                project_prefix.as_deref(),
-                args.dry_run,
-                args.auth_profile.as_deref(),
-                args.task_id.as_deref(),
-                None,
-                false,
-                None,
-            ),
-            SyncDirection::Pull => SyncService::pull(
-                resolver,
-                &args.remote,
-                project_prefix.as_deref(),
-                args.dry_run,
-                args.auth_profile.as_deref(),
-                args.task_id.as_deref(),
-                None,
-                false,
-                None,
-            ),
-        }
-        .map_err(|e| e.to_string())?;
+        let options = SyncOptions {
+            remote: &args.remote,
+            project: project_prefix.as_deref(),
+            dry_run: args.dry_run,
+            auth_profile: args.auth_profile.as_deref(),
+            task_id: args.task_id.as_deref(),
+            ..SyncOptions::default()
+        };
+        let result = SyncService::run(resolver, direction, options).map_err(|e| e.to_string())?;
 
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&result);

@@ -1,49 +1,19 @@
 use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
-    api_server.register_handler("POST", "/api/sync/pull", |req: &HttpRequest| {
-        let resolver = try_response!(resolve_tasks_dir());
-
-        let payload: SyncRequest = try_response!(parse_body_or_empty(req));
-
-        match SyncService::pull(
-            &resolver,
-            &payload.remote,
-            payload.project.as_deref(),
-            payload.dry_run,
-            payload.auth_profile.as_deref(),
-            payload.task_id.as_deref(),
-            payload.write_report,
-            payload.include_report.unwrap_or(false),
-            payload.client_run_id.as_deref(),
-        ) {
-            Ok(result) => ok_json(200, json!({"data": result})),
-            Err(err) => map_lotar_error(err),
-        }
-    });
-
-    // POST /api/sync/push
-
-    api_server.register_handler("POST", "/api/sync/push", |req: &HttpRequest| {
-        let resolver = try_response!(resolve_tasks_dir());
-
-        let payload: SyncRequest = try_response!(parse_body_or_empty(req));
-
-        match SyncService::push(
-            &resolver,
-            &payload.remote,
-            payload.project.as_deref(),
-            payload.dry_run,
-            payload.auth_profile.as_deref(),
-            payload.task_id.as_deref(),
-            payload.write_report,
-            payload.include_report.unwrap_or(false),
-            payload.client_run_id.as_deref(),
-        ) {
-            Ok(result) => ok_json(200, json!({"data": result})),
-            Err(err) => map_lotar_error(err),
-        }
-    });
+    for (path, direction) in [
+        ("/api/sync/pull", SyncDirection::Pull),
+        ("/api/sync/push", SyncDirection::Push),
+    ] {
+        api_server.register_handler("POST", path, move |req: &HttpRequest| {
+            let resolver = try_response!(resolve_tasks_dir());
+            let payload: SyncRequest = try_response!(parse_body_or_empty(req));
+            match SyncService::run(&resolver, direction, SyncOptions::from(&payload)) {
+                Ok(result) => ok_json(200, json!({"data": result})),
+                Err(err) => map_lotar_error(err),
+            }
+        });
+    }
 
     // POST /api/sync/validate
 

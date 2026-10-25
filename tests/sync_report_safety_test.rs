@@ -107,14 +107,15 @@ fn sync_push_dry_run_does_not_persist_even_when_reports_requested() {
     let before = std::fs::read_dir(root.path()).unwrap().count();
     let response = lotar::services::sync_service::SyncService::push(
         &resolver,
-        "origin",
-        Some("TEST"),
-        true,
-        None,
-        None,
-        Some(true),
-        true,
-        Some("../../dry"),
+        lotar::services::sync_service::SyncOptions {
+            remote: "origin",
+            project: Some("TEST"),
+            dry_run: true,
+            write_report: Some(true),
+            include_report: true,
+            client_run_id: Some("../../dry"),
+            ..Default::default()
+        },
     )
     .unwrap();
     assert!(response.report.unwrap().stored_path.is_none());

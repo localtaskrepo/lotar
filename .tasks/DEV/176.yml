@@ -1,0 +1,37 @@
+title: Refactor sync_service into focused modules with an options struct
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T00:19:58.122479+00:00
+modified: 2026-10-25T01:50:19.402028+00:00
+comments:
+- date: 2026-10-25T01:21:59.858563+00:00
+  text: 'Progress: SyncOptions (pub, From<&SyncRequest>) replaces the 9-arg push/pull/run; SyncTarget+SyncSinks replace perform_push/perform_pull''s 9 args; all 5 too_many_arguments expects removed. REST registers one handler for push+pull via SyncService::run. File split into sync_service/{mod,report,journal,client,jira,github,mapping,push,pull}.rs mechanically (items moved verbatim, pub(super)); clippy clean, sync tests 51/51. Next: coverage-guided tests for client/auth, jira/github helpers, run() error paths.'
+- date: 2026-10-25T01:50:19.357965+00:00
+  text: 'Done. Added pub SyncOptions (From<&SyncRequest>); push/pull/run take it, REST registers one handler for both directions, CLI/MCP call SyncService::run. perform_push/perform_pull take SyncTarget + SyncSinks; all 5 too_many_arguments expectations removed (the ticket''s ''6'' counted one twice). Split sync_service.rs (4.7k lines) into sync_service/{mod,report,journal,client,jira,github,mapping,push,pull}.rs by moving items verbatim (pub(super)); no behavior changes. Added test_support.rs (routed mock HTTP API) and provider_tests.rs (20 tests: entry-point validation, auth profiles, HTTP error mapping, GitHub search paging/PR skipping/fetch fallback, Jira transitions, Jira user lookup+cache, ADF, account ids, issue type fallback, targeted pull dry-run/apply/no-op/reference errors). Sync line coverage 66.2% -> 78.3%. Verified: npm run lint:agent, test:agent (1690 Rust + 1145 UI), smoke 341/343 with 2 known load flakes (DEV-170) passing in isolation. Follow-up idea: mapping.rs (~1.4k lines) could split references/field readers further; sync_retry_cases.rs could reuse test_support::MockApi.'
+description: src/services/sync_service.rs is ~4,700 lines with 6 too_many_arguments expectations (push/pull/run/perform_push/perform_pull) and ~1,370 uncovered lines. Introduce a sync options struct shared by CLI/REST/MCP, split push/pull/report/provider mapping into modules, remove the expectations, and add tests for the uncovered paths without changing sync behavior.
+history:
+- at: 2026-10-25T01:21:59.764912+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T01:21:59.858563+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T01:50:19.357965+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T01:50:19.402028+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

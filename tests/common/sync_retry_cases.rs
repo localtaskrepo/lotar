@@ -171,27 +171,35 @@ fn sync_creation_link_failure_recovers_once_both_providers_and_directions() {
             FAIL_SYNC_LINK.set(true);
             match direction {
                 SyncDirection::Push => perform_push(
-                    &resolver,
-                    &remote,
+                    SyncTarget {
+                        resolver: &resolver,
+                        remote: &remote,
+                        task_id: task.as_ref().map(|t| t.id.as_str()),
+                        dry_run: false,
+                    },
                     Some("TEST"),
-                    task.as_ref().map(|t| t.id.as_str()),
-                    false,
                     Some(&client),
-                    &mut first,
-                    &mut vec![],
-                    &mut journal,
+                    SyncSinks {
+                        recorder: &mut first,
+                        warnings: &mut vec![],
+                        journal: &mut journal,
+                    },
                 )
                 .unwrap(),
                 SyncDirection::Pull => perform_pull(
-                    &resolver,
-                    &remote,
+                    SyncTarget {
+                        resolver: &resolver,
+                        remote: &remote,
+                        task_id: None,
+                        dry_run: false,
+                    },
                     "TEST",
-                    None,
-                    false,
                     &client,
-                    &mut first,
-                    &mut vec![],
-                    &mut journal,
+                    SyncSinks {
+                        recorder: &mut first,
+                        warnings: &mut vec![],
+                        journal: &mut journal,
+                    },
                 )
                 .unwrap(),
             }
@@ -216,40 +224,52 @@ fn sync_creation_link_failure_recovers_once_both_providers_and_directions() {
             let mut second = recorder(direction, false);
             match direction {
                 SyncDirection::Push => perform_push(
-                    &resolver,
-                    &remote,
+                    SyncTarget {
+                        resolver: &resolver,
+                        remote: &remote,
+                        task_id: Some(retry_alias),
+                        dry_run: false,
+                    },
                     Some("TEST"),
-                    Some(retry_alias),
-                    false,
                     Some(&client),
-                    &mut second,
-                    &mut vec![],
-                    &mut journal,
+                    SyncSinks {
+                        recorder: &mut second,
+                        warnings: &mut vec![],
+                        journal: &mut journal,
+                    },
                 )
                 .unwrap(),
                 SyncDirection::Pull => {
                     perform_pull(
-                        &resolver,
-                        &remote,
+                        SyncTarget {
+                            resolver: &resolver,
+                            remote: &remote,
+                            task_id: Some(retry_alias),
+                            dry_run: false,
+                        },
                         "TEST",
-                        Some(retry_alias),
-                        false,
                         &client,
-                        &mut second,
-                        &mut vec![],
-                        &mut journal,
+                        SyncSinks {
+                            recorder: &mut second,
+                            warnings: &mut vec![],
+                            journal: &mut journal,
+                        },
                     )
                     .unwrap();
                     perform_pull(
-                        &resolver,
-                        &remote,
+                        SyncTarget {
+                            resolver: &resolver,
+                            remote: &remote,
+                            task_id: None,
+                            dry_run: false,
+                        },
                         "TEST",
-                        None,
-                        false,
                         &client,
-                        &mut second,
-                        &mut vec![],
-                        &mut journal,
+                        SyncSinks {
+                            recorder: &mut second,
+                            warnings: &mut vec![],
+                            journal: &mut journal,
+                        },
                     )
                     .unwrap();
                 }
@@ -292,15 +312,19 @@ fn sync_ambiguous_remote_success_is_persisted_and_fails_closed() {
         let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
         let mut warnings = vec![];
         perform_push(
-            &resolver,
-            &remote,
+            SyncTarget {
+                resolver: &resolver,
+                remote: &remote,
+                task_id: Some(&task.id),
+                dry_run: false,
+            },
             Some("TEST"),
-            Some(&task.id),
-            false,
             Some(&client),
-            &mut recorder(SyncDirection::Push, false),
-            &mut warnings,
-            &mut journal,
+            SyncSinks {
+                recorder: &mut recorder(SyncDirection::Push, false),
+                warnings: &mut warnings,
+                journal: &mut journal,
+            },
         )
         .unwrap();
         assert!(warnings.iter().any(|s| s.contains("Indeterminate")));
@@ -363,27 +387,35 @@ fn sync_dry_run_never_writes_journal_tasks_or_remote() {
             let mut report = recorder(direction, true);
             match direction {
                 SyncDirection::Push => perform_push(
-                    &resolver,
-                    &remote,
+                    SyncTarget {
+                        resolver: &resolver,
+                        remote: &remote,
+                        task_id: None,
+                        dry_run: true,
+                    },
                     Some("TEST"),
                     None,
-                    true,
-                    None,
-                    &mut report,
-                    &mut vec![],
-                    &mut journal,
+                    SyncSinks {
+                        recorder: &mut report,
+                        warnings: &mut vec![],
+                        journal: &mut journal,
+                    },
                 )
                 .unwrap(),
                 SyncDirection::Pull => perform_pull(
-                    &resolver,
-                    &remote,
+                    SyncTarget {
+                        resolver: &resolver,
+                        remote: &remote,
+                        task_id: None,
+                        dry_run: true,
+                    },
                     "TEST",
-                    None,
-                    true,
                     &client,
-                    &mut report,
-                    &mut vec![],
-                    &mut journal,
+                    SyncSinks {
+                        recorder: &mut report,
+                        warnings: &mut vec![],
+                        journal: &mut journal,
+                    },
                 )
                 .unwrap(),
             }
@@ -412,26 +444,34 @@ fn sync_returned_identity_journal_failure_never_recreates() {
             FAIL_SYNC_RESULT_SAVE.set(true);
             let result = match direction {
                 SyncDirection::Push => perform_push(
-                    &resolver,
-                    &remote,
+                    SyncTarget {
+                        resolver: &resolver,
+                        remote: &remote,
+                        task_id: None,
+                        dry_run: false,
+                    },
                     Some("TEST"),
-                    None,
-                    false,
                     Some(&client),
-                    &mut recorder(direction, false),
-                    &mut vec![],
-                    &mut journal,
+                    SyncSinks {
+                        recorder: &mut recorder(direction, false),
+                        warnings: &mut vec![],
+                        journal: &mut journal,
+                    },
                 ),
                 SyncDirection::Pull => perform_pull(
-                    &resolver,
-                    &remote,
+                    SyncTarget {
+                        resolver: &resolver,
+                        remote: &remote,
+                        task_id: None,
+                        dry_run: false,
+                    },
                     "TEST",
-                    None,
-                    false,
                     &client,
-                    &mut recorder(direction, false),
-                    &mut vec![],
-                    &mut journal,
+                    SyncSinks {
+                        recorder: &mut recorder(direction, false),
+                        warnings: &mut vec![],
+                        journal: &mut journal,
+                    },
                 ),
             };
             assert!(result.unwrap_err().to_string().contains("journal failure"));
@@ -527,28 +567,36 @@ fn sync_dry_recovery_preserves_journal_and_rejects_cross_scope_linking() {
         .reconcile(&resolver, &scope, Some("TEST"), Some(&task.id), &remote)
         .unwrap();
     perform_pull(
-        &resolver,
-        &remote,
+        SyncTarget {
+            resolver: &resolver,
+            remote: &remote,
+            task_id: Some(&task.id),
+            dry_run: true,
+        },
         "TEST",
-        Some(&task.id),
-        true,
         &client,
-        &mut recorder(SyncDirection::Pull, true),
-        &mut vec![],
-        &mut journal,
+        SyncSinks {
+            recorder: &mut recorder(SyncDirection::Pull, true),
+            warnings: &mut vec![],
+            journal: &mut journal,
+        },
     )
     .unwrap();
     let mut preview = recorder(SyncDirection::Pull, true);
     perform_pull(
-        &resolver,
-        &remote,
+        SyncTarget {
+            resolver: &resolver,
+            remote: &remote,
+            task_id: None,
+            dry_run: true,
+        },
         "TEST",
-        None,
-        true,
         &client,
-        &mut preview,
-        &mut vec![],
-        &mut journal,
+        SyncSinks {
+            recorder: &mut preview,
+            warnings: &mut vec![],
+            journal: &mut journal,
+        },
     )
     .unwrap();
     assert_eq!(preview.summary.created, 0);
@@ -585,15 +633,19 @@ fn sync_loaded_journal_and_new_intents_use_storage_identity() {
             "TEST-1"
         );
         perform_push(
-            &resolver,
-            &remote,
+            SyncTarget {
+                resolver: &resolver,
+                remote: &remote,
+                task_id: Some(alias),
+                dry_run: false,
+            },
             Some("TEST"),
-            Some(alias),
-            false,
             Some(&client),
-            &mut recorder(SyncDirection::Push, false),
-            &mut vec![],
-            &mut journal,
+            SyncSinks {
+                recorder: &mut recorder(SyncDirection::Push, false),
+                warnings: &mut vec![],
+                journal: &mut journal,
+            },
         )
         .unwrap();
         assert_eq!(journal.links[0].task_id.as_deref(), Some(task.id.as_str()));
@@ -685,15 +737,19 @@ fn sync_replacement_io_failure_preserves_all_pending_intents() {
         local_task(&resolver);
         let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
         perform_push(
-            &resolver,
-            &remote,
+            SyncTarget {
+                resolver: &resolver,
+                remote: &remote,
+                task_id: None,
+                dry_run: false,
+            },
             Some("TEST"),
-            None,
-            false,
             Some(&client),
-            &mut recorder(SyncDirection::Push, false),
-            &mut vec![],
-            &mut journal,
+            SyncSinks {
+                recorder: &mut recorder(SyncDirection::Push, false),
+                warnings: &mut vec![],
+                journal: &mut journal,
+            },
         )
         .unwrap();
         assert_eq!(journal.links.len(), 2);

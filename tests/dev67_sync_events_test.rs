@@ -46,14 +46,15 @@ fn dry_run_push(
 ) -> lotar::api_types::SyncResponse {
     lotar::services::sync_service::SyncService::push(
         &resolver(root),
-        "origin",
-        project,
-        true,
-        None,
-        None,
-        Some(false),
-        true,
-        Some(run_id),
+        lotar::services::sync_service::SyncOptions {
+            remote: "origin",
+            project,
+            dry_run: true,
+            write_report: Some(false),
+            include_report: true,
+            client_run_id: Some(run_id),
+            ..Default::default()
+        },
     )
     .unwrap()
 }
