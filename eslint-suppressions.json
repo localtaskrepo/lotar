@@ -156,7 +156,7 @@
   },
   "view/pages/SprintsList.vue": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 25
+      "count": 21
     }
   },
   "view/pages/SyncHub.vue": {

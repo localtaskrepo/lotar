@@ -1,0 +1,30 @@
+title: Move SprintsList and SyncHub logic into tested helper modules
+status: Done
+priority: Low
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-25T08:09:54.566049+00:00
+modified: 2026-10-25T15:57:40.635267+00:00
+comments:
+- date: 2026-10-25T08:17:53.578927+00:00
+  text: 'SprintsList (3811 -> ~3440 lines): duration/date/membership/paging helpers moved to view/utils/sprintPlanning.ts; create/edit form state, start/end/length sync and create/update payloads moved to composables/useSprintForm.ts (also removed 4 ''any'' suppressions). SyncHub (2291 -> ~2170 lines): remote/mapping helpers and a pure buildRemoteConfig moved to view/utils/syncRemotes.ts. New specs: sprintPlanning.spec.ts (8), syncRemotes.spec.ts (3). Verified: lint, all Rust (1692) and UI (1192) tests, full smoke (346). Note: a plan length added across a DST change lands an hour off (pre-existing, unchanged).'
+- date: 2026-10-25T15:57:40.635267+00:00
+  text: 'Fixed the DST bug found during the refactor: the sprint form added plan lengths as fixed milliseconds, so ''1w'' from 09:00 ended at 10:00 across a clock change, and a 4-week date span read as ''3w 6d 23h''. New addPlanLength/planLengthBetween in view/utils/sprintPlanning.ts count weeks/days on the local calendar and only hours/minutes as elapsed time (also handles 25-hour days). Tests cross the US and EU March changes; verified under America/Los_Angeles, Europe/Berlin, Australia/Sydney and UTC. Gates: lint, 1692 Rust + 1196 UI tests, 346 smoke. Not changed: the server computes an end from start + plan length (only when no end date is stored, e.g. CLI/MCP with --length) in fixed 24h days, since it has no user timezone.'
+history:
+- at: 2026-10-25T08:17:53.578927+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T08:17:53.610640+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T15:57:40.635267+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -439,12 +439,10 @@
 <script setup lang="ts">
 import PageHeader from '../components/PageHeader.vue'
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
+import { stringify as stringifyYaml } from 'yaml'
 import { api } from '../api/client'
 import type {
   ConfigInspectResult,
-  SyncFieldMapping,
-  SyncProvider,
   SyncRemoteConfig,
   SyncReport,
   SyncReportEntry,
@@ -472,6 +470,18 @@ import {
   type SyncScope,
 } from '../composables/useSyncRuns'
 import { formatProjectLabel } from '../utils/projectLabels'
+import {
+  buildRemoteConfig,
+  formatMapping,
+  formatMappingErrors,
+  hasValue,
+  parseMappingInput,
+  remoteDefFromForm,
+  remoteProviderIcon,
+  remoteProviderLabel,
+  validateMapping,
+  type RemoteFormState,
+} from '../utils/syncRemotes'
 
 const { projects, project } = useConfigScope()
 const { openTaskPanel } = useTaskPanelController()
@@ -538,15 +548,6 @@ const remoteEntries = computed(() =>
 // ---- Remote editor ----------------------------------------------------------
 
 type RemoteDialogMode = 'add' | 'edit'
-type RemoteFormState = {
-  name: string
-  provider: SyncProvider
-  project: string
-  repo: string
-  filter: string
-  auth_profile: string
-  mapping: string
-}
 
 const remoteDialogOpen = ref(false)
 const remoteDialogMode = ref<RemoteDialogMode>('add')
@@ -657,26 +658,6 @@ const dialogTargetBanner = computed(() => {
   return `Saves the remote in ${dialogTargetLabel.value} config.`
 })
 
-function hasValue(value?: string | null): boolean {
-  return String(value ?? '').trim().length > 0
-}
-
-function remoteProviderIcon(remote: SyncRemoteConfig): 'jira' | 'github' | 'list' {
-  if (remote.provider === 'jira') return 'jira'
-  if (remote.provider === 'github') return 'github'
-  return 'list'
-}
-
-function remoteProviderLabel(remote: SyncRemoteConfig): string {
-  if (remote.provider === 'jira') {
-    return remote.project?.trim() || 'Jira'
-  }
-  if (remote.provider === 'github') {
-    return remote.repo?.trim() || 'GitHub'
-  }
-  return String(remote.provider)
-}
-
 function resetRemoteForm() {
   remoteForm.value = {
     name: '',
@@ -742,17 +723,6 @@ function openEditRemoteDialog(entry: { name: string; remote: SyncRemoteConfig; o
   remoteDialogOpen.value = true
 }
 
-function remoteDefFromForm(remote: SyncRemoteConfig): SyncRemoteConfig {
-  return {
-    provider: remote.provider,
-    project: remote.project ?? null,
-    repo: remote.repo ?? null,
-    filter: remote.filter ?? null,
-    auth_profile: remote.auth_profile ?? null,
-    mapping: remote.mapping ?? {},
-  }
-}
-
 function chooseDialogTarget(target: 'override-project' | 'inherit-global') {
   dialogTargetScope.value = target === 'override-project' ? scope.value : ''
   dialogNeedsTargetChoice.value = false
@@ -768,58 +738,6 @@ function closeRemoteDialog() {
   dialogNeedsTargetChoice.value = false
 }
 
-function formatMapping(mapping?: Record<string, SyncFieldMapping>): string {
-  if (!mapping || Object.keys(mapping).length === 0) return ''
-  return stringifyYaml(mapping).trim()
-}
-
-function parseMappingInput(value: string): Record<string, SyncFieldMapping> | null {
-  const trimmed = value.trim()
-  if (!trimmed) return {}
-  try {
-    const parsed = parseYaml(trimmed)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-    return parsed as Record<string, SyncFieldMapping>
-  } catch {
-    return null
-  }
-}
-
-function buildRemoteConfigFromForm(): { config: SyncRemoteConfig | null; errors: string[] } {
-  const errors: string[] = []
-  const provider = remoteForm.value.provider
-  const projectValue = remoteForm.value.project.trim()
-  const repoValue = remoteForm.value.repo.trim()
-
-  if (provider === 'jira' && !projectValue) {
-    errors.push('Jira project key is required.')
-  }
-  if (provider === 'github' && !repoValue) {
-    errors.push('GitHub repository is required.')
-  }
-
-  const mapping = parseMappingInput(remoteForm.value.mapping)
-  if (mapping === null) {
-    errors.push('Mapping must be valid YAML.')
-    return { config: null, errors }
-  }
-
-  const mappingErrors = validateMapping(mapping)
-  errors.push(...mappingErrors)
-  if (errors.length) return { config: null, errors }
-
-  const config: SyncRemoteConfig = {
-    provider,
-    project: provider === 'jira' ? projectValue || null : null,
-    repo: provider === 'github' ? repoValue || null : null,
-    filter: remoteForm.value.filter.trim() || null,
-    auth_profile: remoteForm.value.auth_profile.trim() || null,
-    mapping: Object.keys(mapping).length ? mapping : {},
-  }
-
-  return { config, errors }
-}
-
 const mappingRows = computed(() => {
   const lines = remoteForm.value.mapping.split('\n').length
   return Math.min(Math.max(lines + 2, 8), 18)
@@ -832,57 +750,6 @@ const mappingErrors = computed(() => {
 })
 
 const mappingErrorPreview = computed(() => mappingErrors.value.slice(0, 3))
-
-function validateMapping(mapping: Record<string, SyncFieldMapping>): string[] {
-  const errors: string[] = []
-  const allowedKeys = new Set(['field', 'values', 'set', 'default', 'add', 'when_empty'])
-  for (const [localField, value] of Object.entries(mapping)) {
-    if (!localField.trim()) {
-      errors.push('Mapping keys cannot be empty.')
-      continue
-    }
-    if (typeof value === 'string') {
-      continue
-    }
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      errors.push(`Mapping for ${localField} must be a string or mapping.`)
-      continue
-    }
-    const detail = value as Record<string, unknown>
-    for (const key of Object.keys(detail)) {
-      if (!allowedKeys.has(key)) {
-        errors.push(`Mapping for ${localField} has unsupported key '${key}'.`)
-      }
-    }
-    if (detail.values && (typeof detail.values !== 'object' || Array.isArray(detail.values))) {
-      errors.push(`Mapping for ${localField} values must be a key/value object.`)
-    }
-    if (detail.values && typeof detail.values === 'object' && !Array.isArray(detail.values)) {
-      for (const [mapKey, mapValue] of Object.entries(detail.values)) {
-        if (!String(mapKey).trim() || typeof mapValue !== 'string') {
-          errors.push(`Mapping for ${localField} values must map strings to strings.`)
-          break
-        }
-      }
-    }
-    if (detail.add && !Array.isArray(detail.add)) {
-      errors.push(`Mapping for ${localField} add must be a list of strings.`)
-    }
-    if (Array.isArray(detail.add) && detail.add.some((item) => typeof item !== 'string')) {
-      errors.push(`Mapping for ${localField} add must be a list of strings.`)
-    }
-    if (detail.when_empty && detail.when_empty !== 'skip' && detail.when_empty !== 'clear') {
-      errors.push(`Mapping for ${localField} when_empty must be 'skip' or 'clear'.`)
-    }
-  }
-  return errors
-}
-
-function formatMappingErrors(errors: string[]): string {
-  const preview = errors.slice(0, 3)
-  if (errors.length <= preview.length) return preview.join(' ')
-  return `${preview.join(' ')} (${errors.length - preview.length} more)`
-}
 
 /**
  * Fresh inspect of the CAPTURED target scope right before writing; merges the
@@ -908,7 +775,7 @@ async function submitRemoteDialog() {
     return
   }
 
-  const { config, errors } = buildRemoteConfigFromForm()
+  const { config, errors } = buildRemoteConfig(remoteForm.value)
   if (!config || errors.length) {
     remoteFormError.value = formatMappingErrors(errors)
     return
@@ -1047,7 +914,7 @@ async function validateRemoteDialog() {
   remoteDialogValidationStatus.value = 'idle'
   remoteDialogValidationMessage.value = null
 
-  const { config, errors } = buildRemoteConfigFromForm()
+  const { config, errors } = buildRemoteConfig(remoteForm.value)
   if (!config || errors.length) {
     remoteFormError.value = formatMappingErrors(errors)
     return

@@ -787,7 +787,6 @@ import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type {
   SprintBurndownResponse,
-  SprintCreateRequest,
   SprintListItem,
   SprintSummaryReportResponse,
   SprintUpdateRequest,
@@ -818,16 +817,21 @@ import { useColumnDragReorder } from '../composables/useColumnDragReorder'
 import { ensureCompletionPolicies, useCompletionPolicy } from '../composables/useCompletionPolicy'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
+import { useSprintForm } from '../composables/useSprintForm'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import {
-  MS_PER_DAY,
-  formatRelativeTime,
-  fromDateTimeInputValue,
-  parseTaskDate,
-  safeTimestamp,
-  toDateTimeInputValue,
-} from '../utils/date'
+import { MS_PER_DAY, formatRelativeTime, parseTaskDate, safeTimestamp } from '../utils/date'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
+import {
+  formatElapsedDuration,
+  normalizeSprintMembership,
+  normalizeTaskRecord,
+  clampPageOffset,
+  pageOffset,
+  pageSlice,
+  parseDurationToMs,
+  sprintMembershipMatches,
+  toTrimmedString,
+} from '../utils/sprintPlanning'
 import { projectOf } from '../utils/text'
 import { colKeyToSortBy, compareTaskIds, sortTasks as sortTasksByContract } from '../utils/taskSort'
 import {
@@ -874,42 +878,6 @@ const allColumns: ColumnKey[] = [
 ]
 
 const defaultColumns: ColumnKey[] = ['id', 'title', 'status', 'priority', 'assignee', 'due_date', 'modified']
-
-function normalizeSprintMembership(raw: unknown): number[] {
-  if (!Array.isArray(raw)) return []
-  const seen = new Set<number>()
-  const values: number[] = []
-  for (const entry of raw) {
-    const parsed = typeof entry === 'number' ? entry : Number(entry)
-    if (!Number.isFinite(parsed) || parsed <= 0 || seen.has(parsed)) continue
-    seen.add(parsed)
-    values.push(parsed)
-  }
-  values.sort((a, b) => a - b)
-  return values
-}
-
-function normalizeTaskRecord(task: TaskDTO): TaskDTO {
-  const tags = Array.isArray((task as any).tags) ? [...(task.tags as string[])] : []
-  const sprints = normalizeSprintMembership((task as any).sprints)
-  return {
-    ...task,
-    tags,
-    sprints,
-  }
-}
-
-function sprintMembershipMatches(previous: TaskDTO | null | undefined, next: TaskDTO): boolean {
-  const prevMembership = normalizeSprintMembership(previous ? (previous as any).sprints : undefined)
-  const nextMembership = normalizeSprintMembership((next as any).sprints)
-  if (prevMembership.length !== nextMembership.length) return false
-  for (let index = 0; index < prevMembership.length; index += 1) {
-    if (prevMembership[index] !== nextMembership[index]) {
-      return false
-    }
-  }
-  return true
-}
 
 function loadStoredSort(): { key: ColumnKey | null; dir: 'asc' | 'desc' } | null {
   const parsed = storageGetJson<{ key?: ColumnKey; dir?: 'asc' | 'desc' }>(sortStorageKey)
@@ -1022,18 +990,7 @@ const submitting = ref(false)
 const firstField = ref<HTMLInputElement | null>(null)
 const backlogRef = ref<ComponentPublicInstance | null>(null)
 
-const form = reactive({
-  label: '',
-  goal: '',
-  plan_length: '',
-  ends_at: '',
-  starts_at: '',
-  capacity_points: '',
-  capacity_hours: '',
-  overdue_after: '',
-  notes: '',
-  skip_defaults: false,
-})
+const { form, resetForm, fillFormFromSprint, createPayload, updatePayload } = useSprintForm()
 const filter = ref<Record<string, string>>(typeof route.query.q === 'string' ? { q: route.query.q } : {})
 // Initialize from the route at setup so the FilterBar's first emit echoes the
 // real project instead of a transient empty value that would strip ?project=
@@ -1574,31 +1531,12 @@ const backlogTotalCount = computed(() => sortedBacklogTasks.value.length)
 const backlogPageStart = computed(() => (backlogTotalCount.value ? backlogOffset.value + 1 : 0))
 const backlogPageEnd = computed(() => Math.min(backlogOffset.value + tasksPageSize.value, backlogTotalCount.value))
 
-const pagedBacklogTasks = computed(() => {
-  if (backlogOffset.value === 0 && backlogTotalCount.value <= tasksPageSize.value) {
-    return sortedBacklogTasks.value
-  }
-  return sortedBacklogTasks.value.slice(backlogOffset.value, backlogOffset.value + tasksPageSize.value)
-})
+const pagedBacklogTasks = computed(() => pageSlice(sortedBacklogTasks.value, backlogOffset.value, tasksPageSize.value))
 
 let stopPreferencesListener: (() => void) | null = null
 
-function pageOffsetFor(total: number, page: number): number {
-  const size = Math.max(1, tasksPageSize.value)
-  const pageCount = Math.max(1, Math.ceil(Math.max(0, total) / size))
-  const clamped = Math.max(1, Math.min(page, pageCount))
-  return (clamped - 1) * size
-}
-
 function clampBacklogOffset() {
-  const size = Math.max(1, tasksPageSize.value)
-  const total = backlogTotalCount.value
-  if (total <= 0) {
-    backlogOffset.value = 0
-    return
-  }
-  const maxOffset = Math.max(0, Math.floor((total - 1) / size) * size)
-  backlogOffset.value = Math.min(Math.max(0, backlogOffset.value), maxOffset)
+  backlogOffset.value = clampPageOffset(backlogOffset.value, backlogTotalCount.value, tasksPageSize.value)
 }
 
 function sprintTaskOffset(id: number): number {
@@ -1606,23 +1544,17 @@ function sprintTaskOffset(id: number): number {
 }
 
 function goToBacklogPage(page: number) {
-  backlogOffset.value = pageOffsetFor(backlogTotalCount.value, page)
+  backlogOffset.value = pageOffset(backlogTotalCount.value, page, tasksPageSize.value)
 }
 
 function goToSprintPage(id: number, page: number) {
-  sprintTaskOffsets[id] = pageOffsetFor(getSortedTasksForSprint(id).length, page)
+  sprintTaskOffsets[id] = pageOffset(getSortedTasksForSprint(id).length, page, tasksPageSize.value)
 }
 
 // The slice happens AFTER getSortedTasksForSprint, so ordering, membership,
 // drag semantics, and multi-sprint participation are untouched by paging.
 function getPagedTasksForSprint(id: number): TaskDTO[] {
-  const size = Math.max(1, tasksPageSize.value)
-  const offset = sprintTaskOffset(id)
-  const sorted = getSortedTasksForSprint(id)
-  if (offset === 0 && sorted.length <= size) {
-    return sorted
-  }
-  return sorted.slice(offset, offset + size)
+  return pageSlice(getSortedTasksForSprint(id), sprintTaskOffset(id), tasksPageSize.value)
 }
 
 function resetAllPagingOffsets() {
@@ -1635,7 +1567,6 @@ function resetAllPagingOffsets() {
 // Clamp when arrays shrink (e.g. the last page was deleted) and evict offsets
 // whose sprint no longer has any tasks.
 function clampSprintOffsets() {
-  const size = Math.max(1, tasksPageSize.value)
   Object.entries(sprintTaskOffsets).forEach(([key, offset]) => {
     const id = Number(key)
     const total = getSortedTasksForSprint(id).length
@@ -1643,10 +1574,8 @@ function clampSprintOffsets() {
       delete sprintTaskOffsets[id]
       return
     }
-    const maxOffset = Math.max(0, Math.floor((total - 1) / size) * size)
-    if (offset > maxOffset) {
-      sprintTaskOffsets[id] = maxOffset
-    }
+    const clamped = clampPageOffset(offset, total, tasksPageSize.value)
+    if (clamped !== offset) sprintTaskOffsets[id] = clamped
   })
 }
 
@@ -1832,238 +1761,8 @@ watch(
   },
 )
 
-let updatingLengthFromDates = false
-let updatingEndFromLength = false
-
-watch(
-  () => [form.starts_at, form.ends_at] as const,
-  ([startValue, endValue]) => {
-    if (updatingEndFromLength) return
-    const startTs = dateTimeInputToTimestamp(startValue)
-    const endTs = dateTimeInputToTimestamp(endValue)
-    if (startTs === null || endTs === null) {
-      return
-    }
-    if (endTs <= startTs) {
-      if (!updatingLengthFromDates && form.plan_length) {
-        updatingLengthFromDates = true
-        try {
-          form.plan_length = ''
-        } finally {
-          updatingLengthFromDates = false
-        }
-      }
-      return
-    }
-    const formatted = formatDurationForPlanLength(endTs - startTs)
-    if (!formatted || form.plan_length === formatted) {
-      return
-    }
-    updatingLengthFromDates = true
-    try {
-      form.plan_length = formatted
-    } finally {
-      updatingLengthFromDates = false
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  () => form.plan_length,
-  (value) => {
-    if (updatingLengthFromDates) return
-    const startTs = dateTimeInputToTimestamp(form.starts_at)
-    if (startTs === null) {
-      return
-    }
-    const durationMs = parseDurationToMs(value)
-    if (durationMs === null || durationMs <= 0) {
-      return
-    }
-    const newEndInput = timestampToDateTimeInput(startTs + durationMs)
-    if (!newEndInput || form.ends_at === newEndInput) {
-      return
-    }
-    updatingEndFromLength = true
-    try {
-      form.ends_at = newEndInput
-    } finally {
-      updatingEndFromLength = false
-    }
-  },
-)
-
-watch(
-  () => form.starts_at,
-  (value) => {
-    if (!value || form.ends_at || updatingEndFromLength) {
-      return
-    }
-    const durationMs = parseDurationToMs(form.plan_length)
-    if (durationMs === null || durationMs <= 0) {
-      return
-    }
-    const startTs = dateTimeInputToTimestamp(value)
-    if (startTs === null) {
-      return
-    }
-    const newEndInput = timestampToDateTimeInput(startTs + durationMs)
-    if (!newEndInput) {
-      return
-    }
-    updatingEndFromLength = true
-    try {
-      form.ends_at = newEndInput
-    } finally {
-      updatingEndFromLength = false
-    }
-  },
-)
-
 function clearFilters() {
   clearFiltersAction(filterBarRef)
-}
-
-function toStringValue(value: unknown) {
-  if (typeof value === 'string') return value
-  if (value === null || value === undefined) return ''
-  try {
-    return String(value)
-  } catch {
-    return ''
-  }
-}
-
-function toTrimmedString(value: unknown) {
-  return toStringValue(value).trim()
-}
-
-const DURATION_UNIT_MS: Record<string, number> = {
-  ms: 1,
-  millisecond: 1,
-  milliseconds: 1,
-  s: 1_000,
-  sec: 1_000,
-  secs: 1_000,
-  second: 1_000,
-  seconds: 1_000,
-  m: 60_000,
-  min: 60_000,
-  mins: 60_000,
-  minute: 60_000,
-  minutes: 60_000,
-  h: 3_600_000,
-  hr: 3_600_000,
-  hrs: 3_600_000,
-  hour: 3_600_000,
-  hours: 3_600_000,
-  d: 86_400_000,
-  day: 86_400_000,
-  days: 86_400_000,
-  w: 604_800_000,
-  week: 604_800_000,
-  weeks: 604_800_000,
-}
-
-const PLAN_LENGTH_UNITS = [
-  { label: 'w', size: 604_800_000 },
-  { label: 'd', size: 86_400_000 },
-  { label: 'h', size: 3_600_000 },
-  { label: 'm', size: 60_000 },
-]
-
-function parseDurationToMs(value: string | null | undefined): number | null {
-  if (!value) return null
-  const text = value.trim().toLowerCase()
-  if (!text) return null
-  const pattern = /([0-9]*\.?[0-9]+)\s*([a-z]+)/g
-  let total = 0
-  let matched = false
-  let match: RegExpExecArray | null
-  while ((match = pattern.exec(text)) !== null) {
-    matched = true
-    const amount = Number.parseFloat(match[1] ?? '')
-    if (!Number.isFinite(amount)) {
-      continue
-    }
-    const unitRaw = match[2] ?? ''
-    const unitMs = DURATION_UNIT_MS[unitRaw] ?? DURATION_UNIT_MS[unitRaw.replace(/s$/, '')]
-    if (!unitMs) {
-      continue
-    }
-    total += amount * unitMs
-  }
-  if (!matched) {
-    return null
-  }
-  return total > 0 ? total : null
-}
-
-function dateTimeInputToTimestamp(value: string | null | undefined): number | null {
-  if (!value) return null
-  const normalized = fromDateTimeInputValue(value)
-  if (!normalized) return null
-  const timestamp = safeTimestamp(normalized)
-  return timestamp
-}
-
-function timestampToDateTimeInput(timestamp: number): string {
-  if (!Number.isFinite(timestamp)) return ''
-  const rounded = Math.round(timestamp / 60_000) * 60_000
-  return toDateTimeInputValue(new Date(rounded).toISOString())
-}
-
-function formatDurationForPlanLength(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) {
-    return ''
-  }
-  let remaining = ms
-  const parts: string[] = []
-  for (const unit of PLAN_LENGTH_UNITS) {
-    const value = Math.floor(remaining / unit.size)
-    if (value > 0) {
-      parts.push(`${value}${unit.label}`)
-      remaining -= value * unit.size
-    }
-  }
-  if (!parts.length && remaining > 0) {
-    return '1m'
-  }
-  return parts.join(' ')
-}
-
-function formatElapsedDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) {
-    return '<1m'
-  }
-  const units = [
-    { label: 'd', size: 86_400_000 },
-    { label: 'h', size: 3_600_000 },
-    { label: 'm', size: 60_000 },
-  ]
-  const parts: string[] = []
-  let remaining = ms
-  for (const unit of units) {
-    if (remaining < unit.size && parts.length === 0) {
-      continue
-    }
-    if (remaining < unit.size) {
-      continue
-    }
-    const value = Math.floor(remaining / unit.size)
-    if (value > 0) {
-      parts.push(`${value}${unit.label}`)
-      remaining -= value * unit.size
-    }
-    if (parts.length === 2) {
-      break
-    }
-  }
-  if (!parts.length) {
-    return '<1m'
-  }
-  return parts.join(' ')
 }
 
 interface StartDelayInfo {
@@ -2790,13 +2489,6 @@ function getSortedTasksForSprint(id: number) {
   return sortTasks(getTasksForSprint(id))
 }
 
-function parseNumberInput(value: unknown): number | null {
-  const trimmed = toTrimmedString(value)
-  if (!trimmed) return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
 function formatShortDate(value?: string | null) {
   if (!value) return ''
   try {
@@ -2904,37 +2596,11 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-function resetForm() {
-  form.label = ''
-  form.goal = ''
-  form.plan_length = ''
-  form.ends_at = ''
-  form.starts_at = ''
-  form.capacity_points = ''
-  form.capacity_hours = ''
-  form.overdue_after = ''
-  form.notes = ''
-  form.skip_defaults = false
-}
-
 function openCreate() {
   modal.mode = 'create'
   modal.sprintId = null
   resetForm()
   modal.open = true
-}
-
-function fillFormFromSprint(sprint: SprintListItem) {
-  form.label = sprint.label ?? sprint.display_name ?? ''
-  form.goal = sprint.goal ?? ''
-  form.plan_length = sprint.plan_length ?? ''
-  form.ends_at = toDateTimeInputValue(sprint.planned_end)
-  form.starts_at = toDateTimeInputValue(sprint.planned_start)
-  form.capacity_points = sprint.capacity_points != null ? String(sprint.capacity_points) : ''
-  form.capacity_hours = sprint.capacity_hours != null ? String(sprint.capacity_hours) : ''
-  form.overdue_after = sprint.overdue_after ?? ''
-  form.notes = sprint.notes ?? ''
-  form.skip_defaults = false
 }
 
 function openEdit(sprint: SprintListItem) {
@@ -2960,25 +2626,7 @@ async function submitModal() {
   submitting.value = true
   try {
     if (modal.mode === 'create') {
-      const payload: SprintCreateRequest = { label: trimmedLabel }
-      const goal = toTrimmedString(form.goal)
-      if (goal) payload.goal = goal
-      const planLength = toTrimmedString(form.plan_length)
-      if (planLength) payload.plan_length = planLength
-      const endsAt = fromDateTimeInputValue(form.ends_at)
-      if (endsAt) payload.ends_at = endsAt
-      const startsAt = fromDateTimeInputValue(form.starts_at)
-      if (startsAt) payload.starts_at = startsAt
-      const overdueAfter = toTrimmedString(form.overdue_after)
-      if (overdueAfter) payload.overdue_after = overdueAfter
-      const notesValue = toStringValue(form.notes)
-      if (toTrimmedString(notesValue)) payload.notes = notesValue
-      const capacityPoints = parseNumberInput(form.capacity_points)
-      if (capacityPoints !== null) payload.capacity_points = capacityPoints
-      const capacityHours = parseNumberInput(form.capacity_hours)
-      if (capacityHours !== null) payload.capacity_hours = capacityHours
-      if (form.skip_defaults) payload.skip_defaults = true
-
+      const payload = createPayload(trimmedLabel)
       const response = await api.sprintCreate(payload)
       showToast(`Created ${response.sprint.display_name}`)
       if (response.applied_defaults?.length) {
@@ -2988,25 +2636,7 @@ async function submitModal() {
         response.warnings.forEach((warning) => showToast(`Warning: ${warning}`))
       }
     } else if (modal.sprintId !== null) {
-      const goalValue = toTrimmedString(form.goal)
-      const planLength = toTrimmedString(form.plan_length)
-      const endsAt = fromDateTimeInputValue(form.ends_at)
-      const startsAt = fromDateTimeInputValue(form.starts_at)
-      const overdueAfter = toTrimmedString(form.overdue_after)
-      const notesValue = toStringValue(form.notes)
-      const updatePayload: SprintUpdateRequest = {
-        sprint: modal.sprintId,
-        label: trimmedLabel,
-        goal: goalValue,
-        plan_length: planLength,
-        ends_at: endsAt ?? '',
-        starts_at: startsAt ?? '',
-        overdue_after: overdueAfter,
-        notes: notesValue,
-        capacity_points: parseNumberInput(form.capacity_points),
-        capacity_hours: parseNumberInput(form.capacity_hours),
-      }
-      const response = await api.sprintUpdate(updatePayload)
+      const response = await api.sprintUpdate(updatePayload(modal.sprintId, trimmedLabel))
       showToast(`Updated ${response.sprint.display_name}`)
       if (response.warnings?.length) {
         response.warnings.forEach((warning) => showToast(`Warning: ${warning}`))
