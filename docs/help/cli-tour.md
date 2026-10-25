@@ -10,7 +10,7 @@ Install LoTaR first: see [Installation](install.md).
 # Create a task. The first command in a repository creates .tasks/ with default settings.
 lotar add "Add user authentication" --type feature --priority high
 
-# List and search (case-insensitive substrings in IDs, titles, subtitles, descriptions, and tags)
+# List and search (every word must match; see `lotar help list` for phrases, exclusions and typos)
 lotar list
 lotar list "auth"
 lotar list --status todo --priority high

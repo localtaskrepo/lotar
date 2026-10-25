@@ -535,7 +535,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Text search query"
+            "description": "Free-text search: every word must match in any order; supports \"quoted phrases\", -word exclusions and typo tolerance (docs/help/list.md#search-text)."
           },
           {
             "name": "sort_by",
@@ -543,7 +543,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
+            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match for q first with the default desc order), or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
           },
           {
             "name": "order",
@@ -830,7 +830,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Query text to match against task id and title."
+            "description": "Query text. Task IDs and numbers rank first; then every word must match in the title, subtitle, description, tags or other text, best match first, with the same rules as list search."
           },
           {
             "name": "project",
@@ -2802,7 +2802,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Text search query."
+            "description": "Free-text search: every word must match in any order; supports \"quoted phrases\", -word exclusions and typo tolerance (docs/help/list.md#search-text)."
           },
           {
             "name": "sprints",
@@ -2826,7 +2826,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
+            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match for q first with the default desc order), or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
           },
           {
             "name": "order",

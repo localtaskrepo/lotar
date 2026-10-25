@@ -1997,7 +1997,8 @@ impl TaskService {
         Ok(())
     }
 
-    /// Relevance ordering belongs to lookup suggestions, never ordinary task lists.
+    /// Lookup suggestions are always relevance-ranked; ordinary task lists
+    /// only when `sort_by=relevance` is requested.
     pub fn suggest(
         storage: &Storage,
         query: &str,
@@ -2009,54 +2010,38 @@ impl TaskService {
         let number = (!query.is_empty() && query.bytes().all(|b| b.is_ascii_digit()))
             .then(|| query.parse::<u64>().ok())
             .flatten();
-        let lower = query.to_lowercase();
+        let search = crate::utils::text_search::SearchQuery::parse(query);
         let filter = TaskListFilter {
             project,
             ..Default::default()
         };
         // Do not prefilter by substring: padded aliases must reach the ranker.
+        // ID matches rank first; text matches follow, best score first, with
+        // the same rules as list search (all words, phrases, typos).
         let mut ranked = Self::list(storage, &filter)
             .into_iter()
             .filter_map(|(id, task)| {
                 let parsed = TaskId::parse(&id).ok()?;
-                let title = task.title.to_lowercase();
-                let rank = if query.is_empty() || full_id.as_ref() == Some(&parsed) {
-                    0
+                let (rank, score) = if query.is_empty() || full_id.as_ref() == Some(&parsed) {
+                    (0, 0)
                 } else if number == Some(parsed.number) {
-                    1
+                    (1, 0)
                 } else if id.starts_with(query) || parsed.number.to_string().starts_with(query) {
-                    2
+                    (2, 0)
                 } else if id.contains(query) {
-                    3
-                } else if title == lower {
-                    4
-                } else if title.starts_with(&lower) {
-                    5
-                } else if title.contains(&lower) {
-                    6
-                } else if task
-                    .subtitle
-                    .as_ref()
-                    .is_some_and(|s| s.to_lowercase().contains(&lower))
-                {
-                    7
-                } else if task
-                    .description
-                    .as_ref()
-                    .is_some_and(|s| s.to_lowercase().contains(&lower))
-                {
-                    8
-                } else if task
-                    .tags
-                    .iter()
-                    .any(|tag| tag.to_lowercase().contains(&lower))
-                {
-                    9
+                    (3, 0)
                 } else {
-                    return None;
+                    use crate::utils::text_search::Searchable;
+                    (4, search.score(&task.search_document(&id))?)
                 };
                 Some((
-                    (rank, parsed.project, parsed.number, id.clone()),
+                    (
+                        rank,
+                        std::cmp::Reverse(score),
+                        parsed.project,
+                        parsed.number,
+                        id.clone(),
+                    ),
                     (id, task),
                 ))
             })

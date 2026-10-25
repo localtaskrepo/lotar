@@ -176,6 +176,13 @@ describe('custom field values', () => {
 })
 
 describe('sortTasks', () => {
+    it('keeps the server order for relevance (DEV-167)', () => {
+        const tasks = [task({ id: 'A-10' }), task({ id: 'A-2' }), task({ id: 'A-1' })]
+        expect(normalizeSortBy('best-match')).toBe('relevance')
+        expect(compareTasks(tasks[0]!, tasks[1]!, 'relevance')).toBe(0)
+        expect(sortTasks(tasks, 'relevance', 'desc').map((t) => t.id)).toEqual(['A-10', 'A-2', 'A-1'])
+    })
+
     it('defaults to modified desc in the caller and breaks ties by natural ID ASC', () => {
         const tasks = [
             task({ id: 'A-2', modified: '2026-01-01T11:00:00Z' }),

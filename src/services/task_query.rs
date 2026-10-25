@@ -22,6 +22,7 @@
 //!   (inclusive lower bound).
 
 use crate::api_types::TaskDTO;
+use crate::utils::text_search::{SearchQuery, Searchable};
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, TimeZone, Utc};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -43,6 +44,9 @@ pub enum SortKey {
     Id,
     Tags,
     Sprints,
+    /// Best text match first for the current search; without a search it
+    /// falls back to the default order (modified desc). DEV-167.
+    Relevance,
 }
 
 /// Resolved sort specification: a builtin key or a custom field name.
@@ -93,6 +97,8 @@ pub struct TaskQueryOptions {
     pub due: Option<DueFilter>,
     pub recent: Option<RecentFilter>,
     pub needs: BTreeSet<NeedsFlag>,
+    /// The free-text search, used to order by relevance.
+    pub search: Option<SearchQuery>,
 }
 
 impl Default for TaskQueryOptions {
@@ -103,6 +109,7 @@ impl Default for TaskQueryOptions {
             due: None,
             recent: None,
             needs: BTreeSet::new(),
+            search: None,
         }
     }
 }
@@ -123,6 +130,7 @@ fn parse_builtin_sort_key(lower: &str) -> Option<SortKey> {
         "id" => Some(SortKey::Id),
         "tags" => Some(SortKey::Tags),
         "sprints" => Some(SortKey::Sprints),
+        "relevance" | "best-match" => Some(SortKey::Relevance),
         _ => None,
     }
 }
@@ -153,7 +161,7 @@ pub fn parse_sort_by(raw: &str) -> Result<SortSpec, String> {
         return Ok(SortSpec::Builtin(key));
     }
     Err(format!(
-        "Invalid sort_by: '{raw}' (expected a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints), custom:<name>, or field:<name>)"
+        "Invalid sort_by: '{raw}' (expected a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance), custom:<name>, or field:<name>)"
     ))
 }
 
@@ -239,6 +247,7 @@ pub fn parse_query_options(
     if let Some(raw) = query.get("needs") {
         options.needs = parse_needs(raw)?;
     }
+    options.search = query.get("q").map(|raw| SearchQuery::parse(raw));
     Ok(options)
 }
 
@@ -594,6 +603,8 @@ fn compare_by_spec<T: TaskSortFields + ?Sized>(
             SortKey::Type => a.type_str().cmp(&b.type_str()),
             SortKey::Project => project_prefix_of(id_a).cmp(&project_prefix_of(id_b)),
             SortKey::Id => crate::storage::compare_task_ids(id_a, id_b),
+            // Needs the search query; see `sort_by_relevance`.
+            SortKey::Relevance => Ordering::Equal,
         },
         SortSpec::Custom(name) => a.custom_field_value(name).cmp(&b.custom_field_value(name)),
     }
@@ -621,7 +632,43 @@ pub fn sort_tasks<T: TaskSortFields>(tasks: &mut [(String, T)], spec: &SortSpec,
 /// and ordered task list; pagination stays a caller concern.
 pub fn apply(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now: DateTime<Utc>) {
     apply_smart_filters(tasks, options, now);
-    sort_tasks(tasks, &options.sort, options.order);
+    if options.sort == SortSpec::Builtin(SortKey::Relevance) {
+        sort_by_relevance(tasks, options.search.as_ref(), options.order);
+    } else {
+        sort_tasks(tasks, &options.sort, options.order);
+    }
+}
+
+/// Order by search relevance: descending puts the best match first. Ties,
+/// and every task when there is no search, fall back to the default order
+/// (modified desc, then canonical ID asc).
+pub fn sort_by_relevance<T: TaskSortFields + Searchable>(
+    tasks: &mut [(String, T)],
+    search: Option<&SearchQuery>,
+    order: SortOrder,
+) {
+    let scores: std::collections::HashMap<String, u32> = match search {
+        Some(query) if !query.is_empty() => tasks
+            .iter()
+            .map(|(id, task)| {
+                let score = query.score(&task.search_document(id)).unwrap_or(0);
+                (id.clone(), score)
+            })
+            .collect(),
+        _ => Default::default(),
+    };
+    tasks.sort_by(|(id_a, a), (id_b, b)| {
+        let score_a = scores.get(id_a).copied().unwrap_or(0);
+        let score_b = scores.get(id_b).copied().unwrap_or(0);
+        let by_score = if order.is_desc() {
+            score_b.cmp(&score_a)
+        } else {
+            score_a.cmp(&score_b)
+        };
+        by_score
+            .then_with(|| compare_parsed_instant(b.modified(), a.modified()))
+            .then_with(|| crate::storage::compare_task_ids(id_a, id_b))
+    });
 }
 
 #[cfg(test)]

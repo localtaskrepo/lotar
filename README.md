@@ -163,7 +163,7 @@ An honest snapshot as of October 2026. Rows marked **◀** are where LoTaR is be
 | Sprints and burndown | ✅ | ⚠️ milestones, no burndown | ⚠️ iterations, no burndown chart | ✅ |
 | Sync with other trackers | ⚠️ Jira and GitHub (beta) | ❌ | n/a | n/a |
 | TODO comment scanning | ✅ | ❌ | ❌ | ❌ |
-| **◀** Typo-tolerant search | ❌ case- and separator-insensitive only | ✅ fuzzy search | ❌ | ❌ |
+| Typo-tolerant search | ✅ all words, phrases, exclusions, typos, best-match sort | ✅ fuzzy search | ❌ | ❌ |
 | **◀** Docs and decision records | ❌ | ✅ | ⚠️ wiki | ⚠️ via Confluence |
 
 Pick GitHub Issues or Jira when you need a hosted tracker for non-developers, permissions, and integrations. Pick LoTaR when you want tasks reviewed in the same pull request as the code, and agents working those tasks on your own machine.

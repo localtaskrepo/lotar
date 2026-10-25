@@ -59,6 +59,20 @@
       >
         <template #actions>
           <UiButton
+            v-if="hasTextSearch"
+            type="button"
+            class="tasks-toolbar-btn"
+            :class="{ 'tasks-toolbar-btn--active': bestMatch }"
+            aria-label="Best match first"
+            title="Order the results by how well they match the search"
+            :aria-pressed="bestMatch"
+            data-testid="tasks-best-match"
+            @click="toggleBestMatch"
+          >
+            <IconGlyph name="search" aria-hidden="true" />
+            <span class="tasks-toolbar-btn__label">Best match</span>
+          </UiButton>
+          <UiButton
             type="button"
             class="tasks-toolbar-btn"
             :class="{ 'tasks-toolbar-btn--active': bulk }"
@@ -598,8 +612,25 @@ function applySortToFilter(sortBy: string, order: 'asc' | 'desc') {
   next.order = order
   if (sortSnapshot(next) === sortSnapshot(filter.value)) return
   filter.value = next
-  persistSort(filter.value.project || '', sortBy, order)
+  // Best match only means something while searching, so it is never the
+  // remembered sort for the next visit.
+  if (normalizeSortBy(sortBy) !== 'relevance') persistSort(filter.value.project || '', sortBy, order)
 }
+
+// DEV-167: order the current search by relevance, or go back to the saved sort.
+const hasTextSearch = computed(() => !!(filter.value.q ?? '').trim())
+const bestMatch = computed(() => normalizeSortBy(filter.value.sort_by) === 'relevance')
+function restoreSavedSort() {
+  const saved = readSavedSort(filter.value.project || '')
+  applySortToFilter(saved.sort_by, saved.order)
+}
+function toggleBestMatch() {
+  if (bestMatch.value) restoreSavedSort()
+  else applySortToFilter('relevance', 'desc')
+}
+watch(hasTextSearch, (searching) => {
+  if (!searching && bestMatch.value) restoreSavedSort()
+})
 
 function onTableSort(next: { key: ColKey | null; dir: 'asc' | 'desc' }) {
   const sortBy = next.key ? colKeyToSortBy(next.key) : null

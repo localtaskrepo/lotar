@@ -369,9 +369,11 @@ function parseToken(
     assignmentKeys: Record<string, boolean>,
 ): void {
     // A fully quoted literal is explicit free text ("a=b", "status:todo").
+    // It keeps its double quotes so the server searches it as one phrase
+    // (DEV-167); a literal containing a double quote cannot be a phrase.
     const whole = unquoteSegment(raw)
     if (whole.quoted) {
-        words.push(whole.value)
+        words.push(whole.value.includes('"') ? whole.value : `"${whole.value}"`)
         return
     }
     if (isUrlLike(raw)) {
@@ -590,6 +592,7 @@ const SORT_BY_BUILTINS = [
     'id',
     'tags',
     'sprints',
+    'relevance',
 ]
 
 /**

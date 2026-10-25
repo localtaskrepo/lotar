@@ -548,7 +548,8 @@ const filterHelp = computed(() => [
   {
     syntax: 'q="search words"',
     label: 'Search text',
-    description: 'Plain words search tasks; q= explicitly sets the search text.',
+    description:
+      'Plain words must all match, in any order. Quote a phrase, exclude with -word; small typos are forgiven. q= explicitly sets the search text.',
     aliases: '',
   },
   { syntax: 'deletion=active', label: 'Visibility', description: 'active, deleted or all.', aliases: '' },
@@ -557,7 +558,7 @@ const filterHelp = computed(() => [
     syntax: 'sort_by=priority',
     label: 'Sort field',
     description:
-      'priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints or custom:name.',
+      'priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match first) or custom:name.',
     aliases: '',
   },
 ])

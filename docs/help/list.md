@@ -19,7 +19,20 @@ lotar list "login" --project AUTH --priority high --page-size 50
 lotar --format json list --due-soon --tag release
 ```
 
-`<SEARCH>` is optional positional text, not a `--search` flag. It performs a case-insensitive substring search across canonical IDs, titles, subtitles, descriptions, and tags. Other filters are applied alongside it.
+`<SEARCH>` is optional positional text, not a `--search` flag. Other filters are applied alongside it.
+
+## Search text
+
+The same rules apply to `lotar list`, the web UI search box, the REST `q` parameter and the MCP `search` parameter:
+
+- **Every word must match**, in any order and in any searched field: `lotar list "redirect login"` finds "Fix the login redirect loop".
+- **Quoted phrases** match the words together: `lotar list '"login redirect"'`.
+- **Exclusions** drop tasks containing a word or phrase: `lotar list 'login -oauth'`.
+- **Partial words, case and accents** don't matter: `redir` finds `redirect`, `uber` finds `über`, and `ATLS-2` finds the task ID.
+- **Typos are tolerated** in words of four or more letters (one mistake, two from eight letters): `redirct` finds `redirect`. Words with digits or symbols, phrases and exclusions match exactly.
+- **Searched fields:** ID, title, subtitle, description, acceptance criteria, tags, references, and comments.
+
+Results keep the usual order. Add `--sort-by relevance` to list the best matches first: an exact ID, then an exact title, then matches in the title, subtitle, description, tags and comments. `--reverse` lists the weakest matches first.
 
 ## Build the perfect filter
 
@@ -32,7 +45,7 @@ lotar --format json list --due-soon --tag release
 | Dates | `--overdue` (due before today), `--due-soon[=days]` (due today through today+days inclusive) |
 | Equality predicates | `--where key=value` or `--where field:<name>=value` (non-empty values; repeat as needed) |
 | Effort windows | `--effort-min 2h`, `--effort-max 1d`, accepts time or points |
-| Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
+| Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
 | Output | `--format text|json`, `--log-level info`, `--details`; `table`/`markdown`/`md` are text aliases |
 
 Tips:

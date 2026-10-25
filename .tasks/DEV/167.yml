@@ -1,7 +1,40 @@
 title: Check what kind of search we support
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-24T23:48:32.465007+00:00
+modified: 2026-10-25T20:25:54.301883+00:00
+comments:
+- date: 2026-10-25T20:01:12.531820+00:00
+  text: |-
+    Review (before): one rule everywhere text reaches the server (CLI list, REST q, MCP search, UI search box on Tasks/Board/Calendar/Sprints/Insights/Dependencies): the WHOLE query as one case-insensitive substring of id/title/subtitle/description/tags. So 'redirect login' missed 'login redirect', no phrases or exclusions, no typo or accent tolerance, comments/criteria/references never searched, no relevance order. /api/tasks/suggest (task pickers) ranked IDs then title/subtitle/description/tags but with the same single-substring match. UI client-side filters (tag editor, chip lists, SyncHub report search, grammar suggestions) are small substring filters over short option lists; left as is.
+
+    Plan/implementation: new src/utils/text_search.rs shared by storage filter, REST, MCP, CLI and suggest: all words must match in any order; "quoted phrases"; -word / -"phrase" exclusions; case and Latin accent folding; substring kept (redir, IDs); typo tolerance (1 edit from 4 letters, 2 from 8; letters-only words) via bounded Damerau distance; searches id, title, subtitle, description, acceptance criteria, tags, references, comments; scoring (exact ID > exact title > title prefix > title > subtitle > description/criteria > tags > references/comments; word > prefix > infix > typo). New opt-in sort key 'relevance' (REST/MCP sort_by, CLI --sort-by, UI grammar) — default list orders unchanged per the existing design note; suggest ranks text matches by score after ID matches, preserving its tested order. UI: search box keeps quotes on quoted literals so phrases reach the server; Tasks page shows a Best match toggle while searching (not persisted as the saved sort).
+- date: 2026-10-25T20:25:54.264896+00:00
+  text: 'Done. Verification: unit tests in src/utils/text_search.rs; tests/dev167_text_search_test.rs (REST words/phrases/exclusions/accents/typos/ID, relevance vs default order, CLI incl. --reverse, MCP); suggestion ranking contract unchanged (task_suggestion_ranking_test); UI specs (taskSort relevance, grammar keeps phrase quotes, TasksList Best match toggle not persisted); smoke ui.search.smoke.spec.ts in a browser. Gates: lint, 1705 Rust + 1199 UI tests, 347 smoke. Performance on 3000 tasks with long descriptions/comments (optimized build, CLI list): 54-87 ms vs 45-90 ms before; worst case a no-substring typo query 78 ms; relevance sort 137 ms. Follow-up idea (not done): regex terms (/pattern/) and field-scoped terms (title:, comment:).'
 description: Review the current search logic for all functions in the tool and check if we only do partial and wildcard matching or if we can support more powerful search methods across the board.
+history:
+- at: 2026-10-25T19:29:19.274364+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-25T20:01:12.531820+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T20:25:54.264896+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-25T20:25:54.301883+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

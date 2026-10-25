@@ -136,7 +136,7 @@ vi.mock('../components/FilterBar.vue', () => ({
     default: {
         props: ['statuses', 'priorities', 'types', 'value', 'storageKey'],
         emits: ['update:value'],
-        template: '<div class="filter-bar" />',
+        template: '<div class="filter-bar"><slot name="actions" /></div>',
     },
 }))
 
@@ -451,6 +451,38 @@ describe('TasksList server-authoritative sorting', () => {
             URL_.revokeObjectURL = originalRevoke
             wrapper.unmount()
         }
+    })
+
+    it('offers Best match only while searching, without remembering it as the sort (DEV-167)', async () => {
+        localStorage.setItem('lotar.tasks.sort', JSON.stringify({ sort_by: 'due', order: 'asc' }))
+        const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
+        await settle()
+        const vm = wrapper.vm as any
+        expect(wrapper.find('[data-testid="tasks-best-match"]').exists()).toBe(false)
+
+        vm.filter = { ...vm.filter, q: 'login redirect' }
+        await settle()
+        tasksStore.getQuery.mockClear()
+        await wrapper.get('[data-testid="tasks-best-match"]').trigger('click')
+        await settle()
+        expect(vm.filter.sort_by).toBe('relevance')
+        expect(vm.filter.order).toBe('desc')
+        const calls = tasksStore.getQuery.mock.calls as unknown as Array<[Record<string, unknown>]>
+        expect(calls[calls.length - 1]![0].sort_by).toBe('relevance')
+        expect(JSON.parse(localStorage.getItem('lotar.tasks.sort') || 'null')).toEqual({ sort_by: 'due', order: 'asc' })
+
+        // Toggling off restores the saved sort; so does clearing the search.
+        await wrapper.get('[data-testid="tasks-best-match"]').trigger('click')
+        await settle()
+        expect(vm.filter.sort_by).toBe('due')
+        await wrapper.get('[data-testid="tasks-best-match"]').trigger('click')
+        await settle()
+        vm.filter = { ...vm.filter, q: '' }
+        await settle()
+        expect(vm.filter.sort_by).toBe('due')
+        expect(vm.filter.order).toBe('asc')
+        expect(wrapper.find('[data-testid="tasks-best-match"]').exists()).toBe(false)
+        wrapper.unmount()
     })
 
     it('clearing filters resets the saved sort to the default', async () => {

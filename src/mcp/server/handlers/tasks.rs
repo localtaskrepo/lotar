@@ -1771,7 +1771,13 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         err(req_id.clone(), -32602, &msg, None)
     }
 
-    let mut query_options = crate::services::task_query::TaskQueryOptions::default();
+    let mut query_options = crate::services::task_query::TaskQueryOptions {
+        search: filter
+            .text_query
+            .as_deref()
+            .map(crate::utils::text_search::SearchQuery::parse),
+        ..Default::default()
+    };
     if let Some(raw) = match opt_string_param(&req, "sort_by") {
         Ok(v) => v,
         Err(resp) => return resp,

@@ -44,6 +44,8 @@ export type TaskSortBuiltin =
     | 'title'
     | 'tags'
     | 'sprints'
+    /** Best text match first for the current search (server-side only). */
+    | 'relevance'
 export type TaskSortBy = TaskSortBuiltin | `custom:${string}`
 
 export const DEFAULT_TASK_SORT_BY: TaskSortBy = 'modified'
@@ -64,10 +66,12 @@ const TASK_SORT_BUILTINS = new Set<string>([
     'title',
     'tags',
     'sprints',
+    'relevance',
 ])
 
 const BUILTIN_ALIASES: Record<string, TaskSortBuiltin> = {
     'due-date': 'due',
+    'best-match': 'relevance',
 }
 
 /** Normalize a `sort_by` wire value; `null` when absent or invalid. */
@@ -552,6 +556,9 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number
             return cmpVec(a.tags ?? [], b.tags ?? [], cmpStr)
         case 'sprints':
             return cmpVec(a.sprints ?? [], b.sprints ?? [], (x, y) => x - y)
+        case 'relevance':
+            // Only the server can score a search; keep its order.
+            return 0
         default: {
             const name = sortBy.slice('custom:'.length)
             return cmpCustomField(a.custom_fields, b.custom_fields, name)
@@ -564,6 +571,8 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number
  * natural task ID ASC regardless of direction. Returns a new array.
  */
 export function sortTasks<T extends TaskDTO>(tasks: readonly T[], sortBy: TaskSortBy, order: TaskSortOrder): T[] {
+    // Relevance is scored by the server; the input already has that order.
+    if (sortBy === 'relevance') return [...tasks]
     const dir = order === 'asc' ? 1 : -1
     const arr = [...tasks]
     arr.sort((a, b) => {

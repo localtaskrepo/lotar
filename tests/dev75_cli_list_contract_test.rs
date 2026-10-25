@@ -190,7 +190,9 @@ fn list_help_matches_the_actual_predicate_and_format_contract() {
     let text = String::from_utf8_lossy(&output.get_output().stdout);
     for fragment in [
         "optional positional text",
-        "IDs, titles, subtitles, descriptions, and tags",
+        // DEV-167 search rules and the fields they cover.
+        "Every word must match",
+        "ID, title, subtitle, description, acceptance criteria, tags, references, and comments",
         "non-empty equality predicates only",
         "no aligned table or Markdown table is generated",
     ] {

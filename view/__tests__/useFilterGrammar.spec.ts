@@ -221,14 +221,23 @@ describe('parseFilterQuery free-text preservation', () => {
     it('keeps fully quoted literals as free text', () => {
         const parsed = parseFilterQuery('"a=b"')
         expect(parsed.filters).toEqual({})
-        expect(parsed.text).toBe('a=b')
+        // Quotes stay so the server searches the literal as a phrase (DEV-167).
+        expect(parsed.text).toBe('"a=b"')
         expect(parsed.errors).toBeUndefined()
     })
 
     it('keeps fully quoted colon-looking literals as free text', () => {
         const parsed = parseFilterQuery('"status:todo"')
         expect(parsed.filters).toEqual({})
-        expect(parsed.text).toBe('status:todo')
+        expect(parsed.text).toBe('"status:todo"')
+    })
+
+    it('passes phrases and exclusions through as search text (DEV-167)', () => {
+        const parsed = parseFilterQuery('status:todo "login redirect" -oauth')
+        expect(parsed.filters).toEqual({ status: 'todo' })
+        expect(parsed.text).toBe('"login redirect" -oauth')
+        // Re-parsing the text the search box shows gives the same search.
+        expect(parseFilterQuery(parsed.text).text).toBe(parsed.text)
     })
 
     it('preserves apostrophes in free text', () => {

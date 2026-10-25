@@ -193,6 +193,20 @@ impl SearchHandler {
         let (spec, order) = match args.sort_by.as_deref() {
             Some(sort_key) => {
                 let spec = Self::resolve_sort_spec(sort_key, config)?;
+                if spec == SortSpec::Builtin(crate::services::task_query::SortKey::Relevance) {
+                    // Best match first; --reverse puts the weakest first.
+                    let order = if args.reverse {
+                        SortOrder::Asc
+                    } else {
+                        SortOrder::Desc
+                    };
+                    let search = args
+                        .query
+                        .as_deref()
+                        .map(crate::utils::text_search::SearchQuery::parse);
+                    crate::services::task_query::sort_by_relevance(tasks, search.as_ref(), order);
+                    return Ok(());
+                }
                 let order = if args.reverse {
                     SortOrder::Desc
                 } else {

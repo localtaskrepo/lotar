@@ -240,26 +240,12 @@ impl StorageSearch {
     }
 
     /// Check if a task matches text filter criteria
+    /// Every search word must match (see `utils::text_search` for the rules).
     pub fn matches_text_filter(task_id: &str, task: &Task, text_query: &Option<String>) -> bool {
-        if let Some(query) = text_query {
-            let query_lower = query.to_lowercase();
-            let id_lower = task_id.to_lowercase();
-            id_lower.contains(&query_lower)
-                || task.title.to_lowercase().contains(&query_lower)
-                || task
-                    .subtitle
-                    .as_ref()
-                    .is_some_and(|s| s.to_lowercase().contains(&query_lower))
-                || task
-                    .description
-                    .as_ref()
-                    .is_some_and(|s| s.to_lowercase().contains(&query_lower))
-                || task
-                    .tags
-                    .iter()
-                    .any(|tag| tag.to_lowercase().contains(&query_lower))
-        } else {
-            true
+        use crate::utils::text_search::{SearchQuery, Searchable};
+        match text_query {
+            Some(query) => SearchQuery::parse(query).matches(&task.search_document(task_id)),
+            None => true,
         }
     }
 }
