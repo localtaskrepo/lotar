@@ -121,3 +121,41 @@ fn agent_run_takes_model_and_effort() {
         "profile-model|high"
     );
 }
+
+/// Agents call the CLI themselves; the job tells them which build started it
+/// so a different `lotar` on PATH can't answer instead (DEV-206).
+#[test]
+fn agent_jobs_get_the_running_lotar_binary() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _tasks = EnvVarGuard::set(
+        "LOTAR_TASKS_DIR",
+        fixtures.tasks_root.to_string_lossy().as_ref(),
+    );
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    let seen = root.join("bin.txt");
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: TEST\nagents:\n  stub:\n    runner: command\n    command: sh\n    args: ['-c', 'printf \"%s\" \"$LOTAR_BIN\" > \"{}\"']\n",
+            seen.display()
+        ),
+    );
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["add", "Which binary"])
+        .assert()
+        .success();
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"])
+        .assert()
+        .success();
+    let bin = std::fs::read_to_string(&seen).unwrap();
+    assert_eq!(
+        std::fs::canonicalize(&bin).unwrap(),
+        std::fs::canonicalize(env!("CARGO_BIN_EXE_lotar")).unwrap()
+    );
+}

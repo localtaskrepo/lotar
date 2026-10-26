@@ -989,6 +989,14 @@ fn build_prompt(
     out
 }
 
+/// The running `lotar` executable, when this process is one (not a test
+/// harness or another host embedding the library).
+fn current_lotar_binary() -> Option<std::path::PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let stem = exe.file_stem()?.to_str()?;
+    (stem == "lotar").then_some(exe)
+}
+
 /// Directories outside the working directory that a workspace-permission
 /// job may write: the tasks directory and the repository's git data. A merge
 /// job also gets the main checkout, since merging updates it.
@@ -1512,6 +1520,13 @@ fn run_job(
         let job_ctx = job_context_for(&job_id);
         let lotar_env = build_lotar_env(&task, &config, &tasks_dir, None, job_ctx.as_ref());
         command.env.extend(lotar_env);
+    }
+    // The agent calls the CLI itself; point it at this build, not whatever
+    // `lotar` is first on its PATH (login shells and some CLIs reorder PATH).
+    if let Some(bin) = current_lotar_binary() {
+        command
+            .env
+            .insert("LOTAR_BIN".to_string(), bin.to_string_lossy().to_string());
     }
 
     let initial_input = command.initial_input.take();

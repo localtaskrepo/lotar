@@ -112,6 +112,8 @@ If the wrapper is not available, jobs can still run, but `list-running` will sho
 - `LOTAR_AGENT_CONTEXT_EXTENSION` — extension for context files (default `.context`).
 - `LOTAR_AGENT_LOGS_DIR` — when set, enables debug logging to this directory (supports relative or absolute paths).
 
+Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_TICKET_REPORTER`, `LOTAR_TASKS_DIR`, the worktree path and branch, …) and `LOTAR_BIN`, the absolute path of the `lotar` that started the job. The built-in instructions run the CLI as `"${LOTAR_BIN:-lotar}"`, so an older `lotar` elsewhere on PATH (or a CLI that runs commands in a login shell, like Codex) can't answer instead.
+
 ## Windows agent commands
 
 Every job prompt is multiline (it embeds ticket context). Windows cannot pass such arguments through `cmd.exe` safely: Rust's spawn validation rejects CR/LF newlines in batch arguments outright, and `cmd.exe` argument forwarding can mangle other special characters. When an agent profile `command` resolves to a `.cmd`/`.bat` file, the wrapper therefore tries to resolve the shim to the executable it forwards to and runs that directly: npm-generated `cmd` shims (the standard `claude`, `codex`, `copilot`, and `gemini` global installs) are recognized and executed as `node <cli.js>` with the original arguments followed by any baked shim suffix, so the complete prompt arrives byte-exact. Batch commands the wrapper cannot recognize keep going through `cmd.exe` with the limitations above.

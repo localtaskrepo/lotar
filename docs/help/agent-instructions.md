@@ -8,26 +8,26 @@ You are running inside a LoTaR agent job on the local machine with access to the
 
 ## LoTaR CLI quick reference
 
-Use `lotar` to read and update the ticket you are working on. The ticket ID is in the `LOTAR_TICKET_ID` environment variable. The tasks directory is in `LOTAR_TASKS_DIR`.
+Use the LoTaR CLI to read and update the ticket you are working on. Run it as `"${LOTAR_BIN:-lotar}"`: `LOTAR_BIN` is the LoTaR build that started this job, while a `lotar` on your PATH may be a different version. The ticket ID is in the `LOTAR_TICKET_ID` environment variable. The tasks directory is in `LOTAR_TASKS_DIR`.
 
 ```sh
 # Read ticket details
-lotar --format json list "$LOTAR_TICKET_ID"
-lotar task relationships "$LOTAR_TICKET_ID"
+"${LOTAR_BIN:-lotar}" --format json list "$LOTAR_TICKET_ID"
+"${LOTAR_BIN:-lotar}" task relationships "$LOTAR_TICKET_ID"
 
 # Inspect configured statuses before choosing a workflow transition
-lotar config show --project "${LOTAR_TICKET_ID%-*}"
+"${LOTAR_BIN:-lotar}" config show --project "${LOTAR_TICKET_ID%-*}"
 # Set STATUS to a configured status appropriate for this workflow, then:
-lotar status "$LOTAR_TICKET_ID" "${STATUS:?Choose a configured workflow status}"
+"${LOTAR_BIN:-lotar}" status "$LOTAR_TICKET_ID" "${STATUS:?Choose a configured workflow status}"
 
 # Add a comment to the ticket
-lotar comment "$LOTAR_TICKET_ID" "Implemented the feature and all tests pass."
+"${LOTAR_BIN:-lotar}" comment "$LOTAR_TICKET_ID" "Implemented the feature and all tests pass."
 
 # Add tags
-lotar task edit "$LOTAR_TICKET_ID" --tag needs-review
+"${LOTAR_BIN:-lotar}" task edit "$LOTAR_TICKET_ID" --tag needs-review
 
 # List tasks
-lotar list
+"${LOTAR_BIN:-lotar}" list
 ```
 
 Use comments to log progress and decisions. "This job" below says whether you set the ticket's status when you finish.
@@ -45,10 +45,10 @@ If the ticket is ambiguous, a product decision is missing, you need feedback, or
 Example:
 
 ```sh
-lotar comment "$LOTAR_TICKET_ID" "Need clarification: should this preserve the legacy JSON shape or switch to the new schema?"
+"${LOTAR_BIN:-lotar}" comment "$LOTAR_TICKET_ID" "Need clarification: should this preserve the legacy JSON shape or switch to the new schema?"
 # Only after selecting a configured waiting state:
-lotar status "$LOTAR_TICKET_ID" "${WAITING_STATUS:?Choose a configured waiting status}"
-lotar assignee "$LOTAR_TICKET_ID" "${LOTAR_TICKET_REPORTER:?Reporter must be known}"
+"${LOTAR_BIN:-lotar}" status "$LOTAR_TICKET_ID" "${WAITING_STATUS:?Choose a configured waiting status}"
+"${LOTAR_BIN:-lotar}" assignee "$LOTAR_TICKET_ID" "${LOTAR_TICKET_REPORTER:?Reporter must be known}"
 ```
 
 If you receive an agent-job message that answers the question, incorporate it and continue from the current state.

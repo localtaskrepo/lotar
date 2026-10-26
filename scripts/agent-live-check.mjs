@@ -69,8 +69,6 @@ function lotar(dir, args, env = {}, timeoutSeconds = 240) {
         cwd: dir,
         env: {
             ...process.env,
-            // Agents call `lotar` themselves; make that the binary under test.
-            PATH: `${path.dirname(lotarBin)}${path.delimiter}${process.env.PATH}`,
             LOTAR_AGENT_LOGS_DIR: path.join(dir, '.agent-logs'),
             ...env,
         },
