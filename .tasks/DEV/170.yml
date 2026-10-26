@@ -4,7 +4,7 @@ priority: Low
 type: Bug
 reporter: mallox
 created: 2026-10-24T23:52:53.970680+00:00
-modified: 2026-10-25T04:06:19.791330+00:00
+modified: 2026-10-26T22:36:18.038499+00:00
 comments:
 - date: 2026-10-25T00:07:23.315288+00:00
   text: 'Another occurrence 2026-10-24 (full smoke after applying Dependabot #44/#45/#47 locally): ui.insights-isolation ''drawer open and feed refresh cannot alter the Insights activity chart (mocked feed, isolated scopes)'' failed once in a full parallel run, then passed 3/3 in isolation and the next full run passed 343/343. Same load-timing pattern.'
@@ -16,6 +16,8 @@ comments:
   text: 'Another load-only failure (2026-10-24): ui.query-isolation ''keeps a foreign-project task out...'' first lists.settle poll timed out in the full run; passed 3/3 in isolation (fresh browser storage, unaffected by the FilterBar restore change).'
 - date: 2026-10-25T04:06:19.791330+00:00
   text: 'Load-only failure (2026-10-24): ui.insights-isolation ''Insights requests stay explicitly project-scoped'' lists.settle poll timed out in the full run; passed 3/3 in isolation. Same settle-timeout pattern as ui.query-isolation.'
+- date: 2026-10-26T22:36:18.038499+00:00
+  text: 'Seen again during the 2026-10-26 agent work (full npm run test:smoke:agent, machine busy with builds): ui.backlog-order (drag at 390px), ui.filter-panel (desktop and mobile cases, ''Matcher did not succeed in time'') and ui.query-isolation failed once; each passed when rerun alone (filter-panel 3 of 3). None of these specs touch agent code.'
 description: 'Observed 2026-10-24 on macOS full smoke runs (test:smoke:agent / test:smoke:quick:agent), all passing when rerun in isolation: ui.query-isolation ''surfaces failed calendar query switches without stale rows and recovers via retry'' (once), ui.query-isolation ''keeps a foreign-project task out of the active filtered view while it stays reachable via its own project'' (once) and ui.relationships ''ranks exact IDs first across lookup fields and restores searched content after leaving the view'' (once); about 1 failing run in 5. Same pattern as DEV-132/DEV-136: timing under full parallel load. Next: capture the assertion and timing evidence for each and make the waits condition-based.'
 history:
 - at: 2026-10-25T00:07:23.315288+00:00
@@ -35,6 +37,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-10-25T04:06:19.791330+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T22:36:18.038499+00:00
   actor: mallox
   changes:
   - field: comment_added

@@ -9,6 +9,7 @@
           type="button"
           data-testid="agent-run-open"
           :disabled="!profiles.length"
+          :title="profiles.length ? undefined : 'Set up an agent first'"
           @click="openRunDialog()"
         >
           Run agent
@@ -46,147 +47,157 @@
           <span class="profile-chip__meta">{{ profileSummary(profile) }}</span>
         </button>
       </div>
-      <p v-else-if="profilesLoaded" class="muted profile-hint">
-        No agent profiles yet. Add one under <code>agents:</code> in the configuration, then assign a ticket to it.
-      </p>
     </div>
 
-    <div class="filter-tabs" role="tablist" aria-label="Filter jobs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.value"
-        class="filter-tab"
-        :class="{ active: activeTab === tab.value }"
-        type="button"
-        role="tab"
-        :aria-selected="activeTab === tab.value"
-        @click="activeTab = tab.value"
-      >
-        {{ tab.label }}
-        <span v-if="tab.count !== undefined" class="tab-count">{{ tab.count }}</span>
-      </button>
-    </div>
-
-    <div v-if="loading && !jobs.length" class="muted">Loading jobs…</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-
-    <UiEmptyState
-      v-else-if="!filteredJobs.length"
-      :title="activeTab === 'all' ? 'No agent jobs yet' : `No ${activeTab} jobs`"
-      :description="
-        activeTab === 'all'
-          ? 'Assign a ticket to an agent profile (for example @implement), or use Run agent to start a job.'
-          : 'Jobs with this status will show up here.'
-      "
+    <AgentSetupPanel
+      v-if="profilesLoaded && !profiles.length"
+      :installed="installedRunners"
+      :project="profilesProject"
+      @added="loadProfiles"
     />
 
-    <div v-else class="col" style="gap: 12px">
-      <UiCard v-for="group in groupedJobs" :key="group.ticketId" class="ticket-group-card">
-        <div class="ticket-group-card__header">
-          <div class="ticket-group-card__identity">
-            <div class="ticket-group-card__title-row">
-              <button class="chip" type="button" @click="openTask(group.ticketId)">{{ group.ticketId }}</button>
-              <span v-if="ticketInfo[group.ticketId]?.title" class="ticket-title">{{
-                ticketInfo[group.ticketId]!.title
-              }}</span>
+    <template v-if="profiles.length || jobs.length || !profilesLoaded">
+      <div class="filter-tabs" role="tablist" aria-label="Filter jobs">
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          class="filter-tab"
+          :class="{ active: activeTab === tab.value }"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === tab.value"
+          @click="activeTab = tab.value"
+        >
+          {{ tab.label }}
+          <span v-if="tab.count !== undefined" class="tab-count">{{ tab.count }}</span>
+        </button>
+      </div>
+
+      <div v-if="loading && !jobs.length" class="muted">Loading jobs…</div>
+      <div v-else-if="error" class="error">{{ error }}</div>
+
+      <UiEmptyState
+        v-else-if="!filteredJobs.length"
+        :title="activeTab === 'all' ? 'No agent jobs yet' : `No ${activeTab} jobs`"
+        :description="
+          activeTab === 'all'
+            ? 'Assign a ticket to an agent profile (for example @implement), or use Run agent to start a job.'
+            : 'Jobs with this status will show up here.'
+        "
+      />
+
+      <div v-else class="col" style="gap: 12px">
+        <UiCard v-for="group in groupedJobs" :key="group.ticketId" class="ticket-group-card">
+          <div class="ticket-group-card__header">
+            <div class="ticket-group-card__identity">
+              <div class="ticket-group-card__title-row">
+                <button class="chip" type="button" @click="openTask(group.ticketId)">{{ group.ticketId }}</button>
+                <span v-if="ticketInfo[group.ticketId]?.title" class="ticket-title">{{
+                  ticketInfo[group.ticketId]!.title
+                }}</span>
+              </div>
+              <div class="ticket-meta">
+                <span v-if="ticketInfo[group.ticketId]" class="ticket-status">{{
+                  ticketInfo[group.ticketId]!.status
+                }}</span>
+                <span v-if="ticketInfo[group.ticketId]?.assignee">{{ ticketInfo[group.ticketId]!.assignee }}</span>
+                <span>{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
+              </div>
+              <ol v-if="group.jobs.length > 1" class="phase-trail" aria-label="Job sequence">
+                <li v-for="job in group.jobs" :key="job.id" :class="`phase-step phase-step--${job.status}`">
+                  {{ job.agent ? `@${job.agent}` : job.runner }}
+                </li>
+              </ol>
             </div>
-            <div class="ticket-meta">
-              <span v-if="ticketInfo[group.ticketId]" class="ticket-status">{{
-                ticketInfo[group.ticketId]!.status
-              }}</span>
-              <span v-if="ticketInfo[group.ticketId]?.assignee">{{ ticketInfo[group.ticketId]!.assignee }}</span>
-              <span>{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
-            </div>
-            <ol v-if="group.jobs.length > 1" class="phase-trail" aria-label="Job sequence">
-              <li v-for="job in group.jobs" :key="job.id" :class="`phase-step phase-step--${job.status}`">
-                {{ job.agent ? `@${job.agent}` : job.runner }}
-              </li>
-            </ol>
+            <UiButton
+              variant="ghost"
+              type="button"
+              class="ticket-group-card__run"
+              :disabled="!profiles.length"
+              @click="openRunDialog({ ticket: group.ticketId, agent: group.latest?.agent })"
+            >
+              Run again
+            </UiButton>
           </div>
-          <UiButton
-            variant="ghost"
-            type="button"
-            class="ticket-group-card__run"
-            :disabled="!profiles.length"
-            @click="openRunDialog({ ticket: group.ticketId, agent: group.latest?.agent })"
-          >
-            Run again
-          </UiButton>
-        </div>
 
-        <div class="ticket-group-jobs">
-          <article v-for="job in group.jobs" :key="job.id" class="job-card" :class="`job-${job.status}`">
-            <div class="job-card__top">
-              <div class="job-card__identity">
-                <span class="status-chip" :class="`status-${job.status}`">{{ job.status }}</span>
-                <span v-if="job.agent" class="phase-chip">@{{ job.agent }}</span>
-                <span class="job-runner"
-                  >{{ job.runner
-                  }}<span v-if="job.model || job.effort" data-testid="agent-job-settings">
-                    · {{ runSettings(job.model, job.effort) }}</span
-                  ></span
+          <div class="ticket-group-jobs">
+            <article v-for="job in group.jobs" :key="job.id" class="job-card" :class="`job-${job.status}`">
+              <div class="job-card__top">
+                <div class="job-card__identity">
+                  <span class="status-chip" :class="`status-${job.status}`">{{ job.status }}</span>
+                  <span v-if="job.agent" class="phase-chip">@{{ job.agent }}</span>
+                  <span class="job-runner"
+                    >{{ job.runner
+                    }}<span v-if="job.model || job.effort" data-testid="agent-job-settings">
+                      · {{ runSettings(job.model, job.effort) }}</span
+                    ></span
+                  >
+                </div>
+                <div class="job-card__actions">
+                  <UiButton variant="ghost" type="button" @click="toggleLogs(job.id)">
+                    {{ isLogsOpen(job.id) ? 'Hide logs' : 'Show logs' }}
+                  </UiButton>
+                  <UiButton v-if="isActiveJob(job)" variant="danger" type="button" @click="cancel(job.id)">
+                    {{ job.status === 'queued' ? 'Remove' : 'Stop' }}
+                  </UiButton>
+                </div>
+              </div>
+
+              <div class="job-card__meta">
+                <span :title="formatDate(job.created_at)">{{ jobTiming(job) }}</span>
+                <span
+                  v-if="job.exit_code !== null && job.exit_code !== undefined && job.exit_code !== 0"
+                  class="job-exit"
+                  >exit {{ job.exit_code }}</span
                 >
+                <span v-if="job.worktree_branch" class="branch-chip" :title="job.worktree_path || undefined">{{
+                  job.worktree_branch
+                }}</span>
               </div>
-              <div class="job-card__actions">
-                <UiButton variant="ghost" type="button" @click="toggleLogs(job.id)">
-                  {{ isLogsOpen(job.id) ? 'Hide logs' : 'Show logs' }}
-                </UiButton>
-                <UiButton v-if="isActiveJob(job)" variant="danger" type="button" @click="cancel(job.id)">
-                  {{ job.status === 'queued' ? 'Remove' : 'Stop' }}
-                </UiButton>
-              </div>
-            </div>
 
-            <div class="job-card__meta">
-              <span :title="formatDate(job.created_at)">{{ jobTiming(job) }}</span>
-              <span v-if="job.exit_code !== null && job.exit_code !== undefined && job.exit_code !== 0" class="job-exit"
-                >exit {{ job.exit_code }}</span
-              >
-              <span v-if="job.worktree_branch" class="branch-chip" :title="job.worktree_path || undefined">{{
-                job.worktree_branch
-              }}</span>
-            </div>
-
-            <div v-if="job.last_message" class="job-summary">
-              <p v-if="isToolLine(job.last_message)" class="job-summary__text job-summary__text--tool">
-                {{ job.last_message }}
-              </p>
-              <MarkdownContent
-                v-else
-                class="job-summary__text"
-                :class="{ 'job-summary__text--clamped': isLongSummary(job.last_message) && !expandedSummaries[job.id] }"
-                :source="job.last_message"
-              />
-              <button
-                v-if="isLongSummary(job.last_message)"
-                type="button"
-                class="link-button"
-                @click="expandedSummaries[job.id] = !expandedSummaries[job.id]"
-              >
-                {{ expandedSummaries[job.id] ? 'Show less' : 'Show more' }}
-              </button>
-            </div>
-
-            <div v-if="isLogsOpen(job.id)" class="log-panel">
-              <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
-              <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
-              <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
-              <AgentJobLog v-else :entries="logsByJob[job.id] || []" />
-
-              <form v-if="canMessage(job)" class="job-message" @submit.prevent="sendMessage(job.id)">
-                <UiInput
-                  :model-value="messageDrafts[job.id] || ''"
-                  placeholder="Send a message to the agent"
-                  aria-label="Message to the agent"
-                  @update:modelValue="(value: string) => setMessageDraft(job.id, value)"
+              <div v-if="job.last_message" class="job-summary">
+                <p v-if="isToolLine(job.last_message)" class="job-summary__text job-summary__text--tool">
+                  {{ job.last_message }}
+                </p>
+                <MarkdownContent
+                  v-else
+                  class="job-summary__text"
+                  :class="{
+                    'job-summary__text--clamped': isLongSummary(job.last_message) && !expandedSummaries[job.id],
+                  }"
+                  :source="job.last_message"
                 />
-                <UiButton variant="ghost" type="submit" :disabled="!messageDrafts[job.id]"> Send </UiButton>
-              </form>
-            </div>
-          </article>
-        </div>
-      </UiCard>
-    </div>
+                <button
+                  v-if="isLongSummary(job.last_message)"
+                  type="button"
+                  class="link-button"
+                  @click="expandedSummaries[job.id] = !expandedSummaries[job.id]"
+                >
+                  {{ expandedSummaries[job.id] ? 'Show less' : 'Show more' }}
+                </button>
+              </div>
+
+              <div v-if="isLogsOpen(job.id)" class="log-panel">
+                <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
+                <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
+                <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
+                <AgentJobLog v-else :entries="logsByJob[job.id] || []" />
+
+                <form v-if="canMessage(job)" class="job-message" @submit.prevent="sendMessage(job.id)">
+                  <UiInput
+                    :model-value="messageDrafts[job.id] || ''"
+                    placeholder="Send a message to the agent"
+                    aria-label="Message to the agent"
+                    @update:modelValue="(value: string) => setMessageDraft(job.id, value)"
+                  />
+                  <UiButton variant="ghost" type="submit" :disabled="!messageDrafts[job.id]"> Send </UiButton>
+                </form>
+              </div>
+            </article>
+          </div>
+        </UiCard>
+      </div>
+    </template>
   </section>
 
   <AgentRunDialog
@@ -240,6 +251,7 @@ import { formatDateTime, formatRelativeTime } from '../utils/date'
 import type { AgentJob, AgentJobLogEntry, AgentProfileInfo, AgentQueueStats } from '../api/types'
 import AgentJobLog from '../components/AgentJobLog.vue'
 import AgentRunDialog from '../components/AgentRunDialog.vue'
+import AgentSetupPanel from '../components/AgentSetupPanel.vue'
 import MarkdownContent from '../components/MarkdownContent.vue'
 import { isActiveJob, isFailedJob, isToolLine, jobDuration, runSettings } from '../utils/agentJobs'
 import UiButton from '../components/UiButton.vue'
@@ -264,6 +276,8 @@ const messageDrafts = ref<Record<string, string>>({})
 
 const profiles = ref<AgentProfileInfo[]>([])
 const profilesLoaded = ref(false)
+const installedRunners = ref<string[]>([])
+const profilesProject = ref<string | null>(null)
 const ticketInfo = ref<Record<string, { title: string; status: string; assignee?: string | null }>>({})
 const expandedSummaries = ref<Record<string, boolean>>({})
 const runDialog = reactive<{ open: boolean; ticket?: string; agent?: string | null }>({ open: false })
@@ -322,7 +336,10 @@ const ticketSuggestions = computed(() => [...new Set(jobs.value.map((job) => job
 
 async function loadProfiles() {
   try {
-    profiles.value = (await api.listAgentProfiles())?.profiles ?? []
+    const response = await api.listAgentProfiles()
+    profiles.value = response?.profiles ?? []
+    installedRunners.value = response?.installed_runners ?? []
+    profilesProject.value = response?.project ?? null
   } catch {
     profiles.value = []
   } finally {
@@ -809,14 +826,9 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-.profile-chip__meta,
-.profile-hint {
+.profile-chip__meta {
   color: var(--color-muted);
   font-size: 12px;
-}
-
-.profile-hint {
-  margin: 0;
 }
 
 .filter-tabs {

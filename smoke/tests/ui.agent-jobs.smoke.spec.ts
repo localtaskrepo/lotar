@@ -256,6 +256,32 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
+    it('guides setting up the first agent when none is configured', async () => {
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: { '.tasks/config.yml': configWithAgents('') },
+        });
+        try {
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/agents`, async (page) => {
+                    const panel = page.getByTestId('agent-setup');
+                    await panel.waitFor({ timeout: 15_000 });
+                    expect(await page.locator('.filter-tab').count()).toBe(0);
+                    await panel.locator('#agent-setup-name').fill('helper');
+                    await panel.getByRole('button', { name: 'Add agent', exact: true }).click();
+                    await page.locator('.profile-chip', { hasText: '@helper' }).waitFor({ timeout: 10_000 });
+                    expect(await panel.count()).toBe(0);
+                });
+                const profiles = await (await fetch(`${server.url}/api/agents/profiles`)).json();
+                expect(profiles.data.profiles.map((p: { name: string }) => p.name)).toEqual(['helper']);
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
     it('starts a job from the Run agent dialog and shows the ticket it ran on', async () => {
         const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-run-dialog-');
 

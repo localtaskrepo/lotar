@@ -74,6 +74,43 @@ fn parse_sync_remotes(value: &str) -> Result<HashMap<String, SyncRemoteConfig>, 
         .map_err(|err| ConfigError::ParseError(format!("Invalid remotes value: {}", err)))
 }
 
+/// Agent profiles as a YAML/JSON mapping of name to profile (a runner name
+/// or a detailed profile). Names must work as `@name` assignees.
+fn parse_agent_profiles(
+    value: &str,
+) -> Result<HashMap<String, crate::config::types::AgentProfileConfig>, ConfigError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let profiles: HashMap<String, crate::config::types::AgentProfileConfig> =
+        serde_yaml_ng::from_str(trimmed)
+            .map_err(|err| ConfigError::ParseError(format!("Invalid agents value: {}", err)))?;
+    for (name, profile) in &profiles {
+        let valid_name = !name.is_empty()
+            && name.len() <= 64
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+        if !valid_name {
+            return Err(ConfigError::ParseError(format!(
+                "Invalid agent name '{name}': use letters, digits, '-', '_' or '.'"
+            )));
+        }
+        let runner = profile.to_detail().runner;
+        if !AGENT_RUNNERS.contains(&runner.trim().to_ascii_lowercase().as_str()) {
+            return Err(ConfigError::ParseError(format!(
+                "Agent '{name}' has unsupported runner '{runner}'. Expected {}",
+                AGENT_RUNNERS.join(", ")
+            )));
+        }
+    }
+    Ok(profiles)
+}
+
+/// Runner kinds an agent profile can use.
+pub const AGENT_RUNNERS: &[&str] = &["claude", "codex", "copilot", "gemini", "command"];
+
 fn parse_bool_flag(value: &str, field: &str) -> Result<bool, ConfigError> {
     let normalized = value.trim().to_lowercase();
     match normalized.as_str() {
@@ -668,6 +705,9 @@ pub fn apply_field_to_global_config(
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
+        "agents" => {
+            config.agents = parse_agent_profiles(value)?;
+        }
         "scan_signal_words" => {
             config.scan_signal_words = parse_simple_csv(value);
         }
@@ -1062,6 +1102,10 @@ pub fn apply_field_to_project_config(
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
+        "agents" => {
+            let profiles = parse_agent_profiles(value)?;
+            config.agents = (!profiles.is_empty()).then_some(profiles);
+        }
         "branch_type_aliases" => {
             if value.trim().is_empty() {
                 config.branch_type_aliases = None;
@@ -1332,6 +1376,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         }
         "remotes" => {
             let _ = parse_sync_remotes(value)?;
+        }
+        "agents" => {
+            let _ = parse_agent_profiles(value)?;
         }
         "strict_members"
             if !value.trim().is_empty() => {

@@ -376,6 +376,74 @@ impl ConfigService {
         })
     }
 
+    /// Add one agent profile to the project (or global) config through the
+    /// regular `agents` field write, so validation, canonical formatting and
+    /// change events match `config set`. Refuses a name that already resolves
+    /// for that scope, including one inherited from the global config.
+    pub fn add_agent_profile(
+        resolver: &TasksDirectoryResolver,
+        project: Option<&str>,
+        global: bool,
+        name: &str,
+        profile: crate::config::types::AgentProfileDetail,
+    ) -> LoTaRResult<ConfigSetOutcome> {
+        let tasks_dir = resolver.path.as_path();
+        let name = name.trim();
+        let project = if global {
+            None
+        } else {
+            project
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .map(str::to_string)
+                .or_else(|| {
+                    crate::config::resolution::config_for_project(tasks_dir, None)
+                        .ok()
+                        .map(|config| config.default_project)
+                        .filter(|p| !p.is_empty())
+                })
+        };
+        if !global && project.is_none() {
+            return Err(LoTaRError::ValidationError(
+                "No project given and no default project set".to_string(),
+            ));
+        }
+        let resolved = crate::config::resolution::config_for_project(tasks_dir, project.as_deref())
+            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        if resolved.agent_profiles.contains_key(name) {
+            return Err(LoTaRError::ValidationError(format!(
+                "An agent named '{name}' already exists"
+            )));
+        }
+        let mut agents = match project.as_deref() {
+            None => {
+                crate::config::persistence::load_global_config(Some(tasks_dir))
+                    .map_err(|e| LoTaRError::ValidationError(e.to_string()))?
+                    .agents
+            }
+            Some(prefix) => {
+                crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir)
+                    .map_err(|e| LoTaRError::ValidationError(e.to_string()))?
+                    .agents
+                    .unwrap_or_default()
+            }
+        };
+        let simple =
+            profile.model.is_none() && profile.effort.is_none() && profile.permissions.is_none();
+        agents.insert(
+            name.to_string(),
+            if simple {
+                crate::config::types::AgentProfileConfig::Runner(profile.runner)
+            } else {
+                crate::config::types::AgentProfileConfig::Detailed(Box::new(profile))
+            },
+        );
+        let value = serde_json::to_string(&agents)
+            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let values = std::collections::BTreeMap::from([("agents".to_string(), value)]);
+        Self::set(resolver, &values, global, project.as_deref())
+    }
+
     /// Whether a project-scope value equals the resolved global value for the
     /// same canonical field (so storing it would be a redundant duplicate
     /// override). Callers must have canonicalized and schema-validated the

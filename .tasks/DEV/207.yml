@@ -4,7 +4,16 @@ priority: Medium
 type: Bug
 reporter: mallox
 created: 2026-10-26T20:21:32.319496+00:00
+modified: 2026-10-26T22:22:14.332904+00:00
+comments:
+- date: 2026-10-26T22:22:14.332904+00:00
+  text: Make the behavior dependent on a config value, and set the default to what you proposed.
 description: |-
   Found in the DEV-201 live run of the agent-pipeline template. cleanup_on_done (and lotar agent worktree cleanup) refuse to remove a worktree whose git status --ignored lists anything, a guard added in the DEV-53 security pass. Agents almost always leave build or test output (__pycache__, node_modules, target/), usually git-ignored, so in practice finished tickets keep their worktree and agent/ branch.
 
   Options: allow ignored files that git worktree remove would also drop, remove known build output first, or report the reason on the job or ticket so people know why cleanup was skipped. Keep the protection for untracked and modified files. Needs a decision on the DEV-53 rationale before changing it.
+history:
+- at: 2026-10-26T22:22:14.332904+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

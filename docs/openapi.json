@@ -2528,7 +2528,13 @@
                               "permissions": { "type": "string", "enum": ["read-only", "workspace", "full"] }
                             }
                           }
-                        }
+                        },
+                        "installed_runners": {
+                          "type": "array",
+                          "items": { "type": "string" },
+                          "description": "Agent CLIs found on the server's PATH"
+                        },
+                        "project": { "type": "string", "description": "Project the profiles were resolved for" }
                       }
                     }
                   }
@@ -2551,6 +2557,34 @@
             "description": "Restrict profiles to a project prefix"
           }
         ]
+      },
+      "post": {
+        "summary": "Add an agent profile",
+        "description": "Adds one profile to the project (default project when omitted) or, with global, to the global config, through the same validation as config set.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "runner"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "runner": { "type": "string", "enum": ["claude", "codex", "copilot", "gemini", "command"] },
+                  "project": { "type": "string" },
+                  "global": { "type": "boolean" },
+                  "model": { "type": "string" },
+                  "effort": { "type": "string" },
+                  "permissions": { "type": "string", "enum": ["read-only", "workspace", "full"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Config write result (updated, warnings, info, errors)" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
       }
     },
     "/api/attachments/get": {

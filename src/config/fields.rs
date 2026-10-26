@@ -291,6 +291,7 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
     field("agent_automation").aliases(&["agent.automation"]),
     field("agent_worktree").aliases(&["agent.worktree"]),
     field("remotes").both().aliases(&["sync.remotes"]),
+    field("agents").both(),
     field("auth_profiles").aliases(&["sync.auth_profiles"]),
     field("sprints_defaults_capacity_points")
         .global()
@@ -423,6 +424,7 @@ mod tests {
         "agent_worktree_dir",
         "agent_worktree_branch_prefix",
         "remotes",
+        "agents",
         "sprints_defaults_capacity_points",
         "sprints_defaults_capacity_hours",
         "sprints_defaults_length",
@@ -486,6 +488,7 @@ mod tests {
         "agent_worktree_dir",
         "agent_worktree_branch_prefix",
         "remotes",
+        "agents",
     ];
 
     const LEGACY_CONFIG_PATHS: &[(&str, &str)] = &[

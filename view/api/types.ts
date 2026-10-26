@@ -1353,6 +1353,21 @@ export interface AgentProfileInfo {
 
 export interface AgentProfilesResponse {
     profiles: AgentProfileInfo[]
+    /** Agent CLIs found on the server's PATH (claude, codex, copilot, gemini). */
+    installed_runners?: string[]
+    /** Project the profiles were resolved for (the default project when none was asked for). */
+    project?: string | null
+}
+
+/** Body of `POST /api/agents/profiles`. */
+export interface AgentProfileCreateRequest {
+    name: string
+    runner: string
+    project?: string
+    global?: boolean
+    model?: string
+    effort?: string
+    permissions?: string
 }
 
 // Automation simulation

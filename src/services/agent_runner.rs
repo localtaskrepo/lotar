@@ -132,6 +132,44 @@ fn args_set_permissions(kind: AgentRunnerKind, args: &[String]) -> bool {
 /// Each CLI's flags for a permission level. `writable_dirs` are extra
 /// directories the `workspace` level may write besides the working directory
 /// (the tasks directory and git data of a worktree job).
+/// The agent CLIs LoTaR can drive that are on this machine's PATH.
+pub fn installed_agent_clis() -> Vec<&'static str> {
+    let Some(path) = std::env::var_os("PATH") else {
+        return Vec::new();
+    };
+    let dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path).collect();
+    ["claude", "codex", "copilot", "gemini"]
+        .into_iter()
+        .filter(|program| {
+            dirs.iter().any(|dir| {
+                let candidates = if cfg!(windows) {
+                    vec![
+                        dir.join(format!("{program}.exe")),
+                        dir.join(format!("{program}.cmd")),
+                    ]
+                } else {
+                    vec![dir.join(program)]
+                };
+                candidates.iter().any(|candidate| is_executable(candidate))
+            })
+        })
+        .collect()
+}
+
+fn is_executable(path: &std::path::Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        path.metadata()
+            .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+    }
+    #[cfg(not(unix))]
+    {
+        path.is_file()
+    }
+}
+
 fn permission_args(
     kind: AgentRunnerKind,
     level: AgentPermissions,

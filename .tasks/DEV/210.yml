@@ -1,0 +1,34 @@
+title: Agents page guides setting up the first agent
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-26T22:25:01.611167+00:00
+modified: 2026-10-26T22:41:08.912635+00:00
+comments:
+- date: 2026-10-26T22:41:08.873032+00:00
+  text: 'Done. Without agent profiles the Agents page shows a setup panel: what an agent profile is, name + CLI (installed CLIs preselected, missing ones marked; warning when none is on PATH) + scope (default project or all projects), and the YAML/config-set equivalent plus the agent-pipeline template hint; empty job tabs are hidden until there is something to show. Backend: ''agents'' is a regular config field (lotar config set agents ''<json>'', project or global, validated names and runners); POST /api/agents/profiles adds one profile through that path (refuses existing names, bad model/effort/permissions); GET reports installed_runners and the resolved project. Docs, OpenAPI, quick reference updated. Verified in a browser (light, dark, 390px) on a fresh project, adding a profile through the panel. Tests: dev210_agent_setup_test (3), two Vitest cases, smoke ''guides setting up the first agent''. Gates: lint, 1735 Rust + 1225 UI, 352 smoke (a first full smoke run had 3 load flakes in unrelated specs, recorded on DEV-170; clean on rerun).'
+description: |-
+  Raised by the developer: in a project without agent profiles (this repo, for example) the Agents page offers nothing to do. It should explain what an agent profile is and let you add one.
+
+  Plan: make agents settable like other config fields (lotar config set agents '<json>', REST config set) with validation; POST /api/agents/profiles adds one profile to the project or global config through that path; GET /api/agents/profiles reports which agent CLIs are installed; the page shows a setup panel (name, CLI with installed ones marked, scope) plus the YAML equivalent and pointers to templates, and refreshes once a profile exists.
+history:
+- at: 2026-10-26T22:25:01.671321+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-26T22:41:08.873032+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T22:41:08.912635+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

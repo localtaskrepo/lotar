@@ -21,6 +21,7 @@ vi.mock('../api/client', () => ({
         listAgentProfiles: vi.fn(),
         getTask: vi.fn(),
         runAgentJob: vi.fn(),
+        addAgentProfile: vi.fn(),
     },
 }))
 
@@ -1074,6 +1075,59 @@ describe('AgentJobs page context and actions', () => {
             await flushPromises()
             const boxes = wrapper.findAll('.job-card').map((card) => card.find('.job-message').exists())
             expect(boxes).toEqual([false, true])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})
+
+describe('AgentJobs setup when no agents exist', () => {
+    it('explains agents and adds the first profile to the default project', async () => {
+        ;(api.listAgentProfiles as any)
+            .mockResolvedValueOnce({ profiles: [], installed_runners: ['codex'], project: 'APP' })
+            .mockResolvedValueOnce({
+                profiles: [{ name: 'implement', runner: 'codex', permissions: 'workspace' }],
+                installed_runners: ['codex'],
+                project: 'APP',
+            })
+        ;(api.addAgentProfile as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
+        const wrapper = await mountAgentJobs()
+        try {
+            const panel = wrapper.find('[data-testid="agent-setup"]')
+            expect(panel.exists()).toBe(true)
+            expect(panel.text()).toContain('Set up an agent')
+            expect(panel.text()).toContain('.tasks/APP/config.yml')
+            expect((panel.find('#agent-setup-runner').element as HTMLSelectElement).value).toBe('codex')
+            expect(panel.find('#agent-setup-runner').text()).toContain('Claude Code (not found)')
+
+            await panel.find('form').trigger('submit')
+            await flushPromises()
+
+            expect(api.addAgentProfile).toHaveBeenCalledWith({ name: 'implement', runner: 'codex', project: 'APP' })
+            expect(wrapper.find('[data-testid="agent-setup"]').exists()).toBe(false)
+            expect(wrapper.find('.profile-chip').text()).toContain('@implement')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('warns when no supported CLI is installed and can add to all projects', async () => {
+        ;(api.listAgentProfiles as any).mockResolvedValue({ profiles: [], installed_runners: [], project: 'APP' })
+        ;(api.addAgentProfile as any).mockResolvedValue({
+            updated: false,
+            warnings: [],
+            info: [],
+            errors: ["An agent named 'implement' already exists"],
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            const panel = wrapper.find('[data-testid="agent-setup"]')
+            expect(panel.text()).toContain('None of these CLIs was found')
+            await panel.find('#agent-setup-scope').setValue('global')
+            await panel.find('form').trigger('submit')
+            await flushPromises()
+            expect(api.addAgentProfile).toHaveBeenCalledWith({ name: 'implement', runner: 'claude', global: true })
+            expect(wrapper.find('[data-testid="agent-setup"]').text()).toContain('already exists')
         } finally {
             wrapper.unmount()
         }

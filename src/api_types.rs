@@ -638,6 +638,29 @@ pub struct AgentProfileInfo {
     pub permissions: String,
 }
 
+/// Body of `POST /api/agents/profiles`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentProfileCreateRequest {
+    /// Profile name; tickets assigned to `@name` start a job with it.
+    pub name: String,
+    /// `claude`, `codex`, `copilot`, `gemini` or `command`.
+    pub runner: String,
+    /// Project prefix to add it to; defaults to the default project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
+    /// Add it to the global config (all projects) instead.
+    #[serde(default)]
+    pub global: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    /// `read-only`, `workspace` (default) or `full`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobLogEntry {

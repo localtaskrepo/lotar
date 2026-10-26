@@ -175,6 +175,8 @@ Repository guidance for agents working on LoTaR itself lives in:
 
 ## Web UI
 
+Without any agent profile, the Agents page shows a setup panel: pick a name and a CLI (the ones installed on the machine running LoTaR are preselected) and add the profile to the current project or to all projects. The same works from the command line with `lotar config set agents '{"implement": "claude"}' --project PROJ` (the value replaces that scope's whole `agents` map) or over REST with `POST /api/agents/profiles`.
+
 The Agents page lists jobs grouped by ticket and updates live over SSE:
 
 - Each ticket shows its title, current status and assignee, and the order its jobs ran in (for example `@implement → @test`).

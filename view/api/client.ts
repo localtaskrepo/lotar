@@ -9,6 +9,7 @@ import type {
     AgentJobMessageRequest,
     AgentJobMessageResponse,
     AgentJobStatusResponse,
+    AgentProfileCreateRequest,
     AgentProfilesResponse,
     ApiEnvelope,
     AttachmentRemoveRequest,
@@ -358,6 +359,9 @@ export const api = {
     // Agent profiles
     listAgentProfiles(project?: string): Promise<AgentProfilesResponse> {
         return get('/api/agents/profiles', project ? { project } : undefined)
+    },
+    addAgentProfile(payload: AgentProfileCreateRequest): Promise<ConfigSetResponse> {
+        return post('/api/agents/profiles', payload)
     },
 
     // Activity
