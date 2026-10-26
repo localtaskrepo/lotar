@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Gated mock agent fixture: a Copilot-wire mock whose run is held on a
+// Gated mock agent fixture: a Copilot CLI (`--output-format json`) mock whose run is held on a
 // test-owned gate file so tests can observe and assert mid-run state
 // deterministically instead of racing fixed sleeps.
 //
@@ -99,10 +99,10 @@ function emit(payload) {
 }
 
 if (mode === 'copilot') {
-    emit({ type: 'system', subtype: 'init', session_id: sessionId });
-    emit({ type: 'message', delta: true, content: 'phase one', session_id: sessionId });
+    emit({ type: 'user.message', data: { content: 'gate prompt' } });
+    emit({ type: 'tool.execution_start', data: { toolName: 'bash', arguments: { command: 'phase one' } } });
 } else if (mode === 'hold') {
-    emit({ type: 'system', subtype: 'init', session_id: sessionId });
+    emit({ type: 'user.message', data: { content: 'gate prompt' } });
 }
 writeSentinel(`started-${label}.sentinel`);
 
@@ -114,12 +114,12 @@ while (!existsSync(releasePath) && Date.now() < deadline) {
 
 const tail = [];
 if (mode === 'copilot') {
-    tail.push({ type: 'message', delta: true, content: ' / phase two', session_id: sessionId });
-    tail.push({ type: 'message', content: 'phase one / phase two done', session_id: sessionId });
+    tail.push({ type: 'tool.execution_start', data: { toolName: 'bash', arguments: { command: 'phase two' } } });
+    tail.push({ type: 'assistant.message', data: { content: 'phase one / phase two done' } });
 } else if (mode === 'hold') {
-    tail.push({ type: 'message', content: 'held agent released', session_id: sessionId });
+    tail.push({ type: 'assistant.message', data: { content: 'held agent released' } });
 }
-tail.push({ type: 'result', result: 'Completed successfully', session_id: sessionId });
+tail.push({ type: 'result', sessionId, exitCode, usage: { premiumRequests: 0 } });
 
 // Exit from the write callback so piped stdout is flushed before exit and
 // the completion sentinel never precedes the emitted runner lines.

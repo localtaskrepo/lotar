@@ -86,7 +86,7 @@ function parseWireLines(stdout: string): Array<Record<string, unknown>> {
 }
 
 describe('agent fixture behavior', () => {
-    it('mock agent emits the copilot wire sequence and exits zero', async () => {
+    it('mock agent emits a Copilot CLI json run and exits zero', async () => {
         const child = startNodeScript(MOCK_AGENT_SCRIPT, []);
         const outcome = await child.outcome;
 
@@ -95,13 +95,11 @@ describe('agent fixture behavior', () => {
 
         const events = parseWireLines(outcome.stdout);
         expect(events).toHaveLength(5);
-        expect(events[0]).toMatchObject({ type: 'system', subtype: 'init' });
-        expect(events[0]?.session_id).toEqual(expect.any(String));
-        expect(events[1]).toMatchObject({ type: 'message', delta: true, content: 'Hello' });
-        expect(events[2]).toMatchObject({ type: 'message', delta: true, content: ' from mock agent!' });
-        expect(events[3]).toMatchObject({ type: 'message', content: 'Hello from mock agent!' });
-        expect(events[3]?.delta).toBeUndefined();
-        expect(events[4]).toMatchObject({ type: 'result', result: 'Completed successfully' });
+        expect(events[0]).toMatchObject({ type: 'user.message' });
+        expect(events[1]).toMatchObject({ type: 'tool.execution_start', data: { toolName: 'bash' } });
+        expect(events[2]).toMatchObject({ type: 'assistant.message', data: { content: 'Hello from mock agent!' } });
+        expect(events[4]).toMatchObject({ type: 'result', exitCode: 0 });
+        expect(events[4]?.sessionId).toEqual(expect.any(String));
     });
 
     it('mock agent honors a requested non-zero exit code', async () => {
@@ -109,7 +107,9 @@ describe('agent fixture behavior', () => {
         const outcome = await child.outcome;
 
         expect(outcome.code).toBe(7);
-        expect(parseWireLines(outcome.stdout)).toHaveLength(5);
+        const events = parseWireLines(outcome.stdout);
+        expect(events).toHaveLength(5);
+        expect(events[4]).toMatchObject({ type: 'result', exitCode: 7 });
     });
 
     it('gate agent holds until released, then completes with both phases', async () => {
@@ -128,10 +128,12 @@ describe('agent fixture behavior', () => {
 
             expect(outcome.code).toBe(0);
             const events = parseWireLines(outcome.stdout);
-            expect(events[0]).toMatchObject({ type: 'system', subtype: 'init' });
-            expect(events.some((e) => e.content === 'phase one' && e.delta === true)).toBe(true);
-            expect(events.some((e) => e.content === 'phase one / phase two done')).toBe(true);
-            expect(events[events.length - 1]).toMatchObject({ type: 'result', result: 'Completed successfully' });
+            expect(events[0]).toMatchObject({ type: 'user.message' });
+            expect(events[1]).toMatchObject({ data: { toolName: 'bash', arguments: { command: 'phase one' } } });
+            expect(events).toContainEqual(
+                expect.objectContaining({ type: 'assistant.message', data: { content: 'phase one / phase two done' } }),
+            );
+            expect(events[events.length - 1]).toMatchObject({ type: 'result', exitCode: 0 });
 
             await gate.waitForCompleted('probe', 5_000);
             expect(await gate.drain(1_000)).toEqual([]);
@@ -161,18 +163,11 @@ describe('agent fixture behavior', () => {
 
         try {
             const launcher = fixtureAgents.command('mock');
-            // Mirror the product's copilot spawn shape: base flags precede any
-            // profile args and the prompt is the final argument. Node's CLI
-            // would reject --output-format, so this proves the launcher (not
-            // the raw node executable) is the configured command.
-            const runnerArgs = [
-                '-p',
-                '--output-format',
-                'stream-json',
-                '--input-format',
-                'stream-json',
-                'ignored prompt text',
-            ];
+            // Mirror the product's copilot spawn shape: the prompt and base
+            // flags precede any profile args. Node's CLI would reject
+            // --output-format, so this proves the launcher (not the raw node
+            // executable) is the configured command.
+            const runnerArgs = ['-p', 'ignored prompt text', '--output-format', 'json', '--no-ask-user'];
             const child =
                 process.platform === 'win32'
                     ? startExecutable('cmd', ['/c', launcher, ...runnerArgs])
@@ -183,8 +178,8 @@ describe('agent fixture behavior', () => {
             expect(outcome.signal).toBeNull();
             const events = parseWireLines(outcome.stdout);
             expect(events).toHaveLength(5);
-            expect(events[0]).toMatchObject({ type: 'system', subtype: 'init' });
-            expect(events[4]).toMatchObject({ type: 'result', result: 'Completed successfully' });
+            expect(events[0]).toMatchObject({ type: 'user.message' });
+            expect(events[4]).toMatchObject({ type: 'result', exitCode: 0 });
         } finally {
             await fixtureAgents.dispose();
         }

@@ -635,6 +635,39 @@ mod git_required {
     }
 
     #[test]
+    fn cli_worktree_list_accepts_a_relative_tasks_dir() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let wt = root.join("worktrees").join(&ticket);
+        let branch = format!("agent/{ticket}");
+        git(
+            root,
+            &["worktree", "add", "-b", &branch, wt.to_str().unwrap()],
+        );
+        let relative = fixture.tasks_root.strip_prefix(root).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_lotar"))
+            .args([
+                "--tasks-dir",
+                relative.to_str().unwrap(),
+                "agent",
+                "worktree",
+                "list",
+            ])
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .current_dir(root)
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "{stdout}{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(stdout.contains(&branch), "{stdout}");
+    }
+
+    #[test]
     fn automatic_cleanup_preserves_missing_malformed_dirty_and_unmerged_worktrees() {
         common::require_git();
         for body in [

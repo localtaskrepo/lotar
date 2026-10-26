@@ -1,0 +1,30 @@
+title: Review and update the agent workflow templates
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-26T17:02:37.302496+00:00
+modified: 2026-10-26T17:38:26.679937+00:00
+description: |-
+  Review the agent templates (agent-pipeline, agent-reviewed) and the built-in agent instructions against how jobs and automation work today.
+
+  Findings so far:
+  - The built-in instructions (docs/help/agent-instructions.md) tell agents to update the status when they start and finish, so every live run (claude, codex, copilot) set its ticket to Done, which automation then overrode with NeedsReview. When automation owns the lifecycle the agent should comment, not move the status, except to flag a blocker.
+  - They also say to avoid git, so worktree jobs never commit; the work only exists as uncommitted changes in the worktree. Worktree jobs should commit to their agent branch.
+  - `agent.automation.on_start/on_success/...` is parsed but never applied; without an automation.yml a finished job leaves the ticket untouched. Templates make users copy the automation section by hand; init should write a working automation.yml.
+  - Templates use runner: copilot for every phase, alias event names (job_start/complete/error), an auto merge-and-push-to-main phase, and allow an endless test-failure → implement loop.
+  - Per-phase model/effort depends on DEV-200.
+history:
+- at: 2026-10-26T17:38:26.679937+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Review the agent templates (agent-pipeline, agent-reviewed) and the built-in agent instructions against how jobs and automation work today.
+
+      Findings so far:
+      - The built-in instructions (docs/help/agent-instructions.md) tell agents to update the status when they start and finish, so every live run (claude, codex, copilot) set its ticket to Done, which automation then overrode with NeedsReview. When automation owns the lifecycle the agent should comment, not move the status, except to flag a blocker.
+      - They also say to avoid git, so worktree jobs never commit; the work only exists as uncommitted changes in the worktree. Worktree jobs should commit to their agent branch.
+      - `agent.automation.on_start/on_success/...` is parsed but never applied; without an automation.yml a finished job leaves the ticket untouched. Templates make users copy the automation section by hand; init should write a working automation.yml.
+      - Templates use runner: copilot for every phase, alias event names (job_start/complete/error), an auto merge-and-push-to-main phase, and allow an endless test-failure → implement loop.
+      - Per-phase model/effort depends on DEV-200.

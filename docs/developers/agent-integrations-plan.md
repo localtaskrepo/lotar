@@ -21,32 +21,34 @@ Enable LoTaR to orchestrate installed agent CLIs (Copilot CLI, Claude Code, Code
 - `payload` (text, usage, raw)
 
 ## Runner event mapping (observed)
+
+Checked against live runs of claude 2.1.308, codex-cli 0.163 and copilot 1.0.69 (DEV-199); sanitised captures are replayed by the parser tests from `tests/fixtures/agent-streams/`. Gemini follows its headless docs only.
+
 ### Claude Code
-- Requires `--verbose` with `--output-format stream-json`.
-- `type=system/subtype=init` → `init`
-- `type=stream_event` + `content_block_delta` → `progress`
-- `type=assistant` → `message`
-- `type=result` + `subtype=success|error` → `completed` / `failed`
+- `-p --output-format stream-json --input-format stream-json --verbose`. In stream-json input mode the positional prompt is ignored: the prompt is written to stdin as a `{"type":"user",...}` line and stdin is closed after the `result` line, which is what ends the process.
+- `type=system/subtype=init` → `init`; other system subtypes (hooks, `api_retry`) → ignored / progress
+- `type=assistant` text blocks → `message`; `tool_use` blocks → `progress` (`Tool: detail`)
+- `type=stream_event` (partial deltas) → ignored; LoTaR no longer passes `--include-partial-messages`
+- `type=result` + `is_error` → `completed` / `failed` (a failed result fails the job even with exit code 0); `permission_denials` → progress note
 
 ### Codex CLI
-- Use `codex exec --json` (JSONL).
+- `codex exec --json … <prompt>` (JSONL).
 - `thread.started` → `init`
-- `item.completed` (agent_message/reasoning) → `progress` / `message`
-- `turn.completed` → `completed` (usage)
+- `item.started` `command_execution` / `item.completed` `file_change` → `progress`; `item.completed` `agent_message` → `message`
+- `turn.completed` → `completed`; `turn.failed` / `error` → `failed`
 
 ### Gemini CLI
-- Use `--output-format stream-json`.
+- `--output-format stream-json … -p <prompt>`.
 - Filter non‑JSON lines (IDE warnings).
 - `type=init` → `init`
-- `type=message` + `delta=true` → `progress`
+- `type=message` (assistant) → `message`; `tool_use` → `progress`
 - `type=result` + `status=success|error` → `completed` / `failed`
 
 ### Copilot CLI
-- Use `-p --output-format stream-json`.
-- `type=system/subtype=init` → `init`
-- `type=message` + `delta=true` → `progress`
-- `type=message` (no delta) → `message`
-- `type=result` → `completed` / `failed`
+- `-p <prompt> --output-format json --no-ask-user` (there is no stream-json mode). Every line is a `{type, data}` envelope.
+- `user.message` (the echoed prompt, first line) → `init`
+- `tool.execution_start` → `progress`; `assistant.message` → `message`; deltas, reasoning and turn markers → ignored
+- `result` (`sessionId`, `exitCode`, `usage`) → `completed` / `failed`
 
 ## Job lifecycle
 1) `queued`

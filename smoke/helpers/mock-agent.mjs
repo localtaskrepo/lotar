@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Cross-platform mock agent that emits Copilot CLI stream-json output.
+// Cross-platform mock agent that emits GitHub Copilot CLI output
+// (`copilot -p <prompt> --output-format json`), in the envelope a real run
+// prints: `{ type, data }` lines ending with a `result` line.
 //
 // The product spawns `<node> <this script> <runner flags> <prompt>` and
-// parses stdout lines as runner events, so this plain Node script replaces
-// the former bash mock-agent.sh without any bash/date/sleep dependency.
-// Unknown argv entries (the runner's own flags and the trailing prompt)
-// are ignored. Recognized flags:
+// parses stdout lines as runner events. Unknown argv entries (the runner's
+// own flags and the prompt) are ignored. Recognized flags:
 //   --exit <code>   exit with the given code after emitting all events
 //   --session <id>  use a fixed session id
 
@@ -30,11 +30,11 @@ const exitCode = Number.isInteger(requestedExit) ? requestedExit : 0;
 const sessionId = options['--session'] ?? `test-session-${process.pid}-${Date.now()}`;
 
 const events = [
-    { type: 'system', subtype: 'init', session_id: sessionId },
-    { type: 'message', delta: true, content: 'Hello', session_id: sessionId },
-    { type: 'message', delta: true, content: ' from mock agent!', session_id: sessionId },
-    { type: 'message', content: 'Hello from mock agent!', session_id: sessionId },
-    { type: 'result', result: 'Completed successfully', session_id: sessionId },
+    { type: 'user.message', data: { content: 'mock prompt' } },
+    { type: 'tool.execution_start', data: { toolName: 'bash', arguments: { command: 'echo Hello' } } },
+    { type: 'assistant.message', data: { content: 'Hello from mock agent!' } },
+    { type: 'assistant.turn_end', data: { turnId: '0' } },
+    { type: 'result', sessionId, exitCode, usage: { premiumRequests: 0 } },
 ];
 
 // Write through a single buffered write and exit from its callback so

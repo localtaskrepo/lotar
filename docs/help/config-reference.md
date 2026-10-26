@@ -28,15 +28,21 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - sync.write_reports: boolean (default true)
 - agent.context_enabled: boolean (default true) — when true, LoTaR stores per-ticket `.context` files to support agent resume/continue; disable for stateless runs. If you don’t want to share context files, add `.context` to `.gitignore`.
 - agent.context_extension: string (default ".context")
-- agent.logs_dir: optional string (default workspace `.agent-logs`; see [Agent Jobs](./agent.md))
+- agent.logs_dir: optional string (default unset: job logs are not written, so `lotar agent status`/`logs` only find jobs the current process still holds). Relative paths resolve from the workspace root; see [Agent Jobs](./agent.md).
 - agent.instructions: string | { file: string } (default: built-in) — prepended to agent prompts. Inline strings are used directly; file paths can be absolute or relative to the tasks directory.
 - agent.worktree.enabled: boolean (default false) — when true, agent jobs run inside a git worktree.
 - agent.worktree.dir: string (default computed) — optional worktree root directory; relative paths resolve from the repo’s parent directory.
 - agent.worktree.branch_prefix: string (default "agent/") — prefix used when creating agent branches.
 - agent.worktree.max_parallel_jobs: optional positive integer (unset means unlimited)
 - agent.worktree.cleanup_on_done / cleanup_on_failure / cleanup_on_cancel / cleanup_delete_branches: booleans (default false). Eligibility and clean/merged/active-job safeguards still apply; see [Agent Jobs](./agent.md).
-- agent.automation.on_start / on_success / on_failure / on_cancel: lifecycle action maps (`set_status`, `reassign_to`). Defaults start at InProgress, succeed at NeedsReview with `assignee_or_reporter`, and leave failure/cancel empty. Custom workflows must provide compatible actions; see [Agent Jobs](./agent.md).
+- agent.automation.on_start / on_success / on_failure / on_cancel: legacy lifecycle maps that are still accepted but not applied. Job lifecycle changes (for example InProgress on start, NeedsReview on success) come from `job_started` / `job_completed` / `job_failed` / `job_cancelled` rules in the automation file; see [Automation Rules](./automation.md#agent-job-queueing).
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
+  - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `command`
+  - agents.<name>.permissions: `read-only` | `workspace` | `full` (default `workspace`) — what the agent may do without asking; see [Agent Jobs](./agent.md#permissions)
+  - agents.<name>.command: optional string — the executable to run (default: the runner name; required for `command`)
+  - agents.<name>.args: string[] — extra CLI arguments, after LoTaR's own flags
+  - agents.<name>.env: map — extra environment variables
+  - agents.<name>.instructions: string | { file: string } — replaces `agent.instructions` for this profile
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
 - scan.enable_ticket_words: boolean (built-in default: true) — issue-type words act as signal words in addition to TODO/FIXME/etc. Bare ticket keys alone never create tasks.

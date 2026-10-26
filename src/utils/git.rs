@@ -94,7 +94,15 @@ pub fn verified_common_dir(root: &Path) -> std::io::Result<PathBuf> {
 
 /// Find the git repo root by walking up from start until a .git directory or file is found.
 pub fn find_repo_root(start: &Path) -> Option<PathBuf> {
-    let mut cur = start;
+    // A relative start such as `.tasks` would otherwise walk up to the empty
+    // path and return that as the root, which no command can run in.
+    let absolute;
+    let mut cur = if start.is_absolute() {
+        start
+    } else {
+        absolute = std::env::current_dir().ok()?.join(start);
+        absolute.as_path()
+    };
     loop {
         let candidate = cur.join(".git");
         if candidate.is_dir() || candidate.is_file() {

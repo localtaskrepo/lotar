@@ -143,10 +143,30 @@ pub struct AgentMcpConfig {
     pub allow: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// What an agent run may do without asking (DEV-199). LoTaR maps the level
+/// onto each CLI's own permission flags, unless the profile's `args` already
+/// pass that CLI's permission flags.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentPermissions {
+    /// Read and plan only; no edits or commands that change anything.
+    ReadOnly,
+    /// Edit files and run commands in the job's working directory (sandboxed
+    /// where the CLI supports it). The default.
+    #[default]
+    Workspace,
+    /// Approve everything, without sandboxing. Only for isolated machines.
+    Full,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentProfileDetail {
     pub runner: String,
+    /// Defaults to `workspace` when omitted.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub permissions: Option<AgentPermissions>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub command: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -174,7 +194,7 @@ pub enum AgentInstructionsConfig {
 #[serde(untagged)]
 pub enum AgentProfileConfig {
     Runner(String),
-    Detailed(AgentProfileDetail),
+    Detailed(Box<AgentProfileDetail>),
 }
 
 impl AgentProfileConfig {
@@ -182,14 +202,9 @@ impl AgentProfileConfig {
         match self {
             AgentProfileConfig::Runner(runner) => AgentProfileDetail {
                 runner: runner.clone(),
-                command: None,
-                args: Vec::new(),
-                env: HashMap::new(),
-                tools: None,
-                mcp: None,
-                instructions: None,
+                ..Default::default()
             },
-            AgentProfileConfig::Detailed(detail) => detail.clone(),
+            AgentProfileConfig::Detailed(detail) => (**detail).clone(),
         }
     }
 }

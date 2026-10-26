@@ -37,6 +37,7 @@
     "playwright:install": "npx playwright install --with-deps chromium",
     "seed:test-tasks": "node scripts/generate-test-tasks.mjs",
     "site:build": "node scripts/build-site.mjs",
+    "agents:live": "node scripts/agent-live-check.mjs",
     "screenshots": "npm run build:smoke && node scripts/screenshots.mjs",
     "clean": "cargo clean && rm -rf node_modules",
     "hooks:install": "git config core.hooksPath .githooks",

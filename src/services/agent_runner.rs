@@ -1,4 +1,4 @@
-use crate::config::types::AgentProfileDetail;
+use crate::config::types::{AgentPermissions, AgentProfileDetail};
 use crate::errors::{LoTaRError, LoTaRResult};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -45,6 +45,9 @@ pub struct RunnerCommand {
     pub program: String,
     pub args: Vec<String>,
     pub env: HashMap<String, String>,
+    /// Bytes to write to the runner's stdin right after it starts (Claude
+    /// reads its first prompt from stdin in stream-json input mode).
+    pub initial_input: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,12 +64,160 @@ pub struct RunnerEvent {
     pub text: Option<String>,
     pub session_id: Option<String>,
     pub payload: Option<JsonValue>,
+    /// The runner reported a failure (an error result, a failed turn), even
+    /// if the process later exits 0.
+    pub failed: bool,
+}
+
+impl RunnerEvent {
+    fn new(kind: RunnerEventKind, text: Option<String>, session_id: Option<String>) -> Self {
+        Self {
+            kind,
+            text,
+            session_id,
+            payload: None,
+            failed: false,
+        }
+    }
+
+    fn with_payload(mut self, payload: &JsonValue) -> Self {
+        self.payload = Some(payload.clone());
+        self
+    }
+
+    fn failing(mut self) -> Self {
+        self.failed = true;
+        self
+    }
+}
+
+/// Claude Code settings for the `workspace` level: shell commands run inside
+/// the OS sandbox without prompting, so writes outside the working directory
+/// (and its allowed directories) are blocked.
+const CLAUDE_SANDBOX_SETTINGS: &str =
+    r#"{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true}}"#;
+
+/// True when the profile's own args already choose a permission mode, so
+/// LoTaR must not add its defaults (they could conflict).
+fn args_set_permissions(kind: AgentRunnerKind, args: &[String]) -> bool {
+    let flags: &[&str] = match kind {
+        AgentRunnerKind::Claude => &[
+            "--permission-mode",
+            "--dangerously-skip-permissions",
+            "--allow-dangerously-skip-permissions",
+        ],
+        AgentRunnerKind::Codex => &[
+            "-s",
+            "--sandbox",
+            "--full-auto",
+            "--approve-for-me",
+            "--dangerously-bypass-approvals-and-sandbox",
+        ],
+        AgentRunnerKind::Copilot => &[
+            "--allow-all-tools",
+            "--allow-all",
+            "--yolo",
+            "--allow-tool",
+            "--deny-tool",
+        ],
+        AgentRunnerKind::Gemini => &["--approval-mode", "-y", "--yolo"],
+        AgentRunnerKind::Command => return true,
+    };
+    args.iter().any(|arg| {
+        let name = arg.split('=').next().unwrap_or(arg);
+        flags.contains(&name)
+    })
+}
+
+/// Each CLI's flags for a permission level. `writable_dirs` are extra
+/// directories the `workspace` level may write besides the working directory
+/// (the tasks directory and git data of a worktree job).
+fn permission_args(
+    kind: AgentRunnerKind,
+    level: AgentPermissions,
+    profile_args: &[String],
+    writable_dirs: &[std::path::PathBuf],
+) -> Vec<String> {
+    let mut args = level_args(kind, level, profile_args);
+    if level == AgentPermissions::Workspace {
+        let flag = match kind {
+            AgentRunnerKind::Gemini => "--include-directories",
+            AgentRunnerKind::Command => return args,
+            _ => "--add-dir",
+        };
+        for dir in writable_dirs {
+            args.extend([flag.to_string(), dir.display().to_string()]);
+        }
+    }
+    args
+}
+
+fn level_args(
+    kind: AgentRunnerKind,
+    level: AgentPermissions,
+    profile_args: &[String],
+) -> Vec<String> {
+    let owned = |items: &[&str]| {
+        items
+            .iter()
+            .map(|item| item.to_string())
+            .collect::<Vec<_>>()
+    };
+    match (kind, level) {
+        (AgentRunnerKind::Command, _) => Vec::new(),
+        (AgentRunnerKind::Claude, AgentPermissions::ReadOnly) => {
+            owned(&["--permission-mode", "plan"])
+        }
+        (AgentRunnerKind::Claude, AgentPermissions::Workspace) => {
+            let mut args = owned(&["--permission-mode", "acceptEdits"]);
+            // A profile that brings its own settings keeps them as they are.
+            if !profile_args
+                .iter()
+                .any(|arg| arg == "--settings" || arg.starts_with("--settings="))
+            {
+                args.extend([
+                    "--settings".to_string(),
+                    CLAUDE_SANDBOX_SETTINGS.to_string(),
+                ]);
+            }
+            args
+        }
+        (AgentRunnerKind::Claude, AgentPermissions::Full) => {
+            owned(&["--permission-mode", "bypassPermissions"])
+        }
+        (AgentRunnerKind::Codex, AgentPermissions::ReadOnly) => owned(&["--sandbox", "read-only"]),
+        (AgentRunnerKind::Codex, AgentPermissions::Workspace) => {
+            owned(&["--sandbox", "workspace-write"])
+        }
+        (AgentRunnerKind::Codex, AgentPermissions::Full) => {
+            owned(&["--dangerously-bypass-approvals-and-sandbox"])
+        }
+        (AgentRunnerKind::Copilot, AgentPermissions::ReadOnly) => owned(&[
+            "--allow-all-tools",
+            "--deny-tool=write",
+            "--deny-tool=shell",
+        ]),
+        // Copilot has no sandbox: its file tools stay limited to the working
+        // directory, shell commands are not. Pushing stays a human decision.
+        (AgentRunnerKind::Copilot, AgentPermissions::Workspace) => {
+            owned(&["--allow-all-tools", "--deny-tool=shell(git push)"])
+        }
+        (AgentRunnerKind::Copilot, AgentPermissions::Full) => owned(&["--allow-all"]),
+        (AgentRunnerKind::Gemini, AgentPermissions::ReadOnly) => {
+            owned(&["--approval-mode", "plan"])
+        }
+        (AgentRunnerKind::Gemini, AgentPermissions::Workspace) => {
+            owned(&["--approval-mode", "auto_edit"])
+        }
+        (AgentRunnerKind::Gemini, AgentPermissions::Full) => owned(&["--approval-mode", "yolo"]),
+    }
 }
 
 pub fn build_runner_command(
     kind: AgentRunnerKind,
     profile: &AgentProfileDetail,
     prompt: &str,
+    writable_dirs: &[std::path::PathBuf],
 ) -> LoTaRResult<RunnerCommand> {
     if kind == AgentRunnerKind::Command {
         let program = profile.command.clone().ok_or_else(|| {
@@ -79,284 +230,448 @@ pub fn build_runner_command(
         // it is available via the LOTAR_AGENT_PROMPT env var instead.
         let mut env = expand_env_map(&profile.env);
         env.insert("LOTAR_AGENT_PROMPT".to_string(), prompt.to_string());
-        return Ok(RunnerCommand { program, args, env });
+        return Ok(RunnerCommand {
+            program,
+            args,
+            env,
+            initial_input: None,
+        });
     }
 
     let program = profile
         .command
         .clone()
         .unwrap_or_else(|| kind.as_str().to_string());
+    let owned = |items: &[&str]| {
+        items
+            .iter()
+            .map(|item| item.to_string())
+            .collect::<Vec<_>>()
+    };
 
+    // Base flags verified against claude 2.1.308, codex-cli 0.163, copilot
+    // 1.0.69 and the Gemini CLI headless docs (DEV-199).
     let mut args: Vec<String> = match kind {
-        AgentRunnerKind::Codex => vec!["exec".to_string(), "--json".to_string()],
-        AgentRunnerKind::Claude => vec![
-            "-p".to_string(),
-            "--output-format".to_string(),
-            "stream-json".to_string(),
-            "--input-format".to_string(),
-            "stream-json".to_string(),
-            "--verbose".to_string(),
-            "--include-partial-messages".to_string(),
-        ],
+        AgentRunnerKind::Codex => owned(&["exec", "--json"]),
+        // In stream-json input mode Claude ignores a positional prompt and
+        // reads user messages from stdin, so the prompt is sent there.
+        AgentRunnerKind::Claude => owned(&[
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--input-format",
+            "stream-json",
+            "--verbose",
+        ]),
+        // Copilot: `-p` takes the prompt as its value; only text/json output.
         AgentRunnerKind::Copilot => vec![
             "-p".to_string(),
+            prompt.to_string(),
             "--output-format".to_string(),
-            "stream-json".to_string(),
-            "--input-format".to_string(),
-            "stream-json".to_string(),
+            "json".to_string(),
+            "--no-ask-user".to_string(),
         ],
-        AgentRunnerKind::Gemini => vec!["--output-format".to_string(), "stream-json".to_string()],
+        AgentRunnerKind::Gemini => owned(&["--output-format", "stream-json"]),
         AgentRunnerKind::Command => unreachable!("handled above"),
     };
 
-    if !profile.args.is_empty() {
-        args.extend(profile.args.iter().cloned());
+    if !args_set_permissions(kind, &profile.args) {
+        args.extend(permission_args(
+            kind,
+            profile.permissions.unwrap_or_default(),
+            &profile.args,
+            writable_dirs,
+        ));
     }
+    args.extend(profile.args.iter().cloned());
 
-    args.push(prompt.to_string());
+    let initial_input = match kind {
+        AgentRunnerKind::Claude => format_stdin_message(kind, prompt),
+        AgentRunnerKind::Codex => {
+            args.push(prompt.to_string());
+            None
+        }
+        AgentRunnerKind::Gemini => {
+            args.extend(["-p".to_string(), prompt.to_string()]);
+            None
+        }
+        _ => None,
+    };
 
     let env = expand_env_map(&profile.env);
 
-    Ok(RunnerCommand { program, args, env })
+    Ok(RunnerCommand {
+        program,
+        args,
+        env,
+        initial_input,
+    })
 }
 
-pub fn parse_runner_line(kind: AgentRunnerKind, line: &str) -> Option<RunnerEvent> {
+/// Parse one line of runner output. `None` means the line is not a runner
+/// event at all (kept as raw output for debugging); an empty list means a
+/// recognised event with nothing to show (hooks, deltas, bookkeeping).
+pub fn parse_runner_line(kind: AgentRunnerKind, line: &str) -> Option<Vec<RunnerEvent>> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
-        return None;
+        return Some(Vec::new());
     }
-
-    match kind {
-        AgentRunnerKind::Codex => parse_codex_line(trimmed),
-        AgentRunnerKind::Claude => parse_claude_line(trimmed),
-        AgentRunnerKind::Copilot => parse_copilot_line(trimmed),
-        AgentRunnerKind::Gemini => parse_gemini_line(trimmed),
-        AgentRunnerKind::Command => Some(RunnerEvent {
-            kind: RunnerEventKind::Progress,
-            text: Some(trimmed.to_string()),
-            session_id: None,
-            payload: None,
-        }),
+    if kind == AgentRunnerKind::Command {
+        return Some(vec![RunnerEvent::new(
+            RunnerEventKind::Progress,
+            Some(trimmed.to_string()),
+            None,
+        )]);
     }
+    let payload: JsonValue = serde_json::from_str(trimmed).ok()?;
+    payload.get("type").and_then(|v| v.as_str())?;
+    Some(match kind {
+        AgentRunnerKind::Codex => parse_codex_event(&payload),
+        AgentRunnerKind::Claude => parse_claude_event(&payload),
+        AgentRunnerKind::Copilot => parse_copilot_event(&payload),
+        AgentRunnerKind::Gemini => parse_gemini_event(&payload),
+        AgentRunnerKind::Command => unreachable!("handled above"),
+    })
 }
 
-fn parse_codex_line(line: &str) -> Option<RunnerEvent> {
-    let payload: JsonValue = serde_json::from_str(line).ok()?;
-    let event_type = payload.get("type").and_then(|v| v.as_str())?;
-    let session_id = payload
-        .get("thread_id")
+fn str_field(value: &JsonValue, key: &str) -> Option<String> {
+    value
+        .get(key)
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(|s| s.to_string())
+}
 
-    match event_type {
-        "thread.started" => Some(RunnerEvent {
-            kind: RunnerEventKind::Init,
-            text: None,
-            session_id,
-            payload: Some(payload),
-        }),
-        "item.completed" => {
-            let item = payload.get("item");
-            let item_type = item.and_then(|v| v.get("type")).and_then(|v| v.as_str());
-            let text = item
-                .and_then(|v| v.get("text"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+fn non_empty(text: Option<String>) -> Option<String> {
+    text.filter(|text| !text.trim().is_empty())
+}
 
-            let kind = match item_type {
-                Some("agent_message") => RunnerEventKind::Message,
-                _ => RunnerEventKind::Progress,
-            };
+/// One readable line for a tool call: its name and the most telling input.
+fn tool_summary(name: &str, input: Option<&JsonValue>) -> String {
+    const KEYS: [&str; 7] = [
+        "command",
+        "file_path",
+        "path",
+        "pattern",
+        "url",
+        "query",
+        "description",
+    ];
+    let detail = input.and_then(|input| {
+        if let Some(text) = input.as_str() {
+            return Some(text.to_string());
+        }
+        KEYS.iter().find_map(|key| str_field(input, key))
+    });
+    let mut line = match detail {
+        Some(detail) => format!("{name}: {}", detail.lines().next().unwrap_or_default()),
+        None => name.to_string(),
+    };
+    if line.chars().count() > 160 {
+        line = line.chars().take(157).collect::<String>() + "...";
+    }
+    line
+}
 
-            Some(RunnerEvent {
-                kind,
+fn parse_codex_event(payload: &JsonValue) -> Vec<RunnerEvent> {
+    let event_type = payload
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    let session_id = str_field(payload, "thread_id");
+    let item = payload.get("item");
+    let item_type = item.and_then(|v| v.get("type")).and_then(|v| v.as_str());
+    match (event_type, item_type) {
+        ("thread.started", _) => {
+            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
+        }
+        ("item.completed", Some("agent_message")) => {
+            let text = non_empty(item.and_then(|item| str_field(item, "text")));
+            vec![RunnerEvent::new(RunnerEventKind::Message, text, session_id).with_payload(payload)]
+        }
+        ("item.started", Some("command_execution")) => {
+            let command = item
+                .and_then(|item| str_field(item, "command"))
+                .unwrap_or_default();
+            vec![RunnerEvent::new(
+                RunnerEventKind::Progress,
+                Some(tool_summary("Run", Some(&JsonValue::String(command)))),
+                session_id,
+            )]
+        }
+        ("item.completed", Some("file_change")) => {
+            let paths: Vec<String> = item
+                .and_then(|item| item.get("changes"))
+                .and_then(|v| v.as_array())
+                .map(|changes| {
+                    changes
+                        .iter()
+                        .filter_map(|change| str_field(change, "path"))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let text = format!(
+                "Edited {}",
+                if paths.is_empty() {
+                    "files".to_string()
+                } else {
+                    paths.join(", ")
+                }
+            );
+            vec![RunnerEvent::new(
+                RunnerEventKind::Progress,
+                Some(text),
+                session_id,
+            )]
+        }
+        ("item.completed", Some("error")) => {
+            let text = non_empty(item.and_then(|item| str_field(item, "message")));
+            vec![RunnerEvent::new(
+                RunnerEventKind::Progress,
                 text,
                 session_id,
-                payload: Some(payload),
-            })
+            )]
         }
-        "turn.completed" => Some(RunnerEvent {
-            kind: RunnerEventKind::Result,
-            text: None,
-            session_id,
-            payload: Some(payload),
-        }),
-        _ => None,
+        ("turn.completed", _) => {
+            vec![RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload)]
+        }
+        ("turn.failed", _) => {
+            let text = payload
+                .get("error")
+                .and_then(|error| str_field(error, "message"));
+            vec![
+                RunnerEvent::new(RunnerEventKind::Result, text, session_id)
+                    .with_payload(payload)
+                    .failing(),
+            ]
+        }
+        ("error", _) => {
+            let text = str_field(payload, "message");
+            vec![RunnerEvent::new(RunnerEventKind::Progress, text, session_id).failing()]
+        }
+        _ => Vec::new(),
     }
 }
 
-fn parse_claude_line(line: &str) -> Option<RunnerEvent> {
-    let payload: JsonValue = serde_json::from_str(line).ok()?;
-    let event_type = payload.get("type").and_then(|v| v.as_str())?;
-    let session_id = payload
-        .get("session_id")
+fn parse_claude_event(payload: &JsonValue) -> Vec<RunnerEvent> {
+    let event_type = payload
+        .get("type")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-
+        .unwrap_or_default();
+    let session_id = str_field(payload, "session_id");
     match event_type {
-        "system" => {
-            let subtype = payload.get("subtype").and_then(|v| v.as_str());
-            if subtype == Some("init") {
-                Some(RunnerEvent {
-                    kind: RunnerEventKind::Init,
-                    text: None,
+        "system" => match payload.get("subtype").and_then(|v| v.as_str()) {
+            Some("init") => vec![
+                RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload),
+            ],
+            Some("api_retry") => {
+                let attempt = payload.get("attempt").and_then(|v| v.as_u64()).unwrap_or(0);
+                let error =
+                    str_field(payload, "error").unwrap_or_else(|| "request failed".to_string());
+                vec![RunnerEvent::new(
+                    RunnerEventKind::Progress,
+                    Some(format!("API {error}; retrying (attempt {attempt})")),
                     session_id,
-                    payload: Some(payload),
-                })
-            } else {
-                None
+                )]
             }
-        }
-        "stream_event" => {
-            let event = payload.get("event");
-            let event_type = event.and_then(|v| v.get("type")).and_then(|v| v.as_str());
-            if event_type == Some("content_block_delta") {
-                let text = event
-                    .and_then(|v| v.get("delta"))
-                    .and_then(|v| v.get("text"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                Some(RunnerEvent {
-                    kind: RunnerEventKind::Progress,
-                    text,
-                    session_id,
-                    payload: Some(payload),
-                })
-            } else {
-                None
-            }
-        }
+            // Hooks, status and other bookkeeping events.
+            _ => Vec::new(),
+        },
+        // Partial-message deltas (only sent with --include-partial-messages,
+        // which LoTaR does not request): the full message follows anyway.
+        "stream_event" => Vec::new(),
         "assistant" => {
-            let text = payload
+            let blocks = payload
                 .get("message")
                 .and_then(|v| v.get("content"))
-                .and_then(|v| v.get(0))
-                .and_then(|v| v.get("text"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            Some(RunnerEvent {
-                kind: RunnerEventKind::Message,
-                text,
-                session_id,
-                payload: Some(payload),
-            })
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            let mut events = Vec::new();
+            // Every text block counts, not only the first (thinking and tool
+            // blocks often come before the text).
+            let text: Vec<String> = blocks
+                .iter()
+                .filter(|block| {
+                    block.get("type").and_then(|v| v.as_str()).unwrap_or("text") == "text"
+                })
+                .filter_map(|block| str_field(block, "text"))
+                .collect();
+            if let Some(text) = non_empty(Some(text.join("\n\n"))) {
+                events.push(
+                    RunnerEvent::new(RunnerEventKind::Message, Some(text), session_id.clone())
+                        .with_payload(payload),
+                );
+            }
+            for block in &blocks {
+                if block.get("type").and_then(|v| v.as_str()) == Some("tool_use") {
+                    let name = str_field(block, "name").unwrap_or_else(|| "tool".to_string());
+                    events.push(RunnerEvent::new(
+                        RunnerEventKind::Progress,
+                        Some(tool_summary(&name, block.get("input"))),
+                        session_id.clone(),
+                    ));
+                }
+            }
+            events
         }
-        "result" => Some(RunnerEvent {
-            kind: RunnerEventKind::Result,
-            text: payload
-                .get("result")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            session_id,
-            payload: Some(payload),
-        }),
-        _ => None,
+        "result" => {
+            let is_error = payload
+                .get("is_error")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+                || payload
+                    .get("subtype")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(|s| s != "success");
+            let mut events = Vec::new();
+            let denials = payload
+                .get("permission_denials")
+                .and_then(|v| v.as_array())
+                .map(|denials| denials.len())
+                .unwrap_or(0);
+            if denials > 0 {
+                events.push(RunnerEvent::new(
+                    RunnerEventKind::Progress,
+                    Some(format!(
+                        "{denials} tool call(s) were denied by the permission settings; see the agent profile's permissions"
+                    )),
+                    session_id.clone(),
+                ));
+            }
+            let mut result = RunnerEvent::new(
+                RunnerEventKind::Result,
+                str_field(payload, "result"),
+                session_id,
+            )
+            .with_payload(payload);
+            if is_error {
+                result = result.failing();
+            }
+            events.push(result);
+            events
+        }
+        _ => Vec::new(),
     }
 }
 
-fn parse_copilot_line(line: &str) -> Option<RunnerEvent> {
-    let payload: JsonValue = serde_json::from_str(line).ok()?;
-    let event_type = payload.get("type").and_then(|v| v.as_str())?;
-    let session_id = payload
-        .get("session_id")
+/// Copilot CLI `--output-format json`: `{type, data}` envelopes.
+fn parse_copilot_event(payload: &JsonValue) -> Vec<RunnerEvent> {
+    let event_type = payload
+        .get("type")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-
+        .unwrap_or_default();
+    let data = payload.get("data");
+    let session_id = str_field(payload, "sessionId")
+        .or_else(|| data.and_then(|data| str_field(data, "sessionId")));
     match event_type {
-        "system" => {
-            let subtype = payload.get("subtype").and_then(|v| v.as_str());
-            if subtype == Some("init") {
-                Some(RunnerEvent {
-                    kind: RunnerEventKind::Init,
-                    text: None,
-                    session_id,
-                    payload: Some(payload),
-                })
-            } else {
-                None
+        // A real `-p` run has no session-start line; the echoed prompt is
+        // its first event, so that marks the start.
+        "session.start" | "user.message" => {
+            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
+        }
+        "assistant.message" => {
+            let text = non_empty(data.and_then(|data| str_field(data, "content")));
+            match text {
+                Some(text) => vec![
+                    RunnerEvent::new(RunnerEventKind::Message, Some(text), session_id)
+                        .with_payload(payload),
+                ],
+                None => Vec::new(),
             }
         }
-        "message" => {
-            let text = payload
-                .get("content")
-                .and_then(|v| v.as_str())
-                .or_else(|| payload.get("text").and_then(|v| v.as_str()))
-                .map(|s| s.to_string());
-            let kind = if payload
-                .get("delta")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-            {
-                RunnerEventKind::Progress
-            } else {
-                RunnerEventKind::Message
-            };
-            Some(RunnerEvent {
-                kind,
-                text,
+        "tool.execution_start" => {
+            let name = data
+                .and_then(|data| str_field(data, "toolName"))
+                .unwrap_or_else(|| "tool".to_string());
+            let summary = tool_summary(&name, data.and_then(|data| data.get("arguments")));
+            vec![RunnerEvent::new(
+                RunnerEventKind::Progress,
+                Some(summary),
                 session_id,
-                payload: Some(payload),
-            })
+            )]
         }
-        "result" => Some(RunnerEvent {
-            kind: RunnerEventKind::Result,
-            text: payload
-                .get("result")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            session_id,
-            payload: Some(payload),
-        }),
-        _ => None,
+        "session.error" | "error" => {
+            let text = data
+                .and_then(|data| str_field(data, "message"))
+                .or_else(|| str_field(payload, "message"));
+            vec![RunnerEvent::new(RunnerEventKind::Progress, text, session_id).failing()]
+        }
+        "result" => {
+            let exit_code = payload
+                .get("exitCode")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let mut result =
+                RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload);
+            if exit_code != 0 {
+                result = result.failing();
+            }
+            vec![result]
+        }
+        _ => Vec::new(),
     }
 }
 
-fn parse_gemini_line(line: &str) -> Option<RunnerEvent> {
-    if !line.trim_start().starts_with('{') {
-        return None;
-    }
-    let payload: JsonValue = serde_json::from_str(line).ok()?;
-    let event_type = payload.get("type").and_then(|v| v.as_str())?;
-    let session_id = payload
-        .get("session_id")
+/// Gemini CLI `--output-format stream-json` (from the headless docs; not
+/// verified against a live run).
+fn parse_gemini_event(payload: &JsonValue) -> Vec<RunnerEvent> {
+    let event_type = payload
+        .get("type")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-
+        .unwrap_or_default();
+    let session_id = str_field(payload, "session_id");
     match event_type {
-        "init" => Some(RunnerEvent {
-            kind: RunnerEventKind::Init,
-            text: None,
-            session_id,
-            payload: Some(payload),
-        }),
+        "init" => {
+            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
+        }
         "message" => {
-            let text = payload
-                .get("content")
+            if payload
+                .get("role")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let kind = if payload
+                .is_some_and(|role| role != "assistant")
+            {
+                return Vec::new();
+            }
+            let text = non_empty(str_field(payload, "content"));
+            let delta = payload
                 .get("delta")
                 .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-            {
+                .unwrap_or(false);
+            let kind = if delta {
                 RunnerEventKind::Progress
             } else {
                 RunnerEventKind::Message
             };
-            Some(RunnerEvent {
-                kind,
-                text,
-                session_id,
-                payload: Some(payload),
-            })
+            match text {
+                Some(text) => {
+                    vec![RunnerEvent::new(kind, Some(text), session_id).with_payload(payload)]
+                }
+                None => Vec::new(),
+            }
         }
-        "result" => Some(RunnerEvent {
-            kind: RunnerEventKind::Result,
-            text: None,
+        "tool_use" => {
+            let name = str_field(payload, "tool_name").unwrap_or_else(|| "tool".to_string());
+            vec![RunnerEvent::new(
+                RunnerEventKind::Progress,
+                Some(tool_summary(&name, payload.get("parameters"))),
+                session_id,
+            )]
+        }
+        "error" => vec![RunnerEvent::new(
+            RunnerEventKind::Progress,
+            str_field(payload, "message"),
             session_id,
-            payload: Some(payload),
-        }),
-        _ => None,
+        )],
+        "result" => {
+            let failed = str_field(payload, "status").is_some_and(|status| status != "success");
+            let mut result =
+                RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload);
+            if failed {
+                result = result.failing();
+            }
+            vec![result]
+        }
+        _ => Vec::new(),
     }
 }
 
@@ -389,17 +704,15 @@ pub fn validate_runner_command(cmd: &RunnerCommand) -> LoTaRResult<()> {
 /// Returns whether stdin should be piped for this runner kind.
 /// When true, the runner accepts user messages via stdin.
 pub fn supports_stdin(kind: AgentRunnerKind) -> bool {
-    match kind {
-        AgentRunnerKind::Claude | AgentRunnerKind::Copilot => true,
-        AgentRunnerKind::Codex | AgentRunnerKind::Gemini | AgentRunnerKind::Command => false,
-    }
+    // Copilot has no stdin message protocol (DEV-199); Claude does.
+    matches!(kind, AgentRunnerKind::Claude)
 }
 
 /// Format a user message for the runner's stdin protocol.
 /// Returns the bytes to write (including trailing newline).
 pub fn format_stdin_message(kind: AgentRunnerKind, message: &str) -> Option<Vec<u8>> {
     match kind {
-        AgentRunnerKind::Claude | AgentRunnerKind::Copilot => {
+        AgentRunnerKind::Claude => {
             // stream-json input format:
             // {"type":"user","message":{"role":"user","content":"<text>"}}
             let obj = serde_json::json!({
@@ -421,108 +734,348 @@ pub fn format_stdin_message(kind: AgentRunnerKind, message: &str) -> Option<Vec<
 mod tests {
     use super::*;
 
-    #[test]
-    fn parse_claude_stream_event_delta() {
-        let line = r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}},"session_id":"test-123"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Claude, line);
-        assert!(event.is_some(), "Expected Some, got None for stream_event");
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Progress);
-        assert_eq!(event.text.as_deref(), Some("Hello"));
-        assert_eq!(event.session_id.as_deref(), Some("test-123"));
+    fn profile(runner: &str) -> AgentProfileDetail {
+        AgentProfileDetail {
+            runner: runner.to_string(),
+            ..Default::default()
+        }
+    }
+
+    fn replay(kind: AgentRunnerKind, fixture: &str) -> Vec<RunnerEvent> {
+        let path = format!(
+            "{}/tests/fixtures/agent-streams/{fixture}",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let text = std::fs::read_to_string(path).expect("fixture");
+        text.lines()
+            .flat_map(|line| {
+                parse_runner_line(kind, line).expect("every captured line is a runner event")
+            })
+            .collect()
+    }
+
+    fn texts(events: &[RunnerEvent], kind: RunnerEventKind) -> Vec<String> {
+        events
+            .iter()
+            .filter(|event| event.kind == kind)
+            .filter_map(|event| event.text.clone())
+            .collect()
     }
 
     #[test]
-    fn parse_claude_init() {
-        let line = r#"{"type":"system","subtype":"init","session_id":"abc-123"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Claude, line);
-        assert!(event.is_some());
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Init);
-        assert_eq!(event.session_id.as_deref(), Some("abc-123"));
+    fn claude_gets_its_prompt_on_stdin_with_workspace_permissions() {
+        let cmd = build_runner_command(
+            AgentRunnerKind::Claude,
+            &profile("claude"),
+            "Fix the bug",
+            &[],
+        )
+        .unwrap();
+        assert!(
+            !cmd.args.iter().any(|arg| arg == "Fix the bug"),
+            "{:?}",
+            cmd.args
+        );
+        assert!(
+            cmd.args
+                .windows(2)
+                .any(|pair| pair == ["--input-format", "stream-json"])
+        );
+        assert!(
+            cmd.args
+                .windows(2)
+                .any(|pair| pair == ["--permission-mode", "acceptEdits"])
+        );
+        assert!(cmd.args.windows(2).any(|pair| pair[0] == "--settings" && pair[1].contains("autoAllowBashIfSandboxed")));
+        let input: serde_json::Value =
+            serde_json::from_slice(cmd.initial_input.as_ref().unwrap()).unwrap();
+        assert_eq!(input["message"]["content"], "Fix the bug");
     }
 
     #[test]
-    fn parse_claude_assistant_message() {
-        let line = r#"{"type":"assistant","message":{"content":[{"text":"Hello world"}]},"session_id":"abc"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Claude, line);
-        assert!(event.is_some());
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Message);
-        assert_eq!(event.text.as_deref(), Some("Hello world"));
+    fn permission_levels_map_onto_each_cli() {
+        let level = |runner: &str, permissions: AgentPermissions| {
+            let mut detail = profile(runner);
+            detail.permissions = Some(permissions);
+            let kind: AgentRunnerKind = runner.parse().unwrap();
+            build_runner_command(kind, &detail, "p", &[])
+                .unwrap()
+                .args
+                .join(" ")
+        };
+        assert!(level("claude", AgentPermissions::ReadOnly).contains("--permission-mode plan"));
+        assert!(
+            level("claude", AgentPermissions::Full).contains("--permission-mode bypassPermissions")
+        );
+        assert!(level("codex", AgentPermissions::ReadOnly).contains("--sandbox read-only"));
+        assert!(level("codex", AgentPermissions::Workspace).contains("--sandbox workspace-write"));
+        assert!(
+            level("codex", AgentPermissions::Full)
+                .contains("--dangerously-bypass-approvals-and-sandbox")
+        );
+        assert!(level("copilot", AgentPermissions::ReadOnly).contains("--deny-tool=write"));
+        assert!(
+            level("copilot", AgentPermissions::Workspace).contains("--deny-tool=shell(git push)")
+        );
+        assert!(level("copilot", AgentPermissions::Full).contains("--allow-all"));
+        assert!(level("gemini", AgentPermissions::Workspace).contains("--approval-mode auto_edit"));
+        assert!(level("gemini", AgentPermissions::Full).contains("--approval-mode yolo"));
     }
 
     #[test]
-    fn parse_claude_result() {
-        let line = r#"{"type":"result","result":"Done!","session_id":"abc"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Claude, line);
-        assert!(event.is_some());
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Result);
-        assert_eq!(event.text.as_deref(), Some("Done!"));
+    fn profile_permission_flags_replace_the_defaults() {
+        let mut detail = profile("claude");
+        detail.args = vec!["--permission-mode".into(), "plan".into()];
+        let args = build_runner_command(AgentRunnerKind::Claude, &detail, "p", &[])
+            .unwrap()
+            .args;
+        assert_eq!(
+            args.iter()
+                .filter(|arg| *arg == "--permission-mode")
+                .count(),
+            1
+        );
+        assert!(!args.iter().any(|arg| arg == "--settings"));
+
+        let mut detail = profile("codex");
+        detail.args = vec!["-s".into(), "danger-full-access".into()];
+        let args = build_runner_command(AgentRunnerKind::Codex, &detail, "p", &[])
+            .unwrap()
+            .args;
+        assert!(!args.iter().any(|arg| arg == "workspace-write"));
     }
 
     #[test]
-    fn parse_copilot_init() {
-        let line = r#"{"type":"system","subtype":"init","session_id":"cp-123"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Copilot, line);
-        assert!(event.is_some());
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Init);
-        assert_eq!(event.session_id.as_deref(), Some("cp-123"));
+    fn workspace_level_can_write_the_extra_directories() {
+        let dirs = vec![
+            std::path::PathBuf::from("/repo/.tasks"),
+            std::path::PathBuf::from("/repo/.git"),
+        ];
+        let args = |runner: &str| {
+            let kind: AgentRunnerKind = runner.parse().unwrap();
+            build_runner_command(kind, &profile(runner), "p", &dirs)
+                .unwrap()
+                .args
+                .join(" ")
+        };
+        for runner in ["claude", "codex", "copilot"] {
+            assert!(
+                args(runner).contains("--add-dir /repo/.tasks --add-dir /repo/.git"),
+                "{runner}"
+            );
+        }
+        assert!(args("gemini").contains("--include-directories /repo/.tasks"));
+        let mut read_only = profile("claude");
+        read_only.permissions = Some(AgentPermissions::ReadOnly);
+        let args = build_runner_command(AgentRunnerKind::Claude, &read_only, "p", &dirs)
+            .unwrap()
+            .args;
+        assert!(!args.iter().any(|arg| arg == "--add-dir"));
     }
 
     #[test]
-    fn parse_copilot_message() {
-        let line = r#"{"type":"message","content":"Hello from copilot","session_id":"cp-1"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Copilot, line);
-        assert!(event.is_some());
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Message);
-        assert_eq!(event.text.as_deref(), Some("Hello from copilot"));
+    fn codex_copilot_and_gemini_take_the_prompt_as_an_argument() {
+        let codex =
+            build_runner_command(AgentRunnerKind::Codex, &profile("codex"), "Do it", &[]).unwrap();
+        assert_eq!(codex.args.first().map(String::as_str), Some("exec"));
+        assert_eq!(codex.args.last().map(String::as_str), Some("Do it"));
+        assert!(codex.initial_input.is_none());
+
+        let copilot =
+            build_runner_command(AgentRunnerKind::Copilot, &profile("copilot"), "Do it", &[])
+                .unwrap();
+        assert_eq!(&copilot.args[..2], ["-p", "Do it"]);
+        assert!(
+            copilot
+                .args
+                .windows(2)
+                .any(|pair| pair == ["--output-format", "json"])
+        );
+        assert!(copilot.args.iter().any(|arg| arg == "--no-ask-user"));
+        assert!(
+            !copilot
+                .args
+                .iter()
+                .any(|arg| arg == "stream-json" || arg == "--input-format")
+        );
+
+        let gemini =
+            build_runner_command(AgentRunnerKind::Gemini, &profile("gemini"), "Do it", &[])
+                .unwrap();
+        assert!(
+            gemini
+                .args
+                .ends_with(&["-p".to_string(), "Do it".to_string()])
+        );
     }
 
     #[test]
-    fn parse_copilot_progress_delta() {
-        let line = r#"{"type":"message","content":"chunk","delta":true,"session_id":"cp-1"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Copilot, line);
-        assert!(event.is_some());
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Progress);
-        assert_eq!(event.text.as_deref(), Some("chunk"));
+    fn command_runner_gets_the_prompt_in_the_environment() {
+        let mut detail = profile("command");
+        detail.command = Some("my-agent".into());
+        let cmd = build_runner_command(AgentRunnerKind::Command, &detail, "Do it", &[]).unwrap();
+        assert_eq!(
+            cmd.env.get("LOTAR_AGENT_PROMPT").map(String::as_str),
+            Some("Do it")
+        );
+        assert!(cmd.args.is_empty());
     }
 
     #[test]
-    fn parse_copilot_result() {
-        let line = r#"{"type":"result","result":"All done","session_id":"cp-1"}"#;
-        let event = parse_runner_line(AgentRunnerKind::Copilot, line);
-        assert!(event.is_some());
-        let event = event.unwrap();
-        assert_eq!(event.kind, RunnerEventKind::Result);
-        assert_eq!(event.text.as_deref(), Some("All done"));
+    fn replays_a_real_claude_edit_run() {
+        let events = replay(AgentRunnerKind::Claude, "claude-edit.jsonl");
+        assert_eq!(
+            events.first().map(|event| event.kind),
+            Some(RunnerEventKind::Init)
+        );
+        let progress = texts(&events, RunnerEventKind::Progress);
+        assert!(
+            progress
+                .iter()
+                .any(|text| text.starts_with("Edit: ") && text.ends_with("calc.py")),
+            "{progress:?}"
+        );
+        assert!(
+            progress
+                .iter()
+                .any(|text| text.starts_with("Bash: python3")),
+            "{progress:?}"
+        );
+        assert!(!texts(&events, RunnerEventKind::Message).is_empty());
+        let result = events.last().unwrap();
+        assert_eq!(result.kind, RunnerEventKind::Result);
+        assert!(!events.iter().any(|event| event.failed));
+        assert!(result.session_id.is_some());
     }
 
     #[test]
-    fn supports_stdin_for_claude_and_copilot() {
+    fn replays_a_real_codex_edit_run() {
+        let events = replay(AgentRunnerKind::Codex, "codex-edit.jsonl");
+        assert_eq!(
+            events.first().map(|event| event.kind),
+            Some(RunnerEventKind::Init)
+        );
+        let progress = texts(&events, RunnerEventKind::Progress);
+        assert!(
+            progress
+                .iter()
+                .any(|text| text.starts_with("Run: ") && text.contains("cat calc.py")),
+            "{progress:?}"
+        );
+        assert!(
+            progress
+                .iter()
+                .any(|text| text.starts_with("Edited ") && text.ends_with("calc.py")),
+            "{progress:?}"
+        );
+        assert!(!texts(&events, RunnerEventKind::Message).is_empty());
+        assert_eq!(
+            events.last().map(|event| event.kind),
+            Some(RunnerEventKind::Result)
+        );
+        assert!(!events.iter().any(|event| event.failed));
+    }
+
+    #[test]
+    fn replays_a_real_copilot_edit_run() {
+        let events = replay(AgentRunnerKind::Copilot, "copilot-edit.jsonl");
+        assert_eq!(events.first().unwrap().kind, RunnerEventKind::Init);
+        let progress = texts(&events, RunnerEventKind::Progress);
+        assert!(
+            progress.iter().any(|text| text.starts_with("apply_patch")),
+            "{progress:?}"
+        );
+        assert!(
+            progress
+                .iter()
+                .any(|text| text.starts_with("bash: python3")),
+            "{progress:?}"
+        );
+        assert!(!texts(&events, RunnerEventKind::Message).is_empty());
+        let result = events.last().unwrap();
+        assert_eq!(result.kind, RunnerEventKind::Result);
+        assert!(result.session_id.is_some());
+        assert!(!events.iter().any(|event| event.failed));
+    }
+
+    #[test]
+    fn runner_reported_failures_are_flagged() {
+        let failed = |kind: AgentRunnerKind, line: &str| {
+            parse_runner_line(kind, line)
+                .unwrap()
+                .iter()
+                .any(|event| event.failed)
+        };
+        assert!(failed(
+            AgentRunnerKind::Claude,
+            r#"{"type":"result","subtype":"error_max_turns","is_error":true,"session_id":"s"}"#
+        ));
+        assert!(failed(
+            AgentRunnerKind::Codex,
+            r#"{"type":"turn.failed","error":{"message":"quota"}}"#
+        ));
+        assert!(failed(
+            AgentRunnerKind::Codex,
+            r#"{"type":"error","message":"stream disconnected"}"#
+        ));
+        assert!(failed(
+            AgentRunnerKind::Copilot,
+            r#"{"type":"result","sessionId":"s","exitCode":1}"#
+        ));
+        assert!(failed(
+            AgentRunnerKind::Gemini,
+            r#"{"type":"result","status":"error"}"#
+        ));
+        assert!(!failed(
+            AgentRunnerKind::Claude,
+            r#"{"type":"result","subtype":"success","is_error":false}"#
+        ));
+    }
+
+    #[test]
+    fn claude_reports_denied_tools_and_joins_text_blocks() {
+        let events = parse_runner_line(
+            AgentRunnerKind::Claude,
+            r#"{"type":"result","subtype":"success","is_error":false,"permission_denials":[{"tool_name":"Bash"}]}"#,
+        )
+        .unwrap();
+        assert!(events[0].text.as_deref().unwrap().contains("denied"));
+
+        let events = parse_runner_line(
+            AgentRunnerKind::Claude,
+            r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"First"},{"type":"tool_use","name":"Read","input":{"file_path":"a.rs"}},{"type":"text","text":"Second"}]}}"#,
+        )
+        .unwrap();
+        assert_eq!(events[0].text.as_deref(), Some("First\n\nSecond"));
+        assert_eq!(events[1].text.as_deref(), Some("Read: a.rs"));
+    }
+
+    #[test]
+    fn bookkeeping_lines_are_recognised_but_not_shown_and_noise_is_raw() {
+        let hook = r#"{"type":"system","subtype":"hook_started","session_id":"s"}"#;
+        assert_eq!(
+            parse_runner_line(AgentRunnerKind::Claude, hook).map(|events| events.len()),
+            Some(0)
+        );
+        let delta = r#"{"type":"assistant.reasoning_delta","data":{"deltaContent":"x"}}"#;
+        assert_eq!(
+            parse_runner_line(AgentRunnerKind::Copilot, delta).map(|events| events.len()),
+            Some(0)
+        );
+        assert!(parse_runner_line(AgentRunnerKind::Claude, "Warning: something odd").is_none());
+    }
+
+    #[test]
+    fn only_claude_accepts_stdin_messages() {
         assert!(supports_stdin(AgentRunnerKind::Claude));
-        assert!(supports_stdin(AgentRunnerKind::Copilot));
+        assert!(!supports_stdin(AgentRunnerKind::Copilot));
         assert!(!supports_stdin(AgentRunnerKind::Codex));
         assert!(!supports_stdin(AgentRunnerKind::Gemini));
         assert!(!supports_stdin(AgentRunnerKind::Command));
-    }
-
-    #[test]
-    fn format_stdin_message_claude() {
         let msg = format_stdin_message(AgentRunnerKind::Claude, "hello world").unwrap();
         let parsed: serde_json::Value = serde_json::from_slice(&msg).unwrap();
         assert_eq!(parsed["type"], "user");
-        assert_eq!(parsed["message"]["role"], "user");
         assert_eq!(parsed["message"]["content"], "hello world");
-    }
-
-    #[test]
-    fn format_stdin_message_unsupported() {
-        assert!(format_stdin_message(AgentRunnerKind::Codex, "hello").is_none());
-        assert!(format_stdin_message(AgentRunnerKind::Command, "hello").is_none());
+        assert!(format_stdin_message(AgentRunnerKind::Copilot, "hello").is_none());
     }
 }

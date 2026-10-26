@@ -1,0 +1,24 @@
+title: Scenario tests for automation and agents, including opt-in live CLI runs
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-26T17:02:37.339929+00:00
+modified: 2026-10-26T17:38:26.713866+00:00
+description: |-
+  Scenario coverage for automation and agents working together.
+
+  - Rust scenario tests with realistic per-runner stub streams (based on the real captures in tests/fixtures/agent-streams): pipeline through several phases, runner-reported failure with exit code 0, cancel mid-run, queue limits, worktrees, messages to a running Claude job.
+  - Smoke coverage for the same flows through the server and UI.
+  - Opt-in live runs (npm run agents:live, scripts/agent-live-check.mjs): today edit and pipeline for claude/codex/copilot; add failure, cancel, message mid-run and a template pipeline.
+history:
+- at: 2026-10-26T17:38:26.713866+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Scenario coverage for automation and agents working together.
+
+      - Rust scenario tests with realistic per-runner stub streams (based on the real captures in tests/fixtures/agent-streams): pipeline through several phases, runner-reported failure with exit code 0, cancel mid-run, queue limits, worktrees, messages to a running Claude job.
+      - Smoke coverage for the same flows through the server and UI.
+      - Opt-in live runs (npm run agents:live, scripts/agent-live-check.mjs): today edit and pipeline for claude/codex/copilot; add failure, cancel, message mid-run and a template pipeline.

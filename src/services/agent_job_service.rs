@@ -112,6 +112,9 @@ struct AgentJobState {
     next_sequence: u64,
     runtime: Option<AgentJobRuntime>,
     cancellation_finalized: bool,
+    /// The runner reported a failure in its output (an error result, a
+    /// failed turn), so the job fails even if the process exits 0.
+    runner_failed: bool,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -322,6 +325,7 @@ impl AgentJobService {
                     next_sequence: 0,
                     runtime: None,
                     cancellation_finalized: false,
+                    runner_failed: false,
                 },
             );
 
@@ -650,6 +654,7 @@ fn wrap_runner_command(
         program: wrapper_program,
         args,
         env: command.env,
+        initial_input: command.initial_input,
     }
 }
 
@@ -726,12 +731,7 @@ fn resolve_profile(
     if let Some(runner) = req.runner.as_deref() {
         return Ok(AgentProfileDetail {
             runner: runner.to_string(),
-            command: None,
-            args: Vec::new(),
-            env: HashMap::new(),
-            tools: None,
-            mcp: None,
-            instructions: None,
+            ..Default::default()
         });
     }
 
@@ -894,6 +894,29 @@ fn build_prompt(
     out.push('\n');
 
     out
+}
+
+/// Directories an agent must be able to write besides its working directory:
+/// the tasks directory (to update its ticket) and, for a worktree job, the
+/// repository's git data (to commit). Anything inside the working directory
+/// is already covered (DEV-199).
+fn extra_writable_dirs(
+    working_dir: &std::path::Path,
+    tasks_dir: &std::path::Path,
+) -> Vec<std::path::PathBuf> {
+    let canonical =
+        |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let work = canonical(working_dir);
+    let mut dirs = vec![canonical(tasks_dir)];
+    if let Some(repo_root) = resolve_repo_root(tasks_dir) {
+        let git_dir = repo_root.join(".git");
+        if git_dir.is_dir() {
+            dirs.push(canonical(&git_dir));
+        }
+    }
+    dirs.retain(|dir| !dir.starts_with(&work));
+    dirs.dedup();
+    dirs
 }
 
 struct WorktreeContext {
@@ -1358,7 +1381,8 @@ fn run_job(
         job_context_for(&job_id),
     );
 
-    let command = match build_runner_command(runner_kind, &profile, &prompt) {
+    let writable_dirs = extra_writable_dirs(&worktree_context.working_dir, &tasks_dir);
+    let command = match build_runner_command(runner_kind, &profile, &prompt, &writable_dirs) {
         Ok(cmd) => cmd,
         Err(err) => {
             update_job_failure(&job_id, &ticket_id, err.to_string(), &tasks_dir);
@@ -1384,11 +1408,12 @@ fn run_job(
         command.env.extend(lotar_env);
     }
 
+    let initial_input = command.initial_input.take();
     let mut cmd = Command::new(&command.program);
     cmd.args(&command.args)
         .envs(command.env)
-        // Use null stdin - Claude CLI waits indefinitely when stdin is a pipe
-        // unless --input-format stream-json is used.
+        // Claude reads the prompt and later messages from stdin; the other
+        // CLIs get null stdin so none of them waits for input.
         .stdin(if supports_stdin(runner_kind) {
             Stdio::piped()
         } else {
@@ -1452,6 +1477,29 @@ fn run_job(
     }
     drop(registry);
 
+    // DEV-199: Claude reads its first prompt from stdin. Only the runtime
+    // keeps the pipe afterwards, so closing it there ends the session.
+    if let (Some(bytes), Some(pipe)) = (initial_input.as_ref(), stdin.as_ref()) {
+        let written = pipe
+            .lock()
+            .map_err(|_| std::io::Error::other("stdin lock poisoned"))
+            .and_then(|mut writer| {
+                writer.write_all(bytes)?;
+                writer.flush()
+            });
+        if let Err(err) = written {
+            update_job(&job_id, |state| {
+                state.runner_failed = true;
+                record_and_emit(
+                    state,
+                    "agent_job_progress",
+                    Some(format!("Could not send the prompt to the agent: {err}")),
+                );
+            });
+        }
+    }
+    drop(stdin);
+
     let exited = Arc::new(AtomicBool::new(false));
     let stderr_reader = stderr.map(|stderr| {
         let job_id_clone = job_id.clone();
@@ -1468,13 +1516,29 @@ fn run_job(
             })
         })
     });
+    // Tool lines name files relative to the job's working directory. Runners
+    // may report either spelling of it (macOS /var vs /private/var).
+    let mut working_dir_prefixes = vec![format!("{}/", worktree_context.working_dir.display())];
+    if let Ok(canonical) = worktree_context.working_dir.canonicalize() {
+        working_dir_prefixes.push(format!("{}/", canonical.display()));
+    }
+    working_dir_prefixes.sort_by_key(|prefix| std::cmp::Reverse(prefix.len()));
+    working_dir_prefixes.dedup();
+    let working_dir_prefix = working_dir_prefixes;
     let stdout_reader = stdout.map(|stdout| {
         let job_id_clone = job_id.clone();
+        let working_dir_prefix = working_dir_prefix.clone();
         let exited = Arc::clone(&exited);
         thread::spawn(move || {
             let mut messages = Vec::new();
             let result = read_job_output(stdout, &exited, |line| {
-                handle_runner_line(&job_id_clone, runner_kind, line, &mut messages);
+                handle_runner_line(
+                    &job_id_clone,
+                    runner_kind,
+                    line,
+                    &working_dir_prefix,
+                    &mut messages,
+                );
             });
             (messages, result)
         })
@@ -1753,9 +1817,10 @@ fn handle_runner_line(
     job_id: &str,
     runner_kind: AgentRunnerKind,
     line: &str,
+    working_dir_prefix: &[String],
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) {
-    let Some(event) = parse_runner_line(runner_kind, line) else {
+    let Some(events) = parse_runner_line(runner_kind, line) else {
         // Preserve a small amount of raw output for debugging when parsing fails.
         let raw = line.trim();
         if !raw.is_empty() {
@@ -1767,43 +1832,64 @@ fn handle_runner_line(
         return;
     };
 
-    if let Some(session_id) = event.session_id.clone() {
-        update_job(job_id, |state| {
-            state.record.session_id = Some(session_id.clone());
-        });
-    }
+    for event in events {
+        if let Some(session_id) = event.session_id.clone() {
+            update_job(job_id, |state| {
+                state.record.session_id = Some(session_id.clone());
+            });
+        }
+        if event.failed {
+            update_job(job_id, |state| state.runner_failed = true);
+        }
 
-    match event.kind {
-        RunnerEventKind::Init => {
-            update_job(job_id, |state| {
-                push_event(state, "agent_job_init", None);
-            });
-        }
-        RunnerEventKind::Progress => {
-            let message = event.text.clone();
-            update_job(job_id, |state| {
-                if let Some(ref msg) = message {
-                    state.record.last_message = Some(msg.clone());
-                }
-                record_and_emit(state, "agent_job_progress", message.clone());
-            });
-        }
-        RunnerEventKind::Message => {
-            let message = event.text.clone();
-            if let Some(ref msg) = message {
-                context_messages.push(build_assistant_message(msg));
+        match event.kind {
+            RunnerEventKind::Init => {
+                update_job(job_id, |state| {
+                    push_event(state, "agent_job_init", None);
+                });
             }
-            update_job(job_id, |state| {
+            RunnerEventKind::Progress => {
+                let message = event.text.clone().map(|text| {
+                    working_dir_prefix
+                        .iter()
+                        .fold(text, |text, prefix| text.replace(prefix.as_str(), ""))
+                });
+                update_job(job_id, |state| {
+                    if let Some(ref msg) = message {
+                        state.record.last_message = Some(msg.clone());
+                    }
+                    record_and_emit(state, "agent_job_progress", message.clone());
+                });
+            }
+            RunnerEventKind::Message => {
+                let message = event.text.clone();
                 if let Some(ref msg) = message {
-                    state.record.last_message = Some(msg.clone());
+                    context_messages.push(build_assistant_message(msg));
                 }
-                record_and_emit(state, "agent_job_message", message.clone());
-            });
-        }
-        RunnerEventKind::Result => {
-            update_job(job_id, |state| {
-                push_event(state, "agent_job_result", None);
-            });
+                update_job(job_id, |state| {
+                    if let Some(ref msg) = message {
+                        state.record.last_message = Some(msg.clone());
+                    }
+                    record_and_emit(state, "agent_job_message", message.clone());
+                });
+            }
+            RunnerEventKind::Result => {
+                let failure_text = event.failed.then(|| event.text.clone()).flatten();
+                update_job(job_id, |state| {
+                    if let Some(ref text) = failure_text {
+                        state.record.last_message = Some(text.clone());
+                    }
+                    push_event(state, "agent_job_result", failure_text.clone());
+                    // DEV-199: Claude keeps running until stdin closes. Messages
+                    // sent before this result are already in the pipe and are
+                    // still answered; the session ends after them.
+                    if runner_kind == AgentRunnerKind::Claude
+                        && let Some(runtime) = state.runtime.as_mut()
+                    {
+                        runtime.stdin = None;
+                    }
+                });
+            }
         }
     }
 }
@@ -1817,7 +1903,13 @@ fn finalize_job(
     config: &ResolvedConfig,
 ) {
     let now = Utc::now().to_rfc3339();
-    let success = exit_code.unwrap_or(1) == 0;
+    // A runner that reported a failure fails the job even when it exits 0.
+    let runner_failed = JOB_REGISTRY
+        .lock()
+        .ok()
+        .and_then(|registry| registry.jobs.get(job_id).map(|state| state.runner_failed))
+        .unwrap_or(false);
+    let success = exit_code.unwrap_or(1) == 0 && !runner_failed;
     let mut finalized = false;
     update_job(job_id, |state| {
         if state.record.status == AgentJobStatus::Cancelled {
@@ -2346,6 +2438,7 @@ mod tests {
             next_sequence: 0,
             runtime: None,
             cancellation_finalized: false,
+            runner_failed: false,
         }
     }
 

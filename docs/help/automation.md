@@ -25,14 +25,14 @@ automation:
       when:
         assignee: "@agent"
       on:
-        job_start:
+        job_started:
           set:
             status: InProgress
-        complete:
+        job_completed:
           set:
             status: NeedsReview
             assignee: "@assignee_or_reporter"
-        error:
+        job_failed:
           set:
             status: HelpNeeded
 ```
@@ -75,13 +75,18 @@ when:
 
 Actions define what happens at different points in the automation lifecycle:
 
-- `start`: when the rule first matches (task change matches `when`)
+- `created`: when the task is created
+- `updated`: when the task changes
+- `assigned`: when the task's assignee changes
 - `commented`: when a comment is added to the task
 - `sprint_changed`: when the task's sprint memberships change
-- `job_start`: when an agent job begins
-- `complete`: when an agent job succeeds
-- `error`: when an agent job fails
-- `cancel`: when an agent job is cancelled
+- `job_started`: when an agent job begins
+- `job_completed`: when an agent job succeeds
+- `job_failed`: when an agent job fails
+- `job_cancelled`: when an agent job is cancelled
+- `start`: legacy catch-all that fires on every matching task change, after the specific hook
+
+Older files may use `job_start`, `complete`/`success`, `error`/`failure` and `cancel` for the job hooks; they still work.
 
 Actions support `set`, `add`, `remove`, and `run`.
 
@@ -93,10 +98,10 @@ on:
       assignee: "@assignee_or_reporter"
     add:
       tags: [automation]
-  complete:
+  job_completed:
     set:
       status: NeedsReview
-  error:
+  job_failed:
     set:
       status: HelpNeeded
     add:
@@ -128,7 +133,7 @@ Use `run` to execute a command when a rule action fires. Commands run on the ser
 
 ```yaml
 on:
-  complete:
+  job_completed:
     set:
       status: Done
     run:
@@ -144,7 +149,7 @@ Short form (shell command):
 
 ```yaml
 on:
-  complete:
+  job_completed:
     run: "sh -c 'echo $LOTAR_TICKET_ID'"
 ```
 

@@ -14,6 +14,42 @@ LoTaR can orchestrate supported agent CLIs (Copilot CLI, Claude Code, Codex CLI,
 - `lotar agent worktree list` — list agent worktrees
 - `lotar agent worktree cleanup [--all] [--delete-branches] [--dry-run]` — remove stale worktrees
 
+## Runners
+
+Each agent profile names a runner. LoTaR starts the CLI headless, reads its JSON event stream, and shows tool calls as progress and the agent's replies as messages.
+
+| Runner | Checked against | How LoTaR starts it |
+| --- | --- | --- |
+| `claude` | Claude Code 2.1.308 | `claude -p --output-format stream-json --input-format stream-json --verbose`; the prompt goes to stdin, so you can send messages while it runs |
+| `codex` | Codex CLI 0.163 | `codex exec --json … <prompt>` |
+| `copilot` | GitHub Copilot CLI 1.0.69 | `copilot -p <prompt> --output-format json --no-ask-user …` |
+| `gemini` | Gemini CLI headless docs (not run live) | `gemini --output-format stream-json … -p <prompt>` |
+| `command` | any program | runs `command` with `args`; the prompt is in `LOTAR_AGENT_PROMPT` |
+
+Profile `args` come after LoTaR's flags. A job fails when the CLI exits non-zero or reports an error in its final result, even if it exits with 0.
+
+### Permissions
+
+An agent runs without anyone at the keyboard, so it can't answer permission prompts. The profile's `permissions` field picks what it may do; LoTaR turns it into each CLI's own flags.
+
+```yaml
+agents:
+  reviewer:
+    runner: claude
+    permissions: read-only   # read-only | workspace (default) | full
+```
+
+| Level | claude | codex | copilot | gemini |
+| --- | --- | --- | --- | --- |
+| `read-only` | `--permission-mode plan` | `--sandbox read-only` | all tools except write and shell | `--approval-mode plan` |
+| `workspace` | `--permission-mode acceptEdits` plus Claude's sandbox, with sandboxed shell commands allowed | `--sandbox workspace-write` | all tools except `git push` | `--approval-mode auto_edit` |
+| `full` | `--permission-mode bypassPermissions` | `--dangerously-bypass-approvals-and-sandbox` | `--allow-all` | `--approval-mode yolo` |
+
+- `workspace` lets the agent edit the job's working directory. It can also write the tasks directory (to update its ticket) and, in a worktree, the repository's `.git` directory (to commit). These are passed as `--add-dir` (Gemini: `--include-directories`).
+- Copilot has no sandbox. At `workspace` its file tools stay in the working directory, but shell commands are not confined.
+- If the profile's `args` already set permissions (for example `--permission-mode`, `--sandbox`, `--allow-tool`/`--deny-tool`, `--approval-mode` or `--yolo`), LoTaR adds no permission flags of its own.
+- `command` runners get no permission flags.
+
 ## list-running requirements
 
 `lotar agent list-running` discovers running jobs by scanning for the wrapper process name. This requires the wrapper binary to be available in the same directory as `lotar` or on `PATH` (or set `LOTAR_AGENT_WRAPPER` to an absolute path).
@@ -123,13 +159,13 @@ Both output readers are joined before final summaries, persisted status, and slo
 
 ## Automation rules
 
-Agent lifecycle automation now lives in the dedicated automation rules file. See [Automation Rules](automation.md) for the schema and examples.
+Agent lifecycle automation lives in the automation rules file. Without a rule, a finished job leaves the ticket's status and assignee as they are. See [Automation Rules](automation.md#agent-job-queueing) for a lifecycle example.
 
 ## Notes
 
 - Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running. Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.
 - Context history is persisted to `<project>/<ticket><extension>` files next to each ticket.
-- When `agent_logs_dir` is configured, job events are also persisted to `<logs_dir>/<JOB_ID>.jsonl` files for debugging.
-- `lotar agent status` and `lotar agent logs` read from log files if the job is not in memory (requires `agent_logs_dir` to be set).
+- When `agent.logs_dir` (or `LOTAR_AGENT_LOGS_DIR`) is set, job events are also persisted to `<logs_dir>/<JOB_ID>.jsonl` files for debugging.
+- `lotar agent status` and `lotar agent logs` read from log files if the job is not in memory (requires `agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR`).
 - Assigning a ticket to an agent profile (e.g., `@claude-review`) automatically queues a job for that ticket.
 - Review-stage tickets can only be advanced by their reporter when the change would alter assignee or status.

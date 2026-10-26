@@ -394,7 +394,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         true,
                     );
                     expect(events.every((event) => typeof event.at === 'string' && event.at.length > 0)).toBe(true);
-                    expect(events.filter((event) => event.message === 'phase one')).toHaveLength(1);
+                    expect(events.filter((event) => event.message === 'bash: phase one')).toHaveLength(1);
 
                     await gate.release();
 

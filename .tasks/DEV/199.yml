@@ -1,0 +1,54 @@
+title: Agent runners fail or cannot edit with current Claude, Codex, Copilot and Gemini CLIs
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-26T17:02:37.217658+00:00
+modified: 2026-10-26T17:38:40.588539+00:00
+comments:
+- date: 2026-10-26T17:02:46.798342+00:00
+  text: |-
+    Findings (2026-10-26, verified locally with claude 2.1.308, codex-cli 0.163.0, copilot 1.0.69; gemini not installed, docs only):
+    - claude: with --input-format stream-json the positional prompt is ignored; the process waits for stdin messages (LoTaR keeps stdin open, so jobs hang until timeout; with stdin closed it exits 0 doing nothing). Fix: send the prompt as the first stdin JSON message and close stdin after the result event. Since 2.1.302 -p starts in manual permission mode, so edits/shell are denied without a permission mode. acceptEdits + sandbox {enabled, autoAllowBashIfSandboxed} runs shell commands inside the folder and blocks writes outside (verified).
+    - copilot: '--output-format stream-json' and '--input-format' are rejected (only text/json; no stdin protocol); -p takes the prompt as its value; needs --allow-all-tools --no-ask-user headless. Events are {type,data} envelopes: assistant.message(data.content), assistant.message_delta, tool.execution_start/complete, result(sessionId, exitCode, usage.codeChanges).
+    - codex: exec --json is valid but defaults to a read-only sandbox (no edits); -s workspace-write edits and runs commands (verified); ignores turn.failed/error; command_execution/file_change items carry tool activity; reads stdin when not a TTY (LoTaR passes null, fine).
+    - gemini: needs -p for headless and --approval-mode (auto_edit/yolo) to edit; replaced by Antigravity (agy) for consumer accounts.
+    - parsers: claude reads only content[0].text (misses text after thinking/tool blocks), shows no tool activity, ignores result.is_error/permission denials/api retries; hook events can precede init.
+    - profile tools/mcp settings are parsed but never applied (DEV-200).
+- date: 2026-10-26T17:38:40.558217+00:00
+  text: |-
+    Done. Changes: Claude gets the prompt as a stdin stream-json message and stdin closes after its result; Copilot uses -p <prompt> --output-format json --no-ask-user and its {type,data} events; Codex/Gemini flags fixed. New profile field permissions (read-only | workspace (default) | full) mapped to each CLI's own flags; workspace runs Claude in its sandbox and adds the tasks dir and, for worktrees, the repo .git as writable dirs (--add-dir / --include-directories). Parsers rewritten: all Claude text blocks, tool calls as progress, runner-reported errors fail the job even with exit 0, no delta spam, working-dir prefixes shortened. Also fixed: lotar agent worktree list with a relative --tasks-dir (find_repo_root returned an empty path). Smoke mocks now emit the real Copilot envelope. Docs: agent.md runners + permissions, config-reference profile fields, automation.md canonical event names; corrected the claims that agent.automation sets lifecycle defaults and that job logs default to .agent-logs (neither is true).
+
+    Verification: sanitized real captures replayed in parser tests (tests/fixtures/agent-streams); npm run lint, test (1715 Rust + 1212 frontend), smoke (350) all pass; live npm run agents:live passes edit and worktree pipeline for claude (16s/30s), codex (27s/30s) and copilot (28s/42s). Gemini not installed, so only checked against its docs.
+
+    Follow-ups: agents set their ticket to Done and never commit in worktrees because of the built-in instructions (DEV-201); model/effort/tools/mcp (DEV-200); more scenarios (DEV-202); job logs are off by default, so lotar agent status/logs can't find finished jobs from another process (open question: default logs_dir).
+description: Agent jobs failed or could not edit files with the current CLIs. Verified live with claude 2.1.308, codex-cli 0.163.0 and copilot 1.0.69; Gemini from its headless docs (not installed).
+history:
+- at: 2026-10-26T17:02:46.757216+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-26T17:02:46.798342+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T17:38:26.782881+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: Agent jobs failed or could not edit files with the current CLIs. Verified live with claude 2.1.308, codex-cli 0.163.0 and copilot 1.0.69; Gemini from its headless docs (not installed).
+- at: 2026-10-26T17:38:40.558217+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T17:38:40.588539+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

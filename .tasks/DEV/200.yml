@@ -1,0 +1,28 @@
+title: 'Agent profiles: model, effort, tools and MCP settings, with overrides from automation and runs'
+status: Todo
+priority: High
+type: Feature
+reporter: mallox
+created: 2026-10-26T17:02:37.267165+00:00
+modified: 2026-10-26T17:38:26.638346+00:00
+description: |-
+  Let a run choose the model and reasoning effort, and apply the profile settings that are parsed but ignored today.
+
+  - Profile fields `model` and `effort`, mapped per runner: claude --model/--effort, codex -m / -c model_reasoning_effort=, copilot --model/--effort, gemini -m (no effort flag).
+  - Overrides from the places that start a job: `lotar agent run --model --effort`, the REST/MCP job request, queue entries, the Agents UI, and automation actions that hand a ticket to an agent (e.g. per-phase model in a pipeline).
+  - Wire `tools` (allowed/denied → claude --allowedTools/--disallowedTools, copilot --allow-tool/--deny-tool) and `mcp` (servers, including LoTaR's own MCP server) into the runner command.
+  - Consider max turns / budget limits and recording usage and cost from the result events (claude total_cost_usd, codex usage, copilot usage).
+  - REST shape changes need api_types.rs, view/api/types.ts, openapi.json and help docs to agree.
+history:
+- at: 2026-10-26T17:38:26.638346+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Let a run choose the model and reasoning effort, and apply the profile settings that are parsed but ignored today.
+
+      - Profile fields `model` and `effort`, mapped per runner: claude --model/--effort, codex -m / -c model_reasoning_effort=, copilot --model/--effort, gemini -m (no effort flag).
+      - Overrides from the places that start a job: `lotar agent run --model --effort`, the REST/MCP job request, queue entries, the Agents UI, and automation actions that hand a ticket to an agent (e.g. per-phase model in a pipeline).
+      - Wire `tools` (allowed/denied → claude --allowedTools/--disallowedTools, copilot --allow-tool/--deny-tool) and `mcp` (servers, including LoTaR's own MCP server) into the runner command.
+      - Consider max turns / budget limits and recording usage and cost from the result events (claude total_cost_usd, codex usage, copilot usage).
+      - REST shape changes need api_types.rs, view/api/types.ts, openapi.json and help docs to agree.

@@ -8,7 +8,7 @@ import { resolveBinaryPath } from './binary.js';
 
 const fixturesDir = path.dirname(fileURLToPath(import.meta.url));
 
-/** Node-based Copilot-wire mock agent (replaces the former mock-agent.sh). */
+/** Node-based mock of a Copilot CLI json run (replaces the former mock-agent.sh). */
 export const MOCK_AGENT_SCRIPT = path.resolve(fixturesDir, 'mock-agent.mjs');
 
 /** Node-based gated mock agent used for live mid-run assertions. */
@@ -59,8 +59,8 @@ let launchCounter = 0;
 /**
  * Write a portable launcher for a fixture script into `dir`.
  *
- * The agent runner contract spawns `<command> -p --output-format stream-json
- * --input-format stream-json <args...> <prompt>` for copilot profiles: the
+ * The agent runner contract spawns `<command> -p <prompt> --output-format
+ * json --no-ask-user <permission flags> <args...>` for copilot profiles: the
  * base flags precede profile args, so `command` must be an executable that
  * tolerates leading unknown flags. A shebang copy of the fixture (Unix) and
  * a cmd forwarder (Windows) both satisfy that without bash/date/sleep, and

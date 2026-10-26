@@ -1,0 +1,14 @@
+title: Support newer agent CLIs (OpenCode, Antigravity, Droid, Cursor, Amp)
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-26T17:02:37.377728+00:00
+modified: 2026-10-26T17:38:26.748145+00:00
+description: 'Newer agent CLIs worth a runner kind: OpenCode, Google Antigravity (agy, replacing Gemini CLI for consumer accounts), Factory Droid, Cursor CLI (agent), Amp. For each: headless flags, JSON event stream, permission flags, model/effort flags; capture a sanitized stream into tests/fixtures/agent-streams when a CLI is available. Until then the command runner can drive them.'
+history:
+- at: 2026-10-26T17:38:26.748145+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: 'Newer agent CLIs worth a runner kind: OpenCode, Google Antigravity (agy, replacing Gemini CLI for consumer accounts), Factory Droid, Cursor CLI (agent), Amp. For each: headless flags, JSON event stream, permission flags, model/effort flags; capture a sanitized stream into tests/fixtures/agent-streams when a CLI is available. Until then the command runner can drive them.'
