@@ -88,7 +88,7 @@ Actions define what happens at different points in the automation lifecycle:
 
 Older files may use `job_start`, `complete`/`success`, `error`/`failure` and `cancel` for the job hooks; they still work.
 
-Actions support `set`, `add`, `remove`, and `run`.
+Actions support `set`, `add`, `remove`, `comment`, `run`, and `agent`.
 
 ```yaml
 on:
@@ -114,6 +114,7 @@ on:
 - `add/remove`: tags/labels, sprint membership (`sprint: <sprint reference or @active>`), and relationships (`depends_on`, `blocks`, `related`)
 - `run`: execute a command when the action fires
 - `comment`: add a comment to the task
+- `agent`: `model`, `effort` and `prompt` for the agent job this action starts by assigning the ticket to an agent profile (see below)
 
 Relationship actions use the shared relationship mutation rules: adding or
 removing `depends_on`, `blocks`, or `related` also updates its reciprocal
@@ -122,6 +123,27 @@ legacy one-sided data, not only a task's stored `depends_on` array. Missing,
 deleted, or unreadable prerequisites remain unresolved. Each prerequisite is
 evaluated against its own project's done-state policy. Relationship repair is
 maintenance and does not itself request a status change or agent launch.
+
+### Agent run settings
+
+When an action hands the ticket to an agent profile, `agent` sets how that job runs. Each value overrides the profile's own; leave one out to keep the profile's. `prompt` replaces the default request ("work on the ticket") and accepts the same templates as comments. Settings on an action that doesn't assign an agent have no effect.
+
+```yaml
+- name: Hand over to testing
+  when:
+    assignee: "@implement"
+  on:
+    job_completed:
+      set:
+        status: Testing
+        assignee: "@test"
+      agent:
+        model: haiku
+        effort: low
+        prompt: "Run the test suite for ${{ticket.id}} and report failures as a comment."
+```
+
+`lotar automation simulate` lists these settings next to the job it would queue.
 
 ### Assignee tokens for actions
 

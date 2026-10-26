@@ -7660,6 +7660,16 @@
           "worktree_branch": {
             "type": "string",
             "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true,
+            "description": "Model the run was asked to use, when one was set."
+          },
+          "effort": {
+            "type": "string",
+            "nullable": true,
+            "description": "Reasoning effort the run was asked to use, when one was set."
           }
         },
         "required": [
@@ -7686,6 +7696,16 @@
           "agent": {
             "type": "string",
             "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true,
+            "description": "Overrides the profile's model for this run. Letters, digits and . _ - : / @ [ ] only."
+          },
+          "effort": {
+            "type": "string",
+            "nullable": true,
+            "description": "Overrides the profile's reasoning effort for this run (for example low, medium, high)."
           }
         },
         "required": [

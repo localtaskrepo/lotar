@@ -223,8 +223,8 @@ or journal data. Unavailable locks and pending recovery are reported explicitly.
 ## Agent Tools
 
 ### `agent_run`
-- **Params:** `ticket_id` (required, e.g. `PROJ-1`), `prompt` (required), optional `runner` (`copilot|claude|codex|gemini|command`) and `agent` (profile name from config).
-- **Validation:** Supply either `runner` or `agent`. Unknown tickets, unsupported runners, and unknown profiles return explanatory tool-execution `isError` results; malformed argument types still return `-32602`.
+- **Params:** `ticket_id` (required, e.g. `PROJ-1`), `prompt` (required), optional `runner` (`copilot|claude|codex|gemini|command`), `agent` (profile name from config), and `model` / `effort` to override the profile's settings for this run.
+- **Validation:** Supply either `runner` or `agent`. `model` and `effort` accept letters, digits and `. _ - : / @ [ ]`. Unknown tickets, unsupported runners, and unknown profiles return explanatory tool-execution `isError` results; malformed argument types still return `-32602`.
 - **Response:** Job details including the job ID used for status tracking.
 
 ### `agent_status`
@@ -241,7 +241,7 @@ or journal data. Unavailable locks and pending recovery are reported explicitly.
 
 ### `agent_send_message`
 - **Params:** `id` (running job ID, required), `message` (required).
-- **Behavior:** Only supported for runners that accept stdin input (Claude, Copilot).
+- **Behavior:** Only supported for runners that accept stdin input (currently Claude).
 - **Response:** Updated job details.
 
 ## Schema Tool

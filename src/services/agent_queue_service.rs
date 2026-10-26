@@ -30,6 +30,10 @@ pub struct AgentQueueEntry {
     pub prompt: String,
     pub queued_at: String,
     pub attempts: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
 }
 
 pub struct AgentQueueService;
@@ -70,6 +74,8 @@ impl AgentQueueService {
             prompt,
             queued_at: Utc::now().to_rfc3339(),
             attempts: 0,
+            model: req.model.clone(),
+            effort: req.effort.clone(),
         };
 
         let mut inserted = false;
@@ -242,6 +248,8 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         prompt: entry.prompt,
         runner: None,
         agent: Some(entry.agent),
+        model: entry.model,
+        effort: entry.effort,
     };
     let _ =
         AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;
@@ -449,6 +457,35 @@ mod tests {
     }
 
     #[test]
+    fn queued_entries_keep_the_runs_model_and_effort() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+
+        let req = AgentJobCreateRequest {
+            ticket_id: "TEST-1".to_string(),
+            prompt: "hello".to_string(),
+            agent: Some("implement".to_string()),
+            model: Some("haiku".to_string()),
+            effort: Some("low".to_string()),
+            ..Default::default()
+        };
+        assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+        let entries = dequeue_entries(&tasks_dir, 10).unwrap();
+        assert_eq!(entries[0].model.as_deref(), Some("haiku"));
+        assert_eq!(entries[0].effort.as_deref(), Some("low"));
+
+        // Entries written before these fields existed still load.
+        let legacy: AgentQueueEntry = serde_json::from_str(
+            r#"{"ticket_id":"TEST-2","agent":"a","prompt":"p","queued_at":"now","attempts":0}"#,
+        )
+        .unwrap();
+        assert!(legacy.model.is_none() && legacy.effort.is_none());
+    }
+
+    #[test]
     fn enqueue_deduplicates() {
         let dir = tempdir().unwrap();
         let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
@@ -461,6 +498,7 @@ mod tests {
             prompt: "hello".to_string(),
             runner: None,
             agent: Some("implement".to_string()),
+            ..Default::default()
         };
 
         assert!(AgentQueueService::enqueue(&tasks_dir, req.clone()).unwrap());
@@ -481,6 +519,7 @@ mod tests {
             prompt: "hello".to_string(),
             runner: None,
             agent: Some("implement".to_string()),
+            ..Default::default()
         };
         assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
         let entries = dequeue_entries(&tasks_dir, 10).unwrap();
@@ -504,6 +543,7 @@ mod tests {
                 prompt: "first".to_string(),
                 runner: None,
                 agent: Some("implement".to_string()),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -515,6 +555,7 @@ mod tests {
                 prompt: "second".to_string(),
                 runner: None,
                 agent: Some("implement".to_string()),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -539,6 +580,7 @@ mod tests {
                 prompt: "hello".to_string(),
                 runner: None,
                 agent: Some("implement".to_string()),
+                ..Default::default()
             };
             let _ = AgentQueueService::enqueue(&tasks_dir, req).unwrap();
         }

@@ -591,7 +591,9 @@
                     style="justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap"
                   >
                     <strong>{{ getAutomationEventLabel(activeCustomAction.event) }}</strong>
-                    <span class="automation-builder__event-chip">{{ activeCustomAction.event }}</span>
+                    <span class="automation-builder__event-chip">{{
+                      getAutomationEventYamlKey(activeCustomAction.event)
+                    }}</span>
                   </div>
 
                   <div class="field">
@@ -718,6 +720,41 @@
                       class="automation-builder__textarea"
                       rows="3"
                       placeholder="Optional comment template"
+                    ></textarea>
+                  </div>
+
+                  <div class="field" data-testid="automation-agent-settings">
+                    <label class="field-label">Agent run settings</label>
+                    <p class="field-hint">
+                      Used when this action assigns the ticket to an agent profile. Empty fields keep the profile's own
+                      settings.
+                    </p>
+                    <div class="field-grid">
+                      <div class="field">
+                        <label class="field-label" for="automation-agent-model">Model</label>
+                        <UiInput
+                          id="automation-agent-model"
+                          v-model="activeCustomAction.agentModel"
+                          maxlength="100"
+                          placeholder="Profile default"
+                        />
+                      </div>
+                      <div class="field">
+                        <label class="field-label" for="automation-agent-effort">Effort</label>
+                        <UiInput
+                          id="automation-agent-effort"
+                          v-model="activeCustomAction.agentEffort"
+                          maxlength="20"
+                          placeholder="low, medium, high…"
+                        />
+                      </div>
+                    </div>
+                    <textarea
+                      v-model="activeCustomAction.agentPrompt"
+                      class="automation-builder__textarea"
+                      rows="2"
+                      aria-label="Agent prompt"
+                      placeholder="Prompt for the agent (default: work on the ticket)"
                     ></textarea>
                   </div>
 
@@ -893,6 +930,7 @@ import {
   createSetFieldDraft,
   formatAutomationRuleLabel,
   getAutomationEventLabel,
+  getAutomationEventYamlKey,
   getConditionFieldSelection,
   getEditableRuleState,
   getSetFieldSelection,
@@ -1437,6 +1475,8 @@ function inferRecipe(draft: AutomationRuleDraft): GuidedRecipe {
   const hasRun =
     (entry.runMode === 'shell' && Boolean(entry.runShell.trim())) ||
     (entry.runMode === 'command' && Boolean(entry.runCommand.trim()))
+  // Only the custom form shows agent run settings, so keep them editable there.
+  if (entry.agentModel.trim() || entry.agentEffort.trim() || entry.agentPrompt.trim()) return 'custom'
 
   if (hasComment && !setFields.length && !addFields.length && !removeFields.length && !hasRun) return 'comment'
   if (hasRun && !setFields.length && !addFields.length && !removeFields.length && !hasComment) return 'command'
@@ -1581,6 +1621,9 @@ function emptyEventAction(event: AutomationEventKey): AutomationEventActionDraft
     runWait: true,
     runIgnoreFailure: false,
     runEnv: [],
+    agentModel: '',
+    agentEffort: '',
+    agentPrompt: '',
   }
 }
 
@@ -1593,7 +1636,10 @@ function hasDraftActionContent(draft: AutomationRuleDraft) {
       entry.addFields.some((row) => row.value.trim()) ||
       entry.removeFields.some((row) => row.value.trim()) ||
       (entry.runMode === 'shell' && entry.runShell.trim()) ||
-      (entry.runMode === 'command' && entry.runCommand.trim()),
+      (entry.runMode === 'command' && entry.runCommand.trim()) ||
+      entry.agentModel.trim() ||
+      entry.agentEffort.trim() ||
+      entry.agentPrompt.trim(),
     )
   })
 }
@@ -1691,6 +1737,52 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 </script>
 
 <style scoped>
+/* Field layout for the dialog wherever the editor is shown. The Config page
+   styles these classes too, but the Automations page does not. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+  align-items: start;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 20px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.field :deep(input.input),
+.field :deep(select.input) {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .automation-builder {
   display: flex;
   flex-direction: column;

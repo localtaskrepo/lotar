@@ -1,0 +1,15 @@
+title: Record agent usage and cost per job
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-26T18:11:32.162137+00:00
+description: |-
+  Every runner reports usage in its final event, but LoTaR drops it. Record it on the job and show it.
+
+  - Claude result: total_cost_usd, usage (input/output/cache tokens), num_turns, duration_ms.
+  - Codex turn.completed: usage (input/cached/output tokens).
+  - Copilot result: usage.premiumRequests, totalApiDurationMs, codeChanges (lines added/removed, files).
+  - Store a normalised summary on the job (REST AgentJob, job log header/status line, SSE payload), show it on the Agents page and in lotar agent status, and make it available to automation templates (e.g. a comment with the cost).
+  - Optional limits: Claude --max-budget-usd / --max-turns from the profile.
+  Raised while testing DEV-199/DEV-200.

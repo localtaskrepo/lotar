@@ -306,6 +306,7 @@ impl AutomationService {
             current.assignee.as_deref(),
             current,
             config,
+            AgentRunSettings::default(),
         );
 
         // Determine which events to fire
@@ -756,9 +757,25 @@ fn describe_action(
         && assignee.starts_with('@')
         && config.agent_profiles.contains_key(&assignee[1..])
     {
+        let mut description = format!("Queue agent job for profile '{}'", &assignee[1..]);
+        if let Some(agent) = action.agent.as_ref() {
+            let settings: Vec<String> = [("model", &agent.model), ("effort", &agent.effort)]
+                .into_iter()
+                .filter_map(|(name, value)| value.as_ref().map(|value| format!("{name} {value}")))
+                .chain(
+                    agent
+                        .prompt
+                        .as_ref()
+                        .map(|prompt| format!("prompt: {}", preview.expand(prompt))),
+                )
+                .collect();
+            if !settings.is_empty() {
+                description.push_str(&format!(" ({})", settings.join(", ")));
+            }
+        }
         actions.push(SimulatedAction {
             action: "queue_agent".to_string(),
-            description: format!("Queue agent job for profile '{}'", &assignee[1..]),
+            description,
         });
     }
 
@@ -1586,12 +1603,22 @@ fn apply_action(
         )?);
     }
     if let Some(updated) = next_task.as_ref() {
+        let run = action.agent.as_ref().map(|agent| AgentRunSettings {
+            model: agent.model.clone(),
+            effort: agent.effort.clone(),
+            prompt: agent
+                .prompt
+                .as_ref()
+                .map(|prompt| tmpl.expand(prompt))
+                .filter(|prompt| !prompt.trim().is_empty()),
+        });
         maybe_queue_agent_on_assignment(
             storage.root_path.as_path(),
             base.assignee.as_deref(),
             updated.assignee.as_deref(),
             updated,
             config,
+            run.unwrap_or_default(),
         );
     }
 
@@ -1898,6 +1925,14 @@ fn patch_has_changes(patch: &TaskUpdate) -> bool {
         || patch.sprints.is_some()
 }
 
+/// Run settings an automation action gives the job its assignment starts.
+#[derive(Debug, Default)]
+struct AgentRunSettings {
+    model: Option<String>,
+    effort: Option<String>,
+    prompt: Option<String>,
+}
+
 /// Automatically queue an agent job when the assignee changes to an agent profile.
 /// This is the implicit behavior: assigning a ticket to an agent starts a job.
 fn maybe_queue_agent_on_assignment(
@@ -1906,6 +1941,7 @@ fn maybe_queue_agent_on_assignment(
     new_assignee: Option<&str>,
     task: &TaskDTO,
     config: &ResolvedConfig,
+    run: AgentRunSettings,
 ) {
     // No change in assignee
     if previous_assignee == new_assignee {
@@ -1973,9 +2009,13 @@ fn maybe_queue_agent_on_assignment(
 
     let req = AgentJobCreateRequest {
         ticket_id: task.id.clone(),
-        prompt: DEFAULT_AUTO_PROMPT.to_string(),
+        prompt: run
+            .prompt
+            .unwrap_or_else(|| DEFAULT_AUTO_PROMPT.to_string()),
         runner: None,
         agent: Some(agent_name),
+        model: run.model,
+        effort: run.effort,
     };
 
     if matches!(

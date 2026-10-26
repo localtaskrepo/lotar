@@ -73,6 +73,8 @@ impl AgentHandler {
             prompt: args.prompt,
             runner: args.runner,
             agent: args.agent,
+            model: args.model,
+            effort: args.effort,
         };
         let job = AgentJobService::start_job(req, resolver).map_err(|e| e.to_string())?;
 
@@ -84,6 +86,13 @@ impl AgentHandler {
         renderer.emit_success(format!("Job {} started", job.id));
         renderer.emit_info(format!("Ticket: {}", job.ticket_id));
         renderer.emit_info(format!("Runner: {}", job.runner));
+        let settings: Vec<String> = [("model", &job.model), ("effort", &job.effort)]
+            .into_iter()
+            .filter_map(|(name, value)| value.as_ref().map(|value| format!("{name} {value}")))
+            .collect();
+        if !settings.is_empty() {
+            renderer.emit_info(format!("Settings: {}", settings.join(", ")));
+        }
 
         let should_wait = args.wait || args.follow;
         if !should_wait {
@@ -138,6 +147,8 @@ impl AgentHandler {
                 "summary": status.as_ref().and_then(|s| s.summary.clone()),
                 "worktree_path": header.worktree_path,
                 "worktree_branch": header.worktree_branch,
+                "model": header.model,
+                "effort": header.effort,
             });
             renderer.emit_json(&serde_json::json!({ "job": job }));
             return Ok(());
@@ -150,6 +161,12 @@ impl AgentHandler {
         renderer.emit_success(format!("Job {}: {}", header.job_id, status_str));
         renderer.emit_info(format!("Ticket: {}", header.ticket_id));
         renderer.emit_info(format!("Runner: {}", header.runner));
+        if let Some(model) = header.model.as_ref() {
+            renderer.emit_info(format!("Model: {model}"));
+        }
+        if let Some(effort) = header.effort.as_ref() {
+            renderer.emit_info(format!("Effort: {effort}"));
+        }
         if let Some(ref s) = status
             && let Some(ref summary) = s.summary
         {
@@ -290,6 +307,8 @@ impl AgentHandler {
                 "id": header.job_id,
                 "ticket_id": header.ticket_id,
                 "runner": header.runner,
+                "model": header.model,
+                "effort": header.effort,
                 "created_at": header.created_at,
                 "status": status.as_ref().map(|s| s.status.as_str()).unwrap_or("unknown"),
                 "exit_code": status.as_ref().and_then(|s| s.exit_code),

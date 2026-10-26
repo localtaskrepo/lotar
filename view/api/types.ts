@@ -1263,6 +1263,10 @@ export interface AgentJob {
     session_id?: string | null
     worktree_path?: string | null
     worktree_branch?: string | null
+    /** Model the run was asked to use, when one was set. */
+    model?: string | null
+    /** Reasoning effort the run was asked to use, when one was set. */
+    effort?: string | null
 }
 
 export interface AgentJobCreateRequest {
@@ -1270,6 +1274,10 @@ export interface AgentJobCreateRequest {
     prompt: string
     runner?: string
     agent?: string
+    /** Overrides the profile's model for this run. */
+    model?: string
+    /** Overrides the profile's reasoning effort for this run. */
+    effort?: string
 }
 
 export interface AgentJobCreateResponse {

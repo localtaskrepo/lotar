@@ -62,6 +62,7 @@ fn request(ticket: &str) -> AgentJobCreateRequest {
         prompt: "Run safety regression".into(),
         agent: Some("safety".into()),
         runner: None,
+        ..Default::default()
     }
 }
 

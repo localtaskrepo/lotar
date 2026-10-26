@@ -456,9 +456,15 @@ pub struct AgentJob {
     pub worktree_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub worktree_branch: Option<String>,
+    /// Model the run was asked to use, when one was set.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub model: Option<String>,
+    /// Reasoning effort the run was asked to use, when one was set.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobCreateRequest {
     pub ticket_id: String,
@@ -467,6 +473,12 @@ pub struct AgentJobCreateRequest {
     pub runner: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent: Option<String>,
+    /// Overrides the profile's model for this run.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub model: Option<String>,
+    /// Overrides the profile's reasoning effort for this run.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

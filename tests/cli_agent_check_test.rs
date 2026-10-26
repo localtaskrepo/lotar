@@ -62,3 +62,62 @@ fn agent_check_passes_when_no_match() {
         .assert()
         .success();
 }
+
+/// `lotar agent run --model/--effort` overrides the profile for that run;
+/// values that look like flags are refused before anything starts (DEV-200).
+#[cfg(unix)]
+#[test]
+fn agent_run_takes_model_and_effort() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _tasks = EnvVarGuard::set(
+        "LOTAR_TASKS_DIR",
+        fixtures.tasks_root.to_string_lossy().as_ref(),
+    );
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    let seen = root.join("settings.txt");
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: TEST\nagents:\n  stub:\n    runner: command\n    model: profile-model\n    command: sh\n    args: ['-c', 'printf \"%s|%s\" \"$LOTAR_AGENT_MODEL\" \"$LOTAR_AGENT_EFFORT\" > \"{}\"']\n",
+            seen.display()
+        ),
+    );
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["add", "Run settings"])
+        .assert()
+        .success();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args([
+            "agent",
+            "run",
+            "TEST-1",
+            "go",
+            "--agent",
+            "stub",
+            "--model=--yolo",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Invalid agent model"));
+    assert!(!seen.exists(), "a refused run must not start");
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args([
+            "agent", "run", "TEST-1", "go", "--agent", "stub", "--effort", "high", "--wait",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("model profile-model, effort high"));
+    assert_eq!(
+        std::fs::read_to_string(&seen).unwrap(),
+        "profile-model|high"
+    );
+}

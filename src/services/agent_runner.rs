@@ -230,6 +230,12 @@ pub fn build_runner_command(
         // it is available via the LOTAR_AGENT_PROMPT env var instead.
         let mut env = expand_env_map(&profile.env);
         env.insert("LOTAR_AGENT_PROMPT".to_string(), prompt.to_string());
+        if let Some(model) = profile.model.as_deref() {
+            env.insert("LOTAR_AGENT_MODEL".to_string(), model.to_string());
+        }
+        if let Some(effort) = profile.effort.as_deref() {
+            env.insert("LOTAR_AGENT_EFFORT".to_string(), effort.to_string());
+        }
         return Ok(RunnerCommand {
             program,
             args,
@@ -283,6 +289,8 @@ pub fn build_runner_command(
             writable_dirs,
         ));
     }
+    args.extend(model_effort_args(kind, profile));
+    args.extend(tool_args(kind, profile));
     args.extend(profile.args.iter().cloned());
 
     let initial_input = match kind {
@@ -306,6 +314,117 @@ pub fn build_runner_command(
         env,
         initial_input,
     })
+}
+
+/// Model and effort values end up as CLI arguments (and, for Codex, inside a
+/// `-c key=value` override), so only plain names are accepted: letters,
+/// digits and `. _ - : / @ [ ]`, not starting with `-`.
+pub fn validate_run_setting(name: &str, value: &str) -> LoTaRResult<()> {
+    let valid = !value.is_empty()
+        && value.len() <= 100
+        && !value.starts_with('-')
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._-:/@[]".contains(c));
+    if valid {
+        Ok(())
+    } else {
+        Err(LoTaRError::ValidationError(format!(
+            "Invalid agent {name} '{value}': use letters, digits and . _ - : / @ [ ] only"
+        )))
+    }
+}
+
+fn has_flag(args: &[String], names: &[&str]) -> bool {
+    args.iter().any(|arg| {
+        let name = arg.split('=').next().unwrap_or(arg);
+        names.contains(&name)
+    })
+}
+
+/// The profile's (or the run's) model and effort as each CLI's own flags.
+/// A flag the profile's `args` already pass is left to the profile.
+fn model_effort_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec<String> {
+    let mut args = Vec::new();
+    let own = &profile.args;
+    if let Some(model) = profile.model.as_deref() {
+        let flag = match kind {
+            AgentRunnerKind::Claude | AgentRunnerKind::Copilot => Some("--model"),
+            AgentRunnerKind::Codex | AgentRunnerKind::Gemini => Some("-m"),
+            AgentRunnerKind::Command => None,
+        };
+        if let Some(flag) = flag
+            && !has_flag(own, &["--model", "-m"])
+        {
+            args.extend([flag.to_string(), model.to_string()]);
+        }
+    }
+    if let Some(effort) = profile.effort.as_deref() {
+        match kind {
+            AgentRunnerKind::Claude if !has_flag(own, &["--effort"]) => {
+                args.extend(["--effort".to_string(), effort.to_string()]);
+            }
+            AgentRunnerKind::Copilot if !has_flag(own, &["--reasoning-effort"]) => {
+                args.extend(["--reasoning-effort".to_string(), effort.to_string()]);
+            }
+            AgentRunnerKind::Codex
+                if !own
+                    .iter()
+                    .any(|arg| arg.starts_with("model_reasoning_effort=")) =>
+            {
+                args.extend(["-c".to_string(), format!("model_reasoning_effort={effort}")]);
+            }
+            // Gemini has no effort flag; command runners read LOTAR_AGENT_EFFORT.
+            _ => {}
+        }
+    }
+    args
+}
+
+/// `tools.allowed` / `tools.disallowed` and `mcp.allow` as each CLI's own
+/// tool flags. Entries use the CLI's own tool syntax, for example
+/// `Bash(npm test:*)` for Claude or `shell(npm test)` for Copilot. Codex and
+/// Gemini have no per-tool flags, so these settings do not apply to them.
+fn tool_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec<String> {
+    let tools = profile.tools.as_ref();
+    let allowed = tools
+        .map(|tools| tools.allowed.as_slice())
+        .unwrap_or_default();
+    let denied = tools
+        .map(|tools| tools.disallowed.as_slice())
+        .unwrap_or_default();
+    let servers = profile
+        .mcp
+        .as_ref()
+        .map(|mcp| mcp.allow.as_slice())
+        .unwrap_or_default();
+    let mut args = Vec::new();
+    match kind {
+        AgentRunnerKind::Claude => {
+            args.extend(allowed.iter().map(|tool| format!("--allowedTools={tool}")));
+            args.extend(
+                servers
+                    .iter()
+                    .map(|server| format!("--allowedTools=mcp__{server}")),
+            );
+            args.extend(
+                denied
+                    .iter()
+                    .map(|tool| format!("--disallowedTools={tool}")),
+            );
+        }
+        AgentRunnerKind::Copilot => {
+            args.extend(
+                allowed
+                    .iter()
+                    .chain(servers)
+                    .map(|tool| format!("--allow-tool={tool}")),
+            );
+            args.extend(denied.iter().map(|tool| format!("--deny-tool={tool}")));
+        }
+        _ => {}
+    }
+    args
 }
 
 /// Parse one line of runner output. `None` means the line is not a runner
@@ -843,6 +962,132 @@ mod tests {
             .unwrap()
             .args;
         assert!(!args.iter().any(|arg| arg == "workspace-write"));
+    }
+
+    #[test]
+    fn model_and_effort_become_each_clis_flags() {
+        let args = |runner: &str| {
+            let mut profile = profile(runner);
+            profile.model = Some("m1".to_string());
+            profile.effort = Some("high".to_string());
+            let kind: AgentRunnerKind = runner.parse().unwrap();
+            build_runner_command(kind, &profile, "p", &[])
+                .unwrap()
+                .args
+                .join(" ")
+        };
+        assert!(args("claude").contains("--model m1 --effort high"));
+        assert!(args("copilot").contains("--model m1 --reasoning-effort high"));
+        assert!(args("codex").contains("-m m1 -c model_reasoning_effort=high"));
+        assert!(args("codex").ends_with(" p"), "the prompt stays last");
+        let gemini = args("gemini");
+        assert!(gemini.contains("-m m1") && !gemini.contains("high"));
+
+        let mut command = profile("command");
+        command.command = Some("run-agent".to_string());
+        command.model = Some("m1".to_string());
+        command.effort = Some("low".to_string());
+        let built = build_runner_command(AgentRunnerKind::Command, &command, "p", &[]).unwrap();
+        assert!(built.args.is_empty());
+        assert_eq!(
+            built.env.get("LOTAR_AGENT_MODEL").map(String::as_str),
+            Some("m1")
+        );
+        assert_eq!(
+            built.env.get("LOTAR_AGENT_EFFORT").map(String::as_str),
+            Some("low")
+        );
+    }
+
+    #[test]
+    fn profile_args_keep_their_own_model_and_effort() {
+        let mut claude = profile("claude");
+        claude.model = Some("m1".to_string());
+        claude.effort = Some("high".to_string());
+        claude.args = vec![
+            "--model=opus".to_string(),
+            "--effort".to_string(),
+            "max".to_string(),
+        ];
+        let args = build_runner_command(AgentRunnerKind::Claude, &claude, "p", &[])
+            .unwrap()
+            .args;
+        assert!(
+            !args.iter().any(|arg| arg == "m1" || arg == "high"),
+            "{args:?}"
+        );
+
+        let mut codex = profile("codex");
+        codex.effort = Some("high".to_string());
+        codex.args = vec!["-c".to_string(), "model_reasoning_effort=low".to_string()];
+        let args = build_runner_command(AgentRunnerKind::Codex, &codex, "p", &[])
+            .unwrap()
+            .args;
+        assert!(!args.contains(&"model_reasoning_effort=high".to_string()));
+    }
+
+    #[test]
+    fn run_settings_must_be_plain_names() {
+        for good in [
+            "sonnet",
+            "gpt-5.5",
+            "claude-opus-5-5[1m]",
+            "us.anthropic/x:1",
+            "xhigh",
+        ] {
+            assert!(validate_run_setting("model", good).is_ok(), "{good}");
+        }
+        for bad in [
+            "",
+            "--yolo",
+            "-m",
+            "a b",
+            "x\nlow",
+            "low;rm",
+            "a\"b",
+            &"m".repeat(101),
+        ] {
+            assert!(validate_run_setting("model", bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn tools_and_mcp_servers_become_tool_flags_for_claude_and_copilot() {
+        let with_tools = |runner: &str| {
+            let mut profile = profile(runner);
+            profile.tools = Some(crate::config::types::AgentToolsConfig {
+                allowed: vec!["WebFetch".to_string()],
+                disallowed: vec!["Bash(git push:*)".to_string()],
+            });
+            profile.mcp = Some(crate::config::types::AgentMcpConfig {
+                allow: vec!["docs".to_string()],
+            });
+            let kind: AgentRunnerKind = runner.parse().unwrap();
+            build_runner_command(kind, &profile, "p", &[]).unwrap().args
+        };
+        let claude = with_tools("claude");
+        for flag in [
+            "--allowedTools=WebFetch",
+            "--allowedTools=mcp__docs",
+            "--disallowedTools=Bash(git push:*)",
+        ] {
+            assert!(claude.contains(&flag.to_string()), "{claude:?}");
+        }
+        let copilot = with_tools("copilot");
+        for flag in [
+            "--allow-tool=WebFetch",
+            "--allow-tool=docs",
+            "--deny-tool=Bash(git push:*)",
+        ] {
+            assert!(copilot.contains(&flag.to_string()), "{copilot:?}");
+        }
+        // The workspace defaults still apply next to the profile's tools.
+        assert!(copilot.contains(&"--allow-all-tools".to_string()));
+        assert!(
+            !with_tools("codex")
+                .iter()
+                .any(|arg| arg.contains("WebFetch"))
+        );
     }
 
     #[test]

@@ -90,6 +90,10 @@ export interface AutomationEventActionDraft {
     runWait: boolean
     runIgnoreFailure: boolean
     runEnv: AutomationRunEnvDraft[]
+    /** Settings for the agent job this action's assignment starts. */
+    agentModel: string
+    agentEffort: string
+    agentPrompt: string
 }
 
 export interface AutomationRuleDraft {
@@ -198,10 +202,11 @@ const YAML_EVENT_KEYS: Record<AutomationEventKey, string> = {
     assigned: 'assigned',
     commented: 'commented',
     sprint_changed: 'sprint_changed',
-    job_start: 'job_start',
-    complete: 'complete',
-    error: 'error',
-    cancel: 'cancel',
+    // Write the canonical job hook names; the old aliases are still read.
+    job_start: 'job_started',
+    complete: 'job_completed',
+    error: 'job_failed',
+    cancel: 'job_cancelled',
 }
 
 const CONDITION_OPERATORS: AutomationConditionOperator[] = [
@@ -220,7 +225,7 @@ const CONDITION_OPERATORS: AutomationConditionOperator[] = [
 ]
 
 const SUPPORTED_RULE_KEYS = new Set(['name', 'cooldown', 'when', 'triggers', 'on'])
-const SUPPORTED_ACTION_KEYS = new Set(['set', 'add', 'remove', 'run', 'comment'])
+const SUPPORTED_ACTION_KEYS = new Set(['set', 'add', 'remove', 'run', 'comment', 'agent'])
 const SUPPORTED_WHEN_KEYS = new Set(['all', 'any', 'changes', 'custom_fields'])
 const SUPPORTED_SET_FIELDS = new Set([
     'status',
@@ -469,8 +474,7 @@ function summarizeActions(rule: AutomationRecord, events: AutomationEventKey[]):
     const on = rule?.on
     if (!on || typeof on !== 'object' || !events.length) return ['No actions']
     return events.flatMap((event) => {
-        const action =
-            (on as AutomationRecord)[YAML_EVENT_KEYS[event]] ?? (on as AutomationRecord)[denormalizeEventKey(event)]
+        const action = resolveActionForEvent(on as AutomationRecord, event)
         const summary = summarizeAction(action)
         return summary.map((line) => `${EVENT_LABELS[event]}: ${line}`)
     })
@@ -508,6 +512,14 @@ function summarizeAction(action: unknown): string[] {
 
     if (record.comment) {
         summary.push(`comment: ${formatValue(record.comment)}`)
+    }
+
+    if (isRecord(record.agent)) {
+        const settings = (['model', 'effort'] as const)
+            .filter((key) => typeof record.agent === 'object' && (record.agent as AutomationRecord)[key])
+            .map((key) => `${key} ${formatValue((record.agent as AutomationRecord)[key])}`)
+        if ((record.agent as AutomationRecord).prompt) settings.push('custom prompt')
+        if (settings.length) summary.push(`agent run: ${settings.join(', ')}`)
     }
 
     if (record.run) {
@@ -687,6 +699,20 @@ function collectUnsupportedActionReasons(action: unknown, event: AutomationEvent
             }
             if (!isScalarOrListValue(value)) {
                 reasons.push(`${EVENT_LABELS[event]} ${key}.${field} must be a scalar or list.`)
+            }
+        }
+    }
+
+    if (record.agent !== undefined) {
+        if (!isRecord(record.agent)) {
+            reasons.push(`${EVENT_LABELS[event]} agent settings must be a map.`)
+        } else {
+            for (const [key, value] of Object.entries(record.agent)) {
+                if (!['model', 'effort', 'prompt'].includes(key)) {
+                    reasons.push(`${EVENT_LABELS[event]} agent.${key} is not editable in the builder.`)
+                } else if (typeof value !== 'string') {
+                    reasons.push(`${EVENT_LABELS[event]} agent.${key} must be text.`)
+                }
             }
         }
     }
@@ -929,6 +955,12 @@ function extractEventActionDraft(event: AutomationEventKey, action: unknown): Au
         }))
     }
 
+    if (isRecord(record.agent)) {
+        draft.agentModel = typeof record.agent.model === 'string' ? record.agent.model : ''
+        draft.agentEffort = typeof record.agent.effort === 'string' ? record.agent.effort : ''
+        draft.agentPrompt = typeof record.agent.prompt === 'string' ? record.agent.prompt : ''
+    }
+
     return draft
 }
 
@@ -948,6 +980,9 @@ function createEventActionDraft(event: AutomationEventKey): AutomationEventActio
         runWait: true,
         runIgnoreFailure: false,
         runEnv: [],
+        agentModel: '',
+        agentEffort: '',
+        agentPrompt: '',
     }
 }
 
@@ -955,6 +990,7 @@ function hasActionContent(value: AutomationRecord): boolean {
     return Boolean(
         value.comment ||
         value.run ||
+        (isRecord(value.agent) && Object.keys(value.agent).length) ||
         (value.set && Object.keys(value.set).length) ||
         (value.add && Object.keys(value.add).length) ||
         (value.remove && Object.keys(value.remove).length),
@@ -1114,6 +1150,14 @@ function buildActionFromDraft(actionDraft: AutomationEventActionDraft): Automati
         action.run = run
     }
 
+    const agent: AutomationRecord = {}
+    if (actionDraft.agentModel.trim()) agent.model = actionDraft.agentModel.trim()
+    if (actionDraft.agentEffort.trim()) agent.effort = actionDraft.agentEffort.trim()
+    if (actionDraft.agentPrompt.trim()) agent.prompt = actionDraft.agentPrompt.trim()
+    if (Object.keys(agent).length) {
+        action.agent = agent
+    }
+
     return action
 }
 
@@ -1231,8 +1275,17 @@ export function getAutomationEventLabel(event: AutomationEventKey): string {
     return EVENT_LABELS[event]
 }
 
+/** The key the editor writes for an event in the automation file. */
+export function getAutomationEventYamlKey(event: AutomationEventKey): string {
+    return YAML_EVENT_KEYS[event]
+}
+
+/** The action for an event under any of its names (canonical or alias). */
 function resolveActionForEvent(on: AutomationRecord, event: AutomationEventKey): unknown {
-    return on[YAML_EVENT_KEYS[event]] ?? on[denormalizeEventKey(event)]
+    const direct = on[YAML_EVENT_KEYS[event]] ?? on[denormalizeEventKey(event)]
+    if (direct !== undefined) return direct
+    const alias = Object.keys(on).find((key) => EVENT_ALIAS_TO_KEY[key] === event)
+    return alias === undefined ? undefined : on[alias]
 }
 
 function normalizeEventKey(rawKey: string): AutomationEventKey | null {

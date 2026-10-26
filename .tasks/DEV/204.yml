@@ -4,10 +4,28 @@ priority: High
 type: Feature
 reporter: mallox
 created: 2026-10-26T17:33:43.349209+00:00
+modified: 2026-10-26T17:40:45.262668+00:00
 description: |-
   When a ticket has an image attached we don't use that anywhere to style things up.
   - Previews could be part of the ticket card like in the calendar of board
   - Lists could have icons based on the attached media or previews
   - Display filters can toggle this on or off
   - In the ticket details pane we could show a preview as well instead of just a file name
-  - opening a file opens a new window. A dialog that shows the content and/or offers a download button, and maybe some other tools based on what's being displayed, would maybe be a nicer user expreience.
+history:
+- at: 2026-10-26T17:40:45.262668+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: |-
+      When a ticket has an image attached we don't use that anywhere to style things up.
+      - Previews could be part of the ticket card like in the calendar of board
+      - Lists could have icons based on the attached media or previews
+      - Display filters can toggle this on or off
+      - In the ticket details pane we could show a preview as well instead of just a file name
+      - opening a file opens a new window. A dialog that shows the content and/or offers a download button, and maybe some other tools based on what's being displayed, would maybe be a nicer user expreience.
+    new: |-
+      When a ticket has an image attached we don't use that anywhere to style things up.
+      - Previews could be part of the ticket card like in the calendar of board
+      - Lists could have icons based on the attached media or previews
+      - Display filters can toggle this on or off
+      - In the ticket details pane we could show a preview as well instead of just a file name

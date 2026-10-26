@@ -51,6 +51,25 @@ describe('automation rule form round trips', () => {
         expect(rebuilt).toEqual(rule)
     })
 
+    it('rebuilds the agent run settings of a hand-over action', () => {
+        const rule: AutomationRecord = {
+            name: 'Hand over to testing',
+            when: { assignee: '@implement' },
+            on: {
+                job_completed: {
+                    set: { assignee: '@test', status: 'Testing' },
+                    agent: { model: 'haiku', effort: 'low', prompt: 'Run the tests for ${{ticket.id}}' },
+                },
+            },
+        }
+        const { state, rebuilt } = roundTrip(rule)
+        expect(state.unsupportedReasons).toEqual([])
+        expect(rebuilt).toEqual(rule)
+        expect(getEditableRuleState({ on: { job_completed: { agent: { budget: 3 } } } }).unsupportedReasons).toEqual([
+            expect.stringContaining('agent.budget'),
+        ])
+    })
+
     it('rebuilds any-match rules and shell run actions', () => {
         const rule: AutomationRecord = {
             when: { any: [{ status: 'Done' }, { assignee: '@bot' }] },

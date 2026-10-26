@@ -642,6 +642,99 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
 }
 
+/// An action that hands the ticket to an agent can set that run's model,
+/// effort and prompt; the profile's own model applies otherwise (DEV-200).
+#[cfg(unix)]
+#[test]
+fn automation_agent_settings_reach_the_job_they_start() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+
+    let script = |name: &str| {
+        let args = root.join(format!("{name}.args"));
+        let stdin = root.join(format!("{name}.stdin"));
+        write_stub_agent_script(
+            root,
+            &format!("stub-{name}.sh"),
+            &format!(
+                "#!/bin/sh\n\
+printf '%s\\n' \"$@\" > \"{}\"\n\
+head -n 1 > \"{}\"\n\
+echo '{{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"{name}\"}}'\n\
+echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\",\"session_id\":\"{name}\"}}'\n",
+                args.display(),
+                stdin.display()
+            ),
+        )
+    };
+    let implement_script = script("implement");
+    let test_script = script("test");
+
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "issue:\n  states: [Todo, InProgress, Testing, Done]\nagents:\n  implement:\n    runner: claude\n    model: sonnet\n    command: \"{}\"\n  test:\n    runner: claude\n    model: opus\n    command: \"{}\"\n",
+            implement_script.display(),
+            test_script.display()
+        ),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Hand over to testing\n      when:\n        assignee: \"@implement\"\n      on:\n        job_completed:\n          set:\n            status: Testing\n            assignee: \"@test\"\n          agent:\n            model: haiku\n            effort: low\n            prompt: \"Run the tests for ${{ticket.id}}\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Per-phase settings".to_string(),
+            project: Some("PIPE".to_string()),
+            reporter: Some("sam".to_string()),
+            ..Default::default()
+        },
+    )
+    .expect("create task");
+    TaskService::update(
+        &mut storage,
+        &created.id,
+        TaskUpdate {
+            assignee: Some("@implement".to_string()),
+            ..Default::default()
+        },
+    )
+    .expect("assign implement agent");
+
+    let jobs = wait_for_completed_jobs(&created.id, 2, 10_000);
+    assert_eq!(jobs.len(), 2, "both phases ran: {jobs:?}");
+    let job = |agent: &str| {
+        jobs.iter()
+            .find(|job| job.agent.as_deref() == Some(agent))
+            .unwrap_or_else(|| panic!("{agent} job: {jobs:?}"))
+    };
+    assert_eq!(job("implement").model.as_deref(), Some("sonnet"));
+    assert_eq!(job("implement").effort, None);
+    assert_eq!(job("test").model.as_deref(), Some("haiku"));
+    assert_eq!(job("test").effort.as_deref(), Some("low"));
+
+    let args = fs::read_to_string(root.join("test.args")).unwrap();
+    assert!(args.contains("--model\nhaiku\n--effort\nlow\n"), "{args}");
+    assert!(!args.contains("opus"), "{args}");
+    let implement_args = fs::read_to_string(root.join("implement.args")).unwrap();
+    assert!(
+        implement_args.contains("--model\nsonnet\n"),
+        "{implement_args}"
+    );
+    let prompt = fs::read_to_string(root.join("test.stdin")).unwrap();
+    assert!(
+        prompt.contains(&format!("Run the tests for {}", created.id)),
+        "{prompt}"
+    );
+}
+
 // ---------- New feature tests ----------
 
 /// Command runner: `runner: command` runs arbitrary scripts with full job lifecycle.
@@ -2837,6 +2930,7 @@ exit 0\n",
             prompt: "merge this ticket".to_string(),
             runner: None,
             agent: Some("merge".to_string()),
+            ..Default::default()
         },
         fixtures.tasks_root.as_path(),
     )
@@ -3267,6 +3361,7 @@ exit 0\n",
                 prompt: "merge first".to_string(),
                 runner: None,
                 agent: Some("merge".to_string()),
+                ..Default::default()
             },
             fixtures.tasks_root.as_path(),
         )
@@ -3277,6 +3372,7 @@ exit 0\n",
                 prompt: "merge second".to_string(),
                 runner: None,
                 agent: Some("merge".to_string()),
+                ..Default::default()
             },
             fixtures.tasks_root.as_path(),
         )

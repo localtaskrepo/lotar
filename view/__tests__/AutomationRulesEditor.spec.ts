@@ -52,7 +52,7 @@ describe('AutomationRulesEditor', () => {
         expect(emitted).toBeTruthy()
         const lastPayload = emitted![emitted!.length - 1]![0] as string
         expect(lastPayload).toContain('name: Ship after tests')
-        expect(lastPayload).toContain('complete:')
+        expect(lastPayload).toContain('job_completed:')
         expect(lastPayload).toContain('status: Done')
 
         wrapper.unmount()
@@ -172,6 +172,49 @@ describe('AutomationRulesEditor', () => {
         const nameInput = wrapper.find('input[placeholder="Human review after testing"]')
         expect((nameInput.element as HTMLInputElement).value).toBe('Close after complete')
 
+        wrapper.unmount()
+    })
+
+    it('keeps agent run settings when a hand-over rule is edited', async () => {
+        const existingYaml = `automation:
+  rules:
+    - name: Hand over to testing
+      on:
+        job_completed:
+          set:
+            assignee: "@test"
+          agent:
+            model: haiku
+            effort: low
+            prompt: Run the tests`
+        const wrapper = mount(AutomationRulesEditor, {
+            props: { modelValue: existingYaml },
+            attachTo: document.body,
+        })
+        await flushPromises()
+        await findButton(wrapper, 'Edit')?.trigger('click')
+        await flushPromises()
+
+        // The guided assignment form has no agent fields, so the rule opens as custom.
+        expect(wrapper.find('.automation-builder__recipe-card--active').text()).toContain('Custom')
+        for (let step = 0; step < 4 && !wrapper.find('#automation-agent-model').exists(); step++) {
+            await findButton(wrapper, 'Next')?.trigger('click')
+            await flushPromises()
+        }
+        const model = wrapper.find<HTMLInputElement>('#automation-agent-model')
+        expect(model.element.value).toBe('haiku')
+        await model.setValue('sonnet')
+        await findButton(wrapper, 'Next')?.trigger('click')
+        await flushPromises()
+        await findButton(wrapper, 'Save rule')?.trigger('click')
+        await flushPromises()
+
+        const emitted = wrapper.emitted('update:modelValue')!
+        const rules = parseAutomationYamlDocument(emitted[emitted.length - 1]![0] as string).rules
+        expect((rules[0]!.on as Record<string, unknown>).job_completed).toEqual({
+            set: { assignee: '@test' },
+            agent: { model: 'sonnet', effort: 'low', prompt: 'Run the tests' },
+        })
         wrapper.unmount()
     })
 

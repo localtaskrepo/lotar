@@ -30,6 +30,10 @@ pub struct JobLogHeader {
     pub worktree_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub worktree_branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,37 +62,21 @@ pub struct AgentLogService;
 impl AgentLogService {
     /// Initialize log file for a new job. Writes header line.
     /// Only writes if logs_dir is provided.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call"
-    )]
     pub fn init_log(
         workspace_root: &Path,
         logs_dir: Option<&str>,
-        job_id: &str,
-        ticket_id: &str,
-        runner: &str,
-        created_at: &str,
-        worktree_path: Option<&str>,
-        worktree_branch: Option<&str>,
+        header: JobLogHeader,
     ) -> LoTaRResult<()> {
         let Some(logs_dir) = logs_dir else {
             return Ok(());
         };
 
-        let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
+        let path = resolve_log_path(workspace_root, logs_dir, &header.job_id)?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
 
-        let header = JobLogLine::Header(JobLogHeader {
-            job_id: job_id.to_string(),
-            ticket_id: ticket_id.to_string(),
-            runner: runner.to_string(),
-            created_at: created_at.to_string(),
-            worktree_path: worktree_path.map(|s| s.to_string()),
-            worktree_branch: worktree_branch.map(|s| s.to_string()),
-        });
+        let header = JobLogLine::Header(header);
 
         let mut file = File::create(&path)?;
         let line = serde_json::to_string(&header)
@@ -319,12 +307,16 @@ mod tests {
         AgentLogService::init_log(
             workspace_root,
             Some(logs_dir),
-            "job-test-1",
-            "DICE-1",
-            "claude",
-            "2026-02-03T12:00:00Z",
-            Some("/tmp/worktree"),
-            Some("agent/DICE-1"),
+            JobLogHeader {
+                job_id: "job-test-1".to_string(),
+                ticket_id: "DICE-1".to_string(),
+                runner: "claude".to_string(),
+                created_at: "2026-02-03T12:00:00Z".to_string(),
+                worktree_path: Some("/tmp/worktree".to_string()),
+                worktree_branch: Some("agent/DICE-1".to_string()),
+                model: Some("sonnet".to_string()),
+                effort: None,
+            },
         )
         .unwrap();
 
@@ -367,6 +359,7 @@ mod tests {
             .unwrap();
         assert_eq!(header.ticket_id, "DICE-1");
         assert_eq!(header.runner, "claude");
+        assert_eq!(header.model.as_deref(), Some("sonnet"));
 
         let events = AgentLogService::load_events(workspace_root, logs_dir, "job-test-1").unwrap();
         assert_eq!(events.len(), 2);
@@ -394,12 +387,16 @@ mod tests {
         AgentLogService::init_log(
             workspace_root,
             None,
-            "job-test-2",
-            "DICE-2",
-            "claude",
-            "2026-02-03T12:00:00Z",
-            None,
-            None,
+            JobLogHeader {
+                job_id: "job-test-2".to_string(),
+                ticket_id: "DICE-2".to_string(),
+                runner: "claude".to_string(),
+                created_at: "2026-02-03T12:00:00Z".to_string(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: None,
+                effort: None,
+            },
         )
         .unwrap();
 

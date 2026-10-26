@@ -72,6 +72,12 @@ pub struct AgentRunArgs {
     /// Named agent profile to use
     #[arg(long)]
     pub agent: Option<String>,
+    /// Model for this run, overriding the profile's
+    #[arg(long)]
+    pub model: Option<String>,
+    /// Reasoning effort for this run (for example low, medium, high), overriding the profile's
+    #[arg(long)]
+    pub effort: Option<String>,
     /// Wait for the job to finish
     #[arg(long)]
     pub wait: bool,

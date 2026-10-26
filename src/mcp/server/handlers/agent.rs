@@ -47,6 +47,16 @@ pub(crate) fn handle_agent_run(req: JsonRpcRequest) -> JsonRpcResponse {
             .get("agent")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string()),
+        model: req
+            .params
+            .get("model")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        effort: req
+            .params
+            .get("effort")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
     };
 
     match AgentJobService::start_job(create_req, &resolver) {

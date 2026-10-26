@@ -5,7 +5,7 @@
 //
 //   npm run agents:live                         # every installed CLI, all scenarios
 //   npm run agents:live -- --runner claude      # one CLI
-//   npm run agents:live -- --scenario edit      # one scenario
+//   npm run agents:live -- --scenario edit      # one scenario (edit, settings, pipeline)
 //   npm run agents:live -- --keep               # keep the temp repositories
 //
 // Each scenario builds a throwaway git repository with a small bug and a
@@ -28,6 +28,15 @@ const RUNNERS = {
     codex: { args: ['-c', 'model_reasoning_effort=low'] },
     copilot: { args: [] },
     gemini: { args: ['-m', 'flash'] },
+};
+
+// Model and effort each CLI is asked to use in the settings scenario.
+const SETTINGS = {
+    claude: { model: 'haiku', effort: 'low' },
+    codex: { effort: 'low' },
+    // Copilot plans without model choice only allow `auto`, which takes no effort.
+    copilot: { model: 'auto' },
+    gemini: { model: 'flash' },
 };
 
 const BUGGY = 'def add(a, b):\n    return a - b\n';
@@ -74,8 +83,7 @@ function makeRepo(runner, scenario) {
     return dir;
 }
 
-function writeConfig(dir, runner, extra = '') {
-    const args = JSON.stringify(RUNNERS[runner].args);
+function writeConfig(dir, runner, extra = '', args = JSON.stringify(RUNNERS[runner].args)) {
     fs.mkdirSync(path.join(dir, '.tasks'), { recursive: true });
     fs.writeFileSync(
         path.join(dir, '.tasks', 'config.yml'),
@@ -137,6 +145,40 @@ const SCENARIOS = {
         return {
             dir,
             ok: result.status === 0 && /completed/.test(output) && fixed(path.join(dir, 'calc.py')),
+            detail: output.trim().split('\n').slice(-3).join(' | '),
+            log: jobLog(dir, output),
+        };
+    },
+
+    /** `lotar agent run --model/--effort` reaches the CLI as its own flags. */
+    settings(runner, options) {
+        const dir = makeRepo(runner, 'settings');
+        writeConfig(dir, runner, '', '[]');
+        const ticket = addTicket(dir);
+        const { model, effort } = SETTINGS[runner];
+        const flags = [...(model ? ['--model', model] : []), ...(effort ? ['--effort', effort] : [])];
+        const result = lotar(
+            dir,
+            [
+                'agent',
+                'run',
+                ticket,
+                'Reply with the single word OK. Do not change any files.',
+                '--agent',
+                'fixer',
+                ...flags,
+                '--wait',
+                '--timeout-seconds',
+                String(options.timeout),
+            ],
+            {},
+            options.timeout + 30,
+        );
+        const output = `${result.stdout}${result.stderr}`;
+        const expected = [model && `model ${model}`, effort && `effort ${effort}`].filter(Boolean).join(', ');
+        return {
+            dir,
+            ok: result.status === 0 && /completed/.test(output) && output.includes(`Settings: ${expected}`),
             detail: output.trim().split('\n').slice(-3).join(' | '),
             log: jobLog(dir, output),
         };

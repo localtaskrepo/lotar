@@ -203,6 +203,23 @@ pub struct AutomationAction {
     pub run: Option<AutomationRunAction>,
     #[serde(default)]
     pub comment: Option<String>,
+    /// Settings for the agent job this action starts by assigning the
+    /// ticket to an agent profile.
+    #[serde(default)]
+    pub agent: Option<AutomationAgentAction>,
+}
+
+/// How the agent job started by an action's assignment should run. Each
+/// value overrides the profile's own; `prompt` replaces the default request
+/// and accepts the same `${{...}}` templates as comments.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AutomationAgentAction {
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub effort: Option<String>,
+    #[serde(default)]
+    pub prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

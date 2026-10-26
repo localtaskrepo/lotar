@@ -1,10 +1,21 @@
 title: 'Agent profiles: model, effort, tools and MCP settings, with overrides from automation and runs'
-status: Todo
+status: Done
 priority: High
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T17:02:37.267165+00:00
-modified: 2026-10-26T17:38:26.638346+00:00
+modified: 2026-10-26T18:16:17.675904+00:00
+comments:
+- date: 2026-10-26T17:40:28.441271+00:00
+  text: 'Plan: (1) profile model/effort mapped per runner (claude --model/--effort; codex -m/-c model_reasoning_effort=; copilot --model/--reasoning-effort; gemini -m; command env LOTAR_AGENT_MODEL/EFFORT), skipped when profile args set them; (2) per-run overrides on AgentJobCreateRequest (REST, MCP tool, lotar agent run --model/--effort), persisted in queue entries, shown on job records/cards; (3) automation action ''agent: {model, effort, prompt}'' applied to the job its assignment queues; (4) tools.allowed/disallowed and mcp.allow mapped for claude (--allowedTools/--disallowedTools, mcp__<server>) and copilot (--allow-tool/--deny-tool); (5) docs + openapi + TS types; unit, queue, automation and CLI tests plus a live check. LoTaR MCP injection and usage/cost recording evaluated after, possibly as follow-ups.'
+- date: 2026-10-26T18:16:17.634020+00:00
+  text: |-
+    Done. Profiles take model and effort (claude --model/--effort, codex -m / -c model_reasoning_effort=, copilot --model/--reasoning-effort, gemini -m, command env LOTAR_AGENT_MODEL/EFFORT; profile args that set them win). Runs override them via lotar agent run --model/--effort, POST /api/jobs and the MCP agent_run tool; queue entries keep them; values are checked (no leading '-', plain characters) before anything starts. Automation actions get an 'agent: {model, effort, prompt}' block for the job their assignment starts; simulate lists it. Jobs show model/effort in REST, SSE, job logs, lotar agent status/list-jobs and on the Agents page. tools.allowed/disallowed and mcp.allow now map to claude --allowedTools/--disallowedTools (mcp__<server>) and copilot --allow-tool/--deny-tool. Rules editor: edits the agent block (rules with it open in the custom form so saving keeps it), writes canonical job event names while still reading the aliases, and its fields now lay out properly on the Automations page (they only had styles on the Config page).
+
+    Verification: unit tests for the flag mapping, overrides, validation and tools; queue round trip incl. legacy entries; integration test of a two-phase hand-over where the second job gets the action's model/effort/prompt; CLI test incl. a refused value; Vitest round trip + editor save test; lint, test (1722 Rust + 1214 UI) and smoke (350) pass. Live: npm run agents:live --scenario settings passes for claude (haiku/low), codex (effort low) and copilot (model auto). Copilot effort could not be checked live: this account only has the auto model, which refuses an effort (the job fails with Copilot's message, as it should). Browser check of the job card (light/dark, 390px without overflow) and the editor fields.
+
+    Split out: DEV-205 usage and cost per job, DEV-206 LoTaR MCP server for agent runs.
 description: |-
   Let a run choose the model and reasoning effort, and apply the profile settings that are parsed but ignored today.
 
@@ -26,3 +37,25 @@ history:
       - Wire `tools` (allowed/denied → claude --allowedTools/--disallowedTools, copilot --allow-tool/--deny-tool) and `mcp` (servers, including LoTaR's own MCP server) into the runner command.
       - Consider max turns / budget limits and recording usage and cost from the result events (claude total_cost_usd, codex usage, copilot usage).
       - REST shape changes need api_types.rs, view/api/types.ts, openapi.json and help docs to agree.
+- at: 2026-10-26T17:40:28.389556+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-26T17:40:28.441271+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T18:16:17.634020+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T18:16:17.675904+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

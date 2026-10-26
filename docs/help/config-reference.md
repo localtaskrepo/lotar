@@ -39,6 +39,9 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
   - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `command`
   - agents.<name>.permissions: `read-only` | `workspace` | `full` (default `workspace`) — what the agent may do without asking; see [Agent Jobs](./agent.md#permissions)
+  - agents.<name>.model / effort: optional strings — model and reasoning effort passed to the CLI; runs and automation actions can override them. See [Agent Jobs](./agent.md#model-and-effort)
+  - agents.<name>.tools.allowed / tools.disallowed: string[] — extra tools to allow or deny (Claude, Copilot); see [Agent Jobs](./agent.md#tools-and-mcp-servers)
+  - agents.<name>.mcp.allow: string[] — MCP servers whose tools need no approval (Claude, Copilot)
   - agents.<name>.command: optional string — the executable to run (default: the runner name; required for `command`)
   - agents.<name>.args: string[] — extra CLI arguments, after LoTaR's own flags
   - agents.<name>.env: map — extra environment variables

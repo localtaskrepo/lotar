@@ -88,6 +88,8 @@ struct AgentJobRecord {
     session_id: Option<String>,
     worktree_path: Option<String>,
     worktree_branch: Option<String>,
+    model: Option<String>,
+    effort: Option<String>,
     is_merge_job: bool,
 }
 
@@ -263,6 +265,7 @@ impl AgentJobService {
         let job_id = make_job_id();
         let created_at = Utc::now().to_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
+        let (job_model, job_effort) = (profile.model.clone(), profile.effort.clone());
 
         let should_queue: bool;
         {
@@ -319,6 +322,8 @@ impl AgentJobService {
                         session_id: None,
                         worktree_path: None,
                         worktree_branch: None,
+                        model: job_model.clone(),
+                        effort: job_effort.clone(),
                         is_merge_job,
                     },
                     events: Vec::new(),
@@ -381,6 +386,8 @@ impl AgentJobService {
             session_id: None,
             worktree_path: None,
             worktree_branch: None,
+            model: job_model,
+            effort: job_effort,
         }))
     }
 
@@ -593,6 +600,8 @@ impl AgentJobRecord {
             session_id: self.session_id.clone(),
             worktree_path: self.worktree_path.clone(),
             worktree_branch: self.worktree_branch.clone(),
+            model: self.model.clone(),
+            effort: self.effort.clone(),
         }
     }
 
@@ -721,23 +730,48 @@ fn resolve_profile(
     config: &ResolvedConfig,
     req: &AgentJobCreateRequest,
 ) -> LoTaRResult<AgentProfileDetail> {
-    if let Some(name) = req.agent.as_deref() {
-        let profile = config.agent_profiles.get(name).ok_or_else(|| {
-            LoTaRError::ValidationError(format!("Unknown agent profile '{}'.", name))
-        })?;
-        return Ok(profile.clone());
-    }
-
-    if let Some(runner) = req.runner.as_deref() {
-        return Ok(AgentProfileDetail {
+    let mut profile = if let Some(name) = req.agent.as_deref() {
+        config
+            .agent_profiles
+            .get(name)
+            .ok_or_else(|| {
+                LoTaRError::ValidationError(format!("Unknown agent profile '{}'.", name))
+            })?
+            .clone()
+    } else if let Some(runner) = req.runner.as_deref() {
+        AgentProfileDetail {
             runner: runner.to_string(),
             ..Default::default()
-        });
-    }
+        }
+    } else {
+        return Err(LoTaRError::ValidationError(
+            "Either agent or runner must be provided".to_string(),
+        ));
+    };
 
-    Err(LoTaRError::ValidationError(
-        "Either agent or runner must be provided".to_string(),
-    ))
+    // A run's own model and effort win over the profile's.
+    if let Some(model) = non_blank(req.model.as_deref()) {
+        profile.model = Some(model);
+    }
+    if let Some(effort) = non_blank(req.effort.as_deref()) {
+        profile.effort = Some(effort);
+    }
+    profile.model = non_blank(profile.model.as_deref());
+    profile.effort = non_blank(profile.effort.as_deref());
+    if let Some(model) = profile.model.as_deref() {
+        crate::services::agent_runner::validate_run_setting("model", model)?;
+    }
+    if let Some(effort) = profile.effort.as_deref() {
+        crate::services::agent_runner::validate_run_setting("effort", effort)?;
+    }
+    Ok(profile)
+}
+
+fn non_blank(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn resolve_agent_instructions(
@@ -1351,12 +1385,16 @@ fn run_job(
     let _ = AgentLogService::init_log(
         &workspace_root,
         config.agent_logs_dir.as_deref(),
-        &job_id,
-        &ticket_id,
-        runner_kind.as_str(),
-        &started_at,
-        worktree_path_str.as_deref(),
-        worktree_context.worktree_branch.as_deref(),
+        crate::services::agent_log_service::JobLogHeader {
+            job_id: job_id.clone(),
+            ticket_id: ticket_id.clone(),
+            runner: runner_kind.as_str().to_string(),
+            created_at: started_at.clone(),
+            worktree_path: worktree_path_str.clone(),
+            worktree_branch: worktree_context.worktree_branch.clone(),
+            model: profile.model.clone(),
+            effort: profile.effort.clone(),
+        },
     );
 
     let mut cancelled = false;
@@ -2223,6 +2261,8 @@ fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
         "message": event.message,
         "worktree_path": record.worktree_path,
         "worktree_branch": record.worktree_branch,
+        "model": record.model,
+        "effort": record.effort,
     });
     crate::api_events::emit(&crate::api_events::ApiEvent {
         kind: event.kind.clone(),
@@ -2406,6 +2446,7 @@ mod tests {
             prompt: "do the thing".to_string(),
             runner: Some("command".to_string()),
             agent: None,
+            ..Default::default()
         }
     }
 
@@ -2432,6 +2473,8 @@ mod tests {
                 session_id: None,
                 worktree_path: None,
                 worktree_branch: None,
+                model: None,
+                effort: None,
                 is_merge_job: false,
             },
             events: Vec::new(),
@@ -2651,6 +2694,7 @@ mod tests {
             prompt: "hello".to_string(),
             runner: None,
             agent: Some("codex-default".to_string()),
+            ..Default::default()
         };
         let profile = resolve_profile(&config, &req).unwrap();
         assert_eq!(profile.runner, "codex");

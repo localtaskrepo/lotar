@@ -47,7 +47,7 @@ describe('automationRules utilities', () => {
         expect(rule.when).toEqual({
             any: [{ status: 'InProgress' }, { priority: 'High' }],
         })
-        expect(rule.on).toMatchObject({ complete: { set: { status: 'Done' } } })
+        expect(rule.on).toMatchObject({ job_completed: { set: { status: 'Done' } } })
     })
 
     it('flags NOT conditions as yaml-only', () => {

@@ -167,6 +167,12 @@ pub struct AgentProfileDetail {
     /// Defaults to `workspace` when omitted.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub permissions: Option<AgentPermissions>,
+    /// Model passed to the CLI (for example `sonnet`, `gpt-5.5`).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub model: Option<String>,
+    /// Reasoning effort passed to the CLI (for example `low`, `high`).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub command: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

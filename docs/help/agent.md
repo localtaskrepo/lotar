@@ -4,7 +4,7 @@ LoTaR can orchestrate supported agent CLIs (Copilot CLI, Claude Code, Codex CLI,
 
 ## CLI commands
 
-- `lotar agent run <TICKET> <PROMPT> [--runner <copilot|claude|codex|gemini>] [--agent <profile>] [--wait] [--follow] [--timeout-seconds <N>]`
+- `lotar agent run <TICKET> <PROMPT> [--runner <copilot|claude|codex|gemini>] [--agent <profile>] [--model <MODEL>] [--effort <LEVEL>] [--wait] [--follow] [--timeout-seconds <N>]`
 - `lotar agent status <JOB_ID>`
 - `lotar agent logs <JOB_ID>`
 - `lotar agent cancel <JOB_ID>`
@@ -49,6 +49,55 @@ agents:
 - Copilot has no sandbox. At `workspace` its file tools stay in the working directory, but shell commands are not confined.
 - If the profile's `args` already set permissions (for example `--permission-mode`, `--sandbox`, `--allow-tool`/`--deny-tool`, `--approval-mode` or `--yolo`), LoTaR adds no permission flags of its own.
 - `command` runners get no permission flags.
+
+### Model and effort
+
+A profile can pick the model and reasoning effort; a single run can override them with `lotar agent run --model/--effort`, the `model`/`effort` fields of `POST /api/jobs` and the MCP `agent_run` tool, or an automation action's [`agent` settings](automation.md#agent-run-settings).
+
+```yaml
+agents:
+  implement:
+    runner: claude
+    model: sonnet
+    effort: high
+  review:
+    runner: codex
+    model: gpt-5.5
+    effort: medium
+```
+
+| Runner | `model` | `effort` |
+| --- | --- | --- |
+| `claude` | `--model` | `--effort` (low, medium, high, xhigh, max) |
+| `codex` | `-m` | `-c model_reasoning_effort=<value>` (depends on the model, for example low, medium, high, xhigh) |
+| `copilot` | `--model` | `--reasoning-effort` (none, minimal, low, medium, high, xhigh, max) |
+| `gemini` | `-m` | not supported |
+| `command` | `LOTAR_AGENT_MODEL` | `LOTAR_AGENT_EFFORT` |
+
+Values are passed through as given, so each CLI decides which names it accepts. They may use letters, digits and `. _ - : / @ [ ]`. If the profile's `args` already set the model or effort, those win. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
+
+### Tools and MCP servers
+
+`tools` and `mcp` fine-tune what a Claude or Copilot agent may use, in that CLI's own tool syntax. They add to the permission level rather than replace it.
+
+```yaml
+agents:
+  implement:
+    runner: claude
+    tools:
+      allowed: ["WebFetch", "Bash(npm test:*)"]
+      disallowed: ["Bash(git push:*)"]
+    mcp:
+      allow: [docs]   # tools of the MCP server named "docs" need no approval
+```
+
+| Setting | claude | copilot |
+| --- | --- | --- |
+| `tools.allowed` | `--allowedTools=<tool>` | `--allow-tool=<tool>` |
+| `tools.disallowed` | `--disallowedTools=<tool>` | `--deny-tool=<tool>` |
+| `mcp.allow` | `--allowedTools=mcp__<server>` | `--allow-tool=<server>` |
+
+Codex and Gemini have no per-tool flags, so these settings don't apply to them. The MCP servers themselves come from each CLI's own configuration.
 
 ## list-running requirements
 

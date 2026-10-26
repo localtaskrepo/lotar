@@ -102,6 +102,9 @@
                   <span class="status-chip" :class="`status-${job.status}`">{{ job.status }}</span>
                   <span v-if="job.agent" class="phase-chip">{{ job.agent }}</span>
                   <span class="muted">{{ job.runner }}</span>
+                  <span v-if="job.model || job.effort" class="muted" data-testid="agent-job-settings">
+                    · {{ [job.model, job.effort && `${job.effort} effort`].filter(Boolean).join(', ') }}
+                  </span>
                 </div>
                 <div class="muted" style="font-size: 12px">
                   <span>Created {{ formatDate(job.created_at) }}</span>
@@ -341,6 +344,8 @@ function updateFromEvent(payload: any, kind: string) {
     session_id: payload.session_id || null,
     worktree_path: payload.worktree_path || null,
     worktree_branch: payload.worktree_branch || null,
+    model: payload.model || null,
+    effort: payload.effort || null,
   }
   mergeJob(next)
   recentEventJobs.set(next.id, { job: next, seq: ++eventSeq })
