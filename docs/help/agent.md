@@ -112,7 +112,7 @@ If the wrapper is not available, jobs can still run, but `list-running` will sho
 - `LOTAR_AGENT_CONTEXT_EXTENSION` — extension for context files (default `.context`).
 - `LOTAR_AGENT_LOGS_DIR` — when set, enables debug logging to this directory (supports relative or absolute paths).
 
-Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_TICKET_REPORTER`, `LOTAR_TASKS_DIR`, the worktree path and branch, …) and `LOTAR_BIN`, the absolute path of the `lotar` that started the job. The built-in instructions run the CLI as `"${LOTAR_BIN:-lotar}"`, so an older `lotar` elsewhere on PATH (or a CLI that runs commands in a login shell, like Codex) can't answer instead.
+Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_TICKET_PROJECT`, `LOTAR_TICKET_REPORTER`, `LOTAR_TASKS_DIR`, the worktree path and branch, …) and `LOTAR_BIN`, the absolute path of the `lotar` that started the job. The "This job" section names that path, and its directory is put first on PATH, so an older `lotar` elsewhere (or a CLI that runs commands in a login shell, like Codex) can't answer instead. The built-in examples avoid `${…}` expansions and variables as the command, which Claude Code refuses to run.
 
 ## Windows agent commands
 

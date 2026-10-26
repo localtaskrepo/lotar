@@ -643,16 +643,27 @@ fn parse_claude_event(payload: &JsonValue) -> Vec<RunnerEvent> {
                     .and_then(|v| v.as_str())
                     .is_some_and(|s| s != "success");
             let mut events = Vec::new();
-            let denials = payload
+            let denials: Vec<String> = payload
                 .get("permission_denials")
                 .and_then(|v| v.as_array())
-                .map(|denials| denials.len())
-                .unwrap_or(0);
-            if denials > 0 {
+                .map(|denials| {
+                    denials
+                        .iter()
+                        .map(|denial| {
+                            let name = str_field(denial, "tool_name")
+                                .unwrap_or_else(|| "tool".to_string());
+                            tool_summary(&name, denial.get("tool_input"))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !denials.is_empty() {
                 events.push(RunnerEvent::new(
                     RunnerEventKind::Progress,
                     Some(format!(
-                        "{denials} tool call(s) were denied by the permission settings; see the agent profile's permissions"
+                        "{} tool call(s) were denied by the permission settings; see the agent profile's permissions:\n- {}",
+                        denials.len(),
+                        denials.join("\n- ")
                     )),
                     session_id.clone(),
                 ));
@@ -1281,10 +1292,12 @@ mod tests {
     fn claude_reports_denied_tools_and_joins_text_blocks() {
         let events = parse_runner_line(
             AgentRunnerKind::Claude,
-            r#"{"type":"result","subtype":"success","is_error":false,"permission_denials":[{"tool_name":"Bash"}]}"#,
+            r#"{"type":"result","subtype":"success","is_error":false,"permission_denials":[{"tool_name":"Bash","tool_input":{"command":"git push"}}]}"#,
         )
         .unwrap();
-        assert!(events[0].text.as_deref().unwrap().contains("denied"));
+        let note = events[0].text.as_deref().unwrap();
+        assert!(note.contains("1 tool call(s) were denied"), "{note}");
+        assert!(note.contains("- Bash: git push"), "{note}");
 
         let events = parse_runner_line(
             AgentRunnerKind::Claude,

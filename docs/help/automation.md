@@ -189,6 +189,7 @@ LoTaR injects the following environment variables for automation commands:
 - `LOTAR_TASKS_DIR`
 - `LOTAR_WORKSPACE_ROOT`
 - `LOTAR_TICKET_ID`
+- `LOTAR_TICKET_PROJECT`
 - `LOTAR_TICKET_STATUS`
 - `LOTAR_TICKET_PRIORITY`
 - `LOTAR_TICKET_TYPE`

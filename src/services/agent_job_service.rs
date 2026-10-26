@@ -829,6 +829,12 @@ fn job_notes(
     is_merge_job: bool,
 ) -> String {
     let mut notes = String::new();
+    if let Some(bin) = current_lotar_binary() {
+        notes.push_str(&format!(
+            "- Run the LoTaR CLI as `{}` (the build that started this job).\n",
+            bin.display()
+        ));
+    }
     if config.agent_worktree.enabled {
         let branch = build_worktree_branch(
             &config.agent_worktree.branch_prefix,
@@ -1523,7 +1529,19 @@ fn run_job(
     }
     // The agent calls the CLI itself; point it at this build, not whatever
     // `lotar` is first on its PATH (login shells and some CLIs reorder PATH).
+    // The prompt names this binary by its absolute path (Claude Code refuses
+    // a variable as the command), and its directory goes first on PATH.
     if let Some(bin) = current_lotar_binary() {
+        if let Some(dir) = bin.parent() {
+            let path = std::env::var_os("PATH").unwrap_or_default();
+            let mut dirs = vec![dir.to_path_buf()];
+            dirs.extend(std::env::split_paths(&path));
+            if let Ok(joined) = std::env::join_paths(dirs) {
+                command
+                    .env
+                    .insert("PATH".to_string(), joined.to_string_lossy().to_string());
+            }
+        }
         command
             .env
             .insert("LOTAR_BIN".to_string(), bin.to_string_lossy().to_string());
@@ -1996,8 +2014,11 @@ fn handle_runner_line(
             }
             RunnerEventKind::Result => {
                 let failure_text = event.failed.then(|| event.text.clone()).flatten();
+                // The runner's final answer is the job's summary, ahead of any
+                // note (such as denied tools) logged just before it.
+                let final_text = event.text.clone().filter(|text| !text.trim().is_empty());
                 update_job(job_id, |state| {
-                    if let Some(ref text) = failure_text {
+                    if let Some(ref text) = final_text {
                         state.record.last_message = Some(text.clone());
                     }
                     push_event(state, "agent_job_result", failure_text.clone());

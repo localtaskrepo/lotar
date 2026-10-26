@@ -1106,6 +1106,9 @@ pub(crate) fn build_lotar_env(
         env.insert("LOTAR_AUTOMATION_EVENT".to_string(), label.to_string());
     }
     env.insert("LOTAR_TICKET_ID".to_string(), task.id.clone());
+    if let Some((project, _)) = task.id.rsplit_once('-') {
+        env.insert("LOTAR_TICKET_PROJECT".to_string(), project.to_string());
+    }
     env.insert("LOTAR_TICKET_STATUS".to_string(), task.status.to_string());
     env.insert(
         "LOTAR_TICKET_PRIORITY".to_string(),

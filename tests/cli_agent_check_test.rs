@@ -137,7 +137,7 @@ fn agent_jobs_get_the_running_lotar_binary() {
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
-            "default:\n  project: TEST\nagents:\n  stub:\n    runner: command\n    command: sh\n    args: ['-c', 'printf \"%s\" \"$LOTAR_BIN\" > \"{}\"']\n",
+            "default:\n  project: TEST\nagents:\n  stub:\n    runner: command\n    command: sh\n    args: ['-c', 'printf \"%s|%s|%s\" \"$LOTAR_BIN\" \"$LOTAR_TICKET_PROJECT\" \"${{PATH%%:*}}\" > \"{}\"']\n",
             seen.display()
         ),
     );
@@ -153,9 +153,61 @@ fn agent_jobs_get_the_running_lotar_binary() {
         .args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"])
         .assert()
         .success();
-    let bin = std::fs::read_to_string(&seen).unwrap();
+    let seen = std::fs::read_to_string(&seen).unwrap();
+    let parts: Vec<&str> = seen.split('|').collect();
+    let expected = std::fs::canonicalize(env!("CARGO_BIN_EXE_lotar")).unwrap();
+    assert_eq!(std::fs::canonicalize(parts[0]).unwrap(), expected);
+    assert_eq!(parts[1], "TEST");
     assert_eq!(
-        std::fs::canonicalize(&bin).unwrap(),
-        std::fs::canonicalize(env!("CARGO_BIN_EXE_lotar")).unwrap()
+        std::fs::canonicalize(parts[2]).unwrap(),
+        expected.parent().unwrap(),
+        "the running build's directory comes first on PATH"
     );
+}
+
+/// The runner's final answer is the job summary even when a note (denied
+/// tools) is logged just before it.
+#[test]
+fn agent_job_summary_is_the_final_answer() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _tasks = EnvVarGuard::set(
+        "LOTAR_TASKS_DIR",
+        fixtures.tasks_root.to_string_lossy().as_ref(),
+    );
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    let stub = root.join("claude-stub.sh");
+    std::fs::write(
+        &stub,
+        r#"#!/bin/sh
+cat > /dev/null &
+echo '{"type":"system","subtype":"init","session_id":"s1"}'
+echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Fixed it."}]},"session_id":"s1"}'
+echo '{"type":"result","subtype":"success","is_error":false,"result":"Fixed it.","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"git push"}}],"session_id":"s1"}'
+"#,
+    )
+    .unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: TEST\nagents:\n  fixer:\n    runner: claude\n    command: \"{}\"\n",
+            stub.display()
+        ),
+    );
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["add", "Summary"])
+        .assert()
+        .success();
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["agent", "run", "TEST-1", "go", "--agent", "fixer", "--wait"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Fixed it."))
+        .stdout(predicate::str::contains("denied").not());
 }
