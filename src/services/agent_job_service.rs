@@ -247,8 +247,18 @@ impl AgentJobService {
             ));
         }
 
+        let job_id = make_job_id();
         let context = AgentContextService::load(tasks_dir, &config, &ticket_id)?;
-        let instructions = resolve_agent_instructions(tasks_dir, &config, &profile)?;
+        let template = instruction_template(
+            tasks_dir,
+            &config,
+            &task,
+            &job_id,
+            runner_kind,
+            req.agent.as_deref(),
+        );
+        let instructions = resolve_agent_instructions(tasks_dir, &config, &profile)?
+            .map(|text| template.expand(&text));
         let user_prompt = req.prompt.trim().to_string();
         if user_prompt.is_empty() {
             return Err(LoTaRError::ValidationError(
@@ -264,7 +274,6 @@ impl AgentJobService {
             Some(&notes),
         );
 
-        let job_id = make_job_id();
         let created_at = Utc::now().to_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
         let (job_model, job_effort) = (profile.model.clone(), profile.effort.clone());
@@ -817,6 +826,55 @@ fn read_instructions(
         }
     };
     Ok(non_blank(Some(&text)))
+}
+
+/// Variables for `${{...}}` templates in agent instructions: the automation
+/// ones (`ticket.*`, `agent.*`) plus `ticket.project`, `lotar.bin` (the CLI
+/// to call) and `workspace.root` (the main checkout). Instructions carry
+/// literal values because some agent CLIs refuse commands with `$VARIABLES`.
+fn instruction_template(
+    tasks_dir: &std::path::Path,
+    config: &ResolvedConfig,
+    task: &crate::api_types::TaskDTO,
+    job_id: &str,
+    runner_kind: AgentRunnerKind,
+    agent: Option<&str>,
+) -> crate::automation::template::TemplateContext {
+    let repo_root = resolve_repo_root(tasks_dir);
+    let branch = config.agent_worktree.enabled.then(|| {
+        build_worktree_branch(
+            &config.agent_worktree.branch_prefix,
+            &sanitize_worktree_token(&task.id),
+        )
+    });
+    let worktree_path = branch.as_ref().and_then(|_| {
+        let root = repo_root.as_ref()?;
+        resolve_worktree_root(root, config.agent_worktree.dir.as_deref())
+            .ok()
+            .map(|dir| dir.join(sanitize_worktree_token(&task.id)))
+    });
+    let job = AutomationJobContext {
+        job_id: job_id.to_string(),
+        runner: runner_kind.as_str().to_string(),
+        agent: agent.map(str::to_string),
+        worktree_path: worktree_path.map(|path| path.to_string_lossy().to_string()),
+        worktree_branch: branch,
+    };
+    let workspace_root =
+        repo_root.unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
+    let lotar_bin = current_lotar_binary()
+        .map(|bin| bin.to_string_lossy().to_string())
+        .unwrap_or_else(|| "lotar".to_string());
+    let project = task
+        .id
+        .rsplit_once('-')
+        .map(|(project, _)| project)
+        .unwrap_or_default();
+    crate::automation::template::TemplateContext::from_task(task)
+        .with_job(Some(&job))
+        .with_var("ticket.project", project)
+        .with_var("lotar.bin", &lotar_bin)
+        .with_var("workspace.root", &workspace_root.to_string_lossy())
 }
 
 /// What LoTaR knows about how this job runs and ends, so the agent neither
@@ -2636,6 +2694,60 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(resolved, "You are in the TESTING phase.");
+    }
+
+    #[test]
+    fn instructions_expand_to_literal_ticket_values() {
+        let dir = tempdir().unwrap();
+        let tasks_dir = dir.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+        fs::write(
+            tasks_dir.join("config.yml"),
+            "default:\n  project: TPL\nagent:\n  worktree:\n    enabled: true\nagents:\n  merge: claude\n",
+        )
+        .unwrap();
+        let mut storage = Storage::new(&tasks_dir);
+        let task = crate::services::task_service::TaskService::create(
+            &mut storage,
+            crate::api_types::TaskCreate {
+                title: "Templates".to_string(),
+                project: Some("TPL".to_string()),
+                reporter: Some("Sam Example".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let config =
+            crate::config::resolution::config_for_project(&tasks_dir, Some("TPL")).unwrap();
+        let template = instruction_template(
+            &tasks_dir,
+            &config,
+            &task,
+            "job-1",
+            AgentRunnerKind::Claude,
+            Some("merge"),
+        );
+
+        let builtin = template.expand(DEFAULT_AGENT_INSTRUCTIONS);
+        assert!(!builtin.contains("${{"), "{builtin}");
+        assert!(builtin.contains("list TPL-1"), "{builtin}");
+        assert!(builtin.contains("--project TPL"), "{builtin}");
+        assert!(
+            builtin.contains("assignee TPL-1 \"Sam Example\""),
+            "{builtin}"
+        );
+
+        let merge = template.expand(
+            "git -C \"${{workspace.root}}\" merge --ff-only ${{agent.worktree_branch}} (${{agent.profile}})",
+        );
+        assert!(
+            merge.ends_with("merge --ff-only agent/TPL-1 (merge)"),
+            "{merge}"
+        );
+        assert!(
+            !merge.contains("\"\""),
+            "workspace root is filled in: {merge}"
+        );
     }
 
     #[test]

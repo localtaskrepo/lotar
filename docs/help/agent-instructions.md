@@ -8,26 +8,26 @@ You are running inside a LoTaR agent job on the local machine with access to the
 
 ## LoTaR CLI quick reference
 
-Use the LoTaR CLI to read and update the ticket you are working on. If "This job" below gives a path to the LoTaR CLI, run that path wherever these examples say `lotar`: it is the build that started this job, while a `lotar` on your PATH may be a different version. The environment has `LOTAR_TICKET_ID`, `LOTAR_TICKET_PROJECT`, `LOTAR_TICKET_REPORTER` and `LOTAR_TASKS_DIR`. Use plain `"$VAR"` references in arguments; some agent tools refuse expansions such as `${VAR:-default}` or a variable as the command.
+Use the LoTaR CLI to read and update ticket ${{ticket.id}}. Run it as `"${{lotar.bin}}"`, the build that started this job; a `lotar` on your PATH may be a different version. Write commands with literal values like the ones below: some agent tools refuse commands that contain shell variables such as `$LOTAR_TICKET_ID` or `$?`.
 
 ```sh
 # Read ticket details
-lotar --format json list "$LOTAR_TICKET_ID"
-lotar task relationships "$LOTAR_TICKET_ID"
+"${{lotar.bin}}" --format json list ${{ticket.id}}
+"${{lotar.bin}}" task relationships ${{ticket.id}}
 
 # Inspect configured statuses before choosing a workflow transition
-lotar config show --project "$LOTAR_TICKET_PROJECT"
+"${{lotar.bin}}" config show --project ${{ticket.project}}
 # Replace <STATUS> with a configured status that fits this workflow
-lotar status "$LOTAR_TICKET_ID" <STATUS>
+"${{lotar.bin}}" status ${{ticket.id}} <STATUS>
 
 # Add a comment to the ticket
-lotar comment "$LOTAR_TICKET_ID" "Implemented the feature and all tests pass."
+"${{lotar.bin}}" comment ${{ticket.id}} "Implemented the feature and all tests pass."
 
 # Add tags
-lotar task edit "$LOTAR_TICKET_ID" --tag needs-review
+"${{lotar.bin}}" task edit ${{ticket.id}} --tag needs-review
 
 # List tasks
-lotar list
+"${{lotar.bin}}" list
 ```
 
 Use comments to log progress and decisions. "This job" below says whether you set the ticket's status when you finish.
@@ -38,17 +38,17 @@ If the ticket is ambiguous, a product decision is missing, you need feedback, or
 
 - Do not guess.
 - Add a ticket comment that states the open question or blocker and the decision or input you need.
-- Reassign the ticket to the reporter (`LOTAR_TICKET_REPORTER`) so the author can clarify it.
+- Reassign the ticket to its reporter (${{ticket.reporter}}) so the author can clarify it.
 - Inspect the project configuration and workflow for an appropriate waiting status. Do not assume `HelpNeeded` exists. If no waiting status is configured, leave the status unchanged and explain the blocker in a comment.
 - Only continue once the ticket is reassigned back to an agent or you receive a direct follow-up message.
 
 Example:
 
 ```sh
-lotar comment "$LOTAR_TICKET_ID" "Need clarification: should this preserve the legacy JSON shape or switch to the new schema?"
+"${{lotar.bin}}" comment ${{ticket.id}} "Need clarification: should this preserve the legacy JSON shape or switch to the new schema?"
 # Replace <WAITING_STATUS> with a configured waiting status such as HelpNeeded
-lotar status "$LOTAR_TICKET_ID" <WAITING_STATUS>
-lotar assignee "$LOTAR_TICKET_ID" "$LOTAR_TICKET_REPORTER"
+"${{lotar.bin}}" status ${{ticket.id}} <WAITING_STATUS>
+"${{lotar.bin}}" assignee ${{ticket.id}} "${{ticket.reporter}}"
 ```
 
 If you receive an agent-job message that answers the question, incorporate it and continue from the current state.

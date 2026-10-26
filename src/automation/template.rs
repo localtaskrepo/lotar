@@ -88,6 +88,12 @@ impl TemplateContext {
         self
     }
 
+    /// Add one variable (for example `lotar.bin` in agent instructions).
+    pub fn with_var(mut self, key: &str, value: &str) -> Self {
+        self.set(key, value);
+        self
+    }
+
     fn set(&mut self, key: &str, value: &str) {
         self.vars.insert(key.to_string(), value.to_string());
     }

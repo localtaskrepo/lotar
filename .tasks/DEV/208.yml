@@ -4,4 +4,13 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-10-26T21:28:32.989552+00:00
+modified: 2026-10-26T22:13:05.407239+00:00
+comments:
+- date: 2026-10-26T22:13:05.407239+00:00
+  text: 'Finding from a DEV-12 live run: when a CLI already has a LoTaR MCP server in its own settings (here Copilot), agents prefer its tools (task_get, task_comment_add) over the CLI. That server is not bound to the job''s tasks directory or build, so the agent''s comment and hand-back did not reach the ticket and automation moved it on. If LoTaR injects its own MCP server, it should take precedence over (or replace) a user-configured one for the run, bound to the job''s tasks dir.'
 description: 'Split from DEV-206. Agents update their ticket through the lotar CLI (LOTAR_BIN), which works live for claude, codex and copilot. An MCP route would give typed tools instead of shell commands: inject LoTaR''s MCP server per run (claude --mcp-config, codex -c mcp_servers.lotar.*, copilot --additional-mcp-config) with its tools pre-approved, behind a profile switch such as mcp.lotar: true. Headless MCP tool approval differs per CLI, so each needs a live check.'
+history:
+- at: 2026-10-26T22:13:05.407239+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

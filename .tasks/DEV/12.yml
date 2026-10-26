@@ -3,8 +3,9 @@ status: Todo
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.757103+00:00
-modified: 2026-09-06T13:12:53.954505+00:00
+modified: 2026-10-26T22:13:05.461010+00:00
 comments:
 - date: 2026-09-06T11:14:14.354808+00:00
   text: 'Backlog review: script/action template expansion is implemented in automation/template.rs and covered by template_expansion_in_run_action. Agent instruction text is still appended without expansion. This combined feature remains Todo; remaining scope is instruction/file interpolation using a defined context and the existing template engine, not a second script-template implementation.'
@@ -12,6 +13,8 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 13: Template variables for agent instructions and script that get filled in at runtime. Should follow env/bash syntax for both inline and file-based instructions. This allows for dynamic instructions that can reference ticket fields, context variables, etc. Should support lists for properties like "references". Bash/env syntax allows to address both simple values and complex structures (e.g., `${{references[*].id}}` to get a list of all reference IDs).
+- date: 2026-10-26T22:13:05.434905+00:00
+  text: 'Instruction templates done (scalar): built-in, agent.instructions (inline or file) and profile instructions expand ${{...}} when a job starts, with the automation variables (ticket.*, agent.*) plus ticket.project, lotar.bin and workspace.root; documented in agent.md. The built-in instructions and the agent templates now use literal values, because Claude Code refuses commands containing shell variables (verified: ''A variable in this command can''t be checked before it runs''); live claude handback went from 3 denied commands to 0, codex passes. Tests: instructions_expand_to_literal_ticket_values. Gates: lint, 1732 Rust + 1223 UI, 351 smoke. Remaining for this ticket: list selection such as ${{references[*].id}} and list-valued fields; next step is to define that grammar in automation/template.rs with tests, then use it in instructions.'
 description: |-
   Migrated checklist requirements:
   Scalar action/script expansion already exists, but the original requirement is broader: runtime variables in inline and file-based agent instructions/scripts, ticket and context values, and structured/list selection such as ${{references[*].id}}. Keep Todo. Define the supported env/bash-style grammar and safe escaping/expansion behavior, reuse the existing engine where possible, and add scalar/list plus inline/file regressions. Do not label list or instruction expansion complete based only on scalar script tests.
@@ -31,3 +34,21 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-26T22:04:25.862194+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-26T22:13:05.434905+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T22:13:05.461010+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Todo

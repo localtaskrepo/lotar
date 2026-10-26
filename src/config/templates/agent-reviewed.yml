@@ -76,7 +76,7 @@ config:
         - Rebase the ticket branch onto the main branch and resolve conflicts.
         - Rerun the checks the repository asks for.
         - Fast-forward the main checkout to the branch:
-            git -C "$LOTAR_WORKSPACE_ROOT" merge --ff-only "$LOTAR_AGENT_WORKTREE_BRANCH"
+            git -C "${{workspace.root}}" merge --ff-only ${{agent.worktree_branch}}
           If the main checkout is not on the main branch, or its uncommitted changes block the merge, do not force it: hand the ticket back and explain.
         - Do not push unless the repository guidance says to.
 

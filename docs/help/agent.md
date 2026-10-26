@@ -112,7 +112,7 @@ If the wrapper is not available, jobs can still run, but `list-running` will sho
 - `LOTAR_AGENT_CONTEXT_EXTENSION` — extension for context files (default `.context`).
 - `LOTAR_AGENT_LOGS_DIR` — when set, enables debug logging to this directory (supports relative or absolute paths).
 
-Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_TICKET_PROJECT`, `LOTAR_TICKET_REPORTER`, `LOTAR_TASKS_DIR`, the worktree path and branch, …) and `LOTAR_BIN`, the absolute path of the `lotar` that started the job. The "This job" section names that path, and its directory is put first on PATH, so an older `lotar` elsewhere (or a CLI that runs commands in a login shell, like Codex) can't answer instead. The built-in examples avoid `${…}` expansions and variables as the command, which Claude Code refuses to run.
+Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_TICKET_PROJECT`, `LOTAR_TICKET_REPORTER`, `LOTAR_TASKS_DIR`, the worktree path and branch, …) and `LOTAR_BIN`, the absolute path of the `lotar` that started the job. The built-in instructions call that path (`${{lotar.bin}}`) and its directory is put first on PATH, so an older `lotar` elsewhere (or a CLI that runs commands in a login shell, like Codex) can't answer instead.
 
 ## Windows agent commands
 
@@ -142,6 +142,19 @@ agents:
     instructions: "You are in the TESTING phase. Run the tests and add missing ones."
 ```
 
+Instructions (inline, from a file, built-in or per profile) can use `${{...}}` templates, which LoTaR fills in when the job starts:
+
+| Variable | Value |
+| --- | --- |
+| `ticket.id`, `ticket.title`, `ticket.status`, `ticket.priority`, `ticket.type`, `ticket.assignee`, `ticket.reporter`, `ticket.description`, `ticket.due_date`, `ticket.effort`, `ticket.tags`, `ticket.field:<name>` | the ticket's fields, as in automation templates |
+| `ticket.project` | the ticket's project prefix |
+| `agent.job_id`, `agent.runner`, `agent.profile` | the job |
+| `agent.worktree_branch`, `agent.worktree_path` | the ticket's branch and worktree, when worktrees are on |
+| `lotar.bin` | absolute path of the `lotar` that started the job |
+| `workspace.root` | the main checkout |
+
+Unknown variables expand to nothing. The built-in instructions use them so that commands contain literal values: Claude Code refuses commands with shell variables (`"$LOTAR_TICKET_ID"`, `$?`) in headless runs.
+
 LoTaR writes the "This job" section itself:
 
 - With worktrees on, it names the branch (`agent/<TICKET>`) and tells the agent to commit its work there. Without worktrees the agent works in the main checkout and leaves its changes uncommitted unless asked to commit.
@@ -151,7 +164,7 @@ When a worktree job succeeds with changes still uncommitted, LoTaR commits them 
 
 A merge job (profile `merge`, or a ticket in `Merging`) has to end with its branch in the main checkout's current branch. If the agent couldn't fast-forward it (a sandbox may keep git metadata read-only), LoTaR runs `git merge --ff-only <branch>` in the main checkout, which never overwrites local changes. If the branch still isn't merged, the job fails, so `job_failed` rules run instead of `job_completed`.
 
-To hand a ticket back, an agent comments, sets a waiting status such as `HelpNeeded` and assigns the reporter (`lotar assignee "$LOTAR_TICKET_ID" "$LOTAR_TICKET_REPORTER"`; the ticket's own reporter is always accepted, even when it isn't username-shaped). Once the assignee is no longer the agent, rules that match on that agent no longer fire when its job ends.
+To hand a ticket back, an agent comments, sets a waiting status such as `HelpNeeded` and assigns the reporter (`lotar assignee <TICKET> "<reporter>"`; the ticket's own reporter is always accepted, even when it isn't username-shaped). Once the assignee is no longer the agent, rules that match on that agent no longer fire when its job ends.
 
 Repository guidance for agents working on LoTaR itself lives in:
 
