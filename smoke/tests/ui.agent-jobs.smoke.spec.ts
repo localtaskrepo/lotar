@@ -48,7 +48,7 @@ async function writeReviewedTemplateWorkflow(workspace: SmokeWorkspace, mockLaun
     if (config.project) {
         config.project.name = 'UI Reviewed';
     }
-    for (const agentName of ['implement', 'test', 'merge', 'merge-retry']) {
+    for (const agentName of ['implement', 'test', 'merge']) {
         const agent = config.agents?.[agentName];
         if (!agent) {
             continue;

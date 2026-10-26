@@ -15,7 +15,7 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 - [x] Orchestrator modes — Server (in-memory), Standalone (file queue), Worker (background dequeuer)
 - [x] Git worktree isolation — Per-ticket worktrees with branch prefix, parallel limits, cleanup config
 - [x] Agent context — Per-ticket `.context` files for resume/continue
-- [x] Project templates — `agent-pipeline` and `agent-reviewed` (default to Copilot)
+- [x] Project templates — `agent-pipeline` and `agent-reviewed` (default to Claude; init merges their statuses, profiles and worktree settings into the config)
 - [x] `command` runner — Arbitrary commands as agent jobs with full lifecycle
 - [x] Send message to running agents — Runner-specific stdin formatting
 - [x] Agent skill template — Built-in instructions for agents using lotar

@@ -1,10 +1,37 @@
 title: Review and update the agent workflow templates
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T17:02:37.302496+00:00
-modified: 2026-10-26T17:38:26.679937+00:00
+modified: 2026-10-26T20:43:02.336835+00:00
+comments:
+- date: 2026-10-26T19:52:58.209005+00:00
+  text: |-
+    Plan after review:
+    - init --template agent-pipeline/agent-reviewed is broken: it writes agents.yml (never loaded) and leaves default statuses and no worktree, so automation points at missing statuses and agents. Fix: merge the template's config block into the generated config; stop writing agents.yml.
+    - Templates: canonical job event names; runner failures go to HelpNeeded + reporter instead of looping implement<->test; handle job_cancelled; claude as default runner with commented model/effort; merge phase fast-forwards the local main and does not push by default.
+    - Merge jobs get the main checkout as a writable dir so a workspace-permission merge agent can update main.
+    - Prompt: built-in instructions always included; profile instructions added as role instructions (agent.instructions still replaces the built-in text). LoTaR adds a job section: worktree branch + commit to it; whether automation moves the ticket when the job ends (then don't change status yourself) or not.
+    - agent.automation stays documented as legacy (never applied since the first release).
+    - Verify: unit/integration tests, init test that template automation only references configured statuses/agents, live claude run of the pipeline template.
+- date: 2026-10-26T20:22:09.674940+00:00
+  text: |-
+    Done:
+    - init --template agent-pipeline/agent-reviewed now writes the template's statuses, profiles and worktree settings into the project config (agents.yml was never read); --with=agents appends a commented example. Global init too.
+    - Templates: canonical job events, claude by default with commented model/effort, runner failures and cancels go to the reporter (no implement<->test loop), merge fast-forwards the local main and doesn't push. merge-retry dropped.
+    - Prompt: base instructions plus profile instructions (profile no longer replaces the base); new 'This job' section names the worktree branch and asks for commits, and says whether automation moves the ticket (then hand back when blocked) or the agent sets the status.
+    - Merge jobs: workspace permission includes the main checkout; a merge job that leaves its branch unmerged fails instead of completing.
+    - lotar assignee accepts the ticket's own reporter even when not username-shaped (git user.name), so hand-back works.
+    - agent.automation dead config stays tracked in DEV-152; worktree cleanup blocked by build output filed as DEV-207; agents using the PATH lotar is DEV-206.
+    Verification: lint, 1725 Rust + 1214 UI tests, 350 smoke; new init/template/hand-back/merge-check tests; live claude runs of the template pipeline (fix fast-forwarded to main, ticket Done) and hand-back (HelpNeeded with reporter, pipeline stopped).
+- date: 2026-10-26T20:43:02.284334+00:00
+  text: |-
+    Addendum after cross-CLI live runs:
+    - Codex's workspace-write sandbox keeps git metadata read-only (worktree gitdir and the main .git), so Codex can't commit or fast-forward main. LoTaR now commits what a successful worktree job leaves uncommitted (job fails if that commit fails, e.g. a hook), and after a merge job fast-forwards the main checkout itself when the agent couldn't (job fails if ff-only is impossible). Job notes tell agents to leave changes when git refuses.
+    - Live (npm run agents:live, scenarios template and handback added): claude, codex and copilot pass template (fix fast-forwarded to main, ticket Done). claude and copilot pass handback; codex handback fails only because its login shell resolves the Homebrew lotar 0.9.1, tracked in DEV-206.
+    - Final gates: lint clean; 1727 Rust + 1214 UI tests; 350 smoke.
 description: |-
   Review the agent templates (agent-pipeline, agent-reviewed) and the built-in agent instructions against how jobs and automation work today.
 
@@ -28,3 +55,29 @@ history:
       - `agent.automation.on_start/on_success/...` is parsed but never applied; without an automation.yml a finished job leaves the ticket untouched. Templates make users copy the automation section by hand; init should write a working automation.yml.
       - Templates use runner: copilot for every phase, alias event names (job_start/complete/error), an auto merge-and-push-to-main phase, and allow an endless test-failure → implement loop.
       - Per-phase model/effort depends on DEV-200.
+- at: 2026-10-26T19:49:32.577705+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-26T19:52:58.209005+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T20:22:09.674940+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T20:43:02.284334+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T20:43:02.336835+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

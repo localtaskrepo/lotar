@@ -110,12 +110,23 @@ fn handle_set_assignee(
         return Err("Assignee validation failed: value cannot be empty".to_string());
     }
 
-    let validation = if autop_members_enabled {
-        validator.validate_assignee_allow_unknown(trimmed)
+    // The ticket's own reporter is an identity LoTaR already stored, even
+    // when it is not username-shaped (a git user.name such as "Sam Example"),
+    // so handing a ticket back to its reporter always works.
+    let is_reporter = task
+        .reporter
+        .as_deref()
+        .is_some_and(|reporter| reporter.trim() == trimmed);
+    let validated = if is_reporter {
+        trimmed.to_string()
     } else {
-        validator.validate_assignee(trimmed)
+        let validation = if autop_members_enabled {
+            validator.validate_assignee_allow_unknown(trimmed)
+        } else {
+            validator.validate_assignee(trimmed)
+        };
+        validation.map_err(|e| format!("Assignee validation failed: {}", e))?
     };
-    let validated = validation.map_err(|e| format!("Assignee validation failed: {}", e))?;
 
     let previous = task.assignee.clone();
 

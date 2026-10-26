@@ -45,7 +45,8 @@ agents:
 | `workspace` | `--permission-mode acceptEdits` plus Claude's sandbox, with sandboxed shell commands allowed | `--sandbox workspace-write` | all tools except `git push` | `--approval-mode auto_edit` |
 | `full` | `--permission-mode bypassPermissions` | `--dangerously-bypass-approvals-and-sandbox` | `--allow-all` | `--approval-mode yolo` |
 
-- `workspace` lets the agent edit the job's working directory. It can also write the tasks directory (to update its ticket) and, in a worktree, the repository's `.git` directory (to commit). These are passed as `--add-dir` (Gemini: `--include-directories`).
+- `workspace` lets the agent edit the job's working directory. It can also write the tasks directory (to update its ticket) and, in a worktree, the repository's `.git` directory (to commit). A merge job (profile `merge`, or a ticket in `Merging`) gets the main checkout instead of `.git`, so it can fast-forward main. These are passed as `--add-dir` (Gemini: `--include-directories`).
+- Commits from inside a sandbox can fail: Codex keeps git metadata read-only, and a signing key agent (1Password, `gpg-agent`, `ssh-agent`) is usually out of reach. LoTaR then commits the agent's changes itself when the job ends (see [Default instructions](#default-instructions)).
 - Copilot has no sandbox. At `workspace` its file tools stay in the working directory, but shell commands are not confined.
 - If the profile's `args` already set permissions (for example `--permission-mode`, `--sandbox`, `--allow-tool`/`--deny-tool`, `--approval-mode` or `--yolo`), LoTaR adds no permission flags of its own.
 - `command` runners get no permission flags.
@@ -119,7 +120,12 @@ For an unrecognized batch command, either point `command` at the CLI's native ex
 
 ## Default instructions
 
-LoTaR prepends agent instructions to each run. The built-in default describes the environment and workflow expectations; you can override it with an inline string or a file path under `agent.instructions`.
+Every job prompt starts with instructions, then a "This job" section, then the ticket and the request.
+
+The instructions are the base text followed by the profile's own `instructions`:
+
+- The base text is `agent.instructions` when set, otherwise the built-in text in [agent-instructions.md](agent-instructions.md). It covers the `lotar` commands for reading and updating the ticket and how to hand the ticket back when the agent needs a decision. Set `agent.instructions: ""` to leave it out.
+- `agents.<name>.instructions` is added after it, so a phase agent keeps the base text.
 
 ```yaml
 agent:
@@ -128,9 +134,24 @@ agent:
   # Or point to a file (relative to the tasks directory by default)
   # instructions:
   #   file: "@agent-instructions.md"
+agents:
+  test:
+    runner: claude
+    instructions: "You are in the TESTING phase. Run the tests and add missing ones."
 ```
 
-The built-in instruction text is kept in [agent-instructions.md](agent-instructions.md). Repository guidance lives in:
+LoTaR writes the "This job" section itself:
+
+- With worktrees on, it names the branch (`agent/<TICKET>`) and tells the agent to commit its work there. Without worktrees the agent works in the main checkout and leaves its changes uncommitted unless asked to commit.
+- If an automation rule moves the ticket when the job ends (a rule that matches the ticket and has a `job_completed` action), the agent is told not to change the status or assignee when it finished, only to comment, and to hand the ticket back when it could not finish. Otherwise it is told to set a fitting status when it finishes.
+
+When a worktree job succeeds with changes still uncommitted, LoTaR commits them to the ticket branch (`<TICKET>: changes from the <profile> agent`), so the next phase and the merge see them. Agents can't always commit themselves: Codex's `workspace-write` sandbox keeps git metadata read-only, and commit signing may be out of reach. LoTaR commits as you, outside the sandbox, so your hooks and signing apply; if that commit fails, the job fails with git's error.
+
+A merge job (profile `merge`, or a ticket in `Merging`) has to end with its branch in the main checkout's current branch. If the agent couldn't fast-forward it (a sandbox may keep git metadata read-only), LoTaR runs `git merge --ff-only <branch>` in the main checkout, which never overwrites local changes. If the branch still isn't merged, the job fails, so `job_failed` rules run instead of `job_completed`.
+
+To hand a ticket back, an agent comments, sets a waiting status such as `HelpNeeded` and assigns the reporter (`lotar assignee "$LOTAR_TICKET_ID" "$LOTAR_TICKET_REPORTER"`; the ticket's own reporter is always accepted, even when it isn't username-shaped). Once the assignee is no longer the agent, rules that match on that agent no longer fire when its job ends.
+
+Repository guidance for agents working on LoTaR itself lives in:
 
 - [AGENTS.md](../../AGENTS.md)
 - [Backend instructions](../../.github/instructions/backend.instructions.md)

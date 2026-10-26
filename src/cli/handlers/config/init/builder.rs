@@ -150,6 +150,56 @@ pub fn build_global_config(
     cfg
 }
 
+/// Merge an agent template's statuses, vocabularies, agent profiles and
+/// worktree settings into a project config. Explicit `--states`/`--types`/
+/// `--priorities`/`--tags` flags still win.
+pub fn apply_agent_template_project(
+    cfg: &mut ProjectConfig,
+    template: ProjectConfig,
+    o: &InitOverrides,
+) {
+    if o.states.is_none() && template.issue_states.is_some() {
+        cfg.issue_states = template.issue_states;
+    }
+    if o.types.is_none() && template.issue_types.is_some() {
+        cfg.issue_types = template.issue_types;
+    }
+    if o.priorities.is_none() && template.issue_priorities.is_some() {
+        cfg.issue_priorities = template.issue_priorities;
+    }
+    if o.tags.is_none() && template.tags.is_some() {
+        cfg.tags = template.tags;
+    }
+    if template.agents.is_some() {
+        cfg.agents = template.agents;
+    }
+    if template.agent_worktree.is_some() {
+        cfg.agent_worktree = template.agent_worktree;
+    }
+}
+
+/// Global-config counterpart of [`apply_agent_template_project`].
+pub fn apply_agent_template_global(
+    cfg: &mut GlobalConfig,
+    template: GlobalConfig,
+    o: &InitOverrides,
+) {
+    if o.states.is_none() {
+        cfg.issue_states = template.issue_states;
+    }
+    if o.types.is_none() {
+        cfg.issue_types = template.issue_types;
+    }
+    if o.priorities.is_none() {
+        cfg.issue_priorities = template.issue_priorities;
+    }
+    if o.tags.is_none() {
+        cfg.tags = template.tags;
+    }
+    cfg.agents = template.agents;
+    cfg.agent_worktree = template.agent_worktree;
+}
+
 fn apply_overrides_project(cfg: &mut ProjectConfig, o: &InitOverrides) {
     if let Some(v) = &o.default_assignee {
         cfg.default_assignee = Some(v.clone());

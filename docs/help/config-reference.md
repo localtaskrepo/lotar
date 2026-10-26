@@ -45,7 +45,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
   - agents.<name>.command: optional string — the executable to run (default: the runner name; required for `command`)
   - agents.<name>.args: string[] — extra CLI arguments, after LoTaR's own flags
   - agents.<name>.env: map — extra environment variables
-  - agents.<name>.instructions: string | { file: string } — replaces `agent.instructions` for this profile
+  - agents.<name>.instructions: string | { file: string } — added after `agent.instructions` (or the built-in instructions) for this profile
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
 - scan.enable_ticket_words: boolean (built-in default: true) — issue-type words act as signal words in addition to TODO/FIXME/etc. Bare ticket keys alone never create tasks.

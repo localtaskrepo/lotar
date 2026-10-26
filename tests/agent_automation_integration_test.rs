@@ -11,7 +11,7 @@ use lotar::services::automation_service::{
 use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::{TaskService, TaskUpdateContext};
 use lotar::storage::sprint::{Sprint, SprintActual};
-use serde_yaml_ng::{Mapping as YamlMapping, Value as YamlValue};
+use serde_yaml_ng::Value as YamlValue;
 #[cfg(unix)]
 use std::fs;
 #[cfg(unix)]
@@ -90,71 +90,53 @@ fn init_git_repository(root: &Path) {
     assert!(commit_status.success(), "git commit should succeed");
 }
 
-#[cfg(unix)]
-const AGENT_PIPELINE_TEMPLATE: &str = include_str!("../src/config/templates/agent-pipeline.yml");
-
-#[cfg(unix)]
-const AGENT_REVIEWED_TEMPLATE: &str = include_str!("../src/config/templates/agent-reviewed.yml");
-
-#[cfg(unix)]
-fn template_config_and_automation(template: &str, project_name: &str) -> (String, String) {
-    let template_doc: YamlValue = serde_yaml_ng::from_str(template).expect("parse template yaml");
-    let template_map = template_doc
-        .as_mapping()
-        .expect("template should be a mapping");
-
-    let mut config = template_map
-        .get(YamlValue::String("config".to_string()))
-        .cloned()
-        .expect("template config section");
-    if let Some(config_map) = config.as_mapping_mut()
-        && let Some(project_value) = config_map.get_mut(YamlValue::String("project".to_string()))
-        && let Some(project_map) = project_value.as_mapping_mut()
-    {
-        project_map.insert(
-            YamlValue::String("name".to_string()),
-            YamlValue::String(project_name.to_string()),
-        );
-    }
-
-    let automation = template_map
-        .get(YamlValue::String("automation".to_string()))
-        .cloned()
-        .expect("template automation section");
-
-    let config_yaml = serde_yaml_ng::to_string(&config).expect("serialize config section");
-    let mut automation_root = YamlMapping::new();
-    automation_root.insert(YamlValue::String("automation".to_string()), automation);
-    let automation_yaml = serde_yaml_ng::to_string(&YamlValue::Mapping(automation_root))
-        .expect("serialize automation section");
-
-    (config_yaml, automation_yaml)
-}
-
+/// Set up a project the way users do, with `lotar init --template`, then
+/// point each agent profile at a stub script.
 #[cfg(unix)]
 fn install_template_workflow(
     fixtures: &TestFixtures,
     prefix: &str,
-    project_name: &str,
     template: &str,
     agent_commands: &[(&str, &Path)],
 ) {
-    let (mut config_yaml, automation_yaml) = template_config_and_automation(template, project_name);
+    let output = common::lotar_cmd()
+        .expect("lotar cmd")
+        .current_dir(fixtures.get_temp_path())
+        .env("LOTAR_TEST_SILENT", "1")
+        .args([
+            "init",
+            "--yes",
+            &format!("--project={prefix}"),
+            &format!("--prefix={prefix}"),
+            &format!("--template={template}"),
+        ])
+        .output()
+        .expect("run lotar init");
+    assert!(
+        output.status.success(),
+        "init failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
+    let config_path = fixtures.tasks_root.join(prefix).join("config.yml");
+    let mut config: YamlValue =
+        serde_yaml_ng::from_str(&fs::read_to_string(&config_path).expect("read config"))
+            .expect("parse config");
     for (agent_name, command_path) in agent_commands {
-        let old = format!("{agent_name}:\n    runner: copilot");
-        let new = format!(
-            "{agent_name}:\n    runner: claude\n    command: \"{}\"",
-            command_path.to_string_lossy()
+        let profile = config["agents"]
+            .get_mut(*agent_name)
+            .and_then(YamlValue::as_mapping_mut)
+            .unwrap_or_else(|| panic!("template defines agent {agent_name}"));
+        profile.insert(
+            YamlValue::String("command".to_string()),
+            YamlValue::String(command_path.to_string_lossy().to_string()),
         );
-        config_yaml = config_yaml.replace(&old, &new);
     }
-
-    let project_dir = fixtures.tasks_root.join(prefix);
-    fs::create_dir_all(&project_dir).expect("create project config dir");
-    fixtures.create_config_in_dir(&project_dir, &config_yaml);
-    fs::write(fixtures.tasks_root.join("automation.yml"), automation_yaml)
-        .expect("write automation config");
+    fs::write(
+        &config_path,
+        serde_yaml_ng::to_string(&config).expect("serialize config"),
+    )
+    .expect("write config");
 }
 
 #[cfg(unix)]
@@ -2967,6 +2949,9 @@ profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
 printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
 sid="${{profile}}-$$"
 printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+case "$profile" in
+  implement) echo feature > feature.txt ;;
+esac
 printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
 exit 0
 "#,
@@ -2977,13 +2962,11 @@ exit 0
         install_template_workflow(
             &fixtures,
             "PIP",
-            "Pipeline Template",
-            AGENT_PIPELINE_TEMPLATE,
+            "agent-pipeline",
             &[
                 ("implement", agent_script.as_path()),
                 ("test", agent_script.as_path()),
                 ("merge", agent_script.as_path()),
-                ("merge-retry", agent_script.as_path()),
             ],
         );
 
@@ -3025,11 +3008,184 @@ exit 0
         let run_output = fs::read_to_string(&run_log).expect("read pipeline run log");
         let phases: Vec<_> = run_output.lines().collect();
         assert_eq!(phases, vec!["PIP-1|implement", "PIP-1|test", "PIP-1|merge"]);
+        // The stubs neither commit nor merge (as a sandboxed agent can't);
+        // LoTaR committed the change and fast-forwarded main after the merge job.
+        assert!(
+            fixtures.get_temp_path().join("feature.txt").exists(),
+            "the implement change should reach the main checkout through the merge"
+        );
+        let log = Command::new("git")
+            .args(["log", "--format=%s", "-n", "1"])
+            .current_dir(fixtures.get_temp_path())
+            .output()
+            .expect("git log");
+        assert_eq!(
+            String::from_utf8_lossy(&log.stdout).trim(),
+            "PIP-1: changes from the implement agent"
+        );
+    }
+
+    /// When LoTaR can't commit what the agent left behind, the job fails and
+    /// the ticket goes back to the reporter instead of moving on without it.
+    #[cfg(unix)]
+    #[test]
+    fn uncommittable_leftover_work_fails_the_job() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+        let hook = fixtures.get_temp_path().join(".git/hooks/pre-commit");
+        fs::write(&hook, "#!/bin/sh\necho 'hook says no' >&2\nexit 1\n").expect("write hook");
+        fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).expect("chmod hook");
+
+        let agent_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "leftover-agent.sh",
+            r#"#!/bin/sh
+printf '{"type":"system","subtype":"init","session_id":"s"}\n'
+echo feature > feature.txt
+printf '{"type":"assistant","message":{"content":[{"text":"done"}]},"session_id":"s"}\n'
+exit 0
+"#,
+        );
+        install_template_workflow(
+            &fixtures,
+            "LEF",
+            "agent-pipeline",
+            &[
+                ("implement", agent_script.as_path()),
+                ("test", agent_script.as_path()),
+                ("merge", agent_script.as_path()),
+            ],
+        );
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Leftover work".to_string(),
+                project: Some("LEF".to_string()),
+                reporter: Some("Agent Tests".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+        TaskService::update(
+            &mut storage,
+            &created.id,
+            TaskUpdate {
+                assignee: Some("@implement".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("assign implementation agent");
+
+        let task = wait_for_task_state(
+            &storage,
+            &created.id,
+            "HelpNeeded",
+            Some("Agent Tests"),
+            10_000,
+        )
+        .expect("failed commit should hand the ticket back");
+        assert!(task.tags.contains(&"agent-failed".to_string()));
+        let job = job_for_ticket(&created.id);
+        assert_eq!(job.status, "failed");
+        assert!(
+            job.last_message
+                .as_deref()
+                .is_some_and(|m| m.contains("could not commit") && m.contains("hook says no")),
+            "{job:?}"
+        );
+    }
+
+    /// A merge job whose branch can't reach main (main moved on and nobody
+    /// rebased) fails, so the ticket goes back to the reporter instead of Done.
+    #[cfg(unix)]
+    #[test]
+    fn merge_job_that_cannot_fast_forward_fails() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+
+        let agent_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "unmerged-agent.sh",
+            r#"#!/bin/sh
+profile="${LOTAR_AGENT_PROFILE:-unknown}"
+sid="${profile}-$$"
+printf '{"type":"system","subtype":"init","session_id":"%s"}\n' "$sid"
+if [ "$profile" = implement ]; then
+  echo feature > feature.txt && git add feature.txt && git commit -qm implement || exit 4
+  git -C "$LOTAR_WORKSPACE_ROOT" commit -q --allow-empty -m "main moves on" || exit 4
+fi
+printf '{"type":"assistant","message":{"content":[{"text":"%s complete"}]},"session_id":"%s"}\n' "$profile" "$sid"
+exit 0
+"#,
+        );
+        install_template_workflow(
+            &fixtures,
+            "UNM",
+            "agent-pipeline",
+            &[
+                ("implement", agent_script.as_path()),
+                ("test", agent_script.as_path()),
+                ("merge", agent_script.as_path()),
+            ],
+        );
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Unmerged merge".to_string(),
+                project: Some("UNM".to_string()),
+                reporter: Some("Agent Tests".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+        TaskService::update(
+            &mut storage,
+            &created.id,
+            TaskUpdate {
+                assignee: Some("@implement".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("assign implementation agent");
+
+        let task = wait_for_task_state(
+            &storage,
+            &created.id,
+            "HelpNeeded",
+            Some("Agent Tests"),
+            10_000,
+        )
+        .expect("unmerged merge should hand the ticket back");
+        assert!(task.tags.contains(&"agent-failed".to_string()));
+        let merge_job = AgentJobService::list_jobs()
+            .into_iter()
+            .find(|job| job.ticket_id == created.id && job.agent.as_deref() == Some("merge"))
+            .expect("merge job");
+        assert_eq!(merge_job.status, "failed");
+        assert!(
+            merge_job
+                .last_message
+                .as_deref()
+                .is_some_and(|m| m.contains("agent/UNM-1 is not merged")
+                    && m.contains("can't be fast-forwarded")),
+            "{merge_job:?}"
+        );
+        assert!(!fixtures.get_temp_path().join("feature.txt").exists());
     }
 
     #[cfg(unix)]
     #[test]
-    fn shipped_agent_reviewed_template_handles_failure_review_and_merge() {
+    fn shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge() {
         crate::common::require_git();
         let _guard = lock_agent_tests();
         enable_server_mode();
@@ -3037,12 +3193,10 @@ exit 0
         init_git_repository(fixtures.get_temp_path());
 
         let run_log = fixtures.get_temp_path().join("template-reviewed-run.log");
-        let fail_once_marker = fixtures.get_temp_path().join("test-fails-once.marker");
-        fs::write(&fail_once_marker, "fail once\n").expect("write fail-once marker");
-
-        let implement_script = write_stub_agent_script(
+        let test_runs = fixtures.get_temp_path().join("test-runs.count");
+        let ok_script = write_stub_agent_script(
             fixtures.get_temp_path(),
-            "template-reviewed-implement.sh",
+            "template-reviewed-ok.sh",
             &format!(
                 r#"#!/bin/sh
 profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
@@ -3055,54 +3209,48 @@ exit 0
                 run_log.to_string_lossy()
             ),
         );
+        // First run: the agent needs a decision and hands the ticket back
+        // through the lotar CLI, as the built-in instructions describe.
+        // Second run: the runner itself fails. Third run: tests pass.
         let test_script = write_stub_agent_script(
             fixtures.get_temp_path(),
             "template-reviewed-test.sh",
             &format!(
                 r#"#!/bin/sh
 profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
-printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
+printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{log}"
 sid="${{profile}}-$$"
 printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
-if [ -f "{}" ]; then
-  rm "{}"
-  printf '{{"type":"assistant","message":{{"content":[{{"text":"%s failed"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+n=$(cat "{count}" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "{count}"
+if [ "$n" = 1 ]; then
+  "{lotar}" comment "$LOTAR_TICKET_ID" "Need a decision: keep the old API?" >/dev/null || exit 3
+  "{lotar}" status "$LOTAR_TICKET_ID" HelpNeeded >/dev/null || exit 3
+  "{lotar}" assignee "$LOTAR_TICKET_ID" "$LOTAR_TICKET_REPORTER" >/dev/null || exit 3
+  printf '{{"type":"assistant","message":{{"content":[{{"text":"handed back"}}]}},"session_id":"%s"}}\n' "$sid"
+  exit 0
+fi
+if [ "$n" = 2 ]; then
   exit 1
 fi
 printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
 exit 0
 "#,
-                run_log.to_string_lossy(),
-                fail_once_marker.to_string_lossy(),
-                fail_once_marker.to_string_lossy()
-            ),
-        );
-        let merge_script = write_stub_agent_script(
-            fixtures.get_temp_path(),
-            "template-reviewed-merge.sh",
-            &format!(
-                r#"#!/bin/sh
-profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
-printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
-sid="${{profile}}-$$"
-printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
-printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
-exit 0
-"#,
-                run_log.to_string_lossy()
+                log = run_log.to_string_lossy(),
+                count = test_runs.to_string_lossy(),
+                lotar = env!("CARGO_BIN_EXE_lotar"),
             ),
         );
 
         install_template_workflow(
             &fixtures,
             "REV",
-            "Reviewed Template",
-            AGENT_REVIEWED_TEMPLATE,
+            "agent-reviewed",
             &[
-                ("implement", implement_script.as_path()),
+                ("implement", ok_script.as_path()),
                 ("test", test_script.as_path()),
-                ("merge", merge_script.as_path()),
-                ("merge-retry", merge_script.as_path()),
+                ("merge", ok_script.as_path()),
             ],
         );
         lotar::utils::identity::invalidate_identity_cache(Some(fixtures.tasks_root.as_path()));
@@ -3119,85 +3267,75 @@ exit 0
             },
         )
         .expect("create task");
+        let assign = |storage: &mut lotar::Storage, assignee: &str| {
+            TaskService::update(
+                storage,
+                &created.id,
+                TaskUpdate {
+                    assignee: Some(assignee.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap_or_else(|err| panic!("assign {assignee}: {err}"))
+        };
 
-        TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                assignee: Some("@implement".to_string()),
-                ..Default::default()
-            },
-        )
-        .expect("assign implementation agent");
-
-        let failed_cycle_jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
-            jobs.len() >= 2
-                && jobs.iter().any(|job| {
-                    job.agent.as_deref() == Some("implement") && job.status == "completed"
-                })
-                && jobs
-                    .iter()
-                    .any(|job| job.agent.as_deref() == Some("test") && job.status == "failed")
+        // The test agent hands the ticket back; automation leaves it there.
+        assign(&mut storage, "@implement");
+        let jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
+            jobs.iter().any(|job| {
+                job.agent.as_deref() == Some("test")
+                    && matches!(job.status.as_str(), "completed" | "failed")
+            })
         });
         assert!(
-            failed_cycle_jobs
-                .iter()
-                .any(|job| job.agent.as_deref() == Some("implement") && job.status == "completed"),
-            "expected completed implementation job in failed cycle"
+            jobs.iter()
+                .any(|job| job.agent.as_deref() == Some("test") && job.status == "completed"),
+            "hand-back run should complete normally: {jobs:?}"
         );
+        let handed_back = wait_for_task_state(
+            &storage,
+            &created.id,
+            "HelpNeeded",
+            Some("Agent Tests"),
+            6000,
+        )
+        .expect("agent hand-back should stick");
         assert!(
-            failed_cycle_jobs
+            handed_back
+                .comments
                 .iter()
-                .any(|job| job.agent.as_deref() == Some("test") && job.status == "failed"),
-            "expected failed test job in failed cycle"
+                .any(|c| c.text.contains("Need a decision"))
         );
+        assert!(!handed_back.tags.contains(&"agent-failed".to_string()));
 
+        // A runner failure goes back to the reporter instead of looping.
+        assign(&mut storage, "@test");
+        let failed = wait_for_task_state(
+            &storage,
+            &created.id,
+            "HelpNeeded",
+            Some("Agent Tests"),
+            6000,
+        )
+        .and_then(|task| {
+            task.tags
+                .contains(&"agent-failed".to_string())
+                .then_some(task)
+        });
+        assert!(failed.is_some(), "runner failure should tag agent-failed");
+
+        // Passing tests hand over for review, and review hands over to merge.
+        assign(&mut storage, "@test");
         let review_task =
             wait_for_task_state(&storage, &created.id, "Review", Some("Agent Tests"), 6000)
                 .expect("task should hand back to reporter for review");
         assert!(review_task.tags.iter().any(|tag| tag == "ready-for-review"));
-        assert!(review_task.tags.iter().any(|tag| tag == "test-failure"));
-        assert!(review_task.history.iter().any(|entry| {
-            let saw_status_bounce = entry.changes.iter().any(|change| {
-                change.field == "status"
-                    && change.old.as_deref() == Some("Testing")
-                    && change.new.as_deref() == Some("InProgress")
-            });
-            let saw_reassignment = entry.changes.iter().any(|change| {
-                change.field == "assignee"
-                    && change.old.as_deref() == Some("@test")
-                    && change.new.as_deref() == Some("@implement")
-            });
-            saw_status_bounce && saw_reassignment
-        }));
 
-        let advanced = TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                assignee: Some("@merge".to_string()),
-                ..Default::default()
-            },
-        )
-        .expect("reporter should be allowed to send reviewed task to merge");
-        assert_eq!(advanced.assignee.as_deref(), Some("@merge"));
-
+        assign(&mut storage, "@merge");
         let final_task =
             wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), 6000)
                 .expect("task should complete after merge");
         assert!(!final_task.tags.iter().any(|tag| tag == "ready-for-review"));
-
-        let final_jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
-            jobs.len() >= 5
-                && jobs
-                    .iter()
-                    .any(|job| job.agent.as_deref() == Some("merge") && job.status == "completed")
-        });
-        assert_eq!(
-            final_jobs.len(),
-            5,
-            "expected implement/test retry plus merge jobs"
-        );
 
         let run_output = fs::read_to_string(&run_log).expect("read reviewed run log");
         let phases: Vec<_> = run_output.lines().collect();
@@ -3206,7 +3344,7 @@ exit 0
             vec![
                 "REV-1|implement",
                 "REV-1|test",
-                "REV-1|implement",
+                "REV-1|test",
                 "REV-1|test",
                 "REV-1|merge",
             ]

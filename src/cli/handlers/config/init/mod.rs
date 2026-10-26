@@ -150,6 +150,12 @@ impl ConfigHandler {
         // Build and write project config.
         let mut project_config =
             builder::build_project_config(&project_name, outcome.workflow, &overrides);
+        if let Some(yaml) = scaffolds::agent_template_config(&scaffolds.agents) {
+            let template =
+                crate::config::normalization::parse_project_from_yaml_str(&project_name, &yaml)
+                    .map_err(|e| format!("Agent template is invalid: {}", e))?;
+            builder::apply_agent_template_project(&mut project_config, template, &overrides);
+        }
 
         // --copy-from: merge non-identity fields from the source project.
         if let Some(source_prefix) = args.copy_from.as_deref() {
@@ -208,7 +214,12 @@ fn init_global(
         ));
     }
 
-    let cfg = builder::build_global_config(existing, workflow, overrides);
+    let mut cfg = builder::build_global_config(existing, workflow, overrides);
+    if let Some(yaml) = scaffolds::agent_template_config(&scaffolds.agents) {
+        let template = crate::config::normalization::parse_global_from_yaml_str(&yaml)
+            .map_err(|e| format!("Agent template is invalid: {}", e))?;
+        builder::apply_agent_template_global(&mut cfg, template, overrides);
+    }
     ConfigManager::save_global_config(tasks_root, &cfg).map_err(|e| e.to_string())?;
     renderer.emit_success(format_args!(
         "Global configuration initialized at: {}",
@@ -358,12 +369,14 @@ fn render_scaffold_plan(
         };
         renderer.emit_raw_stdout(format_args!("  • Automation scaffold: {}", p.display()));
     }
-    if !matches!(plan.agents, AgentsScaffold::None) {
-        let p: PathBuf = match prefix {
-            Some(p) => crate::utils::paths::project_dir(tasks_root, p).join("agents.yml"),
-            None => tasks_root.join("agents.yml"),
-        };
-        renderer.emit_raw_stdout(format_args!("  • Agents scaffold: {}", p.display()));
+    match plan.agents {
+        AgentsScaffold::None => {}
+        AgentsScaffold::Example => renderer.emit_raw_stdout(
+            "  • Agents scaffold (commented): example profile appended to the config",
+        ),
+        AgentsScaffold::Pipeline | AgentsScaffold::Reviewed => renderer.emit_raw_stdout(
+            "  • Agent template: statuses, agent profiles and worktree settings merged into the config",
+        ),
     }
     for r in &plan.sync_remotes {
         let label = match r {

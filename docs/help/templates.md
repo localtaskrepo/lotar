@@ -46,18 +46,17 @@ lotar config templates
   - `remotes.github.filter`: `label:lotar` to avoid pulling unrelated issues
 - **jira-github** — Dual Jira + GitHub remote mapping.
   - `remotes.jira` + `remotes.github` configured together
-- **agent-pipeline** — Fully automated multi-phase agent workflow.
-  - `issue.states`: Todo, Implementation, Testing, Merging, Done, HelpNeeded
-  - Agent profiles: `@implement`, `@test`, `@merge`
-  - Worktree enabled with `agent/` branch prefix
-  - Includes automation rules for phase transitions (copy to `automation.yml`)
-- **agent-reviewed** — Agent workflow with human review before merge.
-  - `issue.states`: Todo, Implementation, Testing, NeedsReview, Merging, Done, HelpNeeded
-  - Agent profiles: `@implement`, `@test`, `@merge`
-  - After testing, assigns to `@reporter` for human review
-  - Human approves by assigning to `@merge` to continue
+- **agent-pipeline** — Fully automated agent workflow.
+  - `issue.states`: Todo, InProgress, Testing, Merging, Done, HelpNeeded
+  - Agent profiles `@implement`, `@test`, `@merge` (Claude by default)
+  - Worktrees on, with the `agent/` branch prefix
+  - Automation: Implementation → Testing → Merging → Done
+- **agent-reviewed** — Agent workflow with a human review before merging.
+  - `issue.states`: Todo, InProgress, Testing, Review, Merging, Done, HelpNeeded
+  - Agent profiles `@implement`, `@test`, `@merge` (Claude by default)
+  - After testing, the ticket goes to the reporter in `Review`; assigning it to `@merge` merges it
 
-Each template file includes metadata (`name`, `description`) plus a `config:` block. Only the `config:` block is written to disk.
+Each template file includes metadata (`name`, `description`) plus a `config:` block, and the agent templates an `automation:` block.
 
 ## Initializing from a template
 
@@ -80,19 +79,24 @@ Every `init` call serializes the merged YAML, validates it, and writes the canon
 - Wildcards (`"*"`) mean "allow any value" and map to `StringConfigField::new_wildcard()` internally.
 - Template metadata such as `project_name`, `prefix`, or `issue_states` is also accepted for backward compatibility. The loader rewrites those keys into the modern nested `project.*` and `issue.*` structure so you never have to.
 
-## Automation
+## Agent templates
 
-Templates contain only the `config:` section by default. The agent templates (`agent-pipeline`, `agent-reviewed`) include an `automation:` section at the end of the template file that you should copy to `.tasks/automation.yml` after initialization.
+`lotar init --template agent-pipeline` (or `agent-reviewed`) sets up a project the agent workflow can run in:
 
-These automation rules define phase transitions:
-- **agent-pipeline**: Automatic flow from Implementation → Testing → Merging → Done
-- **agent-reviewed**: Implementation → Testing → NeedsReview (human) → Merging → Done
+- The project config gets the template's statuses, types, priorities, agent profiles and `agent.worktree` settings. `--states`, `--types`, `--priorities` and `--tags` still override the vocabularies.
+- `.tasks/<PREFIX>/automation.yml` gets the phase rules.
 
-When a task is assigned to an agent profile (e.g., `@implement`), the agent automatically picks up the work. On completion, automation rules transition the task to the next phase.
+Assign a ticket to `@implement` to start. Each phase works in the ticket's own worktree and branch and commits there (LoTaR commits anything an agent leaves uncommitted); when a job finishes, the automation rules move the ticket to the next phase:
 
-If an agent needs clarification, the default agent instructions tell it to comment on the ticket, set the task to `HelpNeeded`, and hand it back to `@reporter` so the author can clarify the request before the agent resumes.
+- **agent-pipeline**: Implementation → Testing → Merging → Done. The merge agent rebases the branch onto main, reruns the checks and fast-forwards the main checkout (LoTaR fast-forwards it if the agent can't; the job fails if the branch can't be fast-forwarded). It does not push unless your repository guidance says to.
+- **agent-reviewed**: Implementation → Testing → Review. The reporter reviews the branch, then assigns the ticket to `@merge` (or comments and assigns it to `@implement` for changes). Merging → Done.
 
-Generic runner failures are still handled by the automation rules in the template.
+When something goes wrong the ticket goes back to a person instead of moving on:
+
+- An agent that needs a decision, or finds the work can't be finished, comments, sets `HelpNeeded` and assigns the reporter. Because the assignee is no longer the phase agent, no rule moves the ticket when the job ends.
+- A job whose runner crashes ends up in `HelpNeeded` with the reporter and the `agent-failed` tag. A cancelled job is assigned to the reporter.
+
+Each profile runs `claude`; change `runner` to `codex`, `copilot` or `gemini`, and set `model` and `effort` per phase (see [Agents](agent.md#model-and-effort)). Profile `instructions` describe the phase; LoTaR adds its own instructions to every job (see [Agents](agent.md#default-instructions)).
 
 See [automation.md](automation.md) for the full automation rule syntax.
 

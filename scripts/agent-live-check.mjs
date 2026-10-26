@@ -5,7 +5,7 @@
 //
 //   npm run agents:live                         # every installed CLI, all scenarios
 //   npm run agents:live -- --runner claude      # one CLI
-//   npm run agents:live -- --scenario edit      # one scenario (edit, settings, pipeline)
+//   npm run agents:live -- --scenario edit      # one scenario (edit, settings, pipeline, template, handback)
 //   npm run agents:live -- --keep               # keep the temp repositories
 //
 // Each scenario builds a throwaway git repository with a small bug and a
@@ -18,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { parse, stringify } from 'yaml';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lotarBin = process.env.LOTAR_BIN || path.join(root, 'target', 'debug', 'lotar');
@@ -66,7 +67,13 @@ function run(program, args, options = {}) {
 function lotar(dir, args, env = {}, timeoutSeconds = 240) {
     return run(lotarBin, ['--tasks-dir', path.join(dir, '.tasks'), ...args], {
         cwd: dir,
-        env: { ...process.env, LOTAR_AGENT_LOGS_DIR: path.join(dir, '.agent-logs'), ...env },
+        env: {
+            ...process.env,
+            // Agents call `lotar` themselves; make that the binary under test.
+            PATH: `${path.dirname(lotarBin)}${path.delimiter}${process.env.PATH}`,
+            LOTAR_AGENT_LOGS_DIR: path.join(dir, '.agent-logs'),
+            ...env,
+        },
         timeout: timeoutSeconds * 1000,
     });
 }
@@ -77,6 +84,9 @@ function makeRepo(runner, scenario) {
     git('init', '-q', '-b', 'main');
     git('config', 'user.email', 'live@example.com');
     git('config', 'user.name', 'Live Check');
+    // Signing through a key agent (1Password, gpg-agent) can't reach its
+    // socket from inside an agent sandbox; this repository is throwaway.
+    git('config', 'commit.gpgsign', 'false');
     fs.writeFileSync(path.join(dir, 'calc.py'), BUGGY);
     git('add', '.');
     git('commit', '-qm', 'init');
@@ -234,7 +244,107 @@ const SCENARIOS = {
             log: logs,
         };
     },
+
+    /**
+     * The shipped agent-pipeline template, set up with `lotar init`: one
+     * assignment runs implement → test → merge in the ticket's worktree, the
+     * fix lands on main through a fast-forward, and the ticket ends Done
+     * with its reporter.
+     */
+    template(runner, options) {
+        const dir = makeRepo(runner, 'template');
+        const setup = setUpTemplate(dir, runner);
+        if (setup) return { dir, ok: false, detail: setup };
+        const ticket = addTicket(dir);
+        const ticketYaml = runPipeline(dir, ticket, options);
+        if (ticketYaml.error) return { dir, ok: false, detail: ticketYaml.error };
+        const mainLog = run('git', ['log', '--oneline', '-n', '5', 'main'], { cwd: dir }).stdout.trim();
+        const agentCommits = mainLog.split('\n').length - 1;
+        const jobs = lotar(dir, ['agent', 'list-jobs']).stdout;
+        const ok =
+            ticketYaml.status === 'Done' &&
+            ticketYaml.assignee === 'Live Check' &&
+            fixed(path.join(dir, 'calc.py')) &&
+            agentCommits > 0;
+        return {
+            dir,
+            ok,
+            detail: `final status ${ticketYaml.status}, assignee ${ticketYaml.assignee ?? '(none)'}; main ${fixed(path.join(dir, 'calc.py')) ? 'fixed' : 'not fixed'} with ${agentCommits} agent commit(s); comments ${ticketYaml.comments?.length ?? 0}`,
+            log: jobs,
+        };
+    },
+
+    /**
+     * A ticket the agent can't finish without a decision: with the
+     * agent-pipeline template it hands the ticket back to the reporter in
+     * HelpNeeded, and the pipeline stops there instead of moving on.
+     */
+    handback(runner, options) {
+        const dir = makeRepo(runner, 'handback');
+        const setup = setUpTemplate(dir, runner);
+        if (setup) return { dir, ok: false, detail: setup };
+        const added = lotar(dir, [
+            'add',
+            'Change the greeting in greet.py to the wording marketing approved',
+            '--type',
+            'feature',
+            '--description',
+            'Marketing approved new greeting wording last week. Update greet.py to use it.',
+        ]);
+        if (added.status !== 0) return { dir, ok: false, detail: `lotar add failed: ${added.stderr}` };
+        fs.writeFileSync(path.join(dir, 'greet.py'), 'def greet(name):\n    return f"Hello, {name}"\n');
+        execFileSync('git', ['add', 'greet.py'], { cwd: dir });
+        execFileSync('git', ['commit', '-qm', 'greet'], { cwd: dir });
+        const ticketYaml = runPipeline(dir, 'LIVE-1', options);
+        if (ticketYaml.error) return { dir, ok: false, detail: ticketYaml.error };
+        const jobs = lotar(dir, ['agent', 'list-jobs']).stdout;
+        const jobCount = jobs.split('\n').filter((line) => line.startsWith('job-')).length;
+        const ok =
+            ticketYaml.status === 'HelpNeeded' &&
+            ticketYaml.assignee === 'Live Check' &&
+            !(ticketYaml.tags ?? []).includes('agent-failed') &&
+            jobCount === 1;
+        const question = ticketYaml.comments?.at(-1)?.text ?? '';
+        return {
+            dir,
+            ok,
+            detail: `final status ${ticketYaml.status}, assignee ${ticketYaml.assignee ?? '(none)'}; jobs ${jobCount}; question: ${question.slice(0, 120)}`,
+            log: jobs,
+        };
+    },
 };
+
+/** `lotar init --template agent-pipeline` with every phase on `runner`. */
+function setUpTemplate(dir, runner) {
+    const init = lotar(dir, ['init', '--yes', '--project=LIVE', '--prefix=LIVE', '--template=agent-pipeline']);
+    if (init.status !== 0) return `init failed: ${init.stderr}`;
+    const configFile = path.join(dir, '.tasks', 'LIVE', 'config.yml');
+    const config = parse(fs.readFileSync(configFile, 'utf8'));
+    for (const profile of Object.values(config.agents)) {
+        profile.runner = runner;
+        profile.args = RUNNERS[runner].args;
+    }
+    fs.writeFileSync(configFile, stringify(config));
+    return null;
+}
+
+/** Assign the ticket to @implement and wait until it is Done or HelpNeeded. */
+function runPipeline(dir, ticket, options) {
+    const assigned = lotar(dir, ['assignee', ticket, '@implement']);
+    if (assigned.status !== 0) return { error: `assign failed: ${assigned.stderr}` };
+    // Phases run one after another; allow each the full timeout.
+    const deadline = Date.now() + 3 * options.timeout * 1000;
+    const ticketFile = path.join(dir, '.tasks', 'LIVE', `${ticket.split('-')[1]}.yml`);
+    let ticketYaml = {};
+    while (Date.now() < deadline) {
+        ticketYaml = parse(fs.readFileSync(ticketFile, 'utf8'));
+        // A job whose log has no final status yet lists as running or unknown.
+        const busy = /\t(running|unknown|queued)\t/.test(lotar(dir, ['agent', 'list-jobs']).stdout);
+        if (!busy && (ticketYaml.status === 'Done' || ticketYaml.status === 'HelpNeeded')) break;
+        spawnSync('sleep', ['5']);
+    }
+    return ticketYaml;
+}
 
 // -- Main ----------------------------------------------------------------------------
 

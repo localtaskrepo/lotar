@@ -26,6 +26,10 @@ fn run_ok(args: &[&str], dir: &Path) -> String {
     String::from_utf8_lossy(&out.stdout).to_string()
 }
 
+fn yaml(p: &Path) -> serde_yaml_ng::Value {
+    serde_yaml_ng::from_str(&read(p)).unwrap_or_else(|e| panic!("parse {}: {}", p.display(), e))
+}
+
 fn read(p: &Path) -> String {
     std::fs::read_to_string(p).unwrap_or_else(|e| panic!("read {}: {}", p.display(), e))
 }
@@ -288,23 +292,125 @@ fn with_automation_scaffold_writes_file() {
 }
 
 #[test]
-fn with_agents_pipeline_scaffold_has_phase_keys() {
+fn with_agents_pipeline_scaffold_merges_profiles_into_config() {
     common::reset_lotar_test_environment();
     let tmp = TempDir::new().unwrap();
     run_ok(
         &["init", "--yes", "--project=App", "--with=agents:pipeline"],
         tmp.path(),
     );
-    let path = tmp.path().join(".tasks/APP/agents.yml");
-    assert!(path.exists(), "agents.yml should be written");
-    let text = read(&path);
-    for key in ["implement:", "test:", "merge:"] {
+    assert!(
+        !tmp.path().join(".tasks/APP/agents.yml").exists(),
+        "agent profiles belong in config.yml; nothing reads agents.yml"
+    );
+    let config = yaml(&tmp.path().join(".tasks/APP/config.yml"));
+    for agent in ["implement", "test", "merge"] {
         assert!(
-            text.contains(key),
-            "agents.yml should have {}:\n{}",
-            key,
-            text
+            config["agents"][agent]["runner"].is_string(),
+            "config should define agent {agent}:\n{config:?}"
         );
+    }
+}
+
+#[test]
+fn with_agents_example_appends_a_commented_profile() {
+    common::reset_lotar_test_environment();
+    let tmp = TempDir::new().unwrap();
+    run_ok(
+        &["init", "--yes", "--project=App", "--with=agents"],
+        tmp.path(),
+    );
+    let text = read(&tmp.path().join(".tasks/APP/config.yml"));
+    assert!(text.contains("# agents:"), "{text}");
+    let config = yaml(&tmp.path().join(".tasks/APP/config.yml"));
+    assert!(config.get("agents").is_none(), "example stays commented");
+}
+
+#[test]
+fn agent_templates_produce_a_project_their_automation_can_drive() {
+    for (template, prefix, extra_state) in [
+        ("agent-pipeline", "PIPE", None),
+        ("agent-reviewed", "REVI", Some("Review")),
+    ] {
+        common::reset_lotar_test_environment();
+        let tmp = TempDir::new().unwrap();
+        let project = format!("--project={prefix}");
+        let template_arg = format!("--template={template}");
+        run_ok(&["init", "--yes", &project, &template_arg], tmp.path());
+
+        let project_dir = tmp.path().join(".tasks").join(prefix);
+        assert!(!project_dir.join("agents.yml").exists());
+        let config = yaml(&project_dir.join("config.yml"));
+        let states: Vec<String> = config["issue"]["states"]
+            .as_sequence()
+            .unwrap_or_else(|| panic!("{template}: issue.states missing:\n{config:?}"))
+            .iter()
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect();
+        for state in ["Testing", "Merging", "HelpNeeded"]
+            .into_iter()
+            .chain(extra_state)
+        {
+            assert!(states.iter().any(|s| s == state), "{template}: {states:?}");
+        }
+        assert_eq!(
+            config["agent"]["worktree"]["enabled"].as_bool(),
+            Some(true),
+            "{template}: worktrees must be on for the merge phase:\n{config:?}"
+        );
+        let agents: Vec<String> = config["agents"]
+            .as_mapping()
+            .unwrap_or_else(|| panic!("{template}: agents missing"))
+            .keys()
+            .filter_map(|k| k.as_str().map(str::to_string))
+            .collect();
+
+        // Every status and agent the rules hand the ticket to must exist.
+        let automation = yaml(&project_dir.join("automation.yml"));
+        let rules = automation["automation"]["rules"]
+            .as_sequence()
+            .expect("rules");
+        let mut targets = Vec::new();
+        for rule in rules {
+            let when = rule["when"]["assignee"].as_str().unwrap_or_default();
+            targets.push(("when", when.to_string()));
+            for (event, action) in rule["on"].as_mapping().expect("on") {
+                let event = event.as_str().unwrap_or_default();
+                assert!(
+                    event.starts_with("job_"),
+                    "{template}: use canonical job event names, got {event}"
+                );
+                if let Some(status) = action["set"]["status"].as_str() {
+                    assert!(
+                        states.iter().any(|s| s == status),
+                        "{template}: rule sets unknown status {status}"
+                    );
+                }
+                if let Some(assignee) = action["set"]["assignee"].as_str() {
+                    targets.push(("set", assignee.to_string()));
+                }
+            }
+        }
+        for (_, target) in targets {
+            let Some(name) = target.strip_prefix('@') else {
+                continue;
+            };
+            if [
+                "agent",
+                "reporter",
+                "assignee",
+                "assignee_or_reporter",
+                "me",
+            ]
+            .contains(&name)
+            {
+                continue;
+            }
+            assert!(
+                agents.iter().any(|a| a == name),
+                "{template}: rule refers to unknown agent @{name}; agents: {agents:?}"
+            );
+        }
     }
 }
 
@@ -332,25 +438,6 @@ fn dry_run_writes_no_files() {
         let has_files = walkdir(&tasks).into_iter().any(|p| p.is_file());
         assert!(!has_files, "dry-run must not write any files");
     }
-}
-
-#[test]
-fn legacy_agent_pipeline_template_writes_scaffolds() {
-    common::reset_lotar_test_environment();
-    let tmp = TempDir::new().unwrap();
-    run_ok(
-        &[
-            "init",
-            "--yes",
-            "--project=Pipe",
-            "--template=agent-pipeline",
-        ],
-        tmp.path(),
-    );
-    assert!(tmp.path().join(".tasks/PIPE/automation.yml").exists());
-    assert!(tmp.path().join(".tasks/PIPE/agents.yml").exists());
-    let agents = read(&tmp.path().join(".tasks/PIPE/agents.yml"));
-    assert!(agents.contains("implement:"));
 }
 
 #[test]

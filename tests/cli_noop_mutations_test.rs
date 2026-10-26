@@ -708,3 +708,42 @@ fn cli_invalid_patches_and_pending_journal_still_fail_closed() {
         "no-op edit under pending journal",
     );
 }
+
+/// Agents hand a ticket back with `lotar assignee <id> "$LOTAR_TICKET_REPORTER"`.
+/// A reporter taken from git `user.name` is not username-shaped ("Sam
+/// Example"), and the ticket's own reporter must still be accepted; other
+/// such values stay rejected.
+#[test]
+fn cli_assignee_accepts_the_tickets_own_reporter() {
+    let fixtures = TestFixtures::new();
+    std::fs::write(
+        lotar::utils::paths::global_config_path(&fixtures.tasks_root),
+        "default.project: REP\ndefault.reporter: Sam Example\n",
+    )
+    .expect("write config");
+    let run = |args: &[&str]| {
+        common::lotar_cmd()
+            .expect("lotar cmd")
+            .current_dir(fixtures.get_temp_path())
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(args)
+            .output()
+            .expect("run lotar")
+    };
+    assert!(run(&["add", "Hand back"]).status.success());
+
+    let rejected = run(&["assignee", "REP-1", "Someone Else"]);
+    assert!(
+        !rejected.status.success(),
+        "unknown display names stay rejected"
+    );
+
+    let accepted = run(&["assignee", "REP-1", "Sam Example"]);
+    assert!(
+        accepted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&accepted.stderr)
+    );
+    let yaml = std::fs::read_to_string(fixtures.tasks_root.join("REP/1.yml")).unwrap();
+    assert!(yaml.contains("assignee: Sam Example"), "{yaml}");
+}

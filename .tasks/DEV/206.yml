@@ -4,6 +4,10 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-10-26T18:11:32.217488+00:00
+modified: 2026-10-26T20:43:02.311910+00:00
+comments:
+- date: 2026-10-26T20:43:02.311910+00:00
+  text: 'From DEV-201 live runs: Codex runs commands through a login shell (bash -lc) and puts its own directory first on PATH, so prepending the lotar directory to PATH is not enough for Codex; it kept calling Homebrew''s lotar 0.9.1, whose assignee validation rejected the reporter on hand-back. Prefer an absolute path (e.g. LOTAR_BIN in the job env and in the built-in instructions) or the MCP route.'
 description: |-
   Agents update their ticket through the lotar CLI today, which works but depends on whichever lotar binary is on PATH (the live checks ran Homebrew's 0.9.1 instead of the build that started the job).
 
@@ -11,3 +15,8 @@ description: |-
   - Inject LoTaR's own MCP server into each run (claude --mcp-config JSON, codex -c mcp_servers.lotar.*, copilot --additional-mcp-config) with its tools pre-approved, behind a profile switch such as mcp.lotar: true.
   - At least put the running lotar binary first on PATH (or export LOTAR_BIN) so the CLI the agent calls matches the server.
   Needs live checks per CLI: headless MCP tool approval differs between them. Raised while testing DEV-199/DEV-200.
+history:
+- at: 2026-10-26T20:43:02.311910+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

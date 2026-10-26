@@ -475,6 +475,38 @@ impl AutomationService {
         Ok(())
     }
 
+    /// Whether an automation rule moves this ticket when its agent job ends,
+    /// judged on the ticket as it is now (the assignee that started the job).
+    pub fn handles_job_end(tasks_dir: &Path, ticket_id: &str) -> bool {
+        let project_prefix = crate::storage::TaskId::parse(ticket_id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
+        let Ok(config) = resolve_config_for_project(tasks_dir, Some(&project_prefix)) else {
+            return false;
+        };
+        let storage = Storage::new(tasks_dir);
+        let Ok(task) = TaskService::get(&storage, ticket_id, None) else {
+            return false;
+        };
+        let Ok((automation, _)) =
+            load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))
+        else {
+            return false;
+        };
+        let active_sprints = compute_active_sprint_ids(&storage);
+        automation.automation.rules().iter().any(|rule| {
+            rule.on.job_completed.is_some()
+                && matches_rule(
+                    rule,
+                    &task,
+                    &ChangeSet::empty(&task),
+                    MatchMode::Current,
+                    &config,
+                    &active_sprints,
+                )
+        })
+    }
+
     /// Simulate automation rules without applying changes
     pub fn simulate(
         tasks_dir: &Path,

@@ -45,10 +45,11 @@ Behavior:
   - `.tasks/<PREFIX>/config.yml` with just `project.name`.
   Built-in global defaults are inherited — the saved files stay small.
 - `--workflow` picks a preset vocabulary (`default`, `agile`, `kanban`). Presets are composed dynamically in code; no static template file is written verbatim.
-- `--template` accepts the same values for back-compat, plus legacy scaffold aliases: `agent-pipeline`, `agent-reviewed`, `jira`, `github`, `jira-github`. Each resolves to `default` workflow plus the relevant scaffolds.
+- `--template` accepts the same values for back-compat, plus scaffold aliases: `agent-pipeline`, `agent-reviewed`, `jira`, `github`, `jira-github`. Each resolves to the `default` workflow plus the relevant scaffolds; the agent templates also bring their own statuses (see [Templates](templates.md)).
 - `--with` is a comma-separated list of opt-in scaffolds:
   - `automation` / `automation:pipeline` / `automation:reviewed` — writes `<project>/automation.yml`.
-  - `agents` / `agents:pipeline` / `agents:reviewed` — writes `<project>/agents.yml`.
+  - `agents` — appends a commented example agent profile to the project config.
+  - `agents:pipeline` / `agents:reviewed` — merges the agent template's statuses, types, priorities, agent profiles and worktree settings into the project config. `--states`/`--types`/`--priorities`/`--tags` still win.
   - `sync:jira` / `sync:github` — appends a commented `remotes:` block to the project config.
 - Overrides: `--default-assignee`, `--default-reporter`, `--default-priority`, `--default-status`, `--states`, `--types`, `--priorities`, `--tags` (comma-separated for lists).
 - `--copy-from` merges non-identity fields from an existing project (pass its prefix).

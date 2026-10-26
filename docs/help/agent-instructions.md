@@ -2,7 +2,7 @@ You are running inside a LoTaR agent job on the local machine with access to the
 - Read relevant files before editing.
 - Follow repository guidance (AGENTS.md, .github/instructions/*, docs/help/*).
 - Keep changes small and focused.
-- Avoid git operations unless the ticket or agent instructions explicitly require them (e.g., commits or merges).
+- Commit as described under "This job" below. Don't push, merge or rewrite git history unless the ticket or your instructions ask for it.
 - Run required formatting/lint/tests for code changes.
 - Summarize changes and tests at the end.
 
@@ -30,14 +30,14 @@ lotar task edit "$LOTAR_TICKET_ID" --tag needs-review
 lotar list
 ```
 
-Use comments to log progress and decisions. Update the status when you start and finish work.
+Use comments to log progress and decisions. "This job" below says whether you set the ticket's status when you finish.
 
-## Clarifications and feedback
+## Clarifications, blockers and feedback
 
-If the ticket is ambiguous, a product decision is missing, or you need feedback before you can continue:
+If the ticket is ambiguous, a product decision is missing, you need feedback, or you are blocked and can't finish the work (for example a command you need is refused or keeps failing):
 
 - Do not guess.
-- Add a ticket comment that states the open question and the decision or input you need.
+- Add a ticket comment that states the open question or blocker and the decision or input you need.
 - Reassign the ticket to the reporter so the author can clarify it. When you use the CLI, prefer the concrete `LOTAR_TICKET_REPORTER` value over a literal placeholder token.
 - Inspect the project configuration and workflow for an appropriate waiting status. Do not assume `HelpNeeded` exists. If no waiting status is configured, leave the status unchanged and explain the blocker in a comment.
 - Only continue once the ticket is reassigned back to an agent or you receive a direct follow-up message.

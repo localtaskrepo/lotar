@@ -255,11 +255,13 @@ impl AgentJobService {
                 "Prompt cannot be empty".to_string(),
             ));
         }
+        let notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job);
         let prompt = build_prompt(
             &task,
             &user_prompt,
             context.as_ref(),
             instructions.as_deref(),
+            Some(&notes),
         );
 
         let job_id = make_job_id();
@@ -774,44 +776,95 @@ fn non_blank(value: Option<&str>) -> Option<String> {
         .map(str::to_string)
 }
 
+/// The instructions for a job: the base text (`agent.instructions`, or the
+/// built-in default when unset) followed by the profile's own instructions.
 fn resolve_agent_instructions(
     tasks_dir: &std::path::Path,
     config: &ResolvedConfig,
     profile: &AgentProfileDetail,
 ) -> LoTaRResult<Option<String>> {
-    // Profile-level instructions take precedence over global config
-    let instructions_config = profile
-        .instructions
-        .as_ref()
-        .or(config.agent_instructions.as_ref());
+    let base = match config.agent_instructions.as_ref() {
+        Some(configured) => read_instructions(tasks_dir, configured)?,
+        None => Some(DEFAULT_AGENT_INSTRUCTIONS.trim().to_string()),
+    };
+    let role = match profile.instructions.as_ref() {
+        Some(configured) => read_instructions(tasks_dir, configured)?,
+        None => None,
+    };
+    Ok(match (base, role) {
+        (Some(base), Some(role)) => Some(format!(
+            "{base}\n\n## Instructions for this agent\n\n{role}"
+        )),
+        (base, role) => base.or(role),
+    })
+}
 
-    match instructions_config {
-        Some(AgentInstructionsConfig::Inline(raw)) => {
-            let trimmed = raw.trim();
-            if trimmed.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(trimmed.to_string()))
-            }
-        }
-        Some(AgentInstructionsConfig::File { file }) => {
+fn read_instructions(
+    tasks_dir: &std::path::Path,
+    configured: &AgentInstructionsConfig,
+) -> LoTaRResult<Option<String>> {
+    let text = match configured {
+        AgentInstructionsConfig::Inline(raw) => raw.clone(),
+        AgentInstructionsConfig::File { file } => {
             let path = resolve_agent_instructions_path(tasks_dir, file)?;
-            let payload = fs::read_to_string(&path).map_err(|err| {
+            fs::read_to_string(&path).map_err(|err| {
                 LoTaRError::ValidationError(format!(
                     "Failed to read agent.instructions file '{}': {}",
                     path.display(),
                     err
                 ))
-            })?;
-            let trimmed = payload.trim();
-            if trimmed.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(trimmed.to_string()))
-            }
+            })?
         }
-        None => Ok(Some(DEFAULT_AGENT_INSTRUCTIONS.to_string())),
+    };
+    Ok(non_blank(Some(&text)))
+}
+
+/// What LoTaR knows about how this job runs and ends, so the agent neither
+/// leaves work uncommitted in a worktree nor fights automation over the
+/// ticket's status.
+fn job_notes(
+    tasks_dir: &std::path::Path,
+    config: &ResolvedConfig,
+    ticket_id: &str,
+    is_merge_job: bool,
+) -> String {
+    let mut notes = String::new();
+    if config.agent_worktree.enabled {
+        let branch = build_worktree_branch(
+            &config.agent_worktree.branch_prefix,
+            &sanitize_worktree_token(ticket_id),
+        );
+        notes.push_str(&format!(
+            "- You are working in a git worktree on branch `{branch}`, separate from the main checkout. \
+Commit your work to this branch before you finish. If git refuses to commit (for example inside a sandbox), \
+leave the changes in place: LoTaR commits them when the job ends. Don't switch branches.\n"
+        ));
+        if is_merge_job {
+            notes.push_str(
+                "- This is a merge job: it succeeds only if the branch ends up in the main checkout's current branch. \
+If git refuses to fast-forward the main checkout (for example inside a sandbox), leave it: LoTaR fast-forwards it when the job ends, \
+as long as the branch is rebased onto it.\n",
+            );
+        }
+    } else {
+        notes.push_str(
+            "- You are working in the main checkout. Leave your changes uncommitted unless the ticket or your instructions ask for a commit.\n",
+        );
     }
+    if AutomationService::handles_job_end(tasks_dir, ticket_id) {
+        notes.push_str(
+            "- When this job ends, LoTaR's automation rules move this ticket to the next step as if you finished. \
+If you finished, don't change its status or assignee; add a comment that says what you did. \
+If you could not finish (you are blocked, something fails that you can't fix, or you need a decision), \
+hand the ticket back as described under \"Clarifications, blockers and feedback\" so it doesn't move on.\n",
+        );
+    } else {
+        notes.push_str(
+            "- No automation rule updates this ticket when the job ends. When you finish, \
+set its status to a configured status that fits the result (for example a review status) and add a comment that says what you did.\n",
+        );
+    }
+    notes
 }
 
 fn resolve_agent_instructions_path(
@@ -847,6 +900,7 @@ fn build_prompt(
     user_prompt: &str,
     context: Option<&crate::services::agent_context_service::AgentContextFile>,
     instructions: Option<&str>,
+    job_notes: Option<&str>,
 ) -> String {
     let mut out = String::new();
     if let Some(instructions) = instructions {
@@ -856,6 +910,11 @@ fn build_prompt(
             out.push_str(trimmed);
             out.push_str("\n\n");
         }
+    }
+    if let Some(notes) = job_notes.map(str::trim).filter(|notes| !notes.is_empty()) {
+        out.push_str("This job:\n");
+        out.push_str(notes);
+        out.push_str("\n\n");
     }
     out.push_str("Ticket context:\n");
     out.push_str(&format!("- ID: {}\n", task.id));
@@ -930,13 +989,13 @@ fn build_prompt(
     out
 }
 
-/// Directories an agent must be able to write besides its working directory:
-/// the tasks directory (to update its ticket) and, for a worktree job, the
-/// repository's git data (to commit). Anything inside the working directory
-/// is already covered (DEV-199).
+/// Directories outside the working directory that a workspace-permission
+/// job may write: the tasks directory and the repository's git data. A merge
+/// job also gets the main checkout, since merging updates it.
 fn extra_writable_dirs(
     working_dir: &std::path::Path,
     tasks_dir: &std::path::Path,
+    is_merge_job: bool,
 ) -> Vec<std::path::PathBuf> {
     let canonical =
         |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
@@ -944,7 +1003,9 @@ fn extra_writable_dirs(
     let mut dirs = vec![canonical(tasks_dir)];
     if let Some(repo_root) = resolve_repo_root(tasks_dir) {
         let git_dir = repo_root.join(".git");
-        if git_dir.is_dir() {
+        if is_merge_job {
+            dirs.push(canonical(&repo_root));
+        } else if git_dir.is_dir() {
             dirs.push(canonical(&git_dir));
         }
     }
@@ -1419,7 +1480,14 @@ fn run_job(
         job_context_for(&job_id),
     );
 
-    let writable_dirs = extra_writable_dirs(&worktree_context.working_dir, &tasks_dir);
+    let is_merge_job = JOB_REGISTRY.lock().ok().is_some_and(|registry| {
+        registry
+            .jobs
+            .get(&job_id)
+            .is_some_and(|state| state.record.is_merge_job)
+    });
+    let writable_dirs =
+        extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
     let command = match build_runner_command(runner_kind, &profile, &prompt, &writable_dirs) {
         Ok(cmd) => cmd,
         Err(err) => {
@@ -1932,6 +2000,101 @@ fn handle_runner_line(
     }
 }
 
+/// Commit whatever a successful worktree job left uncommitted on its
+/// branch. `Ok(Some(note))` when LoTaR made a commit, `Ok(None)` when there
+/// was nothing to commit or the job has no worktree.
+fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
+    let Some((worktree, ticket_id, profile)) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        let record = &registry.jobs.get(job_id)?.record;
+        Some((
+            record.worktree_path.clone()?,
+            record.ticket_id.clone(),
+            record.agent_profile.clone(),
+        ))
+    }) else {
+        return Ok(None);
+    };
+    let worktree = std::path::PathBuf::from(worktree);
+    if !worktree.is_dir() {
+        return Ok(None);
+    }
+    let git = |args: &[&str]| {
+        git_command(&worktree)
+            .args(args)
+            .output()
+            .map_err(|err| format!("git {}: {err}", args.join(" ")))
+    };
+    let status = git(&["status", "--porcelain"])?;
+    if !status.status.success() || status.stdout.is_empty() {
+        return Ok(None);
+    }
+    let failed = |output: std::process::Output| {
+        format!(
+            "The agent left uncommitted changes and LoTaR could not commit them: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+    };
+    let added = git(&["add", "--all"])?;
+    if !added.status.success() {
+        return Err(failed(added));
+    }
+    let message = match profile.as_deref() {
+        Some(profile) => format!("{ticket_id}: changes from the {profile} agent"),
+        None => format!("{ticket_id}: changes from the agent"),
+    };
+    let committed = git(&["commit", "--quiet", "-m", &message])?;
+    if !committed.status.success() {
+        return Err(failed(committed));
+    }
+    Ok(Some(format!(
+        "Committed changes the agent left uncommitted: {message}"
+    )))
+}
+
+/// For a merge job on a worktree branch: make sure the branch is in the
+/// main checkout's current branch, fast-forwarding it when the agent could
+/// not (a sandbox may keep git metadata read-only). `Ok(Some(note))` when
+/// LoTaR fast-forwarded; `Err` explains why the branch is still unmerged.
+/// Jobs that are not merge jobs, and states git can't judge, pass.
+fn ensure_branch_merged(
+    job_id: &str,
+    tasks_dir: &std::path::Path,
+) -> Result<Option<String>, String> {
+    let Some(branch) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry
+            .jobs
+            .get(job_id)
+            .filter(|state| state.record.is_merge_job)
+            .and_then(|state| state.record.worktree_branch.clone())
+    }) else {
+        return Ok(None);
+    };
+    let Some(repo_root) = resolve_repo_root(tasks_dir) else {
+        return Ok(None);
+    };
+    let merged = git_command(&repo_root)
+        .args(["merge-base", "--is-ancestor", &branch, "HEAD"])
+        .status()
+        .map_err(|err| format!("git merge-base: {err}"))?;
+    // Exit code 1 means "not an ancestor"; anything else is merged or unknown.
+    if merged.code() != Some(1) {
+        return Ok(None);
+    }
+    let output = git_command(&repo_root)
+        .args(["merge", "--ff-only", "--quiet", &branch])
+        .output()
+        .map_err(|err| format!("git merge: {err}"))?;
+    if output.status.success() {
+        return Ok(Some(format!(
+            "Fast-forwarded the main checkout to {branch}"
+        )));
+    }
+    Err(format!(
+        "Merge job finished, but {branch} is not merged into the main checkout's current branch and can't be fast-forwarded: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    ))
+}
+
 fn finalize_job(
     job_id: &str,
     ticket_id: &str,
@@ -1947,7 +2110,43 @@ fn finalize_job(
         .ok()
         .and_then(|registry| registry.jobs.get(job_id).map(|state| state.runner_failed))
         .unwrap_or(false);
-    let success = exit_code.unwrap_or(1) == 0 && !runner_failed;
+    let mut success = exit_code.unwrap_or(1) == 0 && !runner_failed;
+    // Work an agent leaves uncommitted in its worktree (Codex's sandbox keeps
+    // git metadata read-only, signing may be unreachable) is committed here,
+    // so the next phase and the merge see it. Failing to commit fails the job.
+    let mut commit_failure = None;
+    if success {
+        match commit_leftover_work(job_id) {
+            Ok(Some(message)) => update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(message.clone()));
+            }),
+            Ok(None) => {}
+            Err(message) => commit_failure = Some(message),
+        }
+    }
+    if commit_failure.is_some() {
+        success = false;
+    }
+    // A merge job must end with its branch in the main checkout; LoTaR
+    // fast-forwards when the agent couldn't, and fails the job otherwise so
+    // automation doesn't treat the ticket as merged.
+    let failure_note = if success {
+        match ensure_branch_merged(job_id, tasks_dir) {
+            Ok(Some(message)) => {
+                update_job(job_id, |state| {
+                    record_and_emit(state, "agent_job_progress", Some(message.clone()));
+                });
+                None
+            }
+            Ok(None) => None,
+            Err(message) => Some(message),
+        }
+    } else {
+        commit_failure
+    };
+    if failure_note.is_some() {
+        success = false;
+    }
     let mut finalized = false;
     update_job(job_id, |state| {
         if state.record.status == AgentJobStatus::Cancelled {
@@ -1960,6 +2159,9 @@ fn finalize_job(
         } else {
             AgentJobStatus::Failed
         };
+        if let Some(message) = failure_note.as_ref() {
+            state.record.last_message = Some(message.clone());
+        }
         state.record.summary = state.record.last_message.clone();
         finalized = true;
         let event_kind = if success {
@@ -1967,7 +2169,7 @@ fn finalize_job(
         } else {
             "agent_job_failed"
         };
-        record_and_emit(state, event_kind, None);
+        record_and_emit(state, event_kind, failure_note.clone());
     });
     if !finalized {
         let _ = AgentContextService::append_messages(
@@ -2322,7 +2524,7 @@ mod tests {
     #[test]
     fn build_prompt_includes_ticket_and_request() {
         let task = sample_task();
-        let prompt = build_prompt(&task, "ship it", None, None);
+        let prompt = build_prompt(&task, "ship it", None, None, None);
         assert!(prompt.contains("TEST-1"));
         assert!(prompt.contains("ship it"));
     }
@@ -2330,9 +2532,17 @@ mod tests {
     #[test]
     fn build_prompt_includes_instructions() {
         let task = sample_task();
-        let prompt = build_prompt(&task, "ship it", None, Some("Use the tools"));
+        let prompt = build_prompt(
+            &task,
+            "ship it",
+            None,
+            Some("Use the tools"),
+            Some("- Commit to the branch."),
+        );
         assert!(prompt.contains("Agent instructions:"));
         assert!(prompt.contains("Use the tools"));
+        let notes_at = prompt.find("This job:\n- Commit to the branch.").unwrap();
+        assert!(notes_at < prompt.find("Ticket context:").unwrap());
     }
 
     #[test]
@@ -2352,6 +2562,91 @@ mod tests {
     }
 
     #[test]
+    fn profile_instructions_follow_the_base_instructions() {
+        let dir = tempdir().unwrap();
+        let mut profile = AgentProfileConfig::Runner("claude".to_string()).to_detail();
+        profile.instructions = Some(AgentInstructionsConfig::Inline(
+            "You are in the TESTING phase.".to_string(),
+        ));
+
+        let config = ResolvedConfig::from_global(GlobalConfig::default());
+        let resolved = resolve_agent_instructions(dir.path(), &config, &profile)
+            .unwrap()
+            .unwrap();
+        assert!(
+            resolved.contains("LoTaR CLI quick reference"),
+            "built-in text kept"
+        );
+        assert!(resolved.ends_with("You are in the TESTING phase."));
+
+        let mut config = ResolvedConfig::from_global(GlobalConfig::default());
+        config.agent_instructions = Some(AgentInstructionsConfig::Inline(
+            "Follow AGENTS.md.".to_string(),
+        ));
+        let resolved = resolve_agent_instructions(dir.path(), &config, &profile)
+            .unwrap()
+            .unwrap();
+        assert!(resolved.starts_with("Follow AGENTS.md."));
+        assert!(!resolved.contains("LoTaR CLI quick reference"));
+        assert!(resolved.ends_with("You are in the TESTING phase."));
+
+        config.agent_instructions = crate::config::normalization::parse_global_from_yaml_str(
+            "agent:\n  instructions: \"\"\n",
+        )
+        .unwrap()
+        .agent_instructions;
+        assert!(config.agent_instructions.is_some(), "empty text is kept");
+        let resolved = resolve_agent_instructions(dir.path(), &config, &profile)
+            .unwrap()
+            .unwrap();
+        assert_eq!(resolved, "You are in the TESTING phase.");
+    }
+
+    #[test]
+    fn job_notes_describe_the_branch_and_who_moves_the_ticket() {
+        let dir = tempdir().unwrap();
+        let tasks_dir = dir.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+        fs::write(
+            tasks_dir.join("config.yml"),
+            "default:\n  project: NOTE\nagents:\n  implement: claude\n",
+        )
+        .unwrap();
+        let mut storage = Storage::new(&tasks_dir);
+        let task = crate::services::task_service::TaskService::create(
+            &mut storage,
+            crate::api_types::TaskCreate {
+                title: "Notes".to_string(),
+                project: Some("NOTE".to_string()),
+                assignee: Some("@implement".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut config =
+            crate::config::resolution::config_for_project(&tasks_dir, Some("NOTE")).unwrap();
+
+        let notes = job_notes(&tasks_dir, &config, &task.id, false);
+        assert!(notes.contains("main checkout"), "{notes}");
+        assert!(notes.contains("No automation rule"), "{notes}");
+
+        config.agent_worktree.enabled = true;
+        fs::write(
+            tasks_dir.join("automation.yml"),
+            "automation:\n  rules:\n    - when:\n        assignee: \"@implement\"\n      on:\n        complete:\n          set:\n            status: Done\n",
+        )
+        .unwrap();
+        let notes = job_notes(&tasks_dir, &config, &task.id, false);
+        assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
+        assert!(notes.contains("Commit your work"), "{notes}");
+        assert!(
+            notes.contains("move this ticket to the next step"),
+            "{notes}"
+        );
+        assert!(notes.contains("hand the ticket back"), "{notes}");
+    }
+
+    #[test]
     fn resolve_agent_instructions_defaults_when_unset() {
         let dir = tempdir().unwrap();
         let config = ResolvedConfig::from_global(GlobalConfig::default());
@@ -2359,23 +2654,6 @@ mod tests {
         let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap();
         let content = resolved.expect("default instructions");
         assert!(!content.trim().is_empty());
-    }
-
-    #[test]
-    fn resolve_agent_instructions_profile_overrides_global() {
-        let dir = tempdir().unwrap();
-        let mut config = ResolvedConfig::from_global(GlobalConfig::default());
-        config.agent_instructions = Some(AgentInstructionsConfig::Inline(
-            "global instructions".to_string(),
-        ));
-
-        let mut profile = AgentProfileConfig::Runner("claude".to_string()).to_detail();
-        profile.instructions = Some(AgentInstructionsConfig::Inline(
-            "profile instructions".to_string(),
-        ));
-
-        let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap();
-        assert_eq!(resolved.as_deref(), Some("profile instructions"));
     }
 
     #[test]
