@@ -2505,7 +2505,36 @@
         "summary": "List agent profiles",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Configured agent profiles, sorted by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["name", "runner", "permissions"],
+                            "properties": {
+                              "name": { "type": "string" },
+                              "runner": { "type": "string", "description": "claude, codex, copilot, gemini or command" },
+                              "description": { "type": "string" },
+                              "model": { "type": "string", "description": "Model the profile asks its CLI for, when set" },
+                              "effort": { "type": "string", "description": "Reasoning effort the profile asks for, when set" },
+                              "permissions": { "type": "string", "enum": ["read-only", "workspace", "full"] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             "$ref": "#/components/responses/InternalError"

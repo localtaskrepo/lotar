@@ -24,7 +24,7 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::time::Instant;
 
-const DEFAULT_AUTO_PROMPT: &str = "Work on this ticket using the provided context and agent instructions. Make concrete changes in the repo (code/config/tests), run or update relevant tests, and summarize what changed and how you verified it. If you are blocked or missing information, say what you need and exit non-zero so automation can request help.";
+const DEFAULT_AUTO_PROMPT: &str = "Work on this ticket using the provided context and agent instructions. Make concrete changes in the repo (code/config/tests), run or update relevant tests, and summarize what changed and how you verified it. If you are blocked or missing information, hand the ticket back as your instructions describe.";
 const DEFAULT_MAX_ITERATIONS: u32 = 10;
 
 // ── Cooldown tracker ────────────────────────────────────────────────────────

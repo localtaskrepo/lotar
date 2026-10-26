@@ -1343,6 +1343,12 @@ export interface AgentProfileInfo {
     name: string
     runner: string
     description?: string | null
+    /** Model the profile asks its CLI for, when set. */
+    model?: string | null
+    /** Reasoning effort the profile asks for, when set. */
+    effort?: string | null
+    /** `read-only`, `workspace` or `full`. */
+    permissions: string
 }
 
 export interface AgentProfilesResponse {

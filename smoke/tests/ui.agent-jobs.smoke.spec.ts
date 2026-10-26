@@ -203,7 +203,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     await withPage(`${server.url}/agents`, async (page) => {
                         await page.waitForSelector('h1', { timeout: 15_000 });
                         const heading = await page.textContent('h1');
-                        expect(heading).toContain('Agent jobs');
+                        expect(heading).toContain('Agents');
 
                         // Queue stats should render
                         await page.waitForSelector('.queue-stats-card', { timeout: 10_000 });
@@ -245,6 +245,44 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         expect(cardText).toContain('completed');
                         expect(await (await waitForTicketChip(page, task.id)).count()).toBe(1);
                     });
+                } finally {
+                    await server.stop();
+                }
+            } finally {
+                await workspace.dispose();
+            }
+        } finally {
+            await agents.dispose();
+        }
+    });
+
+    it('starts a job from the Run agent dialog and shows the ticket it ran on', async () => {
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-run-dialog-');
+
+        try {
+            const workspace = await SmokeWorkspace.create({
+                seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml) },
+            });
+
+            try {
+                const task = await workspace.addTask('Dialog started job', { args: ['-p', 'UIAG'] });
+                const server = await startLotarServer(workspace);
+                try {
+                    await withPage(`${server.url}/agents`, async (page) => {
+                        await page.getByRole('button', { name: 'Run agent', exact: true }).click();
+                        const dialog = page.getByTestId('agent-run-dialog');
+                        await dialog.locator('#agent-run-ticket').fill(task.id);
+                        await expect.poll(() => dialog.locator('#agent-run-agent').inputValue()).toBe('mock');
+                        await dialog.getByRole('button', { name: 'Start job', exact: true }).click();
+
+                        await page.waitForSelector('.job-card.job-completed', { timeout: 20_000 });
+                        await expect
+                            .poll(() => page.locator('.ticket-group-card__header').first().textContent())
+                            .toContain('Dialog started job');
+                        expect(await dialog.count()).toBe(0);
+                    });
+                    const jobs = await fetchJobsViaApi(server.url, task.id);
+                    expect(jobs).toHaveLength(1);
                 } finally {
                     await server.stop();
                 }

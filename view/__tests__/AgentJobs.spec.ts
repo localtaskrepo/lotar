@@ -18,6 +18,9 @@ vi.mock('../api/client', () => ({
         cancelAgentJob: vi.fn(),
         cancelAllAgentJobs: vi.fn(),
         sendAgentJobMessage: vi.fn(),
+        listAgentProfiles: vi.fn(),
+        getTask: vi.fn(),
+        runAgentJob: vi.fn(),
     },
 }))
 
@@ -189,6 +192,18 @@ beforeEach(() => {
         queue_stats: { running: 1, queued: 1, max_parallel: 2 },
     })
     ;(api.getAgentJobLogs as any).mockResolvedValue({ job: runningJob, events: [] })
+    ;(api.listAgentProfiles as any).mockResolvedValue({
+        profiles: [
+            { name: 'implement', runner: 'claude', model: 'sonnet', effort: 'high', permissions: 'workspace' },
+            { name: 'reviewer', runner: 'codex', permissions: 'read-only' },
+        ],
+    })
+    ;(api.getTask as any).mockResolvedValue({
+        id: 'DEV-1',
+        title: 'Ship the parser',
+        status: 'InProgress',
+        assignee: '@reviewer',
+    })
     ;(api.cancelAgentJob as any).mockResolvedValue({ cancelled: true, job: { ...runningJob, status: 'cancelled' } })
     ;(api.cancelAllAgentJobs as any).mockResolvedValue({
         cancelled: 2,
@@ -756,12 +771,15 @@ describe('AgentJobs log sequence join', () => {
 
             const text = panelText(wrapper)
             // Every overlapped sequence appears exactly once.
-            expect(occurrences(text, 'bulk-900')).toBe(1)
+            const messages = cardFor(wrapper, 'logs-alpha')
+                .findAll('.log-message')
+                .map((row) => row.text())
+            expect(messages.filter((message) => message === 'bulk-900')).toHaveLength(1)
             expect(text).toContain('bulk-1005')
             // Retention boundary: the oldest retained live entry survives,
             // the trimmed head and the stale resurrection do not come back.
             expect(text).toContain('bulk-6')
-            expect(text).not.toContain('bulk-5bulk-6')
+            expect(messages).not.toContain('bulk-5')
             expect(text).not.toContain('stale resurrect')
 
             // After the merge, snapshot-covered sequences stay ignored and
@@ -938,6 +956,124 @@ describe('AgentJobs log sequence join', () => {
             await flushPromises()
             expect(panelText(wrapper, 'logs-alpha')).toContain('alpha history')
             expect(panelText(wrapper, 'logs-beta')).toContain('beta history')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})
+
+describe('AgentJobs page context and actions', () => {
+    it('shows the ticket title, status and assignee next to its jobs', async () => {
+        const wrapper = await mountAgentJobs()
+        try {
+            await flushPromises()
+            expect(api.getTask).toHaveBeenCalledWith('DEV-1')
+            const header = wrapper.find('.ticket-group-card__header').text()
+            expect(header).toContain('Ship the parser')
+            expect(header).toContain('InProgress')
+            expect(header).toContain('@reviewer')
+            expect(wrapper.findAll('.phase-step')).toHaveLength(3)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('lists the configured profiles with their run settings', async () => {
+        const wrapper = await mountAgentJobs()
+        try {
+            const chips = wrapper.findAll('.profile-chip').map((chip) => chip.text())
+            expect(chips[0]).toContain('@implement')
+            expect(chips[0]).toContain('claude · sonnet, high effort')
+            expect(chips[1]).toContain('codex · read-only')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('starts a run from the dialog, prefilled from the ticket group', async () => {
+        const started = job('job-new', { agent: 'reviewer', created_at: '2026-10-08T11:00:00.000Z' })
+        ;(api.runAgentJob as any).mockResolvedValue({ job: started })
+        const wrapper = await mountAgentJobs()
+        try {
+            const runAgain = wrapper.findAll('button').find((button) => button.text() === 'Run again')!
+            await runAgain.trigger('click')
+            await flushPromises()
+            const dialog = wrapper.find('[data-testid="agent-run-dialog"]')
+            expect(dialog.exists()).toBe(true)
+            expect((dialog.find('#agent-run-ticket').element as HTMLInputElement).value).toBe('DEV-1')
+            expect((dialog.find('#agent-run-agent').element as HTMLSelectElement).value).toBe('reviewer')
+
+            await dialog.find('#agent-run-effort').setValue('low')
+            await dialog.trigger('submit')
+            await flushPromises()
+
+            expect(api.runAgentJob).toHaveBeenCalledWith(
+                expect.objectContaining({ ticket_id: 'DEV-1', agent: 'reviewer', effort: 'low' }),
+            )
+            expect((api.runAgentJob as any).mock.calls[0][0]).not.toHaveProperty('model')
+            expect(wrapper.find('[data-testid="agent-run-dialog"]').exists()).toBe(false)
+            expect(wrapper.findAll('.job-card')).toHaveLength(4)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('keeps the dialog open with the error when the server refuses the run', async () => {
+        ;(api.runAgentJob as any).mockRejectedValue(new Error("Ticket 'DEV-9' not found"))
+        const wrapper = await mountAgentJobs()
+        try {
+            await wrapper.find('[data-testid="agent-run-open"]').trigger('click')
+            await flushPromises()
+            const dialog = wrapper.find('[data-testid="agent-run-dialog"]')
+            await dialog.find('#agent-run-ticket').setValue('DEV-9')
+            await dialog.trigger('submit')
+            await flushPromises()
+            expect(wrapper.find('[data-testid="agent-run-dialog"]').text()).toContain("Ticket 'DEV-9' not found")
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('shows each tool call as its own labelled row', async () => {
+        ;(api.listAgentJobs as any).mockResolvedValue({ jobs: [runningJob], queue_stats: null })
+        ;(api.getAgentJobLogs as any).mockResolvedValue({
+            job: runningJob,
+            events: [
+                { kind: 'agent_job_progress', sequence: 1, at: '2026-10-08T10:00:01.000Z', message: 'Bash: npm test' },
+                { kind: 'agent_job_progress', sequence: 2, at: '2026-10-08T10:00:02.000Z', message: 'Read: src/a.rs' },
+                { kind: 'agent_job_message', sequence: 3, at: '2026-10-08T10:00:03.000Z', message: 'All green.' },
+                { kind: 'agent_job_result', sequence: 4, at: '2026-10-08T10:00:04.000Z', message: null },
+            ],
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            const toggle = wrapper.findAll('button').find((button) => button.text() === 'Show logs')!
+            await toggle.trigger('click')
+            await flushPromises()
+            const rows = wrapper
+                .findAll('.log-row')
+                .map((row) => [row.find('.log-kind').text(), row.find('.log-message').text()])
+            expect(rows).toEqual([
+                ['Tool', 'Bash: npm test'],
+                ['Tool', 'Read: src/a.rs'],
+                ['Agent', 'All green.'],
+            ])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('offers the message box only for running Claude jobs', async () => {
+        const claudeJob = job('job-claude', { runner: 'claude', created_at: '2026-10-08T10:00:05.000Z' })
+        ;(api.listAgentJobs as any).mockResolvedValue({ jobs: [runningJob, claudeJob], queue_stats: null })
+        const wrapper = await mountAgentJobs()
+        try {
+            for (const button of wrapper.findAll('button').filter((b) => b.text() === 'Show logs')) {
+                await button.trigger('click')
+            }
+            await flushPromises()
+            const boxes = wrapper.findAll('.job-card').map((card) => card.find('.job-message').exists())
+            expect(boxes).toEqual([false, true])
         } finally {
             wrapper.unmount()
         }

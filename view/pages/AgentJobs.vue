@@ -1,45 +1,65 @@
 <template>
-  <section class="col" style="gap: 16px">
+  <section class="col agents-page">
     <PageHeader reload-label="Refresh jobs" :reloading="loading" @reload="refresh()">
-      <template #title>Agent jobs</template>
-      <template #subtitle>Track active and recent agent runs grouped by ticket.</template>
+      <template #title>Agents</template>
+      <template #subtitle>Run agents on tickets and follow their jobs.</template>
       <template #toolbar>
+        <UiButton
+          variant="primary"
+          type="button"
+          data-testid="agent-run-open"
+          :disabled="!profiles.length"
+          @click="openRunDialog()"
+        >
+          Run agent
+        </UiButton>
         <UiButton variant="danger" type="button" :disabled="loading || !hasCancelableJobs" @click="cancelAll">
           Stop all
         </UiButton>
       </template>
     </PageHeader>
 
-    <!-- Queue Stats -->
-    <UiCard v-if="queueStats" class="queue-stats-card">
-      <div class="row" style="gap: 24px; align-items: center; justify-content: flex-start">
-        <div class="stat-item">
-          <span class="stat-value running">{{ queueStats.running }}</span>
-          <span class="stat-label">Running</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value queued">{{ queueStats.queued }}</span>
-          <span class="stat-label">Queued</span>
-        </div>
-        <div v-if="queueStats.max_parallel" class="stat-item">
-          <span class="stat-value">{{ queueStats.max_parallel }}</span>
-          <span class="stat-label">Max parallel</span>
-        </div>
-        <div v-else class="stat-item">
-          <span class="stat-value muted">∞</span>
-          <span class="stat-label">Max parallel</span>
-        </div>
+    <div class="agents-overview">
+      <div v-if="queueStats" class="queue-stats-card" aria-label="Queue">
+        <span class="stat-item"
+          ><span class="stat-value running">{{ queueStats.running }}</span>
+          <span class="stat-label">Running</span></span
+        >
+        <span class="stat-item"
+          ><span class="stat-value queued">{{ queueStats.queued }}</span> <span class="stat-label">Queued</span></span
+        >
+        <span class="stat-item"
+          ><span class="stat-value">{{ queueStats.max_parallel || '∞' }}</span>
+          <span class="stat-label">Max parallel</span></span
+        >
       </div>
-    </UiCard>
+      <div v-if="profiles.length" class="profile-list" aria-label="Agent profiles">
+        <button
+          v-for="profile in profiles"
+          :key="profile.name"
+          type="button"
+          class="profile-chip"
+          :title="`Run @${profile.name} on a ticket`"
+          @click="openRunDialog({ agent: profile.name })"
+        >
+          <span class="profile-chip__name">@{{ profile.name }}</span>
+          <span class="profile-chip__meta">{{ profileSummary(profile) }}</span>
+        </button>
+      </div>
+      <p v-else-if="profilesLoaded" class="muted profile-hint">
+        No agent profiles yet. Add one under <code>agents:</code> in the configuration, then assign a ticket to it.
+      </p>
+    </div>
 
-    <!-- Filter tabs -->
-    <div class="row" style="gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap">
+    <div class="filter-tabs" role="tablist" aria-label="Filter jobs">
       <button
         v-for="tab in tabs"
         :key="tab.value"
         class="filter-tab"
         :class="{ active: activeTab === tab.value }"
         type="button"
+        role="tab"
+        :aria-selected="activeTab === tab.value"
         @click="activeTab = tab.value"
       >
         {{ tab.label }}
@@ -52,122 +72,132 @@
 
     <UiEmptyState
       v-else-if="!filteredJobs.length"
-      title="No agent jobs yet"
+      :title="activeTab === 'all' ? 'No agent jobs yet' : `No ${activeTab} jobs`"
       :description="
         activeTab === 'all'
-          ? 'Jobs are usually started from task automation or the CLI and appear here automatically.'
-          : `No ${activeTab} jobs.`
+          ? 'Assign a ticket to an agent profile (for example @implement), or use Run agent to start a job.'
+          : 'Jobs with this status will show up here.'
       "
     />
 
     <div v-else class="col" style="gap: 12px">
       <UiCard v-for="group in groupedJobs" :key="group.ticketId" class="ticket-group-card">
-        <div
-          class="ticket-group-card__header row"
-          style="justify-content: space-between; align-items: flex-start; gap: 16px"
-        >
-          <div class="col" style="gap: 6px; flex: 1 1 auto">
-            <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
-              <button class="chip" type="button" @click="openTask(group.ticketId)">
-                {{ group.ticketId }}
-              </button>
-              <span class="muted">{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
+        <div class="ticket-group-card__header">
+          <div class="ticket-group-card__identity">
+            <div class="ticket-group-card__title-row">
+              <button class="chip" type="button" @click="openTask(group.ticketId)">{{ group.ticketId }}</button>
+              <span v-if="ticketInfo[group.ticketId]?.title" class="ticket-title">{{
+                ticketInfo[group.ticketId]!.title
+              }}</span>
             </div>
-            <div class="muted" style="font-size: 12px">
-              <span>Latest {{ formatDate(group.latest!.created_at) }}</span>
-              <span v-if="group.latest!.finished_at"> · {{ group.latest!.status }}</span>
+            <div class="ticket-meta">
+              <span v-if="ticketInfo[group.ticketId]" class="ticket-status">{{
+                ticketInfo[group.ticketId]!.status
+              }}</span>
+              <span v-if="ticketInfo[group.ticketId]?.assignee">{{ ticketInfo[group.ticketId]!.assignee }}</span>
+              <span>{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
             </div>
+            <ol v-if="group.jobs.length > 1" class="phase-trail" aria-label="Job sequence">
+              <li v-for="job in group.jobs" :key="job.id" :class="`phase-step phase-step--${job.status}`">
+                {{ job.agent ? `@${job.agent}` : job.runner }}
+              </li>
+            </ol>
           </div>
-          <div class="row ticket-group-summary" style="gap: 8px; align-items: center; flex-wrap: wrap">
-            <span v-if="group.counts.running" class="summary-chip summary-chip-running"
-              >{{ group.counts.running }} running</span
-            >
-            <span v-if="group.counts.queued" class="summary-chip summary-chip-queued"
-              >{{ group.counts.queued }} queued</span
-            >
-            <span v-if="group.counts.completed" class="summary-chip summary-chip-completed"
-              >{{ group.counts.completed }} completed</span
-            >
-            <span v-if="group.counts.failed" class="summary-chip summary-chip-failed"
-              >{{ group.counts.failed }} failed</span
-            >
-          </div>
+          <UiButton
+            variant="ghost"
+            type="button"
+            class="ticket-group-card__run"
+            :disabled="!profiles.length"
+            @click="openRunDialog({ ticket: group.ticketId, agent: group.latest?.agent })"
+          >
+            Run again
+          </UiButton>
         </div>
 
         <div class="ticket-group-jobs">
-          <div v-for="job in group.jobs" :key="job.id" class="job-card" :class="`job-${job.status}`">
-            <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 16px">
-              <div class="col" style="gap: 6px; flex: 1 1 auto">
-                <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
-                  <span class="status-chip" :class="`status-${job.status}`">{{ job.status }}</span>
-                  <span v-if="job.agent" class="phase-chip">{{ job.agent }}</span>
-                  <span class="muted">{{ job.runner }}</span>
-                  <span v-if="job.model || job.effort" class="muted" data-testid="agent-job-settings">
-                    · {{ [job.model, job.effort && `${job.effort} effort`].filter(Boolean).join(', ') }}
-                  </span>
-                </div>
-                <div class="muted" style="font-size: 12px">
-                  <span>Created {{ formatDate(job.created_at) }}</span>
-                  <span v-if="job.started_at"> · Started {{ formatDate(job.started_at) }}</span>
-                  <span v-if="job.finished_at"> · Finished {{ formatDate(job.finished_at) }}</span>
-                </div>
-                <div v-if="job.worktree_path" class="muted" style="font-size: 12px">
-                  <span>Worktree {{ job.worktree_path }}</span>
-                  <span v-if="job.worktree_branch"> · {{ job.worktree_branch }}</span>
-                </div>
-                <p v-if="job.last_message" class="muted" style="margin: 0">
-                  {{ job.last_message }}
-                </p>
+          <article v-for="job in group.jobs" :key="job.id" class="job-card" :class="`job-${job.status}`">
+            <div class="job-card__top">
+              <div class="job-card__identity">
+                <span class="status-chip" :class="`status-${job.status}`">{{ job.status }}</span>
+                <span v-if="job.agent" class="phase-chip">@{{ job.agent }}</span>
+                <span class="job-runner"
+                  >{{ job.runner
+                  }}<span v-if="job.model || job.effort" data-testid="agent-job-settings">
+                    · {{ runSettings(job.model, job.effort) }}</span
+                  ></span
+                >
               </div>
-              <div class="row" style="gap: 8px; align-items: center">
+              <div class="job-card__actions">
                 <UiButton variant="ghost" type="button" @click="toggleLogs(job.id)">
                   {{ isLogsOpen(job.id) ? 'Hide logs' : 'Show logs' }}
                 </UiButton>
-                <UiButton
-                  v-if="job.status === 'running' || job.status === 'queued'"
-                  variant="danger"
-                  type="button"
-                  @click="cancel(job.id)"
-                >
+                <UiButton v-if="isActiveJob(job)" variant="danger" type="button" @click="cancel(job.id)">
                   {{ job.status === 'queued' ? 'Remove' : 'Stop' }}
                 </UiButton>
               </div>
+            </div>
+
+            <div class="job-card__meta">
+              <span :title="formatDate(job.created_at)">{{ jobTiming(job) }}</span>
+              <span v-if="job.exit_code !== null && job.exit_code !== undefined && job.exit_code !== 0" class="job-exit"
+                >exit {{ job.exit_code }}</span
+              >
+              <span v-if="job.worktree_branch" class="branch-chip" :title="job.worktree_path || undefined">{{
+                job.worktree_branch
+              }}</span>
+            </div>
+
+            <div v-if="job.last_message" class="job-summary">
+              <p v-if="isToolLine(job.last_message)" class="job-summary__text job-summary__text--tool">
+                {{ job.last_message }}
+              </p>
+              <MarkdownContent
+                v-else
+                class="job-summary__text"
+                :class="{ 'job-summary__text--clamped': isLongSummary(job.last_message) && !expandedSummaries[job.id] }"
+                :source="job.last_message"
+              />
+              <button
+                v-if="isLongSummary(job.last_message)"
+                type="button"
+                class="link-button"
+                @click="expandedSummaries[job.id] = !expandedSummaries[job.id]"
+              >
+                {{ expandedSummaries[job.id] ? 'Show less' : 'Show more' }}
+              </button>
             </div>
 
             <div v-if="isLogsOpen(job.id)" class="log-panel">
               <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
               <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
               <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
-              <div v-else class="log-list">
-                <div v-for="entry in logsByJob[job.id] || []" :key="entry.sequence" class="log-row">
-                  <span class="log-kind">{{ entry.kind }}</span>
-                  <span class="log-time">{{ formatDate(entry.at) }}</span>
-                  <span class="log-message">{{ formatLogMessage(entry) }}</span>
-                </div>
-              </div>
+              <AgentJobLog v-else :entries="logsByJob[job.id] || []" />
 
-              <div class="row" style="gap: 8px; margin-top: 12px">
+              <form v-if="canMessage(job)" class="job-message" @submit.prevent="sendMessage(job.id)">
                 <UiInput
                   :model-value="messageDrafts[job.id] || ''"
                   placeholder="Send a message to the agent"
-                  :disabled="job.status !== 'running'"
+                  aria-label="Message to the agent"
                   @update:modelValue="(value: string) => setMessageDraft(job.id, value)"
                 />
-                <UiButton
-                  variant="ghost"
-                  type="button"
-                  :disabled="job.status !== 'running' || !messageDrafts[job.id]"
-                  @click="sendMessage(job.id)"
-                >
-                  Send
-                </UiButton>
-              </div>
+                <UiButton variant="ghost" type="submit" :disabled="!messageDrafts[job.id]"> Send </UiButton>
+              </form>
             </div>
-          </div>
+          </article>
         </div>
       </UiCard>
     </div>
   </section>
+
+  <AgentRunDialog
+    :open="runDialog.open"
+    :profiles="profiles"
+    :ticket-suggestions="ticketSuggestions"
+    :initial-ticket="runDialog.ticket"
+    :initial-agent="runDialog.agent"
+    @close="runDialog.open = false"
+    @started="onRunStarted"
+  />
 
   <UiModal
     :open="stopAllDialogOpen"
@@ -204,10 +234,14 @@
 
 <script setup lang="ts">
 import PageHeader from '../components/PageHeader.vue'
-import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
-import { formatDateTime } from '../utils/date'
-import type { AgentJob, AgentJobLogEntry, AgentQueueStats } from '../api/types'
+import { formatDateTime, formatRelativeTime } from '../utils/date'
+import type { AgentJob, AgentJobLogEntry, AgentProfileInfo, AgentQueueStats } from '../api/types'
+import AgentJobLog from '../components/AgentJobLog.vue'
+import AgentRunDialog from '../components/AgentRunDialog.vue'
+import MarkdownContent from '../components/MarkdownContent.vue'
+import { isActiveJob, isFailedJob, isToolLine, jobDuration, runSettings } from '../utils/agentJobs'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
@@ -228,6 +262,15 @@ const logsError = ref<Record<string, string>>({})
 const openLogs = ref<Record<string, boolean>>({})
 const messageDrafts = ref<Record<string, string>>({})
 
+const profiles = ref<AgentProfileInfo[]>([])
+const profilesLoaded = ref(false)
+const ticketInfo = ref<Record<string, { title: string; status: string; assignee?: string | null }>>({})
+const expandedSummaries = ref<Record<string, boolean>>({})
+const runDialog = reactive<{ open: boolean; ticket?: string; agent?: string | null }>({ open: false })
+// Ticks while a job runs so its duration stays current.
+const now = ref(Date.now())
+let clock: ReturnType<typeof setInterval> | null = null
+
 const tabs = computed(() => [
   { value: 'all' as const, label: 'All', count: jobs.value.length },
   { value: 'running' as const, label: 'Running', count: jobs.value.filter((j) => j.status === 'running').length },
@@ -236,13 +279,13 @@ const tabs = computed(() => [
   {
     value: 'failed' as const,
     label: 'Failed',
-    count: jobs.value.filter((j) => j.status === 'failed' || j.status === 'cancelled').length,
+    count: jobs.value.filter(isFailedJob).length,
   },
 ])
 
 const filteredJobs = computed(() => {
   if (activeTab.value === 'all') return jobs.value
-  if (activeTab.value === 'failed') return jobs.value.filter((j) => j.status === 'failed' || j.status === 'cancelled')
+  if (activeTab.value === 'failed') return jobs.value.filter(isFailedJob)
   return jobs.value.filter((j) => j.status === activeTab.value)
 })
 
@@ -267,14 +310,92 @@ const groupedJobs = computed(() => {
           running: ticketJobs.filter((job) => job.status === 'running').length,
           queued: ticketJobs.filter((job) => job.status === 'queued').length,
           completed: ticketJobs.filter((job) => job.status === 'completed').length,
-          failed: ticketJobs.filter((job) => job.status === 'failed' || job.status === 'cancelled').length,
+          failed: ticketJobs.filter(isFailedJob).length,
         },
       }
     })
     .sort((a, b) => (b.latest?.created_at ?? '').localeCompare(a.latest?.created_at ?? ''))
 })
 
-const hasCancelableJobs = computed(() => jobs.value.some((job) => job.status === 'running' || job.status === 'queued'))
+const hasCancelableJobs = computed(() => jobs.value.some(isActiveJob))
+const ticketSuggestions = computed(() => [...new Set(jobs.value.map((job) => job.ticket_id))])
+
+async function loadProfiles() {
+  try {
+    profiles.value = (await api.listAgentProfiles())?.profiles ?? []
+  } catch {
+    profiles.value = []
+  } finally {
+    profilesLoaded.value = true
+  }
+}
+
+const ticketRequests = new Set<string>()
+async function loadTicket(id: string) {
+  if (ticketRequests.has(id)) return
+  ticketRequests.add(id)
+  try {
+    const task = await api.getTask(id)
+    if (task) {
+      ticketInfo.value = {
+        ...ticketInfo.value,
+        [id]: { title: task.title, status: task.status, assignee: task.assignee },
+      }
+    }
+  } catch {
+    // The ticket may be deleted or unreadable; the group still shows its ID.
+  } finally {
+    ticketRequests.delete(id)
+  }
+}
+
+watch(
+  () => [...new Set(jobs.value.map((job) => job.ticket_id))],
+  (ids) => {
+    for (const id of ids) if (!ticketInfo.value[id]) void loadTicket(id)
+  },
+)
+
+// Automation moves the ticket right after a job event; read it again shortly after.
+function refreshTicketSoon(id: string) {
+  setTimeout(() => void loadTicket(id), 400)
+}
+
+function profileSummary(profile: AgentProfileInfo) {
+  return [
+    profile.runner,
+    runSettings(profile.model, profile.effort),
+    profile.permissions !== 'workspace' ? profile.permissions : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function jobTiming(job: AgentJob) {
+  if (job.status === 'queued') return `Queued ${formatRelativeTime(job.created_at)}`
+  if (!job.started_at) return `Removed ${formatRelativeTime(job.finished_at || job.created_at)}`
+  const duration = jobDuration(job, now.value)
+  const started = `Started ${formatRelativeTime(job.started_at)}`
+  if (!duration) return started
+  return job.status === 'running' ? `${started} · running for ${duration}` : `${started} · ran ${duration}`
+}
+
+const isLongSummary = (text: string) => text.length > 280 || text.split('\n').length > 3
+
+// Messages reach a running job through its stdin, which only Claude keeps open.
+const canMessage = (job: AgentJob) => job.status === 'running' && job.runner === 'claude'
+
+function openRunDialog(prefill: { ticket?: string; agent?: string | null } = {}) {
+  runDialog.ticket = prefill.ticket
+  runDialog.agent = prefill.agent
+  runDialog.open = true
+}
+
+function onRunStarted(job: AgentJob) {
+  mergeJob(job)
+  runDialog.open = false
+  activeTab.value = 'all'
+}
 
 let sse: ReturnType<typeof useSse> | null = null
 const sseUnsubscribers: Array<() => void> = []
@@ -360,6 +481,7 @@ function updateFromEvent(payload: any, kind: string) {
   }
   // Update queue stats on job state changes
   if (['agent_job_started', 'agent_job_completed', 'agent_job_failed', 'agent_job_cancelled'].includes(kind)) {
+    refreshTicketSoon(next.ticket_id)
     api
       .listAgentJobs()
       .then((r) => {
@@ -448,40 +570,8 @@ function updateLogEntries(id: string, entries: AgentJobLogEntry[]) {
   logEvents.set(id, retained)
   logsByJob.value = {
     ...logsByJob.value,
-    [id]: normalizeLogEntries(ordered),
+    [id]: ordered,
   }
-}
-
-function normalizeLogEntries(entries: AgentJobLogEntry[]): AgentJobLogEntry[] {
-  const normalized: AgentJobLogEntry[] = []
-
-  for (const entry of entries) {
-    const message = entry.message ?? ''
-    if (!shouldDisplayLogEntry(entry)) continue
-
-    const last = normalized[normalized.length - 1]
-    if (entry.kind === 'agent_job_progress' && message.trim()) {
-      if (last && last.kind === 'agent_job_progress') {
-        normalized[normalized.length - 1] = {
-          ...last,
-          at: entry.at,
-          message: `${last.message || ''}${message}`,
-        }
-      } else {
-        normalized.push(entry)
-      }
-      continue
-    }
-
-    if (entry.kind === 'agent_job_message' && message.trim() && last && last.kind === 'agent_job_progress') {
-      normalized[normalized.length - 1] = entry
-      continue
-    }
-
-    normalized.push(entry)
-  }
-
-  return normalized
 }
 
 async function cancel(id: string) {
@@ -566,32 +656,6 @@ function openTask(taskId: string) {
 
 const formatDate = (value?: string | null) => formatDateTime(value, { empty: 'unknown' })
 
-function shouldDisplayLogEntry(entry: AgentJobLogEntry) {
-  return Boolean((entry.message || '').trim()) || Boolean(formatLogMessage(entry))
-}
-
-function formatLogMessage(entry: AgentJobLogEntry) {
-  const text = entry.message?.trim()
-  if (text) return text
-
-  switch (entry.kind) {
-    case 'agent_job_started':
-      return 'Job started'
-    case 'agent_job_init':
-      return 'Runner initialized'
-    case 'agent_job_result':
-      return 'Runner returned a result'
-    case 'agent_job_completed':
-      return 'Job completed'
-    case 'agent_job_failed':
-      return 'Job failed'
-    case 'agent_job_cancelled':
-      return 'Job cancelled'
-    default:
-      return ''
-  }
-}
-
 function setupSse() {
   if (sse) sse.close()
   sseUnsubscribers.splice(0).forEach((fn) => fn())
@@ -606,8 +670,20 @@ function setupSse() {
       'agent_job_completed',
       'agent_job_failed',
       'agent_job_cancelled',
+      'task_updated',
     ].join(','),
   })
+
+  const onTaskUpdated = (ev: MessageEvent) => {
+    try {
+      const id = JSON.parse(ev.data || '{}')?.id
+      if (typeof id === 'string' && ticketInfo.value[id]) void loadTicket(id)
+    } catch {
+      // Ignore malformed payloads.
+    }
+  }
+  sse?.on('task_updated', onTaskUpdated)
+  sseUnsubscribers.push(() => sse?.off('task_updated', onTaskUpdated))
 
   const handlers = [
     'agent_job_started',
@@ -647,19 +723,140 @@ function setupSse() {
 
 onMounted(async () => {
   setupSse()
+  clock = setInterval(() => {
+    if (jobs.value.some((job) => job.status === 'running')) now.value = Date.now()
+  }, 1000)
+  void loadProfiles()
   await refresh()
 })
 
 onBeforeUnmount(() => {
+  if (clock) clearInterval(clock)
   sseUnsubscribers.splice(0).forEach((fn) => fn())
   sse?.close()
 })
 </script>
 
 <style scoped>
+.agents-page {
+  gap: 16px;
+}
+
+.agents-overview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+}
+
 .queue-stats-card {
-  padding: 16px;
-  background: var(--surface-alt, var(--surface));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.stat-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value.running {
+  color: var(--color-accent);
+}
+
+.stat-value.queued {
+  color: var(--color-warning);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.profile-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.profile-chip:hover,
+.profile-chip:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.profile-chip__name {
+  font-weight: 600;
+}
+
+.profile-chip__meta,
+.profile-hint {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.profile-hint {
+  margin: 0;
+}
+
+.filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+
+.filter-tab {
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--color-muted);
+  font-size: 14px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-tab:hover {
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+.filter-tab.active {
+  color: var(--color-fg);
+  font-weight: 600;
+  background: var(--color-surface);
+}
+
+.tab-count {
+  background: var(--color-border);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .ticket-group-card {
@@ -667,196 +864,291 @@ onBeforeUnmount(() => {
 }
 
 .ticket-group-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ticket-group-card__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ticket-group-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ticket-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.ticket-status {
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.ticket-group-card__run {
+  flex-shrink: 0;
+}
+
+.phase-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.phase-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+}
+
+.phase-step + .phase-step::before {
+  content: '→';
+  margin-right: 4px;
+  color: var(--color-muted);
+}
+
+.phase-step::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-border-strong, var(--color-border));
+}
+
+.phase-step--completed::after {
+  background: var(--color-success);
+}
+
+.phase-step--running::after {
+  background: var(--color-accent);
+}
+
+.phase-step--queued::after {
+  background: var(--color-warning);
+}
+
+.phase-step--failed::after,
+.phase-step--cancelled::after {
+  background: var(--color-danger);
 }
 
 .ticket-group-jobs {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-top: 12px;
 }
 
-.stat-item {
+.job-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.stat-value.running {
-  color: var(--accent, #3b82f6);
-}
-
-.stat-value.queued {
-  color: var(--warning, #f59e0b);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.filter-tab {
-  background: transparent;
-  border: none;
-  padding: 8px 12px;
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 14px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.filter-tab:hover {
-  background: var(--surface-alt, rgba(0, 0, 0, 0.05));
-}
-
-.filter-tab.active {
-  color: var(--text);
-  font-weight: 500;
-}
-
-.tab-count {
-  background: var(--surface-alt, rgba(0, 0, 0, 0.1));
-  padding: 2px 6px;
+  gap: 8px;
+  padding: 12px 14px;
   border-radius: 10px;
-  font-size: 11px;
-}
-
-.job-card {
-  padding: 16px;
-  border-radius: 12px;
-  background: var(--surface-alt, var(--surface));
-  border-left: 3px solid transparent;
-}
-
-.summary-chip,
-.phase-chip {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.summary-chip-running {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--accent, #3b82f6);
-}
-
-.summary-chip-queued {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--warning, #f59e0b);
-}
-
-.summary-chip-completed {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--success, #22c55e);
-}
-
-.summary-chip-failed {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--danger, #ef4444);
-}
-
-.phase-chip {
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--text-muted, var(--muted));
-  text-transform: none;
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-border);
+  min-width: 0;
 }
 
 .job-card.job-running {
-  border-left-color: var(--accent, #3b82f6);
+  border-left-color: var(--color-accent);
 }
 
 .job-card.job-queued {
-  border-left-color: var(--warning, #f59e0b);
+  border-left-color: var(--color-warning);
 }
 
 .job-card.job-completed {
-  border-left-color: var(--success, #22c55e);
+  border-left-color: var(--color-success);
 }
 
 .job-card.job-failed,
 .job-card.job-cancelled {
-  border-left-color: var(--danger, #ef4444);
+  border-left-color: var(--color-danger);
+}
+
+.job-card__top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-card__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.job-card__actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.job-runner {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.job-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.job-exit {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.branch-chip {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  color: var(--color-fg);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.job-summary__text {
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.job-summary__text--tool {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: pre-wrap;
+}
+
+.ticket-group-card__title-row .chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.job-summary__text--clamped {
+  max-height: 4.5em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 60%, transparent);
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.status-chip,
+.phase-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .status-chip {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+  color: var(--color-muted);
+  background: color-mix(in oklab, var(--color-muted) 15%, transparent);
 }
 
 .status-chip.status-running {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--accent, #3b82f6);
+  color: var(--color-accent);
+  background: color-mix(in oklab, var(--color-accent) 15%, transparent);
 }
 
 .status-chip.status-queued {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--warning, #f59e0b);
+  color: var(--color-warning);
+  background: color-mix(in oklab, var(--color-warning) 15%, transparent);
 }
 
 .status-chip.status-completed {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--success, #22c55e);
+  color: var(--color-success);
+  background: color-mix(in oklab, var(--color-success) 15%, transparent);
 }
 
 .status-chip.status-failed,
 .status-chip.status-cancelled {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--danger, #ef4444);
+  color: var(--color-danger);
+  background: color-mix(in oklab, var(--color-danger) 15%, transparent);
+}
+
+.phase-chip {
+  border: 1px solid var(--color-border);
+  color: var(--color-fg);
+  font-weight: 500;
 }
 
 .log-panel {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.job-message {
+  display: flex;
   gap: 8px;
 }
 
-.log-list {
-  display: grid;
-  gap: 6px;
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.log-row {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: 8px;
-  align-items: baseline;
-}
-
-.log-kind {
-  font-weight: 600;
-}
-
-.log-time {
-  color: var(--muted);
-}
-
-.log-message {
-  color: var(--text);
-  word-break: break-word;
+.job-message :deep(input) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .stop-all-dialog {
@@ -872,7 +1164,7 @@ onBeforeUnmount(() => {
 
 .stop-all-dialog__message {
   margin: 0;
-  color: var(--muted);
+  color: var(--color-muted);
 }
 
 .stop-all-dialog__error {
@@ -883,5 +1175,19 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .ticket-group-card {
+    padding: 12px;
+  }
+
+  .ticket-group-card__header {
+    flex-direction: column;
+  }
+
+  .ticket-title {
+    white-space: normal;
+  }
 }
 </style>

@@ -31,6 +31,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/sync/validate (SyncValidateRequest) -> { data: SyncValidateResponse }
 - GET  /api/sync/reports/list?project=PREFIX&limit=N&offset=N -> { data: SyncReportListResponse }
 - GET  /api/sync/reports/get?path=<relative>[&project=PREFIX] -> { data: SyncReport }
+- GET  /api/agents/profiles[?project=PREFIX] -> { data: { profiles: AgentProfileInfo[] } } (name, runner, model?, effort?, permissions), sorted by name
 - POST /api/jobs (AgentJobCreateRequest; optional `model`/`effort` override the profile for this run) -> { data: AgentJobCreateResponse }
 - GET  /api/jobs?ticket_id=ID&status=STATUS -> { data: AgentJobListResponse }
 - GET  /api/jobs/get?id=JOB_ID -> { data: AgentJobStatusResponse }

@@ -1,0 +1,39 @@
+title: 'Rework the Agents page: ticket context, readable logs, start a run'
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-26T21:44:55.364039+00:00
+modified: 2026-10-26T22:03:01.554291+00:00
+comments:
+- date: 2026-10-26T22:03:01.510962+00:00
+  text: 'Done. Agents page: ticket title/status/assignee and job order per ticket (live via task_updated + job events); compact job rows (agent, runner, model/effort, relative start, duration ticking while running, branch chip with worktree path on hover, exit code, markdown summary clamped with Show more, tool lines plain); log timeline component (times, labels Tool/Agent/You/Denied/Note/Done/Failed, markdown for agent and user text, one row per entry instead of joining/replacing tool lines, follows output while at the bottom); message box only for running Claude jobs; Run agent dialog (ticket, profile, model, effort, request; per-project profiles) plus Run again and profile chips; compact stats; responsive at 390px; --color-* tokens. API: AgentProfileInfo gains model/effort/permissions, sorted, and without ?project uses the default project (Rust, TS, OpenAPI, quick reference). Default automation prompt no longer says to exit non-zero. Verified in a browser (light, dark, 390px) against real Claude jobs plus stub running/failing jobs. Tests: new Vitest page/helper tests, dev209 REST tests, smoke test starting a job from the dialog. Gates: lint, 1731 Rust + 1223 UI, 351 smoke.'
+description: |-
+  Browser check of /agents with real Claude jobs plus stub running and failing jobs (light, dark, 390px) showed:
+  - Ticket groups show only the ID: no title, current status or assignee, so you can't tell where a pipeline stands.
+  - Each job prints full created/started/finished timestamps and the full absolute worktree path; the useful bits (branch, duration, what the agent concluded) get lost.
+  - Logs list raw kinds (agent_job_message), full dates, and long agent messages in a 300px monospace box; the message box is shown (disabled) on finished jobs and for runners that can't take messages.
+  - Jobs can only be started from automation or the CLI; there is no way to run an agent on a ticket from the page, and the configured agent profiles aren't visible.
+  - At 390px the job actions overflow the card; queue stats take a large card for three numbers; some colors use undefined tokens.
+
+  Plan: ticket header with title/status/assignee and a phase trail; compact job rows with branch chip, relative start and duration (live while running), clamped summary, exit code on failure; log timeline with friendly labels, times, tool calls in mono and messages as prose, auto-scroll while running, composer only for running Claude jobs; Run agent dialog (ticket, profile, model, effort, prompt) and a profiles strip, with AgentProfileInfo gaining model/effort/permissions (REST contract); compact stats; responsive layout; --color-* tokens. Also fix the default automation prompt, which still tells agents to exit non-zero when blocked.
+history:
+- at: 2026-10-26T21:44:58.862084+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-26T22:03:01.510962+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T22:03:01.554291+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

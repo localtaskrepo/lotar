@@ -162,7 +162,13 @@ Repository guidance for agents working on LoTaR itself lives in:
 
 ## Web UI
 
-The Agents page shows live job output as it streams over SSE and lets you interrupt running jobs, queued jobs, or stop all queued/running jobs at once. You can also send messages to a running agent from the UI; this only works for runners that accept stdin in the current configuration (otherwise the API returns an error).
+The Agents page lists jobs grouped by ticket and updates live over SSE:
+
+- Each ticket shows its title, current status and assignee, and the order its jobs ran in (for example `@implement → @test`).
+- Each job shows its agent, runner, model and effort, when it started and how long it ran, its branch (hover for the worktree path), the exit code when it failed, and the agent's last message.
+- **Show logs** opens a timeline of the job: tool calls, the agent's messages, denied tools and notes from LoTaR (worktree, commits, fast-forwards).
+- **Run agent** (or **Run again** on a ticket) starts a job on a ticket without changing its assignee; pick the agent profile and optionally a model, effort and request. Clicking a profile in the profile list opens the same dialog.
+- You can stop a running job, remove a queued one, or stop all of them. While a Claude job runs you can send it a message; other runners don't accept messages.
 
 ## Worktrees
 

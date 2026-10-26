@@ -628,6 +628,14 @@ pub struct AgentProfileInfo {
     pub runner: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub description: Option<String>,
+    /// Model the profile asks its CLI for, when set.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub model: Option<String>,
+    /// Reasoning effort the profile asks for, when set.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
+    /// `read-only`, `workspace` or `full`.
+    pub permissions: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
