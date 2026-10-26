@@ -17,6 +17,9 @@ export const GO_SHORTCUTS: Array<{ key: string; path: string; label: string }> =
     { key: 'p', path: '/preferences', label: 'Preferences' },
 ]
 
+/** Command palette groups, in the order the palette lists them. */
+export const PALETTE_GROUPS = ['This task', 'Recent tasks', 'Go to', 'Filters', 'Actions'] as const
+
 /** How long after `g` the second key still counts. */
 export const GO_SEQUENCE_TIMEOUT_MS = 1500
 

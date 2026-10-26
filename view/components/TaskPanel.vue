@@ -621,7 +621,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type {
   ConfigInspectResult,
@@ -646,6 +646,8 @@ import {
 } from '../utils/taskAttachments'
 import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../utils/text'
 import { useTaskStore } from '../composables/useTaskStore'
+import { setTaskPanelCommands } from '../composables/useTaskPanelController'
+import { recordRecentTask } from '../utils/recentTasks'
 import ChipListField from './ChipListField.vue'
 import IconGlyph from './IconGlyph.vue'
 import MarkdownContent from './MarkdownContent.vue'
@@ -686,6 +688,7 @@ const taskStore = useTaskStore()
 
 const {
   mode,
+  applyPatch,
   ready,
   projects,
   statusOptions,
@@ -790,6 +793,36 @@ const {
 
 // Named apart from the taskId prop, which it would otherwise shadow.
 const panelTaskId = computed(() => (task.id || '').trim())
+
+// DEV-198: offer this task's actions to the command palette and remember it
+// as a recent task, while an existing, editable task is shown.
+const paletteTaskId = computed(() =>
+  mode.value === 'edit' && ready.value && panelTaskId.value && !isDeletedTask(task) ? panelTaskId.value : '',
+)
+watch(
+  () => [paletteTaskId.value, task.title, task.status, task.priority, statusOptions.value, priorityOptions.value],
+  () => {
+    const id = paletteTaskId.value
+    if (!id) {
+      setTaskPanelCommands(null)
+      return
+    }
+    recordRecentTask(id, task.title || '')
+    setTaskPanelCommands({
+      taskId: id,
+      title: task.title || '',
+      status: task.status || '',
+      priority: task.priority || '',
+      statuses: [...statusOptions.value],
+      priorities: [...priorityOptions.value],
+      setStatus: (status) => updateStatus(status),
+      setPriority: (priority) => applyPatch({ priority }),
+      assignToMe: () => applyPatch({ assignee: '@me' }),
+    })
+  },
+  { immediate: true },
+)
+onUnmounted(() => setTaskPanelCommands(null))
 
 // -- DEV-92: deleted (trash) task mode --------------------------------------
 

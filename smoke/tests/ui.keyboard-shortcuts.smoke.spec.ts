@@ -95,4 +95,63 @@ describe('Keyboard shortcuts and command palette (DEV-158)', () => {
             await workspace.dispose();
         }
     });
+    it('acts on the open task, lists recent tasks, applies quick filters and moves with j/k (DEV-198)', async ({
+        expect,
+    }) => {
+        const workspace = await SmokeWorkspace.create({ seedFiles: seed() });
+        const server = await startLotarServer(workspace);
+        try {
+            await withPage(`${server.url}/`, async (page) => {
+                const listQueries: string[] = [];
+                page.on('request', (request) => {
+                    const url = new URL(request.url());
+                    if (url.pathname === '/api/tasks/list') listQueries.push(url.search);
+                });
+                await page.getByTestId('filter-search').waitFor({ state: 'visible' });
+                await page.locator('[data-task-row]').first().waitFor({ state: 'visible' });
+                const isMac = await page.evaluate(() => /mac/i.test(navigator.platform));
+                const openPalette = () => page.keyboard.press(isMac ? 'Meta+k' : 'Control+k');
+                const input = page.getByTestId('command-palette-input');
+                const panel = page.locator('.task-panel');
+
+                // j focuses the first row, Enter opens it.
+                await page.locator('body').click({ position: { x: 5, y: 5 } });
+                await page.keyboard.press('j');
+                expect(await page.evaluate(() => document.activeElement?.hasAttribute('data-task-row'))).toBe(true);
+                await page.keyboard.press('Enter');
+                await expect.poll(() => panel.textContent()).toContain('Keyboard reachable task');
+
+                // The open task's actions run through the panel and save the file.
+                await openPalette();
+                await input.fill('status done');
+                await page.getByTestId('command-palette-option-task-status-Done').waitFor({ state: 'visible' });
+                await input.press('Enter');
+                await expect.poll(() => workspace.readTaskYaml('KEY-7')).toContain('status: Done');
+                await page.keyboard.press('Escape');
+                await panel.waitFor({ state: 'detached' });
+
+                // An empty palette lists the task as recent.
+                await openPalette();
+                await page.getByTestId('command-palette-option-recent-KEY-7').waitFor({ state: 'visible' });
+
+                // Quick filters apply to the current page.
+                await input.fill('overdue');
+                await page.getByTestId('command-palette-option-filter-overdue').waitFor({ state: 'visible' });
+                await input.press('Enter');
+                await expect
+                    .poll(() => listQueries.some((query) => new URLSearchParams(query).get('due') === 'overdue'))
+                    .toBe(true);
+
+                // j moves through board cards as well.
+                await page.goto(`${server.url}/boards`);
+                await page.locator('[data-board-card]').first().waitFor({ state: 'visible' });
+                await page.locator('body').click({ position: { x: 5, y: 5 } });
+                await page.keyboard.press('j');
+                expect(await page.evaluate(() => document.activeElement?.hasAttribute('data-board-card'))).toBe(true);
+            });
+        } finally {
+            await server.stop();
+            await workspace.dispose();
+        }
+    });
 });

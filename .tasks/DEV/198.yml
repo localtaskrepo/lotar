@@ -1,0 +1,36 @@
+title: Command palette task actions, recent tasks, quick filters and j/k list navigation
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-26T00:57:01.338070+00:00
+modified: 2026-10-26T01:09:41.719902+00:00
+comments:
+- date: 2026-10-26T00:59:27.609060+00:00
+  text: 'Plan: (1) open task actions in the palette (''This task''): set status / priority from the task''s project options, assign to me, copy ID, copy link, via handles the TaskPanel registers with the panel controller (so the panel''s own save path, toasts and refresh are used). (2) recent tasks: the panel records opened tasks (localStorage, last 8); the palette lists them when the search is empty. (3) quick filters on pages with a FilterBar: my tasks, overdue, due soon, unassigned, changed this week, clear filters, switch project / all projects, via a handle the mounted FilterBar registers. (4) j/k move focus through Tasks list rows and board cards, Enter opens; same guards as other single-key shortcuts. Help dialog, docs, unit + smoke tests.'
+- date: 2026-10-26T01:09:41.687283+00:00
+  text: 'Done. (1) ''This task'' palette group while a task panel shows an editable task: set status/priority (current value omitted), assign to me (@me), copy ID, copy link; runs through the panel''s own save path (registered via setTaskPanelCommands). The palette now opens over the task panel (it only refuses over other dialogs); single keys stay blocked while the panel is open. (2) Recent tasks (utils/recentTasks.ts, last 8 opened, per browser) listed when the search is empty. (3) ''Filters'' group on pages with a FilterBar (registerFilterBar handle): my tasks, overdue, due in 7 days, unassigned, changed in 7 days, clear filters (keeps project/sort), switch project / all projects. (4) j/k (useListKeyNavigation) through Tasks rows (now tabindex=-1 with Enter to open and a focus ring) and board cards; same guards as other single keys. Shortcut dialog + docs updated. Verified: unit specs (recent list, j/k incl. typing/panel guards, palette group order and empty-only recents), smoke (j+Enter opens a task, palette sets status and the YAML changes, recent task listed, quick filter sends due=overdue, j on board), manual check that typing and Esc work with the palette over a task. Gates: lint, 1712 Rust + 1212 UI, 350 smoke.'
+history:
+- at: 2026-10-26T00:57:01.395011+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-26T00:59:27.609060+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T01:09:41.687283+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-26T01:09:41.719902+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

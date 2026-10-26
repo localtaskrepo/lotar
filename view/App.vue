@@ -88,11 +88,13 @@ import TaskPanelHost from './components/TaskPanelHost.vue'
 import ToastHost from './components/ToastHost.vue'
 import UiButton from './components/UiButton.vue'
 import { showToast } from './components/toast'
+import { useActiveFilterBar } from './composables/useFilterCommands'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
 import { useTaskPanelController } from './composables/useTaskPanelController'
 import { NAV_TABS, useNavTabs } from './composables/useNavTabs'
 import { GO_SHORTCUTS, paletteShortcutLabel } from './utils/keyboardShortcuts'
 import { onPreferencesChanged, readSingleKeyShortcutsPreference, SINGLE_KEY_SHORTCUTS_KEY } from './utils/preferences'
+import { readRecentTasks, type RecentTask } from './utils/recentTasks'
 import { applyThemePreference, storeThemePreference, type ThemePreference } from './utils/theme'
 import { useTaskStore } from './composables/useTaskStore'
 import { projectPrefixOfTaskId } from './utils/text'
@@ -183,7 +185,149 @@ function setTheme(theme: ThemePreference) {
   storeThemePreference(theme)
 }
 
+// DEV-198: the open task's actions, recent tasks and the page's quick filters.
+const { panelCommands } = useTaskPanelController()
+const activeFilterBar = useActiveFilterBar()
+const recentTasks = ref<RecentTask[]>([])
+watch(paletteOpen, (open) => {
+  if (open) recentTasks.value = readRecentTasks()
+})
+
+async function copyText(text: string, what: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast(`Copied ${what}`)
+  } catch {
+    showToast(`Could not copy ${what}`)
+  }
+}
+
+const taskCommands = computed<PaletteCommand[]>(() => {
+  const open = panelCommands.value
+  if (!open) return []
+  const commands: PaletteCommand[] = [
+    ...open.statuses
+      .filter((status) => status !== open.status)
+      .map((status) => ({
+        id: `task-status-${status}`,
+        group: 'This task' as const,
+        label: `Set status to ${status}`,
+        keywords: `${open.taskId} move state`,
+        run: () => void open.setStatus(status),
+      })),
+    ...open.priorities
+      .filter((priority) => priority !== open.priority)
+      .map((priority) => ({
+        id: `task-priority-${priority}`,
+        group: 'This task' as const,
+        label: `Set priority to ${priority}`,
+        keywords: open.taskId,
+        run: () => void open.setPriority(priority),
+      })),
+    {
+      id: 'task-assign-me',
+      group: 'This task',
+      label: 'Assign to me',
+      keywords: `${open.taskId} assignee take`,
+      run: () => void open.assignToMe(),
+    },
+    {
+      id: 'task-copy-id',
+      group: 'This task',
+      label: `Copy task ID ${open.taskId}`,
+      keywords: 'clipboard',
+      run: () => void copyText(open.taskId, open.taskId),
+    },
+    {
+      id: 'task-copy-link',
+      group: 'This task',
+      label: 'Copy link to this task',
+      keywords: `${open.taskId} url clipboard share`,
+      run: () => void copyText(`${window.location.origin}/task/${encodeURIComponent(open.taskId)}`, 'link'),
+    },
+  ]
+  return commands
+})
+
+const recentCommands = computed<PaletteCommand[]>(() =>
+  recentTasks.value
+    .filter((recent) => recent.id !== panelCommands.value?.taskId)
+    .map((recent) => ({
+      id: `recent-${recent.id}`,
+      group: 'Recent tasks' as const,
+      label: recent.title || recent.id,
+      detail: recent.id,
+      emptyOnly: true,
+      run: () => openTaskPanel({ taskId: recent.id }),
+    })),
+)
+
+const QUICK_FILTERS: Array<{ id: string; label: string; keywords: string; filters: Record<string, string> }> = [
+  { id: 'mine', label: 'Show my tasks', keywords: 'assigned me mine', filters: { assignee: '@me' } },
+  { id: 'overdue', label: 'Show overdue tasks', keywords: 'late due', filters: { due: 'overdue' } },
+  {
+    id: 'due-soon',
+    label: 'Show tasks due in the next 7 days',
+    keywords: 'soon deadline week',
+    filters: { due: 'soon' },
+  },
+  { id: 'unassigned', label: 'Show unassigned tasks', keywords: 'nobody owner', filters: { assignee: '__none__' } },
+  {
+    id: 'recent',
+    label: 'Show tasks changed in the last 7 days',
+    keywords: 'recent modified updated week',
+    filters: { recent: '7d' },
+  },
+]
+
+const filterCommands = computed<PaletteCommand[]>(() => {
+  const bar = activeFilterBar.value
+  if (!bar) return []
+  const commands: PaletteCommand[] = QUICK_FILTERS.map((quick) => ({
+    id: `filter-${quick.id}`,
+    group: 'Filters' as const,
+    label: quick.label,
+    keywords: `filter ${quick.keywords}`,
+    run: () => bar.apply(quick.filters),
+  }))
+  commands.push({
+    id: 'filter-clear',
+    group: 'Filters',
+    label: 'Clear filters',
+    keywords: 'reset remove',
+    run: bar.clear,
+  })
+  const projects = bar.projects()
+  if (projects.length > 1) {
+    const current = bar.currentProject()
+    for (const project of projects) {
+      if (project.prefix === current) continue
+      commands.push({
+        id: `filter-project-${project.prefix}`,
+        group: 'Filters',
+        label: `Switch to project ${project.name || project.prefix}`,
+        detail: project.prefix,
+        keywords: 'project change scope',
+        run: () => bar.setProject(project.prefix),
+      })
+    }
+    if (current) {
+      commands.push({
+        id: 'filter-project-all',
+        group: 'Filters',
+        label: 'Show all projects',
+        keywords: 'project scope every',
+        run: () => bar.setProject(''),
+      })
+    }
+  }
+  return commands
+})
+
 const paletteCommands = computed<PaletteCommand[]>(() => [
+  ...taskCommands.value,
+  ...recentCommands.value,
+  ...filterCommands.value,
   ...[...NAV_TABS, { label: 'Preferences', path: '/preferences' }].map((tab) => ({
     id: `go-${tab.path.replace(/\W+/g, '') || 'tasks'}`,
     group: 'Go to' as const,
@@ -245,6 +389,12 @@ useGlobalShortcuts({
   navigate: go,
   singleKeyEnabled: () => singleKeyShortcuts.value,
   // An open panel, drawer or dialog owns the keyboard.
+  // The palette opens over the task panel (its "This task" commands), but
+  // not over other dialogs.
+  paletteBlocked: () =>
+    paletteOpen.value ||
+    shortcutsOpen.value ||
+    [...document.querySelectorAll('[aria-modal="true"]')].some((dialog) => !dialog.classList.contains('task-panel')),
   busy: () =>
     paletteOpen.value ||
     shortcutsOpen.value ||

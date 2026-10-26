@@ -61,6 +61,7 @@ describe('useGlobalShortcuts', () => {
             navigate: vi.fn(),
             singleKeyEnabled: () => handlers.enabled,
             busy: () => handlers.isBusy,
+            paletteBlocked: () => handlers.isBusy,
         }
         const Host = defineComponent({
             setup() {
@@ -195,6 +196,97 @@ describe('CommandPalette', () => {
         await flushPromises()
         expect(selected()).toContain('New task')
         expect(input.getAttribute('aria-activedescendant')).toBeTruthy()
+        wrapper.unmount()
+    })
+})
+
+describe('recent tasks', () => {
+    it('keeps the newest first without duplicates, up to the limit', async () => {
+        const { readRecentTasks, recordRecentTask, RECENT_TASKS_LIMIT } = await import('../utils/recentTasks')
+        for (let n = 1; n <= RECENT_TASKS_LIMIT + 2; n++) recordRecentTask(`A-${n}`, `Task ${n}`)
+        recordRecentTask('A-5', 'Renamed five')
+        const recent = readRecentTasks()
+        expect(recent).toHaveLength(RECENT_TASKS_LIMIT)
+        expect(recent[0]).toEqual({ id: 'A-5', title: 'Renamed five' })
+        expect(recent.filter((task) => task.id === 'A-5')).toHaveLength(1)
+        expect(recent.map((task) => task.id)).not.toContain('A-1')
+    })
+})
+
+describe('useListKeyNavigation', () => {
+    it('moves focus through the items with j and k, but not while typing or with the panel open', async () => {
+        const { useListKeyNavigation } = await import('../composables/useListKeyNavigation')
+        const { useTaskPanelController } = await import('../composables/useTaskPanelController')
+        const Host = defineComponent({
+            setup() {
+                useListKeyNavigation('[data-row]')
+                return () =>
+                    h('div', [
+                        h('input', { id: 'typing' }),
+                        ...['one', 'two', 'three'].map((id) => h('div', { 'data-row': '', tabindex: -1, id })),
+                    ])
+            },
+        })
+        const wrapper = mount(Host, { attachTo: document.body })
+        // jsdom has no layout; make the rows count as visible.
+        for (const row of document.querySelectorAll<HTMLElement>('[data-row]')) {
+            row.getClientRects = () => [{}] as unknown as DOMRectList
+        }
+        const focused = () => document.activeElement?.id
+        press('j')
+        expect(focused()).toBe('one')
+        press('j')
+        press('j')
+        press('j')
+        expect(focused()).toBe('three')
+        press('k')
+        expect(focused()).toBe('two')
+
+        const input = document.getElementById('typing') as HTMLInputElement
+        input.focus()
+        press('j', {}, input)
+        expect(focused()).toBe('typing')
+
+        const panel = useTaskPanelController()
+        panel.openTaskPanel({ taskId: 'A-1' })
+        document.body.focus()
+        press('j')
+        expect(focused()).not.toBe('one')
+        panel.closeTaskPanel()
+        wrapper.unmount()
+    })
+})
+
+describe('CommandPalette groups', () => {
+    it('lists this task first and shows recent tasks only while the search is empty', async () => {
+        const run = vi.fn()
+        const wrapper = mount(CommandPalette, {
+            props: {
+                open: true,
+                commands: [
+                    { id: 'go-tasks', group: 'Go to', label: 'Tasks', run },
+                    {
+                        id: 'recent-A-2',
+                        group: 'Recent tasks',
+                        label: 'Fix login',
+                        detail: 'A-2',
+                        emptyOnly: true,
+                        run,
+                    },
+                    { id: 'task-status-Done', group: 'This task', label: 'Set status to Done', run },
+                    { id: 'filter-overdue', group: 'Filters', label: 'Show overdue tasks', run },
+                ],
+            },
+            attachTo: document.body,
+        })
+        await flushPromises()
+        const groups = () => [...document.querySelectorAll('.palette__group')].map((el) => el.textContent?.trim())
+        expect(groups()).toEqual(['This task', 'Recent tasks', 'Go to', 'Filters'])
+        const input = document.querySelector<HTMLInputElement>('[data-testid="command-palette-input"]')!
+        input.value = 'fix'
+        input.dispatchEvent(new Event('input'))
+        await flushPromises()
+        expect(document.querySelector('[data-testid="command-palette-option-recent-A-2"]')).toBeNull()
         wrapper.unmount()
     })
 })

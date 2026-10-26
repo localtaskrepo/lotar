@@ -57,12 +57,16 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
-import { commandMatchRank } from '../utils/keyboardShortcuts'
+import { commandMatchRank, PALETTE_GROUPS } from '../utils/keyboardShortcuts'
 import UiModal from './UiModal.vue'
 
 export interface PaletteCommand {
   id: string
-  group: 'Go to' | 'Actions'
+  group: (typeof PALETTE_GROUPS)[number]
+  /** Only listed while the search is empty (recent tasks). */
+  emptyOnly?: boolean
+  /** Shown before the label in a muted monospace style, such as a task ID. */
+  detail?: string
   label: string
   /** Extra words that should find this command. */
   keywords?: string
@@ -97,7 +101,11 @@ let taskRequest = 0
 
 const matchedCommands = computed<PaletteItem[]>(() =>
   props.commands
-    .map((command) => ({ command, rank: commandMatchRank(query.value, command.label, command.keywords) }))
+    .filter((command) => !command.emptyOnly || !query.value.trim())
+    .map((command) => ({
+      command,
+      rank: commandMatchRank(query.value, command.label, `${command.detail ?? ''} ${command.keywords ?? ''}`),
+    }))
     .filter((entry): entry is { command: PaletteCommand; rank: number } => entry.rank !== null)
     .sort((a, b) => a.rank - b.rank)
     .map(({ command }) => ({ ...command })),
@@ -116,7 +124,7 @@ const taskItems = computed<PaletteItem[]>(() =>
 /** Commands first, unless the query looks like a task ID. */
 const items = computed<PaletteItem[]>(() => {
   const looksLikeId = /^[A-Za-z][\w-]*-\d+$|^\d+$/.test(query.value.trim())
-  const commands = ['Go to', 'Actions'].flatMap((group) => matchedCommands.value.filter((item) => item.group === group))
+  const commands = PALETTE_GROUPS.flatMap((group) => matchedCommands.value.filter((item) => item.group === group))
   return looksLikeId ? [...taskItems.value, ...commands] : [...commands, ...taskItems.value]
 })
 

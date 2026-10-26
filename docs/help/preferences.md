@@ -35,7 +35,7 @@ Select **Clear last used filter** to remove the saved search and filters of ever
 
 ## Keyboard
 
-**Single-key shortcuts** (on by default) lets `c`, `/`, `?` and `g` followed by a letter work anywhere outside text fields (see [keyboard shortcuts](serve.md)). Turn it off if single keys get in the way of a screen reader, voice control or your own key bindings; **Ctrl+K** (**⌘K** on a Mac) still opens the command palette. The choice is stored in `localStorage` (`lotar.preferences.shortcuts.singleKey`).
+**Single-key shortcuts** (on by default) lets `c`, `/`, `?`, `j`, `k` and `g` followed by a letter work anywhere outside text fields (see [keyboard shortcuts](serve.md)). Turn it off if single keys get in the way of a screen reader, voice control or your own key bindings; **Ctrl+K** (**⌘K** on a Mac) still opens the command palette. The choice is stored in `localStorage` (`lotar.preferences.shortcuts.singleKey`).
 
 ## Tasks List
 

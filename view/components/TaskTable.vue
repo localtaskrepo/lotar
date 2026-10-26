@@ -173,7 +173,10 @@
                 v-for="t in sorted"
                 :key="t.id"
                 :class="{ 'is-recent': !!touchesMap[t.id] }"
+                data-task-row
+                tabindex="-1"
                 @click="$emit('open', t.id)"
+                @keydown.enter.self.prevent="$emit('open', t.id)"
               >
                 <td v-if="selectable" @click.stop style="text-align: center">
                   <input type="checkbox" :checked="isSelected(t.id)" @change="toggleOne(t.id, $event)" />
@@ -726,6 +729,11 @@ th.active .header-button__sort {
 tbody tr {
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard);
+}
+
+tbody tr:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
 }
 
 tbody tr:hover,

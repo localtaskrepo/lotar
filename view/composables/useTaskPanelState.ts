@@ -605,6 +605,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
 
     return {
         mode,
+        applyPatch,
         projects,
         refreshProjects,
         statuses,

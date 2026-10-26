@@ -417,6 +417,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useId, watch, watchEffect } from 'vue'
 import { listFromCsv } from '../composables/useFilterBuilder'
+import { registerFilterBar } from '../composables/useFilterCommands'
 import { filterStorageKey, readSingleKeyShortcutsPreference } from '../utils/preferences'
 import { storageGetJson, storageRemove, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
@@ -1528,6 +1529,27 @@ watch(
   },
   { deep: false },
 )
+
+// DEV-198: let the command palette apply quick filters on this page.
+let unregisterFilterBar: (() => void) | null = null
+onMounted(() => {
+  unregisterFilterBar = registerFilterBar({
+    apply: (filters) => {
+      applyGrammarFilters(filters, Object.keys(filters))
+      if (filters.q !== undefined) {
+        query.value = filters.q
+        searchDraft.value = filters.q
+      }
+    },
+    clear: () => onClear(true),
+    setProject: (prefix) => {
+      project.value = prefix
+    },
+    projects: () => projects.value,
+    currentProject: () => project.value,
+  })
+})
+onUnmounted(() => unregisterFilterBar?.())
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>

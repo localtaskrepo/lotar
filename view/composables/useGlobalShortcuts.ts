@@ -10,6 +10,8 @@ export interface GlobalShortcutHandlers {
     singleKeyEnabled: () => boolean
     /** Something already owns the keyboard, such as an open dialog or task panel. */
     busy: () => boolean
+    /** The palette cannot open now; it may open over the task panel, unlike single keys. */
+    paletteBlocked: () => boolean
 }
 
 /**
@@ -29,7 +31,7 @@ export function useGlobalShortcuts(handlers: GlobalShortcutHandlers) {
     function onKeydown(event: KeyboardEvent) {
         if (event.defaultPrevented || event.isComposing) return
         if (isPaletteChord(event)) {
-            if (handlers.busy()) return
+            if (handlers.paletteBlocked()) return
             event.preventDefault()
             resetGo()
             handlers.openPalette()

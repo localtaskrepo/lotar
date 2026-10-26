@@ -51,6 +51,14 @@ const sections = computed(() => [
     ],
   },
   {
+    title: 'Tasks list and boards',
+    rows: [
+      { keys: ['j'], label: 'Next task' },
+      { keys: ['k'], label: 'Previous task' },
+      { keys: ['Enter'], label: 'Open the selected task' },
+    ],
+  },
+  {
     title: 'Go to',
     rows: GO_SHORTCUTS.map((entry) => ({ keys: ['g', entry.key], label: entry.label })),
   },

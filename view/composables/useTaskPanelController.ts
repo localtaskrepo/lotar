@@ -1,4 +1,4 @@
-import { hasInjectionContext, inject, reactive, readonly } from 'vue'
+import { hasInjectionContext, inject, reactive, readonly, shallowRef } from 'vue'
 import { routerKey } from 'vue-router'
 import type { TaskDTO } from '../api/types'
 
@@ -83,6 +83,30 @@ function closeTaskPanel() {
     }
 }
 
+/**
+ * Commands the open task panel offers to the command palette (DEV-198). They
+ * run through the panel's own save path, so its form, toasts and refresh
+ * behave as if the change was made in the panel.
+ */
+export interface TaskPanelCommands {
+    taskId: string
+    title: string
+    status: string
+    priority: string
+    statuses: string[]
+    priorities: string[]
+    setStatus: (status: string) => Promise<void>
+    setPriority: (priority: string) => Promise<void>
+    assignToMe: () => Promise<void>
+}
+
+const panelCommands = shallowRef<TaskPanelCommands | null>(null)
+
+/** Registered by the task panel while it shows an existing, editable task. */
+export function setTaskPanelCommands(commands: TaskPanelCommands | null) {
+    panelCommands.value = commands
+}
+
 function notifyCreated(task: TaskDTO) {
     try {
         state.callbacks?.onCreated?.(task)
@@ -131,6 +155,7 @@ export function useTaskPanelController() {
     }
     return {
         state: readonly(state),
+        panelCommands,
         openTaskPanel,
         navigateTask,
         setNavigatedTask: (taskId: string) => {

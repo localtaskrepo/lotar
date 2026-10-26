@@ -221,6 +221,7 @@
                     @click.exact="selectTask(task.id)"
                     @keydown.enter.prevent="openTask(task.id)"
                     tabindex="0"
+                    data-board-card
                   >
                     <header v-if="hasTaskHeader(task)" class="row task-header">
                       <template v-if="hasTaskIdentity(task)">
@@ -437,6 +438,7 @@
                 @click.exact="selectTask(task.id)"
                 @keydown.enter.prevent="openTask(task.id)"
                 tabindex="0"
+                data-board-card
               >
                 <header v-if="hasTaskHeader(task)" class="row task-header">
                   <template v-if="hasTaskIdentity(task)">
@@ -531,8 +533,11 @@ import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
 import { memberColor, memberInitials } from '../utils/member'
 import { statusEnteredAt } from '../utils/taskHistory'
+import { useListKeyNavigation } from '../composables/useListKeyNavigation'
 
 const route = useRoute()
+// DEV-198: j / k move through the cards; Enter opens the focused one.
+useListKeyNavigation('[data-board-card]')
 const { projects, refresh: refreshProjects, loading: loadingProjects } = useProjects()
 const {
   statuses,

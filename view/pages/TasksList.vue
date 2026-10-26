@@ -438,6 +438,7 @@ import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import type { ColKey } from '../composables/useColumns'
+import { useListKeyNavigation } from '../composables/useListKeyNavigation'
 import { colKeyToSortBy, normalizeSortBy, normalizeSortOrder, sortByToColKey } from '../utils/taskSort'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { isDeletedTask, projectOf, titleCase } from '../utils/text'
@@ -633,6 +634,8 @@ function applySortToFilter(sortBy: string, order: 'asc' | 'desc') {
 
 // DEV-167: order the current search by relevance, or go back to the saved sort.
 const hasTextSearch = computed(() => !!(filter.value.q ?? '').trim())
+// DEV-198: j / k move through the task rows; Enter opens the focused one.
+useListKeyNavigation('[data-task-row]')
 const bestMatch = computed(() => normalizeSortBy(filter.value.sort_by) === 'relevance')
 function restoreSavedSort() {
   const saved = readSavedSort(filter.value.project || '')
