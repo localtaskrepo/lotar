@@ -3105,7 +3105,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 2px;
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .meta-value--warning {
@@ -3309,7 +3309,7 @@ onUnmounted(() => {
 
 .badge--info {
   background: color-mix(in oklab, var(--color-accent) 18%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .badge--danger {

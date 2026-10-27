@@ -10,6 +10,8 @@ export interface BrandingState {
     theme: string | null
     themeSource: 'home' | 'repository' | null
     repositoryTheme: string | null
+    /** Path of a usable repository skin (`ui.theme_file`). */
+    themeFile: string | null
     name: string | null
     logo: string | null
     logoDark: string | null
@@ -24,6 +26,7 @@ const state = reactive<BrandingState>({
     theme: null,
     themeSource: null,
     repositoryTheme: null,
+    themeFile: null,
     name: null,
     logo: null,
     logoDark: null,
@@ -40,6 +43,9 @@ export function applyBranding(response: BrandingResponse) {
     state.theme = response.theme ?? null
     state.themeSource = response.theme_source ?? null
     state.repositoryTheme = response.repository_theme ?? null
+    const skinChanged = state.loaded && state.themeFile !== (response.theme_file ?? null)
+    state.themeFile = response.theme_file ?? null
+    if (skinChanged) reloadSkinStylesheet()
     state.name = response.name?.trim() || null
     state.logo = response.logo ?? null
     state.logoDark = response.logo_dark ?? null
@@ -64,6 +70,13 @@ function applyIcon(url: string | null) {
         if (url) link.removeAttribute('type')
         else if (type) link.type = type
     }
+}
+
+// index.html links the repository skin once; fetch it again when it changes.
+function reloadSkinStylesheet() {
+    if (typeof document === 'undefined') return
+    const link = document.querySelector<HTMLLinkElement>('link[href^="/api/branding/theme.css"]')
+    if (link) link.href = `/api/branding/theme.css?v=${Date.now()}`
 }
 
 export async function refreshBranding(): Promise<void> {

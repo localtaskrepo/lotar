@@ -1,26 +1,43 @@
 /*
- * Themes (DEV-218, DEV-219). Each theme defines a light set on
- * [data-theme-name="<id>"] and a dark set on
- * [data-theme-name="<id>"][data-mode="dark"]. The app sets both attributes
- * on <html>; theme previews set them on their own element, so the rules are
- * plain attribute selectors that work on any element.
+ * Themes (DEV-218 – DEV-220). A theme is a skin (fonts, corners, page and
+ * card treatment, effects) plus a colour palette. The app sets
+ * data-theme-name="<skin>", data-theme-palette="<palette>" (always, default
+ * included) and data-mode="light|dark" on <html>; theme previews set them on
+ * their own element, so the rules are plain attribute selectors.
  *
- * Both blocks define the full colour and shadow token set so nothing leaks
- * in from another theme or mode. Character tokens (fonts, heading style,
- * radii, page/header/card backgrounds, bevels, glows; defaults in the
- * `:root, [data-theme-name]` block of styles.css) are optional: the light
- * block's selector also matches in dark mode, so set them there once and
- * override in the dark block only what differs. Derived tokens (focus rings,
- * chart slots 1-3, semantic and legacy aliases) are recomputed per themed
- * element in styles.css. Theme ids must match THEMES in view/utils/themes.ts
- * and UI_THEMES in src/services/branding_service.rs; `npm run check:themes`
- * verifies completeness and contrast, including every colour stop of
- * patterned backgrounds.
+ *   [data-theme-name='<skin>']                     character + default palette, light
+ *   [data-theme-name='<skin>'][data-mode='dark']   its dark version
+ *   [data-theme-name='<skin>'][data-theme-palette='<p>']                   palette p, light
+ *   [data-theme-name='<skin>'][data-theme-palette='<p>'][data-mode='dark'] palette p, dark
+ *
+ * The skin blocks define the full colour and shadow token set so nothing
+ * leaks in from another theme or mode. Character tokens (fonts, heading
+ * style, radii, page/header/card backgrounds, bevels, glows; defaults in the
+ * `:where(:root, [data-theme-name])` block of styles.css) are optional: the
+ * light block's selector also matches in dark mode, so set them there once
+ * and override in the dark block only what differs. Character tokens are
+ * written in terms of the colour tokens wherever possible, so a palette
+ * block usually only recolours.
+ *
+ * Palette blocks override the skin's blocks. A palette's light block has the
+ * same specificity as the skin's dark block and comes after it, so it also
+ * applies in dark mode: every colour it sets (and anything the skin's dark
+ * block sets) must be set again in the palette's dark block. The default
+ * palette has no blocks of its own.
+ *
+ * Derived tokens (focus rings, chart slots 1-3, semantic and legacy aliases)
+ * are recomputed per themed element in styles.css. Skins and palettes must
+ * match THEMES in view/utils/themes.ts and UI_THEMES in
+ * src/services/branding_service.rs; `npm run check:themes` verifies
+ * completeness and contrast for every skin × palette × mode, including every
+ * colour stop of patterned backgrounds and the header text tokens.
  */
 
-/* LoTaR (default): sky blue on cool slate. Identical to the fallback palette
-   in styles.css (the theme spec checks this); do not change. */
-[data-theme-name='lotar'] {
+/* Classic: the everyday LoTaR look; its palettes recolour it and add a light
+   touch of character. The default palette (lotar: sky blue on cool slate)
+   is identical to the fallback palette in styles.css (the theme spec checks
+   this); do not change. */
+[data-theme-name='classic'] {
     color-scheme: light;
     --color-bg: #ffffff;
     --color-surface: #f8fafc;
@@ -47,7 +64,7 @@
     --shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.15);
 }
 
-[data-theme-name='lotar'][data-mode='dark'] {
+[data-theme-name='classic'][data-mode='dark'] {
     color-scheme: dark;
     --color-bg: #111315;
     --color-surface: #1b1d1f;
@@ -74,8 +91,8 @@
     --shadow-lg: 0 20px 42px rgba(5, 6, 7, 0.6);
 }
 
-/* Ocean: calm blue-grey, soft contrast. */
-[data-theme-name='ocean'] {
+/* Classic · Ocean: calm blue-grey, soft contrast. */
+[data-theme-name='classic'][data-theme-palette='ocean'] {
     color-scheme: light;
     --color-bg: #f4f7fa;
     --color-surface: #eaeff4;
@@ -115,7 +132,7 @@
     --topbar-accent: var(--color-accent-strong);
 }
 
-[data-theme-name='ocean'][data-mode='dark'] {
+[data-theme-name='classic'][data-theme-palette='ocean'][data-mode='dark'] {
     color-scheme: dark;
     --color-bg: #1c232c;
     --color-surface: #232c37;
@@ -142,8 +159,8 @@
     --shadow-lg: 0 20px 42px rgba(5, 6, 7, 0.6);
 }
 
-/* Forest: greens on warm neutrals. */
-[data-theme-name='forest'] {
+/* Classic · Forest: greens on warm neutrals. */
+[data-theme-name='classic'][data-theme-palette='forest'] {
     color-scheme: light;
     --color-bg: #fbfaf6;
     --color-surface: #f3f1ea;
@@ -185,7 +202,7 @@
     --topbar-accent: var(--color-accent-strong);
 }
 
-[data-theme-name='forest'][data-mode='dark'] {
+[data-theme-name='classic'][data-theme-palette='forest'][data-mode='dark'] {
     color-scheme: dark;
     --color-bg: #161a16;
     --color-surface: #1e231e;
@@ -212,8 +229,8 @@
     --shadow-lg: 0 20px 42px rgba(5, 6, 7, 0.6);
 }
 
-/* Ember: warm amber and terracotta. */
-[data-theme-name='ember'] {
+/* Classic · Ember: warm amber and terracotta. */
+[data-theme-name='classic'][data-theme-palette='ember'] {
     color-scheme: light;
     --color-bg: #fdf9f5;
     --color-surface: #f7efe6;
@@ -258,7 +275,7 @@
     --topbar-accent: var(--color-accent-strong);
 }
 
-[data-theme-name='ember'][data-mode='dark'] {
+[data-theme-name='classic'][data-theme-palette='ember'][data-mode='dark'] {
     color-scheme: dark;
     --color-bg: #1a1512;
     --color-surface: #241d18;
@@ -285,8 +302,8 @@
     --shadow-lg: 0 20px 42px rgba(5, 6, 7, 0.6);
 }
 
-/* Violet: purple accents on cool greys. */
-[data-theme-name='violet'] {
+/* Classic · Violet: purple accents on cool greys. */
+[data-theme-name='classic'][data-theme-palette='violet'] {
     color-scheme: light;
     --color-bg: #fbfbfd;
     --color-surface: #f4f4f8;
@@ -325,7 +342,7 @@
     --topbar-accent: var(--color-accent-strong);
 }
 
-[data-theme-name='violet'][data-mode='dark'] {
+[data-theme-name='classic'][data-theme-palette='violet'][data-mode='dark'] {
     color-scheme: dark;
     --color-bg: #15141c;
     --color-surface: #1d1c27;
@@ -352,8 +369,8 @@
     --shadow-lg: 0 20px 42px rgba(5, 6, 7, 0.6);
 }
 
-/* Rose: rose pink on soft blush neutrals. */
-[data-theme-name='rose'] {
+/* Classic · Rose: rose pink on soft blush neutrals. */
+[data-theme-name='classic'][data-theme-palette='rose'] {
     color-scheme: light;
     --color-bg: #fffafb;
     --color-surface: #fbf1f3;
@@ -391,7 +408,7 @@
     --topbar-accent: var(--color-accent-strong);
 }
 
-[data-theme-name='rose'][data-mode='dark'] {
+[data-theme-name='classic'][data-theme-palette='rose'][data-mode='dark'] {
     color-scheme: dark;
     --color-bg: #1b1417;
     --color-surface: #251b20;
@@ -487,27 +504,29 @@
    card treatment, control bevels and glows. Character tokens set in the
    light block also apply in dark mode; the dark block overrides only what
    differs. Patterns stay low-amplitude around --color-bg so text on the
-   page stays readable (the checker tests fg against every colour stop). */
+   page stays readable (the checker tests fg against every colour stop).
+   Each skin's palettes follow its dark block. */
 
 /* Terminal: a console. Monospace everywhere, square corners, hard-edged
-   shadows. Light is line-printer greenbar paper with dark ink; dark is amber
-   phosphor on black with faint scanlines and a soft glow. */
+   shadows. Light is line-printer listing paper whose bands and ink follow
+   the palette (green = classic greenbar); dark is phosphor on black with
+   faint scanlines and a soft glow. Default palette: amber. */
 [data-theme-name='terminal'] {
     color-scheme: light;
-    --color-bg: #f6f9f2;
-    --color-surface: #e5f0de;
-    --color-surface-contrast: #fcfdfa;
-    --color-border: #c3d7ba;
-    --color-border-strong: #86a97b;
-    --color-fg: #0f1a10;
-    --color-muted: #3b523e;
-    --color-accent: #1f6a37;
-    --color-accent-strong: #17552b;
+    --color-bg: #fbf8f0;
+    --color-surface: #f6e9cc;
+    --color-surface-contrast: #fffdf8;
+    --color-border: #e3d3ad;
+    --color-border-strong: #b8995a;
+    --color-fg: #1c1406;
+    --color-muted: #5a4521;
+    --color-accent: #8a4b00;
+    --color-accent-strong: #703c00;
     --color-accent-contrast: #ffffff;
     --color-danger: #b42318;
     --color-danger-contrast: #ffffff;
     --color-success: #2b7a2f;
-    --color-warning: #9a5b00;
+    --color-warning: #8a6a00;
     --color-chart-4: #9a3d84;
     --color-chart-5: #5a4fb0;
     --color-chart-6: #1d7c74;
@@ -531,7 +550,7 @@
     --radius-lg: 0;
     --radius-xl: 0;
     --radius-pill: 0;
-    /* Greenbar paper: alternating bands three lines tall. */
+    /* Listing paper: alternating bands three lines tall. */
     --page-background: repeating-linear-gradient(180deg, var(--color-bg) 0 3rem, var(--color-surface) 3rem 6rem);
     --topbar-background: var(--color-surface-contrast);
     --topbar-border: var(--color-border-strong);
@@ -581,6 +600,124 @@
     --card-shadow:
         0 0 0 1px color-mix(in oklab, var(--color-accent) 6%, transparent),
         0 0 16px color-mix(in oklab, var(--color-accent) 7%, transparent);
+}
+
+/* Terminal · green: Green phosphor; classic greenbar paper by day. */
+[data-theme-name='terminal'][data-theme-palette='green'] {
+    --color-bg: #f6f9f2;
+    --color-surface: #e5f0de;
+    --color-surface-contrast: #fcfdfa;
+    --color-border: #c3d7ba;
+    --color-border-strong: #86a97b;
+    --color-fg: #0f1a10;
+    --color-muted: #3b523e;
+    --color-accent: #1f6a37;
+    --color-accent-strong: #17552b;
+    --color-accent-contrast: #ffffff;
+    --color-success: #2b7a2f;
+}
+
+[data-theme-name='terminal'][data-theme-palette='green'][data-mode='dark'] {
+    --color-bg: #050d06;
+    --color-surface: #0a170c;
+    --color-surface-contrast: #08120a;
+    --color-border: #173a1c;
+    --color-border-strong: #2a6a33;
+    --color-fg: #a6ffb4;
+    --color-muted: #5cc874;
+    --color-accent: #33ff66;
+    --color-accent-strong: #7dff9c;
+    --color-accent-contrast: #021a07;
+    --color-success: #c3f56a;
+}
+
+/* Terminal · red: Red phosphor; pink listing paper by day. Danger shifts to raspberry. */
+[data-theme-name='terminal'][data-theme-palette='red'] {
+    --color-bg: #fcf6f5;
+    --color-surface: #f8e3e0;
+    --color-surface-contrast: #fffdfc;
+    --color-border: #ebcdc8;
+    --color-border-strong: #c98f86;
+    --color-fg: #1f0d0b;
+    --color-muted: #5e3530;
+    --color-accent: #a3261c;
+    --color-accent-strong: #861c14;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #a8125e;
+    --color-success: #2b7a2f;
+}
+
+[data-theme-name='terminal'][data-theme-palette='red'][data-mode='dark'] {
+    --color-bg: #0f0505;
+    --color-surface: #1a0909;
+    --color-surface-contrast: #140707;
+    --color-border: #401818;
+    --color-border-strong: #6e2a2a;
+    --color-fg: #ffbcb2;
+    --color-muted: #e28377;
+    --color-accent: #ff4d4d;
+    --color-accent-strong: #ff7a70;
+    --color-accent-contrast: #1a0202;
+    --color-danger: #ff6ad0;
+    --color-success: #8fdc5a;
+}
+
+/* Terminal · cyan: Cyan phosphor; blue-bar listing paper by day. */
+[data-theme-name='terminal'][data-theme-palette='cyan'] {
+    --color-bg: #f4f9fb;
+    --color-surface: #dff0f5;
+    --color-surface-contrast: #fcfeff;
+    --color-border: #bfdbe4;
+    --color-border-strong: #7fb0c0;
+    --color-fg: #0a1a20;
+    --color-muted: #33525c;
+    --color-accent: #0b6a80;
+    --color-accent-strong: #08566a;
+    --color-accent-contrast: #ffffff;
+    --color-success: #2b7a2f;
+}
+
+[data-theme-name='terminal'][data-theme-palette='cyan'][data-mode='dark'] {
+    --color-bg: #030d10;
+    --color-surface: #071a1f;
+    --color-surface-contrast: #05141a;
+    --color-border: #12404a;
+    --color-border-strong: #1f6a78;
+    --color-fg: #a8f4ff;
+    --color-muted: #56c3d3;
+    --color-accent: #3ee6ff;
+    --color-accent-strong: #7ff0ff;
+    --color-accent-contrast: #021a20;
+    --color-success: #8fdc5a;
+}
+
+/* Terminal · white: White phosphor; plain grey-bar paper by day. */
+[data-theme-name='terminal'][data-theme-palette='white'] {
+    --color-bg: #fafafa;
+    --color-surface: #ececec;
+    --color-surface-contrast: #ffffff;
+    --color-border: #d4d4d4;
+    --color-border-strong: #9a9a9a;
+    --color-fg: #111111;
+    --color-muted: #4a4a4a;
+    --color-accent: #333333;
+    --color-accent-strong: #1a1a1a;
+    --color-accent-contrast: #ffffff;
+    --color-success: #2b7a2f;
+}
+
+[data-theme-name='terminal'][data-theme-palette='white'][data-mode='dark'] {
+    --color-bg: #0b0b0b;
+    --color-surface: #161616;
+    --color-surface-contrast: #111111;
+    --color-border: #2e2e2e;
+    --color-border-strong: #555555;
+    --color-fg: #e8e8e8;
+    --color-muted: #a8a8a8;
+    --color-accent: #e8e8e8;
+    --color-accent-strong: #ffffff;
+    --color-accent-contrast: #0b0b0b;
+    --color-success: #7ee07e;
 }
 
 /* Matrix: green code on black. Monospace, wide-tracked uppercase headings,
@@ -730,9 +867,77 @@
         0 0 18px color-mix(in oklab, var(--color-accent) 8%, transparent);
 }
 
+/* Matrix · red: Red pill: scarlet glow; danger shifts to magenta. */
+[data-theme-name='matrix'][data-theme-palette='red'] {
+    --color-bg: #fdf3f3;
+    --color-surface: #f8e2e2;
+    --color-surface-contrast: #fffafa;
+    --color-border: #efc4c4;
+    --color-border-strong: #d27a7a;
+    --color-fg: #2a0606;
+    --color-muted: #6a2c2c;
+    --color-accent: #b3121b;
+    --color-accent-strong: #930e15;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #a0127a;
+    --color-danger-contrast: #ffffff;
+    --color-success: #1b7a3a;
+}
+
+[data-theme-name='matrix'][data-theme-palette='red'][data-mode='dark'] {
+    --color-bg: #0b0202;
+    --color-surface: #170505;
+    --color-surface-contrast: #110303;
+    --color-border: #3d0f0f;
+    --color-border-strong: #6a1b1b;
+    --color-fg: #ffc4c4;
+    --color-muted: #e86a6a;
+    --color-accent: #ff3b3b;
+    --color-accent-strong: #ff6b6b;
+    --color-accent-contrast: #1a0000;
+    --color-danger: #ff5fd0;
+    --color-danger-contrast: #1a0012;
+    --color-success: #4ff28a;
+}
+
+/* Matrix · blue: Blue pill: electric blue glow. */
+[data-theme-name='matrix'][data-theme-palette='blue'] {
+    --color-bg: #f2f7fe;
+    --color-surface: #e1ecfb;
+    --color-surface-contrast: #f9fbff;
+    --color-border: #c3d6f2;
+    --color-border-strong: #79a3dc;
+    --color-fg: #031633;
+    --color-muted: #2c4a72;
+    --color-accent: #0b5ac2;
+    --color-accent-strong: #0848a0;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #c0242c;
+    --color-danger-contrast: #ffffff;
+    --color-success: #0f7f4f;
+}
+
+[data-theme-name='matrix'][data-theme-palette='blue'][data-mode='dark'] {
+    --color-bg: #01050d;
+    --color-surface: #041026;
+    --color-surface-contrast: #030b1c;
+    --color-border: #0f2a55;
+    --color-border-strong: #1b4a8f;
+    --color-fg: #c4e2ff;
+    --color-muted: #64a3ea;
+    --color-accent: #3b9dff;
+    --color-accent-strong: #7dbdff;
+    --color-accent-contrast: #00101f;
+    --color-danger: #ff4f5e;
+    --color-danger-contrast: #14000a;
+    --color-success: #4ff28a;
+}
+
 /* Synthwave: 80s neon. Bold, tracked uppercase headings in a geometric
-   face, rounded corners, a sunset header and a neon horizon grid. Dark is
-   deep indigo with magenta and cyan glow; light is pastel vaporwave. */
+   face, rounded corners, a sunset header and a neon horizon grid, all drawn
+   from the palette (accent, chart-4 and chart-5 as second neons, chart-8 as
+   the sun). Default palette: sunset — deep indigo with magenta and cyan in
+   dark, pastel vaporwave in light. */
 [data-theme-name='synthwave'] {
     color-scheme: light;
     --color-bg: #fcf5ff;
@@ -782,8 +987,20 @@
                 transparent 1px 24px
             )
             0 100% / 100% 30vh no-repeat fixed,
-        linear-gradient(180deg, #fcf5ff 0%, #f2f3ff 55%, #ffedf7 100%) fixed;
-    --topbar-background: linear-gradient(90deg, #ffe1f2, #efe1ff 50%, #dcf3ff);
+        linear-gradient(
+                180deg,
+                var(--color-bg) 0%,
+                color-mix(in oklab, var(--color-chart-4) 5%, var(--color-bg)) 55%,
+                color-mix(in oklab, var(--color-accent) 6%, var(--color-bg)) 100%
+            )
+            fixed;
+    /* Sunset header: accent → secondary neon → chart-4, mixed into the page. */
+    --topbar-background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--color-accent) 12%, var(--color-bg)),
+        color-mix(in oklab, var(--color-chart-5) 12%, var(--color-bg)) 50%,
+        color-mix(in oklab, var(--color-chart-4) 14%, var(--color-bg))
+    );
     --topbar-border: color-mix(in oklab, var(--color-accent) 55%, var(--color-border));
     --card-background: linear-gradient(
         180deg,
@@ -837,13 +1054,101 @@
                 transparent 1px 24px
             )
             0 100% / 100% 30vh no-repeat fixed,
-        linear-gradient(180deg, var(--color-bg), #22104a) fixed, var(--color-bg);
-    --topbar-background: linear-gradient(90deg, #2b0f55, #4b1460 55%, #5c1846);
-    --topbar-accent: #ffa6dc;
+        linear-gradient(180deg, var(--color-bg), color-mix(in oklab, var(--color-chart-5) 16%, var(--color-bg))) fixed,
+        var(--color-bg);
+    --topbar-background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--color-chart-5) 26%, var(--color-bg)),
+        color-mix(in oklab, var(--color-accent) 26%, var(--color-bg)) 55%,
+        color-mix(in oklab, var(--color-chart-8) 24%, var(--color-bg))
+    );
+    --topbar-accent: color-mix(in oklab, var(--color-accent) 55%, white);
     --card-shadow:
         0 0 0 1px color-mix(in oklab, var(--color-chart-4) 12%, transparent),
         0 10px 28px -12px color-mix(in oklab, var(--color-accent) 55%, transparent);
     --accent-glow: 0 0 14px color-mix(in oklab, var(--color-accent) 45%, transparent);
+}
+
+/* Synthwave · outrun: Outrun: orange sun and magenta on night navy. */
+[data-theme-name='synthwave'][data-theme-palette='outrun'] {
+    --color-bg: #fff8f0;
+    --color-surface: #fdebd9;
+    --color-surface-contrast: #fffcf8;
+    --color-border: #f3d3b5;
+    --color-border-strong: #e0a46e;
+    --color-fg: #2a1408;
+    --color-muted: #6e4a33;
+    --color-accent: #b34700;
+    --color-accent-strong: #823300;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #c41d3a;
+    --color-danger-contrast: #ffffff;
+    --color-success: #1b8657;
+    --color-warning: #8f6400;
+    --color-chart-4: #c0137f;
+    --color-chart-5: #6a3fd0;
+    --color-chart-8: #b07a00;
+}
+
+[data-theme-name='synthwave'][data-theme-palette='outrun'][data-mode='dark'] {
+    --color-bg: #0d0a1f;
+    --color-surface: #171233;
+    --color-surface-contrast: #120e29;
+    --color-border: #2e2558;
+    --color-border-strong: #4c3d8a;
+    --color-fg: #fff1e6;
+    --color-muted: #c9b5e0;
+    --color-accent: #ff8c1a;
+    --color-accent-strong: #ffad5c;
+    --color-accent-contrast: #1a0a00;
+    --color-danger: #ff4d5e;
+    --color-danger-contrast: #1a0505;
+    --color-success: #3cf0a0;
+    --color-warning: #ffe14d;
+    --color-chart-4: #ff3fb4;
+    --color-chart-5: #8f5cff;
+    --color-chart-8: #ffd23f;
+}
+
+/* Synthwave · ice: Ice: cyan and violet neon on midnight blue. */
+[data-theme-name='synthwave'][data-theme-palette='ice'] {
+    --color-bg: #f3fbff;
+    --color-surface: #e2f3fb;
+    --color-surface-contrast: #fbfeff;
+    --color-border: #c4e3f2;
+    --color-border-strong: #7fbfdc;
+    --color-fg: #06223a;
+    --color-muted: #335a78;
+    --color-accent: #0a6f8f;
+    --color-accent-strong: #085a75;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #c62828;
+    --color-danger-contrast: #ffffff;
+    --color-success: #1b8657;
+    --color-warning: #946200;
+    --color-chart-4: #6a3fd0;
+    --color-chart-5: #3550c8;
+    --color-chart-8: #0f8fa8;
+}
+
+[data-theme-name='synthwave'][data-theme-palette='ice'][data-mode='dark'] {
+    --color-bg: #061325;
+    --color-surface: #0b1d36;
+    --color-surface-contrast: #08182e;
+    --color-border: #1a3a63;
+    --color-border-strong: #2f5f96;
+    --color-fg: #eaf8ff;
+    --color-muted: #9cc4e4;
+    --color-accent: #3ee6ff;
+    --color-accent-strong: #8ff0ff;
+    --color-accent-contrast: #021a24;
+    --color-danger: #ff5a6e;
+    --color-danger-contrast: #1a0505;
+    --color-success: #5ef0a8;
+    --color-warning: #ffd23f;
+    --color-chart-4: #c49cff;
+    --color-chart-5: #6f8cff;
+    --color-chart-8: #9ff5ff;
 }
 
 /* Blueprint: a technical drawing. Condensed uppercase headings, near-square
@@ -960,6 +1265,76 @@
     --shadow-lg: 0 20px 42px rgba(4, 14, 30, 0.6);
 }
 
+/* Blueprint · green: Engineering green: green grid paper; dark green drawing board. */
+[data-theme-name='blueprint'][data-theme-palette='green'] {
+    --color-bg: #f7fcf8;
+    --color-surface: #e8f4ec;
+    --color-surface-contrast: #ffffff;
+    --color-border: #c4e0cd;
+    --color-border-strong: #82b896;
+    --color-fg: #0b2a1a;
+    --color-muted: #345c45;
+    --color-accent: #1f7a55;
+    --color-accent-strong: #176244;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #c0262d;
+    --color-danger-contrast: #ffffff;
+    --color-success: #2f7a1f;
+    --color-warning: #9a5a00;
+}
+
+[data-theme-name='blueprint'][data-theme-palette='green'][data-mode='dark'] {
+    --color-bg: #0d3326;
+    --color-surface: #123d2e;
+    --color-surface-contrast: #10382a;
+    --color-border: #2a6650;
+    --color-border-strong: #4a9478;
+    --color-fg: #eefcf4;
+    --color-muted: #aedcc2;
+    --color-accent: #7fffc4;
+    --color-accent-strong: #b0ffdc;
+    --color-accent-contrast: #05261a;
+    --color-danger: #ff8a8a;
+    --color-danger-contrast: #1a0505;
+    --color-success: #c3f56a;
+    --color-warning: #ffd36b;
+}
+
+/* Blueprint · sepia: Sepia: an old drawing on aged paper; brown board with cream lines. */
+[data-theme-name='blueprint'][data-theme-palette='sepia'] {
+    --color-bg: #fbf6ec;
+    --color-surface: #f2e8d4;
+    --color-surface-contrast: #fffcf5;
+    --color-border: #e2d2b2;
+    --color-border-strong: #c0a372;
+    --color-fg: #2e1d0c;
+    --color-muted: #654a2c;
+    --color-accent: #8a5a2b;
+    --color-accent-strong: #6f4620;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #b0281e;
+    --color-danger-contrast: #ffffff;
+    --color-success: #3d7a34;
+    --color-warning: #97600a;
+}
+
+[data-theme-name='blueprint'][data-theme-palette='sepia'][data-mode='dark'] {
+    --color-bg: #2a1d10;
+    --color-surface: #332415;
+    --color-surface-contrast: #2e2012;
+    --color-border: #574029;
+    --color-border-strong: #806040;
+    --color-fg: #f6ead6;
+    --color-muted: #d0b894;
+    --color-accent: #f0c890;
+    --color-accent-strong: #f8dcb0;
+    --color-accent-contrast: #2a1a08;
+    --color-danger: #ff8a7a;
+    --color-danger-contrast: #1a0505;
+    --color-success: #a8d890;
+    --color-warning: #ffd36b;
+}
+
 /* Paper: a notebook. Serif type throughout, faint ruled lines on warm
    paper, soft paper shadows and fountain-pen blue ink. Dark is night ink:
    brown-black paper with cream text. */
@@ -1043,9 +1418,51 @@
     --field-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
+/* Paper · black: Black ink. */
+[data-theme-name='paper'][data-theme-palette='black'] {
+    --color-accent: #2b2b2b;
+    --color-accent-strong: #000000;
+    --color-accent-contrast: #ffffff;
+}
+
+[data-theme-name='paper'][data-theme-palette='black'][data-mode='dark'] {
+    --color-accent: #e8e2d6;
+    --color-accent-strong: #ffffff;
+    --color-accent-contrast: #12100c;
+}
+
+/* Paper · red: Red ink (burgundy); danger shifts to orange-red. */
+[data-theme-name='paper'][data-theme-palette='red'] {
+    --color-accent: #9e2a3a;
+    --color-accent-strong: #7f1f2d;
+    --color-accent-contrast: #ffffff;
+    --color-danger: #c2410c;
+}
+
+[data-theme-name='paper'][data-theme-palette='red'][data-mode='dark'] {
+    --color-accent: #f093a8;
+    --color-accent-strong: #f5b3c2;
+    --color-accent-contrast: #12100c;
+    --color-danger: #ff8a5c;
+}
+
+/* Paper · green: Green ink. */
+[data-theme-name='paper'][data-theme-palette='green'] {
+    --color-accent: #2f6b3f;
+    --color-accent-strong: #24552f;
+    --color-accent-contrast: #ffffff;
+}
+
+[data-theme-name='paper'][data-theme-palette='green'][data-mode='dark'] {
+    --color-accent: #9fd8a8;
+    --color-accent-strong: #bfe8c4;
+    --color-accent-contrast: #12100c;
+}
+
 /* Retro: a 90s desktop. Tahoma/Verdana, square corners, grey window chrome
    with bevelled buttons, sunken fields and raised cards on a dithered teal
-   desktop, under a navy title-bar header with light text. */
+   desktop, under a navy title-bar header with light text. The palettes are
+   Win95-style desktop schemes: desktop, title bar and accent. */
 [data-theme-name='retro'] {
     color-scheme: light;
     --color-bg: #c0c0c0;
@@ -1082,10 +1499,17 @@
     --radius-lg: 0;
     --radius-xl: 0;
     --radius-pill: 0;
-    /* Dithered teal desktop. */
-    --page-background: repeating-conic-gradient(#5cb6b4 0 25%, #57b0ae 0 50%) 0 0 / 4px 4px, #5cb6b4;
+    /* Desktop and title-bar colours; the palettes change these. */
+    --retro-desktop: #5cb6b4;
+    --retro-desktop-dither: #57b0ae;
+    --retro-title-start: #000080;
+    --retro-title-end: #0d4a94;
+    /* Dithered desktop. */
+    --page-background:
+        repeating-conic-gradient(var(--retro-desktop) 0 25%, var(--retro-desktop-dither) 0 50%) 0 0 / 4px 4px,
+        var(--retro-desktop);
     /* Navy title bar with light text, like an active window. */
-    --topbar-background: linear-gradient(90deg, #000080, #0d4a94);
+    --topbar-background: linear-gradient(90deg, var(--retro-title-start), var(--retro-title-end));
     --topbar-border: #000040;
     --topbar-fg: #ffffff;
     --topbar-muted: #d8e4f4;
@@ -1126,8 +1550,10 @@
     --shadow-sm: 1px 1px 0 rgba(0, 0, 0, 0.6);
     --shadow-md: 2px 2px 0 rgba(0, 0, 0, 0.65);
     --shadow-lg: 4px 4px 0 rgba(0, 0, 0, 0.7);
-    --page-background: repeating-conic-gradient(#0f4848 0 25%, #0d4343 0 50%) 0 0 / 4px 4px, #0f4848;
-    --topbar-background: linear-gradient(90deg, #0a246a, #1c3f86);
+    --retro-desktop: #0f4848;
+    --retro-desktop-dither: #0d4343;
+    --retro-title-start: #0a246a;
+    --retro-title-end: #1c3f86;
     --topbar-border: #000000;
     --card-shadow: inset -1px -1px #000000, inset 1px 1px #505050, inset -2px -2px #1c1c1c, inset 2px 2px #6e6e6e;
     --control-shadow: inset -1px -1px #000000, inset 1px 1px #6e6e6e, inset -2px -2px #1c1c1c, inset 2px 2px #505050;
@@ -1135,6 +1561,63 @@
         inset -1px -1px #6e6e6e, inset 1px 1px #000000, inset -2px -2px #505050, inset 2px 2px #1c1c1c;
     --field-background: #1e1e1e;
     --field-shadow: inset -1px -1px #6e6e6e, inset 1px 1px #1c1c1c, inset -2px -2px #505050, inset 2px 2px #000000;
+}
+
+/* Retro · plum: Plum desktop and title bar. */
+[data-theme-name='retro'][data-theme-palette='plum'] {
+    --color-accent: #6b1a66;
+    --color-accent-strong: #4b1248;
+    --retro-desktop: #cbb0c6;
+    --retro-desktop-dither: #ad87a7;
+    --retro-title-start: #4b1248;
+    --retro-title-end: #7a2a74;
+}
+
+[data-theme-name='retro'][data-theme-palette='plum'][data-mode='dark'] {
+    --color-accent: #e3a6dd;
+    --color-accent-strong: #f0c6ec;
+    --retro-desktop: #3a1f38;
+    --retro-desktop-dither: #351b33;
+    --retro-title-start: #4b1248;
+    --retro-title-end: #7a2a74;
+}
+
+/* Retro · slate: Slate desktop and title bar. */
+[data-theme-name='retro'][data-theme-palette='slate'] {
+    --color-accent: #2f4a66;
+    --color-accent-strong: #22364c;
+    --retro-desktop: #8fa5b9;
+    --retro-desktop-dither: #889fb3;
+    --retro-title-start: #22364c;
+    --retro-title-end: #36506a;
+}
+
+[data-theme-name='retro'][data-theme-palette='slate'][data-mode='dark'] {
+    --color-accent: #a8c4e0;
+    --color-accent-strong: #c8dcef;
+    --retro-desktop: #26323e;
+    --retro-desktop-dither: #222d38;
+    --retro-title-start: #22364c;
+    --retro-title-end: #36506a;
+}
+
+/* Retro · desert: Desert desktop and a brown title bar. */
+[data-theme-name='retro'][data-theme-palette='desert'] {
+    --color-accent: #7a4f1f;
+    --color-accent-strong: #5a3a1a;
+    --retro-desktop: #c9ad86;
+    --retro-desktop-dither: #c2a67e;
+    --retro-title-start: #5a3a1a;
+    --retro-title-end: #64431e;
+}
+
+[data-theme-name='retro'][data-theme-palette='desert'][data-mode='dark'] {
+    --color-accent: #e8c48a;
+    --color-accent-strong: #f4dab0;
+    --retro-desktop: #43341f;
+    --retro-desktop-dither: #3d2f1c;
+    --retro-title-start: #5a3a1a;
+    --retro-title-end: #64431e;
 }
 
 /* Candy: playful and squishy. A rounded font, very round corners, polka
@@ -1223,4 +1706,74 @@
     --shadow-sm: 0 4px 10px rgba(10, 2, 12, 0.5);
     --shadow-md: 0 6px 18px rgba(10, 2, 12, 0.55);
     --shadow-lg: 0 20px 42px rgba(10, 2, 12, 0.6);
+}
+
+/* Candy · mint: Mint: fresh greens with pink sprinkles. */
+[data-theme-name='candy'][data-theme-palette='mint'] {
+    --color-bg: #f2fcf8;
+    --color-surface: #dcf5ec;
+    --color-surface-contrast: #ffffff;
+    --color-border: #bfe8d9;
+    --color-border-strong: #82cdb2;
+    --color-fg: #0d2e24;
+    --color-muted: #3c6b5c;
+    --color-accent: #11785c;
+    --color-accent-strong: #0c5f49;
+    --color-accent-contrast: #ffffff;
+    --color-success: #2f8a2f;
+    --color-warning: #9a6200;
+    --color-chart-4: #c92a75;
+    --color-chart-5: #7c5cd6;
+}
+
+[data-theme-name='candy'][data-theme-palette='mint'][data-mode='dark'] {
+    --color-bg: #0c1f1a;
+    --color-surface: #143029;
+    --color-surface-contrast: #112923;
+    --color-border: #24493f;
+    --color-border-strong: #3a7062;
+    --color-fg: #e8fff6;
+    --color-muted: #a6d8c6;
+    --color-accent: #5ff0c0;
+    --color-accent-strong: #9af5d8;
+    --color-accent-contrast: #062018;
+    --color-success: #b8f06a;
+    --color-warning: #ffd166;
+    --color-chart-4: #ff7ac6;
+    --color-chart-5: #b69cff;
+}
+
+/* Candy · grape: Grape: purple soda with blue fizz. */
+[data-theme-name='candy'][data-theme-palette='grape'] {
+    --color-bg: #f8f4ff;
+    --color-surface: #ece3fd;
+    --color-surface-contrast: #ffffff;
+    --color-border: #dccdf8;
+    --color-border-strong: #b9a0ee;
+    --color-fg: #22123f;
+    --color-muted: #5e4a85;
+    --color-accent: #7a3fd1;
+    --color-accent-strong: #6230b0;
+    --color-accent-contrast: #ffffff;
+    --color-success: #1f8a5b;
+    --color-warning: #a06400;
+    --color-chart-4: #c92a75;
+    --color-chart-5: #1e88c8;
+}
+
+[data-theme-name='candy'][data-theme-palette='grape'][data-mode='dark'] {
+    --color-bg: #170f2a;
+    --color-surface: #22173d;
+    --color-surface-contrast: #1d1335;
+    --color-border: #3b2a66;
+    --color-border-strong: #5a4590;
+    --color-fg: #f3edff;
+    --color-muted: #c3b3ea;
+    --color-accent: #b98cff;
+    --color-accent-strong: #d0b2ff;
+    --color-accent-contrast: #1a0a33;
+    --color-success: #6ef0b0;
+    --color-warning: #ffd166;
+    --color-chart-4: #ff7ac6;
+    --color-chart-5: #6fd0ff;
 }

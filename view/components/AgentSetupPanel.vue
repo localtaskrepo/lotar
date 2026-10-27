@@ -199,7 +199,7 @@ async function submit() {
 .agent-setup__more summary {
   cursor: pointer;
   font-size: 13px;
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .agent-setup__more[open] {

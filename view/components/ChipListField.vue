@@ -332,7 +332,7 @@ const filteredSuggestions = computed(() => {
 
 .chip-field__add:hover:not(:disabled) {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .chip-field__add:disabled {

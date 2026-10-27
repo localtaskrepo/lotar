@@ -1,6 +1,6 @@
 import { storageGet, storageRemove, storageSet } from './storage'
 import { darken, getContrastingColor, normalizeHex, withAlpha } from './color'
-import { DEFAULT_THEME, isThemeId, type ThemeId } from './themes'
+import { DEFAULT_THEME, effectivePalette, formatThemeValue, parseThemeValue } from './themes'
 
 /** Light/dark mode choice (kept under its historic name and storage key). */
 export type ThemePreference = 'system' | 'light' | 'dark'
@@ -46,46 +46,53 @@ function applyMode() {
     updateChromeThemeColor()
 }
 
-let repositoryTheme: ThemeId | null = readCachedRepositoryTheme()
-
-function readCachedRepositoryTheme(): ThemeId | null {
-    const cached = storageGet(REPOSITORY_THEME_KEY)
-    return isThemeId(cached) ? cached : null
+// Theme values are `skin` or `skin:palette` (see utils/themes.ts); stored
+// values are normalised, so legacy ids keep working.
+function normalise(value: unknown): string | null {
+    const choice = parseThemeValue(value, true)
+    return choice ? formatThemeValue(choice) : null
 }
 
-/** The user's own theme choice, or null to follow the repository default. */
-export function readThemeNamePreference(): ThemeId | null {
-    const stored = storageGet(THEME_NAME_KEY)
-    return isThemeId(stored) ? stored : null
+let repositoryTheme: string | null = normalise(storageGet(REPOSITORY_THEME_KEY))
+
+/** The user's own theme choice, or null to follow the configured default. */
+export function readThemeNamePreference(): string | null {
+    return normalise(storageGet(THEME_NAME_KEY))
 }
 
-export function storeThemeNamePreference(theme: ThemeId | null) {
-    if (theme) storageSet(THEME_NAME_KEY, theme)
+export function storeThemeNamePreference(theme: string | null) {
+    const value = normalise(theme)
+    if (value) storageSet(THEME_NAME_KEY, value)
     else storageRemove(THEME_NAME_KEY)
 }
 
-/** The repository's default theme (`ui.theme`), as last reported by the server. */
-export function getRepositoryTheme(): ThemeId {
+/** The configured default (`ui.theme`), as last reported by the server. */
+export function getRepositoryTheme(): string {
     return repositoryTheme ?? DEFAULT_THEME
 }
 
-/** Record the repository default and re-apply when the user follows it. */
+/** Record the configured default and re-apply when the user follows it. */
 export function setRepositoryTheme(theme: string | null | undefined) {
-    repositoryTheme = isThemeId(theme) ? theme : null
+    repositoryTheme = normalise(theme)
     if (repositoryTheme) storageSet(REPOSITORY_THEME_KEY, repositoryTheme)
     else storageRemove(REPOSITORY_THEME_KEY)
     applyThemeName(readThemeNamePreference())
 }
 
-/** Theme in effect: the user's choice, else the repository default. */
-export function effectiveThemeName(choice: ThemeId | null = readThemeNamePreference()): ThemeId {
+/** Theme in effect: the user's choice, else the configured default. */
+export function effectiveThemeName(choice: string | null = readThemeNamePreference()): string {
     return choice ?? getRepositoryTheme()
 }
 
-/** Apply a theme choice (null = repository default) to <html>. */
-export function applyThemeName(choice: ThemeId | null) {
+/** Apply a theme choice (null = configured default) to <html>. */
+export function applyThemeName(choice: string | null) {
     if (typeof document === 'undefined') return
-    document.documentElement.dataset.themeName = effectiveThemeName(choice)
+    const parsed = parseThemeValue(effectiveThemeName(choice), true) ?? { theme: DEFAULT_THEME, palette: null }
+    const root = document.documentElement
+    root.dataset.themeName = parsed.theme
+    const palette = effectivePalette(parsed)
+    if (palette) root.dataset.themePalette = palette
+    else delete root.dataset.themePalette
     updateChromeThemeColor()
 }
 

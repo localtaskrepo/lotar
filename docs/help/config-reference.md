@@ -70,7 +70,8 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - sprints.defaults.capacity_points / capacity_hours: optional nonnegative numbers
 - sprints.notifications.enabled: boolean (default true; project-overridable)
 - web_ui_path: optional global-only path (top-level spelling), for an external web bundle
-- ui.theme: optional global-only default web UI theme (`lotar`, `ocean`, `forest`, `ember`, `violet`, `rose`, `contrast`, `terminal`, `matrix`, `synthwave`, `blueprint`, `paper`, `retro`, `candy`). Set it in the repository's config for everyone, or in your own `~/.lotar` (which wins) for yourself; people can still pick a theme per browser in Preferences
+- ui.theme: optional global-only default web UI theme, written `skin` or `skin:palette`. Skins and palettes (first = default): `classic` (lotar, ocean, forest, ember, violet, rose), `contrast`, `terminal` (amber, green, red, cyan, white), `matrix` (green, red, blue), `synthwave` (sunset, outrun, ice), `blueprint` (blue, green, sepia), `paper` (blue, black, red, green), `retro` (teal, plum, slate, desert), `candy` (bubblegum, mint, grape), and `custom` for the repository skin below. The ids `lotar`, `ocean`, `forest`, `ember`, `violet` and `rose` from before palettes still work (`classic:<id>`). Set it in the repository's config for everyone, or in your own `~/.lotar` (which wins) for yourself; people can still pick a theme per browser in Preferences
+- ui.theme_file: optional global-only repository skin: a `.css` file (path relative to the repository) that sets theme variables, e.g. `:root { --color-accent: #c0392b; --font-heading: Georgia, serif; }` with dark-mode values under any selector or `@media (prefers-color-scheme: dark)` block mentioning `dark`. Only custom properties are used (no `url()`, `@import` or other rules); they apply when `ui.theme` (or a person's choice) is `custom`. The variable names are the ones in `view/styles.css` and `view/themes.css`
 - ui.name: optional global-only name shown next to the logo and as the browser tab title (at most 40 characters)
 - ui.logo / ui.logo_dark / ui.icon: optional global-only images for the header logo, its dark-mode version, and the browser tab icon. Paths are relative to the repository (the folder holding the tasks directory), e.g. `assets/app-icon.svg`; files outside it, symlinks out of it, and files that are not SVG/PNG/JPEG/WebP/GIF/ICO/AVIF images are never served. Images uploaded in Config → Appearance are stored in `.tasks/@branding/`
 - remotes: map (named remotes)
@@ -133,12 +134,14 @@ attachments:
 
 # Web UI look for everyone using this repository
 ui:
-  theme: forest
+  theme: terminal:green
   name: Acme Shop
   # Paths relative to the repository root
   logo: assets/logo.svg
   logo_dark: assets/logo-dark.svg
   icon: assets/app-icon.svg
+  # Your own skin (theme variables only); pick it with theme: custom
+  # theme_file: assets/lotar-theme.css
 
 sync:
   reports_dir: "@reports"

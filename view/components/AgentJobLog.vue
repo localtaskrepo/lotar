@@ -101,7 +101,7 @@ watch(
 }
 
 .log-tone-agent .log-kind {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .log-tone-user {
@@ -109,7 +109,7 @@ watch(
 }
 
 .log-tone-user .log-kind {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .log-tone-warning .log-kind,

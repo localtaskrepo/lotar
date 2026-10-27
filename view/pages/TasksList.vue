@@ -1754,7 +1754,7 @@ const handleTaskUpdated = (task: TaskDTO) => {
 
 .tasks-toolbar-btn--active {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .tasks-toolbar-selected {

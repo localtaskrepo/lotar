@@ -1,30 +1,42 @@
 #!/usr/bin/env node
 // Contrast and completeness check for the themes in view/themes.css
-// (DEV-218, DEV-219). Every theme has a light block `[data-theme-name="<id>"]`
-// and a dark block `[data-theme-name="<id>"][data-mode="dark"]`.
+// (DEV-218 – DEV-220). A theme is a skin plus a colour palette:
 //
+//   [data-theme-name="<skin>"]                                   skin, light
+//   [data-theme-name="<skin>"][data-mode="dark"]                 skin, dark
+//   [data-theme-name="<skin>"][data-theme-palette="<p>"]         palette, light
+//   [data-theme-name="<skin>"][data-theme-palette="<p>"][data-mode="dark"]
+//
+// The skin blocks hold the skin's character and its default palette.
 // - Mode tokens (`color-scheme`, `--color-*`, `--shadow-*`) are not reset on
-//   themed elements by styles.css, so both blocks must define the complete
-//   set; otherwise a theme preview would inherit the page's colours.
+//   themed elements by styles.css, so both skin blocks must define the
+//   complete set; otherwise a theme preview would inherit the page's colours.
 // - Character tokens (fonts, radii, page/card/header backgrounds, control
 //   bevels, glows) have defaults on every themed element in styles.css. The
-//   light block is the theme's base (its selector also matches in dark mode)
+//   skin's light block is its base (its selector also matches in dark mode)
 //   and may set them once; the dark block may only override what the light
 //   block sets, so the dark look is always "light block + dark overrides".
+// - Palette blocks override the skin's blocks. A palette light block has the
+//   same specificity as the skin's dark block and comes after it, so it wins
+//   in dark mode too: it must follow the skin's dark block, and every mode
+//   token it sets, and every token the skin's dark block sets, must be set
+//   again in the palette's dark block.
 //
-// Contrast uses WCAG 2 relative luminance. Background tokens that may hold
-// gradients or patterns are checked colour stop by colour stop against the
-// foreground (translucent stops are composited over --color-bg; stops the
-// parser cannot evaluate are skipped with a note). The default `lotar` theme
-// reproduces the historical palette and is reported but never fails the run.
+// Every skin × palette × mode is checked on its effective tokens (the blocks
+// that match, in cascade order). Contrast uses WCAG 2 relative luminance.
+// Background tokens that may hold gradients or patterns are checked colour
+// stop by colour stop (translucent stops are composited over --color-bg;
+// stops the parser cannot evaluate are skipped with a note), and the header
+// text tokens against every header stop. The default palette of `classic`
+// reproduces the historical LoTaR palette and is reported but never fails.
 //
 // Usage: node scripts/check-theme-contrast.mjs [path/to/themes.css]
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-/** Themes whose palette is frozen; failures are reported, not fatal. */
-export const EXEMPT_THEMES = new Set(['lotar']);
+/** Skins whose default palette is frozen; failures are reported, not fatal. */
+export const EXEMPT_THEMES = new Set(['classic']);
 
 export const REQUIRED_TOKENS = [
     'color-scheme',
@@ -108,30 +120,42 @@ export const HIGH_CONTRAST_THEMES = new Set(['contrast']);
 const HIGH_CONTRAST_BORDER_MIN = 3;
 
 /**
- * Parse themes.css into `{ id: { light: Map, dark: Map } }` plus a list of
- * structural errors (unknown selectors, duplicate blocks).
+ * @typedef {{ light?: Map<string, string>, dark?: Map<string, string>, order: { light?: number, dark?: number } }} BlockPair
+ * @typedef {BlockPair & { palettes: Record<string, BlockPair> }} SkinBlocks
+ */
+
+/**
+ * Parse themes.css into `{ skin: { light, dark, palettes: { id: { light,
+ * dark } } } }` (token maps, plus each block's position in `order`) and a
+ * list of structural errors (unknown selectors, duplicate blocks).
  * @param {string} css
  */
 export function parseThemes(css) {
     const source = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    /** @type {Record<string, { light?: Map<string, string>, dark?: Map<string, string> }>} */
+    /** @type {Record<string, SkinBlocks>} */
     const themes = {};
     /** @type {string[]} */
     const errors = [];
     const blockPattern = /([^{}]+)\{([^{}]*)\}/g;
     let match;
+    let index = 0;
     while ((match = blockPattern.exec(source)) !== null) {
         const selector = match[1].trim().replace(/\s+/g, ' ');
-        const selectorMatch = selector.match(/^\[data-theme-name=(["'])([a-z0-9-]+)\1\](\[data-mode=(["'])dark\4\])?$/);
+        const selectorMatch = selector.match(
+            /^\[data-theme-name=(["'])([a-z0-9-]+)\1\](?:\[data-theme-palette=(["'])([a-z0-9-]+)\3\])?(\[data-mode=(["'])dark\6\])?$/,
+        );
         if (!selectorMatch) {
             errors.push(`unexpected selector: ${selector}`);
             continue;
         }
         const id = selectorMatch[2];
-        const mode = selectorMatch[3] ? 'dark' : 'light';
-        const entry = (themes[id] ??= {});
+        const palette = selectorMatch[4];
+        const mode = selectorMatch[5] ? 'dark' : 'light';
+        const skin = (themes[id] ??= { order: {}, palettes: {} });
+        const entry = palette ? (skin.palettes[palette] ??= { order: {} }) : skin;
+        const label = palette ? `${id}:${palette}` : id;
         if (entry[mode]) {
-            errors.push(`${id}: duplicate ${mode} block`);
+            errors.push(`${label}: duplicate ${mode} block`);
             continue;
         }
         const tokens = new Map();
@@ -146,6 +170,7 @@ export function parseThemes(css) {
             if (name) tokens.set(name, value);
         }
         entry[mode] = tokens;
+        entry.order[mode] = index++;
     }
     return { themes, errors };
 }
@@ -468,8 +493,58 @@ export function headerContrast(themeTokens) {
 }
 
 /**
- * Run every check. Returns table rows, hard errors (fail the run) and
- * notes (reported only).
+ * Contrast checks for one skin × palette × mode on its effective tokens.
+ * @param {Map<string, string>} tokens
+ * @param {{ highContrast: boolean, label: string, mode: string, fail: (message: string) => void, notes: string[] }} context
+ */
+function checkVariant(tokens, { highContrast, label: id, mode, fail, notes }) {
+    /** @type {Record<string, { ratio: number | null, min: number, pass: boolean }>} */
+    const results = {};
+    for (const [label, fgToken, bgToken, baseMin] of CHECKS) {
+        const min = label.startsWith('border') && highContrast ? HIGH_CONTRAST_BORDER_MIN : baseMin;
+        const ratio = contrast(tokens.get(fgToken) ?? '', tokens.get(bgToken) ?? '');
+        if (ratio === null) {
+            notes.push(`${id} ${mode} ${label}: skipped (non-hex value)`);
+            results[label] = { ratio, min, pass: true };
+            continue;
+        }
+        const pass = ratio >= min;
+        results[label] = { ratio, min, pass };
+        if (!pass) fail(`${id} ${mode} ${label}: ${ratio.toFixed(2)} < ${min}`);
+    }
+    const stops = backgroundStopContrast(tokens);
+    for (const skip of new Set(stops.skipped)) notes.push(`${id} ${mode} ${skip}: skipped (unsupported colour)`);
+    let lowest = null;
+    for (const { token, stop, ratio } of stops.results) {
+        lowest = lowest === null ? ratio : Math.min(lowest, ratio);
+        if (ratio < BACKGROUND_FG_MIN) {
+            fail(`${id} ${mode} fg on ${token} stop ${stop}: ${ratio.toFixed(2)} < ${BACKGROUND_FG_MIN}`);
+        }
+    }
+    results[BACKGROUND_LABEL] = {
+        ratio: lowest,
+        min: BACKGROUND_FG_MIN,
+        pass: lowest === null || lowest >= BACKGROUND_FG_MIN,
+    };
+    const header = headerContrast(tokens);
+    for (const skip of new Set(header.skipped)) notes.push(`${id} ${mode} ${skip}: skipped (unsupported colour)`);
+    for (const [label, , min] of HEADER_CHECKS) {
+        const { ratio, stop } = header.results[label];
+        const pass = ratio === null || ratio >= min;
+        results[label] = { ratio, min, pass };
+        if (!pass) fail(`${id} ${mode} ${label} on --topbar-background stop ${stop}: ${ratio.toFixed(2)} < ${min}`);
+    }
+    return results;
+}
+
+/** Later maps win, like later matching rules of equal or higher specificity. */
+function cascade(...maps) {
+    return new Map(maps.filter(Boolean).flatMap((map) => [...map]));
+}
+
+/**
+ * Run every check. Returns table rows (one per skin × palette × mode), hard
+ * errors (fail the run) and notes (reported only).
  * @param {ReturnType<typeof parseThemes>['themes']} themes
  */
 export function checkThemes(themes) {
@@ -479,71 +554,77 @@ export function checkThemes(themes) {
     const errors = [];
     /** @type {string[]} */
     const notes = [];
-    for (const [id, entry] of Object.entries(themes)) {
-        const exempt = EXEMPT_THEMES.has(id);
+    for (const [id, skin] of Object.entries(themes)) {
         for (const mode of ['light', 'dark']) {
-            if (!entry[mode]) errors.push(`${id}: missing ${mode} block`);
+            if (!skin[mode]) errors.push(`${id}: missing ${mode} block`);
         }
-        if (entry.light && entry.dark) {
-            const onlyLight = [...entry.light.keys()].filter((k) => isModeToken(k) && !entry.dark.has(k)).sort();
-            const onlyDark = [...entry.dark.keys()].filter((k) => !entry.light.has(k)).sort();
+        if (skin.light && skin.dark) {
+            const onlyLight = [...skin.light.keys()].filter((k) => isModeToken(k) && !skin.dark.has(k)).sort();
+            const onlyDark = [...skin.dark.keys()].filter((k) => !skin.light.has(k)).sort();
             if (onlyLight.length) errors.push(`${id}: only in light block: ${onlyLight.join(', ')}`);
             if (onlyDark.length) errors.push(`${id}: only in dark block: ${onlyDark.join(', ')}`);
         }
         for (const mode of ['light', 'dark']) {
-            const own = entry[mode];
+            const own = skin[mode];
             if (!own) continue;
             const missing = REQUIRED_TOKENS.filter((t) => !own.has(t));
             if (missing.length) errors.push(`${id} ${mode}: missing ${missing.join(', ')}`);
             const scheme = own.get('color-scheme');
             if (scheme && scheme !== mode) errors.push(`${id} ${mode}: color-scheme is "${scheme}"`);
-            // The light (base) selector also matches in dark mode.
-            const tokens = mode === 'dark' && entry.light ? new Map([...entry.light, ...own]) : own;
+        }
+        /** @type {{ label: string, exempt: boolean, light?: Map<string, string>, dark?: Map<string, string> }[]} */
+        const variants = [
+            {
+                label: id,
+                exempt: EXEMPT_THEMES.has(id),
+                light: skin.light,
+                dark: skin.dark && cascade(skin.light, skin.dark),
+            },
+        ];
+        for (const [paletteId, palette] of Object.entries(skin.palettes ?? {})) {
+            const label = `${id}:${paletteId}`;
+            for (const mode of ['light', 'dark']) {
+                if (!palette[mode]) errors.push(`${label}: missing ${mode} block`);
+                const scheme = palette[mode]?.get('color-scheme');
+                if (scheme && scheme !== mode) errors.push(`${label} ${mode}: color-scheme is "${scheme}"`);
+            }
+            if (palette.light && palette.dark) {
+                const needDark = [...palette.light.keys()]
+                    .filter((k) => (isModeToken(k) || skin.dark?.has(k)) && !palette.dark.has(k))
+                    .sort();
+                if (needDark.length) {
+                    errors.push(
+                        `${label}: only in light block (would also apply in dark mode): ${needDark.join(', ')}`,
+                    );
+                }
+            }
+            if (palette.order.light !== undefined && (skin.order.dark ?? Infinity) > palette.order.light) {
+                errors.push(`${label}: palette blocks must come after the ${id} dark block`);
+            }
+            variants.push({
+                label,
+                exempt: false,
+                light: palette.light && cascade(skin.light, palette.light),
+                dark: palette.dark && cascade(skin.light, skin.dark, palette.light, palette.dark),
+            });
+        }
+        for (const variant of variants) {
             const fail = (message) => {
-                if (exempt) notes.push(`${message} (frozen default palette)`);
+                if (variant.exempt) notes.push(`${message} (frozen default palette)`);
                 else errors.push(message);
             };
-            /** @type {Record<string, { ratio: number | null, min: number, pass: boolean }>} */
-            const results = {};
-            for (const [label, fgToken, bgToken, baseMin] of CHECKS) {
-                const min =
-                    label.startsWith('border') && HIGH_CONTRAST_THEMES.has(id) ? HIGH_CONTRAST_BORDER_MIN : baseMin;
-                const ratio = contrast(tokens.get(fgToken) ?? '', tokens.get(bgToken) ?? '');
-                if (ratio === null) {
-                    notes.push(`${id} ${mode} ${label}: skipped (non-hex value)`);
-                    results[label] = { ratio, min, pass: true };
-                    continue;
-                }
-                const pass = ratio >= min;
-                results[label] = { ratio, min, pass };
-                if (!pass) fail(`${id} ${mode} ${label}: ${ratio.toFixed(2)} < ${min}`);
+            for (const mode of ['light', 'dark']) {
+                const tokens = variant[mode];
+                if (!tokens) continue;
+                const results = checkVariant(tokens, {
+                    highContrast: HIGH_CONTRAST_THEMES.has(id),
+                    label: variant.label,
+                    mode,
+                    fail,
+                    notes,
+                });
+                rows.push({ theme: variant.label, mode, results });
             }
-            const stops = backgroundStopContrast(tokens);
-            for (const skip of new Set(stops.skipped))
-                notes.push(`${id} ${mode} ${skip}: skipped (unsupported colour)`);
-            let lowest = null;
-            for (const { token, stop, ratio } of stops.results) {
-                lowest = lowest === null ? ratio : Math.min(lowest, ratio);
-                if (ratio < BACKGROUND_FG_MIN) {
-                    fail(`${id} ${mode} fg on ${token} stop ${stop}: ${ratio.toFixed(2)} < ${BACKGROUND_FG_MIN}`);
-                }
-            }
-            results[BACKGROUND_LABEL] = {
-                ratio: lowest,
-                min: BACKGROUND_FG_MIN,
-                pass: lowest === null || lowest >= BACKGROUND_FG_MIN,
-            };
-            const header = headerContrast(tokens);
-            for (const skip of new Set(header.skipped))
-                notes.push(`${id} ${mode} ${skip}: skipped (unsupported colour)`);
-            for (const [label, , min] of HEADER_CHECKS) {
-                const { ratio, stop } = header.results[label];
-                const pass = ratio === null || ratio >= min;
-                results[label] = { ratio, min, pass };
-                if (!pass)
-                    fail(`${id} ${mode} ${label} on --topbar-background stop ${stop}: ${ratio.toFixed(2)} < ${min}`);
-            }
-            rows.push({ theme: id, mode, results });
         }
     }
     return { rows, errors, notes };
@@ -589,7 +670,7 @@ function main() {
         console.error(`\n${allErrors.length} theme check(s) failed.`);
         process.exit(1);
     }
-    console.log(`\nAll ${Object.keys(themes).length} themes pass.`);
+    console.log(`\nAll ${rows.length / 2} skin × palette combinations pass in light and dark.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

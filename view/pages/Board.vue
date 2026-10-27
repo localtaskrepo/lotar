@@ -1463,7 +1463,7 @@ onUnmounted(() => {
 
 .chip.sprint--active {
   background: color-mix(in oklab, var(--color-accent) 18%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .chip.sprint--overdue {

@@ -315,6 +315,7 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
     field("ui_logo").global().aliases(&["ui.logo"]),
     field("ui_logo_dark").global().aliases(&["ui.logo_dark"]),
     field("ui_icon").global().aliases(&["ui.icon"]),
+    field("ui_theme_file").global().aliases(&["ui.theme_file"]),
 ];
 
 static GLOBAL_SETTABLE: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
@@ -442,6 +443,7 @@ mod tests {
         "ui_logo",
         "ui_logo_dark",
         "ui_icon",
+        "ui_theme_file",
     ];
 
     const LEGACY_PROJECT: &[&str] = &[
@@ -559,6 +561,7 @@ mod tests {
         ("ui.logo", "ui_logo"),
         ("ui.logo_dark", "ui_logo_dark"),
         ("ui.icon", "ui_icon"),
+        ("ui.theme_file", "ui_theme_file"),
     ];
 
     // (label path, label key, inspect key)

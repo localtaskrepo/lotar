@@ -201,6 +201,8 @@ export interface BrandingResponse {
     theme_source?: 'home' | 'repository'
     /** The repository's ui.theme when ~/.lotar overrides it. */
     repository_theme?: string
+    /** Path of a usable repository skin (ui.theme_file); theme `custom`. */
+    theme_file?: string
     name?: string
     logo?: string
     logo_dark?: string
@@ -214,7 +216,8 @@ export interface BrandingUploadResponse {
 }
 
 export interface BrandingUploadRequest {
-    image: 'logo' | 'logo-dark' | 'icon'
+    /** An image slot, or `theme` for a skin (.css). */
+    image: 'logo' | 'logo-dark' | 'icon' | 'theme'
     filename: string
     content_base64: string
 }
@@ -1065,6 +1068,7 @@ export interface GlobalConfigRaw {
     ui_logo?: string | null
     ui_logo_dark?: string | null
     ui_icon?: string | null
+    ui_theme_file?: string | null
     remotes?: Record<string, SyncRemoteConfig>
     auth_profiles?: Record<string, SyncAuthProfile>
 }

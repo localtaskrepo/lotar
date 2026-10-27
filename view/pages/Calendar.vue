@@ -1046,7 +1046,7 @@ watch(showSprints, (enabled, previous) => {
 }
 
 .cell-add__btn:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   border-color: color-mix(in oklab, var(--color-accent) 50%, var(--color-border));
 }
 

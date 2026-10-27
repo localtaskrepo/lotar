@@ -1,0 +1,7 @@
+title: Reduce release binary size
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-27T21:07:33.759653+00:00
+description: 'Measured on DEV-220 (macOS arm64, release, HEAD 85eda9a): 6.91 MB, up 1.48 MB since Sep 5 (image crate ~549 KB, raw embedded help docs + openapi.json +268 KB, web bundle +116 KB, feature code ~510 KB). Options without feature loss: (1) gzip-embed docs/help and openapi.json via build.rs (-462 KB); (2) opt-level 3 for the image crates (+114 KB, thumbnails ~5x faster); (3) platform certificate verifier for ureq (-48 KB, untested over HTTPS); (4) --remap-path-prefix in release builds (-33 KB, also hides build paths). With feature trade-offs: image codecs jpeg/png/webp only (-167 KB, loses TIFF previews and GIF/BMP/ICO downscaling); slimmer regex unicode tables (-182/-248 KB, breaks some \p{..} in user regexes). Keep opt-level z (s +2.3 MB, 3 +4.3 MB). Also: release builds use --all-features, which switches custom field values to serde_json::Value in shipped binaries vs dev builds; check whether that is intended. Data and scripts: scratchpad binsize/ from the DEV-220 session.'

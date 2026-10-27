@@ -320,7 +320,7 @@ function formatDuration(days: number | null | undefined) {
 
 .badge--info {
   background: color-mix(in oklab, var(--color-accent) 15%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 .badge--danger {
   background: color-mix(in oklab, var(--color-danger) 15%, transparent);

@@ -1940,7 +1940,7 @@ async function removeSprintChip(sprintId: number) {
 
 .task-panel__sprint-chip--active {
   background: color-mix(in oklab, var(--color-accent) 18%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   border-color: color-mix(in oklab, var(--color-accent) 55%, transparent);
 }
 
@@ -2570,7 +2570,7 @@ textarea {
 }
 
 .task-panel__attachments-browse {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   text-decoration: underline;
 }
 

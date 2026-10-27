@@ -304,6 +304,7 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
         ("logo", &cfg.ui_logo),
         ("logo_dark", &cfg.ui_logo_dark),
         ("icon", &cfg.ui_icon),
+        ("theme_file", &cfg.ui_theme_file),
     ] {
         if let Some(value) = value {
             ui.insert(Y::String(key.into()), Y::String(value.clone()));

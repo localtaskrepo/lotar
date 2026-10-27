@@ -606,6 +606,9 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.ui_icon.is_some() {
         base.ui_icon = override_config.ui_icon;
     }
+    if override_config.ui_theme_file.is_some() {
+        base.ui_theme_file = override_config.ui_theme_file;
+    }
     if override_config.agent_instructions.is_some() {
         base.agent_instructions = override_config.agent_instructions;
     }
@@ -774,6 +777,9 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.ui_icon.is_some() {
         resolved.ui.icon = override_config.ui_icon;
+    }
+    if override_config.ui_theme_file.is_some() {
+        resolved.ui.theme_file = override_config.ui_theme_file;
     }
     if override_config.agent_instructions.is_some() {
         resolved.agent_instructions = override_config.agent_instructions;
@@ -1207,6 +1213,7 @@ impl ResolvedConfig {
                 logo: global.ui_logo,
                 logo_dark: global.ui_logo_dark,
                 icon: global.ui_icon,
+                theme_file: global.ui_theme_file,
             },
         }
     }

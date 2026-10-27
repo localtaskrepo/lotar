@@ -1877,7 +1877,7 @@ async function handleReload() {
 
 .sync-remote-dialog__help:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .sync-remote-dialog__hint {
@@ -1984,7 +1984,7 @@ async function handleReload() {
 }
 
 .pill--info {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   background: color-mix(in oklab, var(--color-accent) 18%, transparent);
   border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-border));
 }
@@ -2012,7 +2012,7 @@ async function handleReload() {
 }
 
 .pill--interactive:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-border));
 }
 
@@ -2377,7 +2377,7 @@ async function handleReload() {
 }
 
 .validation-status--warn {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .validation-status--muted {

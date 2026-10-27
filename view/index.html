@@ -19,8 +19,21 @@
             ;(function () {
                 try {
                     var root = document.documentElement
-                    var name = localStorage.getItem('lotar.themeName') || localStorage.getItem('lotar.repositoryTheme')
-                    root.setAttribute('data-theme-name', /^[a-z]+$/.test(name || '') ? name : 'lotar')
+                    var value =
+                        localStorage.getItem('lotar.themeName') || localStorage.getItem('lotar.repositoryTheme') || ''
+                    // Ids from before palettes (view/utils/themes.ts LEGACY_THEME_ALIASES).
+                    var legacy = {
+                        lotar: 'classic',
+                        ocean: 'classic:ocean',
+                        forest: 'classic:forest',
+                        ember: 'classic:ember',
+                        violet: 'classic:violet',
+                        rose: 'classic:rose',
+                    }
+                    value = legacy[value] || value
+                    var parts = /^[a-z]+(:[a-z]+)?$/.test(value) ? value.split(':') : ['classic']
+                    root.setAttribute('data-theme-name', parts[0])
+                    if (parts[1]) root.setAttribute('data-theme-palette', parts[1])
                     var mode = localStorage.getItem('lotar.theme')
                     if (mode !== 'light' && mode !== 'dark') {
                         mode =
@@ -34,6 +47,8 @@
                 }
             })()
         </script>
+        <!-- The repository skin (ui.theme_file), reduced to theme variables; empty without one. -->
+        <link rel="stylesheet" href="/api/branding/theme.css" />
     </head>
 
     <body>

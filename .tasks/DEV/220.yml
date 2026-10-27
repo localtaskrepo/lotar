@@ -1,0 +1,35 @@
+title: Theme palettes, theme select box and repository skins
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-27T20:24:12.828230+00:00
+modified: 2026-10-27T21:07:33.717325+00:00
+comments:
+- date: 2026-10-27T20:24:12.941272+00:00
+  text: 'Plan: Theme = skin (character) + palette (colours). Skins: classic (palettes lotar, ocean, forest, ember, violet, rose), contrast, terminal, matrix, synthwave, blueprint, paper, retro, candy, plus ''custom'' from the repository. Values ''skin'' or ''skin:palette'' in ui.theme and the browser; legacy ids (lotar, ocean...) map to classic palettes. HTML gets data-theme-name + data-theme-palette. Picker: a custom ThemeSelect (listbox with previews, ''Configured'' tag on the configured skin, palette swatches below) used in Preferences and Config; choosing the configured value clears the browser override. Repository skin: ui.theme_file = repository-relative CSS file; the server keeps only theme custom-property declarations (no url(), @import or other rules) and serves it as /api/branding/theme.css, linked in index.html so it applies before first paint; selectable as the repository''s theme. Startup select gets a sensible width. Binary size: investigated separately, findings reported to the developer.'
+- date: 2026-10-27T21:07:33.674636+00:00
+  text: 'Done. Themes are skin + palette (''skin'' or ''skin:palette''; legacy ids map to classic palettes): Classic (lotar, ocean, forest, ember, violet, rose), High contrast, Terminal (amber, green, red, cyan, white), Matrix (green, red, blue), Synthwave (sunset, outrun, ice), Blueprint (blue, green, sepia), Paper (blue, black, red, green), Retro (teal, plum, slate, desert), Candy (bubblegum, mint, grape); html carries data-theme-palette; CSS restructured and checked for all 32 combos x 2 modes (helper agent). New ThemeSelect (listbox with previews, type-ahead, keyboard, ''Configured'' tag, palette swatches) in Preferences and Config; picking the configured value clears the browser override. Repository skins: ui.theme_file (repo-relative .css) reduced server-side to custom-property declarations scoped to [data-theme-name=''custom''] (no url(), imports or other rules), served at /api/branding/theme.css and linked in index.html; upload via Config. Config theme ''Not set'' replaces ''Built-in''. Startup destination select sized to content. Text uses of --color-accent moved to --color-accent-strong (32 component rules + scan pill). Verified: npm run lint, npm test (1803 Rust + 1279 UI), npm run smoke (356), theme sweep 704 page views across all combos (remaining: classic:lotar light primary buttons 2.77, by design), select box screenshots desktop/390px.'
+description: 'Feedback on DEV-219: (1) the wide ''Configured default'' row looks odd; mark the configured theme in the list with a tag instead and store nothing in the browser when that one is picked. (2) Colour palette option per theme (e.g. Terminal in red); classic themes are really palettes. (3) Startup destination select stretches across the page. (4) ''Built-in'' wording in Config suggests custom skins, which would be useful: a repository-relative skin file like the logo. (5) A custom theme select box reused in Preferences and Config. Also: investigate binary size growth and list reductions.'
+history:
+- at: 2026-10-27T20:24:12.902922+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-10-27T20:24:12.941272+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T21:07:33.674636+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T21:07:33.717325+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -43,7 +43,7 @@ function runAction(id: number, run: () => void) {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 6px);
   background: transparent;
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   font: inherit;
   font-weight: 600;
   cursor: pointer;

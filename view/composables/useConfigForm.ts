@@ -1,6 +1,6 @@
 import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { AgentInstructionsValue, ConfigInspectResult, ConfigSource, ProjectDTO } from '../api/types'
-import { isThemeId } from '../utils/themes'
+import { parseThemeValue } from '../utils/themes'
 import { provenanceClass as getProvenanceClass, provenanceLabel as getProvenanceLabel } from '../utils/provenance'
 
 export type ToggleValue = 'inherit' | 'true' | 'false'
@@ -92,6 +92,7 @@ export interface ConfigFormState {
     uiLogo: string
     uiLogoDark: string
     uiIcon: string
+    uiThemeFile: string
 }
 
 export type ToggleField =
@@ -243,6 +244,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         uiLogo: '',
         uiLogoDark: '',
         uiIcon: '',
+        uiThemeFile: '',
     })
 
     const baseline = ref<ConfigFormState | null>(null)
@@ -689,7 +691,13 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             // DEV-218: same rules as the server (src/services/branding_service.rs).
             case 'ui_theme': {
                 const value = form.uiTheme.trim()
-                errors.ui_theme = value && !isThemeId(value) ? 'Pick one of the listed themes.' : null
+                errors.ui_theme = value && !parseThemeValue(value, true) ? 'Pick one of the listed themes.' : null
+                break
+            }
+            case 'ui_theme_file': {
+                const value = form.uiThemeFile.trim()
+                const pathError = brandingPathError(value.replace(/\.css$/i, '.svg'))
+                errors.ui_theme_file = value && !/\.css$/i.test(value) ? 'Use a .css file.' : pathError
                 break
             }
             case 'ui_name': {
@@ -1014,6 +1022,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'ui_logo',
             'ui_logo_dark',
             'ui_icon',
+            'ui_theme_file',
             'attachments_dir',
             'attachments_max_upload_mb',
             'default_reporter',
@@ -1124,6 +1133,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.uiLogo = data.global_raw?.ui_logo ?? ''
         form.uiLogoDark = data.global_raw?.ui_logo_dark ?? ''
         form.uiIcon = data.global_raw?.ui_icon ?? ''
+        form.uiThemeFile = data.global_raw?.ui_theme_file ?? ''
         form.autoCodeownersAssign = toToggle(!!effective.auto_codeowners_assign)
         form.autoTagsFromPath = toToggle(!!effective.auto_tags_from_path)
         form.autoBranchInferType = toToggle(!!effective.auto_branch_infer_type)
@@ -1408,6 +1418,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             addValue('uiLogo', 'ui_logo')
             addValue('uiLogoDark', 'ui_logo_dark')
             addValue('uiIcon', 'ui_icon')
+            addValue('uiThemeFile', 'ui_theme_file')
         }
 
         addAliasMap('branchTypeAliases', 'branch_type_aliases')

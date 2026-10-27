@@ -361,11 +361,13 @@
               v-model:ui-logo="form.uiLogo"
               v-model:ui-logo-dark="form.uiLogoDark"
               v-model:ui-icon="form.uiIcon"
+              v-model:ui-theme-file="form.uiThemeFile"
               :errors="errors"
               :saved="{
                 uiLogo: baseline?.uiLogo ?? '',
                 uiLogoDark: baseline?.uiLogoDark ?? '',
                 uiIcon: baseline?.uiIcon ?? '',
+                uiThemeFile: baseline?.uiThemeFile ?? '',
               }"
               @validate="validateField"
             />

@@ -786,7 +786,7 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
 }
 .dependency-problem-severity {
   flex-shrink: 0;
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   font-size: var(--text-xs);
   font-weight: 600;
 }
@@ -896,7 +896,7 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
   fill: none;
 }
 .dependency-edge--dependency {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 .dependency-edge--hierarchy {
   color: var(--color-chart-5);

@@ -836,7 +836,7 @@ main {
 }
 
 .scan-pill--updated {
-	color: var(--color-accent);
+	color: var(--color-accent-strong);
 	border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-border));
 }
 

@@ -9,25 +9,79 @@
 
 use std::path::{Component, Path, PathBuf};
 
-/// Theme ids the web UI ships, classic then playful (keep in sync with
-/// `THEMES` in `view/utils/themes.ts`; `view/__tests__/themes.spec.ts`
-/// checks this).
-pub const UI_THEMES: &[&str] = &[
-    "lotar",
-    "ocean",
-    "forest",
-    "ember",
-    "violet",
-    "rose",
-    "contrast",
-    "terminal",
-    "matrix",
-    "synthwave",
-    "blueprint",
-    "paper",
-    "retro",
-    "candy",
+/// Skins the web UI ships and their colour palettes, classic then playful
+/// (keep in sync with `THEMES` in `view/utils/themes.ts`;
+/// `view/__tests__/themes.spec.ts` checks this). The first palette is the
+/// skin's default; an empty list means one fixed palette. `ui.theme` is
+/// written `skin` or `skin:palette`.
+pub const UI_THEMES: &[(&str, &[&str])] = &[
+    (
+        "classic",
+        &["lotar", "ocean", "forest", "ember", "violet", "rose"],
+    ),
+    ("contrast", &[]),
+    ("terminal", &["amber", "green", "red", "cyan", "white"]),
+    ("matrix", &["green", "red", "blue"]),
+    ("synthwave", &["sunset", "outrun", "ice"]),
+    ("blueprint", &["blue", "green", "sepia"]),
+    ("paper", &["blue", "black", "red", "green"]),
+    ("retro", &["teal", "plum", "slate", "desert"]),
+    ("candy", &["bubblegum", "mint", "grape"]),
 ];
+
+/// Theme ids from before palettes (DEV-218/219), still accepted; they map to
+/// classic palettes (`LEGACY_THEME_ALIASES` in `view/utils/themes.ts`).
+pub const UI_THEME_ALIASES: &[(&str, &str)] = &[
+    ("lotar", "classic"),
+    ("ocean", "classic:ocean"),
+    ("forest", "classic:forest"),
+    ("ember", "classic:ember"),
+    ("violet", "classic:violet"),
+    ("rose", "classic:rose"),
+];
+
+/// `ui.theme` value selecting the repository's own skin file.
+pub const CUSTOM_UI_THEME: &str = "custom";
+
+/// Check a `ui.theme` value: `skin`, `skin:palette` with a known palette, a
+/// legacy id, or `custom`. Surrounding whitespace is ignored.
+pub fn check_ui_theme(value: &str) -> Result<(), String> {
+    let value = value.trim();
+    if value == CUSTOM_UI_THEME {
+        return Ok(());
+    }
+    let value = UI_THEME_ALIASES
+        .iter()
+        .find(|(alias, _)| *alias == value)
+        .map_or(value, |(_, target)| *target);
+    let (skin, palette) = match value.split_once(':') {
+        Some((skin, palette)) => (skin, Some(palette)),
+        None => (value, None),
+    };
+    let Some((_, palettes)) = UI_THEMES.iter().find(|(id, _)| *id == skin) else {
+        let skins: Vec<&str> = UI_THEMES.iter().map(|(id, _)| *id).collect();
+        return Err(format!(
+            "Unknown theme '{value}' (expected a theme such as classic or terminal:red, or {CUSTOM_UI_THEME}; themes: {})",
+            skins.join(", ")
+        ));
+    };
+    match palette {
+        None => Ok(()),
+        Some(palette) if palettes.contains(&palette) => Ok(()),
+        Some(palette) if palettes.is_empty() => Err(format!(
+            "Theme '{skin}' has no colour palettes (got '{palette}')"
+        )),
+        Some(palette) => Err(format!(
+            "Unknown palette '{palette}' for theme '{skin}' (expected one of: {})",
+            palettes.join(", ")
+        )),
+    }
+}
+
+/// Whether `value` is an accepted `ui.theme` (see [`check_ui_theme`]).
+pub fn is_valid_ui_theme(value: &str) -> bool {
+    check_ui_theme(value).is_ok()
+}
 
 /// Longest display name shown next to the logo.
 pub const MAX_UI_NAME_CHARS: usize = 40;
@@ -93,16 +147,7 @@ pub fn validate_ui_field(field: &str, value: &str) -> Result<(), String> {
         return Ok(());
     }
     match field {
-        "ui_theme" => {
-            if UI_THEMES.contains(&value) {
-                Ok(())
-            } else {
-                Err(format!(
-                    "Unknown theme '{value}' (expected one of: {})",
-                    UI_THEMES.join(", ")
-                ))
-            }
-        }
+        "ui_theme" => check_ui_theme(value),
         "ui_name" => {
             if value.chars().count() > MAX_UI_NAME_CHARS {
                 Err(format!(
@@ -219,7 +264,6 @@ mod tests {
 
     #[test]
     fn validates_settings() {
-        assert!(validate_ui_field("ui_theme", "forest").is_ok());
         assert!(validate_ui_field("ui_theme", "").is_ok());
         assert!(validate_ui_field("ui_theme", "neon").is_err());
         assert!(validate_ui_field("ui_name", "Acme Tracker").is_ok());
@@ -235,6 +279,55 @@ mod tests {
             "assets/logo",
         ] {
             assert!(validate_ui_field("ui_icon", bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn validates_themes_and_palettes() {
+        for ok in [
+            "classic",
+            "classic:lotar",
+            "classic:ocean",
+            "terminal",
+            "terminal:red",
+            " terminal:amber ",
+            "contrast",
+            "custom",
+            // Legacy ids from before palettes.
+            "lotar",
+            "forest",
+            "rose",
+        ] {
+            assert!(validate_ui_field("ui_theme", ok).is_ok(), "{ok}");
+            assert!(is_valid_ui_theme(ok), "{ok}");
+        }
+        for bad in [
+            "neon",
+            "terminal:pink",
+            "terminal:",
+            "contrast:dark",
+            "custom:red",
+            "forest:ember",
+            "classic:ocean:x",
+            ":red",
+        ] {
+            assert!(validate_ui_field("ui_theme", bad).is_err(), "{bad}");
+        }
+        let err = check_ui_theme("terminal:pink").unwrap_err();
+        assert!(err.contains("amber, green, red, cyan, white"), "{err}");
+        let err = check_ui_theme("neon").unwrap_err();
+        assert!(err.contains("classic, contrast, terminal"), "{err}");
+    }
+
+    #[test]
+    fn theme_aliases_point_at_real_palettes() {
+        for (alias, target) in UI_THEME_ALIASES {
+            assert!(UI_THEMES.iter().all(|(skin, _)| skin != alias), "{alias}");
+            assert!(is_valid_ui_theme(target), "{alias} -> {target}");
+        }
+        for (skin, palettes) in UI_THEMES {
+            assert!(!skin.contains(':') && *skin != CUSTOM_UI_THEME, "{skin}");
+            assert_ne!(palettes.len(), 1, "{skin}: a single palette should be none");
         }
     }
 

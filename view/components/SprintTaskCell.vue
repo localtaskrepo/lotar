@@ -167,7 +167,7 @@ function formatExact(value?: string | null) {
 
 .badge--info {
   background: color-mix(in oklab, var(--color-accent) 18%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .status[data-status] {

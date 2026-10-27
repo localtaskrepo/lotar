@@ -73,7 +73,7 @@ const sprint = { label: (id: number) => `#${id}`, stateClass: () => '', tooltip:
   font-size: 0.75rem;
 }
 .title {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   line-height: 1.35;
 }
 .priority {

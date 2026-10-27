@@ -748,6 +748,9 @@ pub struct GlobalConfig {
     pub ui_logo_dark: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub ui_icon: Option<String>,
+    /// A repository skin: CSS that sets theme variables (DEV-220).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ui_theme_file: Option<String>,
 
     /// Optional path to a directory containing custom web UI assets.
     /// When set and the path exists, the server will serve files from this directory
@@ -851,6 +854,8 @@ pub struct UiSettings {
     pub logo_dark: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub icon: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub theme_file: Option<String>,
 }
 
 impl ResolvedConfig {
@@ -1088,6 +1093,7 @@ impl Default for GlobalConfig {
             ui_logo: None,
             ui_logo_dark: None,
             ui_icon: None,
+            ui_theme_file: None,
             web_ui_path: None,
             remotes: HashMap::new(),
             auth_profiles: HashMap::new(),

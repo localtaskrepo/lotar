@@ -300,7 +300,7 @@ const dueInfo = computed(() => {
 }
 
 .task-hover-card__due.is-soon {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .task-hover-card__due-context {

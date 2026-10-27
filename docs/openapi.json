@@ -3424,8 +3424,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["logo", "logo-dark", "icon"]
-            }
+              "enum": ["logo", "logo-dark", "icon", "theme.css"]
+            },
+            "description": "theme.css serves the repository skin reduced to theme variables (an empty stylesheet without one)."
           }
         ],
         "responses": {
@@ -4764,22 +4765,12 @@
         "properties": {
           "theme": {
             "type": "string",
-            "enum": [
-              "lotar",
-              "ocean",
-              "forest",
-              "ember",
-              "violet",
-              "rose",
-              "contrast",
-              "terminal",
-              "matrix",
-              "synthwave",
-              "blueprint",
-              "paper",
-              "retro",
-              "candy"
-            ]
+            "pattern": "^[a-z]+(:[a-z]+)?$",
+            "description": "skin or skin:palette (e.g. terminal:red), or custom for the repository skin."
+          },
+          "theme_file": {
+            "type": "string",
+            "description": "Path of the repository skin (ui.theme_file) when it is usable."
           },
           "theme_source": {
             "type": "string",
@@ -4828,7 +4819,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "enum": ["logo", "logo-dark", "icon"]
+            "enum": ["logo", "logo-dark", "icon", "theme"]
           },
           "filename": {
             "type": "string"

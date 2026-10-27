@@ -9,18 +9,35 @@ import {
     REQUIRED_TOKENS,
     resolveColor,
 } from '../../scripts/check-theme-contrast.mjs'
-import { THEMES } from '../utils/themes'
+import { LEGACY_THEME_ALIASES, THEMES, type ThemeInfo } from '../utils/themes'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const themesCss = readFileSync(resolve(__dirname, '../themes.css'), 'utf8')
 const stylesCss = readFileSync(resolve(__dirname, '../styles.css'), 'utf8')
 const brandingRs = readFileSync(resolve(__dirname, '../../src/services/branding_service.rs'), 'utf8')
 
-/** Ids in `UI_THEMES` (server-side validation of `ui.theme`). */
-function rustThemeIds(): string[] {
-    const list = brandingRs.match(/pub const UI_THEMES: &\[&str\] = &\[([\s\S]*?)\];/)
-    expect(list, 'UI_THEMES in branding_service.rs').not.toBeNull()
-    return [...(list?.[1] ?? '').matchAll(/"([^"]+)"/g)].map((m) => m[1] ?? '')
+const skins = THEMES as readonly ThemeInfo[]
+
+/** The body of a `pub const NAME: … = &[ … ];` list in branding_service.rs. */
+function rustList(name: string): string {
+    const list = brandingRs.match(new RegExp(`pub const ${name}: [^=]+= &\\[([\\s\\S]*?)\\n\\];`))
+    expect(list, `${name} in branding_service.rs`).not.toBeNull()
+    return list?.[1] ?? ''
+}
+
+/** `UI_THEMES` (server-side validation of `ui.theme`): skin → palette ids. */
+function rustThemes(): [string, string[]][] {
+    return [...rustList('UI_THEMES').matchAll(/\(\s*"([^"]+)",\s*&\[([^\]]*)\],?\s*\)/g)].map((m) => [
+        m[1] ?? '',
+        [...(m[2] ?? '').matchAll(/"([^"]+)"/g)].map((p) => p[1] ?? ''),
+    ])
+}
+
+/** `UI_THEME_ALIASES`: legacy id → `skin[:palette]`. */
+function rustAliases(): Record<string, string> {
+    return Object.fromEntries(
+        [...rustList('UI_THEME_ALIASES').matchAll(/\(\s*"([^"]+)",\s*"([^"]+)"\s*\)/g)].map((m) => [m[1], m[2]]),
+    )
 }
 
 function declarationsOf(css: string, selector: string): Map<string, string> {
@@ -43,8 +60,8 @@ describe('colour themes (themes.css)', () => {
         expect(parseErrors).toEqual([])
     })
 
-    it('defines a light and a dark block for every theme in THEMES, and nothing else', () => {
-        const ids = THEMES.map((theme) => theme.id)
+    it('defines a light and a dark block for every skin in THEMES, and nothing else', () => {
+        const ids = skins.map((theme) => theme.id)
         expect(Object.keys(themes).sort()).toEqual([...ids].sort())
         for (const id of ids) {
             expect(themes[id]?.light, `${id} light`).toBeInstanceOf(Map)
@@ -52,8 +69,33 @@ describe('colour themes (themes.css)', () => {
         }
     })
 
-    it('matches UI_THEMES in branding_service.rs, in the same order', () => {
-        expect(rustThemeIds()).toEqual(THEMES.map((theme) => theme.id))
+    it('defines blocks for every non-default palette in THEMES, and nothing else', () => {
+        for (const skin of skins) {
+            const palettes = skin.palettes ?? []
+            expect(palettes.length, `${skin.id}: a single palette should be none`).not.toBe(1)
+            // The default (first) palette lives in the skin's own blocks.
+            const expected = palettes.slice(1).map((palette) => palette.id)
+            expect(Object.keys(themes[skin.id]?.palettes ?? {}).sort(), skin.id).toEqual([...expected].sort())
+            for (const id of expected) {
+                expect(themes[skin.id]?.palettes[id]?.light, `${skin.id}:${id} light`).toBeInstanceOf(Map)
+                expect(themes[skin.id]?.palettes[id]?.dark, `${skin.id}:${id} dark`).toBeInstanceOf(Map)
+            }
+        }
+    })
+
+    it('matches UI_THEMES and UI_THEME_ALIASES in branding_service.rs, in the same order', () => {
+        expect(rustThemes()).toEqual(
+            skins.map((theme) => [theme.id, (theme.palettes ?? []).map((palette) => palette.id)]),
+        )
+        expect(rustAliases()).toEqual(LEGACY_THEME_ALIASES)
+    })
+
+    it('gives every palette a distinct, valid swatch', () => {
+        for (const skin of skins) {
+            const swatches = (skin.palettes ?? []).map((palette) => palette.swatch)
+            expect(new Set(swatches).size, skin.id).toBe(swatches.length)
+            for (const swatch of swatches) expect(swatch).toMatch(/^#[0-9a-f]{6}$/)
+        }
     })
 
     it('lists the classic themes first, then the playful ones', () => {
@@ -62,17 +104,19 @@ describe('colour themes (themes.css)', () => {
         expect(groups.lastIndexOf('classic')).toBeLessThan(groups.indexOf('playful'))
     })
 
-    it('passes the completeness and contrast checks', () => {
-        const { errors } = checkThemes(themes)
+    it('passes the completeness and contrast checks for every skin × palette × mode', () => {
+        const { errors, rows } = checkThemes(themes)
         expect(errors).toEqual([])
+        const combinations = skins.reduce((sum, skin) => sum + Math.max(1, skin.palettes?.length ?? 0), 0)
+        expect(rows).toHaveLength(combinations * 2)
     })
 
-    it('keeps the lotar theme identical to the styles.css fallback palette', () => {
+    it('keeps the classic default palette identical to the styles.css fallback palette', () => {
         const light = declarationsOf(stylesCss, ':where(:root)')
         const dark = declarationsOf(stylesCss, ':where(:root[data-mode="dark"])')
         const darkMedia = declarationsOf(stylesCss, ':where(:root:not([data-mode]))')
-        expect(Object.fromEntries(themes.lotar?.light ?? [])).toEqual(Object.fromEntries(light))
-        expect(Object.fromEntries(themes.lotar?.dark ?? [])).toEqual(Object.fromEntries(dark))
+        expect(Object.fromEntries(themes.classic?.light ?? [])).toEqual(Object.fromEntries(light))
+        expect(Object.fromEntries(themes.classic?.dark ?? [])).toEqual(Object.fromEntries(dark))
         expect(Object.fromEntries(darkMedia)).toEqual(Object.fromEntries(dark))
     })
 
@@ -133,6 +177,41 @@ describe('colour themes (themes.css)', () => {
         expect(errors.some((e: string) => e.startsWith('navy light topbar-muted'))).toBe(true)
         expect(errors.some((e: string) => e.startsWith('navy light topbar-accent'))).toBe(true)
         expect(rows.find((row) => row.mode === 'light')?.results['topbar-fg']?.ratio).toBeGreaterThan(4.5)
+    })
+
+    it('checks palette blocks: order, dark counterparts and effective tokens', () => {
+        const base = REQUIRED_TOKENS.filter((t) => t !== 'color-scheme')
+            .map((t) => `${t}: #808080;`)
+            .join(' ')
+        const light = `${base} color-scheme: light; --color-bg: #ffffff; --color-fg: #000000;`
+        const dark = `${base} color-scheme: dark; --color-bg: #000000; --color-fg: #ffffff; --text-glow: none;`
+        const css = `
+            [data-theme-name="early"][data-theme-palette="p"] { --color-accent: #000000; }
+            [data-theme-name="early"][data-theme-palette="p"][data-mode="dark"] { --color-accent: #000000; }
+            [data-theme-name="early"] { ${light} --text-glow: none; }
+            [data-theme-name="early"][data-mode="dark"] { ${dark} }
+            [data-theme-name="skin"] { ${light} --text-glow: none; --radius-md: 0; }
+            [data-theme-name="skin"][data-mode="dark"] { ${dark} }
+            [data-theme-name="skin"][data-theme-palette="leaky"] { --color-fg: #111111; --text-glow: 0 0 1px red; --radius-md: 2px; }
+            [data-theme-name="skin"][data-theme-palette="leaky"][data-mode="dark"] { --color-accent: #ffffff; }
+            [data-theme-name="skin"][data-theme-palette="dim"] { --color-fg: #111111; }
+            [data-theme-name="skin"][data-theme-palette="dim"][data-mode="dark"] { --color-fg: #222222; }
+            [data-theme-name="skin"][data-theme-palette="half"] { --color-fg: #111111; }
+        `
+        const parsed = parseThemes(css)
+        expect(parsed.errors).toEqual([])
+        const { errors, rows } = checkThemes(parsed.themes)
+        expect(errors).toContain('early:p: palette blocks must come after the early dark block')
+        // Mode tokens and tokens the skin's dark block sets need a dark
+        // counterpart; pure character tokens (radius) may be shared.
+        expect(errors).toContain(
+            'skin:leaky: only in light block (would also apply in dark mode): --color-fg, --text-glow',
+        )
+        expect(errors).toContain('skin:half: missing dark block')
+        // Palette dark is checked on skin light + skin dark + palette light + palette dark.
+        expect(errors.some((e: string) => e.startsWith('skin:dim dark fg/bg:'))).toBe(true)
+        expect(errors.some((e: string) => e.startsWith('skin:dim light fg/bg:'))).toBe(false)
+        expect(rows.map((row) => `${row.theme} ${row.mode}`)).toContain('skin:dim dark')
     })
 
     it('parses colour stops, var() references and color-mix()', () => {

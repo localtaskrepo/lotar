@@ -849,6 +849,10 @@ pub struct BrandingResponse {
     /// Config page can say so.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_theme: Option<String>,
+    /// The repository skin's path (`ui.theme_file`) when it is usable; the
+    /// theme `custom` then shows it (CSS at /api/branding/theme.css).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme_file: Option<String>,
     /// Name shown next to the logo and in the browser tab (`ui.name`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,

@@ -2,7 +2,14 @@
   <!-- Each half carries its own theme attributes, so it shows that theme
        whatever the page uses (see view/themes.css). -->
   <span class="theme-preview" aria-hidden="true">
-    <span v-for="mode in modes" :key="mode" class="theme-preview__half" :data-theme-name="theme" :data-mode="mode">
+    <span
+      v-for="mode in modes"
+      :key="mode"
+      class="theme-preview__half"
+      :data-theme-name="theme"
+      :data-theme-palette="palette ?? undefined"
+      :data-mode="mode"
+    >
       <span class="theme-preview__bar"
         ><span class="theme-preview__dot"></span><span class="theme-preview__title">Aa</span></span
       >
@@ -20,9 +27,12 @@
 </template>
 
 <script setup lang="ts">
-import type { ThemeId } from '../utils/themes'
-
-defineProps<{ theme: ThemeId }>()
+defineProps<{
+  /** Skin id (or `custom` for the repository skin). */
+  theme: string
+  /** Palette id; omitted = the skin's default. */
+  palette?: string | null
+}>()
 
 const modes = ['light', 'dark'] as const
 </script>

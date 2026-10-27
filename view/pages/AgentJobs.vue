@@ -1124,7 +1124,7 @@ onBeforeUnmount(() => {
   padding: 0;
   border: none;
   background: none;
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   font-size: 12px;
   cursor: pointer;
 }
@@ -1148,7 +1148,7 @@ onBeforeUnmount(() => {
 }
 
 .status-chip.status-running {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   background: color-mix(in oklab, var(--color-accent) 15%, transparent);
 }
 

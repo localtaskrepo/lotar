@@ -232,3 +232,97 @@ fn uploads_store_the_image_in_the_repository_and_point_the_setting_at_it() {
     assert_eq!(upload("logo", "fake.png", b"hello").status, 400);
     assert_eq!(upload("banner", "logo.svg", SVG).status, 400);
 }
+
+#[test]
+fn repository_skins_are_reduced_to_theme_variables() {
+    // DEV-220: ui.theme_file points at a CSS skin in the repository.
+    let fx = workspace(
+        "default:\n  project: APP\nui:\n  theme: custom\n  theme_file: assets/skin.css\n",
+    );
+    std::fs::write(
+        fx.repo.join("assets/skin.css"),
+        ":root { --color-accent: #c0392b; color: red; }\n[data-mode=\"dark\"] { --color-bg: #111; --page-background: url(https://example.com/x.png); }\n",
+    )
+    .unwrap();
+    let api = server();
+
+    let branding = data(&get(&api, "/api/branding"));
+    assert_eq!(branding["theme"], "custom");
+    assert_eq!(branding["theme_file"], "assets/skin.css");
+    let problems = branding["problems"].as_array().unwrap();
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.as_str().unwrap().contains("2 declarations")),
+        "{problems:?}"
+    );
+
+    let css = get(&api, "/api/branding/theme.css");
+    assert_eq!(css.status, 200);
+    assert_eq!(
+        header(&css, "content-type"),
+        Some("text/css; charset=utf-8")
+    );
+    let text = String::from_utf8(css.body).unwrap();
+    assert!(text.contains("[data-theme-name='custom'] {\n  --color-accent: #c0392b;\n}"));
+    assert!(
+        text.contains("[data-theme-name='custom'][data-mode='dark'] {\n  --color-bg: #111;\n}")
+    );
+    assert!(!text.contains("url("));
+    assert!(!text.contains("color: red"));
+}
+
+#[test]
+fn skin_stylesheet_is_empty_without_a_skin_and_uploads_are_checked() {
+    let fx = workspace("default:\n  project: APP\n");
+    let api = server();
+    let css = get(&api, "/api/branding/theme.css");
+    assert_eq!(css.status, 200);
+    assert!(css.body.is_empty());
+
+    let upload = |filename: &str, body: &str| {
+        post(
+            &api,
+            "/api/branding/upload",
+            json!({
+                "image": "theme",
+                "filename": filename,
+                "content_base64": base64::engine::general_purpose::STANDARD.encode(body),
+            }),
+        )
+    };
+    assert_eq!(
+        data(&upload("Acme.css", ":root { --color-accent: #123456; }"))["path"],
+        ".tasks/@branding/theme.css"
+    );
+    assert!(fx.tasks_dir.join("@branding/theme.css").exists());
+    assert_eq!(
+        upload("skin.css", "body { color: red; }").status,
+        400,
+        "no variables"
+    );
+    assert_eq!(
+        upload("skin.txt", ":root { --x: 1; }").status,
+        400,
+        "not css"
+    );
+
+    for (field, value) in [
+        ("ui.theme_file", "../skin.css"),
+        ("ui.theme_file", "assets/skin.scss"),
+        ("ui.theme", "terminal:plaid"),
+    ] {
+        let resp = post(
+            &api,
+            "/api/config/set",
+            json!({"global": true, "values": {field: value}}),
+        );
+        assert_eq!(resp.status, 400, "{field}={value}");
+    }
+    let resp = post(
+        &api,
+        "/api/config/set",
+        json!({"global": true, "values": {"ui.theme": "terminal:red"}}),
+    );
+    assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
+}

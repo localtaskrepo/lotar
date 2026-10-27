@@ -6,19 +6,51 @@
     <div class="field-grid" data-testid="config-appearance">
       <div class="field field--full">
         <label class="field-label" for="config-ui-theme">Default theme</label>
-        <div class="appearance-theme">
-          <UiSelect id="config-ui-theme" v-model="uiTheme" @change="emit('validate', 'ui_theme')">
-            <option value="">Built-in default ({{ THEMES[0].name }})</option>
-            <option v-for="option in THEMES" :key="option.id" :value="option.id">{{ option.name }}</option>
-          </UiSelect>
-          <ThemePreview class="appearance-theme__preview" :theme="previewTheme" />
-        </div>
-        <p class="field-hint">{{ themeDescription }}</p>
+        <ThemeSelect
+          id="config-ui-theme"
+          v-model="themeModel"
+          unset-label="Not set"
+          :custom-name="uiThemeFile.trim() ? 'Repository skin' : null"
+          aria-label="Default theme"
+        />
+        <p class="field-hint">People who haven't picked their own theme in Preferences see this one.</p>
         <p v-if="homeOverride" class="field-hint field-hint--note" data-testid="config-ui-theme-home">
           Your ~/.lotar sets {{ homeOverride }}, which you see instead. Others see this setting unless their own
           ~/.lotar sets a theme.
         </p>
         <p v-if="errors.ui_theme" class="field-error">{{ errors.ui_theme }}</p>
+      </div>
+
+      <div class="field field--full">
+        <label class="field-label" for="config-ui-theme-file">Skin file</label>
+        <div class="appearance-skin">
+          <UiInput
+            id="config-ui-theme-file"
+            v-model="uiThemeFile"
+            maxlength="512"
+            placeholder="assets/lotar-theme.css"
+            @blur="emit('validate', 'ui_theme_file')"
+          />
+          <input
+            ref="skinPicker"
+            type="file"
+            accept=".css,text/css"
+            hidden
+            data-testid="config-ui-theme-file-upload"
+            @change="onSkinPicked"
+          />
+          <UiButton type="button" :disabled="uploading === 'theme'" @click="skinPicker?.click()">
+            {{ uploading === 'theme' ? 'Uploading…' : 'Upload…' }}
+          </UiButton>
+        </div>
+        <p class="field-hint">
+          Your own theme: a CSS file in the repository that sets theme variables such as
+          <code>--color-accent: #c0392b;</code> (rules for dark mode go under a selector or media query mentioning
+          <code>dark</code>). Copy a block from LoTaR's themes as a start. Only variables are used; <code>url()</code>,
+          imports and other rules are ignored. Then pick <strong>Repository skin</strong> above.
+        </p>
+        <p v-if="errors.ui_theme_file" class="field-error">{{ errors.ui_theme_file }}</p>
+        <p v-for="problem in skinProblems" :key="problem" class="field-error">{{ problem }}</p>
       </div>
 
       <div class="field field--full">
@@ -76,15 +108,14 @@ import { computed, onUnmounted, reactive, ref, type Ref } from 'vue'
 import { api } from '../api/client'
 import { useBranding } from '../composables/useBranding'
 import { fileToBase64 } from '../utils/taskAttachments'
-import { isThemeId, THEMES, type ThemeId } from '../utils/themes'
+import { parseThemeValue, themeLabel } from '../utils/themes'
 import ConfigGroup from './ConfigGroup.vue'
-import ThemePreview from './ThemePreview.vue'
+import ThemeSelect from './ThemeSelect.vue'
 import UiButton from './UiButton.vue'
 import UiInput from './UiInput.vue'
-import UiSelect from './UiSelect.vue'
 import { showToast } from './toast'
 
-type FieldKey = 'ui_theme' | 'ui_name' | 'ui_logo' | 'ui_logo_dark' | 'ui_icon'
+type FieldKey = 'ui_theme' | 'ui_name' | 'ui_logo' | 'ui_logo_dark' | 'ui_icon' | 'ui_theme_file'
 type ImageSlot = 'logo' | 'logo-dark' | 'icon'
 
 const uiTheme = defineModel<string>('uiTheme', { required: true })
@@ -92,24 +123,60 @@ const uiName = defineModel<string>('uiName', { required: true })
 const uiLogo = defineModel<string>('uiLogo', { required: true })
 const uiLogoDark = defineModel<string>('uiLogoDark', { required: true })
 const uiIcon = defineModel<string>('uiIcon', { required: true })
+const uiThemeFile = defineModel<string>('uiThemeFile', { required: true })
 
 const props = defineProps<{
   errors: Partial<Record<FieldKey, string | null>>
   /** Saved values, to know when the server's image URL matches the field. */
-  saved: { uiLogo: string; uiLogoDark: string; uiIcon: string }
+  saved: { uiLogo: string; uiLogoDark: string; uiIcon: string; uiThemeFile: string }
 }>()
 
 const emit = defineEmits<{ (e: 'validate', field: FieldKey): void }>()
 
 const branding = useBranding()
 
-const previewTheme = computed<ThemeId>(() => (isThemeId(uiTheme.value) ? uiTheme.value : THEMES[0].id))
+// The select's null is "not set" (an empty field).
+const themeModel = computed<string | null>({
+  get: () => uiTheme.value.trim() || null,
+  set: (value) => {
+    uiTheme.value = value ?? ''
+    emit('validate', 'ui_theme')
+  },
+})
 // A personal ~/.lotar theme wins over the repository's for this person.
 const homeOverride = computed(() => {
   if (branding.themeSource !== 'home' || !branding.theme) return null
-  return THEMES.find((option) => option.id === branding.theme)?.name ?? branding.theme
+  const choice = parseThemeValue(branding.theme, true)
+  return choice ? themeLabel(choice) : branding.theme
 })
-const themeDescription = computed(() => THEMES.find((option) => option.id === previewTheme.value)?.description ?? '')
+const skinProblems = computed(() =>
+  uiThemeFile.value.trim() === props.saved.uiThemeFile.trim()
+    ? branding.problems.filter((problem) => problem.startsWith('Skin:'))
+    : [],
+)
+const skinPicker = ref<HTMLInputElement | null>(null)
+
+async function onSkinPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  uploading.value = 'theme'
+  try {
+    const { path } = await api.uploadBranding({
+      image: 'theme',
+      filename: file.name,
+      content_base64: await fileToBase64(file),
+    })
+    uiThemeFile.value = path
+    emit('validate', 'ui_theme_file')
+    showToast('Skin uploaded. Pick Repository skin as the theme and save.')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message.replace(/^POST \S+ failed: /, '') : 'Upload failed')
+  } finally {
+    uploading.value = null
+  }
+}
 
 interface Slot {
   key: FieldKey
@@ -158,7 +225,7 @@ const slots: Slot[] = [
 // Local previews of files uploaded but not saved yet.
 const pending = reactive<Partial<Record<ImageSlot, { path: string; url: string }>>>({})
 const pickers = reactive<Partial<Record<ImageSlot, HTMLInputElement | null>>>({})
-const uploading = ref<ImageSlot | null>(null)
+const uploading = ref<ImageSlot | 'theme' | null>(null)
 
 function previewFor(slot: Slot): string | null {
   const value = slot.models.value.trim()
@@ -206,10 +273,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.appearance-theme {
+.appearance-skin {
   display: grid;
-  grid-template-columns: minmax(0, 240px) minmax(0, 220px);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
 }
 
@@ -248,7 +315,7 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
-  .appearance-theme,
+  .appearance-skin,
   .appearance-image {
     grid-template-columns: 1fr;
   }

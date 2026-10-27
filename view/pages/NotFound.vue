@@ -56,7 +56,7 @@ function goBack() {
   font-weight: 700;
   letter-spacing: 0.1em;
   margin: 0;
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .not-found h1 {

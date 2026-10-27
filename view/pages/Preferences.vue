@@ -22,12 +22,14 @@
 
         <fieldset class="appearance__group">
           <legend>Theme</legend>
-          <ThemePicker
-            v-model="themeName"
-            :default-theme="repositoryTheme"
-            :default-hint="defaultThemeHint"
-            name="theme-name"
+          <ThemeSelect
+            v-model="themeChoice"
+            :configured="configuredTheme"
+            :configured-source="configuredSource"
+            :custom-name="branding.themeFile ? 'Repository skin' : null"
+            aria-label="Theme"
           />
+          <p class="muted appearance__note">{{ configuredNote }}</p>
         </fieldset>
 
         <fieldset class="appearance__group">
@@ -67,7 +69,7 @@
         <UiCard>
           <h3>Startup destination</h3>
           <div class="col" style="gap: 8px">
-            <UiSelect v-model="startupDestination">
+            <UiSelect v-model="startupDestination" class="preferences__startup">
               <option v-for="option in startupDestinationOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
               </option>
@@ -236,25 +238,43 @@ import {
   storeThemePreference,
   type ThemePreference,
 } from '../utils/theme'
-import ThemePicker from '../components/ThemePicker.vue'
-import { THEMES, type ThemeId } from '../utils/themes'
+import ThemeSelect from '../components/ThemeSelect.vue'
 import { useBranding } from '../composables/useBranding'
 
 const { isTabVisible, setTabHidden } = useNavTabs()
 const theme = ref<ThemePreference>('system')
 // DEV-218: the user's colour theme; null follows the repository default.
-const themeName = ref<ThemeId | null>(readThemeNamePreference())
+// DEV-220: one list; the configured theme is tagged. Choosing it stores
+// nothing (the browser follows the configuration); anything else is kept here.
 const branding = useBranding()
-const repositoryTheme = computed<ThemeId>(() => {
+const configuredTheme = computed(() => {
   void branding.theme
   return getRepositoryTheme()
 })
 // Usually a person's own ~/.lotar sets this; otherwise the repository.
-const defaultThemeHint = computed(() => {
-  const name = THEMES.find((option) => option.id === repositoryTheme.value)?.name ?? repositoryTheme.value
-  if (branding.themeSource === 'home') return `${name} · from your ~/.lotar`
-  if (branding.themeSource === 'repository') return `${name} · set for this repository in Config`
-  return `${name} · built-in`
+const configuredSource = computed(() => {
+  if (branding.themeSource === 'home') return 'your ~/.lotar'
+  if (branding.themeSource === 'repository') return "this repository's Config"
+  return 'LoTaR (nothing configured)'
+})
+const configuredNote = computed(() => {
+  const where =
+    branding.themeSource === 'home'
+      ? 'the theme in your ~/.lotar'
+      : branding.themeSource === 'repository'
+        ? "this repository's theme (Config → Appearance)"
+        : "LoTaR's default, as no theme is configured"
+  return `Marked Configured: ${where}. Picking it follows the configuration; other choices are kept in this browser.`
+})
+const storedTheme = ref<string | null>(readThemeNamePreference())
+const themeChoice = computed<string | null>({
+  get: () => storedTheme.value ?? configuredTheme.value,
+  set: (value) => {
+    const next = value && value !== configuredTheme.value ? value : null
+    storedTheme.value = next
+    storeThemeNamePreference(next)
+    applyThemeName(next)
+  },
 })
 const accent = ref<string>(DEFAULT_ACCENT)
 const accentEnabled = ref(false)
@@ -303,11 +323,6 @@ onMounted(() => {
 watch(theme, (value) => {
   applyThemePreference(value)
   storeThemePreference(value)
-})
-
-watch(themeName, (value) => {
-  storeThemeNamePreference(value)
-  applyThemeName(value)
 })
 
 watch(accentEnabled, (enabled) => {
@@ -449,6 +464,17 @@ function clearSavedFilters() {
   padding: 0;
   border: 0;
   min-width: 0;
+}
+
+/* Sized to its options, not the card. */
+.preferences__startup {
+  width: auto;
+  max-width: 22rem;
+}
+
+.appearance__note {
+  margin: 8px 0 0;
+  font-size: var(--text-xs);
 }
 
 .appearance__group legend {

@@ -1685,7 +1685,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
 
 .filter-bar__help-toggle.btn[aria-expanded='true'] {
   background: color-mix(in oklab, var(--color-accent) 14%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .filter-bar__help {

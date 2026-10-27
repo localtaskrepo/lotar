@@ -19,29 +19,39 @@ describe('theme selection', () => {
         delete document.documentElement.dataset.mode
     })
 
-    it('follows the repository default until the person picks a theme', () => {
+    it('follows the configured default until the person picks a theme', () => {
+        // Legacy ids from before palettes still work.
         setRepositoryTheme('forest')
-        expect(document.documentElement.dataset.themeName).toBe('forest')
-        expect(localStorage.getItem('lotar.repositoryTheme')).toBe('forest')
+        expect(document.documentElement.dataset.themeName).toBe('classic')
+        expect(document.documentElement.dataset.themePalette).toBe('forest')
+        expect(localStorage.getItem('lotar.repositoryTheme')).toBe('classic:forest')
 
-        storeThemeNamePreference('rose')
+        storeThemeNamePreference('terminal:red')
         applyThemeName(readThemeNamePreference())
-        expect(document.documentElement.dataset.themeName).toBe('rose')
+        expect(document.documentElement.dataset.themeName).toBe('terminal')
+        expect(document.documentElement.dataset.themePalette).toBe('red')
 
-        // A new repository default does not override the personal choice.
-        setRepositoryTheme('ocean')
-        expect(document.documentElement.dataset.themeName).toBe('rose')
+        // A new configured default does not override the personal choice.
+        setRepositoryTheme('matrix')
+        expect(document.documentElement.dataset.themeName).toBe('terminal')
 
         storeThemeNamePreference(null)
         applyThemeName(null)
-        expect(document.documentElement.dataset.themeName).toBe('ocean')
+        expect(document.documentElement.dataset.themeName).toBe('matrix')
+        // The default palette is applied by id too.
+        expect(document.documentElement.dataset.themePalette).toBe('green')
     })
 
-    it('ignores unknown themes', () => {
+    it('ignores unknown themes and palettes', () => {
         localStorage.setItem('lotar.themeName', 'neon')
         expect(readThemeNamePreference()).toBeNull()
+        storeThemeNamePreference('terminal:plaid')
+        expect(readThemeNamePreference()).toBeNull()
         setRepositoryTheme('neon')
-        expect(effectiveThemeName()).toBe('lotar')
+        expect(effectiveThemeName()).toBe('classic')
+        // The default palette is stored without a suffix.
+        storeThemeNamePreference('terminal:amber')
+        expect(readThemeNamePreference()).toBe('terminal')
     })
 
     it('resolves the mode, following the system when asked', () => {

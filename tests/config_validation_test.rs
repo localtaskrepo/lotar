@@ -112,6 +112,7 @@ fn test_global_config_validation_valid() {
         ui_logo: None,
         ui_logo_dark: None,
         ui_icon: None,
+        ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
     };
@@ -190,6 +191,7 @@ fn test_global_config_validation_privileged_port_warning() {
         ui_logo: None,
         ui_logo_dark: None,
         ui_icon: None,
+        ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
     };
@@ -285,6 +287,7 @@ fn test_global_config_validation_empty_lists_error() {
         ui_logo: None,
         ui_logo_dark: None,
         ui_icon: None,
+        ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
     };
@@ -382,6 +385,7 @@ fn test_global_config_validation_invalid_defaults() {
         ui_logo: None,
         ui_logo_dark: None,
         ui_icon: None,
+        ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
     };
@@ -466,6 +470,7 @@ fn test_global_config_duplicate_entries_warning() {
         ui_logo: None,
         ui_logo_dark: None,
         ui_icon: None,
+        ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
     };

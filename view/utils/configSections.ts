@@ -39,8 +39,8 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         label: 'Appearance',
         summary: 'Theme, name, logo and icon for everyone using this repository.',
         globalOnly: true,
-        fields: ['uiTheme', 'uiName', 'uiLogo', 'uiLogoDark', 'uiIcon'],
-        errorKeys: ['ui_theme', 'ui_name', 'ui_logo', 'ui_logo_dark', 'ui_icon'],
+        fields: ['uiTheme', 'uiThemeFile', 'uiName', 'uiLogo', 'uiLogoDark', 'uiIcon'],
+        errorKeys: ['ui_theme', 'ui_theme_file', 'ui_name', 'ui_logo', 'ui_logo_dark', 'ui_icon'],
     },
     {
         id: 'defaults',
