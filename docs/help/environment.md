@@ -69,7 +69,7 @@ All rows below are defined inside the same override table and map directly to th
 | Config key | Env var(s) | Accepted values | Purpose |
 | --- | --- | --- | --- |
 | `agent.context_extension` | `LOTAR_AGENT_CONTEXT_EXTENSION` | Extension string | File extension for context files stored next to tickets (default `.context`). |
-| `agent.logs_dir` | `LOTAR_AGENT_LOGS_DIR` | Path string | Directory for debug logs. When set, job events are persisted to `<logs_dir>/<JOB_ID>.jsonl`. Relative paths resolve under the tasks directory. |
+| `agent.logs_dir` | `LOTAR_AGENT_LOGS_DIR` | Path string or `off` | Folder for job logs (`<logs_dir>/<JOB_ID>.jsonl`); default `<tasks dir>/@agent-logs`. Relative paths resolve from the workspace root. `off` turns logging off. |
 
 | Variable | Values | Effect |
 | --- | --- | --- |

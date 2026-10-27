@@ -28,7 +28,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - sync.write_reports: boolean (default true)
 - agent.context_enabled: boolean (default true) — when true, LoTaR stores per-ticket `.context` files to support agent resume/continue; disable for stateless runs. If you don’t want to share context files, add `.context` to `.gitignore`.
 - agent.context_extension: string (default ".context")
-- agent.logs_dir: optional string (default unset: job logs are not written, so `lotar agent status`/`logs` only find jobs the current process still holds). Relative paths resolve from the workspace root; see [Agent Jobs](./agent.md).
+- agent.logs_dir: optional string (default `<tasks dir>/@agent-logs`). Job events are written to `<logs_dir>/<JOB_ID>.jsonl` so `lotar agent status`/`logs`/`list-jobs` and the Agents page find finished jobs. Relative paths resolve from the workspace root; `off` turns logging off. The folder gets a `.gitignore` and keeps the newest 500 job logs; see [Agent Jobs](./agent.md).
 - agent.instructions: string | { file: string } (default: built-in) — prepended to agent prompts. Inline strings are used directly; file paths can be absolute or relative to the tasks directory.
 - agent.worktree.enabled: boolean (default false) — when true, agent jobs run inside a git worktree.
 - agent.worktree.dir: string (default computed) — optional worktree root directory; relative paths resolve from the repo’s parent directory.

@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use sysinfo::{ProcessesToUpdate, System};
 
 /// Get the logs directory and workspace root from config.
-/// Returns (workspace_root, logs_dir) where logs_dir may be None if not configured.
+/// Returns (workspace_root, logs_dir) where logs_dir is None when logging is off.
 fn get_logs_config(resolver: &TasksDirectoryResolver) -> (std::path::PathBuf, Option<String>) {
     let workspace_root = resolver
         .path
@@ -28,9 +28,13 @@ fn get_logs_config(resolver: &TasksDirectoryResolver) -> (std::path::PathBuf, Op
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| resolver.path.clone());
 
-    let logs_dir = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
+    let configured = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
         .ok()
         .and_then(|cfg| cfg.get_resolved_config().agent_logs_dir.clone());
+    let logs_dir = crate::services::agent_log_service::effective_logs_dir(
+        &resolver.path,
+        configured.as_deref(),
+    );
 
     (workspace_root, logs_dir)
 }
@@ -123,10 +127,7 @@ impl AgentHandler {
         // Fall back to persisted log file (if logging is enabled)
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
-            return Err(format!(
-                "Job '{}' not found (agent logging not enabled)",
-                id
-            ));
+            return Err(format!("Job '{}' not found (agent logging is off)", id));
         };
 
         let header = AgentLogService::load_header(&workspace_root, &logs_dir, id)
@@ -200,7 +201,7 @@ impl AgentHandler {
         // Fall back to persisted log file (if logging is enabled)
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
-            renderer.emit_notice("No job events recorded (agent logging not enabled).");
+            renderer.emit_notice("No job events recorded (agent logging is off).");
             return Ok(());
         };
 
@@ -277,7 +278,7 @@ impl AgentHandler {
                 renderer.emit_json(&serde_json::json!({ "jobs": [] }));
                 return Ok(());
             }
-            renderer.emit_notice("No job logs found (agent logging not enabled).");
+            renderer.emit_notice("No job logs found (agent logging is off).");
             return Ok(());
         };
 

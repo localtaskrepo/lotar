@@ -3,8 +3,10 @@
 //! Writes job events to `<logs_dir>/<JOB_ID>.jsonl` files for later retrieval.
 //! Uses JSON Lines format so events can be appended incrementally.
 //!
-//! Logging is only enabled when `agent_logs_dir` is configured. The path can be
-//! relative (resolved against workspace root) or absolute.
+//! Logs go to `<tasks dir>/@agent-logs` unless `agent_logs_dir` names another
+//! folder (relative to the workspace root, or absolute) or turns logging off
+//! with `off`. The folder gets a `.gitignore` so logs are never committed by
+//! accident, and only the newest [`MAX_JOB_LOGS`] job logs are kept.
 
 use crate::errors::{LoTaRError, LoTaRResult};
 use serde::{Deserialize, Serialize};
@@ -59,6 +61,60 @@ pub struct JobStatusLine {
 
 pub struct AgentLogService;
 
+/// Default log folder inside the tasks directory.
+pub const DEFAULT_LOGS_DIR: &str = "@agent-logs";
+/// How many job logs a folder keeps; older ones are removed when a job starts.
+pub const MAX_JOB_LOGS: usize = 500;
+
+/// The log folder to use: the configured one, the default
+/// `<tasks dir>/@agent-logs` when none is set, or `None` when logging is
+/// turned off (`off`, `false` or `none`).
+pub fn effective_logs_dir(tasks_dir: &Path, configured: Option<&str>) -> Option<String> {
+    match configured.map(str::trim) {
+        None | Some("") => Some(
+            tasks_dir
+                .join(DEFAULT_LOGS_DIR)
+                .to_string_lossy()
+                .to_string(),
+        ),
+        Some(value)
+            if ["off", "false", "none"]
+                .iter()
+                .any(|off| value.eq_ignore_ascii_case(off)) =>
+        {
+            None
+        }
+        Some(value) => Some(value.to_string()),
+    }
+}
+
+/// Keep logs out of version control and drop the oldest beyond the limit.
+fn prepare_logs_dir(dir: &Path) {
+    let ignore = dir.join(".gitignore");
+    if !ignore.exists() {
+        let _ = fs::write(&ignore, "# Agent job logs written by LoTaR\n*\n");
+    }
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let mut logs: Vec<(std::time::SystemTime, PathBuf)> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "jsonl"))
+        .filter_map(|entry| {
+            let modified = entry.metadata().ok()?.modified().ok()?;
+            Some((modified, entry.path()))
+        })
+        .collect();
+    if logs.len() <= MAX_JOB_LOGS {
+        return;
+    }
+    logs.sort();
+    let excess = logs.len() - MAX_JOB_LOGS;
+    for (_, path) in logs.into_iter().take(excess) {
+        let _ = fs::remove_file(path);
+    }
+}
+
 impl AgentLogService {
     /// Initialize log file for a new job. Writes header line.
     /// Only writes if logs_dir is provided.
@@ -74,6 +130,7 @@ impl AgentLogService {
         let path = resolve_log_path(workspace_root, logs_dir, &header.job_id)?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
+            prepare_logs_dir(parent);
         }
 
         let header = JobLogLine::Header(header);
@@ -296,6 +353,73 @@ fn resolve_log_path(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTa
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn logs_default_to_the_tasks_dir_and_can_be_turned_off() {
+        let tasks = Path::new("/work/.tasks");
+        assert_eq!(
+            effective_logs_dir(tasks, None).as_deref(),
+            Some("/work/.tasks/@agent-logs")
+        );
+        assert_eq!(
+            effective_logs_dir(tasks, Some(" ")).as_deref(),
+            Some("/work/.tasks/@agent-logs")
+        );
+        assert_eq!(
+            effective_logs_dir(tasks, Some(".logs")).as_deref(),
+            Some(".logs")
+        );
+        assert_eq!(effective_logs_dir(tasks, Some("off")), None);
+        assert_eq!(effective_logs_dir(tasks, Some("None")), None);
+    }
+
+    #[test]
+    fn log_folder_is_git_ignored_and_keeps_the_newest_logs() {
+        let dir = tempdir().unwrap();
+        let logs = dir.path().join("logs");
+        fs::create_dir_all(&logs).unwrap();
+        for index in 0..MAX_JOB_LOGS + 3 {
+            let path = logs.join(format!("job-{index:04}.jsonl"));
+            fs::write(&path, "{}\n").unwrap();
+            let time = std::time::SystemTime::UNIX_EPOCH
+                + std::time::Duration::from_secs(1_000_000 + index as u64);
+            File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(time)
+                .unwrap();
+        }
+        let header = JobLogHeader {
+            job_id: "job-new".to_string(),
+            ticket_id: "T-1".to_string(),
+            runner: "claude".to_string(),
+            created_at: "now".to_string(),
+            worktree_path: None,
+            worktree_branch: None,
+            model: None,
+            effort: None,
+        };
+        AgentLogService::init_log(dir.path(), Some("logs"), header).unwrap();
+        assert!(
+            fs::read_to_string(logs.join(".gitignore"))
+                .unwrap()
+                .contains('*')
+        );
+        let remaining = fs::read_dir(&logs)
+            .unwrap()
+            .filter(|e| {
+                e.as_ref()
+                    .unwrap()
+                    .path()
+                    .extension()
+                    .is_some_and(|x| x == "jsonl")
+            })
+            .count();
+        assert!(remaining <= MAX_JOB_LOGS + 1, "{remaining}");
+        assert!(!logs.join("job-0000.jsonl").exists(), "oldest log removed");
+        assert!(logs.join("job-new.jsonl").exists());
+    }
 
     #[test]
     fn test_log_lifecycle() {

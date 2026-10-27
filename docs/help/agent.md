@@ -110,7 +110,7 @@ If the wrapper is not available, jobs can still run, but `list-running` will sho
 
 - `LOTAR_AGENT_WRAPPER` — absolute path to the wrapper binary if it is not on `PATH`.
 - `LOTAR_AGENT_CONTEXT_EXTENSION` — extension for context files (default `.context`).
-- `LOTAR_AGENT_LOGS_DIR` — when set, enables debug logging to this directory (supports relative or absolute paths).
+- `LOTAR_AGENT_LOGS_DIR` — where job logs go instead of `<tasks dir>/@agent-logs` (relative or absolute; `off` turns logging off).
 
 Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_TICKET_PROJECT`, `LOTAR_TICKET_REPORTER`, `LOTAR_TASKS_DIR`, the worktree path and branch, …) and `LOTAR_BIN`, the absolute path of the `lotar` that started the job. The built-in instructions call that path (`${{lotar.bin}}`) and its directory is put first on PATH, so an older `lotar` elsewhere (or a CLI that runs commands in a login shell, like Codex) can't answer instead.
 
@@ -260,7 +260,7 @@ Agent lifecycle automation lives in the automation rules file. Without a rule, a
 
 - Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running. Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.
 - Context history is persisted to `<project>/<ticket><extension>` files next to each ticket.
-- When `agent.logs_dir` (or `LOTAR_AGENT_LOGS_DIR`) is set, job events are also persisted to `<logs_dir>/<JOB_ID>.jsonl` files for debugging.
-- `lotar agent status` and `lotar agent logs` read from log files if the job is not in memory (requires `agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR`).
+- Job events are persisted to `<tasks dir>/@agent-logs/<JOB_ID>.jsonl` by default (`agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR` picks another folder; `off` turns it off). LoTaR writes a `.gitignore` into the folder so logs, which contain prompts and agent output, aren't committed, and keeps the newest 500 job logs.
+- `lotar agent status`, `lotar agent logs` and `lotar agent list-jobs` read these files when the job isn't in the current process.
 - Assigning a ticket to an agent profile (e.g., `@claude-review`) automatically queues a job for that ticket.
 - Review-stage tickets can only be advanced by their reporter when the change would alter assignee or status.

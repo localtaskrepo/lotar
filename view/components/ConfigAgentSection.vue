@@ -80,11 +80,13 @@
           :id="`${uid}-logs`"
           v-model="logsDir"
           maxlength="512"
-          :placeholder="isGlobal ? 'Not saved (kept in memory only)' : inheritPlaceholder(globalLogsDir)"
+          :placeholder="
+            isGlobal ? '<tasks dir>/@agent-logs' : inheritPlaceholder(globalLogsDir || '<tasks dir>/@agent-logs')
+          "
         />
         <p class="field-hint">
-          When set, job events are also written to &lt;folder&gt;/&lt;JOB_ID&gt;.jsonl so status and logs survive
-          restarts.
+          Job events are written to &lt;folder&gt;/&lt;JOB_ID&gt;.jsonl so status and logs survive restarts. Leave empty
+          for &lt;tasks dir&gt;/@agent-logs, or enter <code>off</code> to turn logging off.
         </p>
       </div>
 

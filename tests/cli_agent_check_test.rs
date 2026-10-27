@@ -211,3 +211,50 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"Fixed it."
         .stdout(predicate::str::contains("Fixed it."))
         .stdout(predicate::str::contains("denied").not());
 }
+
+/// Job logs are kept by default (DEV-211), so a finished job can be looked up
+/// from another process without configuring agent.logs_dir.
+#[test]
+fn finished_jobs_can_be_read_back_without_configuring_logs() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _tasks = EnvVarGuard::set(
+        "LOTAR_TASKS_DIR",
+        fixtures.tasks_root.to_string_lossy().as_ref(),
+    );
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        "default:\n  project: TEST\nagents:\n  stub:\n    runner: command\n    command: sh\n    args: ['-c', 'echo done']\n",
+    );
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["add", "Logged job"])
+        .assert()
+        .success();
+    let run = crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"])
+        .output()
+        .unwrap();
+    assert!(run.status.success());
+    let stdout = String::from_utf8_lossy(&run.stdout);
+    let job_id = stdout
+        .split_whitespace()
+        .find(|word| word.starts_with("job-"))
+        .expect("job id in output")
+        .to_string();
+
+    let logs = fixtures.tasks_root.join("@agent-logs");
+    assert!(logs.join(format!("{job_id}.jsonl")).exists());
+    assert!(logs.join(".gitignore").exists());
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["agent", "status", &job_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("completed"));
+}

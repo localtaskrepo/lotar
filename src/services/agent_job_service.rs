@@ -319,7 +319,10 @@ impl AgentJobService {
                         ticket_id: ticket_id.clone(),
                         tasks_dir: tasks_dir_buf.clone(),
                         workspace_root,
-                        agent_logs_dir: config.agent_logs_dir.clone(),
+                        agent_logs_dir: crate::services::agent_log_service::effective_logs_dir(
+                            tasks_dir,
+                            config.agent_logs_dir.as_deref(),
+                        ),
                         runner: runner_kind.as_str().to_string(),
                         runner_kind,
                         agent_profile: req.agent.clone(),
@@ -1551,9 +1554,13 @@ fn run_job(
         .worktree_path
         .as_ref()
         .map(|p| p.to_string_lossy().to_string());
+    let logs_dir = crate::services::agent_log_service::effective_logs_dir(
+        &tasks_dir,
+        config.agent_logs_dir.as_deref(),
+    );
     let _ = AgentLogService::init_log(
         &workspace_root,
-        config.agent_logs_dir.as_deref(),
+        logs_dir.as_deref(),
         crate::services::agent_log_service::JobLogHeader {
             job_id: job_id.clone(),
             ticket_id: ticket_id.clone(),
