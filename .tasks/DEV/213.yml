@@ -1,0 +1,7 @@
+title: Per-run model and effort overrides lose to the profile's own args
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-27T02:17:35.372060+00:00
+description: 'Found by the DEV-202 live failure scenario: lotar agent run --model X (and the REST/MCP/automation overrides) is ignored when the profile''s args already contain --model; the documented rule is that profile args win over LoTaR''s model/effort flags. That rule makes sense for the profile''s own model/effort fields, but an explicit per-run override probably should win, or at least the run should warn that it was ignored. Decide the precedence; if overrides should win, drop the profile''s own --model/--effort (and Codex model_reasoning_effort) from args for that run.'
