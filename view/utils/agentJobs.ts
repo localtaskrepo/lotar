@@ -1,4 +1,4 @@
-import type { AgentJob, AgentJobLogEntry } from '../api/types'
+import type { AgentJob, AgentJobLogEntry, AgentJobUsage } from '../api/types'
 
 export type LogTone = 'neutral' | 'tool' | 'agent' | 'user' | 'note' | 'warning' | 'success' | 'danger'
 
@@ -88,3 +88,38 @@ export const isFailedJob = (job: AgentJob) => job.status === 'failed' || job.sta
 /** Request prefilled in the Run agent dialog. */
 export const DEFAULT_RUN_PROMPT =
     'Work on this ticket. Make the changes it asks for, check them, and summarize what you changed and how you verified it.'
+
+const compactNumber = new Intl.NumberFormat(undefined, { notation: 'compact', maximumSignificantDigits: 3 })
+
+export function formatCost(cost: number): string {
+    return cost >= 1 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(cost >= 0.01 ? 3 : 4)}`
+}
+
+/** Short usage line for a job card: "$0.0040 · 107K tokens · 4 turns". */
+export function describeUsage(usage?: AgentJobUsage | null): string {
+    if (!usage) return ''
+    const parts: string[] = []
+    if (usage.cost_usd !== undefined) parts.push(formatCost(usage.cost_usd))
+    const tokens = (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0)
+    if (tokens) parts.push(`${compactNumber.format(tokens)} tokens`)
+    if (usage.turns !== undefined) parts.push(`${usage.turns} ${usage.turns === 1 ? 'turn' : 'turns'}`)
+    if (usage.premium_requests !== undefined)
+        parts.push(`${usage.premium_requests} premium ${usage.premium_requests === 1 ? 'request' : 'requests'}`)
+    if (usage.lines_added !== undefined || usage.lines_removed !== undefined)
+        parts.push(`+${usage.lines_added ?? 0} −${usage.lines_removed ?? 0} lines`)
+    return parts.join(' · ')
+}
+
+/** Full detail for a tooltip. */
+export function usageDetail(usage?: AgentJobUsage | null): string {
+    if (!usage) return ''
+    const lines: string[] = []
+    if (usage.input_tokens !== undefined)
+        lines.push(
+            `Input: ${usage.input_tokens.toLocaleString()} tokens` +
+                (usage.cached_input_tokens ? ` (${usage.cached_input_tokens.toLocaleString()} cached)` : ''),
+        )
+    if (usage.output_tokens !== undefined) lines.push(`Output: ${usage.output_tokens.toLocaleString()} tokens`)
+    if (usage.cost_usd !== undefined) lines.push(`Cost: $${usage.cost_usd.toFixed(4)}`)
+    return lines.join('\n')
+}

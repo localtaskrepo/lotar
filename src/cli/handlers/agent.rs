@@ -118,6 +118,9 @@ impl AgentHandler {
                 return Ok(());
             }
             renderer.emit_success(format!("Job {}: {}", job.id, job.status));
+            if let Some(usage) = job.usage.as_ref() {
+                renderer.emit_info(format!("Usage: {}", usage.describe()));
+            }
             if let Some(msg) = job.last_message.as_ref() {
                 renderer.emit_info(msg);
             }
@@ -150,6 +153,7 @@ impl AgentHandler {
                 "worktree_branch": header.worktree_branch,
                 "model": header.model,
                 "effort": header.effort,
+                "usage": status.as_ref().and_then(|s| s.usage.clone()),
             });
             renderer.emit_json(&serde_json::json!({ "job": job }));
             return Ok(());
@@ -167,6 +171,9 @@ impl AgentHandler {
         }
         if let Some(effort) = header.effort.as_ref() {
             renderer.emit_info(format!("Effort: {effort}"));
+        }
+        if let Some(usage) = status.as_ref().and_then(|s| s.usage.as_ref()) {
+            renderer.emit_info(format!("Usage: {}", usage.describe()));
         }
         if let Some(ref s) = status
             && let Some(ref summary) = s.summary
@@ -948,6 +955,9 @@ fn wait_for_job_completion(
                 renderer.emit_error(format!("Job {} {}", job.id, job.status));
             }
 
+            if let Some(usage) = job.usage.as_ref() {
+                renderer.emit_info(format!("Usage: {}", usage.describe()));
+            }
             if let Some(summary) = job.summary.as_ref() {
                 renderer.emit_info(summary);
             }

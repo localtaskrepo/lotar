@@ -1269,6 +1269,21 @@ export interface AgentJob {
     model?: string | null
     /** Reasoning effort the run was asked to use, when one was set. */
     effort?: string | null
+    /** What the job used, as its CLI reports it. */
+    usage?: AgentJobUsage | null
+}
+
+/** Usage a CLI reports for a job; missing values were not reported. */
+export interface AgentJobUsage {
+    /** All input tokens, including cached ones. */
+    input_tokens?: number
+    cached_input_tokens?: number
+    output_tokens?: number
+    cost_usd?: number
+    turns?: number
+    premium_requests?: number
+    lines_added?: number
+    lines_removed?: number
 }
 
 export interface AgentJobCreateRequest {

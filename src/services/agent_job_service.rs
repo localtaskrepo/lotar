@@ -90,6 +90,7 @@ struct AgentJobRecord {
     worktree_branch: Option<String>,
     model: Option<String>,
     effort: Option<String>,
+    usage: Option<crate::api_types::AgentJobUsage>,
     is_merge_job: bool,
 }
 
@@ -338,6 +339,7 @@ impl AgentJobService {
                         worktree_branch: None,
                         model: job_model.clone(),
                         effort: job_effort.clone(),
+                        usage: None,
                         is_merge_job,
                     },
                     events: Vec::new(),
@@ -402,6 +404,7 @@ impl AgentJobService {
             worktree_branch: None,
             model: job_model,
             effort: job_effort,
+            usage: None,
         }))
     }
 
@@ -616,6 +619,7 @@ impl AgentJobRecord {
             worktree_branch: self.worktree_branch.clone(),
             model: self.model.clone(),
             effort: self.effort.clone(),
+            usage: self.usage.clone(),
         }
     }
 
@@ -642,6 +646,7 @@ fn job_context_for(id: &str) -> Option<AutomationJobContext> {
         agent: state.record.agent_profile.clone(),
         worktree_path: state.record.worktree_path.clone(),
         worktree_branch: state.record.worktree_branch.clone(),
+        usage: state.record.usage.clone(),
     })
 }
 
@@ -862,6 +867,7 @@ fn instruction_template(
         agent: agent.map(str::to_string),
         worktree_path: worktree_path.map(|path| path.to_string_lossy().to_string()),
         worktree_branch: branch,
+        usage: None,
     };
     let workspace_root =
         repo_root.unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
@@ -2118,7 +2124,17 @@ fn handle_runner_line(
                 // The runner's final answer is the job's summary, ahead of any
                 // note (such as denied tools) logged just before it.
                 let final_text = event.text.clone().filter(|text| !text.trim().is_empty());
+                let usage = event.payload.as_ref().and_then(|payload| {
+                    crate::services::agent_runner::usage_from_result(runner_kind, payload)
+                });
                 update_job(job_id, |state| {
+                    if let Some(ref usage) = usage {
+                        state
+                            .record
+                            .usage
+                            .get_or_insert_with(Default::default)
+                            .add(usage);
+                    }
                     if let Some(ref text) = final_text {
                         state.record.last_message = Some(text.clone());
                     }
@@ -2321,27 +2337,31 @@ fn finalize_job(
 
     // Write final status to persistent log (if logging is enabled)
     let status_str = if success { "completed" } else { "failed" };
-    let (summary, workspace_root, logs_dir) = if let Ok(registry) = JOB_REGISTRY.lock() {
+    let (summary, workspace_root, logs_dir, usage) = if let Ok(registry) = JOB_REGISTRY.lock() {
         if let Some(state) = registry.jobs.get(job_id) {
             (
                 state.record.summary.clone(),
                 state.record.workspace_root.clone(),
                 state.record.agent_logs_dir.clone(),
+                state.record.usage.clone(),
             )
         } else {
-            (None, tasks_dir.to_path_buf(), None)
+            (None, tasks_dir.to_path_buf(), None, None)
         }
     } else {
-        (None, tasks_dir.to_path_buf(), None)
+        (None, tasks_dir.to_path_buf(), None, None)
     };
-    let _ = AgentLogService::write_status(
+    let _ = AgentLogService::write_status_with_usage(
         &workspace_root,
         logs_dir.as_deref(),
         job_id,
-        status_str,
-        &Utc::now().to_rfc3339(),
-        exit_code,
-        summary,
+        crate::services::agent_log_service::JobStatusLine {
+            status: status_str.to_string(),
+            at: Utc::now().to_rfc3339(),
+            exit_code,
+            summary,
+            usage,
+        },
     );
 
     let mut job_context = None;
@@ -2354,6 +2374,7 @@ fn finalize_job(
                 agent: state.record.agent_profile.clone(),
                 worktree_path: state.record.worktree_path.clone(),
                 worktree_branch: state.record.worktree_branch.clone(),
+                usage: state.record.usage.clone(),
             });
         }
         if registry
@@ -2602,6 +2623,7 @@ fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
         "worktree_branch": record.worktree_branch,
         "model": record.model,
         "effort": record.effort,
+        "usage": record.usage,
     });
     crate::api_events::emit(&crate::api_events::ApiEvent {
         kind: event.kind.clone(),
@@ -2944,6 +2966,7 @@ mod tests {
                 worktree_branch: None,
                 model: None,
                 effort: None,
+                usage: None,
                 is_merge_job: false,
             },
             events: Vec::new(),

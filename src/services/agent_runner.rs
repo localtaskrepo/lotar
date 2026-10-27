@@ -132,6 +132,72 @@ fn args_set_permissions(kind: AgentRunnerKind, args: &[String]) -> bool {
 /// Each CLI's flags for a permission level. `writable_dirs` are extra
 /// directories the `workspace` level may write besides the working directory
 /// (the tasks directory and git data of a worktree job).
+/// Usage a CLI reports in its final event (Codex: per completed turn).
+pub fn usage_from_result(
+    kind: AgentRunnerKind,
+    payload: &JsonValue,
+) -> Option<crate::api_types::AgentJobUsage> {
+    let uint = |value: Option<&JsonValue>| value.and_then(|v| v.as_u64());
+    let float = |value: Option<&JsonValue>| value.and_then(|v| v.as_f64());
+    let usage = match kind {
+        AgentRunnerKind::Claude => {
+            let usage = payload.get("usage");
+            let field = |name: &str| uint(usage.and_then(|u| u.get(name)));
+            let parts = [
+                field("input_tokens"),
+                field("cache_creation_input_tokens"),
+                field("cache_read_input_tokens"),
+            ];
+            crate::api_types::AgentJobUsage {
+                input_tokens: parts
+                    .iter()
+                    .any(Option::is_some)
+                    .then(|| parts.iter().flatten().sum()),
+                cached_input_tokens: field("cache_read_input_tokens"),
+                output_tokens: field("output_tokens"),
+                cost_usd: float(payload.get("total_cost_usd")),
+                turns: uint(payload.get("num_turns")),
+                ..Default::default()
+            }
+        }
+        AgentRunnerKind::Codex => {
+            let usage = payload.get("usage")?;
+            let field = |name: &str| uint(usage.get(name));
+            let output = match (field("output_tokens"), field("reasoning_output_tokens")) {
+                (Some(out), reasoning) => Some(out + reasoning.unwrap_or(0)),
+                (None, reasoning) => reasoning,
+            };
+            crate::api_types::AgentJobUsage {
+                input_tokens: field("input_tokens"),
+                cached_input_tokens: field("cached_input_tokens"),
+                output_tokens: output,
+                turns: Some(1),
+                ..Default::default()
+            }
+        }
+        AgentRunnerKind::Copilot => {
+            let usage = payload.get("usage")?;
+            let changes = usage.get("codeChanges");
+            crate::api_types::AgentJobUsage {
+                premium_requests: float(usage.get("premiumRequests")),
+                lines_added: uint(changes.and_then(|c| c.get("linesAdded"))),
+                lines_removed: uint(changes.and_then(|c| c.get("linesRemoved"))),
+                ..Default::default()
+            }
+        }
+        AgentRunnerKind::Gemini => {
+            let stats = payload.get("stats")?;
+            crate::api_types::AgentJobUsage {
+                input_tokens: uint(stats.get("input_tokens")),
+                output_tokens: uint(stats.get("output_tokens")),
+                ..Default::default()
+            }
+        }
+        AgentRunnerKind::Command => return None,
+    };
+    (usage != crate::api_types::AgentJobUsage::default()).then_some(usage)
+}
+
 /// The agent CLIs LoTaR can drive that are on this machine's PATH.
 pub fn installed_agent_clis() -> Vec<&'static str> {
     let Some(path) = std::env::var_os("PATH") else {
@@ -415,6 +481,12 @@ fn model_effort_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec
             // Gemini has no effort flag; command runners read LOTAR_AGENT_EFFORT.
             _ => {}
         }
+    }
+    if let Some(budget) = profile.max_budget_usd.filter(|budget| *budget > 0.0)
+        && kind == AgentRunnerKind::Claude
+        && !has_flag(own, &["--max-budget-usd"])
+    {
+        args.extend(["--max-budget-usd".to_string(), budget.to_string()]);
     }
     args
 }
@@ -907,6 +979,61 @@ mod tests {
             runner: runner.to_string(),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn usage_comes_from_each_clis_final_event() {
+        let usage = |kind: AgentRunnerKind, fixture: &str| {
+            let mut total: Option<crate::api_types::AgentJobUsage> = None;
+            for event in replay(kind, fixture) {
+                if event.kind == RunnerEventKind::Result
+                    && let Some(usage) = event
+                        .payload
+                        .as_ref()
+                        .and_then(|payload| usage_from_result(kind, payload))
+                {
+                    total.get_or_insert_with(Default::default).add(&usage);
+                }
+            }
+            total.expect("usage reported")
+        };
+
+        let claude = usage(AgentRunnerKind::Claude, "claude-edit.jsonl");
+        assert_eq!(claude.input_tokens, Some(6 + 13185 + 93837));
+        assert_eq!(claude.cached_input_tokens, Some(93837));
+        assert_eq!(claude.output_tokens, Some(588));
+        assert_eq!(claude.cost_usd, Some(0.00399887));
+        assert_eq!(claude.turns, Some(4));
+        assert_eq!(
+            claude.describe(),
+            "107,028 tokens in (93,837 cached), 588 out · $0.0040 · 4 turns"
+        );
+
+        let codex = usage(AgentRunnerKind::Codex, "codex-edit.jsonl");
+        assert_eq!(codex.input_tokens, Some(90723));
+        assert_eq!(codex.cached_input_tokens, Some(80768));
+        assert_eq!(codex.output_tokens, Some(253));
+        assert_eq!(codex.cost_usd, None);
+
+        let copilot = usage(AgentRunnerKind::Copilot, "copilot-edit.jsonl");
+        assert_eq!(copilot.premium_requests, Some(1.0));
+        assert_eq!(copilot.lines_added, Some(1));
+        assert_eq!(copilot.lines_removed, Some(1));
+        assert_eq!(copilot.describe(), "1 premium request · +1 −1 lines");
+    }
+
+    #[test]
+    fn max_budget_is_passed_to_claude_only() {
+        let mut profile = crate::config::types::AgentProfileDetail {
+            runner: "claude".to_string(),
+            max_budget_usd: Some(0.5),
+            ..Default::default()
+        };
+        let claude = model_effort_args(AgentRunnerKind::Claude, &profile);
+        assert_eq!(claude, ["--max-budget-usd", "0.5"]);
+        assert!(model_effort_args(AgentRunnerKind::Codex, &profile).is_empty());
+        profile.args = vec!["--max-budget-usd".into(), "2".into()];
+        assert!(model_effort_args(AgentRunnerKind::Claude, &profile).is_empty());
     }
 
     fn replay(kind: AgentRunnerKind, fixture: &str) -> Vec<RunnerEvent> {

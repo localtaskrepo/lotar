@@ -57,6 +57,8 @@ pub struct JobStatusLine {
     pub exit_code: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub usage: Option<crate::api_types::AgentJobUsage>,
 }
 
 pub struct AgentLogService;
@@ -186,6 +188,27 @@ impl AgentLogService {
         exit_code: Option<i32>,
         summary: Option<String>,
     ) -> LoTaRResult<()> {
+        Self::write_status_with_usage(
+            workspace_root,
+            logs_dir,
+            job_id,
+            JobStatusLine {
+                status: status.to_string(),
+                at: at.to_string(),
+                exit_code,
+                summary,
+                usage: None,
+            },
+        )
+    }
+
+    /// Write the final status line, including what the job used.
+    pub fn write_status_with_usage(
+        workspace_root: &Path,
+        logs_dir: Option<&str>,
+        job_id: &str,
+        status_line: JobStatusLine,
+    ) -> LoTaRResult<()> {
         let Some(logs_dir) = logs_dir else {
             return Ok(());
         };
@@ -195,12 +218,7 @@ impl AgentLogService {
             return Ok(());
         }
 
-        let status_line = JobLogLine::Status(JobStatusLine {
-            status: status.to_string(),
-            at: at.to_string(),
-            exit_code,
-            summary,
-        });
+        let status_line = JobLogLine::Status(status_line);
 
         let mut file = OpenOptions::new().append(true).open(&path)?;
         let line = serde_json::to_string(&status_line)

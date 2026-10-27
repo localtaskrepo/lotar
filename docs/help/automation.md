@@ -213,7 +213,7 @@ Available variables:
 | `ticket.*` | `id`, `title`, `status`, `priority`, `type`, `assignee`, `reporter`, `description`, `due_date`, `effort`, `tags`, `field:<name>` |
 | `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
 | `comment.*` | `text` (available on `commented` events) |
-| `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events) |
+| `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the CLI reported them |
 
 Example:
 

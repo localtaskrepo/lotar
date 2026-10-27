@@ -430,6 +430,117 @@ pub struct TaskUpdate {
     pub sprints: Option<Vec<u32>>,
 }
 
+/// What a job used, as far as its CLI reports it. Claude reports tokens,
+/// cost and turns; Codex tokens; Copilot premium requests and changed lines;
+/// Gemini tokens. Missing values were not reported.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobUsage {
+    /// All input tokens, including cached ones.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_tokens: Option<u64>,
+    /// Input tokens read from the prompt cache.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_input_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<u64>,
+    /// Cost in US dollars as computed by the CLI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_usd: Option<f64>,
+    /// Agent turns (model round trips).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turns: Option<u64>,
+    /// GitHub Copilot premium requests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub premium_requests: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lines_added: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lines_removed: Option<u64>,
+}
+
+impl AgentJobUsage {
+    /// Add another report (Codex reports usage per turn).
+    pub fn add(&mut self, other: &AgentJobUsage) {
+        fn sum<T: Copy + std::ops::Add<Output = T>>(a: Option<T>, b: Option<T>) -> Option<T> {
+            match (a, b) {
+                (Some(a), Some(b)) => Some(a + b),
+                (a, b) => a.or(b),
+            }
+        }
+        self.input_tokens = sum(self.input_tokens, other.input_tokens);
+        self.cached_input_tokens = sum(self.cached_input_tokens, other.cached_input_tokens);
+        self.output_tokens = sum(self.output_tokens, other.output_tokens);
+        self.cost_usd = sum(self.cost_usd, other.cost_usd);
+        self.turns = sum(self.turns, other.turns);
+        self.premium_requests = sum(self.premium_requests, other.premium_requests);
+        self.lines_added = sum(self.lines_added, other.lines_added);
+        self.lines_removed = sum(self.lines_removed, other.lines_removed);
+    }
+
+    /// One line for people: "106,028 tokens in (93,837 cached), 588 out · $0.0040 · 4 turns".
+    pub fn describe(&self) -> String {
+        let number = |n: u64| {
+            let digits = n.to_string();
+            let mut out = String::new();
+            for (i, ch) in digits.chars().enumerate() {
+                if i > 0 && (digits.len() - i).is_multiple_of(3) {
+                    out.push(',');
+                }
+                out.push(ch);
+            }
+            out
+        };
+        let mut parts = Vec::new();
+        match (self.input_tokens, self.output_tokens) {
+            (None, None) => {}
+            (input, output) => {
+                let mut tokens = String::new();
+                if let Some(input) = input {
+                    tokens.push_str(&format!("{} tokens in", number(input)));
+                    if let Some(cached) = self.cached_input_tokens.filter(|c| *c > 0) {
+                        tokens.push_str(&format!(" ({} cached)", number(cached)));
+                    }
+                }
+                if let Some(output) = output {
+                    if !tokens.is_empty() {
+                        tokens.push_str(", ");
+                    }
+                    tokens.push_str(&format!("{} out", number(output)));
+                }
+                parts.push(tokens);
+            }
+        }
+        if let Some(cost) = self.cost_usd {
+            parts.push(format!("${cost:.4}"));
+        }
+        if let Some(turns) = self.turns {
+            parts.push(format!(
+                "{turns} {}",
+                if turns == 1 { "turn" } else { "turns" }
+            ));
+        }
+        if let Some(requests) = self.premium_requests {
+            parts.push(format!(
+                "{requests} premium {}",
+                if requests == 1.0 {
+                    "request"
+                } else {
+                    "requests"
+                }
+            ));
+        }
+        if self.lines_added.is_some() || self.lines_removed.is_some() {
+            parts.push(format!(
+                "+{} −{} lines",
+                self.lines_added.unwrap_or(0),
+                self.lines_removed.unwrap_or(0)
+            ));
+        }
+        parts.join(" · ")
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJob {
@@ -462,6 +573,9 @@ pub struct AgentJob {
     /// Reasoning effort the run was asked to use, when one was set.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
+    /// Tokens, cost and similar as reported by the CLI, once known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<AgentJobUsage>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

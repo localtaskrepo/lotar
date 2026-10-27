@@ -77,6 +77,28 @@ agents:
 
 Values are passed through as given, so each CLI decides which names it accepts. They may use letters, digits and `. _ - : / @ [ ]`. If the profile's `args` already set the model or effort, those win. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
 
+### Usage and cost
+
+When a job ends, LoTaR records what its CLI reports about it:
+
+| Runner | Recorded |
+| --- | --- |
+| `claude` | input tokens (with cached), output tokens, cost in USD, turns |
+| `codex` | input tokens (with cached), output tokens (including reasoning) |
+| `copilot` | premium requests, lines added and removed |
+| `gemini` | input and output tokens |
+
+The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
+
+A Claude profile can cap what a run may spend with `max_budget_usd` (passed as `--max-budget-usd`); other CLIs have no such limit.
+
+```yaml
+agents:
+  implement:
+    runner: claude
+    max_budget_usd: 2.5
+```
+
 ### Tools and MCP servers
 
 `tools` and `mcp` fine-tune what a Claude or Copilot agent may use, in that CLI's own tool syntax. They add to the permission level rather than replace it.

@@ -76,6 +76,21 @@ impl TemplateContext {
         if let Some(ref v) = job.worktree_branch {
             self.set("agent.worktree_branch", v);
         }
+        if let Some(ref usage) = job.usage {
+            self.set("agent.usage", &usage.describe());
+            if let Some(cost) = usage.cost_usd {
+                self.set("agent.cost_usd", &format!("{cost:.4}"));
+            }
+            if let Some(tokens) = usage.input_tokens {
+                self.set("agent.input_tokens", &tokens.to_string());
+            }
+            if let Some(tokens) = usage.output_tokens {
+                self.set("agent.output_tokens", &tokens.to_string());
+            }
+            if let Some(turns) = usage.turns {
+                self.set("agent.turns", &turns.to_string());
+            }
+        }
         self
     }
 
@@ -216,6 +231,33 @@ fn is_event_only_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn job_usage_is_available_to_templates() {
+        let job = AutomationJobContext {
+            job_id: "job-1".to_string(),
+            runner: "claude".to_string(),
+            agent: Some("implement".to_string()),
+            worktree_path: None,
+            worktree_branch: None,
+            usage: Some(crate::api_types::AgentJobUsage {
+                input_tokens: Some(1200),
+                output_tokens: Some(300),
+                cost_usd: Some(0.0123),
+                turns: Some(3),
+                ..Default::default()
+            }),
+        };
+        let ctx = TemplateContext::new().with_job(Some(&job));
+        assert_eq!(
+            ctx.expand("${{agent.cost_usd}} / ${{agent.input_tokens}} / ${{agent.output_tokens}} / ${{agent.turns}}"),
+            "0.0123 / 1200 / 300 / 3"
+        );
+        assert_eq!(
+            ctx.expand("${{agent.usage}}"),
+            "1,200 tokens in, 300 out · $0.0123 · 3 turns"
+        );
+    }
 
     #[test]
     fn expand_basic_variables() {

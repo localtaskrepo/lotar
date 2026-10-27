@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeLogEntry, formatDuration, jobDuration, runSettings } from '../utils/agentJobs'
+import { describeLogEntry, describeUsage, formatDuration, jobDuration, runSettings } from '../utils/agentJobs'
 import type { AgentJob } from '../api/types'
 
 const entry = (kind: string, message: string | null = null) => ({ kind, sequence: 1, at: '', message })
@@ -34,5 +34,21 @@ describe('agent job helpers', () => {
         expect(runSettings('sonnet', 'high')).toBe('sonnet, high effort')
         expect(runSettings(null, 'low')).toBe('low effort')
         expect(runSettings(null, null)).toBe('')
+    })
+
+    it('summarizes usage per CLI', () => {
+        expect(
+            describeUsage({
+                input_tokens: 107028,
+                cached_input_tokens: 93837,
+                output_tokens: 588,
+                cost_usd: 0.004,
+                turns: 4,
+            }),
+        ).toMatch(/^\$0\.0040 · 108K tokens · 4 turns$/)
+        expect(describeUsage({ premium_requests: 1, lines_added: 3, lines_removed: 1 })).toBe(
+            '1 premium request · +3 −1 lines',
+        )
+        expect(describeUsage(null)).toBe('')
     })
 })

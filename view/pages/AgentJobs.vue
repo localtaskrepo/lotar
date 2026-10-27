@@ -102,6 +102,9 @@
                 }}</span>
                 <span v-if="ticketInfo[group.ticketId]?.assignee">{{ ticketInfo[group.ticketId]!.assignee }}</span>
                 <span>{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
+                <span v-if="group.cost !== null" class="ticket-cost" title="Total cost of these jobs">{{
+                  formatCost(group.cost)
+                }}</span>
               </div>
               <ol v-if="group.jobs.length > 1" class="phase-trail" aria-label="Job sequence">
                 <li v-for="job in group.jobs" :key="job.id" :class="`phase-step phase-step--${job.status}`">
@@ -150,6 +153,9 @@
                   class="job-exit"
                   >exit {{ job.exit_code }}</span
                 >
+                <span v-if="describeUsage(job.usage)" class="job-usage" :title="usageDetail(job.usage) || undefined">{{
+                  describeUsage(job.usage)
+                }}</span>
                 <span v-if="job.worktree_branch" class="branch-chip" :title="job.worktree_path || undefined">{{
                   job.worktree_branch
                 }}</span>
@@ -253,7 +259,16 @@ import AgentJobLog from '../components/AgentJobLog.vue'
 import AgentRunDialog from '../components/AgentRunDialog.vue'
 import AgentSetupPanel from '../components/AgentSetupPanel.vue'
 import MarkdownContent from '../components/MarkdownContent.vue'
-import { isActiveJob, isFailedJob, isToolLine, jobDuration, runSettings } from '../utils/agentJobs'
+import {
+  describeUsage,
+  formatCost,
+  isActiveJob,
+  isFailedJob,
+  isToolLine,
+  jobDuration,
+  runSettings,
+  usageDetail,
+} from '../utils/agentJobs'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
@@ -320,6 +335,9 @@ const groupedJobs = computed(() => {
         ticketId,
         latest,
         jobs,
+        cost: ticketJobs.some((job) => job.usage?.cost_usd !== undefined)
+          ? ticketJobs.reduce((sum, job) => sum + (job.usage?.cost_usd ?? 0), 0)
+          : null,
         counts: {
           running: ticketJobs.filter((job) => job.status === 'running').length,
           queued: ticketJobs.filter((job) => job.status === 'queued').length,
@@ -484,6 +502,7 @@ function updateFromEvent(payload: any, kind: string) {
     worktree_branch: payload.worktree_branch || null,
     model: payload.model || null,
     effort: payload.effort || null,
+    usage: payload.usage || null,
   }
   mergeJob(next)
   recentEventJobs.set(next.id, { job: next, seq: ++eventSeq })
@@ -530,6 +549,7 @@ function mergeJobFields(existing: AgentJob, next: AgentJob): AgentJob {
     last_message: next.last_message || existing.last_message,
     summary: next.summary || existing.summary,
     session_id: next.session_id || existing.session_id,
+    usage: next.usage ?? existing.usage ?? null,
   }
 }
 
@@ -1038,6 +1058,14 @@ onBeforeUnmount(() => {
   gap: 4px 12px;
   font-size: 12px;
   color: var(--color-muted);
+}
+
+.job-usage {
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-cost {
+  font-variant-numeric: tabular-nums;
 }
 
 .job-exit {

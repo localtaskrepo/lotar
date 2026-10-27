@@ -173,6 +173,10 @@ pub struct AgentProfileDetail {
     /// Reasoning effort passed to the CLI (for example `low`, `high`).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
+    /// Stop a run once it has cost this many US dollars (Claude only:
+    /// `--max-budget-usd`).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub max_budget_usd: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub command: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

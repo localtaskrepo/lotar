@@ -1,9 +1,14 @@
 title: Record agent usage and cost per job
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T18:11:32.162137+00:00
+modified: 2026-10-27T01:31:27.471556+00:00
+comments:
+- date: 2026-10-27T01:31:27.432642+00:00
+  text: 'Done: jobs record usage from each CLI''s final event (claude: input tokens incl. cache, cached, output, cost_usd, turns; codex: tokens summed per turn incl. reasoning output; copilot: premium requests and lines added/removed; gemini: stats tokens). Shown in lotar agent status, run --wait, the Agents page (per job with a tooltip, plus a cost total per ticket), REST/SSE/MCP job JSON (AgentJob.usage, OpenAPI updated) and the job log status line. Automation templates get agent.usage, agent.cost_usd, agent.input_tokens, agent.output_tokens, agent.turns. Profiles can set max_budget_usd (claude --max-budget-usd). Tests: usage_comes_from_each_clis_final_event (real captured streams), max_budget_is_passed_to_claude_only, job_usage_is_available_to_templates, UI describeUsage. Live: a claude job recorded 212,336 tokens in (167,626 cached), 1,811 out, $0.0118, 7 turns, read back with lotar agent status from another process. Gates: lint, 1742 Rust + 1226 UI; smoke deferred while the machine is at load 30-50 (recent runs failed only on timeouts in unrelated specs).'
 description: |-
   Every runner reports usage in its final event, but LoTaR drops it. Record it on the job and show it.
 
@@ -13,3 +18,22 @@ description: |-
   - Store a normalised summary on the job (REST AgentJob, job log header/status line, SSE payload), show it on the Agents page and in lotar agent status, and make it available to automation templates (e.g. a comment with the cost).
   - Optional limits: Claude --max-budget-usd / --max-turns from the profile.
   Raised while testing DEV-199/DEV-200.
+history:
+- at: 2026-10-27T01:10:21.666349+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T01:31:27.432642+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T01:31:27.471556+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

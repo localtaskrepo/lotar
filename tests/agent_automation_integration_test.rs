@@ -2758,6 +2758,7 @@ fn clarification_handoff_to_reporter_survives_job_failure() {
             agent: Some("implement".to_string()),
             worktree_path: None,
             worktree_branch: None,
+            usage: None,
         }),
     )
     .expect("apply job failure");

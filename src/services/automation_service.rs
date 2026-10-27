@@ -139,6 +139,8 @@ pub struct AutomationJobContext {
     pub agent: Option<String>,
     pub worktree_path: Option<String>,
     pub worktree_branch: Option<String>,
+    /// What the job used, once it finished (for `${{agent.cost_usd}}` and friends).
+    pub usage: Option<crate::api_types::AgentJobUsage>,
 }
 
 #[derive(Debug, Clone)]
