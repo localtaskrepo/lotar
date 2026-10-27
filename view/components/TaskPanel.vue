@@ -159,8 +159,47 @@
                       <span v-if="attachmentsUploading" class="muted">Uploading…</span>
                     </div>
 
-                    <ul class="task-panel__attachments-list">
-                      <li v-for="entry in attachments" :key="entry.attachment || ''" class="task-panel__attachment">
+                    <ul v-if="imageAttachments.length" class="task-panel__gallery">
+                      <li
+                        v-for="entry in imageAttachments"
+                        :key="entry.attachment || ''"
+                        class="task-panel__gallery-item"
+                      >
+                        <a
+                          class="task-panel__attachment-link task-panel__gallery-link"
+                          :href="attachmentUrl(entry.attachment || '')"
+                          target="_blank"
+                          rel="noopener"
+                          :title="attachmentHoverTitle(entry.attachment || '')"
+                        >
+                          <img
+                            class="task-panel__gallery-image"
+                            :src="attachmentUrl(entry.attachment || '')"
+                            :alt="attachmentDisplayName(entry.attachment || '')"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                          <span class="task-panel__attachment-name task-panel__gallery-name">{{
+                            attachmentDisplayName(entry.attachment || '')
+                          }}</span>
+                        </a>
+                        <UiButton
+                          variant="ghost"
+                          icon-only
+                          type="button"
+                          class="task-panel__attachment-remove task-panel__gallery-remove"
+                          aria-label="Remove attachment"
+                          title="Remove attachment"
+                          :disabled="attachmentsUploading || removingAttachmentPath === (entry.attachment || '')"
+                          @click.prevent.stop="removeAttachment(entry.attachment || '')"
+                        >
+                          <IconGlyph name="close" />
+                        </UiButton>
+                      </li>
+                    </ul>
+
+                    <ul v-if="fileAttachments.length" class="task-panel__attachments-list">
+                      <li v-for="entry in fileAttachments" :key="entry.attachment || ''" class="task-panel__attachment">
                         <div class="task-panel__attachment-chip">
                           <a
                             class="task-panel__attachment-link"
@@ -169,16 +208,11 @@
                             rel="noopener"
                             :title="attachmentHoverTitle(entry.attachment || '')"
                           >
-                            <span class="task-panel__attachment-icon" aria-hidden="true">
-                              <img
-                                v-if="isImageAttachment(entry.attachment || '')"
-                                class="task-panel__attachment-thumb"
-                                :src="attachmentUrl(entry.attachment || '')"
-                                alt=""
-                                loading="lazy"
-                              />
-                              <IconGlyph v-else name="download" />
-                            </span>
+                            <AttachmentTile
+                              :attachment="attachmentView(entry.attachment || '')"
+                              :size="22"
+                              :title="attachmentDisplayName(entry.attachment || '')"
+                            />
                             <span class="task-panel__attachment-name">{{
                               attachmentDisplayName(entry.attachment || '')
                             }}</span>
@@ -643,12 +677,14 @@ import {
   extractUrlsFromText,
   isImageAttachment,
   linkDisplayName,
+  taskAttachments,
 } from '../utils/taskAttachments'
 import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../utils/text'
 import { useTaskStore } from '../composables/useTaskStore'
 import { setTaskPanelCommands } from '../composables/useTaskPanelController'
 import { recordRecentTask } from '../utils/recentTasks'
 import ChipListField from './ChipListField.vue'
+import AttachmentTile from './AttachmentTile.vue'
 import IconGlyph from './IconGlyph.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import UiButton from './UiButton.vue'
@@ -1037,6 +1073,10 @@ function onReferencesUpdated(updated: TaskDTO) {
 
 const attachmentUrl = (relPath: string) => buildAttachmentUrl(relPath, task.id)
 const attachmentHoverTitle = (relPath: string) => buildAttachmentHoverTitle(relPath, attachmentsDir?.value)
+// Images get a preview gallery; other files keep compact chips with a type tile.
+const imageAttachments = computed(() => attachments.value.filter((entry) => isImageAttachment(entry.attachment || '')))
+const fileAttachments = computed(() => attachments.value.filter((entry) => !isImageAttachment(entry.attachment || '')))
+const attachmentView = (relPath: string) => taskAttachments({ id: task.id, references: [{ attachment: relPath }] })[0]!
 
 async function detectAndAttachLinksFromTaskText() {
   if (!autoDetectLinksPreference.value) return
@@ -2257,6 +2297,69 @@ textarea {
 
 .task-panel__attachment-remove.btn.icon-only .icon-glyph {
   font-size: 1rem;
+}
+
+.task-panel__gallery {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel__gallery-item {
+  position: relative;
+  min-width: 0;
+}
+
+.task-panel__gallery-link.task-panel__attachment-link {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: var(--radius-md, 0.375rem);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.task-panel__gallery-link:hover {
+  text-decoration: none;
+  border-color: var(--color-accent);
+}
+
+.task-panel__gallery-image {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  background: color-mix(in oklab, var(--color-muted) 10%, transparent);
+}
+
+.task-panel__gallery-name {
+  padding: 0 8px 6px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.task-panel__gallery-remove.btn.icon-only {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: color-mix(in oklab, var(--color-bg) 85%, transparent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.task-panel__gallery-item:hover .task-panel__gallery-remove,
+.task-panel__gallery-remove:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .task-panel__gallery-remove.btn.icon-only {
+    opacity: 1;
+  }
 }
 
 .task-panel__attachment-icon {

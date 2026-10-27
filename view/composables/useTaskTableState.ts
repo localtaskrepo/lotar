@@ -178,6 +178,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     function isSortableCol(key: ColKey | string): boolean {
+        if (key === 'attachments') return false
         if (!isControlledSort.value) return true
         return colKeyToSortBy(key) !== null
     }

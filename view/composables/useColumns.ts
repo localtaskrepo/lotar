@@ -15,12 +15,13 @@ export type BuiltinColKey =
     | 'due_date'
     | 'created'
     | 'modified'
+    | 'attachments'
 
 export type ColKey = BuiltinColKey | `custom:${string}`
 
 export type FieldOption = { key: ColKey | string; label: string }
 
-const BUILTIN_COLUMNS: BuiltinColKey[] = [
+export const BUILTIN_COLUMNS: BuiltinColKey[] = [
     'id',
     'title',
     'status',
@@ -33,6 +34,7 @@ const BUILTIN_COLUMNS: BuiltinColKey[] = [
     'sprints',
     'due_date',
     'modified',
+    'attachments',
 ]
 
 const DEFAULT_VISIBLE: BuiltinColKey[] = [
@@ -46,6 +48,7 @@ const DEFAULT_VISIBLE: BuiltinColKey[] = [
     'sprints',
     'due_date',
     'modified',
+    'attachments',
 ]
 
 const BUILTIN_LABELS: Record<BuiltinColKey, string> = {
@@ -62,6 +65,7 @@ const BUILTIN_LABELS: Record<BuiltinColKey, string> = {
     due_date: 'Due',
     created: 'Created',
     modified: 'Updated',
+    attachments: 'Attachments',
 }
 
 export interface UseColumnsOptions {

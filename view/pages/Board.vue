@@ -223,6 +223,9 @@
                     tabindex="0"
                     data-board-card
                   >
+                    <div v-if="cardCover(task)" class="task-cover" aria-hidden="true">
+                      <AttachmentTile :attachment="cardCover(task)!" cover />
+                    </div>
                     <header v-if="hasTaskHeader(task)" class="row task-header">
                       <template v-if="hasTaskIdentity(task)">
                         <div class="row task-header__left">
@@ -440,6 +443,9 @@
                 tabindex="0"
                 data-board-card
               >
+                <div v-if="cardCover(task)" class="task-cover" aria-hidden="true">
+                  <AttachmentTile :attachment="cardCover(task)!" cover />
+                </div>
                 <header v-if="hasTaskHeader(task)" class="row task-header">
                   <template v-if="hasTaskIdentity(task)">
                     <div class="row task-header__left">
@@ -500,6 +506,8 @@ import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
+import AttachmentTile from '../components/AttachmentTile.vue'
+import { taskAttachments } from '../utils/taskAttachments'
 import BoardCardMeta from '../components/BoardCardMeta.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -1085,6 +1093,13 @@ const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
   sprints: true,
   due_date: true,
   modified: false,
+  attachments: true,
+}
+
+/** First image attachment of a card, when the Attachments field is shown. */
+function cardCover(task: TaskDTO) {
+  if (!boardFields.isVisible('attachments')) return null
+  return taskAttachments(task).find((attachment) => attachment.kind === 'image') ?? null
 }
 
 const boardFields = useColumns({
@@ -1292,6 +1307,13 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
   position: relative;
+}
+.task-cover {
+  margin: -8px -8px 8px;
+  height: 120px;
+  overflow: hidden;
+  border-radius: var(--radius-base) var(--radius-base) 0 0;
+  background: var(--color-surface);
 }
 .task {
   padding: 8px;

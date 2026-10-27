@@ -180,6 +180,12 @@
                     :placement="idx % 7 > 3 ? 'right' : 'left'"
                   >
                     <div class="task-inline">
+                      <AttachmentTile
+                        v-if="chipAttachment(t)"
+                        class="task-inline__thumb"
+                        :attachment="chipAttachment(t)!"
+                        :size="16"
+                      />
                       <span class="id">{{ t.id }}</span>
                       <span class="title">{{ shortTitle(t.title) }}</span>
                     </div>
@@ -249,7 +255,9 @@ import type { TaskDTO } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
+import AttachmentTile from '../components/AttachmentTile.vue'
 import TaskHoverCard from '../components/TaskHoverCard.vue'
+import { taskAttachments } from '../utils/taskAttachments'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
@@ -364,6 +372,14 @@ const DEFAULT_CALENDAR_HOVER_FIELDS: Record<string, boolean> = {
   sprints: true,
   due_date: true,
   modified: true,
+  attachments: true,
+}
+
+/** The image (or first file) shown on a day chip, when the Attachments field is on. */
+function chipAttachment(task: TaskDTO) {
+  if (!calendarHoverFields.isVisible('attachments')) return null
+  const attachments = taskAttachments(task)
+  return attachments.find((attachment) => attachment.kind === 'image') ?? attachments[0] ?? null
 }
 
 const calendarHoverFields = useColumns({
@@ -833,6 +849,12 @@ watch(showSprints, (enabled, previous) => {
   gap: 6px;
   width: 100%;
   min-height: 20px;
+}
+.tasks .task-item .task-inline:has(.task-inline__thumb) {
+  grid-template-columns: auto auto 1fr;
+}
+.tasks .task-item .task-inline__thumb {
+  border-radius: 4px;
 }
 .tasks .task-item:hover {
   background: color-mix(in oklab, var(--surface) 82%, transparent);

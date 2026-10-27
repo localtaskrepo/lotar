@@ -1,0 +1,7 @@
+title: Server-side attachment thumbnails
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-27T05:34:34.961243+00:00
+description: DEV-204 shows image attachments as board covers, list thumbnails and hover previews by loading the full-size file lazily. Large photos or screenshots could make boards with many covers slow and heavy. Serve small cached thumbnails (e.g. a size parameter on /api/attachments) and use them in AttachmentTile; keep the full image for the task panel gallery.

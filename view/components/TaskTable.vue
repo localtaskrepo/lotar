@@ -257,6 +257,29 @@
                     <span :title="fmtDateTime(t.modified)">{{ relativeTime(t.modified) }}</span>
                     <span v-if="touchesMap[t.id]?.actor" class="muted"> • {{ touchesMap[t.id]?.actor }}</span>
                   </template>
+                  <template v-else-if="col === 'attachments'">
+                    <span
+                      v-if="taskAttachments(t).length"
+                      class="task-table__attachments"
+                      :title="
+                        taskAttachments(t)
+                          .map((a) => a.name)
+                          .join('\n')
+                      "
+                    >
+                      <AttachmentTile
+                        v-for="attachment in taskAttachments(t).slice(0, 3)"
+                        :key="attachment.path"
+                        :attachment="attachment"
+                        :size="28"
+                        :title="attachment.name"
+                      />
+                      <span v-if="taskAttachments(t).length > 3" class="muted task-table__attachments-more"
+                        >+{{ taskAttachments(t).length - 3 }}</span
+                      >
+                    </span>
+                    <span v-else class="muted">—</span>
+                  </template>
                   <template v-else-if="customFieldKey(col)">
                     <span>{{ t.custom_fields?.[customFieldKey(col)!] || '—' }}</span>
                   </template>
@@ -386,6 +409,8 @@
 </template>
 
 <script setup lang="ts">
+import AttachmentTile from './AttachmentTile.vue'
+import { taskAttachments } from '../utils/taskAttachments'
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState'
 import { useColumnDragReorder } from '../composables/useColumnDragReorder'
@@ -986,5 +1011,16 @@ tbody tr.is-recent {
 
 .add-button:hover .icon-glyph {
   color: inherit;
+}
+
+.task-table__attachments {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-table__attachments-more {
+  font-size: 12px;
+  margin-left: 2px;
 }
 </style>

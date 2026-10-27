@@ -210,3 +210,65 @@ export function fileToBase64(file: File): Promise<string> {
         reader.readAsDataURL(file)
     })
 }
+
+export type AttachmentKind = 'image' | 'pdf' | 'video' | 'audio' | 'sheet' | 'archive' | 'text' | 'doc' | 'file'
+
+const KIND_EXTENSIONS: Record<Exclude<AttachmentKind, 'file'>, string[]> = {
+    image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp'],
+    pdf: ['pdf'],
+    video: ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'],
+    audio: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'],
+    sheet: ['csv', 'tsv', 'xls', 'xlsx', 'ods', 'numbers'],
+    archive: ['zip', 'tar', 'gz', 'tgz', 'bz2', 'xz', '7z', 'rar'],
+    text: ['txt', 'md', 'log', 'json', 'yaml', 'yml', 'xml', 'html', 'csv'],
+    doc: ['doc', 'docx', 'odt', 'rtf', 'pages', 'ppt', 'pptx', 'key', 'odp'],
+}
+
+/** File extension of a stored attachment's display name, lower case ("png"). */
+export function attachmentExtension(relPath: string): string {
+    const name = attachmentDisplayName(relPath)
+    const dot = name.lastIndexOf('.')
+    return dot > 0 ? name.slice(dot + 1).toLowerCase() : ''
+}
+
+/** What kind of file an attachment is, from its extension. */
+export function attachmentKind(relPath: string): AttachmentKind {
+    const ext = attachmentExtension(relPath)
+    for (const [kind, extensions] of Object.entries(KIND_EXTENSIONS) as [AttachmentKind, string[]][]) {
+        if (extensions.includes(ext)) return kind
+    }
+    return 'file'
+}
+
+export interface TaskAttachmentView {
+    /** Stored path, as kept in the task's references. */
+    path: string
+    name: string
+    kind: AttachmentKind
+    /** Upper-case extension for file tiles ("PDF"), or "FILE". */
+    label: string
+    url: string
+}
+
+/** A task's managed attachments, in reference order, ready for display. */
+export function taskAttachments(task: {
+    id?: string | null
+    references?: Array<{ attachment?: string | null }> | null
+}): TaskAttachmentView[] {
+    const out: TaskAttachmentView[] = []
+    const seen = new Set<string>()
+    for (const reference of task.references ?? []) {
+        const path = (reference.attachment ?? '').trim()
+        if (!path || seen.has(path)) continue
+        seen.add(path)
+        const ext = attachmentExtension(path)
+        out.push({
+            path,
+            name: attachmentDisplayName(path),
+            kind: attachmentKind(path),
+            label: (ext || 'file').toUpperCase().slice(0, 4),
+            url: attachmentUrl(path, task.id),
+        })
+    }
+    return out
+}

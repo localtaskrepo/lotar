@@ -46,6 +46,8 @@ type IconName =
   | 'edit'
   | 'columns'
   | 'file'
+  | 'paperclip'
+  | 'image'
   | 'github'
   | 'jira'
   | 'search'
@@ -132,6 +134,18 @@ const ICONS: Record<IconName, IconDef> = {
   },
   file: {
     paths: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6'],
+  },
+  paperclip: {
+    paths: [
+      'M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48',
+    ],
+  },
+  image: {
+    paths: [
+      'M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z',
+      'M8.5 10a1.5 1.5 0 100-3 1.5 1.5 0 000 3z',
+      'M21 15l-5-5L5 21',
+    ],
   },
   github: {
     paths: [

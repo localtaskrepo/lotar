@@ -1,11 +1,16 @@
 title: Better image handling
-status: InProgress
+status: Done
 priority: High
 type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-26T17:33:43.349209+00:00
-modified: 2026-10-27T04:14:27.546487+00:00
+modified: 2026-10-27T05:34:18.935990+00:00
+comments:
+- date: 2026-10-27T04:19:34.432715+00:00
+  text: 'Plan: one shared ''attachments'' field in the existing field-visibility menus (board Card fields, list Columns, calendar hover Fields, dependency card fields) so previews can be turned on/off per view. Board cards: cover image from the first image attachment plus a paperclip count. List: an Attachments column with small thumbnails or file-type tiles (PDF, CSV…) and +N. Calendar: thumbnail on the day chip and a preview in the hover card. Task panel: image attachments as a preview gallery instead of name chips; other files keep chips with a type tile. Images load lazily; server-side thumbnails would be a follow-up if large images make boards slow.'
+- date: 2026-10-27T05:34:18.902976+00:00
+  text: 'Done. Shared Attachments field in board Card fields, list Columns and calendar hover Fields (dependency graph nodes have no references, so it is left out there). Board: cover from the first image + paperclip count. List: Attachments column with up to 3 thumbnails/type tiles and +N. Calendar: thumbnail on the day chip, preview + file list in the hover card. Task panel: image gallery; other files keep chips with a type tile. Broken images fall back to a type tile. Verified: npm run lint, npm test (1751 Rust + 1232 UI), npm run smoke (353, incl. new ui.attachment-previews), plus screenshots in light/dark/390px. Follow-up for server-side thumbnails filed separately.'
 description: |-
   When a ticket has an image attached we don't use that anywhere to style things up.
   - Previews could be part of the ticket card like in the calendar of board
@@ -38,3 +43,17 @@ history:
     new: InProgress
   - field: assignee
     new: mallox
+- at: 2026-10-27T04:19:34.432715+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T05:34:18.902976+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T05:34:18.935990+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

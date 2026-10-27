@@ -184,14 +184,14 @@ describe('TaskPanel hyphenated-prefix attachments and config', () => {
     it('builds attachment URLs with the full exact-case project prefix', async () => {
         const wrapper = await mountTaskPanel()
 
-        const attachmentLinks = wrapper.findAll('.task-panel__attachment-link')
-        expect(attachmentLinks.length).toBe(2)
+        // Images are shown in a gallery before other files, so look links up by URL.
+        const hrefs = wrapper.findAll('.task-panel__attachment-link').map((link) => link.attributes('href') ?? '')
+        expect(hrefs.length).toBe(2)
 
-        const plainHref = attachmentLinks[0]!.attributes('href') ?? ''
-        expect(plainHref).toContain('/api/attachments/get?')
+        const plainHref = hrefs.find((href) => href.includes('/api/attachments/get?')) ?? ''
         expect(plainHref).toContain('project=ABC-OPS')
 
-        const hashedHref = attachmentLinks[1]!.attributes('href') ?? ''
+        const hashedHref = hrefs.find((href) => href.includes('/api/attachments/h/')) ?? ''
         expect(hashedHref).toContain('/api/attachments/h/0123456789abcdef0123456789abcdef/')
         expect(hashedHref).toContain('project=ABC-OPS')
     })

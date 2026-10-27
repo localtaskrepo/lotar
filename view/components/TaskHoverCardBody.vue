@@ -6,6 +6,8 @@ import { ensureCompletionPolicy, useCompletionPolicy } from '../composables/useC
 import { formatRelativeTime, parseTaskDate, startOfLocalDay } from '../utils/date'
 import { formatMember } from '../utils/member'
 import { projectOf } from '../utils/text'
+import { taskAttachments } from '../utils/taskAttachments'
+import AttachmentTile from './AttachmentTile.vue'
 
 const props = defineProps<{
   task: Pick<
@@ -25,7 +27,8 @@ const props = defineProps<{
     | 'modified'
     | 'custom_fields'
     | 'task_state'
-  >
+  > &
+    Partial<Pick<TaskDTO, 'references'>>
   fields?: Partial<Record<string, boolean>>
 }>()
 
@@ -53,6 +56,7 @@ type FieldKey =
   | 'sprints'
   | 'due_date'
   | 'modified'
+  | 'attachments'
 
 function isFieldVisible(key: FieldKey) {
   return props.fields?.[key] !== false
@@ -72,6 +76,10 @@ const showSprints = computed(() => isFieldVisible('sprints'))
 const showModified = computed(() => isFieldVisible('modified'))
 
 const hasHeader = computed(() => showId.value || showTitle.value)
+
+const attachments = computed(() => (isFieldVisible('attachments') ? taskAttachments(props.task) : []))
+const preview = computed(() => attachments.value.find((attachment) => attachment.kind === 'image') ?? null)
+const otherFiles = computed(() => attachments.value.filter((attachment) => attachment !== preview.value))
 
 const customFieldEntries = computed(() => {
   const enabled = Object.entries(props.fields ?? {})
@@ -138,6 +146,9 @@ const dueInfo = computed(() => {
 </script>
 
 <template>
+  <div v-if="preview" class="task-hover-card__preview">
+    <AttachmentTile :attachment="preview" cover />
+  </div>
   <header v-if="hasHeader" class="task-hover-card__header">
     <span v-if="showId" class="task-hover-card__id">{{ task.id }}</span>
     <span v-if="showTitle" class="task-hover-card__title">{{ task.title }}</span>
@@ -186,6 +197,14 @@ const dueInfo = computed(() => {
       <dt>{{ entry.label }}</dt>
       <dd>{{ entry.value }}</dd>
     </div>
+    <div v-if="otherFiles.length" class="task-hover-card__row">
+      <dt>Files</dt>
+      <dd class="task-hover-card__files">
+        <span v-for="file in otherFiles" :key="file.path" class="task-hover-card__file">
+          <AttachmentTile :attachment="file" :size="18" />{{ file.name }}
+        </span>
+      </dd>
+    </div>
   </dl>
   <div v-if="showTags && tags.length" class="task-hover-card__tags">
     <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
@@ -193,6 +212,30 @@ const dueInfo = computed(() => {
 </template>
 
 <style scoped>
+.task-hover-card__preview {
+  margin: -12px -12px 10px;
+  height: 140px;
+  overflow: hidden;
+  border-radius: inherit;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: var(--color-surface);
+}
+
+.task-hover-card__files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-hover-card__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .task-hover-card__header {
   display: flex;
   gap: 8px;

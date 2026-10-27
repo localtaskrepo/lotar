@@ -245,7 +245,7 @@ import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import UiButton from '../components/UiButton.vue'
 import UiSelect from '../components/UiSelect.vue'
-import { useColumns } from '../composables/useColumns'
+import { useColumns, BUILTIN_COLUMNS } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
 import { useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useFilterOptions } from '../composables/useFilterOptions'
@@ -344,6 +344,8 @@ const customFilterPresets = useCustomFilterPresets(customFields)
 // Retain the existing per-project field choices when moving details onto cards.
 const cardFields = useColumns({
   storagePrefix: 'lotar.dependencyHoverFields',
+  // Graph nodes carry no references, so there is nothing to show for attachments.
+  builtinColumns: BUILTIN_COLUMNS.filter((key) => key !== 'attachments'),
   defaultVisible: [
     'id',
     'title',

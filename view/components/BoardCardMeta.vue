@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { customFieldEntriesFromTask, injectColumnStore } from '../composables/useColumns'
 import { formatMember, memberColor, memberInitials } from '../utils/member'
+import { taskAttachments } from '../utils/taskAttachments'
+import IconGlyph from './IconGlyph.vue'
 
 const props = defineProps<{
   task: Pick<
@@ -18,7 +20,8 @@ const props = defineProps<{
     | 'tags'
     | 'sprints'
     | 'custom_fields'
-  >
+  > &
+    Partial<Pick<TaskDTO, 'references'>>
   fields?: Partial<Record<string, boolean>>
   hasHeader: boolean
   dueInfo: { label: string; overdue: boolean }
@@ -43,6 +46,8 @@ const customEntries = computed(() => {
   return customFieldEntriesFromTask(props.task, keys ?? [])
 })
 
+const attachments = computed(() => (visibleFields.value?.isVisible('attachments') ? taskAttachments(props.task) : []))
+
 const hasPrimaryMeta = computed(() => {
   if (!visibleFields.value) return false
   const t = props.task
@@ -55,6 +60,7 @@ const hasPrimaryMeta = computed(() => {
     (visibleFields.value.isVisible('due_date') && props.dueInfo.label) ||
     (visibleFields.value.isVisible('modified') && (t.modified || '').trim()) ||
     (visibleFields.value.isVisible('tags') && (t.tags || []).length) ||
+    attachments.value.length > 0 ||
     customEntries.value.length > 0,
   )
 })
@@ -94,6 +100,14 @@ const hasMeta = computed(() => hasPrimaryMeta.value || showSprints.value)
         >{{ dueInfo.label }}</span
       >
       <span v-if="visibleFields?.isVisible('modified') && modifiedInfo" class="muted">{{ modifiedInfo }}</span>
+      <span
+        v-if="attachments.length"
+        class="muted task-meta__attachments"
+        :title="attachments.map((a) => a.name).join('\n')"
+        :aria-label="`${attachments.length} ${attachments.length === 1 ? 'attachment' : 'attachments'}`"
+      >
+        <IconGlyph name="paperclip" />{{ attachments.length }}
+      </span>
       <template v-if="visibleFields?.isVisible('tags')">
         <span v-for="tag in task.tags || []" :key="tag" class="tag">{{ tag }}</span>
       </template>
@@ -114,3 +128,17 @@ const hasMeta = computed(() => hasPrimaryMeta.value || showSprints.value)
     </div>
   </footer>
 </template>
+
+<style scoped>
+.task-meta__attachments {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-meta__attachments .icon-glyph {
+  width: 13px;
+  height: 13px;
+}
+</style>
