@@ -266,7 +266,9 @@ impl AgentJobService {
                 "Prompt cannot be empty".to_string(),
             ));
         }
-        let notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job);
+        let read_only =
+            profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
+        let notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only);
         let prompt = build_prompt(
             &task,
             &user_prompt,
@@ -894,7 +896,14 @@ fn job_notes(
     config: &ResolvedConfig,
     ticket_id: &str,
     is_merge_job: bool,
+    read_only: bool,
 ) -> String {
+    if read_only {
+        return "- This job is read-only: you can read files and search, but not edit files or run commands \
+that change anything, including lotar. Don't try to update the ticket. Put your complete result in your \
+final answer; LoTaR saves it as the job summary.\n"
+            .to_string();
+    }
     let mut notes = String::new();
     if let Some(bin) = current_lotar_binary() {
         notes.push_str(&format!(
@@ -2839,7 +2848,7 @@ mod tests {
         let mut config =
             crate::config::resolution::config_for_project(&tasks_dir, Some("NOTE")).unwrap();
 
-        let notes = job_notes(&tasks_dir, &config, &task.id, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false);
         assert!(notes.contains("main checkout"), "{notes}");
         assert!(notes.contains("No automation rule"), "{notes}");
 
@@ -2849,7 +2858,7 @@ mod tests {
             "automation:\n  rules:\n    - when:\n        assignee: \"@implement\"\n      on:\n        complete:\n          set:\n            status: Done\n",
         )
         .unwrap();
-        let notes = job_notes(&tasks_dir, &config, &task.id, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false);
         assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
         assert!(notes.contains("Commit your work"), "{notes}");
         assert!(
@@ -2857,6 +2866,11 @@ mod tests {
             "{notes}"
         );
         assert!(notes.contains("hand the ticket back"), "{notes}");
+
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, true);
+        assert!(notes.contains("This job is read-only"), "{notes}");
+        assert!(notes.contains("final answer"), "{notes}");
+        assert!(!notes.contains("Commit your work"), "{notes}");
     }
 
     #[test]

@@ -1,0 +1,31 @@
+title: Read-only agent jobs are told to put results in their answer
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-27T01:37:11.899751+00:00
+modified: 2026-10-27T01:43:21.433326+00:00
+comments:
+- date: 2026-10-27T01:43:21.395501+00:00
+  text: 'Done: read-only profiles get a short ''This job'' note instead of the commit/automation notes: they can''t change anything (including lotar), shouldn''t try to update the ticket, and their final answer is saved as the job summary. Test extended in job_notes_describe_the_branch_and_who_moves_the_ticket. Live: a read-only researcher job (RES-7, Gemini CLI research) answered directly without the ''couldn''t update the ticket'' preface every earlier read-only job had. Gates: lint, 1743 Rust + 1226 UI.'
+description: 'Found while using LoTaR to research newer CLIs (six read-only Claude jobs): the built-in instructions tell every agent to comment on and update its ticket, but read-only jobs (Claude plan mode) can''t run lotar, so each answer opened with an apology about not updating the ticket. The job notes should tell read-only jobs that their final answer is saved as the job summary and that they shouldn''t try to change the ticket.'
+history:
+- at: 2026-10-27T01:37:11.955044+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T01:43:21.395501+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T01:43:21.433326+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

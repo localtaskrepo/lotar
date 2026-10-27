@@ -177,7 +177,7 @@ Instructions (inline, from a file, built-in or per profile) can use `${{...}}` t
 
 Lists work as in automation templates, for example `${{ticket.references[*].link}}` or `${{ticket.comments[-1].text}}` (see [Template variables](automation.md#template-variables)). Unknown variables expand to nothing. The built-in instructions use them so that commands contain literal values: Claude Code refuses commands with shell variables (`"$LOTAR_TICKET_ID"`, `$?`) in headless runs.
 
-LoTaR writes the "This job" section itself:
+LoTaR writes the "This job" section itself (a `read-only` job is only told that it can't change anything and that its final answer is saved as the job summary):
 
 - With worktrees on, it names the branch (`agent/<TICKET>`) and tells the agent to commit its work there. Without worktrees the agent works in the main checkout and leaves its changes uncommitted unless asked to commit.
 - If an automation rule moves the ticket when the job ends (a rule that matches the ticket and has a `job_completed` action), the agent is told not to change the status or assignee when it finished, only to comment, and to hand the ticket back when it could not finish. Otherwise it is told to set a fitting status when it finishes.
