@@ -758,7 +758,7 @@ pub struct AgentProfileInfo {
 pub struct AgentProfileCreateRequest {
     /// Profile name; tickets assigned to `@name` start a job with it.
     pub name: String,
-    /// `claude`, `codex`, `copilot`, `gemini` or `command`.
+    /// A runner name such as `claude`, `codex` or `copilot` (see the agent docs).
     pub runner: String,
     /// Project prefix to add it to; defaults to the default project.
     #[serde(default, skip_serializing_if = "Option::is_none")]

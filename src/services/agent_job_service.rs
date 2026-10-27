@@ -213,8 +213,9 @@ impl AgentJobService {
         let profile = resolve_profile(&config, &req)?;
         let runner_kind = profile.runner.parse::<AgentRunnerKind>().map_err(|_| {
             LoTaRError::ValidationError(format!(
-                "Unsupported runner '{}'. Expected copilot, claude, codex, gemini, or command",
-                profile.runner
+                "Unsupported runner '{}'. Expected {}",
+                profile.runner,
+                crate::config::operations::AGENT_RUNNERS.join(", ")
             ))
         })?;
 

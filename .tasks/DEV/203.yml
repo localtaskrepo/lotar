@@ -1,10 +1,14 @@
 title: Support newer agent CLIs (OpenCode, Antigravity, Droid, Cursor, Amp)
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T17:02:37.377728+00:00
-modified: 2026-10-26T17:38:26.748145+00:00
+modified: 2026-10-27T01:52:28.688998+00:00
+comments:
+- date: 2026-10-27T01:52:28.655565+00:00
+  text: 'Done as far as possible without the CLIs installed (none of them is on this machine). Research: seven read-only LoTaR agent jobs (Claude sonnet, web search/fetch pre-approved, ~$1.48 total, run through LoTaR itself) collected each CLI''s documented headless interface; notes kept in docs/developers/agent-cli-research.md. Added runners cursor (cursor-agent -p --output-format stream-json --trust; Claude-like stream plus tool_call events), amp (amp --stream-json -x; Claude parser; read-only refused since Amp has none), droid (droid exec --output-format json; final Claude-like result object), opencode and kilo (run --format json; step_start/text/tool_use/step_finish/error; permissions via OPENCODE_CONFIG_CONTENT), antigravity (agy -p --output-format stream-json; init/step_update/result ''event'' stream). Each maps read-only/workspace/full, model and effort where documented, extra dirs where a flag exists, and usage. Tests: replays_the_documented_streams_of_newer_clis (docs-derived fixtures *-docs.jsonl with README), newer_clis_get_their_documented_flags. The live check includes them once installed. Also checked: Gemini CLI''s current documented stream matches the existing parser. Remaining risk: all six are unverified against real installs; event field names for OpenCode/Kilo and Droid''s stream are only community-documented. Gates: lint, 1745 Rust + 1226 UI.'
 description: 'Newer agent CLIs worth a runner kind: OpenCode, Google Antigravity (agy, replacing Gemini CLI for consumer accounts), Factory Droid, Cursor CLI (agent), Amp. For each: headless flags, JSON event stream, permission flags, model/effort flags; capture a sanitized stream into tests/fixtures/agent-streams when a CLI is available. Until then the command runner can drive them.'
 history:
 - at: 2026-10-26T17:38:26.748145+00:00
@@ -12,3 +16,21 @@ history:
   changes:
   - field: description
     new: 'Newer agent CLIs worth a runner kind: OpenCode, Google Antigravity (agy, replacing Gemini CLI for consumer accounts), Factory Droid, Cursor CLI (agent), Amp. For each: headless flags, JSON event stream, permission flags, model/effort flags; capture a sanitized stream into tests/fixtures/agent-streams when a CLI is available. Until then the command runner can drive them.'
+- at: 2026-10-27T01:43:25.930562+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T01:52:28.655565+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T01:52:28.688998+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

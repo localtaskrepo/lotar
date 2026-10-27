@@ -1433,7 +1433,7 @@ fn make_agent_run_tool() -> Value {
             "properties": {
                 "ticket_id": {"type": "string", "description": "The ticket ID to run the agent on (e.g. PROJ-1)"},
                 "prompt": {"type": "string", "description": "Instructions for the agent"},
-                "runner": {"type": ["string", "null"], "description": "Runner type: copilot, claude, codex, gemini, or command"},
+                "runner": {"type": ["string", "null"], "description": "Runner type: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity or command"},
                 "agent": {"type": ["string", "null"], "description": "Agent profile name from config"},
                 "model": {"type": ["string", "null"], "description": "Model for this run, overriding the profile's (for example sonnet or gpt-5.5)"},
                 "effort": {"type": ["string", "null"], "description": "Reasoning effort for this run, overriding the profile's (for example low or high)"}

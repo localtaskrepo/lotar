@@ -36,7 +36,8 @@ config:
   # (how to use the lotar CLI, the worktree branch, and how the job ends);
   # the instructions here describe the phase.
   #
-  # runner: claude, codex, copilot or gemini. model and effort are passed to
+  # runner: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo or
+  # antigravity. model and effort are passed to
   # that CLI, so use names it knows (for example claude: sonnet/opus/haiku and
   # effort low…max; codex: effort minimal…high).
   agents:

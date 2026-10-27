@@ -66,7 +66,7 @@ pub struct AgentRunArgs {
     pub ticket: String,
     /// Prompt for the agent
     pub prompt: String,
-    /// Runner to use (copilot, claude, codex, gemini)
+    /// Runner to use (claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity)
     #[arg(long)]
     pub runner: Option<String>,
     /// Named agent profile to use

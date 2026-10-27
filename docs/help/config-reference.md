@@ -38,7 +38,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - agent.worktree.cleanup_ignored_files: boolean (default true). When true, git-ignored files (build output) don't keep a worktree from being cleaned up; untracked and modified files always do. Set false to keep any worktree that holds ignored files.
 - agent.automation.on_start / on_success / on_failure / on_cancel: legacy lifecycle maps that are still accepted but not applied. Job lifecycle changes (for example InProgress on start, NeedsReview on success) come from `job_started` / `job_completed` / `job_failed` / `job_cancelled` rules in the automation file; see [Automation Rules](./automation.md#agent-job-queueing).
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
-  - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `command`
+  - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `cursor` | `amp` | `droid` | `opencode` | `kilo` | `antigravity` | `command`
   - agents.<name>.permissions: `read-only` | `workspace` | `full` (default `workspace`) — what the agent may do without asking; see [Agent Jobs](./agent.md#permissions)
   - agents.<name>.model / effort: optional strings — model and reasoning effort passed to the CLI; runs and automation actions can override them. See [Agent Jobs](./agent.md#model-and-effort)
   - agents.<name>.tools.allowed / tools.disallowed: string[] — extra tools to allow or deny (Claude, Copilot); see [Agent Jobs](./agent.md#tools-and-mcp-servers)
@@ -46,7 +46,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
   - agents.<name>.command: optional string — the executable to run (default: the runner name; required for `command`)
   - agents.<name>.args: string[] — extra CLI arguments, after LoTaR's own flags
   - agents.<name>.env: map — extra environment variables
-  - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be claude, codex, copilot, gemini or command.
+  - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be one of the runners in [Agent Jobs](./agent.md#runners).
   - agents.<name>.max_budget_usd: number — stop a Claude run once it has cost this much (`--max-budget-usd`); ignored by other runners
   - agents.<name>.instructions: string | { file: string } — added after `agent.instructions` (or the built-in instructions) for this profile
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])

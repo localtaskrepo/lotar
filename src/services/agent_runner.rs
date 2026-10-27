@@ -10,6 +10,18 @@ pub enum AgentRunnerKind {
     Claude,
     Copilot,
     Gemini,
+    /// Cursor CLI (`cursor-agent -p`); from its docs, not run live.
+    Cursor,
+    /// Sourcegraph Amp (`amp -x --stream-json`); from its docs, not run live.
+    Amp,
+    /// Factory Droid (`droid exec -o json`); from its docs, not run live.
+    Droid,
+    /// OpenCode (`opencode run --format json`); from its docs, not run live.
+    Opencode,
+    /// Kilo Code CLI, an OpenCode fork (`kilo run --format json`); not run live.
+    Kilo,
+    /// Google Antigravity CLI (`agy -p --output-format stream-json`); not run live.
+    Antigravity,
     Command,
 }
 
@@ -20,9 +32,39 @@ impl AgentRunnerKind {
             Self::Claude => "claude",
             Self::Copilot => "copilot",
             Self::Gemini => "gemini",
+            Self::Cursor => "cursor",
+            Self::Amp => "amp",
+            Self::Droid => "droid",
+            Self::Opencode => "opencode",
+            Self::Kilo => "kilo",
+            Self::Antigravity => "antigravity",
             Self::Command => "command",
         }
     }
+
+    /// The program LoTaR runs when a profile sets no `command`.
+    pub fn default_program(&self) -> &'static str {
+        match self {
+            Self::Cursor => "cursor-agent",
+            Self::Antigravity => "agy",
+            other => other.as_str(),
+        }
+    }
+
+    /// Every runner a profile may name.
+    pub const ALL: [AgentRunnerKind; 11] = [
+        Self::Claude,
+        Self::Codex,
+        Self::Copilot,
+        Self::Gemini,
+        Self::Cursor,
+        Self::Amp,
+        Self::Droid,
+        Self::Opencode,
+        Self::Kilo,
+        Self::Antigravity,
+        Self::Command,
+    ];
 }
 
 impl FromStr for AgentRunnerKind {
@@ -34,6 +76,12 @@ impl FromStr for AgentRunnerKind {
             "claude" => Ok(Self::Claude),
             "copilot" => Ok(Self::Copilot),
             "gemini" => Ok(Self::Gemini),
+            "cursor" | "cursor-agent" => Ok(Self::Cursor),
+            "amp" => Ok(Self::Amp),
+            "droid" => Ok(Self::Droid),
+            "opencode" => Ok(Self::Opencode),
+            "kilo" | "kilocode" => Ok(Self::Kilo),
+            "antigravity" | "agy" => Ok(Self::Antigravity),
             "command" => Ok(Self::Command),
             _ => Err(()),
         }
@@ -121,6 +169,13 @@ fn args_set_permissions(kind: AgentRunnerKind, args: &[String]) -> bool {
             "--deny-tool",
         ],
         AgentRunnerKind::Gemini => &["--approval-mode", "-y", "--yolo"],
+        AgentRunnerKind::Cursor => &["--mode", "--plan", "-f", "--force", "--yolo", "--sandbox"],
+        AgentRunnerKind::Amp => &["--dangerously-allow-all", "--settings-file"],
+        AgentRunnerKind::Droid => &["--auto", "--skip-permissions-unsafe"],
+        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => {
+            &["--auto", "--yolo", "--dangerously-skip-permissions"]
+        }
+        AgentRunnerKind::Antigravity => &["--mode", "--dangerously-skip-permissions"],
         AgentRunnerKind::Command => return true,
     };
     args.iter().any(|arg| {
@@ -140,7 +195,7 @@ pub fn usage_from_result(
     let uint = |value: Option<&JsonValue>| value.and_then(|v| v.as_u64());
     let float = |value: Option<&JsonValue>| value.and_then(|v| v.as_f64());
     let usage = match kind {
-        AgentRunnerKind::Claude => {
+        AgentRunnerKind::Claude | AgentRunnerKind::Amp | AgentRunnerKind::Droid => {
             let usage = payload.get("usage");
             let field = |name: &str| uint(usage.and_then(|u| u.get(name)));
             let parts = [
@@ -193,20 +248,67 @@ pub fn usage_from_result(
                 ..Default::default()
             }
         }
+        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => {
+            let part = payload.get("part")?;
+            let tokens = part.get("tokens");
+            let field = |name: &str| uint(tokens.and_then(|t| t.get(name)));
+            let cache_read = uint(
+                tokens
+                    .and_then(|t| t.get("cache"))
+                    .and_then(|c| c.get("read")),
+            );
+            let cache_write = uint(
+                tokens
+                    .and_then(|t| t.get("cache"))
+                    .and_then(|c| c.get("write")),
+            );
+            let input = [field("input"), cache_read, cache_write];
+            crate::api_types::AgentJobUsage {
+                input_tokens: input
+                    .iter()
+                    .any(Option::is_some)
+                    .then(|| input.iter().flatten().sum()),
+                cached_input_tokens: cache_read,
+                output_tokens: match (field("output"), field("reasoning")) {
+                    (None, None) => None,
+                    (out, reasoning) => Some(out.unwrap_or(0) + reasoning.unwrap_or(0)),
+                },
+                cost_usd: float(part.get("cost")),
+                turns: Some(1),
+                ..Default::default()
+            }
+        }
+        AgentRunnerKind::Cursor => return None,
+        AgentRunnerKind::Antigravity => {
+            let usage = payload.get("result")?.get("usage")?;
+            let field = |name: &str| uint(usage.get(name));
+            crate::api_types::AgentJobUsage {
+                input_tokens: field("input_tokens"),
+                cached_input_tokens: field("cache_read_tokens"),
+                output_tokens: match (field("output_tokens"), field("thinking_tokens")) {
+                    (None, None) => None,
+                    (out, thinking) => Some(out.unwrap_or(0) + thinking.unwrap_or(0)),
+                },
+                turns: uint(payload.get("result").and_then(|r| r.get("num_turns"))),
+                ..Default::default()
+            }
+        }
         AgentRunnerKind::Command => return None,
     };
     (usage != crate::api_types::AgentJobUsage::default()).then_some(usage)
 }
 
-/// The agent CLIs LoTaR can drive that are on this machine's PATH.
+/// The runners whose CLI is on this machine's PATH (by runner name).
 pub fn installed_agent_clis() -> Vec<&'static str> {
     let Some(path) = std::env::var_os("PATH") else {
         return Vec::new();
     };
     let dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path).collect();
-    ["claude", "codex", "copilot", "gemini"]
+    AgentRunnerKind::ALL
         .into_iter()
-        .filter(|program| {
+        .filter(|kind| *kind != AgentRunnerKind::Command)
+        .filter(|kind| {
+            let program = kind.default_program();
             dirs.iter().any(|dir| {
                 let candidates = if cfg!(windows) {
                     vec![
@@ -219,6 +321,7 @@ pub fn installed_agent_clis() -> Vec<&'static str> {
                 candidates.iter().any(|candidate| is_executable(candidate))
             })
         })
+        .map(|kind| kind.as_str())
         .collect()
 }
 
@@ -246,8 +349,13 @@ fn permission_args(
     if level == AgentPermissions::Workspace {
         let flag = match kind {
             AgentRunnerKind::Gemini => "--include-directories",
-            AgentRunnerKind::Command => return args,
-            _ => "--add-dir",
+            AgentRunnerKind::Claude
+            | AgentRunnerKind::Codex
+            | AgentRunnerKind::Copilot
+            | AgentRunnerKind::Antigravity => "--add-dir",
+            // No extra-directory flag (Cursor, Amp, Droid) or handled through
+            // the permission config (OpenCode, Kilo).
+            _ => return args,
         };
         for dir in writable_dirs {
             args.extend([flag.to_string(), dir.display().to_string()]);
@@ -314,6 +422,35 @@ fn level_args(
             owned(&["--approval-mode", "auto_edit"])
         }
         (AgentRunnerKind::Gemini, AgentPermissions::Full) => owned(&["--approval-mode", "yolo"]),
+        // Cursor's print mode only proposes edits unless --force is given.
+        (AgentRunnerKind::Cursor, AgentPermissions::ReadOnly) => owned(&["--mode", "plan"]),
+        (AgentRunnerKind::Cursor, AgentPermissions::Workspace) => {
+            owned(&["--force", "--sandbox", "enabled"])
+        }
+        (AgentRunnerKind::Cursor, AgentPermissions::Full) => {
+            owned(&["--force", "--sandbox", "disabled"])
+        }
+        // Amp documents only "allow all"; read-only is refused when the
+        // command is built, and workspace keeps Amp's own defaults.
+        (AgentRunnerKind::Amp, AgentPermissions::Full) => owned(&["--dangerously-allow-all"]),
+        (AgentRunnerKind::Amp, _) => Vec::new(),
+        // Droid is read-only by default; medium adds builds, tests and commits.
+        (AgentRunnerKind::Droid, AgentPermissions::ReadOnly) => Vec::new(),
+        (AgentRunnerKind::Droid, AgentPermissions::Workspace) => owned(&["--auto", "medium"]),
+        (AgentRunnerKind::Droid, AgentPermissions::Full) => owned(&["--skip-permissions-unsafe"]),
+        // OpenCode and Kilo take permission rules through config (set in the
+        // command's environment); --auto approves what the rules allow.
+        (AgentRunnerKind::Opencode | AgentRunnerKind::Kilo, AgentPermissions::ReadOnly) => {
+            Vec::new()
+        }
+        (AgentRunnerKind::Opencode | AgentRunnerKind::Kilo, _) => owned(&["--auto"]),
+        (AgentRunnerKind::Antigravity, AgentPermissions::ReadOnly) => owned(&["--mode", "plan"]),
+        (AgentRunnerKind::Antigravity, AgentPermissions::Workspace) => {
+            owned(&["--mode", "accept-edits"])
+        }
+        (AgentRunnerKind::Antigravity, AgentPermissions::Full) => {
+            owned(&["--dangerously-skip-permissions"])
+        }
     }
 }
 
@@ -351,7 +488,7 @@ pub fn build_runner_command(
     let program = profile
         .command
         .clone()
-        .unwrap_or_else(|| kind.as_str().to_string());
+        .unwrap_or_else(|| kind.default_program().to_string());
     let owned = |items: &[&str]| {
         items
             .iter()
@@ -382,8 +519,24 @@ pub fn build_runner_command(
             "--no-ask-user".to_string(),
         ],
         AgentRunnerKind::Gemini => owned(&["--output-format", "stream-json"]),
+        // The flags below follow each CLI's docs (DEV-203); none is run live.
+        AgentRunnerKind::Cursor => owned(&["-p", "--output-format", "stream-json", "--trust"]),
+        AgentRunnerKind::Amp => owned(&["--stream-json"]),
+        AgentRunnerKind::Droid => owned(&["exec", "--output-format", "json"]),
+        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => owned(&["run", "--format", "json"]),
+        AgentRunnerKind::Antigravity => {
+            owned(&["--output-format", "stream-json", "--disable-slash-commands"])
+        }
         AgentRunnerKind::Command => unreachable!("handled above"),
     };
+    if kind == AgentRunnerKind::Amp
+        && profile.permissions == Some(AgentPermissions::ReadOnly)
+        && !args_set_permissions(kind, &profile.args)
+    {
+        return Err(LoTaRError::ValidationError(
+            "The amp runner has no read-only mode; use workspace or full permissions".to_string(),
+        ));
+    }
 
     if !args_set_permissions(kind, &profile.args) {
         args.extend(permission_args(
@@ -403,14 +556,35 @@ pub fn build_runner_command(
             args.push(prompt.to_string());
             None
         }
-        AgentRunnerKind::Gemini => {
+        AgentRunnerKind::Gemini | AgentRunnerKind::Antigravity => {
             args.extend(["-p".to_string(), prompt.to_string()]);
+            None
+        }
+        AgentRunnerKind::Amp => {
+            args.extend(["-x".to_string(), prompt.to_string()]);
+            None
+        }
+        // The prompt is the last positional argument.
+        AgentRunnerKind::Cursor
+        | AgentRunnerKind::Droid
+        | AgentRunnerKind::Opencode
+        | AgentRunnerKind::Kilo => {
+            args.push(prompt.to_string());
             None
         }
         _ => None,
     };
 
-    let env = expand_env_map(&profile.env);
+    let mut env = expand_env_map(&profile.env);
+    if matches!(kind, AgentRunnerKind::Opencode | AgentRunnerKind::Kilo)
+        && !args_set_permissions(kind, &profile.args)
+        && !env.contains_key("OPENCODE_CONFIG_CONTENT")
+    {
+        env.insert(
+            "OPENCODE_CONFIG_CONTENT".to_string(),
+            opencode_permission_config(profile.permissions.unwrap_or_default(), writable_dirs),
+        );
+    }
 
     Ok(RunnerCommand {
         program,
@@ -453,9 +627,17 @@ fn model_effort_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec
     let own = &profile.args;
     if let Some(model) = profile.model.as_deref() {
         let flag = match kind {
-            AgentRunnerKind::Claude | AgentRunnerKind::Copilot => Some("--model"),
-            AgentRunnerKind::Codex | AgentRunnerKind::Gemini => Some("-m"),
-            AgentRunnerKind::Command => None,
+            AgentRunnerKind::Claude
+            | AgentRunnerKind::Copilot
+            | AgentRunnerKind::Cursor
+            | AgentRunnerKind::Antigravity => Some("--model"),
+            AgentRunnerKind::Codex
+            | AgentRunnerKind::Gemini
+            | AgentRunnerKind::Droid
+            | AgentRunnerKind::Opencode
+            | AgentRunnerKind::Kilo => Some("-m"),
+            // Amp picks models through modes; command runners read env vars.
+            AgentRunnerKind::Amp | AgentRunnerKind::Command => None,
         };
         if let Some(flag) = flag
             && !has_flag(own, &["--model", "-m"])
@@ -477,6 +659,16 @@ fn model_effort_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec
                     .any(|arg| arg.starts_with("model_reasoning_effort=")) =>
             {
                 args.extend(["-c".to_string(), format!("model_reasoning_effort={effort}")]);
+            }
+            AgentRunnerKind::Droid if !has_flag(own, &["-r", "--reasoning-effort"]) => {
+                args.extend(["--reasoning-effort".to_string(), effort.to_string()]);
+            }
+            AgentRunnerKind::Antigravity if !has_flag(own, &["--effort"]) => {
+                args.extend(["--effort".to_string(), effort.to_string()]);
+            }
+            // OpenCode and Kilo call reasoning effort a provider "variant".
+            AgentRunnerKind::Opencode | AgentRunnerKind::Kilo if !has_flag(own, &["--variant"]) => {
+                args.extend(["--variant".to_string(), effort.to_string()]);
             }
             // Gemini has no effort flag; command runners read LOTAR_AGENT_EFFORT.
             _ => {}
@@ -553,14 +745,213 @@ pub fn parse_runner_line(kind: AgentRunnerKind, line: &str) -> Option<Vec<Runner
         )]);
     }
     let payload: JsonValue = serde_json::from_str(trimmed).ok()?;
-    payload.get("type").and_then(|v| v.as_str())?;
+    let tag = if kind == AgentRunnerKind::Antigravity {
+        "event"
+    } else {
+        "type"
+    };
+    payload.get(tag).and_then(|v| v.as_str())?;
     Some(match kind {
         AgentRunnerKind::Codex => parse_codex_event(&payload),
-        AgentRunnerKind::Claude => parse_claude_event(&payload),
+        // Amp's stream and Droid's final JSON object follow Claude's shapes.
+        AgentRunnerKind::Claude | AgentRunnerKind::Amp | AgentRunnerKind::Droid => {
+            parse_claude_event(&payload)
+        }
         AgentRunnerKind::Copilot => parse_copilot_event(&payload),
         AgentRunnerKind::Gemini => parse_gemini_event(&payload),
+        AgentRunnerKind::Cursor => parse_cursor_event(&payload),
+        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => parse_opencode_event(&payload),
+        AgentRunnerKind::Antigravity => parse_antigravity_event(&payload),
         AgentRunnerKind::Command => unreachable!("handled above"),
     })
+}
+
+/// OpenCode/Kilo permission rules for a permission level, passed through
+/// `OPENCODE_CONFIG_CONTENT`. The last matching rule wins.
+fn opencode_permission_config(
+    level: AgentPermissions,
+    writable_dirs: &[std::path::PathBuf],
+) -> String {
+    let permission = match level {
+        AgentPermissions::ReadOnly => serde_json::json!({ "edit": "deny", "bash": "deny" }),
+        AgentPermissions::Workspace => {
+            let mut outside = serde_json::Map::new();
+            for dir in writable_dirs {
+                outside.insert(
+                    format!("{}/**", dir.display()),
+                    JsonValue::String("allow".to_string()),
+                );
+            }
+            serde_json::json!({
+                "bash": { "*": "allow", "git push*": "deny" },
+                "external_directory": outside,
+            })
+        }
+        AgentPermissions::Full => JsonValue::String("allow".to_string()),
+    };
+    serde_json::json!({ "permission": permission }).to_string()
+}
+
+/// Cursor CLI `stream-json`: Claude-style `system`/`assistant`/`result`
+/// events plus `tool_call` events keyed by tool type.
+fn parse_cursor_event(payload: &JsonValue) -> Vec<RunnerEvent> {
+    if payload.get("type").and_then(|v| v.as_str()) != Some("tool_call") {
+        return parse_claude_event(payload);
+    }
+    if payload.get("subtype").and_then(|v| v.as_str()) != Some("started") {
+        return Vec::new();
+    }
+    let session_id = str_field(payload, "session_id");
+    let Some((key, call)) = payload
+        .get("tool_call")
+        .and_then(|v| v.as_object())
+        .and_then(|calls| calls.iter().next())
+    else {
+        return Vec::new();
+    };
+    let name = key.strip_suffix("ToolCall").unwrap_or(key);
+    let name = str_field(call, "name").unwrap_or_else(|| {
+        let mut chars = name.chars();
+        chars
+            .next()
+            .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+            .unwrap_or_default()
+    });
+    let input = call.get("args").or_else(|| call.get("arguments"));
+    vec![RunnerEvent::new(
+        RunnerEventKind::Progress,
+        Some(tool_summary(&name, input)),
+        session_id,
+    )]
+}
+
+/// OpenCode and Kilo `--format json`: `step_start`, `text`, `tool_use`,
+/// `step_finish` and `error` events, each with a `part` and `sessionID`.
+fn parse_opencode_event(payload: &JsonValue) -> Vec<RunnerEvent> {
+    let session_id = str_field(payload, "sessionID");
+    let part = payload.get("part");
+    match payload
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+    {
+        "step_start" => {
+            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
+        }
+        "text" => match non_empty(part.and_then(|p| str_field(p, "text"))) {
+            Some(text) => vec![
+                RunnerEvent::new(RunnerEventKind::Message, Some(text), session_id)
+                    .with_payload(payload),
+            ],
+            None => Vec::new(),
+        },
+        "tool_use" => {
+            let name = part
+                .and_then(|p| str_field(p, "tool"))
+                .unwrap_or_else(|| "tool".to_string());
+            let input = part
+                .and_then(|p| p.get("state"))
+                .and_then(|s| s.get("input"));
+            vec![RunnerEvent::new(
+                RunnerEventKind::Progress,
+                Some(tool_summary(&name, input)),
+                session_id,
+            )]
+        }
+        // One per step; each carries that step's tokens and cost.
+        "step_finish" => {
+            vec![RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload)]
+        }
+        "error" => {
+            let error = payload.get("error");
+            let text = error
+                .and_then(|e| e.as_str().map(str::to_string))
+                .or_else(|| {
+                    error
+                        .and_then(|e| e.get("data"))
+                        .and_then(|d| str_field(d, "message"))
+                })
+                .or_else(|| error.and_then(|e| str_field(e, "name")))
+                .or_else(|| str_field(payload, "message"));
+            vec![RunnerEvent::new(RunnerEventKind::Progress, text, session_id).failing()]
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Antigravity `stream-json`: `init`, `step_update` and `result` events
+/// named in an `event` field.
+fn parse_antigravity_event(payload: &JsonValue) -> Vec<RunnerEvent> {
+    match payload
+        .get("event")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+    {
+        "init" => vec![
+            RunnerEvent::new(
+                RunnerEventKind::Init,
+                None,
+                str_field(payload, "conversation_id"),
+            )
+            .with_payload(payload),
+        ],
+        "step_update" => {
+            let Some(step) = payload.get("step_update") else {
+                return Vec::new();
+            };
+            let session_id = str_field(step, "conversation_id");
+            if str_field(step, "state").as_deref() != Some("DONE") {
+                return Vec::new();
+            }
+            match str_field(step, "step_type").as_deref() {
+                Some("agent_response") => match non_empty(str_field(step, "text_delta")) {
+                    Some(text) => vec![RunnerEvent::new(
+                        RunnerEventKind::Message,
+                        Some(text),
+                        session_id,
+                    )],
+                    None => Vec::new(),
+                },
+                Some("tool") => {
+                    let info = step.get("tool_info");
+                    let name = str_field(step, "tool_name")
+                        .or_else(|| info.and_then(|i| str_field(i, "name")))
+                        .unwrap_or_else(|| "tool".to_string());
+                    vec![RunnerEvent::new(
+                        RunnerEventKind::Progress,
+                        Some(tool_summary(&name, info.and_then(|i| i.get("parameters")))),
+                        session_id,
+                    )]
+                }
+                _ => Vec::new(),
+            }
+        }
+        "result" => {
+            let result = payload.get("result");
+            let session_id = result.and_then(|r| str_field(r, "conversation_id"));
+            let failed = result
+                .and_then(|r| str_field(r, "status"))
+                .is_some_and(|status| status != "SUCCESS");
+            let text = result.and_then(|r| {
+                if failed {
+                    r.get("error").map(|e| {
+                        e.as_str()
+                            .map(str::to_string)
+                            .unwrap_or_else(|| e.to_string())
+                    })
+                } else {
+                    str_field(r, "response")
+                }
+            });
+            let mut event =
+                RunnerEvent::new(RunnerEventKind::Result, text, session_id).with_payload(payload);
+            if failed {
+                event = event.failing();
+            }
+            vec![event]
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn str_field(value: &JsonValue, key: &str) -> Option<String> {
@@ -576,8 +967,10 @@ fn non_empty(text: Option<String>) -> Option<String> {
 
 /// One readable line for a tool call: its name and the most telling input.
 fn tool_summary(name: &str, input: Option<&JsonValue>) -> String {
-    const KEYS: [&str; 7] = [
+    const KEYS: [&str; 9] = [
         "command",
+        "CommandLine",
+        "filePath",
         "file_path",
         "path",
         "pattern",
@@ -1340,6 +1733,177 @@ mod tests {
             Some("Do it")
         );
         assert!(cmd.args.is_empty());
+    }
+
+    /// Newer CLIs from their docs (DEV-203): each documented example run
+    /// yields a start, the tool calls, the answer, a result and usage.
+    #[test]
+    fn replays_the_documented_streams_of_newer_clis() {
+        let cases = [
+            (
+                AgentRunnerKind::Cursor,
+                "cursor-docs.jsonl",
+                "Read: calc.py",
+            ),
+            (
+                AgentRunnerKind::Amp,
+                "amp-docs.jsonl",
+                "Read: /work/repo/calc.py",
+            ),
+            (AgentRunnerKind::Droid, "droid-docs.jsonl", ""),
+            (
+                AgentRunnerKind::Opencode,
+                "opencode-docs.jsonl",
+                "read: /work/repo/calc.py",
+            ),
+            (
+                AgentRunnerKind::Antigravity,
+                "antigravity-docs.jsonl",
+                "run_command: cat calc.py",
+            ),
+        ];
+        for (kind, fixture, tool) in cases {
+            let events = replay(kind, fixture);
+            if !tool.is_empty() {
+                assert!(
+                    texts(&events, RunnerEventKind::Progress)
+                        .iter()
+                        .any(|t| t == tool),
+                    "{fixture}: {:?}",
+                    texts(&events, RunnerEventKind::Progress)
+                );
+                assert_eq!(
+                    events.first().map(|event| event.kind),
+                    Some(RunnerEventKind::Init),
+                    "{fixture}"
+                );
+            }
+            let answer = "Fixed add() to return a + b.";
+            let messages = texts(&events, RunnerEventKind::Message);
+            let results = texts(&events, RunnerEventKind::Result);
+            assert!(
+                messages.iter().any(|m| m == answer) || results.iter().any(|r| r == answer),
+                "{fixture}: {messages:?} {results:?}"
+            );
+            assert!(!events.iter().any(|event| event.failed), "{fixture}");
+            let mut usage = crate::api_types::AgentJobUsage::default();
+            for event in events.iter().filter(|e| e.kind == RunnerEventKind::Result) {
+                if let Some(u) = event
+                    .payload
+                    .as_ref()
+                    .and_then(|p| usage_from_result(kind, p))
+                {
+                    usage.add(&u);
+                }
+            }
+            match kind {
+                AgentRunnerKind::Cursor => assert_eq!(usage, Default::default()),
+                AgentRunnerKind::Amp => assert_eq!(usage.input_tokens, Some(3500)),
+                AgentRunnerKind::Droid => {
+                    assert_eq!(usage.input_tokens, Some(8500));
+                    assert_eq!(usage.turns, Some(3));
+                }
+                AgentRunnerKind::Opencode => {
+                    assert_eq!(usage.input_tokens, Some(900 + 2000 + 300 + 2900));
+                    assert_eq!(usage.output_tokens, Some(30 + 20 + 5));
+                    assert_eq!(usage.turns, Some(2));
+                    assert!((usage.cost_usd.unwrap() - 0.002).abs() < 1e-9);
+                }
+                AgentRunnerKind::Antigravity => {
+                    assert_eq!(usage.input_tokens, Some(10418));
+                    assert_eq!(usage.cached_input_tokens, Some(8113));
+                    assert_eq!(usage.output_tokens, Some(589 + 551));
+                }
+                _ => unreachable!(),
+            }
+        }
+        // An unsuccessful Antigravity result fails the job.
+        let failed = parse_runner_line(
+            AgentRunnerKind::Antigravity,
+            r#"{"event":"result","result":{"status":"ERROR","error":"quota exceeded"}}"#,
+        )
+        .unwrap();
+        assert!(failed[0].failed);
+        assert_eq!(failed[0].text.as_deref(), Some("quota exceeded"));
+        // OpenCode errors are reported and fail the job.
+        let error = parse_runner_line(
+            AgentRunnerKind::Opencode,
+            r#"{"type":"error","sessionID":"s","error":{"name":"ProviderAuthError","data":{"message":"No API key"}}}"#,
+        )
+        .unwrap();
+        assert!(error[0].failed);
+        assert_eq!(error[0].text.as_deref(), Some("No API key"));
+    }
+
+    #[test]
+    fn newer_clis_get_their_documented_flags() {
+        let build = |runner: &str, permissions: AgentPermissions| {
+            let kind: AgentRunnerKind = runner.parse().unwrap();
+            let mut detail = profile(runner);
+            detail.permissions = Some(permissions);
+            detail.model = Some("m1".into());
+            detail.effort = Some("high".into());
+            build_runner_command(
+                kind,
+                &detail,
+                "Do it",
+                &[std::path::PathBuf::from("/repo/.tasks")],
+            )
+        };
+        let args = |runner: &str, permissions| build(runner, permissions).unwrap().args.join(" ");
+
+        let cursor = build("cursor", AgentPermissions::Workspace).unwrap();
+        assert_eq!(cursor.program, "cursor-agent");
+        assert!(
+            cursor
+                .args
+                .join(" ")
+                .starts_with("-p --output-format stream-json --trust")
+        );
+        assert!(cursor.args.join(" ").contains("--force --sandbox enabled"));
+        assert_eq!(cursor.args.last().map(String::as_str), Some("Do it"));
+        assert!(args("cursor", AgentPermissions::ReadOnly).contains("--mode plan"));
+
+        assert!(args("amp", AgentPermissions::Workspace).ends_with("-x Do it"));
+        assert!(args("amp", AgentPermissions::Full).contains("--dangerously-allow-all"));
+        assert!(build("amp", AgentPermissions::ReadOnly).is_err());
+        assert!(!args("amp", AgentPermissions::Workspace).contains("m1"));
+
+        let droid = args("droid", AgentPermissions::Workspace);
+        assert!(
+            droid.starts_with("exec --output-format json --auto medium"),
+            "{droid}"
+        );
+        assert!(droid.contains("-m m1 --reasoning-effort high"));
+        assert!(!args("droid", AgentPermissions::ReadOnly).contains("--auto"));
+
+        let opencode = build("opencode", AgentPermissions::Workspace).unwrap();
+        assert!(
+            opencode
+                .args
+                .join(" ")
+                .starts_with("run --format json --auto")
+        );
+        assert!(opencode.args.join(" ").contains("-m m1 --variant high"));
+        let config = opencode.env.get("OPENCODE_CONFIG_CONTENT").unwrap();
+        assert!(config.contains("/repo/.tasks/**"), "{config}");
+        let read_only = build("opencode", AgentPermissions::ReadOnly).unwrap();
+        assert!(!read_only.args.iter().any(|a| a == "--auto"));
+        assert!(read_only.env["OPENCODE_CONFIG_CONTENT"].contains(r#""edit":"deny""#));
+        assert_eq!(
+            build("kilo", AgentPermissions::Full).unwrap().program,
+            "kilo"
+        );
+
+        let agy = build("antigravity", AgentPermissions::Workspace).unwrap();
+        assert_eq!(agy.program, "agy");
+        let agy = agy.args.join(" ");
+        assert!(
+            agy.contains("--mode accept-edits --add-dir /repo/.tasks"),
+            "{agy}"
+        );
+        assert!(agy.contains("--model m1 --effort high"));
+        assert!(agy.ends_with("-p Do it"));
     }
 
     #[test]

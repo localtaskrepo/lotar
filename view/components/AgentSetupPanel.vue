@@ -3,8 +3,8 @@
     <div class="agent-setup__intro">
       <h2 class="agent-setup__title">Set up an agent</h2>
       <p>
-        An agent profile names a coding CLI that LoTaR runs on a ticket in this repository: Claude Code, Codex, GitHub
-        Copilot or Gemini. Once a profile exists, assign a ticket to <code>@{{ name || 'name' }}</code> or use
+        An agent profile names a coding CLI that LoTaR runs on a ticket in this repository, such as Claude Code, Codex
+        or GitHub Copilot. Once a profile exists, assign a ticket to <code>@{{ name || 'name' }}</code> or use
         <strong>Run agent</strong>, and the job shows up on this page.
       </p>
     </div>
@@ -73,6 +73,12 @@ const RUNNERS = [
   { value: 'codex', label: 'Codex' },
   { value: 'copilot', label: 'GitHub Copilot' },
   { value: 'gemini', label: 'Gemini' },
+  { value: 'cursor', label: 'Cursor' },
+  { value: 'amp', label: 'Amp' },
+  { value: 'droid', label: 'Factory Droid' },
+  { value: 'opencode', label: 'OpenCode' },
+  { value: 'kilo', label: 'Kilo Code' },
+  { value: 'antigravity', label: 'Antigravity' },
 ]
 
 const name = ref('implement')

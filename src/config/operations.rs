@@ -98,7 +98,10 @@ fn parse_agent_profiles(
             )));
         }
         let runner = profile.to_detail().runner;
-        if !AGENT_RUNNERS.contains(&runner.trim().to_ascii_lowercase().as_str()) {
+        if runner
+            .parse::<crate::services::agent_runner::AgentRunnerKind>()
+            .is_err()
+        {
             return Err(ConfigError::ParseError(format!(
                 "Agent '{name}' has unsupported runner '{runner}'. Expected {}",
                 AGENT_RUNNERS.join(", ")
@@ -109,7 +112,19 @@ fn parse_agent_profiles(
 }
 
 /// Runner kinds an agent profile can use.
-pub const AGENT_RUNNERS: &[&str] = &["claude", "codex", "copilot", "gemini", "command"];
+pub const AGENT_RUNNERS: &[&str] = &[
+    "claude",
+    "codex",
+    "copilot",
+    "gemini",
+    "cursor",
+    "amp",
+    "droid",
+    "opencode",
+    "kilo",
+    "antigravity",
+    "command",
+];
 
 fn parse_bool_flag(value: &str, field: &str) -> Result<bool, ConfigError> {
     let normalized = value.trim().to_lowercase();

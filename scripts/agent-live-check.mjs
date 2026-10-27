@@ -29,6 +29,13 @@ const RUNNERS = {
     codex: { args: ['-c', 'model_reasoning_effort=low'] },
     copilot: { args: [] },
     gemini: { args: ['-m', 'flash'] },
+    // Docs-based runners (DEV-203): checked here once their CLI is installed.
+    cursor: { args: [], program: 'cursor-agent' },
+    amp: { args: [] },
+    droid: { args: [] },
+    opencode: { args: [] },
+    kilo: { args: [] },
+    antigravity: { args: [], program: 'agy' },
 };
 
 // Model and effort each CLI is asked to use in the settings scenario.
@@ -38,6 +45,12 @@ const SETTINGS = {
     // Copilot plans without model choice only allow `auto`, which takes no effort.
     copilot: { model: 'auto' },
     gemini: { model: 'flash' },
+    cursor: {},
+    amp: {},
+    droid: {},
+    opencode: {},
+    kilo: {},
+    antigravity: {},
 };
 
 const BUGGY = 'def add(a, b):\n    return a - b\n';
@@ -353,7 +366,7 @@ if (!fs.existsSync(lotarBin)) {
 }
 const runners = (options.runners.length ? options.runners : Object.keys(RUNNERS)).filter((runner) => {
     if (!RUNNERS[runner]) throw new Error(`Unknown runner: ${runner}`);
-    if (installed(runner)) return true;
+    if (installed(RUNNERS[runner].program ?? runner)) return true;
     console.log(`- ${runner}: not installed, skipped`);
     return false;
 });

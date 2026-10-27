@@ -24,7 +24,15 @@ Each agent profile names a runner. LoTaR starts the CLI headless, reads its JSON
 | `codex` | Codex CLI 0.163 | `codex exec --json … <prompt>` |
 | `copilot` | GitHub Copilot CLI 1.0.69 | `copilot -p <prompt> --output-format json --no-ask-user …` |
 | `gemini` | Gemini CLI headless docs (not run live) | `gemini --output-format stream-json … -p <prompt>` |
+| `cursor` | Cursor CLI docs (not run live) | `cursor-agent -p --output-format stream-json --trust … <prompt>`; set `command: agent` if your install only has the newer `agent` binary |
+| `amp` | Amp execute-mode docs (not run live) | `amp --stream-json … -x <prompt>` |
+| `droid` | Factory Droid `droid exec` docs (not run live) | `droid exec --output-format json … <prompt>`; output arrives when the run ends, so there is no live progress |
+| `opencode` | OpenCode CLI docs (not run live) | `opencode run --format json … <prompt>` |
+| `kilo` | Kilo Code CLI (an OpenCode fork; not run live) | `kilo run --format json … <prompt>` |
+| `antigravity` | Antigravity CLI headless docs (not run live) | `agy --output-format stream-json --disable-slash-commands … -p <prompt>` |
 | `command` | any program | runs `command` with `args`; the prompt is in `LOTAR_AGENT_PROMPT` |
+
+The runners marked "not run live" follow each CLI's documented headless interface; their parsers are tested against the documented example events. Treat them as a starting point and report differences you see with a real install; the research behind them is in [agent CLI research notes](../developers/agent-cli-research.md).
 
 Profile `args` come after LoTaR's flags. A job fails when the CLI exits non-zero or reports an error in its final result, even if it exits with 0.
 
@@ -48,6 +56,15 @@ agents:
 - `workspace` lets the agent edit the job's working directory. It can also write the tasks directory (to update its ticket) and, in a worktree, the repository's `.git` directory (to commit). A merge job (profile `merge`, or a ticket in `Merging`) gets the main checkout instead of `.git`, so it can fast-forward main. These are passed as `--add-dir` (Gemini: `--include-directories`).
 - Commits from inside a sandbox can fail: Codex keeps git metadata read-only, and a signing key agent (1Password, `gpg-agent`, `ssh-agent`) is usually out of reach. LoTaR then commits the agent's changes itself when the job ends (see [Default instructions](#default-instructions)).
 - Copilot has no sandbox. At `workspace` its file tools stay in the working directory, but shell commands are not confined.
+- The newer runners map the levels to their documented options:
+
+  | Level | cursor | amp | droid | opencode, kilo | antigravity |
+  | --- | --- | --- | --- | --- | --- |
+  | `read-only` | `--mode plan` | refused (Amp has no read-only mode) | default (Droid is read-only without `--auto`) | permission config denies edit and bash | `--mode plan` |
+  | `workspace` | `--force --sandbox enabled` | Amp's defaults | `--auto medium` | `--auto` with permission config: bash allowed except `git push`, the extra directories allowed | `--mode accept-edits` plus `--add-dir` |
+  | `full` | `--force --sandbox disabled` | `--dangerously-allow-all` | `--skip-permissions-unsafe` | `--auto` with every permission allowed | `--dangerously-skip-permissions` |
+
+  OpenCode and Kilo get their permission rules through `OPENCODE_CONFIG_CONTENT`, unless the profile's `env` sets it.
 - If the profile's `args` already set permissions (for example `--permission-mode`, `--sandbox`, `--allow-tool`/`--deny-tool`, `--approval-mode` or `--yolo`), LoTaR adds no permission flags of its own.
 - `command` runners get no permission flags.
 
@@ -73,6 +90,11 @@ agents:
 | `codex` | `-m` | `-c model_reasoning_effort=<value>` (depends on the model, for example low, medium, high, xhigh) |
 | `copilot` | `--model` | `--reasoning-effort` (none, minimal, low, medium, high, xhigh, max) |
 | `gemini` | `-m` | not supported |
+| `cursor` | `--model` | not supported |
+| `amp` | not supported (Amp chooses models through its modes) | not supported |
+| `droid` | `-m` | `--reasoning-effort` |
+| `opencode`, `kilo` | `-m provider/model` | `--variant` |
+| `antigravity` | `--model` | `--effort` |
 | `command` | `LOTAR_AGENT_MODEL` | `LOTAR_AGENT_EFFORT` |
 
 Values are passed through as given, so each CLI decides which names it accepts. They may use letters, digits and `. _ - : / @ [ ]`. If the profile's `args` already set the model or effort, those win. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
@@ -87,6 +109,10 @@ When a job ends, LoTaR records what its CLI reports about it:
 | `codex` | input tokens (with cached), output tokens (including reasoning) |
 | `copilot` | premium requests, lines added and removed |
 | `gemini` | input and output tokens |
+| `amp`, `droid` | input tokens (with cached), output tokens, turns |
+| `opencode`, `kilo` | input tokens (with cached), output tokens, cost in USD, steps as turns |
+| `antigravity` | input tokens (with cached), output tokens including thinking, turns |
+| `cursor` | nothing (its output reports no usage) |
 
 The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
 

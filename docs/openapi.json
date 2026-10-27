@@ -2570,7 +2570,10 @@
                 "required": ["name", "runner"],
                 "properties": {
                   "name": { "type": "string" },
-                  "runner": { "type": "string", "enum": ["claude", "codex", "copilot", "gemini", "command"] },
+                  "runner": {
+                    "type": "string",
+                    "enum": ["claude", "codex", "copilot", "gemini", "cursor", "amp", "droid", "opencode", "kilo", "antigravity", "command"]
+                  },
                   "project": { "type": "string" },
                   "global": { "type": "boolean" },
                   "model": { "type": "string" },

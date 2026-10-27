@@ -1,0 +1,1 @@
+{"type":"result","subtype":"success","is_error":false,"duration_ms":8123,"num_turns":3,"result":"Fixed add() to return a + b.","session_id":"droid-session-1","usage":{"input_tokens":5100,"output_tokens":210,"cache_read_input_tokens":3000,"cache_creation_input_tokens":400,"factory_credits":2,"ttft_ms":900}}
