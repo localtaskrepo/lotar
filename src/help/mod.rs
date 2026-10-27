@@ -1,5 +1,4 @@
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
-use include_dir::{Dir, DirEntry, include_dir};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::collections::HashMap;
@@ -7,7 +6,19 @@ use std::fmt::Write as FmtWrite;
 use std::io::IsTerminal;
 use std::sync::LazyLock;
 
-static HELP_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/docs/help");
+// docs/help, embedded gzip-compressed by build.rs (DEV-221).
+include!(concat!(env!("OUT_DIR"), "/help_docs.rs"));
+
+/// The text of a help file (path relative to docs/help), decompressed.
+fn help_doc(path: &str) -> Option<String> {
+    use std::io::Read;
+    let (_, compressed) = HELP_DOCS.iter().find(|(name, _)| *name == path)?;
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(*compressed)
+        .read_to_string(&mut text)
+        .ok()?;
+    Some(text)
+}
 const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 // Default to version-pinned docs on GitHub (e.g., v0.3.0); override with LOTAR_DOCS_BASE_URL
 static DEFAULT_DOCS_BASE_URL: LazyLock<String> = LazyLock::new(|| {
@@ -33,13 +44,13 @@ impl HelpSystem {
 
     pub fn show_command_help(&self, command: &str) -> Result<String, String> {
         if let Some(file) = self.fetch_help_file(command) {
-            return self.render_help_file(command, command, file);
+            return self.render_help_file(command, &file);
         }
 
         if let Some(alias) = HELP_ALIASES.get(command)
             && let Some(file) = self.fetch_help_file(alias)
         {
-            return self.render_help_file(command, alias, file);
+            return self.render_help_file(command, &file);
         }
 
         Err(format!("No help available for command '{}'", command))
@@ -53,7 +64,7 @@ impl HelpSystem {
     pub fn list_available_help(&self) -> Result<String, String> {
         let mut help_files = Vec::new();
 
-        self.collect_help_files(&HELP_DIR, &mut help_files);
+        self.collect_help_files(&mut help_files);
 
         if help_files.is_empty() {
             return Ok(self.renderer.render_warning("No help files found"));
@@ -78,29 +89,16 @@ impl HelpSystem {
         }
     }
 
-    fn find_help_file(&self, filename: &str) -> Option<include_dir::File<'_>> {
-        HELP_DIR.get_file(filename).cloned()
+    fn find_help_file(&self, filename: &str) -> Option<String> {
+        help_doc(filename)
     }
 
-    fn fetch_help_file(&self, topic: &str) -> Option<include_dir::File<'_>> {
+    fn fetch_help_file(&self, topic: &str) -> Option<String> {
         let help_file = format!("{}.md", topic);
         self.find_help_file(&help_file)
     }
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "the caller hands this value over and does not use it afterwards"
-    )]
-    fn render_help_file(
-        &self,
-        command: &str,
-        topic: &str,
-        file: include_dir::File<'_>,
-    ) -> Result<String, String> {
-        let content = file
-            .contents_utf8()
-            .ok_or_else(|| format!("Help file '{}.md' is not valid UTF-8", topic))?;
-
+    fn render_help_file(&self, command: &str, content: &str) -> Result<String, String> {
         match self.renderer.format {
             OutputFormat::Json => Ok(serde_json::json!({
                 "command": command,
@@ -117,28 +115,17 @@ impl HelpSystem {
         }
     }
 
-    fn collect_help_files(&self, dir: &Dir<'_>, files: &mut Vec<String>) {
-        for entry in dir.entries() {
-            match entry {
-                DirEntry::File(file) => {
-                    if let Some(name) = file.path().file_name()
-                        && let Some(name_str) = name.to_str()
-                        && name_str.ends_with(".md")
-                    {
-                        files.push(name_str.to_string());
-                    }
-                }
-                DirEntry::Dir(subdir) => {
-                    self.collect_help_files(subdir, files);
-                }
+    fn collect_help_files(&self, files: &mut Vec<String>) {
+        for (path, _) in HELP_DOCS {
+            let name = path.rsplit('/').next().unwrap_or(path);
+            if name.ends_with(".md") {
+                files.push(name.to_string());
             }
         }
     }
 
     fn extract_description(&self, filename: &str) -> Option<String> {
-        if let Some(file) = self.find_help_file(filename)
-            && let Some(content) = file.contents_utf8()
-        {
+        if let Some(content) = self.find_help_file(filename) {
             // Extract first line after # header as description
             for line in content.lines() {
                 let line = line.trim();

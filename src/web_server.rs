@@ -295,13 +295,32 @@ fn handle_connection(
         let _ = stream.flush();
     } else if path.starts_with("/api") {
         if path == "/api/openapi.json" {
-            let spec = include_str!("../docs/openapi.json");
+            // Embedded gzip-compressed by build.rs (DEV-221); sent as is to
+            // clients that accept gzip, decompressed for the rest.
+            static SPEC_GZ: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/openapi.json.gz"));
+            let accepts_gzip = headers.get("accept-encoding").is_some_and(|value| {
+                value
+                    .split(',')
+                    .any(|part| part.trim().eq_ignore_ascii_case("gzip"))
+            });
+            let (body, encoding) = if accepts_gzip {
+                (
+                    SPEC_GZ.to_vec(),
+                    "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n",
+                )
+            } else {
+                use std::io::Read;
+                let mut text = Vec::new();
+                let _ = flate2::read::GzDecoder::new(SPEC_GZ).read_to_end(&mut text);
+                (text, "Vary: Accept-Encoding\r\n")
+            };
             let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                spec.len(),
-                spec
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
+                encoding,
+                body.len()
             );
             let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(&body);
             let _ = stream.flush();
             return;
         }

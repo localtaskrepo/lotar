@@ -191,6 +191,22 @@ jobs:
         if: matrix.rust_target != 'aarch64-unknown-linux-musl'
         shell: bash
         run: |
+          set -euo pipefail
+          # Keep the runner's home and checkout paths out of the binary and
+          # shorten the source paths embedded in panic messages (DEV-221).
+          # (The cross build above runs in a container with generic paths.)
+          native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
+          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+          rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+          flags="--remap-path-prefix=$(native "$cargo_home")=/cargo"
+          flags="$flags --remap-path-prefix=$(native "$rustup_home")=/rustup"
+          # Later prefixes win: map each registry index folder to /cargo too,
+          # so dependency paths shrink to /cargo/<crate>-<version>/...
+          for index in "$cargo_home"/registry/src/*/; do
+            [ -d "$index" ] && flags="$flags --remap-path-prefix=$(native "${index%/}")=/cargo"
+          done
+          flags="$flags --remap-path-prefix=$(native "${GITHUB_WORKSPACE:-$PWD}")=/lotar"
+          export RUSTFLAGS="${RUSTFLAGS:-} $flags"
           cargo build --release --locked --all-features --target "${{ matrix.rust_target }}"
 
       - name: Strip binary (Unix)

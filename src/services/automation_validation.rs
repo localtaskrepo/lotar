@@ -101,6 +101,20 @@ fn validate_condition_value(
     result: &mut ValidationResult,
 ) {
     let map = condition.as_map();
+    // An invalid pattern would silently never match; say so when saving.
+    if let Some(pattern) = map.matches.as_ref()
+        && let Err(error) = regex::Regex::new(pattern)
+    {
+        let detail = error.to_string();
+        let reason = detail.lines().last().unwrap_or("invalid pattern").trim();
+        let reason = reason.strip_prefix("error: ").unwrap_or(reason);
+        result.add_error(ValidationError::error(
+            Some("automation".to_string()),
+            format!(
+                "Automation condition on '{field}' has an invalid pattern '{pattern}': {reason}."
+            ),
+        ));
+    }
     let Some(target) = map.equals.as_ref() else {
         if let Some(values) = map.any.as_ref() {
             for value in values {
@@ -183,5 +197,55 @@ fn validate_action(
                 "Automation run command cannot be empty.".to_string(),
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::types::GlobalConfig;
+
+    fn validate(yaml: &str) -> ValidationResult {
+        let file: AutomationFile = serde_yaml_ng::from_str(yaml).unwrap();
+        validate_rules(&file, &ResolvedConfig::from_global(GlobalConfig::default()))
+    }
+
+    #[test]
+    fn reports_invalid_match_patterns() {
+        let result = validate(
+            "automation:\n  rules:\n    - when:\n        title:\n          matches: '(unclosed'\n      on:\n        updated:\n          add_tags: [x]\n",
+        );
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|error| error.to_string().contains("invalid pattern '(unclosed'")),
+            "{:?}",
+            result.errors
+        );
+        let ok = validate(
+            "automation:\n  rules:\n    - when:\n        title:\n          matches: '^\\p{L}+ \\w+$'\n      on:\n        updated:\n          add_tags: [x]\n",
+        );
+        assert!(ok.errors.is_empty(), "{:?}", ok.errors);
+    }
+
+    /// DEV-221: Unicode classes user patterns (search, scan, validation,
+    /// automation) keep after trimming the regex crate's tables.
+    #[test]
+    fn unicode_support_in_user_patterns() {
+        let matches =
+            |pattern: &str, text: &str| regex::Regex::new(pattern).unwrap().is_match(text);
+        // Every script works with \w, \b, case folding and general categories.
+        assert!(matches(r"^\w+$", "Größe"));
+        assert!(matches(r"^\w+$", "задача"));
+        assert!(matches(r"^\w+$", "任务"));
+        assert!(matches(r"(?i)^ΑΒΓ$", "αβγ"));
+        assert!(matches(r"\bfix\b", "fix ошибку"));
+        assert!(matches(r"^\p{L}+$", "日本語"));
+        assert!(matches(r"^\p{Lu}", "Éclair"));
+        assert!(matches(r"\d", "٣"));
+        // Named script and boolean properties (\p{Greek}, \p{Emoji}) are left
+        // out of normal builds; test builds can't show it, because dev-only
+        // dependencies turn the regex crate's full Unicode tables back on.
     }
 }

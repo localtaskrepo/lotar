@@ -1,7 +1,37 @@
 title: Reduce release binary size
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-27T21:07:33.759653+00:00
+modified: 2026-10-27T22:03:27.071883+00:00
+comments:
+- date: 2026-10-27T21:42:23.324498+00:00
+  text: 'Developer chose: (1) gzip-embed help docs and openapi.json, (2) opt-level 3 for the image crates, (4) --remap-path-prefix for release builds, and the regex trim only if users rarely meet it. Not doing (3) platform certificates (untested over HTTPS) or (5) image codec trimming (keep formats). Regex: keep unicode-perl, unicode-case, unicode-gencat (\w/\d/\s/\b, case folding and \p{L}-style categories work in every script); drop script/bool/age/segment property classes (\p{Greek}, \p{Han}, \p{Emoji}, \p{Alphabetic}) that users would only hit by hand-writing them. Search and config patterns already report such errors; automation ''matches'' patterns are silently ignored when invalid, so add validation for them. Measure before/after with a release build.'
+- date: 2026-10-27T22:03:27.036975+00:00
+  text: 'Done (macOS arm64 release, measured against e253718 = 6,926,528 bytes): 6,363,584 bytes, -562,944 (-8.1%). (1) build.rs gzips docs/help and docs/openapi.json into OUT_DIR; help decompresses on demand (src/help/mod.rs), /api/openapi.json is sent gzipped when accepted (29.5 KB instead of 254 KB) and decompressed otherwise; verified both paths byte-identical to the file. (2) [profile.release.package.*] opt-level 3 for image, zune-jpeg, zune-core, png, fdeflate, miniz_oxide, image-webp: first 480px thumbnail of a 3000x2000 JPEG 94 ms -> 25 ms. (4) release.yml remaps cargo home, rustup home, each registry index and the checkout (home paths in the binary 436 -> 1, the remaining one is the help viewer''s doc base dir); not applied to the cross-built aarch64-musl target, whose container paths are already generic; Windows paths converted with cygpath; workflow not run yet. (6) regex keeps unicode-perl/case/gencat: \w \d \s \b, case folding and \p{L}-style categories work in every script; \p{Greek}/\p{Emoji}-style named properties are no longer available (only visible outside test builds, where dev-dependencies re-enable full Unicode); documented in list.md, and automation matches patterns are now validated on save. Not done by request: platform certificates (3), image codec trimming (5). Verified: npm run lint, npm test (1805 Rust + 1279 UI), npm run smoke (356).'
 description: 'Measured on DEV-220 (macOS arm64, release, HEAD 85eda9a): 6.91 MB, up 1.48 MB since Sep 5 (image crate ~549 KB, raw embedded help docs + openapi.json +268 KB, web bundle +116 KB, feature code ~510 KB). Options without feature loss: (1) gzip-embed docs/help and openapi.json via build.rs (-462 KB); (2) opt-level 3 for the image crates (+114 KB, thumbnails ~5x faster); (3) platform certificate verifier for ureq (-48 KB, untested over HTTPS); (4) --remap-path-prefix in release builds (-33 KB, also hides build paths). With feature trade-offs: image codecs jpeg/png/webp only (-167 KB, loses TIFF previews and GIF/BMP/ICO downscaling); slimmer regex unicode tables (-182/-248 KB, breaks some \p{..} in user regexes). Keep opt-level z (s +2.3 MB, 3 +4.3 MB). Also: release builds use --all-features, which switches custom field values to serde_json::Value in shipped binaries vs dev builds; check whether that is intended. Data and scripts: scratchpad binsize/ from the DEV-220 session.'
+history:
+- at: 2026-10-27T21:42:23.278554+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T21:42:23.324498+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T22:03:27.036975+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T22:03:27.071883+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

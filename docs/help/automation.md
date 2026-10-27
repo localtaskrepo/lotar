@@ -48,6 +48,8 @@ Supported combinators:
 - `not`: invert a condition
 - `changes`: explicit from/to checks
 
+A field condition can also test the value with a regular expression, e.g. `title: { matches: '^\[ops\]' }`. Patterns use the same syntax as [search text](list.md#search-text); an invalid pattern is rejected when the rules are saved through LoTaR.
+
 Examples:
 
 ```yaml
