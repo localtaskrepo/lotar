@@ -175,7 +175,7 @@ Instructions (inline, from a file, built-in or per profile) can use `${{...}}` t
 | `lotar.bin` | absolute path of the `lotar` that started the job |
 | `workspace.root` | the main checkout |
 
-Unknown variables expand to nothing. The built-in instructions use them so that commands contain literal values: Claude Code refuses commands with shell variables (`"$LOTAR_TICKET_ID"`, `$?`) in headless runs.
+Lists work as in automation templates, for example `${{ticket.references[*].link}}` or `${{ticket.comments[-1].text}}` (see [Template variables](automation.md#template-variables)). Unknown variables expand to nothing. The built-in instructions use them so that commands contain literal values: Claude Code refuses commands with shell variables (`"$LOTAR_TICKET_ID"`, `$?`) in headless runs.
 
 LoTaR writes the "This job" section itself:
 

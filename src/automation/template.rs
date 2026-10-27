@@ -3,9 +3,31 @@ use crate::services::automation_service::AutomationJobContext;
 use std::collections::HashMap;
 
 /// Context for expanding `${{...}}` template variables in automation config strings.
+///
+/// Scalars are looked up by key (`ticket.title`). Lists support a selector:
+/// `ticket.tags[*]` joins all items with ", ", `ticket.comments[-1].text`
+/// picks one item (negative indexes count from the end) and an optional
+/// `.field` reads a field of each item (`ticket.references[*].link`).
 #[derive(Default)]
 pub struct TemplateContext {
     vars: HashMap<String, String>,
+    lists: HashMap<String, Vec<ListItem>>,
+}
+
+/// One list item: its plain value plus named fields (references, comments).
+#[derive(Default, Clone)]
+struct ListItem {
+    value: String,
+    fields: HashMap<&'static str, String>,
+}
+
+impl ListItem {
+    fn plain(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+            fields: HashMap::new(),
+        }
+    }
 }
 
 impl TemplateContext {
@@ -58,6 +80,108 @@ impl TemplateContext {
             let stringified = custom_field_to_string(value);
             self.set(&format!("{prefix}.field:{key}"), &stringified);
         }
+
+        let plain = |values: &[String]| values.iter().cloned().map(ListItem::plain).collect();
+        self.lists
+            .insert(format!("{prefix}.tags"), plain(&task.tags));
+        self.lists.insert(
+            format!("{prefix}.acceptance_criteria"),
+            plain(&task.acceptance_criteria),
+        );
+        self.lists.insert(
+            format!("{prefix}.sprints"),
+            task.sprints
+                .iter()
+                .map(|id| ListItem::plain(id.to_string()))
+                .collect(),
+        );
+        let relationships = &task.relationships;
+        for (name, values) in [
+            ("depends_on", &relationships.depends_on),
+            ("blocks", &relationships.blocks),
+            ("related", &relationships.related),
+            ("children", &relationships.children),
+            ("fixes", &relationships.fixes),
+        ] {
+            self.lists
+                .insert(format!("{prefix}.relationships.{name}"), plain(values));
+        }
+        if let Some(ref parent) = relationships.parent {
+            self.set(&format!("{prefix}.relationships.parent"), parent);
+        }
+        if let Some(ref duplicate) = relationships.duplicate_of {
+            self.set(&format!("{prefix}.relationships.duplicate_of"), duplicate);
+        }
+        self.lists.insert(
+            format!("{prefix}.comments"),
+            task.comments
+                .iter()
+                .map(|comment| ListItem {
+                    value: comment.text.clone(),
+                    fields: HashMap::from([
+                        ("text", comment.text.clone()),
+                        ("date", comment.date.clone()),
+                    ]),
+                })
+                .collect(),
+        );
+        self.lists.insert(
+            format!("{prefix}.references"),
+            task.references
+                .iter()
+                .map(|reference| {
+                    let fields: HashMap<&'static str, String> = [
+                        ("code", &reference.code),
+                        ("link", &reference.link),
+                        ("file", &reference.file),
+                        ("attachment", &reference.attachment),
+                        ("jira", &reference.jira),
+                        ("github", &reference.github),
+                    ]
+                    .into_iter()
+                    .filter_map(|(name, value)| value.clone().map(|value| (name, value)))
+                    .collect();
+                    let value = ["code", "link", "file", "attachment", "jira", "github"]
+                        .iter()
+                        .find_map(|name| fields.get(name).cloned())
+                        .unwrap_or_default();
+                    ListItem { value, fields }
+                })
+                .collect(),
+        );
+    }
+
+    /// The value for `key`: a scalar, or a list selection such as
+    /// `ticket.references[*].link` or `ticket.comments[-1].text`.
+    fn lookup(&self, key: &str) -> Option<String> {
+        if let Some(value) = self.vars.get(key) {
+            return Some(value.clone());
+        }
+        let open = key.find('[')?;
+        let close = open + key[open..].find(']')?;
+        let list = self.lists.get(&key[..open])?;
+        let selector = key[open + 1..close].trim();
+        let rest = &key[close + 1..];
+        let field = match rest.strip_prefix('.') {
+            Some(field) => Some(field),
+            None if rest.is_empty() => None,
+            None => return None,
+        };
+        let read = |item: &ListItem| match field {
+            None => Some(item.value.clone()),
+            Some(name) => item.fields.get(name).cloned(),
+        };
+        if selector == "*" {
+            let values: Vec<String> = list.iter().filter_map(read).collect();
+            return Some(values.join(", "));
+        }
+        let index: i64 = selector.parse().ok()?;
+        let position = if index < 0 {
+            list.len().checked_sub(index.unsigned_abs() as usize)?
+        } else {
+            index as usize
+        };
+        list.get(position).and_then(read)
     }
 
     /// Add agent/job context variables.
@@ -140,8 +264,8 @@ impl TemplateContext {
                 continue;
             };
             let key = after_open[..end].trim();
-            if let Some(value) = self.vars.get(key) {
-                result.push_str(value);
+            if let Some(value) = self.lookup(key) {
+                result.push_str(&value);
             } else if is_event_only_key(key) {
                 result.push_str(&rest[start..start + 3 + end + 2]);
                 if !unresolved.iter().any(|k| k == key) {
@@ -162,11 +286,11 @@ impl TemplateContext {
             let after_open = &rest[start + 3..];
             if let Some(end) = after_open.find("}}") {
                 let key = after_open[..end].trim();
-                if let Some(value) = self.vars.get(key) {
+                if let Some(value) = self.lookup(key) {
                     if shell_escape {
-                        shell_quote_into(&mut result, value);
+                        shell_quote_into(&mut result, &value);
                     } else {
-                        result.push_str(value);
+                        result.push_str(&value);
                     }
                 }
                 // Unknown key → empty string (no output)
@@ -231,6 +355,78 @@ fn is_event_only_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn task_with_lists() -> TaskDTO {
+        serde_json::from_value(serde_json::json!({
+            "id": "WEB-7",
+            "title": "Lists",
+            "status": "Todo",
+            "priority": "Medium",
+            "task_type": "Feature",
+            "created": "now",
+            "modified": "now",
+            "tags": ["ui", "agents"],
+            "acceptance_criteria": ["Shows the cost", "Works offline"],
+            "relationships": { "depends_on": ["WEB-1", "WEB-2"], "parent": "WEB-0" },
+            "comments": [
+                { "date": "2026-10-01", "text": "First" },
+                { "date": "2026-10-02", "text": "Latest note" }
+            ],
+            "references": [
+                { "link": "https://example.com/spec" },
+                { "code": "src/app.rs#L10" },
+                { "link": "https://example.com/design" }
+            ],
+            "sprints": [3]
+        }))
+        .expect("task json")
+    }
+
+    #[test]
+    fn lists_expand_with_selectors() {
+        let ctx = TemplateContext::from_task(&task_with_lists());
+        assert_eq!(ctx.expand("${{ticket.tags[*]}}"), "ui, agents");
+        assert_eq!(ctx.expand("${{ticket.tags[0]}}"), "ui");
+        assert_eq!(
+            ctx.expand("${{ticket.tags}}"),
+            "ui,agents",
+            "scalar form unchanged"
+        );
+        assert_eq!(
+            ctx.expand("${{ticket.references[*].link}}"),
+            "https://example.com/spec, https://example.com/design"
+        );
+        assert_eq!(
+            ctx.expand("${{ticket.references[*]}}"),
+            "https://example.com/spec, src/app.rs#L10, https://example.com/design"
+        );
+        assert_eq!(
+            ctx.expand("${{ticket.references[1].code}}"),
+            "src/app.rs#L10"
+        );
+        assert_eq!(ctx.expand("${{ticket.comments[-1].text}}"), "Latest note");
+        assert_eq!(ctx.expand("${{ticket.comments[-1].date}}"), "2026-10-02");
+        assert_eq!(
+            ctx.expand("${{ticket.relationships.depends_on[*]}}"),
+            "WEB-1, WEB-2"
+        );
+        assert_eq!(ctx.expand("${{ticket.relationships.parent}}"), "WEB-0");
+        assert_eq!(
+            ctx.expand("${{ticket.acceptance_criteria[*]}}"),
+            "Shows the cost, Works offline"
+        );
+        assert_eq!(ctx.expand("${{ticket.sprints[*]}}"), "3");
+        // Out of range, unknown fields and malformed selectors expand to nothing.
+        assert_eq!(ctx.expand("[${{ticket.tags[5]}}]"), "[]");
+        assert_eq!(ctx.expand("[${{ticket.comments[-9].text}}]"), "[]");
+        assert_eq!(ctx.expand("[${{ticket.references[0].nope}}]"), "[]");
+        assert_eq!(ctx.expand("[${{ticket.tags[x]}}]"), "[]");
+        // Shell-safe expansion quotes the joined value as one argument.
+        assert_eq!(
+            ctx.expand_shell_safe("echo ${{ticket.tags[*]}}"),
+            "echo 'ui, agents'"
+        );
+    }
 
     #[test]
     fn job_usage_is_available_to_templates() {

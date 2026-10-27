@@ -215,6 +215,17 @@ Available variables:
 | `comment.*` | `text` (available on `commented` events) |
 | `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the CLI reported them |
 
+Lists take a selector in square brackets. `[*]` joins every item with ", ", a number picks one item (`[0]` is the first, `[-1]` the last), and `.field` reads a field of each item:
+
+| List | Fields |
+|------|--------|
+| `ticket.tags`, `ticket.acceptance_criteria`, `ticket.sprints` | — |
+| `ticket.relationships.depends_on`, `.blocks`, `.related`, `.children`, `.fixes` | — (`ticket.relationships.parent` and `.duplicate_of` are plain values) |
+| `ticket.comments` | `text`, `date` (the item itself is the text) |
+| `ticket.references` | `code`, `link`, `file`, `attachment`, `jira`, `github` (the item itself is whichever is set) |
+
+For example `${{ticket.references[*].link}}` lists every link, and `${{ticket.comments[-1].text}}` is the latest comment. The same selectors work for `previous.*`. An index out of range or an unknown field expands to nothing.
+
 Example:
 
 ```yaml
