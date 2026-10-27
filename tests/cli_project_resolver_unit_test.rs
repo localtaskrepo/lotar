@@ -73,6 +73,7 @@ fn make_resolver() -> ProjectResolver {
         agent_automation: Default::default(),
         agent_worktree: Default::default(),
         remotes: Default::default(),
+        ui: Default::default(),
     };
     resolver_from_config(cfg, std::path::PathBuf::from("/tmp"))
 }

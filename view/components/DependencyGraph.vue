@@ -896,10 +896,10 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
   fill: none;
 }
 .dependency-edge--dependency {
-  color: var(--color-accent, #337ab7);
+  color: var(--color-accent);
 }
 .dependency-edge--hierarchy {
-  color: #8b5cba;
+  color: var(--color-chart-5);
   --edge-dash: 8 3;
 }
 .dependency-edge--related {
@@ -907,11 +907,11 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
   --edge-dash: 2 4;
 }
 .dependency-edge--fixes {
-  color: #27865d;
+  color: var(--color-success-strong);
   --edge-dash: 10 3 2 3;
 }
 .dependency-edge--duplicate {
-  color: #b47722;
+  color: var(--color-warning-strong);
   --edge-dash: 4 3;
 }
 .dependency-edge path {

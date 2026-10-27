@@ -1741,11 +1741,11 @@ const handleTaskUpdated = (task: TaskDTO) => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  border-left: 3px solid var(--color-danger, #c62828);
+  border-left: 3px solid var(--color-danger);
 }
 
 .refresh-error__message {
-  color: var(--color-danger-strong, var(--color-danger, #c62828));
+  color: var(--color-danger-strong);
 }
 
 .tasks-toolbar-btn .tasks-toolbar-btn__label {
@@ -1842,7 +1842,7 @@ const handleTaskUpdated = (task: TaskDTO) => {
 }
 
 .menu-item.danger {
-  color: var(--color-danger, #c62828);
+  color: var(--color-danger);
 }
 
 .tasks-modal__form {
@@ -1866,7 +1866,7 @@ const handleTaskUpdated = (task: TaskDTO) => {
 }
 
 .tasks-modal__hint--danger {
-  color: var(--color-danger, #c62828);
+  color: var(--color-danger);
 }
 
 .tasks-modal__checkbox {

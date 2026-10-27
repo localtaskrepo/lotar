@@ -216,7 +216,7 @@ watch(
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
-  background: color-mix(in oklab, var(--bg) 92%, white 8%);
+  background: var(--color-surface-contrast);
 }
 
 .feed-item__header {

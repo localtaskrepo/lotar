@@ -927,7 +927,12 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                             }),
                         );
                         expect(margins.every((margin) => margin <= 2)).toBe(true);
+                        // The app follows an OS mode change via <html data-mode> (DEV-218),
+                        // a moment after the media change; wait for it before reading colours.
+                        const modeIs = (mode: string) =>
+                            page.waitForFunction((value) => document.documentElement.dataset.mode === value, mode);
                         await page.emulateMedia({ colorScheme: 'dark' });
+                        await modeIs('dark');
                         const darkText = await page.evaluate(() => getComputedStyle(document.body).color);
                         await expect
                             .poll(() =>
@@ -938,6 +943,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                             )
                             .toBe(darkText);
                         await page.emulateMedia({ colorScheme: 'light' });
+                        await modeIs('light');
                         const lightText = await page.evaluate(() => getComputedStyle(document.body).color);
                         await expect
                             .poll(() =>

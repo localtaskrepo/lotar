@@ -54,6 +54,7 @@ mod activity;
 mod agents;
 mod attachments;
 mod automation;
+mod branding;
 mod config;
 mod jobs;
 mod projects;
@@ -495,6 +496,7 @@ pub fn initialize(api_server: &mut ApiServer) {
     references::register(api_server);
     relationships::register(api_server);
     attachments::register(api_server);
+    branding::register(api_server);
     config::register(api_server);
     automation::register(api_server);
     agents::register(api_server);

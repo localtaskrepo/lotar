@@ -1,10 +1,19 @@
 import { storageGet, storageRemove, storageSet } from './storage'
 import { darken, getContrastingColor, normalizeHex, withAlpha } from './color'
+import { DEFAULT_THEME, isThemeId, type ThemeId } from './themes'
 
+/** Light/dark mode choice (kept under its historic name and storage key). */
 export type ThemePreference = 'system' | 'light' | 'dark'
 
 const THEME_KEY = 'lotar.theme'
 const ACCENT_KEY = 'lotar.accent'
+/** The user's colour theme; absent means "use the repository default". */
+const THEME_NAME_KEY = 'lotar.themeName'
+/**
+ * Last repository default seen, so the inline script in index.html can apply
+ * the right theme before the app has asked the server (no flash).
+ */
+const REPOSITORY_THEME_KEY = 'lotar.repositoryTheme'
 
 export const DEFAULT_ACCENT = '#0ea5e9'
 
@@ -26,13 +35,57 @@ export function readThemePreference(): ThemePreference {
 export function applyThemePreference(theme: ThemePreference) {
     currentThemePreference = theme
     ensureSystemThemeListener()
+    applyMode()
+}
+
+/** Put the resolved light/dark mode on <html> as `data-mode`. */
+function applyMode() {
     if (typeof document === 'undefined') return
     const root = document.documentElement
-    if (theme === 'system') {
-        delete (root as any).dataset.theme
-    } else {
-        ;(root as any).dataset.theme = theme
-    }
+    root.dataset.mode = getEffectiveTheme()
+    updateChromeThemeColor()
+}
+
+let repositoryTheme: ThemeId | null = readCachedRepositoryTheme()
+
+function readCachedRepositoryTheme(): ThemeId | null {
+    const cached = storageGet(REPOSITORY_THEME_KEY)
+    return isThemeId(cached) ? cached : null
+}
+
+/** The user's own theme choice, or null to follow the repository default. */
+export function readThemeNamePreference(): ThemeId | null {
+    const stored = storageGet(THEME_NAME_KEY)
+    return isThemeId(stored) ? stored : null
+}
+
+export function storeThemeNamePreference(theme: ThemeId | null) {
+    if (theme) storageSet(THEME_NAME_KEY, theme)
+    else storageRemove(THEME_NAME_KEY)
+}
+
+/** The repository's default theme (`ui.theme`), as last reported by the server. */
+export function getRepositoryTheme(): ThemeId {
+    return repositoryTheme ?? DEFAULT_THEME
+}
+
+/** Record the repository default and re-apply when the user follows it. */
+export function setRepositoryTheme(theme: string | null | undefined) {
+    repositoryTheme = isThemeId(theme) ? theme : null
+    if (repositoryTheme) storageSet(REPOSITORY_THEME_KEY, repositoryTheme)
+    else storageRemove(REPOSITORY_THEME_KEY)
+    applyThemeName(readThemeNamePreference())
+}
+
+/** Theme in effect: the user's choice, else the repository default. */
+export function effectiveThemeName(choice: ThemeId | null = readThemeNamePreference()): ThemeId {
+    return choice ?? getRepositoryTheme()
+}
+
+/** Apply a theme choice (null = repository default) to <html>. */
+export function applyThemeName(choice: ThemeId | null) {
+    if (typeof document === 'undefined') return
+    document.documentElement.dataset.themeName = effectiveThemeName(choice)
     updateChromeThemeColor()
 }
 
@@ -84,6 +137,9 @@ export function storeAccentPreference(accent: string | null) {
 
 export function initializeThemeFromStorage() {
     ensureSystemThemeListener()
+    // The old explicit-mode attribute; `data-mode` replaced it.
+    if (typeof document !== 'undefined') delete document.documentElement.dataset.theme
+    applyThemeName(readThemeNamePreference())
     const theme = readThemePreference()
     applyThemePreference(theme)
     const accent = readAccentPreference()
@@ -96,7 +152,7 @@ function ensureSystemThemeListener() {
     prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const listener = () => {
         if (currentThemePreference === 'system') {
-            updateChromeThemeColor()
+            applyMode()
         }
     }
     if (typeof prefersDarkQuery.addEventListener === 'function') {
@@ -126,7 +182,12 @@ function updateChromeThemeColor() {
     if (typeof document === 'undefined') return
     const metaTags = document.querySelectorAll('meta[name="theme-color"]') as NodeListOf<HTMLMetaElement>
     if (!metaTags.length) return
-    const color = getEffectiveTheme() === 'dark' ? DARK_CHROME_COLOR : LIGHT_CHROME_COLOR
+    // The browser chrome matches the theme's page background.
+    const themed =
+        typeof getComputedStyle === 'function'
+            ? getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim()
+            : ''
+    const color = themed || (getEffectiveTheme() === 'dark' ? DARK_CHROME_COLOR : LIGHT_CHROME_COLOR)
     metaTags.forEach((meta) => {
         meta.setAttribute('content', color)
     })

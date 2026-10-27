@@ -2,10 +2,28 @@
   <header class="topbar">
     <div class="topbar-inner container">
       <div class="brand-group">
-        <a class="brand" href="/" aria-label="LoTaR home" @click.prevent="go('/')">
-          <img class="brand__logo brand__logo--light" :src="logoLight" alt="" width="574" height="152" />
-          <img class="brand__logo brand__logo--dark" :src="logoDark" alt="" width="574" height="152" />
-          <span class="brand__name">LoTaR</span>
+        <a
+          class="brand"
+          :class="{ 'brand--custom': brandIsCustom }"
+          href="/"
+          :aria-label="`${appName} home`"
+          @click.prevent="go('/')"
+        >
+          <template v-if="branding.logo">
+            <img class="brand__logo brand__logo--custom brand__logo--light" :src="branding.logo" alt="" />
+            <img
+              class="brand__logo brand__logo--custom brand__logo--dark"
+              :src="branding.logoDark ?? branding.logo"
+              alt=""
+            />
+          </template>
+          <!-- A custom name without a logo pairs it with the LoTaR app icon. -->
+          <img v-else-if="branding.name" class="brand__logo brand__logo--icon" :src="appIcon" alt="" />
+          <template v-else>
+            <img class="brand__logo brand__logo--light" :src="logoLight" alt="" width="574" height="152" />
+            <img class="brand__logo brand__logo--dark" :src="logoDark" alt="" width="574" height="152" />
+          </template>
+          <span class="brand__name" :class="{ 'brand__name--visible': branding.name }">{{ appName }}</span>
         </a>
         <div class="topbar-actions">
           <UiButton
@@ -84,6 +102,8 @@ import KeyboardShortcutsDialog from './components/KeyboardShortcutsDialog.vue'
 import IconGlyph from './components/IconGlyph.vue'
 import logoLight from './assets/branding/lotar-logo.svg'
 import logoDark from './assets/branding/lotar-logo-dark.svg'
+import appIcon from './assets/branding/lotar-app-icon.svg'
+import { DEFAULT_APP_NAME, useBranding } from './composables/useBranding'
 import TaskPanelHost from './components/TaskPanelHost.vue'
 import ToastHost from './components/ToastHost.vue'
 import UiButton from './components/UiButton.vue'
@@ -113,6 +133,10 @@ onUnmounted(() => {
 })
 const version = (import.meta as any).env?.VITE_CARGO_VERSION || ''
 const router = useRouter()
+// DEV-218: repository logo, name and theme default.
+const branding = useBranding()
+const appName = computed(() => branding.name ?? DEFAULT_APP_NAME)
+const brandIsCustom = computed(() => Boolean(branding.logo || branding.name))
 const route = useRoute()
 const activityOpen = ref(false)
 const { state: taskPanelState, openTaskPanel, closeTaskPanel } = useTaskPanelController()
@@ -457,23 +481,39 @@ watch(
   display: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  .brand__logo--light {
-    display: none;
-  }
-  .brand__logo--dark {
-    display: block;
-  }
+/* The whole selector sits in :global(); Vue drops anything after it. */
+:global(html[data-mode='dark'] .brand__logo--light) {
+  display: none;
 }
 
-:global(html[data-theme='light'] .brand__logo--light),
-:global(html[data-theme='dark'] .brand__logo--dark) {
+:global(html[data-mode='dark'] .brand__logo--dark) {
   display: block;
 }
 
-:global(html[data-theme='light'] .brand__logo--dark),
-:global(html[data-theme='dark'] .brand__logo--light) {
-  display: none;
+/* Repository logos can have any shape; keep them within the header. */
+.brand__logo--custom {
+  max-width: 180px;
+  object-fit: contain;
+}
+
+.brand--custom {
+  align-items: center;
+  gap: 8px;
+}
+
+.brand__name.brand__name--visible {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: hidden;
+  clip: auto;
+  clip-path: none;
+  max-width: 220px;
+  text-overflow: ellipsis;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-fg);
 }
 
 .brand__name {

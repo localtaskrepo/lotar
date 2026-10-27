@@ -2,7 +2,17 @@ import type { ConfigFormState } from '../composables/useConfigForm'
 
 /** Sections of the Config page, in menu order (DEV-19). */
 export type ConfigSectionId =
-    'general' | 'defaults' | 'workflow' | 'fields' | 'people' | 'automation' | 'git' | 'storage' | 'agents' | 'sprints'
+    | 'general'
+    | 'appearance'
+    | 'defaults'
+    | 'workflow'
+    | 'fields'
+    | 'people'
+    | 'automation'
+    | 'git'
+    | 'storage'
+    | 'agents'
+    | 'sprints'
 
 export interface ConfigSectionDefinition {
     id: ConfigSectionId
@@ -23,6 +33,14 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         summary: 'Server settings and the project name.',
         fields: ['serverPort', 'webUiPath', 'projectName'],
         errorKeys: ['server_port', 'project_name'],
+    },
+    {
+        id: 'appearance',
+        label: 'Appearance',
+        summary: 'Theme, name, logo and icon for everyone using this repository.',
+        globalOnly: true,
+        fields: ['uiTheme', 'uiName', 'uiLogo', 'uiLogoDark', 'uiIcon'],
+        errorKeys: ['ui_theme', 'ui_name', 'ui_logo', 'ui_logo_dark', 'ui_icon'],
     },
     {
         id: 'defaults',

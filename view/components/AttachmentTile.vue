@@ -224,6 +224,7 @@ function onError() {
 .attachment-tile--video-frame {
   position: relative;
   display: block;
+  /* Letterbox behind video stays black regardless of theme. */
   background: #000;
 }
 
@@ -245,6 +246,7 @@ function onError() {
   height: 36px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
+  /* Play badge sits on video content, not on the theme surface. */
   color: #fff;
   background: rgb(0 0 0 / 55%);
   font-size: 16px;

@@ -378,7 +378,7 @@ onUnmounted(() => {
 }
 
 .filter-tab:hover {
-  background: var(--surface-alt, rgba(0, 0, 0, 0.05));
+  background: color-mix(in oklab, var(--color-fg) 5%, transparent);
 }
 
 .filter-tab.active {
@@ -395,7 +395,7 @@ onUnmounted(() => {
   padding: 2px 8px;
   border-radius: 8px;
   font-size: 12px;
-  background: var(--surface-alt, rgba(0, 0, 0, 0.05));
+  background: color-mix(in oklab, var(--color-fg) 5%, transparent);
   font-family: var(--font-mono, monospace);
 }
 
@@ -404,8 +404,8 @@ onUnmounted(() => {
   padding: 2px 8px;
   border-radius: 8px;
   font-size: 12px;
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--success, #22c55e);
+  background: color-mix(in oklab, var(--color-success) 15%, transparent);
+  color: var(--color-success);
 }
 
 .simulator-card,
@@ -416,7 +416,7 @@ onUnmounted(() => {
 .simulated-action {
   padding: 12px;
   border-radius: 8px;
-  background: var(--surface-alt, rgba(0, 0, 0, 0.03));
+  background: color-mix(in oklab, var(--color-fg) 3%, transparent);
 }
 
 .rule-ref {
@@ -439,7 +439,7 @@ onUnmounted(() => {
 .task-preview {
   padding: 12px;
   border-radius: 8px;
-  background: var(--surface-alt, rgba(0, 0, 0, 0.03));
+  background: color-mix(in oklab, var(--color-fg) 3%, transparent);
 }
 
 .tag-chip {
@@ -447,19 +447,19 @@ onUnmounted(() => {
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
-  background: var(--surface-alt, rgba(0, 0, 0, 0.1));
+  background: color-mix(in oklab, var(--color-fg) 10%, transparent);
 }
 
 .help-text {
   padding: 16px;
-  background: var(--surface-alt, rgba(0, 0, 0, 0.02));
+  background: color-mix(in oklab, var(--color-fg) 2%, transparent);
   border-radius: 8px;
 }
 
 .help-text code {
   padding: 2px 4px;
   border-radius: 4px;
-  background: var(--surface-alt, rgba(0, 0, 0, 0.1));
+  background: color-mix(in oklab, var(--color-fg) 10%, transparent);
   font-family: var(--font-mono, monospace);
   font-size: 12px;
 }

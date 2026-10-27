@@ -2,11 +2,12 @@
   <section class="preferences">
     <PageHeader><template #title>Preferences</template></PageHeader>
 
-    <div class="preferences-layout">
-      <div class="preference-column">
-        <UiCard>
-          <h3>Theme</h3>
-          <div class="col" style="gap: 8px">
+    <UiCard class="preferences-appearance">
+      <h3>Appearance</h3>
+      <div class="appearance">
+        <fieldset class="appearance__group">
+          <legend>Mode</legend>
+          <div class="row" style="gap: 16px; flex-wrap: wrap">
             <label class="row" style="gap: 8px; align-items: center">
               <input type="radio" name="theme" value="system" v-model="theme" /> System (follow OS)
             </label>
@@ -17,10 +18,39 @@
               <input type="radio" name="theme" value="dark" v-model="theme" /> Dark
             </label>
           </div>
-        </UiCard>
+        </fieldset>
 
-        <UiCard>
-          <h3>Accent color</h3>
+        <fieldset class="appearance__group">
+          <legend>Theme</legend>
+          <div class="theme-grid" data-testid="theme-picker">
+            <label class="theme-option" :class="{ 'theme-option--selected': themeName === null }">
+              <input v-model="themeName" type="radio" name="theme-name" :value="null" class="theme-option__input" />
+              <ThemePreview :theme="repositoryTheme" />
+              <span class="theme-option__name">Repository default</span>
+              <span class="theme-option__hint muted">{{ repositoryThemeLabel }}, set in Config</span>
+            </label>
+            <label
+              v-for="option in THEMES"
+              :key="option.id"
+              class="theme-option"
+              :class="{ 'theme-option--selected': themeName === option.id }"
+            >
+              <input
+                v-model="themeName"
+                type="radio"
+                name="theme-name"
+                :value="option.id"
+                class="theme-option__input"
+              />
+              <ThemePreview :theme="option.id" />
+              <span class="theme-option__name">{{ option.name }}</span>
+              <span class="theme-option__hint muted">{{ option.description }}</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="appearance__group">
+          <legend>Accent color</legend>
           <div class="col" style="gap: 12px">
             <label class="row" style="gap: 8px; align-items: center">
               <input type="checkbox" v-model="accentEnabled" /> Use custom accent color
@@ -44,11 +74,15 @@
               <UiButton variant="ghost" @click="resetAccent">Reset</UiButton>
             </div>
             <p class="muted" style="margin: 0">
-              Accent affects highlights, focus rings, and selection states across the app.
+              Replaces the theme's accent for highlights, focus rings and selection states, in every theme.
             </p>
           </div>
-        </UiCard>
+        </fieldset>
+      </div>
+    </UiCard>
 
+    <div class="preferences-layout">
+      <div class="preference-column">
         <UiCard>
           <h3>Startup destination</h3>
           <div class="col" style="gap: 8px">
@@ -97,6 +131,16 @@
             </p>
           </div>
         </UiCard>
+
+        <UiCard>
+          <h3>Tables</h3>
+          <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
+            <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
+            <span class="muted"
+              >Clears saved table columns, sorting, and board/calendar field visibility for all projects.</span
+            >
+          </div>
+        </UiCard>
       </div>
 
       <div class="preference-column">
@@ -112,16 +156,6 @@
               </UiSelect>
             </label>
             <p class="muted" style="margin: 0">Used when the Tasks list URL does not specify a page size.</p>
-          </div>
-        </UiCard>
-
-        <UiCard>
-          <h3>Tables</h3>
-          <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
-            <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
-            <span class="muted"
-              >Clears saved table columns, sorting, and board/calendar field visibility for all projects.</span
-            >
           </div>
         </UiCard>
 
@@ -202,18 +236,35 @@ import {
 } from '../utils/preferences'
 import {
   applyAccentPreference,
+  applyThemeName,
   applyThemePreference,
   DEFAULT_ACCENT,
+  getRepositoryTheme,
   normalizeAccent,
   readAccentPreference,
+  readThemeNamePreference,
   readThemePreference,
   storeAccentPreference,
+  storeThemeNamePreference,
   storeThemePreference,
   type ThemePreference,
 } from '../utils/theme'
+import ThemePreview from '../components/ThemePreview.vue'
+import { THEMES, type ThemeId } from '../utils/themes'
+import { useBranding } from '../composables/useBranding'
 
 const { isTabVisible, setTabHidden } = useNavTabs()
 const theme = ref<ThemePreference>('system')
+// DEV-218: the user's colour theme; null follows the repository default.
+const themeName = ref<ThemeId | null>(readThemeNamePreference())
+const branding = useBranding()
+const repositoryTheme = computed<ThemeId>(() => {
+  void branding.theme
+  return getRepositoryTheme()
+})
+const repositoryThemeLabel = computed(
+  () => THEMES.find((option) => option.id === repositoryTheme.value)?.name ?? repositoryTheme.value,
+)
 const accent = ref<string>(DEFAULT_ACCENT)
 const accentEnabled = ref(false)
 const startupDestination = ref<StartupDestination>(DEFAULT_STARTUP_DESTINATION)
@@ -260,6 +311,11 @@ onMounted(() => {
 watch(theme, (value) => {
   applyThemePreference(value)
   storeThemePreference(value)
+})
+
+watch(themeName, (value) => {
+  storeThemeNamePreference(value)
+  applyThemeName(value)
 })
 
 watch(accentEnabled, (enabled) => {
@@ -384,6 +440,70 @@ function clearSavedFilters() {
   flex-direction: column;
   gap: 16px;
   width: 100%;
+}
+
+.appearance {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.appearance__group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.appearance__group legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.theme-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  cursor: pointer;
+}
+
+.theme-option:hover {
+  border-color: var(--color-border-strong);
+}
+
+.theme-option--selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.theme-option:focus-within {
+  box-shadow: var(--focus-ring);
+}
+
+/* The radio stays focusable and announced; the card is its visible control. */
+.theme-option__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-option__name {
+  font-weight: 600;
+}
+
+.theme-option__hint {
+  font-size: var(--text-xs);
 }
 
 .preferences-layout {

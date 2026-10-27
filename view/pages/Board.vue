@@ -1347,21 +1347,21 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .priority.priority--critical {
-  color: var(--danger, #d93025);
+  color: var(--color-danger);
   font-weight: 600;
 }
 .priority.priority--high {
-  color: var(--warning, #e8710a);
+  color: var(--color-warning-strong);
   font-weight: 600;
 }
 .priority.priority--low {
   opacity: 0.6;
 }
 .task.priority--critical {
-  border-left: 3px solid var(--danger, #d93025);
+  border-left: 3px solid var(--color-danger);
 }
 .task.priority--high {
-  border-left: 3px solid var(--warning, #e8710a);
+  border-left: 3px solid var(--color-warning);
 }
 .column:focus {
   outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent);
@@ -1674,18 +1674,18 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  border-left: 3px solid var(--color-danger, #c62828);
+  border-left: 3px solid var(--color-danger);
 }
 
 .refresh-error__message {
-  color: var(--color-danger-strong, var(--color-danger, #c62828));
+  color: var(--color-danger-strong);
 }
 
 /* -- Ticket selection --------------------------------------------------- */
 .task--selected {
-  outline: 2px solid var(--color-accent, #0969da);
+  outline: 2px solid var(--color-accent);
   outline-offset: -1px;
-  background: color-mix(in oklab, var(--color-accent, #0969da) 6%, var(--bg));
+  background: color-mix(in oklab, var(--color-accent) 6%, var(--bg));
 }
 
 /* -- Member badges (assignee colour dots) ------------------------------- */
@@ -1698,6 +1698,7 @@ onUnmounted(() => {
   border-radius: 50%;
   font-size: 10px;
   font-weight: 700;
+  /* Member hues are fixed mid-tones (utils/member.ts), so white text stays legible in every theme. */
   color: #fff;
   flex-shrink: 0;
   line-height: 1;

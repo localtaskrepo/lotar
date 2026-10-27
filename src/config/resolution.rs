@@ -591,6 +591,21 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.agent_logs_dir.is_some() {
         base.agent_logs_dir = override_config.agent_logs_dir;
     }
+    if override_config.ui_theme.is_some() {
+        base.ui_theme = override_config.ui_theme;
+    }
+    if override_config.ui_name.is_some() {
+        base.ui_name = override_config.ui_name;
+    }
+    if override_config.ui_logo.is_some() {
+        base.ui_logo = override_config.ui_logo;
+    }
+    if override_config.ui_logo_dark.is_some() {
+        base.ui_logo_dark = override_config.ui_logo_dark;
+    }
+    if override_config.ui_icon.is_some() {
+        base.ui_icon = override_config.ui_icon;
+    }
     if override_config.agent_instructions.is_some() {
         base.agent_instructions = override_config.agent_instructions;
     }
@@ -744,6 +759,21 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.agent_logs_dir.is_some() {
         resolved.agent_logs_dir = override_config.agent_logs_dir;
+    }
+    if override_config.ui_theme.is_some() {
+        resolved.ui.theme = override_config.ui_theme;
+    }
+    if override_config.ui_name.is_some() {
+        resolved.ui.name = override_config.ui_name;
+    }
+    if override_config.ui_logo.is_some() {
+        resolved.ui.logo = override_config.ui_logo;
+    }
+    if override_config.ui_logo_dark.is_some() {
+        resolved.ui.logo_dark = override_config.ui_logo_dark;
+    }
+    if override_config.ui_icon.is_some() {
+        resolved.ui.icon = override_config.ui_icon;
     }
     if override_config.agent_instructions.is_some() {
         resolved.agent_instructions = override_config.agent_instructions;
@@ -1171,6 +1201,13 @@ impl ResolvedConfig {
             agent_automation: global.agent_automation,
             agent_worktree: global.agent_worktree,
             remotes: global.remotes,
+            ui: crate::config::types::UiSettings {
+                theme: global.ui_theme,
+                name: global.ui_name,
+                logo: global.ui_logo,
+                logo_dark: global.ui_logo_dark,
+                icon: global.ui_icon,
+            },
         }
     }
 }

@@ -10,6 +10,7 @@ pub mod audit_service;
 pub mod automation_matching;
 pub mod automation_service;
 pub mod automation_validation;
+pub mod branding_service;
 pub mod completion;
 pub mod config_service;
 pub mod memory_cache;

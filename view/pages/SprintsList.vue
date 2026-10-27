@@ -2816,10 +2816,10 @@ onUnmounted(() => {
 }
 
 .task-row--before > td {
-  box-shadow: inset 0 3px var(--color-primary, #4676d7);
+  box-shadow: inset 0 3px var(--color-primary);
 }
 .task-row--after > td {
-  box-shadow: inset 0 -3px var(--color-primary, #4676d7);
+  box-shadow: inset 0 -3px var(--color-primary);
 }
 
 .alert.warn {

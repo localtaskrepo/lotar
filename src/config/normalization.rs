@@ -296,6 +296,23 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
         root.insert(Y::String("web_ui_path".into()), Y::String(path.clone()));
     }
 
+    // ui (DEV-218)
+    let mut ui = serde_yaml_ng::Mapping::new();
+    for (key, value) in [
+        ("theme", &cfg.ui_theme),
+        ("name", &cfg.ui_name),
+        ("logo", &cfg.ui_logo),
+        ("logo_dark", &cfg.ui_logo_dark),
+        ("icon", &cfg.ui_icon),
+    ] {
+        if let Some(value) = value {
+            ui.insert(Y::String(key.into()), Y::String(value.clone()));
+        }
+    }
+    if !ui.is_empty() {
+        root.insert(Y::String("ui".into()), Y::Mapping(ui));
+    }
+
     // default
     let mut default = serde_yaml_ng::Mapping::new();
     if cfg.default_project != defaults.default_project && !cfg.default_project.is_empty() {

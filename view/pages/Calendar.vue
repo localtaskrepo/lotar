@@ -959,11 +959,11 @@ watch(showSprints, (enabled, previous) => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  border-left: 3px solid var(--color-danger, #c62828);
+  border-left: 3px solid var(--color-danger);
 }
 
 .refresh-error__message {
-  color: var(--color-danger-strong, var(--color-danger, #c62828));
+  color: var(--color-danger-strong);
 }
 
 .calendar-day-dialog__header {

@@ -236,7 +236,7 @@ const tooltipLeft = computed(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 0.375rem);
   background: var(--color-bg);
-  box-shadow: var(--shadow-md, 0 4px 12px rgb(0 0 0 / 0.12));
+  box-shadow: var(--shadow-md);
   font-size: var(--text-xs, 0.75rem);
   pointer-events: none;
 }

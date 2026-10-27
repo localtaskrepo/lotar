@@ -346,6 +346,33 @@
         </section>
 
         <section
+          v-if="isGlobal"
+          v-show="activeSection === 'appearance'"
+          :id="`config-section-appearance`"
+          class="config-section"
+          data-section="appearance"
+          :aria-label="sectionLabel('appearance')"
+        >
+          <h2 class="config-nav__sr">{{ sectionLabel('appearance') }}</h2>
+          <div class="config-section__item">
+            <ConfigAppearanceSection
+              v-model:ui-theme="form.uiTheme"
+              v-model:ui-name="form.uiName"
+              v-model:ui-logo="form.uiLogo"
+              v-model:ui-logo-dark="form.uiLogoDark"
+              v-model:ui-icon="form.uiIcon"
+              :errors="errors"
+              :saved="{
+                uiLogo: baseline?.uiLogo ?? '',
+                uiLogoDark: baseline?.uiLogoDark ?? '',
+                uiIcon: baseline?.uiIcon ?? '',
+              }"
+              @validate="validateField"
+            />
+          </div>
+        </section>
+
+        <section
           v-show="activeSection === 'storage'"
           :id="`config-section-storage`"
           class="config-section"
@@ -677,6 +704,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import ConfigAgentSection from '../components/ConfigAgentSection.vue'
+import ConfigAppearanceSection from '../components/ConfigAppearanceSection.vue'
 import ConfigAutomationSection from '../components/ConfigAutomationSection.vue'
 import ConfigBranchAliasSection from '../components/ConfigBranchAliasSection.vue'
 import ConfigDefaultsSection from '../components/ConfigDefaultsSection.vue'
@@ -1361,7 +1389,7 @@ watch(
   height: 18px;
   border-radius: 9px;
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-danger-contrast);
   font-size: 12px;
   font-weight: 700;
 }

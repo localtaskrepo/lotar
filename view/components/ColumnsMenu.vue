@@ -150,6 +150,6 @@ onUnmounted(() => {
 }
 
 .column-option:hover {
-  background: var(--color-hover, rgba(0, 0, 0, 0.04));
+  background: color-mix(in oklab, var(--color-fg) 4%, transparent);
 }
 </style>

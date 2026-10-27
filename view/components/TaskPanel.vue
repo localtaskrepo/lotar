@@ -1998,9 +1998,9 @@ async function removeSprintChip(sprintId: number) {
 }
 
 .task-panel__deleted-badge {
-  border: 1px solid color-mix(in oklab, var(--color-danger, #c62828) 45%, transparent);
-  background: color-mix(in oklab, var(--color-danger, #c62828) 12%, transparent);
-  color: var(--color-danger, #c62828);
+  border: 1px solid color-mix(in oklab, var(--color-danger) 45%, transparent);
+  background: color-mix(in oklab, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
 }
 
 .task-panel__deleted-banner {
@@ -2011,10 +2011,10 @@ async function removeSprintChip(sprintId: number) {
   flex-wrap: wrap;
   padding: var(--space-3, 0.75rem);
   margin-bottom: var(--space-3, 0.75rem);
-  border: 1px solid color-mix(in oklab, var(--color-danger, #c62828) 40%, transparent);
-  border-left: 3px solid var(--color-danger, #c62828);
+  border: 1px solid color-mix(in oklab, var(--color-danger) 40%, transparent);
+  border-left: 3px solid var(--color-danger);
   border-radius: var(--radius-md, 0.375rem);
-  background: color-mix(in oklab, var(--color-danger, #c62828) 8%, transparent);
+  background: color-mix(in oklab, var(--color-danger) 8%, transparent);
 }
 
 .task-panel__deleted-banner-text {

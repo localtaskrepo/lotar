@@ -834,6 +834,46 @@ pub struct AttachmentUploadResponse {
     pub warnings: Vec<String>,
 }
 
+/// Repository branding for the web UI (DEV-218).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct BrandingResponse {
+    /// Default theme id for everyone (`ui.theme`); absent = built-in default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    /// Name shown next to the logo and in the browser tab (`ui.name`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// URL of the logo, when one is configured and can be served.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo: Option<String>,
+    /// URL of the logo for dark mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo_dark: Option<String>,
+    /// URL of the app icon (browser tab icon).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Why configured images are not shown (missing file, not an image…).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub problems: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct BrandingUploadResponse {
+    /// Path of the stored image, relative to the repository (for `ui.logo` etc.).
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct BrandingUploadRequest {
+    /// `logo`, `logo-dark` or `icon`.
+    pub image: String,
+    pub filename: String,
+    pub content_base64: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AttachmentReorderRequest {

@@ -3392,6 +3392,100 @@
         }
       }
     },
+    "/api/branding": {
+      "get": {
+        "summary": "Repository branding for the web UI",
+        "description": "The repository's default theme (ui.theme), display name (ui.name) and URLs for its logo, dark-mode logo and app icon. Image URLs are present only when the configured file exists inside the repository and really is an image; problems explains the others.",
+        "responses": {
+          "200": {
+            "description": "Branding",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeBrandingResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/branding/{image}": {
+      "get": {
+        "summary": "A configured branding image",
+        "description": "Serves ui.logo, ui.logo_dark or ui.icon from inside the repository. Responses carry Cache-Control: no-cache and a content ETag (If-None-Match -> 304); SVGs get a sandboxing Content-Security-Policy.",
+        "parameters": [
+          {
+            "name": "image",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["logo", "logo-dark", "icon"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image bytes",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/branding/upload": {
+      "post": {
+        "summary": "Store a branding image in the repository",
+        "description": "Stores an image (at most 2 MiB; camera and location metadata removed) as .tasks/@branding/<image>.<ext>, replacing an earlier upload for the same image, and returns its repository path. The ui.* setting is not changed; save it with POST /api/config/set.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrandingUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeBrandingUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/attachments/info": {
       "post": {
         "summary": "Size and dimensions of attachments",
@@ -4664,6 +4758,81 @@
           }
         },
         "required": ["items"]
+      },
+      "BrandingResponse": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string",
+            "enum": ["lotar", "ocean", "forest", "ember", "violet", "rose", "contrast"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "logo": {
+            "type": "string",
+            "description": "URL of the logo."
+          },
+          "logo_dark": {
+            "type": "string",
+            "description": "URL of the dark-mode logo."
+          },
+          "icon": {
+            "type": "string",
+            "description": "URL of the app icon."
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why configured images are not shown."
+          }
+        }
+      },
+      "EnvelopeBrandingResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BrandingResponse"
+          }
+        },
+        "required": ["data"]
+      },
+      "BrandingUploadRequest": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string",
+            "enum": ["logo", "logo-dark", "icon"]
+          },
+          "filename": {
+            "type": "string"
+          },
+          "content_base64": {
+            "type": "string"
+          }
+        },
+        "required": ["image", "filename", "content_base64"]
+      },
+      "BrandingUploadResponse": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Repository-relative path for ui.logo, ui.logo_dark or ui.icon."
+          }
+        },
+        "required": ["path"]
+      },
+      "EnvelopeBrandingUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BrandingUploadResponse"
+          }
+        },
+        "required": ["data"]
       },
       "EnvelopeAttachmentInfoResponse": {
         "type": "object",

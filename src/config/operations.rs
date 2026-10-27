@@ -810,6 +810,18 @@ pub fn apply_field_to_global_config(
                 config.web_ui_path = Some(trimmed.to_string());
             }
         }
+        "ui_theme" | "ui_name" | "ui_logo" | "ui_logo_dark" | "ui_icon" => {
+            crate::services::branding_service::validate_ui_field(field, value)
+                .map_err(ConfigError::ParseError)?;
+            let next = parse_optional_string(value);
+            match field {
+                "ui_theme" => config.ui_theme = next,
+                "ui_name" => config.ui_name = next,
+                "ui_logo" => config.ui_logo = next,
+                "ui_logo_dark" => config.ui_logo_dark = next,
+                _ => config.ui_icon = next,
+            }
+        }
         _ => {
             return Err(ConfigError::ParseError(format!(
                 "Unknown global config field: {}",
@@ -1364,6 +1376,10 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
             }
         "agent_logs_dir" => {
             // Accept any string; empty clears the setting.
+        }
+        "ui_theme" | "ui_name" | "ui_logo" | "ui_logo_dark" | "ui_icon" => {
+            crate::services::branding_service::validate_ui_field(field, value)
+                .map_err(ConfigError::ParseError)?;
         }
         "agent_instructions" | "agent_instructions_file" => {
             // Accept any string; empty values clear the override.

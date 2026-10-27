@@ -1,0 +1,35 @@
+title: Themes and repository branding for the web UI
+status: Done
+priority: High
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-27T17:29:15.809351+00:00
+modified: 2026-10-27T18:48:02.128216+00:00
+comments:
+- date: 2026-10-27T17:29:15.912897+00:00
+  text: 'Plan: (1) Colour tokens per theme x mode: 7 themes (LoTaR default, Ocean, Forest, Ember, Violet, Rose, High contrast), each with light+dark token sets; JS resolves system mode to data-mode so every theme''s dark set applies; an inline script in index.html sets theme/mode before first paint (no flash). Validate WCAG contrast per theme with a script. (2) Replace hard-coded colours in ~15 components with tokens. (3) Repository settings in config.yml: ui.theme (default theme for everyone), ui.name (shown next to the logo and in the tab title), ui.logo / ui.logo_dark / ui.icon (paths relative to the workspace root, e.g. assets/icon.svg). Global-only. (4) Server: GET /api/branding/{logo,logo-dark,icon} serves those files only from inside the workspace and only when they really are images (SVG sandboxed, ETag by mtime); POST /api/branding/upload stores an uploaded image under .tasks/@branding and points the setting at it. (5) UI: header logo/name and favicon from the repository settings; Preferences theme picker with previews (Repository default + each theme), mode stays per user, custom accent still overrides; Config page Appearance section with path suggestions, upload and preview. (6) Tests (Rust, UI, smoke) and screenshots of every theme in light/dark.'
+- date: 2026-10-27T18:48:02.097550+00:00
+  text: 'Done. Seven themes (LoTaR, Ocean, Forest, Ember, Violet, Rose, High contrast) x light/dark in view/themes.css; html carries data-theme-name + data-mode (system resolved by JS, inline script applies saved choice before first paint). Six new themes pass WCAG targets (scripts/check-theme-contrast.mjs, npm run check:themes, enforced by themes.spec); the LoTaR default is unchanged and fails five light-mode targets (white on accent 2.77, white on accent-strong 4.10, accent-strong on bg 4.10, white on danger 3.76, border-strong on bg 1.46). Hard-coded component colours replaced with tokens except documented intentional ones. Preferences: Appearance card with mode, theme cards previewing both modes (Repository default + 7), accent. Config: Appearance section (default theme, name, logo, dark logo, app icon; upload stores .tasks/@branding/<slot>.<ext>, saved with the rest). Server: ui.theme/name/logo/logo_dark/icon global-only settings with validation; GET /api/branding, GET /api/branding/{logo,logo-dark,icon} (inside repo only, real images only, SVG sandboxed, ETag), POST /api/branding/upload. Header/tab title/favicon follow branding and update on config_updated. Fixed on the way: default logo did not switch in explicit dark mode (Vue :global swallowed the selector). Verified: npm run lint, npm test (1795 Rust + 1267 UI), npm run smoke (356; one full run had a load-related timeout in ui.relationships that passed 2x alone; ui.relationships now waits for the JS mode switch), screenshots of all 7 themes in light and dark, Preferences, Config Appearance and a branded header in both modes.'
+description: 'Let people customize how the web UI looks: at least 5 themes, each with light and dark modes, plus a custom logo for the repository and repository-relative resources such as an app icon that LoTaR can use as its own icon.'
+history:
+- at: 2026-10-27T17:29:15.878671+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-10-27T17:29:15.912897+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T18:48:02.097550+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T18:48:02.128216+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

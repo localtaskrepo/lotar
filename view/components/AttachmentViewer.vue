@@ -269,6 +269,7 @@ function onKeydown(event: KeyboardEvent) {
   z-index: var(--z-modal-high);
   display: flex;
   flex-direction: column;
+  /* Lightbox is always near-black with light controls, independent of theme. */
   background: rgb(10 12 16 / 96%);
   backdrop-filter: blur(6px);
   color: #f1f5f9;
@@ -329,6 +330,7 @@ function onKeydown(event: KeyboardEvent) {
   max-height: 100%;
   object-fit: contain;
   cursor: zoom-in;
+  /* Checkerboard reveals transparency; fixed to suit the dark lightbox. */
   background: repeating-conic-gradient(#2a2f37 0% 25%, #353b45 0% 50%) 50% / 16px 16px;
 }
 
@@ -353,6 +355,7 @@ function onKeydown(event: KeyboardEvent) {
   height: 100%;
   border: 0;
   border-radius: 6px;
+  /* Documents (PDF etc.) are authored for a white page. */
   background: #fff;
 }
 
@@ -363,6 +366,7 @@ function onKeydown(event: KeyboardEvent) {
   padding: 16px;
   overflow: auto;
   border-radius: 6px;
+  /* Text preview matches the dark lightbox rather than the theme. */
   background: #0f172a;
   color: #e2e8f0;
   font-size: 13px;

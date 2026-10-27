@@ -619,9 +619,9 @@ onUnmounted(() => {
 }
 
 .task-table__deleted-badge {
-  border: 1px solid color-mix(in oklab, var(--color-danger, #c62828) 45%, transparent);
-  color: var(--color-danger, #c62828);
-  background: color-mix(in oklab, var(--color-danger, #c62828) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-danger) 45%, transparent);
+  color: var(--color-danger);
+  background: color-mix(in oklab, var(--color-danger) 10%, transparent);
   white-space: nowrap;
 }
 </style>

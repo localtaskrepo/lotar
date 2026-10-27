@@ -1845,7 +1845,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__rule-note {
   padding: 10px 12px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--color-warning, #d97706) 10%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
   color: var(--color-muted);
   font-size: 13px;
 }
@@ -1860,16 +1860,16 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
   border-radius: 999px;
   font-size: 12px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface-2, rgba(0, 0, 0, 0.03));
+  background: color-mix(in oklab, var(--color-fg) 3%, transparent);
 }
 
 .automation-builder__warning-chip {
-  background: color-mix(in srgb, var(--color-warning, #d97706) 12%, transparent);
-  border-color: color-mix(in srgb, var(--color-warning, #d97706) 36%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 36%, var(--color-border));
 }
 
 .automation-builder__summary-chip--action {
-  background: color-mix(in srgb, var(--color-accent, #0f766e) 12%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 .automation-builder__summary-block {
@@ -1888,7 +1888,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__preview-yaml {
   border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: var(--color-surface-2, rgba(0, 0, 0, 0.02));
+  background: color-mix(in oklab, var(--color-fg) 2%, transparent);
 }
 
 .automation-builder__advanced summary,
@@ -1910,7 +1910,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: var(--color-surface, #fff);
+  background: var(--color-surface);
   padding: 12px 14px;
   font: inherit;
   resize: vertical;
@@ -1950,7 +1950,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 
 .automation-builder__step {
   border: 1px solid var(--color-border);
-  background: var(--color-surface-2, rgba(0, 0, 0, 0.02));
+  background: color-mix(in oklab, var(--color-fg) 2%, transparent);
   border-radius: 14px;
   padding: 10px 12px;
   display: flex;
@@ -1959,12 +1959,12 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 }
 
 .automation-builder__step--active {
-  border-color: color-mix(in srgb, var(--color-accent, #0f766e) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent, #0f766e) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 .automation-builder__step--complete {
-  border-color: color-mix(in srgb, var(--color-success, #16a34a) 35%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
 }
 
 .automation-builder__dialog-body {
@@ -1999,7 +1999,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__event-tab {
   border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: var(--color-surface-2, rgba(0, 0, 0, 0.02));
+  background: color-mix(in oklab, var(--color-fg) 2%, transparent);
   padding: 14px;
   cursor: pointer;
   text-align: left;
@@ -2019,8 +2019,8 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__recipe-card--active,
 .automation-builder__event-toggle--active,
 .automation-builder__event-tab--active {
-  border-color: color-mix(in srgb, var(--color-accent, #0f766e) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent, #0f766e) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 .automation-builder__event-grid {
@@ -2055,7 +2055,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
   border-radius: 12px;
   border: 1px dashed var(--color-border);
   color: var(--color-muted);
-  background: var(--color-surface-2, rgba(0, 0, 0, 0.02));
+  background: color-mix(in oklab, var(--color-fg) 2%, transparent);
 }
 
 .automation-builder__rows {

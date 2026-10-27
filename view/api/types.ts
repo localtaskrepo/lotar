@@ -194,6 +194,27 @@ export interface AttachmentUploadResponse {
     warnings?: string[]
 }
 
+/** Repository branding for the web UI (DEV-218). */
+export interface BrandingResponse {
+    theme?: string
+    name?: string
+    logo?: string
+    logo_dark?: string
+    icon?: string
+    problems?: string[]
+}
+
+export interface BrandingUploadResponse {
+    /** Repository-relative path for ui.logo / ui.logo_dark / ui.icon. */
+    path: string
+}
+
+export interface BrandingUploadRequest {
+    image: 'logo' | 'logo-dark' | 'icon'
+    filename: string
+    content_base64: string
+}
+
 export interface AttachmentReorderRequest {
     id: string
     /** Every attachment of the task (stored names), once, in the new order. */
@@ -1035,6 +1056,11 @@ export interface GlobalConfigRaw {
     branch_priority_aliases: Record<string, string>
     /** Global-only external web bundle path; absent when unset. */
     web_ui_path?: string | null
+    ui_theme?: string | null
+    ui_name?: string | null
+    ui_logo?: string | null
+    ui_logo_dark?: string | null
+    ui_icon?: string | null
     remotes?: Record<string, SyncRemoteConfig>
     auth_profiles?: Record<string, SyncAuthProfile>
 }

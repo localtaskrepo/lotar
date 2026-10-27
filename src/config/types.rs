@@ -736,6 +736,19 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub agent_worktree: AgentWorktreeConfig,
 
+    /// Web UI branding (DEV-218): default theme, display name, and logo/icon
+    /// images given as paths relative to the repository.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ui_theme: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ui_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ui_logo: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ui_logo_dark: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ui_icon: Option<String>,
+
     /// Optional path to a directory containing custom web UI assets.
     /// When set and the path exists, the server will serve files from this directory
     /// before falling back to the bundled UI. This allows using a custom or development UI.
@@ -818,6 +831,26 @@ pub struct ResolvedConfig {
 
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub remotes: HashMap<String, SyncRemoteConfig>,
+
+    /// Web UI branding shared by everyone using the repository (DEV-218).
+    #[serde(default)]
+    pub ui: UiSettings,
+}
+
+/// Repository-wide web UI branding (`ui.*` in the global config).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct UiSettings {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub theme: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub logo: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub logo_dark: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub icon: Option<String>,
 }
 
 impl ResolvedConfig {
@@ -1050,6 +1083,11 @@ impl Default for GlobalConfig {
             agents: HashMap::new(),
             agent_automation: AgentAutomationConfig::default(),
             agent_worktree: AgentWorktreeConfig::default(),
+            ui_theme: None,
+            ui_name: None,
+            ui_logo: None,
+            ui_logo_dark: None,
+            ui_icon: None,
             web_ui_path: None,
             remotes: HashMap::new(),
             auth_profiles: HashMap::new(),

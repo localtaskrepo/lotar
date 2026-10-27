@@ -79,6 +79,7 @@ fn cfg() -> ResolvedConfig {
         agent_automation: Default::default(),
         agent_worktree: Default::default(),
         remotes: Default::default(),
+        ui: Default::default(),
     }
 }
 

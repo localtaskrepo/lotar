@@ -17,6 +17,7 @@ import SyncHub from './pages/SyncHub.vue'
 import TaskDetails from './pages/TaskDetails.vue'
 import TasksList from './pages/TasksList.vue'
 import './styles.css'
+import './themes.css'
 import { getStartupRedirectPath, storeLastVisitedStartupRoute } from './utils/preferences'
 import { initializeThemeFromStorage } from './utils/theme'
 

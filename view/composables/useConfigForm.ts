@@ -1,5 +1,6 @@
 import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { AgentInstructionsValue, ConfigInspectResult, ConfigSource, ProjectDTO } from '../api/types'
+import { isThemeId } from '../utils/themes'
 import { provenanceClass as getProvenanceClass, provenanceLabel as getProvenanceLabel } from '../utils/provenance'
 
 export type ToggleValue = 'inherit' | 'true' | 'false'
@@ -85,6 +86,12 @@ export interface ConfigFormState {
     sprintNotificationsEnabled: ToggleValue
     /** Global-only external web bundle path. */
     webUiPath: string
+    /** DEV-218: repository branding (global only). */
+    uiTheme: string
+    uiName: string
+    uiLogo: string
+    uiLogoDark: string
+    uiIcon: string
 }
 
 export type ToggleField =
@@ -231,10 +238,29 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         sprintCapacityHours: '',
         sprintNotificationsEnabled: 'true',
         webUiPath: '',
+        uiTheme: '',
+        uiName: '',
+        uiLogo: '',
+        uiLogoDark: '',
+        uiIcon: '',
     })
 
     const baseline = ref<ConfigFormState | null>(null)
     const errors = reactive<Record<string, string | null>>({})
+
+    /** A branding image must be an image path inside the repository. */
+    function brandingPathError(raw: string): string | null {
+        const value = raw.trim()
+        if (!value) return null
+        if (value.startsWith('/') || value.startsWith('~') || /^[a-z]:[\\/]/i.test(value)) {
+            return 'Use a path relative to the repository, e.g. assets/logo.svg.'
+        }
+        if (value.split(/[\\/]/).includes('..')) return 'The image must be inside the repository.'
+        if (!/\.(svg|png|jpe?g|webp|gif|ico|avif)$/i.test(value)) {
+            return 'Use an image file (SVG, PNG, JPEG, WebP, GIF, ICO or AVIF).'
+        }
+        return null
+    }
 
     const isGlobal = computed(() => project.value === '')
     const currentProject = computed(() => projects.value.find((p) => p.prefix === project.value) || null)
@@ -660,6 +686,23 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 }
                 break
             }
+            // DEV-218: same rules as the server (src/services/branding_service.rs).
+            case 'ui_theme': {
+                const value = form.uiTheme.trim()
+                errors.ui_theme = value && !isThemeId(value) ? 'Pick one of the listed themes.' : null
+                break
+            }
+            case 'ui_name': {
+                errors.ui_name = form.uiName.trim().length > 40 ? 'Keep the name to 40 characters or fewer.' : null
+                break
+            }
+            case 'ui_logo':
+            case 'ui_logo_dark':
+            case 'ui_icon': {
+                const formKey = field === 'ui_logo' ? 'uiLogo' : field === 'ui_logo_dark' ? 'uiLogoDark' : 'uiIcon'
+                errors[field] = brandingPathError(form[formKey])
+                break
+            }
             case 'attachments_dir': {
                 const value = form.attachmentsDir.trim()
                 if (!value) {
@@ -966,6 +1009,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     function validateAll(): boolean {
         const fields: string[] = [
+            'ui_theme',
+            'ui_name',
+            'ui_logo',
+            'ui_logo_dark',
+            'ui_icon',
             'attachments_dir',
             'attachments_max_upload_mb',
             'default_reporter',
@@ -1071,6 +1119,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.sprintCapacityHours = effective.sprint_defaults?.capacity_hours?.toString() ?? ''
         form.sprintNotificationsEnabled = toToggle(effective.sprint_notifications?.enabled !== false)
         form.webUiPath = data.global_raw?.web_ui_path ?? ''
+        form.uiTheme = data.global_raw?.ui_theme ?? ''
+        form.uiName = data.global_raw?.ui_name ?? ''
+        form.uiLogo = data.global_raw?.ui_logo ?? ''
+        form.uiLogoDark = data.global_raw?.ui_logo_dark ?? ''
+        form.uiIcon = data.global_raw?.ui_icon ?? ''
         form.autoCodeownersAssign = toToggle(!!effective.auto_codeowners_assign)
         form.autoTagsFromPath = toToggle(!!effective.auto_tags_from_path)
         form.autoBranchInferType = toToggle(!!effective.auto_branch_infer_type)
@@ -1350,6 +1403,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             addValue('sprintCapacityHours', 'sprints_defaults_capacity_hours')
             addToggleField('sprintNotificationsEnabled', 'sprints_notifications_enabled')
             addValue('webUiPath', 'web_ui_path')
+            addValue('uiTheme', 'ui_theme')
+            addValue('uiName', 'ui_name')
+            addValue('uiLogo', 'ui_logo')
+            addValue('uiLogoDark', 'ui_logo_dark')
+            addValue('uiIcon', 'ui_icon')
         }
 
         addAliasMap('branchTypeAliases', 'branch_type_aliases')

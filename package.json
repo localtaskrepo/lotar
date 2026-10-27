@@ -43,6 +43,7 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "test:hooks": "node --test scripts/tests/git-hooks.test.mjs",
     "check:deps": "cargo deny check",
+    "check:themes": "node scripts/check-theme-contrast.mjs",
     "coverage:ui": "vitest run --config view/vitest.config.ts --coverage",
     "coverage:rust": "cargo llvm-cov nextest --all-features --no-fail-fast --html --output-dir target/coverage/rust && cargo llvm-cov report --lcov --output-path target/coverage/rust/lcov.info && cargo llvm-cov report --summary-only"
   },

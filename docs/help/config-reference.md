@@ -70,6 +70,9 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - sprints.defaults.capacity_points / capacity_hours: optional nonnegative numbers
 - sprints.notifications.enabled: boolean (default true; project-overridable)
 - web_ui_path: optional global-only path (top-level spelling), for an external web bundle
+- ui.theme: optional global-only default web UI theme for everyone (`lotar`, `ocean`, `forest`, `ember`, `violet`, `rose`, `contrast`); people can still pick their own in Preferences
+- ui.name: optional global-only name shown next to the logo and as the browser tab title (at most 40 characters)
+- ui.logo / ui.logo_dark / ui.icon: optional global-only images for the header logo, its dark-mode version, and the browser tab icon. Paths are relative to the repository (the folder holding the tasks directory), e.g. `assets/app-icon.svg`; files outside it, symlinks out of it, and files that are not SVG/PNG/JPEG/WebP/GIF/ICO/AVIF images are never served. Images uploaded in Config → Appearance are stored in `.tasks/@branding/`
 - remotes: map (named remotes)
 - remotes.<name>.provider: enum (jira|github)
 - remotes.<name>.project: string (Jira project key)
@@ -93,7 +96,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - auth_profiles.<name>.api_url: string
 
 ## Home and Project keys
-Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `default.project`, sprint defaults, and `web_ui_path` are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
+Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `default.project`, sprint defaults, `web_ui_path` and `ui.*` are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
 
 Auth profiles are home-only: `auth_profiles` is ignored in project configs (secrets never live in the repo). Remotes can be configured globally or per-project; project remotes override/extend global remotes.
 
@@ -127,6 +130,15 @@ attachments:
   dir: "@attachments"
   # 0 disables uploads, -1 is unlimited, positive values are MiB
   max_upload_mb: 10
+
+# Web UI look for everyone using this repository
+ui:
+  theme: forest
+  name: Acme Shop
+  # Paths relative to the repository root
+  logo: assets/logo.svg
+  logo_dark: assets/logo-dark.svg
+  icon: assets/app-icon.svg
 
 sync:
   reports_dir: "@reports"

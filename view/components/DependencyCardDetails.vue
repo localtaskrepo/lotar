@@ -113,6 +113,7 @@ const sprint = { label: (id: number) => `#${id}`, stateClass: () => '', tooltip:
   width: 20px;
   height: 20px;
   border-radius: 50%;
+  /* Member hues are fixed mid-tones (utils/member.ts), so white text stays legible in every theme. */
   color: white;
   font-size: 10px;
   flex: 0 0 auto;

@@ -1115,6 +1115,7 @@ onBeforeUnmount(() => {
 .job-summary__text--clamped {
   max-height: 4.5em;
   overflow: hidden;
+  /* Mask: only alpha matters, so the colour is irrelevant to theming. */
   mask-image: linear-gradient(to bottom, #000 60%, transparent);
 }
 

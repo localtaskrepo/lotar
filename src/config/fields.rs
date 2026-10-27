@@ -310,6 +310,11 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
         .global()
         .source("sprints.notifications.enabled"),
     field("web_ui_path").global(),
+    field("ui_theme").global().aliases(&["ui.theme"]),
+    field("ui_name").global().aliases(&["ui.name"]),
+    field("ui_logo").global().aliases(&["ui.logo"]),
+    field("ui_logo_dark").global().aliases(&["ui.logo_dark"]),
+    field("ui_icon").global().aliases(&["ui.icon"]),
 ];
 
 static GLOBAL_SETTABLE: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
@@ -432,6 +437,11 @@ mod tests {
         "sprints_defaults_overdue_after",
         "sprints_notifications_enabled",
         "web_ui_path",
+        "ui_theme",
+        "ui_name",
+        "ui_logo",
+        "ui_logo_dark",
+        "ui_icon",
     ];
 
     const LEGACY_PROJECT: &[&str] = &[
@@ -544,6 +554,11 @@ mod tests {
         ("agent.worktree", "agent_worktree"),
         ("sync.remotes", "remotes"),
         ("sync.auth_profiles", "auth_profiles"),
+        ("ui.theme", "ui_theme"),
+        ("ui.name", "ui_name"),
+        ("ui.logo", "ui_logo"),
+        ("ui.logo_dark", "ui_logo_dark"),
+        ("ui.icon", "ui_icon"),
     ];
 
     // (label path, label key, inspect key)

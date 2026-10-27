@@ -7,16 +7,16 @@ Personalize the LoTaR web experience and reset per-browser state without touchin
 
 Open the Preferences view from the main navigation (top-right menu). All settings live in the browser (`localStorage` or `sessionStorage`) and apply only to the current machine and browser profile—`view/pages/Preferences.vue` never touches your repo files.
 
-## Theme Controls
+## Appearance
 
-- **System** — Follow the operating system appearance (light/dark).
-- **Light / Dark** — Force a specific theme regardless of the OS.
-- Theme choices update instantly and persist between sessions (`localStorage` key `lotar.theme`, handled in `view/utils/theme.ts`).
-- Browser chrome (`<meta name="theme-color">`) stays in sync so the mobile/desktop address bar tint matches the active theme.
+- **Mode** — **System** follows the operating system's light/dark setting; **Light** or **Dark** forces one (`localStorage` key `lotar.theme`).
+- **Theme** — Seven colour themes, each with a light and a dark version: LoTaR (default), Ocean, Forest, Ember, Violet, Rose and High contrast. Each card previews both versions. **Repository default** follows the theme set for everyone in Config → Appearance (`ui.theme`); picking a theme here overrides it for you only (`localStorage` key `lotar.themeName`).
+- Choices apply instantly, are applied before the page first draws (no flash of the default colours), and persist between sessions; see `view/utils/theme.ts` and `view/themes.css`.
+- Browser chrome (`<meta name="theme-color">`) follows the active theme's background.
 
 ## Accent Color
 
-1. Enable **Use custom accent color** to override the default LoTaR blue.
+1. Enable **Use custom accent color** to replace the theme's accent colour (in every theme).
 2. Pick a color with the visual picker or type a hex value (normalized automatically).
 3. Preview chip shows foreground contrast, and focus rings/buttons update immediately.
 4. Use **Reset** to return to the default accent and disable the override.

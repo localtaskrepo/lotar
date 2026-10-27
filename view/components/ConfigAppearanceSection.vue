@@ -1,0 +1,243 @@
+<template>
+  <ConfigGroup
+    title="Appearance"
+    description="How LoTaR looks for everyone using this repository. People can still pick their own theme and mode in Preferences."
+  >
+    <div class="field-grid" data-testid="config-appearance">
+      <div class="field field--full">
+        <label class="field-label" for="config-ui-theme">Default theme</label>
+        <div class="appearance-theme">
+          <UiSelect id="config-ui-theme" v-model="uiTheme" @change="emit('validate', 'ui_theme')">
+            <option value="">Built-in default ({{ THEMES[0].name }})</option>
+            <option v-for="option in THEMES" :key="option.id" :value="option.id">{{ option.name }}</option>
+          </UiSelect>
+          <ThemePreview class="appearance-theme__preview" :theme="previewTheme" />
+        </div>
+        <p class="field-hint">{{ themeDescription }}</p>
+        <p v-if="errors.ui_theme" class="field-error">{{ errors.ui_theme }}</p>
+      </div>
+
+      <div class="field field--full">
+        <label class="field-label" for="config-ui-name">Name</label>
+        <UiInput
+          id="config-ui-name"
+          v-model="uiName"
+          maxlength="40"
+          placeholder="LoTaR"
+          @blur="emit('validate', 'ui_name')"
+        />
+        <p class="field-hint">Shown next to the logo and as the browser tab title.</p>
+        <p v-if="errors.ui_name" class="field-error">{{ errors.ui_name }}</p>
+      </div>
+
+      <div v-for="slot in slots" :key="slot.key" class="field field--full">
+        <label class="field-label" :for="`config-ui-${slot.image}`">{{ slot.label }}</label>
+        <div class="appearance-image">
+          <span
+            class="appearance-image__preview"
+            :class="{ 'appearance-image__preview--dark': slot.image === 'logo-dark' }"
+          >
+            <img v-if="previewFor(slot)" :src="previewFor(slot)!" :alt="`${slot.label} preview`" />
+            <span v-else class="muted">{{ slot.models.value ? 'Save to preview' : 'None' }}</span>
+          </span>
+          <UiInput
+            :id="`config-ui-${slot.image}`"
+            v-model="slot.models.value"
+            maxlength="512"
+            :placeholder="slot.placeholder"
+            @blur="emit('validate', slot.key)"
+          />
+          <input
+            :ref="(el) => (pickers[slot.image] = el as HTMLInputElement | null)"
+            type="file"
+            accept="image/*,.svg,.ico"
+            hidden
+            :data-testid="`config-ui-${slot.image}-file`"
+            @change="onPicked(slot, $event)"
+          />
+          <UiButton type="button" :disabled="uploading === slot.image" @click="pickers[slot.image]?.click()">
+            {{ uploading === slot.image ? 'Uploading…' : 'Upload…' }}
+          </UiButton>
+        </div>
+        <p class="field-hint">{{ slot.hint }}</p>
+        <p v-if="errors[slot.key]" class="field-error">{{ errors[slot.key] }}</p>
+        <p v-for="problem in problemsFor(slot)" :key="problem" class="field-error">{{ problem }}</p>
+      </div>
+    </div>
+  </ConfigGroup>
+</template>
+
+<script setup lang="ts">
+import { computed, onUnmounted, reactive, ref, type Ref } from 'vue'
+import { api } from '../api/client'
+import { useBranding } from '../composables/useBranding'
+import { fileToBase64 } from '../utils/taskAttachments'
+import { isThemeId, THEMES, type ThemeId } from '../utils/themes'
+import ConfigGroup from './ConfigGroup.vue'
+import ThemePreview from './ThemePreview.vue'
+import UiButton from './UiButton.vue'
+import UiInput from './UiInput.vue'
+import UiSelect from './UiSelect.vue'
+import { showToast } from './toast'
+
+type FieldKey = 'ui_theme' | 'ui_name' | 'ui_logo' | 'ui_logo_dark' | 'ui_icon'
+type ImageSlot = 'logo' | 'logo-dark' | 'icon'
+
+const uiTheme = defineModel<string>('uiTheme', { required: true })
+const uiName = defineModel<string>('uiName', { required: true })
+const uiLogo = defineModel<string>('uiLogo', { required: true })
+const uiLogoDark = defineModel<string>('uiLogoDark', { required: true })
+const uiIcon = defineModel<string>('uiIcon', { required: true })
+
+const props = defineProps<{
+  errors: Partial<Record<FieldKey, string | null>>
+  /** Saved values, to know when the server's image URL matches the field. */
+  saved: { uiLogo: string; uiLogoDark: string; uiIcon: string }
+}>()
+
+const emit = defineEmits<{ (e: 'validate', field: FieldKey): void }>()
+
+const branding = useBranding()
+
+const previewTheme = computed<ThemeId>(() => (isThemeId(uiTheme.value) ? uiTheme.value : THEMES[0].id))
+const themeDescription = computed(() => THEMES.find((option) => option.id === previewTheme.value)?.description ?? '')
+
+interface Slot {
+  key: FieldKey
+  image: ImageSlot
+  label: string
+  placeholder: string
+  hint: string
+  models: Ref<string>
+  saved: () => string
+  url: () => string | null
+}
+
+const slots: Slot[] = [
+  {
+    key: 'ui_logo',
+    image: 'logo',
+    label: 'Logo',
+    placeholder: 'assets/logo.svg',
+    hint: 'Replaces the LoTaR logo in the header. A path relative to the repository, or upload one (stored in .tasks/@branding).',
+    models: uiLogo,
+    saved: () => props.saved.uiLogo,
+    url: () => branding.logo,
+  },
+  {
+    key: 'ui_logo_dark',
+    image: 'logo-dark',
+    label: 'Logo for dark mode',
+    placeholder: 'Same as the logo',
+    hint: 'Optional version for dark backgrounds.',
+    models: uiLogoDark,
+    saved: () => props.saved.uiLogoDark,
+    url: () => branding.logoDark,
+  },
+  {
+    key: 'ui_icon',
+    image: 'icon',
+    label: 'App icon',
+    placeholder: 'assets/app-icon.svg',
+    hint: 'Shown in the browser tab, e.g. your app’s own icon. Square images (SVG, PNG or ICO) work best.',
+    models: uiIcon,
+    saved: () => props.saved.uiIcon,
+    url: () => branding.icon,
+  },
+]
+
+// Local previews of files uploaded but not saved yet.
+const pending = reactive<Partial<Record<ImageSlot, { path: string; url: string }>>>({})
+const pickers = reactive<Partial<Record<ImageSlot, HTMLInputElement | null>>>({})
+const uploading = ref<ImageSlot | null>(null)
+
+function previewFor(slot: Slot): string | null {
+  const value = slot.models.value.trim()
+  const local = pending[slot.image]
+  if (local && local.path === value) return local.url
+  if (value && value === slot.saved().trim()) return slot.url()
+  return null
+}
+
+const SLOT_NAMES: Record<ImageSlot, string> = { logo: 'Logo', 'logo-dark': 'Dark logo', icon: 'Icon' }
+
+function problemsFor(slot: Slot): string[] {
+  if (slot.models.value.trim() !== slot.saved().trim()) return []
+  return branding.problems.filter((problem) => problem.startsWith(`${SLOT_NAMES[slot.image]}:`))
+}
+
+async function onPicked(slot: Slot, event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  uploading.value = slot.image
+  try {
+    const { path } = await api.uploadBranding({
+      image: slot.image,
+      filename: file.name,
+      content_base64: await fileToBase64(file),
+    })
+    const previous = pending[slot.image]
+    if (previous) URL.revokeObjectURL(previous.url)
+    pending[slot.image] = { path, url: URL.createObjectURL(file) }
+    slot.models.value = path
+    emit('validate', slot.key)
+    showToast(`${slot.label} uploaded. Save to apply it.`)
+  } catch (error) {
+    showToast(error instanceof Error ? error.message.replace(/^POST \S+ failed: /, '') : 'Upload failed')
+  } finally {
+    uploading.value = null
+  }
+}
+
+onUnmounted(() => {
+  for (const entry of Object.values(pending)) if (entry) URL.revokeObjectURL(entry.url)
+})
+</script>
+
+<style scoped>
+.appearance-theme {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 220px);
+  gap: 12px;
+  align-items: center;
+}
+
+.appearance-image {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.appearance-image__preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 4px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--text-xs);
+}
+
+/* Show the dark logo the way it will appear: on a dark header. */
+.appearance-image__preview--dark {
+  background: #111315;
+}
+
+.appearance-image__preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+@media (max-width: 640px) {
+  .appearance-theme,
+  .appearance-image {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

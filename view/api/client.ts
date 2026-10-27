@@ -19,6 +19,9 @@ import type {
     AttachmentReorderRequest,
     AttachmentInfoRequest,
     AttachmentInfoResponse,
+    BrandingResponse,
+    BrandingUploadRequest,
+    BrandingUploadResponse,
     AutomationInspectResponse,
     AutomationSetRequest,
     AutomationSetResponse,
@@ -249,6 +252,12 @@ export const api = {
             xhr.onerror = () => reject(new Error(`POST ${path} failed: network error`))
             xhr.send(JSON.stringify(payload))
         })
+    },
+    branding(): Promise<BrandingResponse> {
+        return get('/api/branding')
+    },
+    uploadBranding(payload: BrandingUploadRequest): Promise<BrandingUploadResponse> {
+        return post('/api/branding/upload', payload)
     },
     reorderTaskAttachments(payload: AttachmentReorderRequest): Promise<TaskDTO> {
         return post('/api/tasks/attachments/reorder', payload)
