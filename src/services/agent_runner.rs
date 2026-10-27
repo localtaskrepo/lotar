@@ -298,6 +298,92 @@ pub fn usage_from_result(
     (usage != crate::api_types::AgentJobUsage::default()).then_some(usage)
 }
 
+/// Tools of LoTaR's MCP server an agent job may use: reading and updating
+/// tickets, not starting agents, deleting tasks or syncing.
+pub const LOTAR_MCP_JOB_TOOLS: &[&str] = &[
+    "task_get",
+    "task_list",
+    "task_update",
+    "task_comment_add",
+    "task_reference_add",
+    "relationship_graph",
+    "config_show",
+    "whoami",
+];
+
+/// Whether this runner can be given LoTaR's MCP server for a job.
+pub fn supports_lotar_mcp(kind: AgentRunnerKind) -> bool {
+    matches!(
+        kind,
+        AgentRunnerKind::Claude | AgentRunnerKind::Copilot | AgentRunnerKind::Codex
+    )
+}
+
+/// Attach LoTaR's MCP server (named `lotar`, which also shadows a server of
+/// that name in the CLI's own settings) to a runner command, limited to
+/// [`LOTAR_MCP_JOB_TOOLS`] and pre-approved. Returns false for runners
+/// without a supported way to add an MCP server.
+pub fn attach_lotar_mcp(
+    command: &mut RunnerCommand,
+    kind: AgentRunnerKind,
+    lotar_bin: &str,
+    tasks_dir: &std::path::Path,
+) -> bool {
+    let tasks = tasks_dir.to_string_lossy().to_string();
+    let tools = LOTAR_MCP_JOB_TOOLS.join(",");
+    let env = serde_json::json!({
+        "LOTAR_TASKS_DIR": tasks,
+        "LOTAR_MCP_TOOLS": tools,
+        "LOTAR_MCP_AUTORELOAD": "0",
+    });
+    let flags: Vec<String> = match kind {
+        AgentRunnerKind::Claude => vec![
+            "--mcp-config".to_string(),
+            serde_json::json!({ "mcpServers": { "lotar": {
+                "type": "stdio", "command": lotar_bin, "args": ["mcp"], "env": env,
+            }}})
+            .to_string(),
+            "--allowedTools=mcp__lotar".to_string(),
+        ],
+        AgentRunnerKind::Copilot => vec![
+            "--additional-mcp-config".to_string(),
+            serde_json::json!({ "mcpServers": { "lotar": {
+                "type": "local", "command": lotar_bin, "args": ["mcp"], "env": env, "tools": ["*"],
+            }}})
+            .to_string(),
+            "--allow-tool=lotar".to_string(),
+        ],
+        AgentRunnerKind::Codex => {
+            // `-c` values are TOML; JSON strings and arrays are valid TOML.
+            let toml_string = |value: &str| serde_json::to_string(value).unwrap_or_default();
+            vec![
+                "-c".to_string(),
+                format!("mcp_servers.lotar.command={}", toml_string(lotar_bin)),
+                "-c".to_string(),
+                r#"mcp_servers.lotar.args=["mcp"]"#.to_string(),
+                // Codex exec never asks, so the server's tools must be pre-approved.
+                "-c".to_string(),
+                r#"mcp_servers.lotar.default_tools_approval_mode="approve""#.to_string(),
+                "-c".to_string(),
+                format!(
+                    "mcp_servers.lotar.env={{LOTAR_TASKS_DIR={}, LOTAR_MCP_TOOLS={}, LOTAR_MCP_AUTORELOAD=\"0\"}}",
+                    toml_string(&tasks),
+                    toml_string(&tools)
+                ),
+            ]
+        }
+        _ => return false,
+    };
+    // Codex takes the prompt as its last argument; options go before it.
+    let at = if kind == AgentRunnerKind::Codex {
+        command.args.len().saturating_sub(1)
+    } else {
+        command.args.len()
+    };
+    command.args.splice(at..at, flags);
+    true
+}
+
 /// The runners whose CLI is on this machine's PATH (by runner name).
 pub fn installed_agent_clis() -> Vec<&'static str> {
     let Some(path) = std::env::var_os("PATH") else {
@@ -1630,6 +1716,7 @@ mod tests {
             });
             profile.mcp = Some(crate::config::types::AgentMcpConfig {
                 allow: vec!["docs".to_string()],
+                ..Default::default()
             });
             let kind: AgentRunnerKind = runner.parse().unwrap();
             build_runner_command(kind, &profile, "p", &[]).unwrap().args
@@ -1904,6 +1991,51 @@ mod tests {
         );
         assert!(agy.contains("--model m1 --effort high"));
         assert!(agy.ends_with("-p Do it"));
+    }
+
+    #[test]
+    fn lotar_mcp_is_attached_per_cli_with_a_tool_allowlist() {
+        let tasks = std::path::Path::new("/repo/.tasks");
+        let attach = |runner: &str| {
+            let kind: AgentRunnerKind = runner.parse().unwrap();
+            let mut command = build_runner_command(kind, &profile(runner), "Do it", &[]).unwrap();
+            let attached = attach_lotar_mcp(&mut command, kind, "/bin/lotar", tasks);
+            (attached, command.args)
+        };
+        let (ok, claude) = attach("claude");
+        assert!(ok);
+        let config = &claude[claude.iter().position(|a| a == "--mcp-config").unwrap() + 1];
+        let config: JsonValue = serde_json::from_str(config).unwrap();
+        let server = &config["mcpServers"]["lotar"];
+        assert_eq!(server["command"], "/bin/lotar");
+        assert_eq!(server["args"], serde_json::json!(["mcp"]));
+        assert_eq!(server["env"]["LOTAR_TASKS_DIR"], "/repo/.tasks");
+        let tools = server["env"]["LOTAR_MCP_TOOLS"].as_str().unwrap();
+        assert!(tools.contains("task_comment_add") && !tools.contains("agent_run"));
+        assert!(claude.iter().any(|a| a == "--allowedTools=mcp__lotar"));
+
+        let (ok, copilot) = attach("copilot");
+        assert!(ok);
+        assert!(copilot.iter().any(|a| a == "--additional-mcp-config"));
+        assert!(copilot.iter().any(|a| a == "--allow-tool=lotar"));
+
+        let (ok, codex) = attach("codex");
+        assert!(ok);
+        assert_eq!(
+            codex.last().map(String::as_str),
+            Some("Do it"),
+            "prompt stays last"
+        );
+        let joined = codex.join(" ");
+        assert!(
+            joined.contains(r#"mcp_servers.lotar.command="/bin/lotar""#),
+            "{joined}"
+        );
+        assert!(joined.contains(r#"default_tools_approval_mode="approve""#));
+        assert!(joined.contains(r#"LOTAR_TASKS_DIR="/repo/.tasks""#));
+
+        assert!(!attach("gemini").0);
+        assert!(!attach("cursor").0);
     }
 
     #[test]

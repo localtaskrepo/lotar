@@ -125,6 +125,7 @@ All rows below are defined inside the same override table and map directly to th
 | `LOTAR_SSE_READY` | `1` | Allows clients to request an immediate `ready` SSE event; primarily used by integration tests. |
 | `LOTAR_STATS_EFFORT_CAP` | Integer | Caps the rolling window size used by `lotar stats effort`. |
 | `LOTAR_MCP_AUTORELOAD` | `0`/`1` (default `1`) | Controls whether the MCP stdio server restarts when the binary changes. |
+| `LOTAR_MCP_TOOLS` | comma-separated tool names | Limits which tools the MCP server lists and runs; unset means all. Agent jobs with `mcp.lotar` use it. |
 | `LOTAR_DOCS_BASE_URL` | URL | Overrides the base used when rendering hyperlinks inside `lotar help`. |
 | `LOTAR_HELP_STYLE` | `ansi`/`plain` | Forces colored (`ansi`) or plain-text help output regardless of TTY detection. |
 

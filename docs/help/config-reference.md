@@ -47,6 +47,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
   - agents.<name>.args: string[] — extra CLI arguments, after LoTaR's own flags
   - agents.<name>.env: map — extra environment variables
   - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be one of the runners in [Agent Jobs](./agent.md#runners).
+  - agents.<name>.mcp.lotar: boolean (default false) — give the job LoTaR's own MCP server, limited to ticket tools (claude, copilot and codex)
   - agents.<name>.max_budget_usd: number — stop a Claude run once it has cost this much (`--max-budget-usd`); ignored by other runners
   - agents.<name>.instructions: string | { file: string } — added after `agent.instructions` (or the built-in instructions) for this profile
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])

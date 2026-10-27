@@ -269,7 +269,16 @@ impl AgentJobService {
         }
         let read_only =
             profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
-        let notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only);
+        let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar)
+            && crate::services::agent_runner::supports_lotar_mcp(runner_kind);
+        let notes = job_notes(
+            tasks_dir,
+            &config,
+            &ticket_id,
+            is_merge_job,
+            read_only,
+            lotar_mcp,
+        );
         let prompt = build_prompt(
             &task,
             &user_prompt,
@@ -898,6 +907,7 @@ fn job_notes(
     ticket_id: &str,
     is_merge_job: bool,
     read_only: bool,
+    lotar_mcp: bool,
 ) -> String {
     if read_only {
         return "- This job is read-only: you can read files and search, but not edit files or run commands \
@@ -906,6 +916,12 @@ final answer; LoTaR saves it as the job summary.\n"
             .to_string();
     }
     let mut notes = String::new();
+    if lotar_mcp {
+        notes.push_str(&format!(
+            "- LoTaR's MCP server `lotar` is connected for this ticket. Prefer its tools ({}) to read and update the ticket.\n",
+            crate::services::agent_runner::LOTAR_MCP_JOB_TOOLS.join(", ")
+        ));
+    }
     if let Some(bin) = current_lotar_binary() {
         notes.push_str(&format!(
             "- Run the LoTaR CLI as `{}` (the build that started this job).\n",
@@ -1619,13 +1635,32 @@ fn run_job(
     });
     let writable_dirs =
         extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
-    let command = match build_runner_command(runner_kind, &profile, &prompt, &writable_dirs) {
+    let mut command = match build_runner_command(runner_kind, &profile, &prompt, &writable_dirs) {
         Ok(cmd) => cmd,
         Err(err) => {
             update_job_failure(&job_id, &ticket_id, err.to_string(), &tasks_dir);
             return;
         }
     };
+    if profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) {
+        let bin = current_lotar_binary()
+            .map(|bin| bin.to_string_lossy().to_string())
+            .unwrap_or_else(|| "lotar".to_string());
+        if !crate::services::agent_runner::attach_lotar_mcp(
+            &mut command,
+            runner_kind,
+            &bin,
+            &tasks_dir,
+        ) {
+            let note = format!(
+                "The {} runner can't be given LoTaR's MCP server; the agent uses the lotar CLI instead.",
+                runner_kind.as_str()
+            );
+            update_job(&job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+        }
+    }
 
     let command = wrap_runner_command(command, &job_id, &ticket_id, runner_kind.as_str());
 
@@ -2849,7 +2884,7 @@ mod tests {
         let mut config =
             crate::config::resolution::config_for_project(&tasks_dir, Some("NOTE")).unwrap();
 
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
         assert!(notes.contains("main checkout"), "{notes}");
         assert!(notes.contains("No automation rule"), "{notes}");
 
@@ -2859,7 +2894,7 @@ mod tests {
             "automation:\n  rules:\n    - when:\n        assignee: \"@implement\"\n      on:\n        complete:\n          set:\n            status: Done\n",
         )
         .unwrap();
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
         assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
         assert!(notes.contains("Commit your work"), "{notes}");
         assert!(
@@ -2868,7 +2903,7 @@ mod tests {
         );
         assert!(notes.contains("hand the ticket back"), "{notes}");
 
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, true);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false);
         assert!(notes.contains("This job is read-only"), "{notes}");
         assert!(notes.contains("final answer"), "{notes}");
         assert!(!notes.contains("Commit your work"), "{notes}");

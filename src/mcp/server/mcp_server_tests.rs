@@ -2088,3 +2088,37 @@ fn dev64_nullable_force_single_does_not_mask_force_alias() {
         "MCP-1"
     );
 }
+
+/// DEV-208: agent jobs start `lotar mcp` with LOTAR_MCP_TOOLS so an agent can
+/// update its ticket but not reach other tools such as agent_run.
+#[test]
+fn tool_allowlist_limits_listing_and_calls() {
+    let _lock = lock_var("LOTAR_MCP_TOOLS");
+    // SAFETY: the variable is guarded by the test env lock above.
+    unsafe { std::env::set_var("LOTAR_MCP_TOOLS", "task_get, task_comment_add") };
+    let list = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(1)),
+        method: "tools/list".into(),
+        params: json!({}),
+    });
+    let names: Vec<String> = list.result.as_ref().unwrap()["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap().to_string())
+        .collect();
+    let call = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(2)),
+        method: "tools/call".into(),
+        params: json!({ "name": "agent_run", "arguments": {} }),
+    });
+    // SAFETY: still under the lock.
+    unsafe { std::env::remove_var("LOTAR_MCP_TOOLS") };
+    let mut sorted = names.clone();
+    sorted.sort();
+    assert_eq!(sorted, ["task_comment_add", "task_get"], "{names:?}");
+    let error = call.error.expect("agent_run refused");
+    assert!(error.message.contains("not available"), "{}", error.message);
+}

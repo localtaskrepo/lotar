@@ -5,7 +5,7 @@
 //
 //   npm run agents:live                         # every installed CLI, all scenarios
 //   npm run agents:live -- --runner claude      # one CLI
-//   npm run agents:live -- --scenario edit      # one scenario (edit, settings, pipeline, template, handback)
+//   npm run agents:live -- --scenario edit      # one scenario (edit, settings, pipeline, template, handback, mcp)
 //   npm run agents:live -- --keep               # keep the temp repositories
 //
 // Each scenario builds a throwaway git repository with a small bug and a
@@ -323,6 +323,45 @@ const SCENARIOS = {
             log: jobs,
         };
     },
+};
+
+/**
+ * With `mcp.lotar: true` the agent gets LoTaR's MCP server and comments on
+ * its ticket through the `task_comment_add` tool.
+ */
+SCENARIOS.mcp = function mcp(runner, options) {
+    const dir = makeRepo(runner, 'mcp');
+    writeConfig(dir, runner);
+    const configFile = path.join(dir, '.tasks', 'config.yml');
+    const config = parse(fs.readFileSync(configFile, 'utf8'));
+    config.agents.fixer.mcp = { lotar: true };
+    fs.writeFileSync(configFile, stringify(config));
+    const ticket = addTicket(dir);
+    const result = lotar(
+        dir,
+        [
+            'agent',
+            'run',
+            ticket,
+            'Do not change any files. Use the lotar MCP tool task_comment_add to add the comment "mcp ok" to this ticket, then stop.',
+            '--agent',
+            'fixer',
+            '--wait',
+        ],
+        {},
+        options.timeout,
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    const log = jobLog(dir, output);
+    const ticketYaml = parse(fs.readFileSync(path.join(dir, '.tasks', 'LIVE', '1.yml'), 'utf8'));
+    const commented = (ticketYaml.comments ?? []).some((c) => c.text?.includes('mcp ok'));
+    const viaTool = /task_comment_add/.test(log);
+    return {
+        dir,
+        ok: result.status === 0 && commented && viaTool,
+        detail: `comment ${commented ? 'added' : 'missing'}; ${viaTool ? 'via the MCP tool' : 'not via the MCP tool'}`,
+        log,
+    };
 };
 
 /** `lotar init --template agent-pipeline` with every phase on `runner`. */

@@ -12,6 +12,7 @@ lotar mcp
 Environment:
 - `LOTAR_TASKS_DIR` — override the workspace search path.
 - `LOTAR_MCP_AUTORELOAD=0` — disable the default binary-change watcher that exits the process when the `lotar` executable is replaced (useful when running under a supervisor that already restarts the process).
+- `LOTAR_MCP_TOOLS=task_get,task_comment_add,…` — only list and run these tools; other calls are refused. Agent jobs with `mcp.lotar: true` set it so an agent can update its ticket but not start agents or delete tasks.
 
 Transport:
 - JSON-RPC 2.0 over stdio, following the MCP `2025-06-18` standard transport.

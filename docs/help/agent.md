@@ -148,6 +148,26 @@ agents:
 
 Codex and Gemini have no per-tool flags, so these settings don't apply to them. The MCP servers themselves come from each CLI's own configuration.
 
+#### LoTaR's own MCP server
+
+With `mcp.lotar: true`, a job also gets LoTaR's MCP server (`lotar mcp`, the same build that started the job, bound to the job's tasks directory) under the name `lotar`, so the agent reads and updates its ticket through tools instead of the CLI:
+
+```yaml
+agents:
+  implement:
+    runner: claude
+    mcp:
+      lotar: true
+```
+
+| Runner | How the server is added | Approval |
+| --- | --- | --- |
+| `claude` | `--mcp-config` | `--allowedTools=mcp__lotar` |
+| `copilot` | `--additional-mcp-config` | `--allow-tool=lotar` |
+| `codex` | `-c mcp_servers.lotar.*` | `default_tools_approval_mode = "approve"` |
+
+The server only offers the tools a job needs: `task_get`, `task_list`, `task_update`, `task_comment_add`, `task_reference_add`, `relationship_graph`, `config_show` and `whoami` (set through `LOTAR_MCP_TOOLS`, which `lotar mcp` honours in general). An agent can't start other agents, delete tasks or sync through it. Because the server is named `lotar`, it takes the place of a LoTaR server with that name in the CLI's own settings for the job, which would point at a different tasks directory or build. Other runners don't support the switch; their jobs log a note and use the CLI.
+
 ## list-running requirements
 
 `lotar agent list-running` discovers running jobs by scanning for the wrapper process name. This requires the wrapper binary to be available in the same directory as `lotar` or on `PATH` (or set `LOTAR_AGENT_WRAPPER` to an absolute path).

@@ -141,6 +141,10 @@ pub struct AgentToolsConfig {
 pub struct AgentMcpConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allow: Vec<String>,
+    /// Connect LoTaR's own MCP server (`lotar mcp`, bound to the job's tasks
+    /// directory) so the agent reads and updates its ticket through tools.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub lotar: bool,
 }
 
 /// What an agent run may do without asking (DEV-199). LoTaR maps the level

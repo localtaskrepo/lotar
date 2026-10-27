@@ -1,16 +1,37 @@
 title: Offer LoTaR's MCP server to agent runs
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T21:28:32.989552+00:00
-modified: 2026-10-26T22:13:05.407239+00:00
+modified: 2026-10-27T02:06:20.855346+00:00
 comments:
 - date: 2026-10-26T22:13:05.407239+00:00
   text: 'Finding from a DEV-12 live run: when a CLI already has a LoTaR MCP server in its own settings (here Copilot), agents prefer its tools (task_get, task_comment_add) over the CLI. That server is not bound to the job''s tasks directory or build, so the agent''s comment and hand-back did not reach the ticket and automation moved it on. If LoTaR injects its own MCP server, it should take precedence over (or replace) a user-configured one for the run, bound to the job''s tasks dir.'
+- date: 2026-10-27T02:06:20.821951+00:00
+  text: 'Done: profiles can set mcp.lotar: true. Jobs then get LoTaR''s MCP server (the build that started the job, LOTAR_TASKS_DIR bound to the job, autoreload off) named ''lotar'' (shadowing a user server of that name): claude --mcp-config + --allowedTools=mcp__lotar, copilot --additional-mcp-config + --allow-tool=lotar, codex -c mcp_servers.lotar.* with default_tools_approval_mode=approve (codex exec otherwise refuses MCP calls: ''requires approval and the approval policy is never''). The server is limited through a new LOTAR_MCP_TOOLS allowlist (lotar mcp honours it generally) to task_get, task_list, task_update, task_comment_add, task_reference_add, relationship_graph, config_show, whoami, so agents can''t start agents, delete or sync. The job notes point the agent at these tools. Other runners log a note and keep using the CLI. Live: new ''mcp'' live-check scenario passes on claude, codex and copilot (comment added via task_comment_add). Tests: tool_allowlist_limits_listing_and_calls, lotar_mcp_is_attached_per_cli_with_a_tool_allowlist. Docs: agent.md, config-reference, mcp.md, environment.md. Gates: lint, 1747 Rust + 1226 UI.'
 description: 'Split from DEV-206. Agents update their ticket through the lotar CLI (LOTAR_BIN), which works live for claude, codex and copilot. An MCP route would give typed tools instead of shell commands: inject LoTaR''s MCP server per run (claude --mcp-config, codex -c mcp_servers.lotar.*, copilot --additional-mcp-config) with its tools pre-approved, behind a profile switch such as mcp.lotar: true. Headless MCP tool approval differs per CLI, so each needs a live check.'
 history:
 - at: 2026-10-26T22:13:05.407239+00:00
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-27T01:52:37.609616+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T02:06:20.821951+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T02:06:20.855346+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -431,12 +431,13 @@ fn route_request(
         // tools/list -> return available tool definitions with input schemas
         "tools/list" => {
             let enum_hints = gather_enum_hints();
-            ok(
-                Some(id),
-                json!({
-                    "tools": build_tool_definitions(enum_hints.as_ref())
-                }),
-            )
+            let mut tools = build_tool_definitions(enum_hints.as_ref());
+            tools.retain(|tool| {
+                tool.get("name")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(tool_allowed)
+            });
+            ok(Some(id), json!({ "tools": tools }))
         }
         // tools/call -> resolve the tool in the registry, validate arguments
         // against the advertised schema, then invoke its handler.
@@ -516,6 +517,18 @@ fn initialize_response(id: Value) -> JsonRpcResponse {
     )
 }
 
+/// `LOTAR_MCP_TOOLS` (comma-separated tool names) limits which tools this
+/// server lists and runs; agent jobs use it so an agent can update its
+/// ticket but not, say, start other agents. Unset means every tool.
+fn tool_allowed(name: &str) -> bool {
+    match std::env::var("LOTAR_MCP_TOOLS") {
+        Ok(list) if !list.trim().is_empty() => list
+            .split(',')
+            .any(|allowed| allowed.trim().eq_ignore_ascii_case(name)),
+        _ => true,
+    }
+}
+
 fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
     let Some(name) = params.get("name").and_then(|v| v.as_str()) else {
         return err(
@@ -525,6 +538,14 @@ fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
             Some(json!({ "tool": null, "issues": ["params.name must be a string"] })),
         );
     };
+    if !tool_allowed(name) {
+        return err(
+            Some(id),
+            -32602,
+            &format!("Tool '{name}' is not available in this session"),
+            None,
+        );
+    }
     let spec = match registry::find_tool_for_call(name) {
         Ok(spec) => spec,
         Err(message) => return err(Some(id), -32602, &message, None),
