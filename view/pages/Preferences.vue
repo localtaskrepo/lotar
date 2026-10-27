@@ -48,9 +48,7 @@
             </p>
           </div>
         </UiCard>
-      </div>
 
-      <div class="preference-column">
         <UiCard>
           <h3>Startup destination</h3>
           <div class="col" style="gap: 8px">
@@ -86,6 +84,38 @@
         </UiCard>
 
         <UiCard>
+          <h3>Keyboard</h3>
+          <div class="col" style="gap: 10px">
+            <label class="row" style="gap: 8px; align-items: center">
+              <input v-model="singleKeyShortcuts" type="checkbox" data-testid="preferences-single-key-shortcuts" />
+              Single-key shortcuts
+            </label>
+            <p class="muted" style="margin: 0">
+              <kbd>c</kbd> new task, <kbd>/</kbd> search, <kbd>g</kbd> then a letter to change pages, and
+              <kbd>?</kbd> for the full list. Turn them off if they get in the way of a screen reader or voice control;
+              {{ paletteLabel }} opens the command palette either way.
+            </p>
+          </div>
+        </UiCard>
+      </div>
+
+      <div class="preference-column">
+        <UiCard>
+          <h3>Tasks list</h3>
+          <div class="col" style="gap: 8px">
+            <label class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
+              <span class="muted">Default page size</span>
+              <UiSelect v-model="tasksPageSize">
+                <option v-for="opt in tasksPageSizeOptions" :key="opt" :value="String(opt)">
+                  {{ opt }}
+                </option>
+              </UiSelect>
+            </label>
+            <p class="muted" style="margin: 0">Used when the Tasks list URL does not specify a page size.</p>
+          </div>
+        </UiCard>
+
+        <UiCard>
           <h3>Tables</h3>
           <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
             <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
@@ -110,36 +140,6 @@
               <UiButton @click="clearSavedFilters">Clear last used filter</UiButton>
               <span class="muted">Removes the saved search and filters of every page from this browser.</span>
             </div>
-          </div>
-        </UiCard>
-
-        <UiCard>
-          <h3>Keyboard</h3>
-          <div class="col" style="gap: 10px">
-            <label class="row" style="gap: 8px; align-items: center">
-              <input v-model="singleKeyShortcuts" type="checkbox" data-testid="preferences-single-key-shortcuts" />
-              Single-key shortcuts
-            </label>
-            <p class="muted" style="margin: 0">
-              <kbd>c</kbd> new task, <kbd>/</kbd> search, <kbd>g</kbd> then a letter to change pages, and
-              <kbd>?</kbd> for the full list. Turn them off if they get in the way of a screen reader or voice control;
-              {{ paletteLabel }} opens the command palette either way.
-            </p>
-          </div>
-        </UiCard>
-
-        <UiCard>
-          <h3>Tasks list</h3>
-          <div class="col" style="gap: 8px">
-            <label class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
-              <span class="muted">Default page size</span>
-              <UiSelect v-model="tasksPageSize">
-                <option v-for="opt in tasksPageSizeOptions" :key="opt" :value="String(opt)">
-                  {{ opt }}
-                </option>
-              </UiSelect>
-            </label>
-            <p class="muted" style="margin: 0">Used when the Tasks list URL does not specify a page size.</p>
           </div>
         </UiCard>
 

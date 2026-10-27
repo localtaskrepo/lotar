@@ -1,0 +1,25 @@
+title: Preferences columns are unbalanced
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-27T04:17:11.205495+00:00
+modified: 2026-10-27T04:17:11.282456+00:00
+comments:
+- date: 2026-10-27T04:17:11.257331+00:00
+  text: 'Done: regrouped the cards. Left: appearance and navigation (Theme, Accent color, Startup destination, Navigation, Keyboard). Right: lists and task panel (Tasks list, Tables, Filters, Task panel). Checked in a browser at 1440 and 1100 px light and 1280 px dark; the columns now end within one card of each other. Typecheck clean; full smoke 352/352.'
+description: 'Reported by the developer: the left column held only Theme and Accent color while the right column held seven cards.'
+history:
+- at: 2026-10-27T04:17:11.257331+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T04:17:11.282456+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

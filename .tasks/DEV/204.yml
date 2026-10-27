@@ -1,10 +1,11 @@
 title: Better image handling
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T17:33:43.349209+00:00
-modified: 2026-10-26T17:40:45.262668+00:00
+modified: 2026-10-27T04:14:27.546487+00:00
 description: |-
   When a ticket has an image attached we don't use that anywhere to style things up.
   - Previews could be part of the ticket card like in the calendar of board
@@ -29,3 +30,11 @@ history:
       - Lists could have icons based on the attached media or previews
       - Display filters can toggle this on or off
       - In the ticket details pane we could show a preview as well instead of just a file name
+- at: 2026-10-27T04:14:27.546487+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
