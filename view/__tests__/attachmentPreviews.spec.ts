@@ -4,7 +4,14 @@ import AttachmentTile from '../components/AttachmentTile.vue'
 import BoardCardMeta from '../components/BoardCardMeta.vue'
 import TaskHoverCardBody from '../components/TaskHoverCardBody.vue'
 import TaskTable from '../components/TaskTable.vue'
-import { attachmentKind, taskAttachments } from '../utils/taskAttachments'
+import {
+    attachmentKind,
+    firstPreviewImage,
+    imageFit,
+    isAttachmentPreviewBroken,
+    markAttachmentPreviewBroken,
+    taskAttachments,
+} from '../utils/taskAttachments'
 
 vi.mock('../api/client', () => ({ api: { showConfig: vi.fn(async () => ({})) } }))
 
@@ -65,7 +72,8 @@ describe('AttachmentTile', () => {
     it('shows images and labels other files', async () => {
         const [pdf, image] = taskAttachments(mixed)
         const imageTile = mount(AttachmentTile, { props: { attachment: image!, size: 24 } })
-        expect(imageTile.find('img').attributes('src')).toBe(image!.url)
+        // A server preview sized for the tile, not the full image.
+        expect(imageTile.find('img').attributes('src')).toBe(`${image!.url}&w=96`)
         expect(imageTile.find('img').attributes('loading')).toBe('lazy')
         expect(imageTile.find('img').attributes('style')).toContain('24px')
 
@@ -74,10 +82,60 @@ describe('AttachmentTile', () => {
         expect(pdfTile.text()).toBe('PDF')
         expect(pdfTile.classes()).toContain('attachment-tile--pdf')
 
-        // A broken image falls back to the file tile.
-        await imageTile.find('img').trigger('error')
-        expect(imageTile.find('img').exists()).toBe(false)
-        expect(imageTile.text()).toBe('PNG')
+        // A broken image falls back to the file tile and is remembered, so a
+        // later tile for the same file does not try again.
+        const [broken] = taskAttachments(task([{ attachment: `broken.${HASH}.png` }]))
+        const brokenTile = mount(AttachmentTile, { props: { attachment: broken! } })
+        await brokenTile.find('img').trigger('error')
+        expect(brokenTile.find('img').exists()).toBe(false)
+        expect(brokenTile.text()).toBe('PNG')
+        expect(isAttachmentPreviewBroken(broken!.url)).toBe(true)
+        expect(
+            mount(AttachmentTile, { props: { attachment: broken! } })
+                .find('img')
+                .exists(),
+        ).toBe(false)
+
+        // As a cover it says why there is no picture.
+        expect(mount(AttachmentTile, { props: { attachment: broken!, cover: true } }).text()).toBe('PNGNo preview')
+    })
+
+    it('fits each image to its shape once it loads', async () => {
+        const [image] = taskAttachments(task([{ attachment: `wide.${HASH}.jpg` }]))
+        const tile = mount(AttachmentTile, { props: { attachment: image!, cover: true } })
+        const img = tile.find('img')
+        expect(img.classes()).toContain('attachment-tile--fit-cover')
+        const define = (key: string, value: number) =>
+            Object.defineProperty(img.element, key, { value, configurable: true })
+        define('naturalWidth', 2400)
+        define('naturalHeight', 300)
+        define('clientWidth', 300)
+        define('clientHeight', 120)
+        await img.trigger('load')
+        expect(img.classes()).toContain('attachment-tile--fit-contain')
+    })
+})
+
+describe('imageFit', () => {
+    const box = { width: 300, height: 120 }
+    it('never enlarges small images', () => {
+        expect(imageFit({ width: 16, height: 16 }, box)).toBe('natural')
+        expect(imageFit({ width: 300, height: 120 }, box)).toBe('natural')
+    })
+    it('shows vector art and transparent images whole', () => {
+        expect(imageFit({ width: 2000, height: 1000 }, box, { vector: true })).toBe('contain')
+        expect(imageFit({ width: 400, height: 400 }, box, { transparent: true })).toBe('contain')
+    })
+    it('crops tall screenshots from the top', () => {
+        expect(imageFit({ width: 1200, height: 3200 }, box)).toBe('top')
+    })
+    it('covers photos but not shapes that would lose almost half', () => {
+        expect(imageFit({ width: 3000, height: 1500 }, box)).toBe('cover')
+        expect(imageFit({ width: 2400, height: 300 }, box)).toBe('contain')
+        expect(imageFit({ width: 1000, height: 1000 }, box)).toBe('contain')
+    })
+    it('covers until the size is known', () => {
+        expect(imageFit({ width: 0, height: 0 }, box)).toBe('cover')
     })
 })
 
@@ -91,6 +149,15 @@ describe('card and hover previews', () => {
         expect(shown.find('.task-meta__attachments').attributes('aria-label')).toBe('4 attachments')
         const hidden = mount(BoardCardMeta, { props: { ...props, fields: { attachments: false } } })
         expect(hidden.find('.task-meta__attachments').exists()).toBe(false)
+    })
+
+    it('skips images that failed to load when choosing a preview', () => {
+        const pair = task([{ attachment: `gone.${HASH}.png` }, { attachment: `kept.${HASH}.jpg` }])
+        expect(firstPreviewImage(pair)!.name).toBe('gone.png')
+        markAttachmentPreviewBroken(taskAttachments(pair)[0]!.url)
+        expect(firstPreviewImage(pair)!.name).toBe('kept.jpg')
+        markAttachmentPreviewBroken(taskAttachments(pair)[1]!.url)
+        expect(firstPreviewImage(pair)).toBeNull()
     })
 
     it('previews the first image in the hover card and lists the other files', async () => {

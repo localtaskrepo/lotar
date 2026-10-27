@@ -15,6 +15,15 @@ interface UseTaskPanelReferenceMutationsOptions {
 
 export type LinkAddOutcome = 'added' | 'skipped' | 'failed'
 
+/** One file of the upload in progress, for the panel's progress list. */
+export interface UploadProgressEntry {
+    key: string
+    name: string
+    /** 0..1 of the bytes sent. */
+    fraction: number
+    state: 'waiting' | 'uploading' | 'done' | 'failed'
+}
+
 export interface TaskPanelReferenceMutationsApi {
     attachments: ComputedRef<NonNullable<TaskDTO['references']>>
     linkReferences: ComputedRef<NonNullable<TaskDTO['references']>>
@@ -22,10 +31,12 @@ export interface TaskPanelReferenceMutationsApi {
     addingLinkReferences: Ref<boolean>
     removingAttachmentPath: Ref<string | null>
     removingLinkUrl: Ref<string | null>
+    uploadProgress: Ref<UploadProgressEntry[]>
     applyReferencesFromTaskResponse: (updated: Partial<TaskDTO> | null | undefined) => void
     removeAttachment: (relPath: string) => Promise<void>
     removeLinkReference: (url: string) => Promise<void>
-    uploadFiles: (files: File[]) => Promise<void>
+    /** Upload files; resolves with the stored names of the ones that worked. */
+    uploadFiles: (files: File[]) => Promise<string[]>
     addUrls: (urls: string[]) => Promise<void>
     attachLinksFromText: (urls: string[]) => Promise<void>
 }
@@ -44,6 +55,7 @@ export function useTaskPanelReferenceMutations(
     const addingLinkReferences = ref(false)
     const removingAttachmentPath = ref<string | null>(null)
     const removingLinkUrl = ref<string | null>(null)
+    const uploadProgress = ref<UploadProgressEntry[]>([])
 
     // Managed attachments-store blobs. Repository-file references (`file`) are
     // intentionally excluded: they are never managed blobs (DEV-61).
@@ -150,38 +162,69 @@ export function useTaskPanelReferenceMutations(
         }
     }
 
-    async function uploadFiles(files: File[]): Promise<void> {
+    async function uploadFiles(files: File[]): Promise<string[]> {
         attachmentsUploading.value = true
+        const stored: string[] = []
+        uploadProgress.value = files.map((file, index) => ({
+            key: `${index}:${file.name}`,
+            name: file.name,
+            fraction: 0,
+            state: 'waiting',
+        }))
         try {
             let added = 0
             let skipped = 0
             let failed = 0
+            let cleaned = 0
+            const warnings: string[] = []
 
-            for (const file of files) {
+            for (const [index, file] of files.entries()) {
+                const progress = uploadProgress.value[index]!
+                progress.state = 'uploading'
                 try {
                     const base64 = await fileToBase64(file)
-                    const response = await api.uploadTaskAttachment({
-                        id: task.id,
-                        filename: file.name,
-                        content_base64: base64,
-                    })
+                    const response = await api.uploadTaskAttachment(
+                        {
+                            id: task.id,
+                            filename: file.name,
+                            content_base64: base64,
+                        },
+                        (fraction) => {
+                            progress.fraction = fraction
+                        },
+                    )
 
                     if (response.attached) {
                         added += 1
                     } else {
                         skipped += 1
                     }
+                    if (response.metadata_removed) cleaned += 1
+                    warnings.push(...(response.warnings ?? []))
+                    stored.push(response.stored_path)
+                    progress.state = 'done'
+                    progress.fraction = 1
 
                     applyResponseTask(response.task)
                 } catch (error: any) {
                     failed += 1
+                    progress.state = 'failed'
                     console.warn('Failed to upload attachment', { file: file.name, error })
                 }
             }
 
+            for (const warning of warnings) showToast(warning, 'Check this file', 6000)
+            if (cleaned > 0) {
+                showToast(
+                    cleaned === 1
+                        ? 'Removed location and camera details from the photo'
+                        : `Removed location and camera details from ${cleaned} photos`,
+                )
+            }
+
             if (files.length === 1 && added === 0 && skipped === 1 && failed === 0) {
                 showToast('Attachment already attached')
-                return
+                return stored
             }
 
             if (added > 0 && skipped === 0 && failed === 0) {
@@ -193,8 +236,10 @@ export function useTaskPanelReferenceMutations(
                 if (failed > 0) parts.push(`${failed} failed`)
                 showToast(parts.length ? `Attachments: ${parts.join(', ')}` : 'No attachments uploaded')
             }
+            return stored
         } finally {
             attachmentsUploading.value = false
+            uploadProgress.value = []
         }
     }
 
@@ -260,6 +305,7 @@ export function useTaskPanelReferenceMutations(
         addingLinkReferences,
         removingAttachmentPath,
         removingLinkUrl,
+        uploadProgress,
         applyReferencesFromTaskResponse,
         removeAttachment,
         removeLinkReference,

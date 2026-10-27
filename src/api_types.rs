@@ -824,6 +824,48 @@ pub struct AttachmentUploadResponse {
     pub stored_path: String,
     pub attached: bool,
     pub task: TaskDTO,
+    /// Camera, location and other personal metadata was removed from the
+    /// image before it was stored (DEV-216).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub metadata_removed: bool,
+    /// Problems worth telling the uploader about, e.g. an image extension on
+    /// a file that is not an image. The upload still succeeded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentReorderRequest {
+    pub id: String,
+    /// The task's attachments (stored names) in their new order. Must list
+    /// every managed attachment of the task exactly once.
+    pub attachments: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentInfoRequest {
+    #[serde(default)]
+    pub project: Option<String>,
+    pub attachments: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentInfo {
+    pub attachment: String,
+    pub size: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentInfoResponse {
+    pub items: Vec<AttachmentInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

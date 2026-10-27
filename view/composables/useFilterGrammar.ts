@@ -68,6 +68,7 @@ export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
     { key: 'due', aliases: ['due', 'duedate', 'dueon'], label: 'Due', values: 'due' },
     { key: 'recent', aliases: ['recent'], label: 'Recent', values: 'recent' },
     { key: 'needs', aliases: ['needs', 'need'], label: 'Needs', values: 'text' },
+    { key: 'has', aliases: ['has', 'with'], label: 'Has', values: 'text' },
     { key: 'mine', aliases: ['mine', 'me'], label: 'Mine', values: 'flag' },
 ]
 
@@ -117,6 +118,7 @@ export const GRAMMAR_FIXED_VALUES: Partial<Record<string, string[]>> = {
     due: ['today', 'soon', 'later', 'overdue'],
     recent: ['7d'],
     needs: ['effort', 'due'],
+    has: ['attachment', 'image', 'link'],
 }
 
 export function findGrammarKey(token: string): GrammarKeyMeta | null {
@@ -656,7 +658,7 @@ function customFieldSuggestions(partial: string, source: FilterValueSource): Sug
 }
 
 /** Keys whose filter value is a CSV multi-select (one chip per entry). */
-const CSV_VALUE_KEYS = new Set(['status', 'priority', 'type', 'sprints', 'tags', 'needs'])
+const CSV_VALUE_KEYS = new Set(['status', 'priority', 'type', 'sprints', 'tags', 'needs', 'has'])
 
 const VALUE_SUGGESTION_LIMIT = 10
 /** sort_by lists every backend builtin plus custom:<name>, so it needs more room. */

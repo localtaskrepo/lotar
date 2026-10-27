@@ -1,0 +1,7 @@
+title: Task history errors in a git repo without commits
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-27T16:21:01.589846+00:00
+description: 'Found during DEV-216 verification. In a workspace that is a git repository with no commits yet (fresh git init), GET /api/tasks/history?id=<ID> returns 500 INTERNAL with ''git log failed ... your current branch main does not have any commits yet''. The task panel shows a console error on open. Expected: an empty history (no commits means no history), not an error. Repro: git init a folder, lotar add a task, lotar serve, open the task panel.'

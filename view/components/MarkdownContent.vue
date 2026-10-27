@@ -6,12 +6,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { renderMarkdownToHtml } from '../utils/markdown'
+import { attachmentUrl } from '../utils/taskAttachments'
 
 const props = defineProps<{
   source: string
+  /** Task whose `attachment:` links and images this text may show. */
+  attachmentTaskId?: string | null
 }>()
 
-const html = computed(() => renderMarkdownToHtml(props.source || ''))
+const html = computed(() =>
+  renderMarkdownToHtml(props.source || '', {
+    resolveAttachment: props.attachmentTaskId ? (stored) => attachmentUrl(stored, props.attachmentTaskId) : undefined,
+  }),
+)
 </script>
 
 <style scoped>
@@ -45,6 +52,12 @@ const html = computed(() => renderMarkdownToHtml(props.source || ''))
 .markdown-content :deep(code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: 0.92em;
+}
+
+.markdown-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
 }
 
 .markdown-content :deep(blockquote) {

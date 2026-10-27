@@ -684,6 +684,14 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Smart filter: keep only tasks missing these fields. Accepts CSV string or array; strict vocabulary: effort, due. Blank explicit values are errors."
         }),
     );
+    properties.insert(
+        "has".into(),
+        json!({
+            "type": ["string", "array", "null"],
+            "items": {"type": "string", "enum": ["attachment", "image", "link"]},
+            "description": "Smart filter: keep only tasks with an attachment, an image attachment, or a link (all listed kinds must be present). Accepts CSV string or array. Blank explicit values are errors."
+        }),
+    );
 
     let mut tool = json!({
         "name": "task_list",

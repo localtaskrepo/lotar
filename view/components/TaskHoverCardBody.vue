@@ -6,7 +6,7 @@ import { ensureCompletionPolicy, useCompletionPolicy } from '../composables/useC
 import { formatRelativeTime, parseTaskDate, startOfLocalDay } from '../utils/date'
 import { formatMember } from '../utils/member'
 import { projectOf } from '../utils/text'
-import { taskAttachments } from '../utils/taskAttachments'
+import { firstPreviewImage, taskAttachments } from '../utils/taskAttachments'
 import AttachmentTile from './AttachmentTile.vue'
 
 const props = defineProps<{
@@ -78,8 +78,8 @@ const showModified = computed(() => isFieldVisible('modified'))
 const hasHeader = computed(() => showId.value || showTitle.value)
 
 const attachments = computed(() => (isFieldVisible('attachments') ? taskAttachments(props.task) : []))
-const preview = computed(() => attachments.value.find((attachment) => attachment.kind === 'image') ?? null)
-const otherFiles = computed(() => attachments.value.filter((attachment) => attachment !== preview.value))
+const preview = computed(() => (attachments.value.length ? firstPreviewImage(props.task) : null))
+const otherFiles = computed(() => attachments.value.filter((attachment) => attachment.url !== preview.value?.url))
 
 const customFieldEntries = computed(() => {
   const enabled = Object.entries(props.fields ?? {})
@@ -147,7 +147,7 @@ const dueInfo = computed(() => {
 
 <template>
   <div v-if="preview" class="task-hover-card__preview">
-    <AttachmentTile :attachment="preview" cover />
+    <AttachmentTile :attachment="preview" cover :cover-height="140" />
   </div>
   <header v-if="hasHeader" class="task-hover-card__header">
     <span v-if="showId" class="task-hover-card__id">{{ task.id }}</span>
@@ -214,7 +214,6 @@ const dueInfo = computed(() => {
 <style scoped>
 .task-hover-card__preview {
   margin: -12px -12px 10px;
-  height: 140px;
   overflow: hidden;
   border-radius: inherit;
   border-bottom-left-radius: 0;

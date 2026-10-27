@@ -257,7 +257,7 @@ import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import AttachmentTile from '../components/AttachmentTile.vue'
 import TaskHoverCard from '../components/TaskHoverCard.vue'
-import { taskAttachments } from '../utils/taskAttachments'
+import { firstPreviewImage, taskAttachments } from '../utils/taskAttachments'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
@@ -378,8 +378,7 @@ const DEFAULT_CALENDAR_HOVER_FIELDS: Record<string, boolean> = {
 /** The image (or first file) shown on a day chip, when the Attachments field is on. */
 function chipAttachment(task: TaskDTO) {
   if (!calendarHoverFields.isVisible('attachments')) return null
-  const attachments = taskAttachments(task)
-  return attachments.find((attachment) => attachment.kind === 'image') ?? attachments[0] ?? null
+  return firstPreviewImage(task) ?? taskAttachments(task)[0] ?? null
 }
 
 const calendarHoverFields = useColumns({

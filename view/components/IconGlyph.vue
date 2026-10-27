@@ -55,6 +55,9 @@ type IconName =
   | 'eye-off'
   | 'download'
   | 'filter'
+  | 'play'
+  | 'star'
+  | 'external'
 
 type IconDef = {
   paths: string[]
@@ -65,6 +68,15 @@ type IconDef = {
 }
 
 const ICONS: Record<IconName, IconDef> = {
+  play: {
+    paths: ['M8 5.5v13a1 1 0 001.5.86l11-6.5a1 1 0 000-1.72l-11-6.5A1 1 0 008 5.5z'],
+  },
+  star: {
+    paths: ['M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z'],
+  },
+  external: {
+    paths: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5'],
+  },
   filter: {
     paths: ['M4 5h16l-6 7v6l-4 2v-8L4 5z'],
   },

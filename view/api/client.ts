@@ -16,6 +16,9 @@ import type {
     AttachmentRemoveResponse,
     AttachmentUploadRequest,
     AttachmentUploadResponse,
+    AttachmentReorderRequest,
+    AttachmentInfoRequest,
+    AttachmentInfoResponse,
     AutomationInspectResponse,
     AutomationSetRequest,
     AutomationSetResponse,
@@ -216,8 +219,42 @@ export const api = {
     restoreTask(id: string, project?: string): Promise<TaskDTO> {
         return post('/api/tasks/restore' + qs({ project }), { id })
     },
-    uploadTaskAttachment(payload: AttachmentUploadRequest): Promise<AttachmentUploadResponse> {
-        return post('/api/tasks/attachments/upload', payload)
+    /**
+     * Upload an attachment. With `onProgress`, the request goes through
+     * XMLHttpRequest so the panel can show per-file progress (fetch has no
+     * upload progress events).
+     */
+    uploadTaskAttachment(
+        payload: AttachmentUploadRequest,
+        onProgress?: (fraction: number) => void,
+    ): Promise<AttachmentUploadResponse> {
+        const path = '/api/tasks/attachments/upload'
+        if (!onProgress || typeof XMLHttpRequest === 'undefined') return post(path, payload)
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open('POST', `${BASE}${path}`)
+            xhr.setRequestHeader('Content-Type', 'application/json')
+            xhr.setRequestHeader('Accept', 'application/json')
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total)
+            }
+            xhr.onload = () => {
+                onProgress(1)
+                parseEnvelope<AttachmentUploadResponse>(
+                    'POST',
+                    path,
+                    new Response(xhr.responseText, { status: xhr.status }),
+                ).then(resolve, reject)
+            }
+            xhr.onerror = () => reject(new Error(`POST ${path} failed: network error`))
+            xhr.send(JSON.stringify(payload))
+        })
+    },
+    reorderTaskAttachments(payload: AttachmentReorderRequest): Promise<TaskDTO> {
+        return post('/api/tasks/attachments/reorder', payload)
+    },
+    attachmentInfo(payload: AttachmentInfoRequest): Promise<AttachmentInfoResponse> {
+        return post('/api/attachments/info', payload)
     },
     removeTaskAttachment(payload: AttachmentRemoveRequest): Promise<AttachmentRemoveResponse> {
         return post('/api/tasks/attachments/remove', payload)

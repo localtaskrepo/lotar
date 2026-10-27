@@ -113,7 +113,11 @@
                       @keydown.enter.prevent="startEditingDescription"
                       @keydown.space.prevent="startEditingDescription"
                     >
-                      <MarkdownContent v-if="(form.description || '').trim()" :source="form.description || ''" />
+                      <MarkdownContent
+                        v-if="(form.description || '').trim()"
+                        :source="form.description || ''"
+                        :attachment-task-id="task.id"
+                      />
                       <span v-else class="muted">Click to add a description…</span>
                     </div>
 
@@ -126,9 +130,10 @@
                           rows="5"
                           placeholder="Description"
                           @input="onDescriptionInput"
+                          @paste="onDescriptionPaste"
                         ></textarea>
                         <div v-else class="task-panel__description-preview" tabindex="0">
-                          <MarkdownContent :source="form.description || ''" />
+                          <MarkdownContent :source="form.description || ''" :attachment-task-id="task.id" />
                         </div>
                       </div>
                       <div class="task-panel__description-controls">
@@ -148,7 +153,8 @@
                   <div
                     v-if="
                       showAttachmentsPreference &&
-                      (attachments.length ||
+                      (canAttachFiles ||
+                        attachments.length ||
                         attachmentsUploading ||
                         (showLinksInAttachmentsPreference && (linkReferences.length || addingLinkReferences)))
                     "
@@ -157,56 +163,143 @@
                     <div class="task-panel__attachments-header">
                       <span>Attachments</span>
                       <span v-if="attachmentsUploading" class="muted">Uploading…</span>
+                      <template v-else-if="canAttachFiles">
+                        <input
+                          ref="attachmentPicker"
+                          type="file"
+                          multiple
+                          hidden
+                          data-testid="attachment-picker"
+                          @change="onAttachmentPicked"
+                        />
+                        <UiButton
+                          variant="ghost"
+                          type="button"
+                          class="task-panel__attach-button"
+                          title="Attach files (or drop them here, or paste a screenshot)"
+                          @click="attachmentPicker?.click()"
+                        >
+                          <IconGlyph name="paperclip" />
+                          Attach
+                        </UiButton>
+                      </template>
                     </div>
-
-                    <ul v-if="imageAttachments.length" class="task-panel__gallery">
+                    <ul v-if="uploadProgress.length" class="task-panel__upload-progress" aria-label="Upload progress">
                       <li
-                        v-for="entry in imageAttachments"
+                        v-for="item in uploadProgress"
+                        :key="item.key"
+                        class="task-panel__upload-row"
+                        :class="`task-panel__upload-row--${item.state}`"
+                      >
+                        <span class="task-panel__upload-name">{{ item.name }}</span>
+                        <progress
+                          class="task-panel__upload-bar"
+                          max="1"
+                          :value="item.fraction"
+                          :aria-label="`Uploading ${item.name}`"
+                        ></progress>
+                        <span class="task-panel__upload-state">{{ uploadStateLabel(item) }}</span>
+                      </li>
+                    </ul>
+                    <button
+                      v-if="canAttachFiles && !visibleAttachments.length && !attachmentsUploading"
+                      type="button"
+                      class="task-panel__attachments-empty"
+                      @click="attachmentPicker?.click()"
+                    >
+                      Drop files here, paste a screenshot, or <span class="task-panel__attachments-browse">browse</span>
+                    </button>
+
+                    <ul v-if="galleryAttachments.length" class="task-panel__gallery">
+                      <li
+                        v-for="entry in galleryAttachments"
                         :key="entry.attachment || ''"
                         class="task-panel__gallery-item"
+                        :class="{ 'task-panel__gallery-item--drop': dropTarget === entry.attachment }"
+                        :draggable="canAttachFiles"
+                        @dragstart="onReorderDragStart($event, 'gallery', entry.attachment || '')"
+                        @dragover="onReorderDragOver($event, 'gallery', entry.attachment || '')"
+                        @dragleave="onReorderDragLeave(entry.attachment || '')"
+                        @drop="onReorderDrop($event, 'gallery', entry.attachment || '')"
+                        @dragend="onReorderDragEnd"
                       >
                         <a
                           class="task-panel__attachment-link task-panel__gallery-link"
                           :href="attachmentUrl(entry.attachment || '')"
                           target="_blank"
                           rel="noopener"
-                          :title="attachmentHoverTitle(entry.attachment || '')"
+                          :title="attachmentTooltip(entry.attachment || '')"
+                          @click="openViewer($event, entry.attachment || '')"
+                          @keydown="onReorderKey($event, 'gallery', entry.attachment || '')"
                         >
-                          <img
-                            class="task-panel__gallery-image"
-                            :src="attachmentUrl(entry.attachment || '')"
-                            :alt="attachmentDisplayName(entry.attachment || '')"
-                            loading="lazy"
-                            decoding="async"
-                          />
+                          <span class="task-panel__gallery-preview">
+                            <AttachmentTile
+                              class="task-panel__gallery-image"
+                              :attachment="attachmentView(entry.attachment || '')"
+                              :alt="attachmentDisplayName(entry.attachment || '')"
+                              :title="attachmentTooltip(entry.attachment || '')"
+                              :preview-width="240"
+                              cover
+                            />
+                          </span>
                           <span class="task-panel__attachment-name task-panel__gallery-name">{{
                             attachmentDisplayName(entry.attachment || '')
                           }}</span>
                         </a>
-                        <UiButton
-                          variant="ghost"
-                          icon-only
-                          type="button"
-                          class="task-panel__attachment-remove task-panel__gallery-remove"
-                          aria-label="Remove attachment"
-                          title="Remove attachment"
-                          :disabled="attachmentsUploading || removingAttachmentPath === (entry.attachment || '')"
-                          @click.prevent.stop="removeAttachment(entry.attachment || '')"
-                        >
-                          <IconGlyph name="close" />
-                        </UiButton>
+                        <span v-if="coverPath === entry.attachment" class="task-panel__cover-badge">Cover</span>
+                        <span class="task-panel__gallery-actions">
+                          <UiButton
+                            v-if="
+                              canAttachFiles && coverPath !== entry.attachment && isImagePath(entry.attachment || '')
+                            "
+                            variant="ghost"
+                            icon-only
+                            type="button"
+                            class="task-panel__gallery-action"
+                            aria-label="Use as cover"
+                            title="Use as card cover"
+                            @click.prevent.stop="useAsCover(entry.attachment || '')"
+                          >
+                            <IconGlyph name="star" />
+                          </UiButton>
+                          <UiButton
+                            variant="ghost"
+                            icon-only
+                            type="button"
+                            class="task-panel__attachment-remove task-panel__gallery-action"
+                            aria-label="Remove attachment"
+                            title="Remove attachment"
+                            :disabled="attachmentsUploading || removingAttachmentPath === (entry.attachment || '')"
+                            @click.prevent.stop="deferredRemoval.remove(entry.attachment || '')"
+                          >
+                            <IconGlyph name="close" />
+                          </UiButton>
+                        </span>
                       </li>
                     </ul>
 
                     <ul v-if="fileAttachments.length" class="task-panel__attachments-list">
-                      <li v-for="entry in fileAttachments" :key="entry.attachment || ''" class="task-panel__attachment">
+                      <li
+                        v-for="entry in fileAttachments"
+                        :key="entry.attachment || ''"
+                        class="task-panel__attachment"
+                        :class="{ 'task-panel__attachment--drop': dropTarget === entry.attachment }"
+                        :draggable="canAttachFiles"
+                        @dragstart="onReorderDragStart($event, 'files', entry.attachment || '')"
+                        @dragover="onReorderDragOver($event, 'files', entry.attachment || '')"
+                        @dragleave="onReorderDragLeave(entry.attachment || '')"
+                        @drop="onReorderDrop($event, 'files', entry.attachment || '')"
+                        @dragend="onReorderDragEnd"
+                      >
                         <div class="task-panel__attachment-chip">
                           <a
                             class="task-panel__attachment-link"
                             :href="attachmentUrl(entry.attachment || '')"
                             target="_blank"
                             rel="noopener"
-                            :title="attachmentHoverTitle(entry.attachment || '')"
+                            :title="attachmentTooltip(entry.attachment || '')"
+                            @click="openViewer($event, entry.attachment || '')"
+                            @keydown="onReorderKey($event, 'files', entry.attachment || '')"
                           >
                             <AttachmentTile
                               :attachment="attachmentView(entry.attachment || '')"
@@ -225,13 +318,18 @@
                             aria-label="Remove attachment"
                             title="Remove attachment"
                             :disabled="attachmentsUploading || removingAttachmentPath === (entry.attachment || '')"
-                            @click.prevent.stop="removeAttachment(entry.attachment || '')"
+                            @click.prevent.stop="deferredRemoval.remove(entry.attachment || '')"
                           >
                             <IconGlyph name="close" />
                           </UiButton>
                         </div>
                       </li>
                     </ul>
+                    <AttachmentViewer
+                      v-model:open-index="viewerIndex"
+                      :attachments="viewerAttachments"
+                      :info="attachmentInfo"
+                    />
 
                     <div v-if="showLinksInAttachmentsPreference && (linkReferences.length || addingLinkReferences)">
                       <div class="task-panel__attachments-header">
@@ -658,6 +756,7 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type {
+  AttachmentInfo,
   ConfigInspectResult,
   SprintIntegrityDiagnostics,
   SyncRemoteConfig,
@@ -666,17 +765,21 @@ import type {
 } from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
 import {
+  pastedFiles,
   useTaskPanelAttachmentDrop,
   useTaskPanelAttachmentPreferences,
 } from '../composables/task-panel/useTaskPanelAttachmentDrop'
+import { useDeferredAttachmentRemoval } from '../composables/task-panel/useDeferredAttachmentRemoval'
 import { useTaskPanelReferenceMutations } from '../composables/task-panel/useTaskPanelReferenceMutations'
 import {
   attachmentDisplayName,
-  attachmentHoverTitle as buildAttachmentHoverTitle,
   attachmentUrl as buildAttachmentUrl,
+  attachmentKind,
   extractUrlsFromText,
-  isImageAttachment,
+  formatFileSize,
   linkDisplayName,
+  moveTo,
+  reorderSubset,
   taskAttachments,
 } from '../utils/taskAttachments'
 import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../utils/text'
@@ -685,6 +788,7 @@ import { setTaskPanelCommands } from '../composables/useTaskPanelController'
 import { recordRecentTask } from '../utils/recentTasks'
 import ChipListField from './ChipListField.vue'
 import AttachmentTile from './AttachmentTile.vue'
+import AttachmentViewer from './AttachmentViewer.vue'
 import IconGlyph from './IconGlyph.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import UiButton from './UiButton.vue'
@@ -1042,8 +1146,8 @@ const {
   addingLinkReferences,
   removingAttachmentPath,
   removingLinkUrl,
+  uploadProgress,
   applyReferencesFromTaskResponse,
-  removeAttachment,
   removeLinkReference,
 } = referenceMutations
 
@@ -1054,6 +1158,7 @@ const {
   onAttachmentsDragOver,
   onAttachmentsDragLeave,
   onAttachmentsDrop,
+  attachPickedFiles,
 } = useTaskPanelAttachmentDrop({
   task,
   mode,
@@ -1071,12 +1176,199 @@ function onReferencesUpdated(updated: TaskDTO) {
   emit('updated', updated)
 }
 
+// Files can be attached once the task exists and is not deleted.
+const canAttachFiles = computed(() => mode.value === 'edit' && !isDeleted.value && Boolean(task.id))
+const attachmentPicker = ref<HTMLInputElement | null>(null)
+function onAttachmentPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  void attachPickedFiles(files)
+}
+
 const attachmentUrl = (relPath: string) => buildAttachmentUrl(relPath, task.id)
-const attachmentHoverTitle = (relPath: string) => buildAttachmentHoverTitle(relPath, attachmentsDir?.value)
 // Images get a preview gallery; other files keep compact chips with a type tile.
-const imageAttachments = computed(() => attachments.value.filter((entry) => isImageAttachment(entry.attachment || '')))
-const fileAttachments = computed(() => attachments.value.filter((entry) => !isImageAttachment(entry.attachment || '')))
 const attachmentView = (relPath: string) => taskAttachments({ id: task.id, references: [{ attachment: relPath }] })[0]!
+const isImagePath = (relPath: string) => attachmentKind(relPath) === 'image'
+
+// Removing from the Attachments area hides the file at once and offers Undo;
+// the removal is sent when the toast expires, or right away when the panel
+// closes or switches task (DEV-216).
+const deferredRemoval = useDeferredAttachmentRemoval({
+  currentTaskId: () => task.id,
+  onRemoved: (updated) => onReferencesUpdated(updated),
+})
+watch(
+  () => [props.open, props.taskId],
+  () => deferredRemoval.flush(),
+)
+
+const visibleAttachments = computed(() =>
+  attachments.value.filter((entry) => !deferredRemoval.isPending(entry.attachment || '')),
+)
+// Pictures and videos get preview tiles; other files keep compact chips.
+const isVisual = (relPath: string) => ['image', 'video'].includes(attachmentKind(relPath))
+const galleryAttachments = computed(() => visibleAttachments.value.filter((entry) => isVisual(entry.attachment || '')))
+const fileAttachments = computed(() => visibleAttachments.value.filter((entry) => !isVisual(entry.attachment || '')))
+/** The first image is the card cover on boards and hover cards. */
+const coverPath = computed(
+  () => visibleAttachments.value.find((entry) => isImagePath(entry.attachment || ''))?.attachment ?? null,
+)
+
+// In-app viewer over everything shown, gallery first.
+const viewerIndex = ref<number | null>(null)
+const viewerPaths = computed(() =>
+  [...galleryAttachments.value, ...fileAttachments.value].map((entry) => entry.attachment || ''),
+)
+const viewerAttachments = computed(() => viewerPaths.value.map((path) => attachmentView(path)))
+function openViewer(event: MouseEvent, relPath: string) {
+  // Modified clicks keep the browser's own new-tab/download behaviour.
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+  event.preventDefault()
+  viewerIndex.value = Math.max(0, viewerPaths.value.indexOf(relPath))
+}
+watch(
+  () => [props.open, props.taskId],
+  () => {
+    viewerIndex.value = null
+  },
+)
+
+// Sizes and dimensions for tooltips and the viewer, fetched once per file.
+const attachmentInfo = ref<Record<string, AttachmentInfo>>({})
+watch(
+  () => attachments.value.map((entry) => entry.attachment || '').join('|'),
+  async () => {
+    const missing = attachments.value
+      .map((entry) => entry.attachment || '')
+      .filter((path) => path && !attachmentInfo.value[path])
+    if (!missing.length || !task.id) return
+    try {
+      const response = await api.attachmentInfo({
+        project: projectPrefixOfTaskId(task.id) || undefined,
+        attachments: missing,
+      })
+      const next = { ...attachmentInfo.value }
+      for (const item of response.items) next[item.attachment] = item
+      attachmentInfo.value = next
+    } catch {
+      // Tooltips just show the name.
+    }
+  },
+  { immediate: true },
+)
+function attachmentTooltip(relPath: string): string {
+  const parts = [attachmentDisplayName(relPath)]
+  const info = attachmentInfo.value[relPath]
+  if (info?.width && info.height) parts.push(`${info.width}×${info.height}`)
+  if (info) parts.push(formatFileSize(info.size))
+  return parts.join(' · ')
+}
+
+function uploadStateLabel(item: { state: string; fraction: number }): string {
+  if (item.state === 'done') return 'Done'
+  if (item.state === 'failed') return 'Failed'
+  if (item.state === 'waiting') return 'Waiting'
+  return `${Math.round(item.fraction * 100)}%`
+}
+
+// Reordering: drag tiles or chips, or Alt+Arrow on a focused one. Images and
+// files reorder within their own group; the first image is the cover.
+async function saveAttachmentOrder(order: string[]) {
+  const current = attachments.value.map((entry) => entry.attachment || '')
+  if (order.join('|') === current.join('|') || !task.id) return
+  const before = (task.references ?? []).map((reference) => ({ ...reference }))
+  // Show the new order right away; the server confirms it.
+  const queue = [...order]
+  task.references = (task.references ?? []).map((reference) =>
+    reference.attachment ? { ...reference, attachment: queue.shift() } : reference,
+  )
+  try {
+    onReferencesUpdated(await api.reorderTaskAttachments({ id: task.id, attachments: order }))
+  } catch (error) {
+    console.warn('Failed to reorder attachments', error)
+    task.references = before
+    showToast('Could not save the new attachment order')
+  }
+}
+function groupPaths(group: 'gallery' | 'files'): string[] {
+  return (group === 'gallery' ? galleryAttachments.value : fileAttachments.value).map((entry) => entry.attachment || '')
+}
+function moveWithinGroup(group: 'gallery' | 'files', path: string, index: number) {
+  const all = attachments.value.map((entry) => entry.attachment || '')
+  void saveAttachmentOrder(reorderSubset(all, moveTo(groupPaths(group), path, index)))
+}
+function useAsCover(path: string) {
+  moveWithinGroup('gallery', path, 0)
+}
+
+const REORDER_MIME = 'application/x-lotar-attachment'
+const dragging = ref<{ group: 'gallery' | 'files'; path: string } | null>(null)
+const dropTarget = ref<string | null>(null)
+function onReorderDragStart(event: DragEvent, group: 'gallery' | 'files', path: string) {
+  if (!canAttachFiles.value || !event.dataTransfer) return
+  // Drop the link/image data browsers add, so the panel's own drop zone does
+  // not mistake the drag for a file or link to attach.
+  event.dataTransfer.clearData()
+  event.dataTransfer.setData(REORDER_MIME, path)
+  event.dataTransfer.effectAllowed = 'move'
+  dragging.value = { group, path }
+}
+function onReorderDragOver(event: DragEvent, group: 'gallery' | 'files', path: string) {
+  if (dragging.value?.group !== group) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  dropTarget.value = path === dragging.value.path ? null : path
+}
+function onReorderDragLeave(path: string) {
+  if (dropTarget.value === path) dropTarget.value = null
+}
+function onReorderDrop(event: DragEvent, group: 'gallery' | 'files', path: string) {
+  const source = dragging.value
+  if (source?.group !== group) return
+  event.preventDefault()
+  event.stopPropagation()
+  dropTarget.value = null
+  dragging.value = null
+  if (source.path !== path) moveWithinGroup(group, source.path, groupPaths(group).indexOf(path))
+}
+function onReorderDragEnd() {
+  dragging.value = null
+  dropTarget.value = null
+}
+function onReorderKey(event: KeyboardEvent, group: 'gallery' | 'files', path: string) {
+  if (!event.altKey || !canAttachFiles.value) return
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  event.preventDefault()
+  const paths = groupPaths(group)
+  moveWithinGroup(group, path, paths.indexOf(path) + (event.key === 'ArrowLeft' ? -1 : 1))
+}
+
+// Pasting a screenshot into the description attaches it and links it inline.
+async function onDescriptionPaste(event: ClipboardEvent) {
+  const files = pastedFiles(event)
+  if (!files.length) return
+  event.preventDefault()
+  // The panel-wide paste handler would attach the same files again.
+  event.stopPropagation()
+  if (!canAttachFiles.value) {
+    showToast('Save the task before attaching files')
+    return
+  }
+  const textarea = event.target as HTMLTextAreaElement
+  const start = textarea.selectionStart ?? (form.description || '').length
+  const end = textarea.selectionEnd ?? start
+  const stored = await referenceMutations.uploadFiles(files)
+  if (!stored.length) return
+  const snippet = stored
+    .map((path) => `${isImagePath(path) ? '!' : ''}[${attachmentDisplayName(path)}](attachment:${path})`)
+    .join('\n')
+  const text = form.description || ''
+  form.description = text.slice(0, start) + snippet + text.slice(end)
+  onDescriptionInput()
+  // The editor may have closed while the upload ran; save in that case.
+  if (!editingDescription.value) onFieldBlur('description')
+}
 
 async function detectAndAttachLinksFromTaskText() {
   if (!autoDetectLinksPreference.value) return
@@ -2246,6 +2538,42 @@ textarea {
   color: var(--color-muted, var(--muted));
 }
 
+.task-panel__attachments-header {
+  align-items: center;
+  min-height: 28px;
+}
+
+.task-panel__attach-button.btn {
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.task-panel__attachments-empty {
+  margin: 0;
+  padding: 12px;
+  width: 100%;
+  border: 1px dashed var(--color-border, var(--border));
+  border-radius: var(--radius-md, 0.375rem);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-muted, var(--muted));
+  text-align: center;
+  cursor: pointer;
+}
+
+.task-panel__attachments-empty:hover,
+.task-panel__attachments-empty:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-fg, inherit);
+}
+
+.task-panel__attachments-browse {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
 .task-panel__attachments-list {
   list-style: none;
   padding: 0;
@@ -2329,12 +2657,11 @@ textarea {
   border-color: var(--color-accent);
 }
 
-.task-panel__gallery-image {
+.task-panel__gallery-preview {
   display: block;
-  width: 100%;
-  height: 110px;
-  object-fit: cover;
-  background: color-mix(in oklab, var(--color-muted) 10%, transparent);
+  height: 120px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--color-border, var(--border));
 }
 
 .task-panel__gallery-name {
@@ -2342,24 +2669,90 @@ textarea {
   font-size: var(--text-xs, 0.75rem);
 }
 
-.task-panel__gallery-remove.btn.icon-only {
+.task-panel__gallery-actions {
   position: absolute;
   top: 4px;
   right: 4px;
-  background: color-mix(in oklab, var(--color-bg) 85%, transparent);
+  display: flex;
+  gap: 4px;
   opacity: 0;
   transition: opacity 0.12s ease;
 }
 
-.task-panel__gallery-item:hover .task-panel__gallery-remove,
-.task-panel__gallery-remove:focus-visible {
+.task-panel__gallery-action.btn.icon-only {
+  background: color-mix(in oklab, var(--color-bg) 85%, transparent);
+}
+
+.task-panel__gallery-item:hover .task-panel__gallery-actions,
+.task-panel__gallery-item:focus-within .task-panel__gallery-actions {
   opacity: 1;
 }
 
 @media (hover: none) {
-  .task-panel__gallery-remove.btn.icon-only {
+  .task-panel__gallery-actions {
     opacity: 1;
   }
+}
+
+.task-panel__cover-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-fg);
+  background: color-mix(in oklab, var(--color-bg) 85%, transparent);
+  pointer-events: none;
+}
+
+.task-panel__gallery-item[draggable='true'] .task-panel__gallery-link {
+  cursor: grab;
+}
+
+.task-panel__gallery-item--drop .task-panel__gallery-link,
+.task-panel__attachment--drop .task-panel__attachment-chip {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.task-panel__upload-progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.task-panel__upload-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-panel__upload-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-panel__upload-bar {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--color-accent);
+}
+
+.task-panel__upload-state {
+  text-align: right;
+  color: var(--color-muted, var(--muted));
+}
+
+.task-panel__upload-row--failed .task-panel__upload-state {
+  color: var(--color-danger);
 }
 
 .task-panel__attachment-icon {

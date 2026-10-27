@@ -188,6 +188,32 @@ export interface AttachmentUploadResponse {
     stored_path: string
     attached: boolean
     task: TaskDTO
+    /** Camera, location and other personal metadata was removed (DEV-216). */
+    metadata_removed?: boolean
+    /** The upload worked, but something looks off (e.g. a fake image). */
+    warnings?: string[]
+}
+
+export interface AttachmentReorderRequest {
+    id: string
+    /** Every attachment of the task (stored names), once, in the new order. */
+    attachments: string[]
+}
+
+export interface AttachmentInfoRequest {
+    project?: string
+    attachments: string[]
+}
+
+export interface AttachmentInfo {
+    attachment: string
+    size: number
+    width?: number
+    height?: number
+}
+
+export interface AttachmentInfoResponse {
+    items: AttachmentInfo[]
 }
 
 export interface AttachmentRemoveRequest {
@@ -444,6 +470,8 @@ export interface TaskListFilter {
     recent?: string
     /** CSV of missing-field filters: `effort`, `due`. */
     needs?: string
+    /** CSV of reference kinds tasks must carry: `attachment`, `image`, `link`. */
+    has?: string
     /**
      * DEV-92 deletion visibility: `active` (default, server-side), `deleted`
      * (trash only), or `all`. Part of the canonical query key, so each

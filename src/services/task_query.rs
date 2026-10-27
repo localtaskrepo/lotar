@@ -87,6 +87,22 @@ pub enum NeedsFlag {
     Effort,
 }
 
+/// `has` smart filter: tasks carrying a kind of reference (DEV-216).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HasFlag {
+    /// Any managed attachment.
+    Attachment,
+    /// An image attachment (by extension).
+    Image,
+    /// A link reference.
+    Link,
+}
+
+/// Extensions treated as images by the `has:image` filter and the web UI.
+pub const IMAGE_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "bmp", "ico", "heic", "heif", "tif", "tiff",
+];
+
 /// Advertised `soon` window in days (docs/help + openapi vocabulary).
 pub const SOON_WINDOW_DAYS: i64 = 7;
 
@@ -97,6 +113,7 @@ pub struct TaskQueryOptions {
     pub due: Option<DueFilter>,
     pub recent: Option<RecentFilter>,
     pub needs: BTreeSet<NeedsFlag>,
+    pub has: BTreeSet<HasFlag>,
     /// The free-text search, used to order by relevance.
     pub search: Option<SearchQuery>,
 }
@@ -109,6 +126,7 @@ impl Default for TaskQueryOptions {
             due: None,
             recent: None,
             needs: BTreeSet::new(),
+            has: BTreeSet::new(),
             search: None,
         }
     }
@@ -224,6 +242,37 @@ pub fn parse_needs(raw: &str) -> Result<BTreeSet<NeedsFlag>, String> {
     Ok(out)
 }
 
+/// Strict `has` CSV parser: attachment, image or link.
+pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
+    if raw.trim().is_empty() {
+        return Err(
+            "Invalid has: must not be blank (omit the parameter or supply attachment, image, link)"
+                .to_string(),
+        );
+    }
+    let mut out = BTreeSet::new();
+    for token in raw.split(',') {
+        let flag = match token.trim().to_ascii_lowercase().as_str() {
+            "attachment" | "attachments" | "file" | "files" => HasFlag::Attachment,
+            "image" | "images" => HasFlag::Image,
+            "link" | "links" => HasFlag::Link,
+            "" => {
+                return Err(
+                    "Invalid has: empty entry (expected CSV of attachment, image, link)"
+                        .to_string(),
+                );
+            }
+            other => {
+                return Err(format!(
+                    "Invalid has entry: '{other}' (expected attachment, image or link)"
+                ));
+            }
+        };
+        out.insert(flag);
+    }
+    Ok(out)
+}
+
 /// Parse the REST query parts handled by the shared executor. Absent keys
 /// keep the defaults; present-but-invalid values error.
 pub fn parse_query_options(
@@ -246,6 +295,9 @@ pub fn parse_query_options(
     }
     if let Some(raw) = query.get("needs") {
         options.needs = parse_needs(raw)?;
+    }
+    if let Some(raw) = query.get("has") {
+        options.has = parse_has(raw)?;
     }
     options.search = query.get("q").map(|raw| SearchQuery::parse(raw));
     Ok(options)
@@ -510,13 +562,35 @@ fn task_matches_needs(task: &TaskDTO, needs: &BTreeSet<NeedsFlag>) -> bool {
     true
 }
 
-/// Apply the smart filters (`due`, `recent`, `needs`) in place.
+fn is_image_name(name: &str) -> bool {
+    name.rsplit_once('.').is_some_and(|(_, ext)| {
+        IMAGE_EXTENSIONS
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(ext))
+    })
+}
+
+fn task_matches_has(task: &TaskDTO, has: &BTreeSet<HasFlag>) -> bool {
+    has.iter().all(|flag| {
+        task.references.iter().any(|reference| match flag {
+            HasFlag::Attachment => reference.attachment.is_some(),
+            HasFlag::Image => reference.attachment.as_deref().is_some_and(is_image_name),
+            HasFlag::Link => reference.link.is_some(),
+        })
+    })
+}
+
+/// Apply the smart filters (`due`, `recent`, `needs`, `has`) in place.
 pub fn apply_smart_filters(
     tasks: &mut Vec<(String, TaskDTO)>,
     options: &TaskQueryOptions,
     now: DateTime<Utc>,
 ) {
-    if options.due.is_none() && options.recent.is_none() && options.needs.is_empty() {
+    if options.due.is_none()
+        && options.recent.is_none()
+        && options.needs.is_empty()
+        && options.has.is_empty()
+    {
         return;
     }
     let today = today_local(now);
@@ -529,6 +603,7 @@ pub fn apply_smart_filters(
                 .recent
                 .is_none_or(|_| task_matches_recent(task, cutoff))
             && task_matches_needs(task, &options.needs)
+            && task_matches_has(task, &options.has)
     });
 }
 
@@ -722,6 +797,11 @@ mod tests {
         let needs = parse_needs("effort,due").unwrap();
         assert!(needs.contains(&NeedsFlag::Effort) && needs.contains(&NeedsFlag::Due));
         assert!(parse_needs("effort,size").is_err());
+        let has = parse_has("image, link").unwrap();
+        assert!(has.contains(&HasFlag::Image) && has.contains(&HasFlag::Link));
+        assert!(
+            parse_has("").is_err() && parse_has("image,").is_err() && parse_has("pdf").is_err()
+        );
         assert!(parse_needs("effort,,due").is_err());
         assert!(
             parse_needs("").is_err(),

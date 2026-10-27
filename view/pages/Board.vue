@@ -224,7 +224,7 @@
                     data-board-card
                   >
                     <div v-if="cardCover(task)" class="task-cover" aria-hidden="true">
-                      <AttachmentTile :attachment="cardCover(task)!" cover />
+                      <AttachmentTile :attachment="cardCover(task)!" cover :cover-height="120" />
                     </div>
                     <header v-if="hasTaskHeader(task)" class="row task-header">
                       <template v-if="hasTaskIdentity(task)">
@@ -444,7 +444,7 @@
                 data-board-card
               >
                 <div v-if="cardCover(task)" class="task-cover" aria-hidden="true">
-                  <AttachmentTile :attachment="cardCover(task)!" cover />
+                  <AttachmentTile :attachment="cardCover(task)!" cover :cover-height="120" />
                 </div>
                 <header v-if="hasTaskHeader(task)" class="row task-header">
                   <template v-if="hasTaskIdentity(task)">
@@ -507,7 +507,7 @@ import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
 import AttachmentTile from '../components/AttachmentTile.vue'
-import { taskAttachments } from '../utils/taskAttachments'
+import { firstPreviewImage } from '../utils/taskAttachments'
 import BoardCardMeta from '../components/BoardCardMeta.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -1096,10 +1096,10 @@ const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
   attachments: true,
 }
 
-/** First image attachment of a card, when the Attachments field is shown. */
+/** First image attachment that loads, when the Attachments field is shown. */
 function cardCover(task: TaskDTO) {
   if (!boardFields.isVisible('attachments')) return null
-  return taskAttachments(task).find((attachment) => attachment.kind === 'image') ?? null
+  return firstPreviewImage(task)
 }
 
 const boardFields = useColumns({
@@ -1310,7 +1310,6 @@ onUnmounted(() => {
 }
 .task-cover {
   margin: -8px -8px 8px;
-  height: 120px;
   overflow: hidden;
   border-radius: var(--radius-base) var(--radius-base) 0 0;
   background: var(--color-surface);

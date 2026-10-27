@@ -248,6 +248,32 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     }
 
+    // Photos carry GPS position, device serials and capture times, and
+    // attachments end up in git: strip that before storing (DEV-216). Only
+    // container bytes change; pixels are never re-encoded.
+    let mut bytes = bytes;
+    let mut warnings: Vec<String> = Vec::new();
+    let extension = payload
+        .filename
+        .rsplit_once('.')
+        .map(|(_, ext)| ext.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    if crate::services::task_query::IMAGE_EXTENSIONS.contains(&extension.as_str())
+        && crate::services::attachment_metadata::sniff_image_format(&bytes).is_none()
+    {
+        warnings.push(format!(
+            "{} is named like an image but does not contain one; it was attached as is and will have no preview",
+            payload.filename.trim()
+        ));
+    }
+    let metadata_removed = match crate::services::attachment_metadata::strip_metadata(&bytes) {
+        Some(clean) => {
+            bytes = clean;
+            true
+        }
+        None => false,
+    };
+
     let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config)
     {
         // Store-root resolution failures are server-side (DEV-58).
@@ -345,12 +371,39 @@ pub(super) fn register(api_server: &mut ApiServer) {
             publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
             ok_json(
                 200,
-                json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached: outcome.changed, task: outcome.task }}),
+                json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached: outcome.changed, task: outcome.task, metadata_removed, warnings }}),
             )
         }
         Err(e) => map_lotar_error(e),
     }
 });
+
+    // POST /api/tasks/attachments/reorder {id, attachments: [stored names]}
+    // The first image becomes the card cover (DEV-216).
+    api_server.register_handler(
+        "POST",
+        "/api/tasks/attachments/reorder",
+        |req: &HttpRequest| {
+            let payload: crate::api_types::AttachmentReorderRequest =
+                try_response!(parse_body_or_empty(req));
+            if payload.id.trim().is_empty() {
+                return bad_request("Missing task id".into());
+            }
+            let resolver = try_response!(resolve_tasks_dir());
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+            match AttachmentService::reorder_attachments(
+                &mut storage,
+                payload.id.trim(),
+                &payload.attachments,
+            ) {
+                Ok(outcome) => {
+                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
+                    ok_json(200, json!({"data": outcome.task}))
+                }
+                Err(e) => map_lotar_error(e),
+            }
+        },
+    );
 
     // POST /api/tasks/attachments/remove
 

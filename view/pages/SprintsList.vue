@@ -875,6 +875,7 @@ const allColumns: ColumnKey[] = [
   'due_date',
   'created',
   'modified',
+  'attachments',
 ]
 
 const defaultColumns: ColumnKey[] = ['id', 'title', 'status', 'priority', 'assignee', 'due_date', 'modified']
@@ -1254,6 +1255,8 @@ function onSort(key: ColumnKey) {
 }
 
 function activateContainerHeader(key: ColumnKey, sprint: number | null) {
+  // Attachments are shown, not sorted.
+  if (!colKeyToSortBy(key)) return
   sortingSprint = sprint
   onHeaderActivate(key)
 }
@@ -1264,6 +1267,7 @@ function ariaSort(key: ColumnKey) {
 }
 
 function sortGlyph(key: ColumnKey) {
+  if (!colKeyToSortBy(key)) return ''
   if (sort.key !== key) return '⇅'
   return sort.dir === 'asc' ? '▲' : '▼'
 }

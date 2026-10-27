@@ -119,6 +119,7 @@ pub(super) const TASK_LIST_KNOWN_KEYS: &[&str] = &[
     "due",
     "recent",
     "needs",
+    "has",
     // RESERVED lifecycle property key (DEV-92): strict active|deleted|all
     // grammar, never interpreted as a custom-field filter.
     "deletion",

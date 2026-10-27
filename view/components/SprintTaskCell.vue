@@ -71,6 +71,13 @@
     <template v-else-if="col === 'modified'">
       <span :title="formatExact(task.modified)">{{ formatRelative(task.modified) }}</span>
     </template>
+    <template v-else-if="col === 'attachments'">
+      <span v-if="attachments.length" class="task-cell__attachments" :aria-label="`${attachments.length} attachments`">
+        <AttachmentTile v-for="item in attachments.slice(0, 3)" :key="item.path" :attachment="item" :size="24" />
+        <span v-if="attachments.length > 3" class="muted">+{{ attachments.length - 3 }}</span>
+      </span>
+      <span v-else class="muted">—</span>
+    </template>
     <template v-else>
       <span>{{ (task as any)[col] ?? '—' }}</span>
     </template>
@@ -83,6 +90,9 @@ import type { ColKey } from '../composables/useColumns'
 import { formatRelativeTime } from '../utils/date'
 import { formatMember } from '../utils/member'
 import { numericOf, projectOf } from '../utils/text'
+import { computed } from 'vue'
+import AttachmentTile from './AttachmentTile.vue'
+import { taskAttachments } from '../utils/taskAttachments'
 
 /**
  * One task cell shared by the sprint and backlog tables on the Sprints page.
@@ -90,7 +100,7 @@ import { numericOf, projectOf } from '../utils/text'
  * the backlog: it selects the multi-sprint tooltip wording and whether the
  * sprints column shows membership chips or a placeholder.
  */
-defineProps<{
+const props = defineProps<{
   task: TaskDTO
   col: ColKey
   contextSprintId: number | null
@@ -112,6 +122,8 @@ function formatDue(value?: string | null) {
   }
 }
 
+const attachments = computed(() => (props.col === 'attachments' ? taskAttachments(props.task) : []))
+
 const formatRelative = (value?: string | null) => formatRelativeTime(value, { empty: '—' })
 
 function formatExact(value?: string | null) {
@@ -125,6 +137,12 @@ function formatExact(value?: string | null) {
 </script>
 
 <style scoped>
+.task-cell__attachments {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .task-title {
   font-weight: 600;
 }

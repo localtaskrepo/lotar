@@ -122,6 +122,7 @@ impl AttachmentService {
         {
             Ok(mut file) => {
                 file.write_all(bytes)?;
+                crate::services::attachment_previews::forget_index(root);
                 Ok((filename, true))
             }
             Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok((filename, false)),
@@ -469,6 +470,78 @@ impl AttachmentService {
                 true
             },
         )
+    }
+
+    /// Put a task's managed attachments in a new order (the first image is
+    /// the card cover). `order` must list every attachment of the task
+    /// exactly once; links and other references keep their positions, and
+    /// attachments fill the slots attachments held before.
+    pub fn reorder_attachments(
+        storage: &mut Storage,
+        task_id: &str,
+        order: &[String],
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
+        let canonical = ReferenceService::parse_task_id(task_id)?.canonical();
+        crate::services::task_service::TaskService::ensure_local_task(storage, task_id)?;
+        let root_path = storage.root_path.clone();
+        let order: Vec<String> = order.iter().map(|name| name.trim().to_string()).collect();
+        let guard_id = canonical.clone();
+        let outcome = storage.mutate_task(&canonical, move |task| {
+            crate::services::task_service::TaskService::ensure_not_deleted(task, &guard_id)?;
+            let current: Vec<String> = task
+                .references
+                .iter()
+                .filter_map(|r| r.attachment.clone())
+                .collect();
+            let mut expected = current.clone();
+            expected.sort();
+            let mut requested = order.clone();
+            requested.sort();
+            if expected != requested {
+                return Err(LoTaRError::ValidationError(
+                    "Attachment order must list each of the task's attachments exactly once"
+                        .to_string(),
+                ));
+            }
+            if current == order {
+                return Ok(false);
+            }
+            let mut next = order.iter();
+            for reference in task.references.iter_mut() {
+                if reference.attachment.is_some() {
+                    reference.attachment = next.next().cloned();
+                }
+            }
+            let now = chrono::Utc::now().to_rfc3339();
+            task.history.push(crate::types::TaskChangeLogEntry {
+                at: now.clone(),
+                actor: crate::utils::identity::resolve_current_user(Some(root_path.as_path())),
+                changes: vec![crate::types::TaskChange {
+                    field: "attachments_reordered".into(),
+                    old: Some(current.join(", ")),
+                    new: Some(order.join(", ")),
+                }],
+            });
+            task.modified = now;
+            Ok(true)
+        })?;
+        let previous = outcome.previous().map(|before| {
+            crate::services::task_service::TaskService::dto_from_task(
+                storage,
+                &canonical,
+                before.clone(),
+            )
+        });
+        let task = crate::services::task_service::TaskService::dto_from_task(
+            storage,
+            &canonical,
+            outcome.after.clone(),
+        );
+        Ok(ReferenceMutationOutcome {
+            task,
+            changed: outcome.changed,
+            previous,
+        })
     }
 
     pub fn resolve_attachment_path(root: &Path, rel_path: &str) -> Result<PathBuf, String> {

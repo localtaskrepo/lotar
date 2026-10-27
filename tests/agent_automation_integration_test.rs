@@ -3589,8 +3589,19 @@ exit 0
         "HelpNeeded",
         6000
     ));
-    let task = TaskService::get(&storage, &created.id, None).unwrap();
-    assert!(task.comments.iter().any(|c| c.text.contains(&job.id)));
+    // The rule's comment can land just after its status change; wait for it.
+    let start = Instant::now();
+    let commented = loop {
+        let task = TaskService::get(&storage, &created.id, None).unwrap();
+        if task.comments.iter().any(|c| c.text.contains(&job.id)) {
+            break true;
+        }
+        if start.elapsed() > Duration::from_millis(6000) {
+            break false;
+        }
+        sleep(Duration::from_millis(50));
+    };
+    assert!(commented, "failure comment names the job");
 }
 
 /// DEV-202: a message sent to a running Claude job reaches the agent through

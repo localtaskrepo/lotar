@@ -1855,6 +1855,37 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     }
 
+    let has_raw: Option<String> = match req.params.get("has") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) => Some(s.clone()),
+        Some(Value::Array(items)) => {
+            let mut joined = Vec::with_capacity(items.len());
+            for item in items {
+                match item.as_str() {
+                    Some(text) => joined.push(text.trim().to_string()),
+                    None => {
+                        return err(req.id.clone(), -32602, "has entries must be strings", None);
+                    }
+                }
+            }
+            Some(joined.join(","))
+        }
+        Some(_) => {
+            return err(
+                req.id.clone(),
+                -32602,
+                "has must be a string or array of strings",
+                None,
+            );
+        }
+    };
+    if let Some(raw) = has_raw {
+        match crate::services::task_query::parse_has(&raw) {
+            Ok(has) => query_options.has = has,
+            Err(msg) => return query_parse_error(&req.id, msg),
+        }
+    }
+
     let storage = Storage::new(&resolver.path.clone());
     let mut tasks = TaskService::list(&storage, &filter);
     // Smart filters + deterministic global ordering (default modified desc,

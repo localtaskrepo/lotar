@@ -60,6 +60,50 @@ export interface TaskPanelAttachmentDropApi {
     onAttachmentsDragOver: (event: DragEvent) => void
     onAttachmentsDragLeave: (event: DragEvent) => void
     onAttachmentsDrop: (event: DragEvent) => Promise<void>
+    /** Attach files chosen with the file picker. */
+    attachPickedFiles: (files: File[]) => Promise<void>
+}
+
+const GENERIC_CLIPBOARD_NAME = /^(image|screenshot|clipboard)?\.(png|jpe?g|gif|webp|bmp)$/i
+
+function pad(value: number): string {
+    return String(value).padStart(2, '0')
+}
+
+/**
+ * Clipboard images arrive as "image.png"; give them a findable name like
+ * "pasted-2026-10-26-213005.png" (numbered when several arrive at once).
+ */
+export function namePastedFiles(files: File[], now = new Date()): File[] {
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+    const generic = files.filter((file) => !file.name || GENERIC_CLIPBOARD_NAME.test(file.name))
+    return files.map((file) => {
+        if (file.name && !GENERIC_CLIPBOARD_NAME.test(file.name)) return file
+        const extension = (file.name.split('.').pop() || file.type.split('/').pop() || 'png').toLowerCase()
+        const suffix = generic.length > 1 ? `-${generic.indexOf(file) + 1}` : ''
+        return new File([file], `pasted-${stamp}${suffix}.${extension === 'jpeg' ? 'jpg' : extension}`, {
+            type: file.type,
+            lastModified: file.lastModified,
+        })
+    })
+}
+
+function isTextEntry(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    return target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement
+}
+
+/**
+ * Files to attach from a paste. Pasting into a text field while the clipboard
+ * also holds text is a text paste (office apps copy text plus a picture of it).
+ */
+export function pastedFiles(event: ClipboardEvent): File[] {
+    const data = event.clipboardData
+    if (!data) return []
+    const files = Array.from(data.files ?? [])
+    if (!files.length) return []
+    if (isTextEntry(event.target) && Array.from(data.types ?? []).includes('text/plain')) return []
+    return namePastedFiles(files)
 }
 
 /**
@@ -154,6 +198,54 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
         }
     }
 
+    function canAttach(what: 'files' | 'links'): boolean {
+        if (options.isDeleted.value) {
+            showToast('Restore the task before attaching files or links')
+            return false
+        }
+        if (mode.value !== 'edit') {
+            showToast(
+                what === 'files' ? 'Save the task before attaching files' : 'Save the task before attaching links',
+            )
+            return false
+        }
+        return true
+    }
+
+    /** Upload now, or buffer until the loading task is ready. */
+    async function attachFiles(files: File[]) {
+        if (!files.length) return
+        if (!task.id) {
+            pendingDropFiles.value = [...pendingDropFiles.value, ...files]
+            pendingDropTaskId = options.targetTaskId() ?? null
+            showToast('Task is still loading — attachments will upload when it is ready')
+            return
+        }
+        await uploadDroppedFiles(files)
+    }
+
+    async function attachPickedFiles(files: File[]) {
+        if (attachmentsUploading.value || !canAttach('files')) return
+        await attachFiles(files)
+    }
+
+    function onDocumentPaste(event: ClipboardEvent) {
+        if (!options.isOpen() || !preferences.showAttachments.value) return
+        if (attachmentsUploading.value || addingLinkReferences.value) return
+        // Only pastes aimed at the panel (or at nothing in particular).
+        const target = event.target
+        const inPanel = target instanceof Element && target.closest('.task-panel') !== null
+        if (!inPanel && target !== document.body && target !== document.documentElement) return
+        const files = pastedFiles(event)
+        if (!files.length) return
+        event.preventDefault()
+        if (!canAttach('files')) return
+        void attachFiles(files)
+    }
+
+    onMounted(() => document.addEventListener('paste', onDocumentPaste))
+    onUnmounted(() => document.removeEventListener('paste', onDocumentPaste))
+
     async function onAttachmentsDrop(event: DragEvent) {
         if (Array.from(event.dataTransfer?.types ?? []).includes(relationshipMime)) return
         if (attachmentsUploading.value || addingLinkReferences.value) return
@@ -165,15 +257,7 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
         event.preventDefault()
         resetAttachmentsDragState()
 
-        if (options.isDeleted.value) {
-            showToast('Restore the task before attaching files or links')
-            return
-        }
-
-        if (mode.value !== 'edit') {
-            showToast(hasFiles ? 'Save the task before attaching files' : 'Save the task before attaching links')
-            return
-        }
+        if (!canAttach(hasFiles ? 'files' : 'links')) return
 
         if (!task.id) {
             // The panel is still initializing this task: `task.id` is assigned only
@@ -184,10 +268,7 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
             // the direct drop path where files take priority.
             if (hasFiles) {
                 const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
-                if (!files.length) return
-                pendingDropFiles.value = [...pendingDropFiles.value, ...files]
-                pendingDropTaskId = options.targetTaskId() ?? null
-                showToast('Task is still loading — attachments will upload when it is ready')
+                await attachFiles(files)
                 return
             }
             if (urls.length) {
@@ -249,5 +330,6 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
         onAttachmentsDragOver,
         onAttachmentsDragLeave,
         onAttachmentsDrop,
+        attachPickedFiles,
     }
 }

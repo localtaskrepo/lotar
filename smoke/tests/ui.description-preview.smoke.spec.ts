@@ -43,16 +43,17 @@ describe.concurrent('UI description preview toggle', () => {
                         expect(box.y + box.height - (button.y + button.height)).toBeLessThan(8);
                         // Below the last line of text (in the reserved padding).
                         expect(button.y).toBeGreaterThanOrEqual(box.y + box.height - paddingBottom - 1);
-                        // The toggle takes no layout space: Tags keeps the normal
-                        // fieldset gap below the description editor.
+                        // The toggle takes no layout space: the next section (the
+                        // attachments drop hint) keeps its normal distance below
+                        // the description editor.
                         const spacing = await page.evaluate(() => {
                             const description = document.querySelector('.task-panel__description')!;
-                            const tagsSection = document.querySelector('.task-panel__tags-section')!;
+                            const next = description.nextElementSibling!;
                             return {
-                                actual:
-                                    tagsSection.getBoundingClientRect().top -
-                                    description.getBoundingClientRect().bottom,
-                                gap: parseFloat(getComputedStyle(description.parentElement!).rowGap),
+                                actual: next.getBoundingClientRect().top - description.getBoundingClientRect().bottom,
+                                gap:
+                                    parseFloat(getComputedStyle(description.parentElement!).rowGap) +
+                                    parseFloat(getComputedStyle(next).marginTop),
                             };
                         });
                         expect(spacing.actual).toBeCloseTo(spacing.gap, 0);

@@ -1,3 +1,4 @@
+import { reactive } from 'vue'
 import { projectPrefixOfTaskId } from './text'
 
 // Pure helpers for managed attachments and link references shown in the task
@@ -214,7 +215,7 @@ export function fileToBase64(file: File): Promise<string> {
 export type AttachmentKind = 'image' | 'pdf' | 'video' | 'audio' | 'sheet' | 'archive' | 'text' | 'doc' | 'file'
 
 const KIND_EXTENSIONS: Record<Exclude<AttachmentKind, 'file'>, string[]> = {
-    image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp'],
+    image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico', 'heic', 'heif', 'tif', 'tiff'],
     pdf: ['pdf'],
     video: ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'],
     audio: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'],
@@ -271,4 +272,111 @@ export function taskAttachments(task: {
         })
     }
     return out
+}
+
+/**
+ * How an image preview fills its box:
+ * - `natural`: it already fits, so it is shown at its own size (no blurry upscaling).
+ * - `contain`: shown whole on a backdrop — vector art, transparent logos, and
+ *   images that cropping would cut by almost half (banners, square logos).
+ * - `top`: tall images (screenshots, documents) crop from the top, where the
+ *   content starts.
+ * - `cover`: everything else fills the box.
+ */
+export type ImageFit = 'cover' | 'top' | 'contain' | 'natural'
+
+interface Size {
+    width: number
+    height: number
+}
+
+const MAX_CROP = 0.45
+
+export function imageFit(
+    natural: Size,
+    box: Size,
+    options: { transparent?: boolean; vector?: boolean } = {},
+): ImageFit {
+    if (options.vector) return 'contain'
+    if (natural.width <= 0 || natural.height <= 0 || box.width <= 0 || box.height <= 0) return 'cover'
+    if (natural.width <= box.width && natural.height <= box.height) return 'natural'
+    if (options.transparent) return 'contain'
+    if (natural.height > natural.width * 1.2) return 'top'
+    const imageRatio = natural.width / natural.height
+    const boxRatio = box.width / box.height
+    const cropped = imageRatio > boxRatio ? 1 - boxRatio / imageRatio : 1 - imageRatio / boxRatio
+    return cropped > MAX_CROP ? 'contain' : 'cover'
+}
+
+// Image previews that failed to load this session. Attachment URLs are
+// content-addressed, so a broken one stays broken; views skip it and fall back
+// to the next image instead of showing an empty frame.
+const brokenPreviews = reactive(new Set<string>())
+
+export function markAttachmentPreviewBroken(url: string): void {
+    brokenPreviews.add(url)
+}
+
+export function isAttachmentPreviewBroken(url: string): boolean {
+    return brokenPreviews.has(url)
+}
+
+/** The first image attachment that can be previewed, for covers and hover cards. */
+export function firstPreviewImage(task: Parameters<typeof taskAttachments>[0]): TaskAttachmentView | null {
+    return taskAttachments(task).find((view) => view.kind === 'image' && !brokenPreviews.has(view.url)) ?? null
+}
+
+/** Preview widths the server renders (see `?w=` on attachment URLs). */
+const THUMBNAIL_WIDTHS = [96, 240, 480, 960, 1600]
+
+/**
+ * URL of a server-made preview at least `cssWidth` CSS pixels wide on this
+ * screen. Small previews of large photos are much lighter than the original;
+ * the server returns the original when it is already small.
+ */
+export function attachmentPreviewUrl(url: string, cssWidth: number): string {
+    const ratio =
+        typeof window !== 'undefined' && window.devicePixelRatio > 1 ? Math.min(window.devicePixelRatio, 2) : 1
+    const wanted = Math.ceil(cssWidth * ratio)
+    const width =
+        THUMBNAIL_WIDTHS.find((candidate) => candidate >= wanted) ?? THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1]!
+    if (!url.includes('/api/attachments/h/')) return url
+    return `${url}${url.includes('?') ? '&' : '?'}w=${width}`
+}
+
+/** TIFF only displays through a server-converted preview. */
+export function needsConvertedPreview(view: Pick<TaskAttachmentView, 'path'>): boolean {
+    const ext = attachmentExtension(view.path)
+    return ext === 'tif' || ext === 'tiff'
+}
+
+/**
+ * Apply a new order for some of the attachments (e.g. only the images) to
+ * the full list: the subset's slots keep their places, filled in the new
+ * order; everything else stays put.
+ */
+export function reorderSubset(all: string[], subsetInNewOrder: string[]): string[] {
+    const members = new Set(subsetInNewOrder)
+    const next = [...subsetInNewOrder]
+    return all.map((path) => (members.has(path) ? next.shift()! : path))
+}
+
+/** Move one entry of `list` to `index` (clamped). */
+export function moveTo<T>(list: T[], item: T, index: number): T[] {
+    const without = list.filter((entry) => entry !== item)
+    const clamped = Math.max(0, Math.min(index, without.length))
+    return [...without.slice(0, clamped), item, ...without.slice(clamped)]
+}
+
+/** "840 KB", "1.2 MB". */
+export function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    const units = ['KB', 'MB', 'GB']
+    let value = bytes / 1024
+    let unit = 0
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024
+        unit += 1
+    }
+    return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`
 }

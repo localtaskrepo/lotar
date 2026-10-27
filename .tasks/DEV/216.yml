@@ -1,0 +1,67 @@
+title: 'Polish image attachments: fit, safety, caching, attaching'
+status: Done
+priority: High
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-27T06:48:51.507607+00:00
+modified: 2026-10-27T16:27:18.048019+00:00
+comments:
+- date: 2026-10-27T06:48:56.923523+00:00
+  text: 'Plan: (1) Server: hash URLs get Cache-Control immutable + ETag/304; nosniff on all attachment responses; SVG gets a sandboxing CSP; add avif/bmp/ico/video/audio/csv/json content types; Rust tests + api docs. (2) Cover fit decided per image on load: small images at natural size (no upscale, pixelated when tiny), transparent or heavily-cropped images contained on a backdrop, tall screenshots top-anchored, photos cover. (3) Broken images are remembered; covers and hover previews skip to the next image or drop the cover; gallery shows a centred fallback. (4) Attach button + paste-to-attach (generic clipboard names become pasted-<timestamp>.png); the attachments area shows in edit mode with a drop/paste hint even when empty. (5) Gallery remove button visible on touch and keyboard focus. Unit + smoke coverage; DEV-215 thumbnails stay separate.'
+- date: 2026-10-27T07:05:19.431937+00:00
+  text: 'Done. Server: hash attachment URLs send Cache-Control private/immutable + the hash as ETag, If-None-Match returns 304; every attachment response sends nosniff; SVGs get a sandboxing CSP; avif/bmp/ico/video/audio/csv/json content types. Found and fixed on the way: the web server turned any status outside its short list (including 304) into 500; it now keeps the code, and a 304 carries no JSON content type or length. UI: covers fit per image (natural size for small images, contained for SVG/transparent/heavy-crop, top-anchored for tall screenshots) and board/hover covers shrink for small images and banners (min 56px); broken images are remembered and skipped, gallery shows ''No preview''; panel gallery uses the same tile; Attach button + clickable drop/paste hint; pasted screenshots become pasted-<timestamp>.png; gallery remove button shows on keyboard focus. Also fixed a flaky agent test (runner_reported_error_with_exit_zero_fails_the_job read the task before the rule''s comment landed). Verified: npm run lint, npm test (1753 Rust + 1245 UI), npm run smoke (354; ui.attachment-previews covers picker, paste, broken cover, cache/304 headers; ui.description-preview now measures against the next section), screenshots light/dark/390px with tiny, transparent, banner, SVG, corrupt and 3000px images. DEV-215 (server thumbnails) stays open.'
+- date: 2026-10-27T15:52:03.180739+00:00
+  text: 'Round 2 (developer asked for all 17 recommendations in this ticket; DEV-215 folded in). Constraint: every cache/index/thumbnail lives in memory only, with idle eviction for long-running servers. Plan: (1) strip GPS/EXIF/XMP/text metadata from JPEG/PNG/WebP uploads without re-encoding, keeping orientation and colour profiles; config attachments.strip_metadata (default on). (2) GET hash route ?w=96|240|480|960|1600 returns a cached in-memory thumbnail (JPEG/PNG), originals otherwise. (3) in-memory hash->path index, rescans on miss. (4) has:attachment|image|link filter (REST, MCP, UI grammar). (5) upload warns when an image extension holds non-image bytes. (6/7) reorder attachments endpoint; ''Use as cover'' moves an image first; drag to reorder. (8) per-file upload progress via XHR. (9) removal deferred behind an Undo toast, flushed on close. (10) attachment info endpoint (size, dimensions) for gallery tooltips. (11) pasting into the description attaches and inserts an attachment: image link rendered inline. (12) in-app viewer (images, video, audio, PDF, text) with prev/next and download. (13) TIFF previews via thumbnails; HEIC served as image/heic, labelled where the browser cannot show it. (14) video tiles show the first frame. (15) HEAD support. (16) RFC 5987 filenames. (17) check sprints list. Shared MemoryCache: byte budget + LRU + background sweep of entries idle > 1h.'
+- date: 2026-10-27T16:27:18.007077+00:00
+  text: 'Round 2 done. Server: in-memory MemoryCache (byte budget + LRU + background sweep of entries idle >1h) backs a hash->file index (rescans on miss, invalidated on upload), thumbnails (?w= snapped to 96/240/480/960/1600; JPEG or PNG when transparent; TIFF always converted; originals for small/SVG/AVIF/HEIC/animated GIF; decode limits + catch_unwind) and attachment info (POST /api/attachments/info). Uploads strip Exif/XMP/IPTC/comments from JPEG/PNG/WebP without re-encoding, keeping orientation and ICC (attachment_metadata.rs, written by a helper agent and reviewed), and warn when an image extension holds non-image bytes. New POST /api/tasks/attachments/reorder (attachments_reordered history). has=attachment|image|link filter on REST list/export, MCP task_list and the UI search. HEAD on API routes, single byte ranges (206/416) for media, RFC 5987 download names; status lines keep unknown codes. UI: viewer (images, TIFF via preview, video, audio, PDF, text; arrows/Esc; download/new tab), Use as cover + drag/Alt+Arrow reorder, Cover badge, per-file upload progress (XHR), Undo toast with deferred removal flushed on close/task switch/pagehide, size+dimension tooltips, video first-frame tiles, server previews sized per slot, description paste inserts attachment: links rendered inline, Attachments column available in Sprints tables. Metadata stripping is always on (no config switch). Verified: npm run lint, npm test (1788 Rust + 1259 UI), npm run smoke (355; one full run hit a load-related timeout in ui.backlog-order, which passed alone twice and in a full rerun), live checks against a scratch server (stripped JPEG comment, 240px preview 4.5KB vs 26KB, HEAD, 206, TIFF conversion) and screenshots of panel, viewer (desktop/390px), list has:image, board. Unrelated bug found: DEV-217 (history 500 in a repo without commits).'
+description: |-
+  Follow-up to DEV-204 after a verification round with edge-case images (tiny icon, transparent logo, 8:1 banner, SVG, corrupt PNG, 3000px photo).
+  Found:
+  - Board covers stretch tiny images (blurry), crop transparent logos, and a broken image leaves an empty box with a 9px PNG label.
+  - Attachments are served without cache headers, so every board render re-downloads every cover even though URLs are content-hashed.
+  - SVG attachments are served inline on the app origin with no CSP; opening a hostile SVG runs its script with API access.
+  - AVIF/video/audio/CSV go out as application/octet-stream.
+  - The UI has no way to attach a file except drag and drop, and no hint that drop works; pasting a screenshot does nothing.
+  - Gallery remove buttons only appear on hover, so touch users cannot remove images.
+history:
+- at: 2026-10-27T06:48:56.884173+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-10-27T06:48:56.923523+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T07:05:19.431937+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T07:05:19.462638+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-27T15:51:18.049205+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-27T15:52:03.180739+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T16:27:18.007077+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T16:27:18.048019+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

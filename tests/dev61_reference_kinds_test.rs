@@ -1398,3 +1398,80 @@ fn hash_prefix_route_downloads_blob_contract() {
         "prefix template must be visible in registered_routes"
     );
 }
+
+fn header<'a>(resp: &'a lotar::api_server::HttpResponse, name: &str) -> Option<&'a str> {
+    resp.headers
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
+}
+
+#[test]
+fn hash_route_is_cacheable_and_sandboxes_svg() {
+    // DEV-216: hash URLs are content-addressed, so browsers may keep them
+    // for good and revalidate with the hash as ETag; SVG documents opened
+    // directly must not run script on the app's origin.
+    let _fx = isolated_workspace();
+    let api = server();
+    let id = rest_create(&api, "TP", "Cache target");
+    let svg = br#"<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>"#;
+    let stored = upload(&api, &id, "diagram.svg", svg);
+    let hash = lotar::services::attachment_service::AttachmentService::extract_hash_tag(&stored)
+        .expect("stored leaf carries a hash tag");
+    let path = format!("/api/attachments/h/{hash}/diagram.svg");
+
+    let resp = api.handle_request(&mk_req("GET", &path, json!({})));
+    assert_eq!(resp.status, 200);
+    assert_eq!(header(&resp, "content-type"), Some("image/svg+xml"));
+    assert_eq!(header(&resp, "x-content-type-options"), Some("nosniff"));
+    assert_eq!(
+        header(&resp, "cache-control"),
+        Some("private, max-age=31536000, immutable")
+    );
+    let etag = header(&resp, "etag").expect("etag").to_string();
+    assert_eq!(etag, format!("\"{hash}\""));
+    let csp = header(&resp, "content-security-policy").expect("svg is sandboxed");
+    assert!(
+        csp.contains("sandbox") && csp.contains("default-src 'none'"),
+        "{csp}"
+    );
+
+    // A matching If-None-Match revalidates without a body.
+    let mut conditional = mk_req("GET", &path, json!({}));
+    conditional
+        .headers
+        .insert("if-none-match".to_string(), format!("W/{etag}"));
+    let resp = api.handle_request(&conditional);
+    assert_eq!(resp.status, 304);
+    assert!(resp.body.is_empty());
+    assert_eq!(header(&resp, "etag"), Some(etag.as_str()));
+
+    // Other files are not sandboxed but still refuse sniffing; types the
+    // browser can preview inline are declared.
+    let stored = upload(&api, &id, "clip.webm", b"webm-bytes");
+    let hash = lotar::services::attachment_service::AttachmentService::extract_hash_tag(&stored)
+        .expect("stored leaf carries a hash tag");
+    let resp = api.handle_request(&mk_req(
+        "GET",
+        &format!("/api/attachments/h/{hash}/clip.webm"),
+        json!({}),
+    ));
+    assert_eq!(header(&resp, "content-type"), Some("video/webm"));
+    assert_eq!(header(&resp, "x-content-type-options"), Some("nosniff"));
+    assert!(header(&resp, "content-security-policy").is_none());
+
+    // Active documents stay downloads-only bytes.
+    let stored = upload(&api, &id, "page.html", b"<script>alert(1)</script>");
+    let resp = api.handle_request(&mk_req_query(
+        "GET",
+        "/api/attachments/get",
+        &[("path", stored.as_str())],
+        json!({}),
+    ));
+    assert_eq!(resp.status, 200);
+    assert_eq!(
+        header(&resp, "content-type"),
+        Some("application/octet-stream")
+    );
+    assert_eq!(header(&resp, "x-content-type-options"), Some("nosniff"));
+}

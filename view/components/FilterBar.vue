@@ -504,6 +504,7 @@ const assignee = ref('')
 const dueDate = ref('')
 const recent = ref('')
 const needs = ref('')
+const has = ref('')
 const customFilters = ref<Record<string, string>>({})
 const searchErrors = ref<string[]>([])
 const filterId = useId()
@@ -532,6 +533,7 @@ const helpDescriptions: Record<string, string> = {
   due: 'today, soon, later or overdue.',
   recent: '7d: modified within the last seven days.',
   needs: 'effort or due: tasks missing those fields.',
+  has: 'attachment, image or link: tasks carrying one.',
   mine: 'true: tasks assigned to you.',
 }
 const filterHelp = computed(() => [
@@ -891,6 +893,7 @@ onMounted(async () => {
       dueDate.value = asText(saved.due)
       recent.value = asText(saved.recent)
       needs.value = asText(saved.needs)
+      has.value = asText(saved.has)
       deletion.value = normalizeDeletionValue(saved.deletion)
       // Sort persistence has a single owner: the page's per-project sort
       // storage (`lotar.tasks.sort::*`). Deliberately do NOT restore
@@ -979,6 +982,7 @@ watch(
       dueDate.value = value.due || ''
       recent.value = value.recent || ''
       needs.value = value.needs || ''
+      has.value = value.has || ''
       deletion.value = normalizeDeletionValue(value.deletion)
       const o = value.order
       order.value = o === 'asc' || o === 'desc' ? o : order.value
@@ -1278,6 +1282,9 @@ function applyGrammarFilters(filters: Record<string, string>, replaceKeys: strin
       case 'needs':
         needs.value = csvValue(key, needs.value, value)
         break
+      case 'has':
+        has.value = csvValue(key, has.value, value)
+        break
       case 'mine':
         if (value === 'true') assignee.value = '@me'
         break
@@ -1331,6 +1338,7 @@ const structuredFilterValue = computed<Record<string, string>>(() => {
   if (dueDate.value) v.due = dueDate.value
   if (recent.value) v.recent = recent.value
   if (needs.value) v.needs = needs.value
+  if (has.value) v.has = has.value
   return v
 })
 
@@ -1361,6 +1369,7 @@ const hasConditions = computed(
       dueDate.value ||
       recent.value ||
       needs.value ||
+      has.value ||
       deletion.value !== 'active' ||
       Object.keys(customFilters.value).length
     ),
@@ -1388,6 +1397,9 @@ function removeChip(chip: FilterChip) {
       break
     case 'needs':
       needs.value = removeCsvValue(needs.value, chip.value)
+      break
+    case 'has':
+      has.value = removeCsvValue(has.value, chip.value)
       break
     case 'assignee':
       assignee.value = ''
@@ -1425,6 +1437,7 @@ const smartChipsValue = computed<Record<string, string>>(() => ({
   ...(dueDate.value ? { due: dueDate.value } : {}),
   ...(recent.value ? { recent: recent.value } : {}),
   ...(needs.value ? { needs: needs.value } : {}),
+  ...(has.value ? { has: has.value } : {}),
 }))
 
 function onSmartChipsUpdate(next: Record<string, string>) {
@@ -1436,6 +1449,7 @@ function onSmartChipsUpdate(next: Record<string, string>) {
   dueDate.value = next.due || ''
   recent.value = next.recent || ''
   needs.value = next.needs || ''
+  has.value = next.has || ''
 }
 
 function emitFilter(synchronousTask = false) {
@@ -1452,6 +1466,7 @@ function emitFilter(synchronousTask = false) {
   if (dueDate.value) v.due = dueDate.value
   if (recent.value) v.recent = recent.value
   if (needs.value) v.needs = needs.value
+  if (has.value) v.has = has.value
   if (deletion.value !== 'active') v.deletion = deletion.value
   v.order = order.value
   if (sortBy.value) {
@@ -1485,6 +1500,7 @@ function onClear(keepScope = false) {
   dueDate.value = ''
   recent.value = ''
   needs.value = ''
+  has.value = ''
   if (!keepScope) {
     order.value = 'desc'
     sortBy.value = ''
@@ -1520,6 +1536,7 @@ watch(
     dueDate,
     recent,
     needs,
+    has,
     deletion,
   ],
   () => {

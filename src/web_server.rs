@@ -325,8 +325,11 @@ fn handle_connection(
             return;
         }
 
+        // HEAD answers like GET without the body (link checkers, download
+        // managers and caches probe attachments this way).
+        let head = method.eq_ignore_ascii_case("HEAD");
         let req = HttpRequest {
-            method,
+            method: if head { "GET".to_string() } else { method },
             path: path.clone(),
             query,
             headers,
@@ -339,10 +342,14 @@ fn handle_connection(
         ));
         resp.headers
             .push(("Access-Control-Allow-Headers".into(), "Content-Type".into()));
-        if !resp
-            .headers
-            .iter()
-            .any(|(k, _)| k.eq_ignore_ascii_case("Content-Type"))
+        // A 304 has no body, and browsers may copy its headers onto the
+        // cached response, so it must not claim a JSON body.
+        let not_modified = resp.status == 304;
+        if !not_modified
+            && !resp
+                .headers
+                .iter()
+                .any(|(k, _)| k.eq_ignore_ascii_case("Content-Type"))
         {
             resp.headers
                 .push(("Content-Type".into(), "application/json".into()));
@@ -360,25 +367,22 @@ fn handle_connection(
             .iter()
             .map(|(k, v)| format!("{}: {}\r\n", k, v))
             .collect::<String>();
-        let status_line = match resp.status {
-            200 => "200 OK",
-            201 => "201 Created",
-            204 => "204 No Content",
-            400 => "400 Bad Request",
-            403 => "403 Forbidden",
-            404 => "404 Not Found",
-            413 => "413 Content Too Large",
-            500 => "500 Internal Server Error",
-            _ => "500 Internal Server Error",
+        let content_length = if not_modified {
+            String::new()
+        } else {
+            format!("Content-Length: {}\r\n", resp.body.len())
         };
         let response = format!(
-            "HTTP/1.1 {}\r\n{}Content-Length: {}\r\n\r\n",
-            status_line,
+            "HTTP/1.1 {} {}\r\n{}{}\r\n",
+            resp.status,
+            reason_phrase(resp.status),
             headers_str,
-            resp.body.len()
+            content_length
         );
         let _ = stream.write_all(response.as_bytes());
-        let _ = stream.write_all(&resp.body);
+        if !head {
+            let _ = stream.write_all(&resp.body);
+        }
         let _ = stream.flush();
     } else {
         let request_path = if path == "/" { "/index.html" } else { &path };
@@ -406,6 +410,25 @@ fn handle_connection(
             let _ = stream.write_all(response.as_bytes());
             let _ = stream.flush();
         }
+    }
+}
+
+/// Reason phrase for an API status line; unknown codes keep their number.
+fn reason_phrase(status: u16) -> &'static str {
+    match status {
+        200 => "OK",
+        201 => "Created",
+        204 => "No Content",
+        206 => "Partial Content",
+        304 => "Not Modified",
+        400 => "Bad Request",
+        403 => "Forbidden",
+        404 => "Not Found",
+        409 => "Conflict",
+        413 => "Content Too Large",
+        416 => "Range Not Satisfiable",
+        500 => "Internal Server Error",
+        _ => "",
     }
 }
 
@@ -1065,7 +1088,15 @@ fn start_tasks_watcher() {
 
 #[cfg(test)]
 mod tests {
-    use super::content_type_for;
+    use super::{content_type_for, reason_phrase};
+
+    #[test]
+    fn status_lines_keep_their_code() {
+        // DEV-216: codes without a listed phrase used to go out as 500.
+        assert_eq!(reason_phrase(304), "Not Modified");
+        assert_eq!(reason_phrase(409), "Conflict");
+        assert_eq!(reason_phrase(418), "");
+    }
 
     #[test]
     fn text_assets_keep_their_documented_mime_types() {

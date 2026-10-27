@@ -613,6 +613,14 @@
               ]
             },
             "description": "Smart filter CSV: keep tasks missing the listed fields (strict vocabulary: effort, due). Multiple entries are ANDed. Blank explicit values and invalid entries return 400."
+          },
+          {
+            "name": "has",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Smart filter CSV: keep tasks carrying every listed kind of reference (attachment, image, link; plurals accepted). Blank explicit values and invalid entries return 400."
           }
         ],
         "responses": {
@@ -2938,6 +2946,14 @@
               "type": "string"
             },
             "description": "Smart filter CSV: tasks missing the listed fields (effort, due). Blank explicit values and invalid entries return 400."
+          },
+          {
+            "name": "has",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Smart filter CSV: keep tasks carrying every listed kind of reference (attachment, image, link; plurals accepted). Blank explicit values and invalid entries return 400."
           }
         ]
       }
@@ -3376,10 +3392,81 @@
         }
       }
     },
+    "/api/attachments/info": {
+      "post": {
+        "summary": "Size and dimensions of attachments",
+        "description": "File size and, for raster images, pixel dimensions read from the image header. Results are cached in memory only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentInfoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Info for each attachment found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAttachmentInfoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/attachments/reorder": {
+      "post": {
+        "summary": "Reorder a task's attachments",
+        "description": "Puts the task's managed attachments in the given order; the first image is the card cover in the web UI. Records an attachments_reordered history entry and emits task_updated when the order changed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentReorderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task after reordering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTask"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/attachments/h/{hash}/{filename}": {
       "get": {
         "summary": "Fetch a managed attachment by content hash",
-        "description": "Streams a managed attachment blob looked up by its 32-hex content-hash tag, primarily for browser Save-Link-As ergonomics. The trailing filename is cosmetic; the hash selects the blob. Honors the project's configured attachments store via the project query parameter.",
+        "description": "Streams a managed attachment blob looked up by its 32-hex content-hash tag, primarily for browser Save-Link-As ergonomics and UI previews. The trailing filename is cosmetic; the hash selects the blob. Honors the project's configured attachments store via the project query parameter. Responses are content-addressed: they carry Cache-Control: private, max-age=31536000, immutable and the hash as ETag, and a matching If-None-Match returns 304. All attachment responses send X-Content-Type-Options: nosniff; SVG files also get a sandboxing Content-Security-Policy so they cannot run script when opened directly; HTML and other active documents are served as application/octet-stream. Content-Disposition carries an ASCII filename plus an RFC 5987 filename* with the exact UTF-8 name. HEAD requests are answered like GET without a body. A single byte range (Range: bytes=...) on an original file returns 206 with Content-Range (416 when unsatisfiable), so browsers can stream and seek video and audio.",
         "parameters": [
           {
             "name": "hash",
@@ -3420,6 +3507,16 @@
               ]
             },
             "description": "When 1/true, Content-Disposition forces a download instead of inline display."
+          },
+          {
+            "name": "w",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Preview width in pixels; snaps up to 96, 240, 480, 960 or 1600. Large JPEG/PNG/WebP/BMP/ICO/GIF images come back downscaled (JPEG, or PNG when transparent); TIFF is always converted. Images that already fit, SVG, AVIF, HEIC and non-images return the original. Thumbnails are generated on demand and kept in memory only; their ETag is \"<hash>-w<width>\"."
           }
         ],
         "responses": {
@@ -3433,6 +3530,12 @@
                 }
               }
             }
+          },
+          "206": {
+            "description": "Partial Content - the requested byte range"
+          },
+          "304": {
+            "description": "Not Modified - the If-None-Match ETag matches the content hash"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -4474,6 +4577,17 @@
           },
           "task": {
             "$ref": "#/components/schemas/TaskDTO"
+          },
+          "metadata_removed": {
+            "type": "boolean",
+            "description": "Present and true when camera, location and other personal metadata (Exif, XMP, IPTC, PNG text chunks) was removed from a JPEG, PNG or WebP image before storing. Pixels are never re-encoded; orientation and colour profiles are kept."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Present when the upload succeeded but something looks wrong, e.g. an image extension on a file that does not contain an image."
           }
         },
         "required": [
@@ -4481,6 +4595,84 @@
           "attached",
           "task"
         ]
+      },
+      "AttachmentReorderRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every managed attachment (stored name) of the task, exactly once, in the new order. Links and other references keep their positions."
+          }
+        },
+        "required": ["id", "attachments"]
+      },
+      "AttachmentInfoRequest": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Project prefix for per-project attachments.dir configuration."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "description": "Stored attachment names."
+          }
+        },
+        "required": ["attachments"]
+      },
+      "AttachmentInfo": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "File size in bytes."
+          },
+          "width": {
+            "type": "integer",
+            "description": "Pixel width, for raster images."
+          },
+          "height": {
+            "type": "integer",
+            "description": "Pixel height, for raster images."
+          }
+        },
+        "required": ["attachment", "size"]
+      },
+      "AttachmentInfoResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentInfo"
+            },
+            "description": "One entry per requested attachment that exists; unknown names are left out."
+          }
+        },
+        "required": ["items"]
+      },
+      "EnvelopeAttachmentInfoResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AttachmentInfoResponse"
+          }
+        },
+        "required": ["data"]
       },
       "AttachmentRemoveRequest": {
         "type": "object",
