@@ -1,3 +1,4 @@
+import { formatProjectLabel } from '../utils/projectLabels'
 import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
@@ -515,12 +516,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     }
 
     function projectLabel(project: { prefix: string; name?: string | null }) {
-        const prefix = project?.prefix || ''
-        const name = (project?.name || '').trim()
-        if (name && name !== prefix) {
-            return `${name} (${prefix})`
-        }
-        return prefix
+        return formatProjectLabel(project)
     }
 
     function closePanel() {

@@ -291,7 +291,7 @@
         <p class="muted">This remote is inherited from the Global config. Choose where your changes apply:</p>
         <div class="sync-remote-dialog__choice-buttons">
           <UiButton type="button" variant="primary" @click="chooseDialogTarget('override-project')">
-            Override in project {{ project }}
+            Override in project {{ projectName(project) }}
           </UiButton>
           <UiButton type="button" @click="chooseDialogTarget('inherit-global')">Edit in Global scope</UiButton>
         </div>
@@ -437,6 +437,7 @@
 </template>
 
 <script setup lang="ts">
+import { useProjectNames } from '../composables/useProjectNames'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import { stringify as stringifyYaml } from 'yaml'
@@ -483,6 +484,7 @@ import {
   type RemoteFormState,
 } from '../utils/syncRemotes'
 
+const { projectName } = useProjectNames()
 const { projects, project } = useConfigScope()
 const { openTaskPanel } = useTaskPanelController()
 
@@ -1566,17 +1568,19 @@ async function verifyDefaultProjectRemote(
       const overrideYaml = stringifyYaml(remoteDefFromForm(overrideRemote)).trim()
       if (overrideYaml !== displayedYaml) {
         showToast(
-          `Remote '${remoteName}' is overridden in default project ${defaultProject}, so a Global run would execute that override. Switch to ${defaultProject} to run it, or align the definitions.`,
+          `Remote '${remoteName}' is overridden in default project ${projectName(defaultProject)}, so a Global run would execute that override. Switch to ${projectName(defaultProject)} to run it, or align the definitions.`,
         )
         return false
       }
     }
-    showToast(`${actionLabelNow} runs through default project ${defaultProject}; its effective config applies.`)
+    showToast(
+      `${actionLabelNow} runs through default project ${projectName(defaultProject)}; its effective config applies.`,
+    )
     return true
   } catch (err: any) {
     if (alive && scope.value === originScope) {
       showToast(
-        `Cannot verify remote '${remoteName}' against default project ${defaultProject}: ${err?.message || 'inspection failed'}. ${actionLabelNow} was blocked.`,
+        `Cannot verify remote '${remoteName}' against default project ${projectName(defaultProject)}: ${err?.message || 'inspection failed'}. ${actionLabelNow} was blocked.`,
       )
     }
     return false

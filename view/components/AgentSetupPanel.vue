@@ -30,7 +30,7 @@
       <label class="field">
         <span class="field-label">Add to</span>
         <select id="agent-setup-scope" v-model="scope" class="input">
-          <option v-if="project" value="project">Project {{ project }}</option>
+          <option v-if="project" value="project">Project {{ projectName(project) }}</option>
           <option value="global">All projects</option>
         </select>
       </label>
@@ -60,11 +60,13 @@
 </template>
 
 <script setup lang="ts">
+import { useProjectNames } from '../composables/useProjectNames'
 import { computed, ref, watch } from 'vue'
 import { api } from '../api/client'
 import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
 
+const { projectName } = useProjectNames()
 const props = defineProps<{ installed: string[]; project?: string | null }>()
 const emit = defineEmits<{ added: [name: string] }>()
 

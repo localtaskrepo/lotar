@@ -521,7 +521,7 @@ describe('Full-scope dependency validation and safe repair', () => {
         await flushPromises()
         expect(mocks.check).toHaveBeenCalledExactlyOnceWith('DEV')
         expect(wrapper.text()).toContain('Validation is partial')
-        expect(wrapper.text()).toContain('all tasks in project DEV')
+        expect(wrapper.text()).toContain('all tasks in project Development')
         expect(wrapper.text()).toContain('validation is incomplete')
     })
 

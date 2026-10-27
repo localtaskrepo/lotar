@@ -97,6 +97,16 @@ const emit = defineEmits<{ (e: 'clear'): void; (e: 'reload'): void }>()
   margin: 0;
 }
 
+/* "— Project name" after a page title (DEV-184). A long name moves to its
+   own line and ends in an ellipsis rather than pushing the controls away. */
+.app-page-header__title :slotted(.app-page-header__project) {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-page-header__controls,
 .app-page-header__toolbar {
   display: flex;

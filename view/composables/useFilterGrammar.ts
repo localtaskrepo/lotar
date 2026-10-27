@@ -830,7 +830,9 @@ export function chipsForFilterValue(value: Record<string, string>, source: Filte
         const meta = GRAMMAR_KEYS.find((m) => m.key === key)
         const label = meta?.label ?? key
         if (key === 'project') {
-            chips.push({ key, label: 'Project', value: raw, display: raw })
+            // Show the project's name, not its prefix (DEV-184).
+            const name = (source.projects ?? []).find((project) => project.prefix === raw)?.name?.trim()
+            chips.push({ key, label: 'Project', value: raw, display: name || raw })
             continue
         }
         if (key === 'mine' && raw === 'true') {

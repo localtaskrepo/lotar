@@ -15,12 +15,13 @@ function truncateName(name: string, maxLength: number): string {
 }
 
 export function formatProjectLabel(
-    project: Pick<ProjectDTO, 'name' | 'prefix'>,
+    project: { prefix: ProjectDTO['prefix']; name?: string | null },
     maxLength = PROJECT_LABEL_MAX_LENGTH,
 ): string {
     const normalizedName = (project.name ?? '').trim()
     const normalizedPrefix = (project.prefix ?? '').trim()
-    const hasName = normalizedName.length > 0
+    // A project named after its prefix shows once, not as "DEV (DEV)".
+    const hasName = normalizedName.length > 0 && normalizedName !== normalizedPrefix
 
     const baseSource = hasName ? normalizedName : normalizedPrefix || 'Project'
     const base = truncateName(baseSource, maxLength)

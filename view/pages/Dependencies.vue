@@ -10,7 +10,9 @@
     >
       <template #title>
         Dependencies
-        <span v-if="scope.project" class="muted">— {{ scope.project }}</span>
+        <span v-if="scope.project" class="muted app-page-header__project" :title="projectLabel(scope.project)"
+          >— {{ projectName(scope.project) }}</span
+        >
       </template>
       <template #subtitle>Explore prerequisites, dependents, and connected tasks.</template>
       <template #view>
@@ -81,7 +83,7 @@
           </label>
           <UiButton
             :disabled="busy"
-            :title="`Validate all relationships in ${scope.project ? `project ${scope.project}` : 'the workspace'}, not only this graph`"
+            :title="`Validate all relationships in ${scope.project ? `project ${projectName(scope.project)}` : 'the workspace'}, not only this graph`"
             @click="checkIssues"
             >{{ scope.project ? 'Validate project' : 'Validate workspace' }}</UiButton
           >
@@ -152,7 +154,8 @@
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <p v-if="check" class="muted">
-        Validation covers {{ scope.project ? `all tasks in project ${scope.project}` : 'all tasks in the workspace' }},
+        Validation covers
+        {{ scope.project ? `all tasks in project ${projectName(scope.project)}` : 'all tasks in the workspace' }},
         independent of the task, depth, relationship choices, or search filters.
       </p>
       <p v-if="check && !check.complete" role="alert">
@@ -180,7 +183,7 @@
           >. Only this problem is included; unrelated safe fixes will not be applied.
         </p>
         <p v-else>
-          Scope: <strong>{{ scope.project ? `project ${scope.project}` : 'the entire workspace' }}</strong
+          Scope: <strong>{{ scope.project ? `project ${projectName(scope.project)}` : 'the entire workspace' }}</strong
           >, not just this graph neighborhood. Nothing changes until you confirm.
         </p>
         <p v-if="preview.changed_tasks.length">
@@ -228,6 +231,7 @@
 </template>
 
 <script setup lang="ts">
+import { useProjectNames } from '../composables/useProjectNames'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
@@ -252,6 +256,7 @@ import { useFilterOptions } from '../composables/useFilterOptions'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
 
+const { projectName, projectLabel } = useProjectNames()
 const route = useRoute(),
   router = useRouter()
 const pendingQuery = ref<LocationQueryRaw | null>(null)
@@ -546,7 +551,7 @@ function checkIssues() {
     const result = await api.relationshipCheck(project)
     if (alive && request === generation) {
       check.value = result
-      const label = project ? `project ${project}` : 'the workspace'
+      const label = project ? `project ${projectName(project)}` : 'the workspace'
       notice.value = result.issues.length
         ? `${result.issues.length} issues reported for ${label}.`
         : result.complete

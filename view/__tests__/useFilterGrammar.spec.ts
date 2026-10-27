@@ -780,6 +780,14 @@ describe('chipsForFilterValue', () => {
         expect(chips).toEqual([{ key: 'project', label: 'Project', value: 'DEV', display: 'DEV' }])
     })
 
+    it('shows the project name on the project chip (DEV-184)', () => {
+        const named = { ...source, projects: [{ prefix: 'PLAT', name: 'Platform Engineering' }] }
+        expect(chipsForFilterValue({ project: 'PLAT' }, named)[0]).toMatchObject({
+            value: 'PLAT',
+            display: 'Platform Engineering',
+        })
+    })
+
     it('splits needs filters into one chip per entry', () => {
         const chips = chipsForFilterValue({ needs: 'effort,review' }, source)
         expect(chips.map((c) => c.label)).toEqual(['Needs effort', 'Needs review'])

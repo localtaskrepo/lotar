@@ -10,7 +10,9 @@
     >
       <template #title>
         Boards
-        <span v-if="project" class="muted">— {{ project }}</span>
+        <span v-if="project" class="muted app-page-header__project" :title="projectLabel(project)"
+          >— {{ projectName(project) }}</span
+        >
       </template>
       <template #view>
         <UiButton
@@ -156,7 +158,7 @@
                 }}
               </option>
               <option v-for="item in projects" :key="item.prefix" :value="item.prefix">
-                {{ item.name && item.name !== item.prefix ? `${item.name} (${item.prefix})` : item.prefix }}
+                {{ formatProjectLabel(item) }}
               </option>
             </UiSelect>
           </div>
@@ -500,6 +502,8 @@
 </template>
 
 <script setup lang="ts">
+import { useProjectNames } from '../composables/useProjectNames'
+import { formatProjectLabel } from '../utils/projectLabels'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -543,6 +547,7 @@ import { memberColor, memberInitials } from '../utils/member'
 import { statusEnteredAt } from '../utils/taskHistory'
 import { useListKeyNavigation } from '../composables/useListKeyNavigation'
 
+const { projectName, projectLabel } = useProjectNames()
 const route = useRoute()
 // DEV-198: j / k move through the cards; Enter opens the focused one.
 useListKeyNavigation('[data-board-card]')

@@ -198,6 +198,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { AutomationSimulateResponse, ConfigInspectResult, ProjectDTO } from '../api/types'
+import { formatProjectLabel } from '../utils/projectLabels'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
@@ -340,14 +341,6 @@ async function runSimulation() {
   } finally {
     simulating.value = false
   }
-}
-
-function formatProjectLabel(project: ProjectDTO): string {
-  const name = project.name?.trim()
-  if (name && name !== project.prefix) {
-    return `${name} (${project.prefix})`
-  }
-  return project.prefix
 }
 
 onMounted(() => {

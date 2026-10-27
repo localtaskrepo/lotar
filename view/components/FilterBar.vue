@@ -162,7 +162,7 @@
     >
       <span v-for="chip in activeChips" :key="`${chip.key}-${chip.value}`" class="filter-bar__chip">
         <span class="filter-bar__chip-label">{{ chip.label }}</span>
-        <span v-if="chip.display" class="filter-bar__chip-value">{{ chip.display }}</span>
+        <span v-if="chip.display" class="filter-bar__chip-value" :title="chip.display">{{ chip.display }}</span>
         <button
           type="button"
           class="filter-bar__chip-remove"
@@ -1804,6 +1804,12 @@ defineExpose({ appendCustomFilter, clear: onClear })
 
 .filter-bar__chip-value {
   font-weight: 600;
+  /* Long values such as project names end in an ellipsis (DEV-184). */
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .filter-bar__chip-remove {

@@ -10,7 +10,9 @@
     >
       <template #title>
         Insights
-        <span v-if="project" class="muted">— {{ project }}</span>
+        <span v-if="project" class="muted app-page-header__project" :title="projectLabel(project)"
+          >— {{ projectName(project) }}</span
+        >
       </template>
       <template #subtitle>{{ subtitle }}</template>
     </PageHeader>
@@ -124,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import { useProjectNames } from '../composables/useProjectNames'
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
@@ -151,6 +154,7 @@ defineOptions({ name: 'ProjectInsights' })
 
 type LensKey = 'overview' | 'delivery' | 'team' | 'planning' | 'quality' | 'mine'
 
+const { projectName, projectLabel } = useProjectNames()
 const LENSES: Array<{ key: LensKey; label: string; note: string; component: Component }> = [
   {
     key: 'overview',
@@ -373,7 +377,7 @@ const insights = provideInsights({
 })
 const customInvalid = computed(() => period.value === 'custom' && !insights.customRange.value)
 const subtitle = computed(() => {
-  const scope = project.value ? `project ${project.value}` : 'all projects'
+  const scope = project.value ? `project ${projectName(project.value)}` : 'all projects'
   const label = insights.periodLabel.value
   return `${fmt(tasks.value.length)} tasks in ${scope} · ${period.value === 'custom' ? label : label.toLowerCase()}`
 })

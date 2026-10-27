@@ -42,6 +42,8 @@ function goBack() {
 <style scoped>
 .not-found {
   width: 100%;
+  /* Padding counts inside the width, or the card spills past phones. */
+  box-sizing: border-box;
   max-width: 720px;
   text-align: center;
   align-self: center;
@@ -49,6 +51,12 @@ function goBack() {
   gap: var(--space-4);
   padding: clamp(2.5rem, 6vw, 4.75rem) clamp(1.5rem, 4vw, 2.5rem);
   margin: clamp(2rem, 5vw, 3rem) auto clamp(5rem, 12vw, 8rem);
+}
+
+/* Centred children size to their content; keep them inside the card on
+   phones so long paths and the heading wrap instead of spilling out. */
+.not-found > * {
+  max-width: 100%;
 }
 
 .not-found__code {
@@ -71,6 +79,7 @@ function goBack() {
 
 .not-found__path {
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
   background: color-mix(in oklab, var(--color-surface) 65%, transparent);
   padding: 2px 6px;
   border-radius: var(--radius-sm);

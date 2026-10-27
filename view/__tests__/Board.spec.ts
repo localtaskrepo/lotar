@@ -412,7 +412,7 @@ describe('Board field visibility', () => {
         const wrapper = mount(Board)
         await flushPromises()
         expect(wrapper.find('#board-project-select').exists()).toBe(false)
-        expect(wrapper.find('h1').text()).toContain('ACME')
+        expect(wrapper.find('h1').text()).toContain('Acme Co')
         expect(tasksStore.getQuery).toHaveBeenCalledWith(expect.objectContaining({ project: 'ACME' }))
         wrapper.unmount()
     })

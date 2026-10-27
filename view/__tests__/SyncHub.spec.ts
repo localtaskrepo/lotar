@@ -765,7 +765,7 @@ describe('SyncHub remote editor', () => {
         expect(wrapper.find('[data-testid="remote-dialog-choice"]').exists()).toBe(true)
         expect(wrapper.find('[data-testid="remote-dialog-target"]').text()).toContain('Inherited from Global')
 
-        await dialogButton(wrapper, 'Override in project ALPHA').trigger('click')
+        await dialogButton(wrapper, 'Override in project Alpha').trigger('click')
         await flushPromises()
         expect(wrapper.find('[data-testid="remote-dialog-choice"]').exists()).toBe(false)
         expect(wrapper.find('[data-testid="remote-dialog-target"]').text()).toContain('Project ALPHA')
@@ -1191,7 +1191,7 @@ describe('SyncHub default-project preflight (B2)', () => {
         expect(remoteRow(wrapper, 'shared').text()).not.toContain('Running')
         expect(
             toastMessages.some(
-                (m) => m.includes('overridden in default project ALPHA') && m.includes('Switch to ALPHA'),
+                (m) => m.includes('overridden in default project Alpha') && m.includes('Switch to Alpha'),
             ),
         ).toBe(true)
         wrapper.unmount()
@@ -1208,7 +1208,7 @@ describe('SyncHub default-project preflight (B2)', () => {
         await rowButton(remoteRow(wrapper, 'shared'), 'Pull').trigger('click')
         await flushPromises()
         expect(api.syncPull).toHaveBeenCalledTimes(1)
-        expect(toastMessages.some((m) => m.includes('runs through default project ALPHA'))).toBe(true)
+        expect(toastMessages.some((m) => m.includes('runs through default project Alpha'))).toBe(true)
         pull.resolve(syncResponse('run-1', 'shared', 'ALPHA'))
         await flushPromises()
 

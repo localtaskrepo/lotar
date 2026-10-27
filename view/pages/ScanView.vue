@@ -286,12 +286,12 @@
 </template>
 
 <script setup lang="ts">
+import { formatProjectLabel } from '../utils/projectLabels'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import type {
   ConfigInspectResult,
-  ProjectDTO,
   ReferenceSnippet,
   ScanEntry,
   ScanRequest,
@@ -383,10 +383,6 @@ const settingsChanged = computed(() => {
 const scanEntries = computed(() =>
   Array.isArray(scanResponse.value?.entries) ? (scanResponse.value?.entries ?? []) : [],
 )
-
-function formatProjectLabel(entry: ProjectDTO) {
-  return entry.name ? `${entry.name} (${entry.prefix})` : entry.prefix
-}
 
 function formatStatus(status: string) {
   switch (status) {

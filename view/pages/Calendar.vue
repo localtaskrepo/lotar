@@ -10,7 +10,9 @@
     >
       <template #title>
         Calendar
-        <span v-if="project" class="muted">— {{ project }}</span>
+        <span v-if="project" class="muted app-page-header__project" :title="projectLabel(project)"
+          >— {{ projectName(project) }}</span
+        >
       </template>
       <template #view>
         <ColumnsMenu
@@ -248,6 +250,7 @@
 </template>
 
 <script setup lang="ts">
+import { useProjectNames } from '../composables/useProjectNames'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -273,6 +276,7 @@ import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay, toDateKey } from '../utils/date'
 import { buildSprintSchedule, type SprintCalendarDayEntry } from '../utils/sprintCalendar'
 
+const { projectName, projectLabel } = useProjectNames()
 const route = useRoute()
 const router = useRouter()
 const { refresh: refreshProjects } = useProjects()

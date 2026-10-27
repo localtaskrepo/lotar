@@ -507,7 +507,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                         .toContain('Inherited from Global');
 
                     // Explicit override choice unlocks the fields.
-                    await page.getByRole('button', { name: 'Override in project ALPHA' }).click();
+                    await page.getByRole('button', { name: 'Override in project Alpha' }).click();
                     await page.waitForSelector('[data-testid="remote-dialog-choice"]', { state: 'detached' });
                     await expect.poll(() => page.locator('.sync-textarea').isDisabled()).toBe(false);
 
@@ -656,14 +656,14 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     const actions = ['Pull', 'Push', 'Check'] as const;
                     for (const [index, action] of actions.entries()) {
                         await remoteRow(page, 'shared-jira').getByRole('button', { name: action, exact: true }).click();
-                        await page.waitForSelector('.toast-card:has-text("overridden in default project ALPHA")', {
+                        await page.waitForSelector('.toast-card:has-text("overridden in default project Alpha")', {
                             timeout: 10_000,
                         });
                         const expectedToasts = index + 1;
                         await expect
                             .poll(
                                 () =>
-                                    page.locator('.toast-card:has-text("overridden in default project ALPHA")').count(),
+                                    page.locator('.toast-card:has-text("overridden in default project Alpha")').count(),
                                 { timeout: 10_000 },
                             )
                             .toBeGreaterThanOrEqual(expectedToasts);
@@ -676,11 +676,11 @@ describe('UI sync scope isolation (DEV-67)', () => {
 
                     // The full guidance names the override and the fix.
                     const toastText = await page
-                        .locator('.toast-card:has-text("overridden in default project ALPHA")')
+                        .locator('.toast-card:has-text("overridden in default project Alpha")')
                         .first()
                         .textContent();
-                    expect(toastText).toContain("Remote 'shared-jira' is overridden in default project ALPHA");
-                    expect(toastText).toContain('Switch to ALPHA to run it, or align the definitions.');
+                    expect(toastText).toContain("Remote 'shared-jira' is overridden in default project Alpha");
+                    expect(toastText).toContain('Switch to Alpha to run it, or align the definitions.');
 
                     // Neither definition was contacted by the blocked runs.
                     expect(stubGlobal.allRequests().length).toBe(0);

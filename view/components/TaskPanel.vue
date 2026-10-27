@@ -2075,6 +2075,9 @@ async function removeSprintChip(sprintId: number) {
   display: flex;
   flex-direction: column;
   gap: var(--space-3, 0.75rem);
+  /* Fieldsets default to min-width: min-content, which lets wide selects
+     push the group past the panel on phones. */
+  min-width: 0;
 }
 
 .task-panel__group legend,
@@ -2841,6 +2844,8 @@ textarea {
 .task-panel__custom-row > *:first-child,
 .task-panel__custom-row > *:nth-child(2) {
   flex: 1;
+  /* Inputs keep a wide default size; let them shrink on phones. */
+  min-width: 0;
 }
 
 .task-panel__relations {

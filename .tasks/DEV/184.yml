@@ -1,7 +1,37 @@
 title: Show project name instead of prefix
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-25T03:10:57.163420+00:00
+modified: 2026-10-27T23:37:51.194247+00:00
+comments:
+- date: 2026-10-27T23:29:44.842484+00:00
+  text: 'Pages now show project names instead of prefixes: page headings (Boards, Calendar, Insights, Dependencies; hover shows ''Name (PREFIX)''), the project filter chip, Dependencies validation text, the Insights refresh toast, the Agents ''Add to'' option and the Sync override button/toasts. One shared formatter (formatProjectLabel) replaces three copies and no longer prints ''DEV (DEV)''; useProjectNames shares one project list. Task IDs, CLI commands and external Jira keys keep prefixes. Long names end in an ellipsis in headings (own line on phones) and chips (24ch). Also fixed at phone width: task panel fieldsets and custom-field rows overflowed the panel (fieldset min-content default), independent of names. Checked 11 pages at 1280/390 with a 60-char name: no horizontal overflow. Tests: projectLabels.spec, useFilterGrammar.spec, page specs updated; smoke ui.project-names at 1280/390.'
+- date: 2026-10-27T23:31:44.386224+00:00
+  text: 'Also: the 404 page overflowed phones by about 11px (card width 100% plus padding with content-box sizing; long paths did not wrap). Fixed with border-box and wrapping of long paths; the ui.project-names smoke now checks the 404 page at 1280 and 390.'
 description: Almost everywhere we show the project prefix and don't show the project name, which would probably be nicer to see.
+history:
+- at: 2026-10-27T23:19:59.116180+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T23:29:44.842484+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:31:44.386224+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:37:51.194247+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
