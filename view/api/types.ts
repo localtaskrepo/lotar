@@ -197,6 +197,10 @@ export interface AttachmentUploadResponse {
 /** Repository branding for the web UI (DEV-218). */
 export interface BrandingResponse {
     theme?: string
+    /** `home` (~/.lotar) or `repository` (.tasks/config.yml); absent = built-in. */
+    theme_source?: 'home' | 'repository'
+    /** The repository's ui.theme when ~/.lotar overrides it. */
+    repository_theme?: string
     name?: string
     logo?: string
     logo_dark?: string

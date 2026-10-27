@@ -224,7 +224,7 @@ const tooltipLeft = computed(() => {
 .trend-chart__key {
   width: 12px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: calc(var(--radius-sm) / 2);
 }
 
 .trend-chart__tooltip {

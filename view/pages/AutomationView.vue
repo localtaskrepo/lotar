@@ -374,7 +374,7 @@ onUnmounted(() => {
   cursor: pointer;
   color: var(--muted);
   font-size: 14px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .filter-tab:hover {
@@ -393,16 +393,16 @@ onUnmounted(() => {
 .condition-chip {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   font-size: 12px;
   background: color-mix(in oklab, var(--color-fg) 5%, transparent);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
 }
 
 .action-chip {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   font-size: 12px;
   background: color-mix(in oklab, var(--color-success) 15%, transparent);
   color: var(--color-success);
@@ -415,7 +415,7 @@ onUnmounted(() => {
 
 .simulated-action {
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   background: color-mix(in oklab, var(--color-fg) 3%, transparent);
 }
 
@@ -438,14 +438,14 @@ onUnmounted(() => {
 
 .task-preview {
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   background: color-mix(in oklab, var(--color-fg) 3%, transparent);
 }
 
 .tag-chip {
   display: inline-block;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   background: color-mix(in oklab, var(--color-fg) 10%, transparent);
 }
@@ -453,14 +453,14 @@ onUnmounted(() => {
 .help-text {
   padding: 16px;
   background: color-mix(in oklab, var(--color-fg) 2%, transparent);
-  border-radius: 8px;
+  border-radius: var(--radius-base);
 }
 
 .help-text code {
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: color-mix(in oklab, var(--color-fg) 10%, transparent);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 </style>

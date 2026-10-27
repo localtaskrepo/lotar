@@ -78,7 +78,7 @@ const sprint = { label: (id: number) => `#${id}`, stateClass: () => '', tooltip:
 }
 .priority {
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
   font-size: 0.7rem;
 }
@@ -121,7 +121,7 @@ const sprint = { label: (id: number) => `#${id}`, stateClass: () => '', tooltip:
 .dependency-card-details :deep(.tag),
 .dependency-card-details :deep(.sprint-chip) {
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
 }
 .dependency-card-details :deep(.task-meta--no-header) {

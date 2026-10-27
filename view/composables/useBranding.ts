@@ -8,6 +8,8 @@ import { useSse } from './useSse'
 export interface BrandingState {
     loaded: boolean
     theme: string | null
+    themeSource: 'home' | 'repository' | null
+    repositoryTheme: string | null
     name: string | null
     logo: string | null
     logoDark: string | null
@@ -20,6 +22,8 @@ export const DEFAULT_APP_NAME = 'LoTaR'
 const state = reactive<BrandingState>({
     loaded: false,
     theme: null,
+    themeSource: null,
+    repositoryTheme: null,
     name: null,
     logo: null,
     logoDark: null,
@@ -34,6 +38,8 @@ let inflight: Promise<void> | null = null
 export function applyBranding(response: BrandingResponse) {
     state.loaded = true
     state.theme = response.theme ?? null
+    state.themeSource = response.theme_source ?? null
+    state.repositoryTheme = response.repository_theme ?? null
     state.name = response.name?.trim() || null
     state.logo = response.logo ?? null
     state.logoDark = response.logo_dark ?? null

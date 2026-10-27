@@ -1387,7 +1387,7 @@ watch(
 .config-nav__badge--error {
   min-width: 18px;
   height: 18px;
-  border-radius: 9px;
+  border-radius: var(--radius-pill);
   background: var(--color-danger);
   color: var(--color-danger-contrast);
   font-size: 12px;

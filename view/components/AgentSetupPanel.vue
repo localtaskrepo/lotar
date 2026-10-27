@@ -160,7 +160,7 @@ async function submit() {
 .agent-setup__warning {
   margin: 0;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   font-size: 13px;
   color: var(--color-fg);
   background: color-mix(in oklab, var(--color-warning) 14%, transparent);
@@ -211,10 +211,10 @@ async function submit() {
 .agent-setup__yaml {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
   overflow-x: auto;
 }

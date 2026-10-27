@@ -9,9 +9,24 @@
 
 use std::path::{Component, Path, PathBuf};
 
-/// Theme ids the web UI ships (keep in sync with `view/utils/themes.ts`).
+/// Theme ids the web UI ships, classic then playful (keep in sync with
+/// `THEMES` in `view/utils/themes.ts`; `view/__tests__/themes.spec.ts`
+/// checks this).
 pub const UI_THEMES: &[&str] = &[
-    "lotar", "ocean", "forest", "ember", "violet", "rose", "contrast",
+    "lotar",
+    "ocean",
+    "forest",
+    "ember",
+    "violet",
+    "rose",
+    "contrast",
+    "terminal",
+    "matrix",
+    "synthwave",
+    "blueprint",
+    "paper",
+    "retro",
+    "candy",
 ];
 
 /// Longest display name shown next to the logo.

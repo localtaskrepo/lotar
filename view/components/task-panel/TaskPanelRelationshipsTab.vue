@@ -412,7 +412,7 @@ function onDrop(event: DragEvent, kind: RelationshipCategory) {
   gap: 4px;
   border: 1px solid var(--border);
   padding: 2px 3px 2px 8px;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   font-size: 0.85em;
   max-width: 100%;
 }

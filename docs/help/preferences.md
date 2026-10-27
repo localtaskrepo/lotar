@@ -10,7 +10,7 @@ Open the Preferences view from the main navigation (top-right menu). All setting
 ## Appearance
 
 - **Mode** — **System** follows the operating system's light/dark setting; **Light** or **Dark** forces one (`localStorage` key `lotar.theme`).
-- **Theme** — Seven colour themes, each with a light and a dark version: LoTaR (default), Ocean, Forest, Ember, Violet, Rose and High contrast. Each card previews both versions. **Repository default** follows the theme set for everyone in Config → Appearance (`ui.theme`); picking a theme here overrides it for you only (`localStorage` key `lotar.themeName`).
+- **Theme** — Fourteen themes, each with a light and a dark version, in two groups. **Classic**: LoTaR (default), Ocean, Forest, Ember, Violet, Rose and High contrast. **Playful** themes change more than colour (fonts, corners, backgrounds, glows and bevels): Terminal, Matrix, Synthwave, Blueprint, Paper, Retro and Candy. Each card previews both versions. **Configured default** follows `ui.theme` from your own `~/.lotar` if it sets one (it wins), otherwise the repository's Config → Appearance, otherwise LoTaR; the card says which. Picking a theme here overrides that in this browser only (`localStorage` key `lotar.themeName`).
 - Choices apply instantly, are applied before the page first draws (no flash of the default colours), and persist between sessions; see `view/utils/theme.ts` and `view/themes.css`.
 - Browser chrome (`<meta name="theme-color">`) follows the active theme's background.
 
@@ -36,6 +36,8 @@ Select **Clear last used filter** to remove the saved search and filters of ever
 ## Keyboard
 
 **Single-key shortcuts** (on by default) lets `c`, `/`, `?`, `j`, `k` and `g` followed by a letter work anywhere outside text fields (see [keyboard shortcuts](serve.md)). Turn it off if single keys get in the way of a screen reader, voice control or your own key bindings; **Ctrl+K** (**⌘K** on a Mac) still opens the command palette. The choice is stored in `localStorage` (`lotar.preferences.shortcuts.singleKey`).
+
+**Show the command palette button in the header** (on by default) can be turned off to declutter the header; the keyboard shortcut still opens the palette. Stored as `lotar.preferences.header.paletteButton`.
 
 ## Tasks List
 

@@ -1655,7 +1655,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius, 4px);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-muted);
   font-size: 18px;

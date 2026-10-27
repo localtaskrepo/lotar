@@ -66,12 +66,12 @@ watch(
   gap: 10px;
   align-items: baseline;
   padding: 4px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .log-time {
   color: var(--color-muted);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 
@@ -95,7 +95,7 @@ watch(
 }
 
 .log-message--mono {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-muted);
 }

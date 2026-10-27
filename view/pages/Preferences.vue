@@ -22,31 +22,12 @@
 
         <fieldset class="appearance__group">
           <legend>Theme</legend>
-          <div class="theme-grid" data-testid="theme-picker">
-            <label class="theme-option" :class="{ 'theme-option--selected': themeName === null }">
-              <input v-model="themeName" type="radio" name="theme-name" :value="null" class="theme-option__input" />
-              <ThemePreview :theme="repositoryTheme" />
-              <span class="theme-option__name">Repository default</span>
-              <span class="theme-option__hint muted">{{ repositoryThemeLabel }}, set in Config</span>
-            </label>
-            <label
-              v-for="option in THEMES"
-              :key="option.id"
-              class="theme-option"
-              :class="{ 'theme-option--selected': themeName === option.id }"
-            >
-              <input
-                v-model="themeName"
-                type="radio"
-                name="theme-name"
-                :value="option.id"
-                class="theme-option__input"
-              />
-              <ThemePreview :theme="option.id" />
-              <span class="theme-option__name">{{ option.name }}</span>
-              <span class="theme-option__hint muted">{{ option.description }}</span>
-            </label>
-          </div>
+          <ThemePicker
+            v-model="themeName"
+            :default-theme="repositoryTheme"
+            :default-hint="defaultThemeHint"
+            name="theme-name"
+          />
         </fieldset>
 
         <fieldset class="appearance__group">
@@ -123,6 +104,10 @@
             <label class="row" style="gap: 8px; align-items: center">
               <input v-model="singleKeyShortcuts" type="checkbox" data-testid="preferences-single-key-shortcuts" />
               Single-key shortcuts
+            </label>
+            <label class="row" style="gap: 8px; align-items: center">
+              <input v-model="showPaletteButton" type="checkbox" data-testid="preferences-palette-button" />
+              Show the command palette button in the header
             </label>
             <p class="muted" style="margin: 0">
               <kbd>c</kbd> new task, <kbd>/</kbd> search, <kbd>g</kbd> then a letter to change pages, and
@@ -227,6 +212,8 @@ import {
   STARTUP_DESTINATION_OPTIONS,
   storeShareFiltersPreference,
   storeSingleKeyShortcutsPreference,
+  storePaletteButtonPreference,
+  readPaletteButtonPreference,
   storeStartupDestination,
   storeTaskPanelAutoDetectLinksPreference,
   storeTaskPanelShowAttachmentsPreference,
@@ -249,7 +236,7 @@ import {
   storeThemePreference,
   type ThemePreference,
 } from '../utils/theme'
-import ThemePreview from '../components/ThemePreview.vue'
+import ThemePicker from '../components/ThemePicker.vue'
 import { THEMES, type ThemeId } from '../utils/themes'
 import { useBranding } from '../composables/useBranding'
 
@@ -262,9 +249,13 @@ const repositoryTheme = computed<ThemeId>(() => {
   void branding.theme
   return getRepositoryTheme()
 })
-const repositoryThemeLabel = computed(
-  () => THEMES.find((option) => option.id === repositoryTheme.value)?.name ?? repositoryTheme.value,
-)
+// Usually a person's own ~/.lotar sets this; otherwise the repository.
+const defaultThemeHint = computed(() => {
+  const name = THEMES.find((option) => option.id === repositoryTheme.value)?.name ?? repositoryTheme.value
+  if (branding.themeSource === 'home') return `${name} · from your ~/.lotar`
+  if (branding.themeSource === 'repository') return `${name} · set for this repository in Config`
+  return `${name} · built-in`
+})
 const accent = ref<string>(DEFAULT_ACCENT)
 const accentEnabled = ref(false)
 const startupDestination = ref<StartupDestination>(DEFAULT_STARTUP_DESTINATION)
@@ -276,6 +267,7 @@ const autoDetectLinks = ref(true)
 
 const shareFilters = ref(false)
 const singleKeyShortcuts = ref(true)
+const showPaletteButton = ref(readPaletteButtonPreference())
 const paletteLabel = paletteShortcutLabel()
 
 const tasksPageSizeOptions = [25, 50, 100, 200]
@@ -352,6 +344,10 @@ watch(shareFilters, (value) => {
 
 watch(singleKeyShortcuts, (value) => {
   storeSingleKeyShortcutsPreference(!!value)
+})
+
+watch(showPaletteButton, (value) => {
+  storePaletteButtonPreference(!!value)
 })
 
 watch(showAttachments, (value) => {
@@ -459,51 +455,6 @@ function clearSavedFilters() {
   margin-bottom: 8px;
   padding: 0;
   font-weight: 600;
-}
-
-.theme-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.theme-option {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-base);
-  cursor: pointer;
-}
-
-.theme-option:hover {
-  border-color: var(--color-border-strong);
-}
-
-.theme-option--selected {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 1px var(--color-accent);
-}
-
-.theme-option:focus-within {
-  box-shadow: var(--focus-ring);
-}
-
-/* The radio stays focusable and announced; the card is its visible control. */
-.theme-option__input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.theme-option__name {
-  font-weight: 600;
-}
-
-.theme-option__hint {
-  font-size: var(--text-xs);
 }
 
 .preferences-layout {

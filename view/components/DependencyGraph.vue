@@ -865,7 +865,7 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
   width: 300px;
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   background: var(--surface, var(--color-bg));
   display: grid;
   gap: 4px;
@@ -959,7 +959,7 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
   box-sizing: border-box;
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   background: var(--surface, var(--color-bg));
   display: grid;
   gap: 6px;
@@ -990,7 +990,7 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
   box-sizing: border-box;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-base);
 }
 .dependency-edge-list a,
 .dependency-edge-list > li > span:not(.dependency-relationship-chip) {
@@ -1006,7 +1006,7 @@ function navigate(id: string, event: MouseEvent | KeyboardEvent) {
   max-width: 100%;
   box-sizing: border-box;
   gap: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 8px;
   background: color-mix(in srgb, currentColor 9%, transparent);
   font-size: 0.8rem;

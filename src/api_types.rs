@@ -841,6 +841,14 @@ pub struct BrandingResponse {
     /// Default theme id for everyone (`ui.theme`); absent = built-in default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
+    /// Where `theme` comes from: `home` (the person's ~/.lotar, which wins)
+    /// or `repository` (.tasks/config.yml). Absent with the built-in default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme_source: Option<String>,
+    /// The repository's own `ui.theme` when ~/.lotar overrides it, so the
+    /// Config page can say so.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_theme: Option<String>,
     /// Name shown next to the logo and in the browser tab (`ui.name`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,

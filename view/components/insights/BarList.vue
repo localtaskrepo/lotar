@@ -137,7 +137,7 @@ function barPercent(value: number) {
 .bar-list__bar {
   display: block;
   height: 100%;
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: var(--viz-1);
 }
 

@@ -40,6 +40,7 @@
             <span class="global-new-task__label">Task</span>
           </UiButton>
           <UiButton
+            v-if="showPaletteButton"
             variant="ghost"
             type="button"
             class="palette-trigger"
@@ -113,7 +114,13 @@ import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
 import { useTaskPanelController } from './composables/useTaskPanelController'
 import { NAV_TABS, useNavTabs } from './composables/useNavTabs'
 import { GO_SHORTCUTS, paletteShortcutLabel } from './utils/keyboardShortcuts'
-import { onPreferencesChanged, readSingleKeyShortcutsPreference, SINGLE_KEY_SHORTCUTS_KEY } from './utils/preferences'
+import {
+  onPreferencesChanged,
+  readSingleKeyShortcutsPreference,
+  SINGLE_KEY_SHORTCUTS_KEY,
+  PALETTE_BUTTON_KEY,
+  readPaletteButtonPreference,
+} from './utils/preferences'
 import { readRecentTasks, type RecentTask } from './utils/recentTasks'
 import { applyThemePreference, storeThemePreference, type ThemePreference } from './utils/theme'
 import { useTaskStore } from './composables/useTaskStore'
@@ -192,10 +199,13 @@ const paletteOpen = ref(false)
 const shortcutsOpen = ref(false)
 const paletteLabel = paletteShortcutLabel()
 const singleKeyShortcuts = ref(readSingleKeyShortcutsPreference())
+// DEV-219: the palette stays on its shortcut when the button is hidden.
+const showPaletteButton = ref(readPaletteButtonPreference())
 let stopPreferences: (() => void) | null = null
 onMounted(() => {
   stopPreferences = onPreferencesChanged((key) => {
     if (key === SINGLE_KEY_SHORTCUTS_KEY) singleKeyShortcuts.value = readSingleKeyShortcutsPreference()
+    if (key === PALETTE_BUTTON_KEY) showPaletteButton.value = readPaletteButtonPreference()
   })
 })
 onUnmounted(() => stopPreferences?.())
@@ -511,9 +521,13 @@ watch(
   clip-path: none;
   max-width: 220px;
   text-overflow: ellipsis;
-  font-weight: 700;
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--heading-tracking);
+  text-shadow: var(--text-glow);
   font-size: 1.05rem;
-  color: var(--color-fg);
+  color: var(--topbar-fg);
 }
 
 .brand__name {

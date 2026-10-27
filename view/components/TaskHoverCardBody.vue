@@ -244,7 +244,7 @@ const dueInfo = computed(() => {
 
 .task-hover-card__id {
   flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--color-muted);
   white-space: nowrap;

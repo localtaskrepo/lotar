@@ -805,12 +805,13 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
+/* The -strong variants keep the numbers readable on light backgrounds. */
 .stat-value.running {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .stat-value.queued {
-  color: var(--color-warning);
+  color: var(--color-warning-strong);
 }
 
 .stat-label {
@@ -830,7 +831,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 4px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-fg);
   font-size: 13px;
@@ -866,7 +867,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   color: var(--color-muted);
   font-size: 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -886,7 +887,7 @@ onBeforeUnmount(() => {
 .tab-count {
   background: var(--color-border);
   padding: 1px 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-popover);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
@@ -1001,7 +1002,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 8px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-popover);
   background: var(--color-surface);
   border-left: 3px solid var(--color-border);
   min-width: 0;
@@ -1074,10 +1075,10 @@ onBeforeUnmount(() => {
 }
 
 .branch-chip {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   color: var(--color-fg);
   max-width: 100%;
@@ -1101,7 +1102,7 @@ onBeforeUnmount(() => {
 
 .job-summary__text--tool {
   margin: 0;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-muted);
   white-space: pre-wrap;
@@ -1132,7 +1133,7 @@ onBeforeUnmount(() => {
 .phase-chip {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 8px;
   font-size: 12px;
   font-weight: 600;

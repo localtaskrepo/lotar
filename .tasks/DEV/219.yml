@@ -1,0 +1,35 @@
+title: Distinctive themes, picker layout and header palette option
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-27T19:11:48.185640+00:00
+modified: 2026-10-27T20:01:31.350408+00:00
+comments:
+- date: 2026-10-27T19:11:48.274003+00:00
+  text: 'Plan: (a) Theme character tokens beyond colour: heading font/weight/case/tracking/glow, page and header backgrounds (gradients, patterns), card and control surfaces/shadows/bevels, accent glow; radii and fonts already tokenised, and the ~56 hard-coded border radii in components move to radius tokens so square/rounded themes apply everywhere. (b) New themes using them: Terminal (monospace, square, phosphor green; light = greenbar printout), Matrix (green glow on black; light = pale phosphor), Synthwave (neon sunset gradients), Blueprint (grid paper, technical), Paper (serif notebook), Retro (90s desktop bevels), Candy (rounded pastels). Picker groups Classic / Playful. (c) ''Default from config'' option naming its source (~/.lotar, repository, built-in) via theme_source on /api/branding; Config Appearance notes when ~/.lotar overrides the repository value. (d) Picker columns balanced so rows fill evenly. (e) Keyboard: Show command palette button. (f) QA: every theme x mode x main page with an in-page contrast scan and screenshot montages.'
+- date: 2026-10-27T20:01:31.314574+00:00
+  text: 'Done. Theme character tokens (fonts, heading style, glow, page/header/card backgrounds, control bevels, field style, header text colours) with zero-specificity defaults; ~56 hard-coded radii and 15 mono font stacks in components now use tokens (helper agent, diff verified). Seven playful themes (terminal, matrix, synthwave, blueprint, paper, retro, candy) plus light character on classic themes (helper agent); contrast checker extended to background colour stops and header text; all 14 pass (LoTaR default exempt). Picker: ''Configured default'' row naming its source (~/.lotar / repository / built-in via theme_source on /api/branding), Classic/Playful groups, balanced columns (never a lone card; list below 4 fitting columns). Config Appearance notes a ~/.lotar override. Keyboard: Show the command palette button (lotar.preferences.header.paletteButton). QA: 14 themes x 2 modes x 11 pages at 1280px with an in-page text contrast scan (308 views) plus 390px overflow check (140 views): fixed the invisible muted status badge (text was --color-bg), small file-type labels and agent counters (now -strong colours), gallery names; links and the active nav link now use --color-accent-strong and LoTaR light''s strong accent is #0369a1. Remaining by design: LoTaR light primary/danger buttons keep white text on sky blue/red (2.77/3.76). Verified: npm run lint, npm test (1795 Rust + 1276 UI), npm run smoke (356; one full run had 3 load timeouts at load 45 that passed 2x alone).'
+description: 'Feedback on DEV-218: (1) ''Repository default'' is misleading; most often the default comes from the person''s own ~/.lotar, so say where it comes from. (2) Add themes with real variety (console/terminal, matrix and other fun styles); the current ones mostly differ by accent. (3) The theme grid can leave a single card on the last row. (4) Keyboard preferences: option to hide the command palette button in the header. (5) Check every theme renders well on every page.'
+history:
+- at: 2026-10-27T19:11:48.241794+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-10-27T19:11:48.274003+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T20:01:31.314574+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T20:01:31.350408+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

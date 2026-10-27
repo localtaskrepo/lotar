@@ -83,6 +83,9 @@ fn branding_reports_settings_and_serves_repository_images() {
 
     let branding = data(&get(&api, "/api/branding"));
     assert_eq!(branding["theme"], "forest");
+    // DEV-219: say where the default comes from (home config is ignored in tests).
+    assert_eq!(branding["theme_source"], "repository");
+    assert!(branding.get("repository_theme").is_none());
     assert_eq!(branding["name"], "Acme Tracker");
     assert!(
         branding["logo"]

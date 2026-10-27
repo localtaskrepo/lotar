@@ -243,7 +243,7 @@ const format = (value: number) => props.format(value)
 .column-chart__swatch {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: calc(var(--radius-sm) / 2);
 }
 
 .column-chart__svg {
@@ -331,6 +331,6 @@ const format = (value: number) => props.format(value)
 .column-chart__key {
   width: 12px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: calc(var(--radius-sm) / 2);
 }
 </style>

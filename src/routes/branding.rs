@@ -190,8 +190,34 @@ fn branding_response(
         .theme
         .clone()
         .filter(|theme| branding_service::UI_THEMES.contains(&theme.as_str()));
+    // ~/.lotar overrides the repository's config.yml (see resolution.rs).
+    let valid = |theme: Option<String>| {
+        theme.filter(|theme| branding_service::UI_THEMES.contains(&theme.as_str()))
+    };
+    let home_theme = valid(
+        crate::config::persistence::load_home_config()
+            .ok()
+            .and_then(|home| home.ui_theme),
+    );
+    let repository_theme = valid(
+        crate::config::persistence::load_global_config(Some(resolver.path.as_path()))
+            .ok()
+            .and_then(|global| global.ui_theme),
+    );
+    let theme_source = match (&theme, &home_theme, &repository_theme) {
+        (Some(theme), Some(home), _) if theme == home => Some("home".to_string()),
+        (Some(theme), _, Some(repo)) if theme == repo => Some("repository".to_string()),
+        _ => None,
+    };
+    let repository_theme = if theme_source.as_deref() == Some("home") {
+        repository_theme
+    } else {
+        None
+    };
     crate::api_types::BrandingResponse {
         theme,
+        theme_source,
+        repository_theme,
         name: config
             .ui
             .name

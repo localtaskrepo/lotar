@@ -3,7 +3,9 @@
        whatever the page uses (see view/themes.css). -->
   <span class="theme-preview" aria-hidden="true">
     <span v-for="mode in modes" :key="mode" class="theme-preview__half" :data-theme-name="theme" :data-mode="mode">
-      <span class="theme-preview__bar"><span class="theme-preview__dot"></span></span>
+      <span class="theme-preview__bar"
+        ><span class="theme-preview__dot"></span><span class="theme-preview__title">Aa</span></span
+      >
       <span class="theme-preview__card">
         <span class="theme-preview__line theme-preview__line--strong"></span>
         <span class="theme-preview__line theme-preview__line--muted"></span>
@@ -35,23 +37,36 @@ const modes = ['light', 'dark'] as const
   border: 1px solid var(--color-border);
 }
 
+/* Each half shows the theme's character too: page and header backgrounds,
+   card surface, corners, heading font and glow. */
 .theme-preview__half {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   padding: 6px;
-  background: var(--color-bg);
+  background: var(--page-background);
   color: var(--color-fg);
 }
 
 .theme-preview__bar {
   display: flex;
   align-items: center;
-  height: 10px;
+  gap: 4px;
+  height: 14px;
   padding: 0 4px;
-  border-radius: 3px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--topbar-background);
+  border: 1px solid var(--topbar-border);
+  color: var(--topbar-fg);
+}
+
+.theme-preview__title {
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  text-transform: var(--heading-transform);
+  text-shadow: var(--text-glow);
+  font-size: 9px;
+  line-height: 1;
 }
 
 .theme-preview__dot {
@@ -67,9 +82,10 @@ const modes = ['light', 'dark'] as const
   flex-direction: column;
   gap: 4px;
   padding: 5px;
-  border-radius: 4px;
-  background: var(--color-surface-contrast);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--card-background);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
 }
 
 .theme-preview__line {
@@ -96,8 +112,9 @@ const modes = ['light', 'dark'] as const
 .theme-preview__button {
   width: 18px;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent);
+  box-shadow: var(--control-shadow), var(--accent-glow);
 }
 
 .theme-preview__status {

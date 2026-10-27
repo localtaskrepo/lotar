@@ -354,7 +354,7 @@ function onKeydown(event: KeyboardEvent) {
   width: min(960px, 100%);
   height: 100%;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   /* Documents (PDF etc.) are authored for a white page. */
   background: #fff;
 }
@@ -365,7 +365,7 @@ function onKeydown(event: KeyboardEvent) {
   margin: 0;
   padding: 16px;
   overflow: auto;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   /* Text preview matches the dark lightbox rather than the theme. */
   background: #0f172a;
   color: #e2e8f0;

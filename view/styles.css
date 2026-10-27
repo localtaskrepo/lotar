@@ -1,8 +1,6 @@
 /* Design tokens -------------------------------------------------------- */
 :root {
 	/* Typography */
-	--font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	--text-xs: 0.75rem;
 	--text-sm: 0.875rem;
 	--text-md: 1rem;
@@ -19,14 +17,6 @@
 	--space-6: 1.5rem;
 	--space-8: 2rem;
 	--control-height: max(36px, 2.25rem);
-	/* Radii */
-	--radius-sm: 0.25rem;
-	--radius-md: 0.375rem;
-	--radius-base: 0.5rem;
-	--radius-popover: 0.625rem;
-	--radius-pill: 999px;
-	--radius-lg: 0.75rem;
-	--radius-xl: 1rem;
 	/* Motion */
 	--duration-fast: 120ms;
 	--duration-med: 180ms;
@@ -70,7 +60,7 @@
 	--color-fg: #0f172a;
 	--color-muted: #64748b;
 	--color-accent: #0ea5e9;
-	--color-accent-strong: #0284c7;
+	--color-accent-strong: #0369a1;
 	--color-accent-contrast: #ffffff;
 	--color-danger: #ef4444;
 	--color-danger-contrast: #ffffff;
@@ -143,6 +133,49 @@
 	--shadow-lg: 0 20px 42px rgba(5, 6, 7, 0.6);
 }
 
+/* Theme character defaults (DEV-219). :where() gives them zero specificity,
+   so view/themes.css wins whatever order the stylesheets load in, while
+   every themed element (previews too) still gets its own reset. */
+:where(:root, [data-theme-name]) {
+	/* Theme character (DEV-219): what a theme may change besides colour.
+	   Defaults are the LoTaR look; view/themes.css overrides per theme. */
+	--font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	--font-heading: var(--font-sans);
+	--heading-weight: 700;
+	--heading-transform: none;
+	--heading-tracking: normal;
+	/* text-shadow on headings and the brand name (e.g. a phosphor glow) */
+	--text-glow: none;
+	/* Any `background` shorthand: colour, gradients, patterns. */
+	--page-background: var(--color-bg);
+	--topbar-background: color-mix(in oklab, var(--color-bg) 88%, transparent);
+	--topbar-border: var(--color-border);
+	/* Header text, so a theme can have a dark header in light mode. */
+	--topbar-fg: var(--color-fg);
+	--topbar-muted: var(--color-muted);
+	--topbar-accent: var(--color-accent-strong);
+	--card-background: linear-gradient(0deg, var(--color-surface-contrast), var(--color-surface-contrast)) padding-box,
+		linear-gradient(180deg, color-mix(in oklab, var(--color-surface) 88%, transparent), color-mix(in oklab, var(--color-surface) 98%, transparent)) border-box;
+	--card-border: var(--color-border);
+	--card-shadow: var(--shadow-sm);
+	/* Extra box-shadows for buttons (bevels) and primary buttons (glows).
+	   They are combined with other shadows, so "none" is not allowed. */
+	--control-shadow: 0 0 0 transparent;
+	--control-shadow-active: 0 0 0 transparent;
+	--accent-glow: 0 0 0 transparent;
+	--field-background: color-mix(in oklab, var(--color-surface) 96%, transparent);
+	--field-shadow: 0 0 0 transparent;
+	/* Radii */
+	--radius-sm: 0.25rem;
+	--radius-md: 0.375rem;
+	--radius-base: 0.5rem;
+	--radius-popover: 0.625rem;
+	--radius-pill: 999px;
+	--radius-lg: 0.75rem;
+	--radius-xl: 1rem;
+}
+
 /* Derived tokens. A custom property that uses var() resolves where it is
    declared, so these are re-declared on every themed element: a theme
    preview (its own data-theme-name/data-mode) then gets its own accent in
@@ -182,9 +215,21 @@ body {
 	height: 100%;
 }
 
+/* Form controls use the theme's font (browsers default them to the system font). */
+input,
+select,
+textarea,
+button {
+	font-family: inherit;
+}
+
+.topbar .btn.ghost {
+	color: var(--topbar-muted);
+}
+
 body {
 	margin: 0;
-	background: var(--color-bg);
+	background: var(--page-background);
 	color: var(--color-fg);
 	font-family: var(--font-sans);
 	font-size: var(--text-sm);
@@ -192,14 +237,25 @@ body {
 	text-rendering: optimizeLegibility;
 }
 
+/* Link text uses the stronger accent shade, which every theme keeps readable. */
 a {
-	color: var(--color-accent);
+	color: var(--color-accent-strong);
 	text-decoration: none;
 	transition: opacity var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 a:hover {
 	text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+	font-family: var(--font-heading);
+	font-weight: var(--heading-weight);
+	text-transform: var(--heading-transform);
+	letter-spacing: var(--heading-tracking);
+	text-shadow: var(--text-glow);
 }
 
 h1 {
@@ -356,6 +412,11 @@ p {
 	font-weight: 500;
 	cursor: pointer;
 	transition: background 120ms ease, border 120ms ease, color 120ms ease, box-shadow 120ms ease;
+	box-shadow: var(--control-shadow);
+}
+
+.btn:active:not(:disabled) {
+	box-shadow: var(--control-shadow-active);
 }
 
 .btn:disabled {
@@ -441,6 +502,7 @@ select.input.toolbar-select {
 	background: var(--color-accent);
 	color: var(--color-accent-contrast);
 	border-color: transparent;
+	box-shadow: var(--control-shadow), var(--accent-glow);
 }
 
 .btn.primary:hover {
@@ -468,7 +530,7 @@ select.input.toolbar-select {
 }
 
 .btn.ghost:hover {
-	background: color-mix(in oklab, var(--color-surface, #f8fafc) 70%, transparent);
+	background: color-mix(in oklab, var(--color-surface) 70%, transparent);
 	border-color: transparent;
 }
 
@@ -479,7 +541,8 @@ select.input.toolbar-select {
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
 	padding: calc(var(--space-2) - 2px) var(--space-3);
-	background: color-mix(in oklab, var(--color-surface) 96%, transparent);
+	background: var(--field-background);
+	box-shadow: var(--field-shadow);
 	color: var(--color-fg);
 	font-size: var(--text-sm);
 	line-height: var(--line-tight);
@@ -493,12 +556,11 @@ select.input.toolbar-select {
 }
 
 .card {
-	border: 1px solid var(--color-border);
+	border: 1px solid var(--card-border);
 	border-radius: var(--radius-lg);
 	padding: var(--space-4);
-	background: linear-gradient(0deg, var(--color-surface-contrast), var(--color-surface-contrast)) padding-box,
-		linear-gradient(180deg, color-mix(in oklab, var(--color-surface) 88%, transparent), color-mix(in oklab, var(--color-surface) 98%, transparent)) border-box;
-	box-shadow: var(--shadow-sm);
+	background: var(--card-background);
+	box-shadow: var(--card-shadow);
 }
 
 /* App chrome ----------------------------------------------------------- */
@@ -507,8 +569,9 @@ select.input.toolbar-select {
 	top: 0;
 	z-index: 10;
 	backdrop-filter: blur(var(--blur-backdrop));
-	background: color-mix(in oklab, var(--color-bg) 88%, transparent);
-	border-bottom: 1px solid var(--color-border);
+	background: var(--topbar-background);
+	border-bottom: 1px solid var(--topbar-border);
+	color: var(--topbar-fg);
 	box-shadow: var(--shadow-xs);
 }
 
@@ -532,7 +595,7 @@ select.input.toolbar-select {
 }
 
 .nav__link {
-	color: var(--color-fg);
+	color: var(--topbar-fg);
 	opacity: 0.85;
 	text-decoration: none;
 	padding: var(--space-1) var(--space-2);
@@ -545,9 +608,9 @@ select.input.toolbar-select {
 }
 
 .nav__link.active {
-	color: var(--color-accent);
+	color: var(--topbar-accent);
 	opacity: 1;
-	background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+	background: color-mix(in oklab, var(--topbar-accent) 18%, transparent);
 	font-weight: 600;
 }
 
@@ -557,9 +620,8 @@ main {
 
 /* Elevated surface for main content ----------------------------------- */
 .surface {
-	background: linear-gradient(0deg, var(--color-surface-contrast), var(--color-surface-contrast)) padding-box,
-		linear-gradient(180deg, color-mix(in oklab, var(--color-surface) 88%, transparent), color-mix(in oklab, var(--color-surface) 98%, transparent)) border-box;
-	border: 1px solid var(--color-border);
+	background: var(--card-background);
+	border: 1px solid var(--card-border);
 	border-radius: var(--radius-xl);
 	box-shadow: var(--shadow-lg);
 	padding: var(--space-5);

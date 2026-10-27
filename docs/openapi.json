@@ -4764,7 +4764,31 @@
         "properties": {
           "theme": {
             "type": "string",
-            "enum": ["lotar", "ocean", "forest", "ember", "violet", "rose", "contrast"]
+            "enum": [
+              "lotar",
+              "ocean",
+              "forest",
+              "ember",
+              "violet",
+              "rose",
+              "contrast",
+              "terminal",
+              "matrix",
+              "synthwave",
+              "blueprint",
+              "paper",
+              "retro",
+              "candy"
+            ]
+          },
+          "theme_source": {
+            "type": "string",
+            "enum": ["home", "repository"],
+            "description": "Where theme comes from: home (the person's ~/.lotar, which wins) or repository (.tasks/config.yml). Absent with the built-in default."
+          },
+          "repository_theme": {
+            "type": "string",
+            "description": "The repository's own ui.theme when ~/.lotar overrides it."
           },
           "name": {
             "type": "string"

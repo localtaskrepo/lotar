@@ -49,7 +49,12 @@ describe('UI theming and repository branding (DEV-218)', () => {
                     expect((await rootState(page)).theme).toBe('ocean');
 
                     // Back to following the repository.
-                    await page.getByTestId('theme-picker').getByText('Repository default').click();
+                    await page.getByTestId('theme-picker').getByText('Configured default').click();
+                    // DEV-219: the palette button can be hidden; the shortcut still works.
+                    await page.getByTestId('preferences-palette-button').uncheck();
+                    await expect(page.getByTestId('command-palette-trigger')).toHaveCount(0);
+                    await page.getByTestId('preferences-palette-button').check();
+                    await expect(page.getByTestId('command-palette-trigger')).toBeVisible();
                     await page.getByLabel('Light').check();
                     await expect.poll(async () => (await rootState(page)).theme).toBe('lotar');
 

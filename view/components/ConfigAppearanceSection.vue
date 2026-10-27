@@ -14,6 +14,10 @@
           <ThemePreview class="appearance-theme__preview" :theme="previewTheme" />
         </div>
         <p class="field-hint">{{ themeDescription }}</p>
+        <p v-if="homeOverride" class="field-hint field-hint--note" data-testid="config-ui-theme-home">
+          Your ~/.lotar sets {{ homeOverride }}, which you see instead. Others see this setting unless their own
+          ~/.lotar sets a theme.
+        </p>
         <p v-if="errors.ui_theme" class="field-error">{{ errors.ui_theme }}</p>
       </div>
 
@@ -100,6 +104,11 @@ const emit = defineEmits<{ (e: 'validate', field: FieldKey): void }>()
 const branding = useBranding()
 
 const previewTheme = computed<ThemeId>(() => (isThemeId(uiTheme.value) ? uiTheme.value : THEMES[0].id))
+// A personal ~/.lotar theme wins over the repository's for this person.
+const homeOverride = computed(() => {
+  if (branding.themeSource !== 'home' || !branding.theme) return null
+  return THEMES.find((option) => option.id === branding.theme)?.name ?? branding.theme
+})
 const themeDescription = computed(() => THEMES.find((option) => option.id === previewTheme.value)?.description ?? '')
 
 interface Slot {
@@ -202,6 +211,10 @@ onUnmounted(() => {
   grid-template-columns: minmax(0, 240px) minmax(0, 220px);
   gap: 12px;
   align-items: center;
+}
+
+.field-hint--note {
+  color: var(--color-fg);
 }
 
 .appearance-image {

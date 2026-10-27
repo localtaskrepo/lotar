@@ -177,7 +177,7 @@ function onError() {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   overflow: hidden;
@@ -253,7 +253,7 @@ function onError() {
 }
 
 .attachment-tile--file {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -276,24 +276,24 @@ function onError() {
 }
 
 .attachment-tile--pdf {
-  color: var(--color-danger);
+  color: var(--color-danger-strong);
   background: color-mix(in oklab, var(--color-danger) 10%, var(--color-surface));
 }
 
 .attachment-tile--sheet {
-  color: var(--color-success);
+  color: var(--color-success-strong);
   background: color-mix(in oklab, var(--color-success) 10%, var(--color-surface));
 }
 
 .attachment-tile--video,
 .attachment-tile--audio {
-  color: var(--color-accent);
+  color: var(--color-accent-strong);
   background: color-mix(in oklab, var(--color-accent) 10%, var(--color-surface));
 }
 
 .attachment-tile--archive,
 .attachment-tile--doc {
-  color: var(--color-warning);
+  color: var(--color-warning-strong);
   background: color-mix(in oklab, var(--color-warning) 10%, var(--color-surface));
 }
 </style>

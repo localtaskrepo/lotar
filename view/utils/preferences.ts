@@ -12,6 +12,8 @@ const TASK_PANEL_AUTO_DETECT_LINKS_KEY = 'lotar.preferences.taskPanel.autoDetect
 
 const SHARE_FILTERS_KEY = 'lotar.preferences.filters.shareAcrossPages'
 export const SINGLE_KEY_SHORTCUTS_KEY = 'lotar.preferences.shortcuts.singleKey'
+/** Whether the header shows the command palette button (DEV-219). */
+export const PALETTE_BUTTON_KEY = 'lotar.preferences.header.paletteButton'
 /** Saved search and filters used by every page when sharing is on (DEV-142). */
 export const SHARED_FILTER_STORAGE_KEY = 'lotar.shared.filter'
 
@@ -124,6 +126,14 @@ export function readSingleKeyShortcutsPreference(): boolean {
 
 export function storeSingleKeyShortcutsPreference(value: boolean) {
     storeBooleanPreference(SINGLE_KEY_SHORTCUTS_KEY, value)
+}
+
+export function readPaletteButtonPreference(): boolean {
+    return readBooleanPreference(PALETTE_BUTTON_KEY, true)
+}
+
+export function storePaletteButtonPreference(value: boolean) {
+    storeBooleanPreference(PALETTE_BUTTON_KEY, value)
 }
 
 /** Where a page's FilterBar saves its search and filters: its own key, or the shared one. */

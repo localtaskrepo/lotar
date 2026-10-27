@@ -50,7 +50,7 @@ const html = computed(() =>
 }
 
 .markdown-content :deep(code) {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.92em;
 }
 

@@ -1844,7 +1844,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 
 .automation-builder__rule-note {
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-warning) 10%, transparent);
   color: var(--color-muted);
   font-size: 13px;
@@ -1857,7 +1857,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   border: 1px solid var(--color-border);
   background: color-mix(in oklab, var(--color-fg) 3%, transparent);
@@ -1887,7 +1887,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__advanced,
 .automation-builder__preview-yaml {
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: color-mix(in oklab, var(--color-fg) 2%, transparent);
 }
 
@@ -1909,7 +1909,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__textarea {
   width: 100%;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   padding: 12px 14px;
   font: inherit;
@@ -1951,7 +1951,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__step {
   border: 1px solid var(--color-border);
   background: color-mix(in oklab, var(--color-fg) 2%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -1998,7 +1998,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 .automation-builder__event-toggle,
 .automation-builder__event-tab {
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: color-mix(in oklab, var(--color-fg) 2%, transparent);
   padding: 14px;
   cursor: pointer;
@@ -2052,7 +2052,7 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 
 .automation-builder__inline-empty {
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px dashed var(--color-border);
   color: var(--color-muted);
   background: color-mix(in oklab, var(--color-fg) 2%, transparent);

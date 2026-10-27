@@ -1862,7 +1862,7 @@ async function removeSprintChip(sprintId: number) {
 
 .badge--muted {
   background: color-mix(in oklab, var(--color-muted) 16%, transparent);
-  color: var(--color-bg);
+  color: var(--color-fg);
 }
 
 .task-panel__body {
@@ -2665,6 +2665,7 @@ textarea {
 }
 
 .task-panel__gallery-name {
+  color: var(--color-fg);
   padding: 0 8px 6px;
   font-size: var(--text-xs, 0.75rem);
 }
@@ -2699,7 +2700,7 @@ textarea {
   top: 6px;
   left: 6px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 600;
   color: var(--color-fg);
@@ -2924,18 +2925,7 @@ textarea {
 }
 
 .task-panel__history-commit {
-  font-family: var(
-    --font-mono,
-    'SFMono-Regular',
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    'Liberation Mono',
-    'Courier New',
-    monospace
-  );
+  font-family: var(--font-mono);
   letter-spacing: 0.02em;
 }
 
@@ -3090,18 +3080,7 @@ textarea {
   border-radius: var(--radius-md, 0.375rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 88%, transparent);
   border: 1px solid color-mix(in oklab, var(--color-border, var(--border)) 60%, transparent);
-  font-family: var(
-    --font-mono,
-    'SFMono-Regular',
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    'Liberation Mono',
-    'Courier New',
-    monospace
-  );
+  font-family: var(--font-mono);
 }
 
 .task-panel__reference-actions {

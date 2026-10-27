@@ -853,7 +853,7 @@ watch(showSprints, (enabled, previous) => {
   grid-template-columns: auto auto 1fr;
 }
 .tasks .task-item .task-inline__thumb {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .tasks .task-item:hover {
   background: color-mix(in oklab, var(--surface) 82%, transparent);
@@ -927,12 +927,12 @@ watch(showSprints, (enabled, previous) => {
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--_color) 70%, transparent);
 }
 .sprint-pill.partial-start {
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
+  border-top-left-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-sm);
 }
 .sprint-pill.partial-end {
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
+  border-top-right-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
 }
 .sprint-pill__label {
   overflow: hidden;

@@ -70,7 +70,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - sprints.defaults.capacity_points / capacity_hours: optional nonnegative numbers
 - sprints.notifications.enabled: boolean (default true; project-overridable)
 - web_ui_path: optional global-only path (top-level spelling), for an external web bundle
-- ui.theme: optional global-only default web UI theme for everyone (`lotar`, `ocean`, `forest`, `ember`, `violet`, `rose`, `contrast`); people can still pick their own in Preferences
+- ui.theme: optional global-only default web UI theme (`lotar`, `ocean`, `forest`, `ember`, `violet`, `rose`, `contrast`, `terminal`, `matrix`, `synthwave`, `blueprint`, `paper`, `retro`, `candy`). Set it in the repository's config for everyone, or in your own `~/.lotar` (which wins) for yourself; people can still pick a theme per browser in Preferences
 - ui.name: optional global-only name shown next to the logo and as the browser tab title (at most 40 characters)
 - ui.logo / ui.logo_dark / ui.icon: optional global-only images for the header logo, its dark-mode version, and the browser tab icon. Paths are relative to the repository (the folder holding the tasks directory), e.g. `assets/app-icon.svg`; files outside it, symlinks out of it, and files that are not SVG/PNG/JPEG/WebP/GIF/ICO/AVIF images are never served. Images uploaded in Config → Appearance are stored in `.tasks/@branding/`
 - remotes: map (named remotes)

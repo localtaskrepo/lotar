@@ -1807,7 +1807,7 @@ async function handleReload() {
 .sync-remote-dialog__target {
   margin: 0;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   border: 1px solid var(--color-border);
   background: color-mix(in oklab, var(--color-surface-contrast) 70%, transparent);
   font-size: 0.85rem;
@@ -1819,7 +1819,7 @@ async function handleReload() {
   gap: 8px;
   padding: 10px 12px;
   border: 1px dashed var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-popover);
 }
 
 .sync-remote-dialog__choice p {
@@ -1867,7 +1867,7 @@ async function handleReload() {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-muted);
@@ -1897,7 +1897,7 @@ async function handleReload() {
   gap: 12px;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-popover);
   background: var(--color-surface);
   flex-wrap: wrap;
 }
@@ -1961,7 +1961,7 @@ async function handleReload() {
 .remote-action {
   padding: 4px 10px;
   font-size: 0.8rem;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
 }
 
 .pill {
@@ -2029,7 +2029,7 @@ async function handleReload() {
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-popover);
   background: var(--color-surface);
   flex-wrap: wrap;
 }
@@ -2173,7 +2173,7 @@ async function handleReload() {
   flex-direction: column;
   gap: 4px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-popover);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   text-align: left;
@@ -2248,7 +2248,7 @@ async function handleReload() {
   gap: 10px;
   padding: 10px 12px;
   margin: 12px 0;
-  border-radius: 10px;
+  border-radius: var(--radius-popover);
   border: 1px solid var(--color-border);
   background: color-mix(in oklab, var(--color-surface) 90%, transparent);
 }
@@ -2269,7 +2269,7 @@ async function handleReload() {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   font-size: 0.7rem;
   border: 1px solid var(--color-border);
   background: color-mix(in oklab, var(--color-surface-contrast) 70%, transparent);
@@ -2282,7 +2282,7 @@ async function handleReload() {
   gap: 6px;
   max-width: 100%;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
   border: 1px solid var(--color-border);
   background: color-mix(in oklab, var(--color-surface-contrast) 70%, transparent);
   font-family: var(--font-mono);
