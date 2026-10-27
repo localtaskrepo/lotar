@@ -1,7 +1,31 @@
 title: Task history errors in a git repo without commits
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-27T16:21:01.589846+00:00
+modified: 2026-10-27T23:08:45.630217+00:00
+comments:
+- date: 2026-10-27T22:40:38.412881+00:00
+  text: 'Fixed: when git log fails, LoTaR asks git whether HEAD exists (git rev-parse --verify --quiet HEAD, locale-independent); without commits the history is empty instead of an error. Covers task history, activity feeds and every other run_git_log user. Test: task_history_is_empty_before_the_first_commit; REST /api/tasks/history in a commit-less repo now returns 200 [].'
 description: 'Found during DEV-216 verification. In a workspace that is a git repository with no commits yet (fresh git init), GET /api/tasks/history?id=<ID> returns 500 INTERNAL with ''git log failed ... your current branch main does not have any commits yet''. The task panel shows a console error on open. Expected: an empty history (no commits means no history), not an error. Repro: git init a folder, lotar add a task, lotar serve, open the task panel.'
+history:
+- at: 2026-10-27T22:39:12.875213+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T22:40:38.412881+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:08:45.630217+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

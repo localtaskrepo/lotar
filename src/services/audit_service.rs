@@ -269,6 +269,11 @@ impl AuditService {
             .output()
             .map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
+            // A repository without commits yet (fresh `git init`) has no
+            // history; that is an empty result, not an error (DEV-217).
+            if !Self::has_commits(repo_root) {
+                return Ok(String::new());
+            }
             return Err(format!(
                 "git log failed (status {}): {}",
                 output.status,
@@ -276,6 +281,18 @@ impl AuditService {
             ));
         }
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    /// Whether the repository's HEAD points at a commit. Asked of git
+    /// directly rather than read from (possibly translated) error text.
+    fn has_commits(repo_root: &Path) -> bool {
+        Command::new("git")
+            .arg("-C")
+            .arg(repo_root)
+            .args(["rev-parse", "--verify", "--quiet", "HEAD"])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(true)
     }
 
     /// Reject commit references that git would parse as command-line options

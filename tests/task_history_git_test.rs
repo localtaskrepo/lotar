@@ -129,6 +129,37 @@ mod git_required {
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert!(v["content"].as_str().unwrap().contains("title: One"));
     }
+
+    /// DEV-217: a freshly initialised repository has no commits yet; its
+    /// tasks simply have no history instead of failing.
+    #[test]
+    fn task_history_is_empty_before_the_first_commit() {
+        crate::common::require_git();
+        let temp = crate::common::temp_dir();
+        let root = temp.path();
+        init_repo(&temp);
+        write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
+        write_file(
+            root,
+            ".tasks/TEST/1.yml",
+            "title: One\nstatus: TODO\nmodified: 2025-08-01T10:00:00Z\n",
+        );
+
+        let out = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .args(["--format", "json", "task", "history", "TEST-1"])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(v["status"], "ok");
+        assert_eq!(v["items"].as_array().unwrap().len(), 0);
+    }
 }
 
 /// DEV-95: the REST history endpoint and the CLI must resolve the
