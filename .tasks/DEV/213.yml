@@ -1,7 +1,31 @@
 title: Per-run model and effort overrides lose to the profile's own args
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-27T02:17:35.372060+00:00
+modified: 2026-10-27T23:08:45.694829+00:00
+comments:
+- date: 2026-10-27T22:49:29.699119+00:00
+  text: 'Decided: an explicit per-run model/effort wins. resolve_profile now drops the profile''s own matching flags from its args for that run (--flag value, --flag=value, Codex -c/--config model_reasoning_effort=…; per runner: --model/-m, --effort, --reasoning-effort, -r, --variant), then applies the override; flags not overridden stay. Command/Amp runners keep their args (they use env vars/modes). docs/help/agent.md updated. Tests: run_overrides_drop_the_profiles_own_model_and_effort_flags, run_overrides_replace_model_and_effort_in_profile_args.'
 description: 'Found by the DEV-202 live failure scenario: lotar agent run --model X (and the REST/MCP/automation overrides) is ignored when the profile''s args already contain --model; the documented rule is that profile args win over LoTaR''s model/effort flags. That rule makes sense for the profile''s own model/effort fields, but an explicit per-run override probably should win, or at least the run should warn that it was ignored. Decide the precedence; if overrides should win, drop the profile''s own --model/--effort (and Codex model_reasoning_effort) from args for that run.'
+history:
+- at: 2026-10-27T22:40:38.445977+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T22:49:29.699119+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:08:45.694829+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

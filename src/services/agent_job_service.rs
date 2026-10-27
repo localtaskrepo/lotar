@@ -821,11 +821,26 @@ fn resolve_profile(
         ));
     };
 
-    // A run's own model and effort win over the profile's.
-    if let Some(model) = non_blank(req.model.as_deref()) {
+    // A run's own model and effort win over the profile's, including model
+    // or effort flags in the profile's own args (DEV-213).
+    let run_model = non_blank(req.model.as_deref());
+    let run_effort = non_blank(req.effort.as_deref());
+    if (run_model.is_some() || run_effort.is_some())
+        && let Ok(kind) = profile
+            .runner
+            .parse::<crate::services::agent_runner::AgentRunnerKind>()
+    {
+        profile.args = crate::services::agent_runner::drop_overridden_args(
+            kind,
+            &profile.args,
+            run_model.is_some(),
+            run_effort.is_some(),
+        );
+    }
+    if let Some(model) = run_model {
         profile.model = Some(model);
     }
-    if let Some(effort) = non_blank(req.effort.as_deref()) {
+    if let Some(effort) = run_effort {
         profile.effort = Some(effort);
     }
     profile.model = non_blank(profile.model.as_deref());
@@ -3281,6 +3296,38 @@ mod tests {
         };
         let profile = resolve_profile(&config, &req).unwrap();
         assert_eq!(profile.runner, "codex");
+    }
+
+    /// DEV-213: a run's own model/effort replace the profile's flags, even
+    /// when the profile passes them in its `args`.
+    #[test]
+    fn run_overrides_replace_model_and_effort_in_profile_args() {
+        let mut config = ResolvedConfig::from_global(GlobalConfig::default());
+        let mut detail = AgentProfileConfig::Runner("claude".to_string()).to_detail();
+        detail.args = vec![
+            "--model".to_string(),
+            "opus".to_string(),
+            "--effort".to_string(),
+            "low".to_string(),
+            "--verbose".to_string(),
+        ];
+        config.agent_profiles.insert("pinned".to_string(), detail);
+        let mut req = AgentJobCreateRequest {
+            ticket_id: "TEST-1".to_string(),
+            prompt: "hello".to_string(),
+            agent: Some("pinned".to_string()),
+            model: Some("sonnet".to_string()),
+            ..Default::default()
+        };
+        let profile = resolve_profile(&config, &req).unwrap();
+        assert_eq!(profile.model.as_deref(), Some("sonnet"));
+        // Only the overridden flag goes; the profile's own effort stays.
+        assert_eq!(profile.args, vec!["--effort", "low", "--verbose"]);
+
+        // Without overrides the profile's args are untouched.
+        req.model = None;
+        let profile = resolve_profile(&config, &req).unwrap();
+        assert_eq!(profile.args.len(), 5);
     }
 }
 

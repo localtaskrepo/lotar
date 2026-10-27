@@ -97,7 +97,7 @@ agents:
 | `antigravity` | `--model` | `--effort` |
 | `command` | `LOTAR_AGENT_MODEL` | `LOTAR_AGENT_EFFORT` |
 
-Values are passed through as given, so each CLI decides which names it accepts. They may use letters, digits and `. _ - : / @ [ ]`. If the profile's `args` already set the model or effort, those win. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
+Values are passed through as given, so each CLI decides which names it accepts. They may use letters, digits and `. _ - : / @ [ ]`. If the profile's `args` already set the model or effort, those win over the profile's `model`/`effort` fields; a single run's override wins over both, replacing the matching flags from the profile's `args` for that run. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
 
 ### Usage and cost
 

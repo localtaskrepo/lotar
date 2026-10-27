@@ -718,6 +718,66 @@ fn has_flag(args: &[String], names: &[&str]) -> bool {
     })
 }
 
+/// Remove the profile's own model and/or effort flags from `args` (both
+/// `--flag value` and `--flag=value`, and Codex's `-c model_reasoning_effort=…`),
+/// so a single run's override is the one the CLI sees (DEV-213).
+pub fn drop_overridden_args(
+    kind: AgentRunnerKind,
+    args: &[String],
+    model: bool,
+    effort: bool,
+) -> Vec<String> {
+    let mut flags: Vec<&str> = Vec::new();
+    if model && !matches!(kind, AgentRunnerKind::Amp | AgentRunnerKind::Command) {
+        flags.extend(["--model", "-m"]);
+    }
+    if effort {
+        flags.extend(match kind {
+            AgentRunnerKind::Claude | AgentRunnerKind::Antigravity => &["--effort"][..],
+            AgentRunnerKind::Copilot => &["--reasoning-effort"][..],
+            AgentRunnerKind::Droid => &["-r", "--reasoning-effort"][..],
+            AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => &["--variant"][..],
+            _ => &[][..],
+        });
+    }
+    let codex_effort = effort && kind == AgentRunnerKind::Codex;
+    let is_effort_override =
+        |value: &str| value.trim_start().starts_with("model_reasoning_effort=");
+
+    let mut kept = Vec::with_capacity(args.len());
+    let mut index = 0;
+    while index < args.len() {
+        let arg = &args[index];
+        let (name, inline) = match arg.split_once('=') {
+            Some((name, value)) => (name, Some(value)),
+            None => (arg.as_str(), None),
+        };
+        let next = args.get(index + 1);
+        if flags.contains(&name) {
+            // `--flag value` also drops the value; `--flag=value` is one arg.
+            let takes_next = inline.is_none() && next.is_some_and(|value| !value.starts_with('-'));
+            index += if takes_next { 2 } else { 1 };
+            continue;
+        }
+        if codex_effort && (name == "-c" || name == "--config") {
+            match inline {
+                Some(value) if is_effort_override(value) => {
+                    index += 1;
+                    continue;
+                }
+                None if next.is_some_and(|value| is_effort_override(value)) => {
+                    index += 2;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        kept.push(arg.clone());
+        index += 1;
+    }
+    kept
+}
+
 /// The profile's (or the run's) model and effort as each CLI's own flags.
 /// A flag the profile's `args` already pass is left to the profile.
 fn model_effort_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec<String> {
@@ -1700,6 +1760,53 @@ mod tests {
             .unwrap()
             .args;
         assert!(!args.contains(&"model_reasoning_effort=high".to_string()));
+    }
+
+    #[test]
+    fn run_overrides_drop_the_profiles_own_model_and_effort_flags() {
+        let owned = |items: &[&str]| {
+            items
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>()
+        };
+        let claude = owned(&["--model", "opus", "--effort=low", "--verbose"]);
+        assert_eq!(
+            drop_overridden_args(AgentRunnerKind::Claude, &claude, true, true),
+            owned(&["--verbose"])
+        );
+        assert_eq!(
+            drop_overridden_args(AgentRunnerKind::Claude, &claude, true, false),
+            owned(&["--effort=low", "--verbose"])
+        );
+        let codex = owned(&[
+            "-m",
+            "gpt-5",
+            "-c",
+            "model_reasoning_effort=low",
+            "-c",
+            "sandbox=x",
+        ]);
+        assert_eq!(
+            drop_overridden_args(AgentRunnerKind::Codex, &codex, true, true),
+            owned(&["-c", "sandbox=x"])
+        );
+        let codex_inline = owned(&["--config=model_reasoning_effort=low", "--json"]);
+        assert_eq!(
+            drop_overridden_args(AgentRunnerKind::Codex, &codex_inline, false, true),
+            owned(&["--json"])
+        );
+        let droid = owned(&["-r", "high", "-m", "x"]);
+        assert_eq!(
+            drop_overridden_args(AgentRunnerKind::Droid, &droid, false, true),
+            owned(&["-m", "x"])
+        );
+        // Command runners take model and effort from env vars; args stay.
+        let command = owned(&["--model", "x"]);
+        assert_eq!(
+            drop_overridden_args(AgentRunnerKind::Command, &command, true, true),
+            command
+        );
     }
 
     #[test]
