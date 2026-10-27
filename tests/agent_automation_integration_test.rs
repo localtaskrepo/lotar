@@ -3524,3 +3524,214 @@ exit 0\n",
         assert!(wait_for_job_status(&second_job.id, "completed", 5000));
     }
 }
+
+/// DEV-202: a runner that reports an error in its final result fails the job
+/// even though it exits 0, and job_failed automation runs.
+#[cfg(unix)]
+#[test]
+fn runner_reported_error_with_exit_zero_fails_the_job() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "error-result.sh",
+        r#"#!/bin/sh
+cat > /dev/null &
+echo '{"type":"system","subtype":"init","session_id":"e1"}'
+echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"API Error: overloaded","session_id":"e1"}'
+exit 0
+"#,
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: ERR\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  worker:\n    runner: claude\n    command: \"{}\"\n",
+            script.display()
+        ),
+    );
+    fs::write(
+        fixtures.tasks_root.join("automation.yml"),
+        "automation:\n  rules:\n    - when:\n        assignee: \"@worker\"\n      on:\n        job_failed:\n          set:\n            status: HelpNeeded\n          comment: \"Agent failed: ${{agent.job_id}}\"\n",
+    )
+    .unwrap();
+    let mut storage = fixtures.create_storage();
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Error result".to_string(),
+            project: Some("ERR".to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    TaskService::update(
+        &mut storage,
+        &created.id,
+        TaskUpdate {
+            assignee: Some("@worker".to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let job = job_for_ticket(&created.id);
+    assert!(
+        wait_for_job_status(&job.id, "failed", 6000),
+        "job should fail"
+    );
+    let job = AgentJobService::get_job(&job.id).unwrap();
+    assert_eq!(job.exit_code, Some(0));
+    assert_eq!(job.last_message.as_deref(), Some("API Error: overloaded"));
+    assert!(wait_for_task_status(
+        &storage,
+        &created.id,
+        "HelpNeeded",
+        6000
+    ));
+    let task = TaskService::get(&storage, &created.id, None).unwrap();
+    assert!(task.comments.iter().any(|c| c.text.contains(&job.id)));
+}
+
+/// DEV-202: a message sent to a running Claude job reaches the agent through
+/// stdin and its answer is recorded.
+#[cfg(unix)]
+#[test]
+fn messages_reach_a_running_claude_job() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    // Reads the prompt, then answers the next stdin message by echoing it.
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "echo-agent.sh",
+        r#"#!/bin/sh
+read -r prompt
+echo '{"type":"system","subtype":"init","session_id":"m1"}'
+echo '{"type":"assistant","message":{"content":[{"type":"text","text":"waiting"}]},"session_id":"m1"}'
+read -r message
+word=$(printf '%s' "$message" | sed -n 's/.*"content":"\([^"]*\)".*/\1/p')
+printf '{"type":"assistant","message":{"content":[{"type":"text","text":"got %s"}]},"session_id":"m1"}\n' "$word"
+printf '{"type":"result","subtype":"success","is_error":false,"result":"got %s","session_id":"m1"}\n' "$word"
+"#,
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: MSG\nagents:\n  talker:\n    runner: claude\n    command: \"{}\"\n",
+            script.display()
+        ),
+    );
+    let mut storage = fixtures.create_storage();
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Messages".to_string(),
+            project: Some("MSG".to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let job = AgentJobService::start_job_with_tasks_dir(
+        AgentJobCreateRequest {
+            ticket_id: created.id.clone(),
+            prompt: "Wait for my message".to_string(),
+            agent: Some("talker".to_string()),
+            ..Default::default()
+        },
+        fixtures.tasks_root.as_path(),
+    )
+    .unwrap();
+    assert!(wait_for_job_status(&job.id, "running", 6000));
+    let deadline = Instant::now() + Duration::from_secs(6);
+    while AgentJobService::get_job(&job.id)
+        .and_then(|j| j.last_message)
+        .as_deref()
+        != Some("waiting")
+    {
+        assert!(Instant::now() < deadline, "agent never started waiting");
+        sleep(Duration::from_millis(25));
+    }
+    AgentJobService::send_message(&job.id, "pineapple").expect("message accepted");
+    assert!(wait_for_job_status(&job.id, "completed", 6000));
+    let job = AgentJobService::get_job(&job.id).unwrap();
+    assert_eq!(job.last_message.as_deref(), Some("got pineapple"));
+    let events = AgentJobService::events_for(&job.id);
+    assert!(
+        events
+            .iter()
+            .any(|e| e.kind == "agent_job_input" && e.message.as_deref() == Some("pineapple"))
+    );
+}
+
+/// DEV-202: cancelling a job also stops commands the agent started in their
+/// own session or process group (Codex and Copilot run shell commands that
+/// way), not only the runner itself.
+#[cfg(unix)]
+#[test]
+fn cancel_stops_commands_the_agent_started_in_their_own_session() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let pid_file = fixtures.get_temp_path().join("detached.pid");
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "detaching-agent.sh",
+        &format!(
+            r#"#!/bin/sh
+cat > /dev/null &
+echo '{{"type":"system","subtype":"init","session_id":"d1"}}'
+python3 -c 'import os, time; os.setsid(); open("{pid}", "w").write(str(os.getpid())); time.sleep(300)' &
+sleep 300
+"#,
+            pid = pid_file.display()
+        ),
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: CAN\nagents:\n  worker:\n    runner: claude\n    command: \"{}\"\n",
+            script.display()
+        ),
+    );
+    let mut storage = fixtures.create_storage();
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Cancel tree".to_string(),
+            project: Some("CAN".to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let job = AgentJobService::start_job_with_tasks_dir(
+        AgentJobCreateRequest {
+            ticket_id: created.id.clone(),
+            prompt: "go".to_string(),
+            agent: Some("worker".to_string()),
+            ..Default::default()
+        },
+        fixtures.tasks_root.as_path(),
+    )
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let pid = loop {
+        if let Ok(text) = fs::read_to_string(&pid_file)
+            && let Ok(pid) = text.trim().parse::<i32>()
+        {
+            break pid;
+        }
+        assert!(Instant::now() < deadline, "detached child never started");
+        sleep(Duration::from_millis(50));
+    };
+    AgentJobService::cancel_job(&job.id).expect("cancel");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    // SAFETY: signal 0 only checks whether the process exists.
+    while unsafe { libc::kill(pid, 0) } == 0 {
+        if Instant::now() > deadline {
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+            panic!("the detached child survived the cancel");
+        }
+        sleep(Duration::from_millis(50));
+    }
+}

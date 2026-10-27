@@ -5,14 +5,14 @@
 //
 //   npm run agents:live                         # every installed CLI, all scenarios
 //   npm run agents:live -- --runner claude      # one CLI
-//   npm run agents:live -- --scenario edit      # one scenario (edit, settings, pipeline, template, handback, mcp)
+//   npm run agents:live -- --scenario edit      # one scenario (edit, settings, pipeline, template, handback, mcp, failure, cancel, message)
 //   npm run agents:live -- --keep               # keep the temp repositories
 //
 // Each scenario builds a throwaway git repository with a small bug and a
 // ticket, drives LoTaR the way a user would, and checks the outcome.
 // LOTAR_BIN overrides the binary (default: target/debug/lotar).
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -363,6 +363,125 @@ SCENARIOS.mcp = function mcp(runner, options) {
         log,
     };
 };
+
+/** An unknown model makes the CLI fail; the job must fail and say why. */
+SCENARIOS.failure = function failure(runner, options) {
+    const dir = makeRepo(runner, 'failure');
+    // No model in the profile args: those would win over --model.
+    writeConfig(dir, runner, '', '[]');
+    const ticket = addTicket(dir);
+    const result = lotar(
+        dir,
+        ['agent', 'run', ticket, 'Say hi.', '--agent', 'fixer', '--model', 'no-such-model-xyz', '--wait'],
+        {},
+        options.timeout,
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    const failed = result.status !== 0 && /failed/i.test(output);
+    return {
+        dir,
+        ok: failed,
+        detail: output.trim().split('\n').slice(-2).join(' | ').slice(0, 300),
+        log: jobLog(dir, output),
+    };
+};
+
+/** Stopping a running job ends it as cancelled and stops the CLI. */
+SCENARIOS.cancel = function cancel(runner, options) {
+    const dir = makeRepo(runner, 'cancel');
+    writeConfig(dir, runner);
+    const ticket = addTicket(dir);
+    return withServer(dir, (api) => {
+        // A duration unique to this run, so leftovers from other runs don't count.
+        const seconds = 200 + Math.floor(Math.random() * 700);
+        const started = api('POST', '/api/jobs', {
+            ticket_id: ticket,
+            agent: 'fixer',
+            prompt: `Run the shell command \`sleep ${seconds}\` and wait for it to finish before you do anything else.`,
+        });
+        const id = started?.data?.job?.id;
+        if (!id) return { dir, ok: false, detail: `start failed: ${JSON.stringify(started)}` };
+        const running = waitFor(
+            options.timeout,
+            () => api('GET', `/api/jobs/get?id=${id}`)?.data?.job?.status === 'running',
+        );
+        spawnSync('sleep', ['8']);
+        api('POST', '/api/jobs/cancel', { id });
+        const stopped = waitFor(30, () => api('GET', `/api/jobs/get?id=${id}`)?.data?.job?.status === 'cancelled');
+        spawnSync('sleep', ['2']);
+        const leftover = run('pgrep', ['-f', `sleep ${seconds}`]).stdout.trim();
+        return {
+            dir,
+            ok: running && stopped && !leftover,
+            detail: `running ${running}; cancelled ${stopped}; leftover process ${leftover ? 'yes' : 'no'}`,
+        };
+    });
+};
+
+/** A message sent while Claude runs is answered in the same job. */
+SCENARIOS.message = function message(runner, options) {
+    if (runner !== 'claude') return { ok: true, detail: 'skipped (only Claude accepts messages)' };
+    const dir = makeRepo(runner, 'message');
+    writeConfig(dir, runner);
+    const ticket = addTicket(dir);
+    return withServer(dir, (api) => {
+        const started = api('POST', '/api/jobs', {
+            ticket_id: ticket,
+            agent: 'fixer',
+            prompt: 'Do not change any files and do not run commands. Reply only with READY. A follow-up message will give you a codeword; reply to it with only the codeword.',
+        });
+        const id = started?.data?.job?.id;
+        if (!id) return { dir, ok: false, detail: `start failed: ${JSON.stringify(started)}` };
+        waitFor(60, () => api('GET', `/api/jobs/get?id=${id}`)?.data?.job?.status === 'running');
+        const sent = api('POST', '/api/jobs/message', { id, message: 'The codeword is PINEAPPLE.' });
+        const done = waitFor(options.timeout, () =>
+            ['completed', 'failed'].includes(api('GET', `/api/jobs/get?id=${id}`)?.data?.job?.status),
+        );
+        const job = api('GET', `/api/jobs/get?id=${id}`)?.data?.job ?? {};
+        const answered = /PINEAPPLE/.test(job.last_message ?? '');
+        return {
+            dir,
+            ok: done && job.status === 'completed' && sent?.data?.accepted === true && answered,
+            detail: `message ${sent?.data?.accepted ? 'accepted' : 'refused'}; final answer: ${(job.last_message ?? '').slice(0, 80)}`,
+        };
+    });
+};
+
+/** Run `body(api)` against a `lotar serve` for `dir`, then stop it. */
+function withServer(dir, body) {
+    const port = 19000 + Math.floor(Math.random() * 1000);
+    const server = spawn(lotarBin, ['--tasks-dir', path.join(dir, '.tasks'), 'serve', '--port', String(port)], {
+        cwd: dir,
+        stdio: 'ignore',
+        env: { ...process.env, LOTAR_AGENT_LOGS_DIR: path.join(dir, '.agent-logs') },
+    });
+    const api = (method, route, payload) => {
+        const args = ['-s', '-X', method, `http://localhost:${port}${route}`];
+        if (payload) args.push('-H', 'content-type: application/json', '-d', JSON.stringify(payload));
+        const response = run('curl', args).stdout;
+        try {
+            return JSON.parse(response);
+        } catch {
+            return null;
+        }
+    };
+    try {
+        if (!waitFor(20, () => api('GET', '/api/jobs') !== null))
+            return { dir, ok: false, detail: 'server did not start' };
+        return body(api);
+    } finally {
+        server.kill();
+    }
+}
+
+function waitFor(seconds, condition) {
+    const deadline = Date.now() + seconds * 1000;
+    while (Date.now() < deadline) {
+        if (condition()) return true;
+        spawnSync('sleep', ['1']);
+    }
+    return false;
+}
 
 /** `lotar init --template agent-pipeline` with every phase on `runner`. */
 function setUpTemplate(dir, runner) {

@@ -748,13 +748,54 @@ fn wrapper_executable_name() -> &'static str {
     }
 }
 
+/// Stop a runner and everything it started. Some CLIs (Codex, Copilot) run
+/// shell commands in their own process group, which signalling the runner's
+/// group misses, so every descendant and its group are signalled too.
 fn terminate_child(child: &mut Child) {
     #[cfg(unix)]
-    unsafe {
-        let pid = child.id() as i32;
-        let _ = libc::kill(-pid, libc::SIGTERM);
+    {
+        let root = child.id();
+        let descendants = descendant_pids(root);
+        // SAFETY: plain signal delivery to processes LoTaR started.
+        unsafe {
+            let _ = libc::kill(-(root as i32), libc::SIGTERM);
+            for pid in &descendants {
+                let pid = *pid as i32;
+                if libc::getpgid(pid) == pid {
+                    let _ = libc::kill(-pid, libc::SIGTERM);
+                }
+                let _ = libc::kill(pid, libc::SIGTERM);
+            }
+        }
     }
     let _ = child.kill();
+}
+
+/// All processes below `root`, found through their parent links.
+#[cfg(unix)]
+fn descendant_pids(root: u32) -> Vec<u32> {
+    let mut system = sysinfo::System::new();
+    system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    for (pid, process) in system.processes() {
+        if let Some(parent) = process.parent() {
+            children
+                .entry(parent.as_u32())
+                .or_default()
+                .push(pid.as_u32());
+        }
+    }
+    let mut found = Vec::new();
+    let mut queue = vec![root];
+    while let Some(pid) = queue.pop() {
+        for child in children.get(&pid).into_iter().flatten() {
+            if !found.contains(child) {
+                found.push(*child);
+                queue.push(*child);
+            }
+        }
+    }
+    found
 }
 
 fn resolve_profile(

@@ -295,7 +295,19 @@ pub fn usage_from_result(
         }
         AgentRunnerKind::Command => return None,
     };
-    (usage != crate::api_types::AgentJobUsage::default()).then_some(usage)
+    // A run that failed before doing anything reports zeros; that is no usage.
+    let nothing = [
+        usage.input_tokens,
+        usage.output_tokens,
+        usage.turns,
+        usage.lines_added,
+        usage.lines_removed,
+    ]
+    .iter()
+    .all(|value| value.unwrap_or(0) == 0)
+        && usage.cost_usd.unwrap_or(0.0) == 0.0
+        && usage.premium_requests.unwrap_or(0.0) == 0.0;
+    (!nothing).then_some(usage)
 }
 
 /// Tools of LoTaR's MCP server an agent job may use: reading and updating
@@ -1499,6 +1511,15 @@ mod tests {
         assert_eq!(copilot.lines_added, Some(1));
         assert_eq!(copilot.lines_removed, Some(1));
         assert_eq!(copilot.describe(), "1 premium request · +1 −1 lines");
+    }
+
+    #[test]
+    fn all_zero_usage_counts_as_none() {
+        let payload = serde_json::json!({
+            "type": "result", "is_error": true, "total_cost_usd": 0.0, "num_turns": 0,
+            "usage": { "input_tokens": 0, "output_tokens": 0 }
+        });
+        assert_eq!(usage_from_result(AgentRunnerKind::Claude, &payload), None);
     }
 
     #[test]

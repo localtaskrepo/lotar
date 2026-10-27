@@ -5,10 +5,12 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-27T00:11:08.775828+00:00
-modified: 2026-10-27T01:08:49.920256+00:00
+modified: 2026-10-27T02:17:20.485527+00:00
 comments:
 - date: 2026-10-27T01:08:48.437020+00:00
   text: 'Done: job logs default to <tasks dir>/@agent-logs; LoTaR writes a .gitignore there (logs hold prompts and agent output) and keeps the newest 500 job logs; agent.logs_dir / LOTAR_AGENT_LOGS_DIR still pick another folder and ''off'' turns logging off. CLI status/logs/list-jobs, the job service and the config UI hint use the same default. Tests: agent_log_service default/off and gitignore+retention tests, cli_agent_check_test finished_jobs_can_be_read_back_without_configuring_logs. Gates: lint, 1739 Rust + 1225 UI. Smoke: a background run had 22 timing failures in unrelated specs (sprints sort, sync reports) while the machine was at load average 24-35 from other work; a foreground rerun was still building after 30+ minutes at commit time, result to follow on this ticket.'
+- date: 2026-10-27T02:17:20.485527+00:00
+  text: 'Smoke follow-up: full npm run test:smoke:agent passed 352/352 once the machine load dropped (run together with DEV-202).'
 description: |-
   Found during DEV-199/201: job logs are only written when agent.logs_dir (or LOTAR_AGENT_LOGS_DIR) is set, so lotar agent status/logs/list-jobs from another terminal, and the Agents page after a server restart, know nothing about finished jobs.
 
@@ -32,3 +34,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-27T02:17:20.485527+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

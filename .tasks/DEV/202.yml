@@ -1,10 +1,14 @@
 title: Scenario tests for automation and agents, including opt-in live CLI runs
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T17:02:37.339929+00:00
-modified: 2026-10-26T17:38:26.713866+00:00
+modified: 2026-10-27T02:17:20.560832+00:00
+comments:
+- date: 2026-10-27T02:17:20.531563+00:00
+  text: 'Done. Rust scenarios added: runner_reported_error_with_exit_zero_fails_the_job (error result, exit 0, job_failed automation comments with the job id), messages_reach_a_running_claude_job (stdin message answered, agent_job_input event), cancel_stops_commands_the_agent_started_in_their_own_session (fails without the fix below). Already covered elsewhere this round: template pipelines with commits/merge/fast-forward/hand-back (agent_automation_integration_test), worktree cleanup with ignored files, queue limits and cancel (agent_safety_test), smoke for setup, run dialog, streaming logs, filters, grouped jobs, reviewed template, stop all. Live (npm run agents:live): new failure, cancel and message scenarios besides edit/settings/pipeline/template/handback/mcp; claude passes all; codex and copilot pass failure and cancel (message is Claude only). Bug found by the live cancel check and fixed: cancelling a codex or copilot job left the agent''s shell command running, because those CLIs start commands in their own process group; LoTaR now signals the runner''s whole process tree. Also: an all-zero usage report (run failed before doing anything) is no longer recorded. Gates: lint, 1751 Rust + 1226 UI, 352 smoke.'
 description: |-
   Scenario coverage for automation and agents working together.
 
@@ -22,3 +26,15 @@ history:
       - Rust scenario tests with realistic per-runner stub streams (based on the real captures in tests/fixtures/agent-streams): pipeline through several phases, runner-reported failure with exit code 0, cancel mid-run, queue limits, worktrees, messages to a running Claude job.
       - Smoke coverage for the same flows through the server and UI.
       - Opt-in live runs (npm run agents:live, scripts/agent-live-check.mjs): today edit and pipeline for claude/codex/copilot; add failure, cancel, message mid-run and a template pipeline.
+- at: 2026-10-27T02:17:20.531563+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T02:17:20.560832+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
