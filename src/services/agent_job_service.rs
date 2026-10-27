@@ -1322,10 +1322,15 @@ pub(crate) fn ticket_done_state(tasks_dir: &std::path::Path, ticket_id: &str) ->
     )
 }
 
+/// Whether a finished ticket's worktree can be removed safely: it must be a
+/// worktree of this repository, on its own branch, merged into the main
+/// checkout, and hold no untracked or modified files. Git-ignored files
+/// (build output) only keep it when `allow_ignored` is false.
 pub(crate) fn check_worktree_cleanup(
     repo_root: &std::path::Path,
     path: &std::path::Path,
     branch: Option<&str>,
+    allow_ignored: bool,
 ) -> LoTaRResult<()> {
     let root = fs::canonicalize(repo_root).map_err(LoTaRError::IoError)?;
     let target = fs::canonicalize(path).map_err(LoTaRError::IoError)?;
@@ -1341,20 +1346,35 @@ pub(crate) fn check_worktree_cleanup(
             "Worktree belongs to a different repository".into(),
         ));
     }
+    let mut status_args = vec!["status", "--porcelain", "--untracked-files=all"];
+    if !allow_ignored {
+        status_args.push("--ignored");
+    }
     let status = git_command(&target)
-        .args([
-            "status",
-            "--porcelain",
-            "--untracked-files=all",
-            "--ignored",
-        ])
+        .args(&status_args)
         .current_dir(&target)
         .output()
         .map_err(LoTaRError::IoError)?;
-    if !status.status.success() || !status.stdout.is_empty() {
+    if !status.status.success() {
         return Err(LoTaRError::ValidationError(
-            "Worktree is dirty or its status is unknown".into(),
+            "git status failed in the worktree".into(),
         ));
+    }
+    if !status.stdout.is_empty() {
+        let first = String::from_utf8_lossy(&status.stdout)
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        return Err(LoTaRError::ValidationError(format!(
+            "it has uncommitted or {} files (for example `{}`)",
+            if allow_ignored {
+                "untracked"
+            } else {
+                "untracked or ignored"
+            },
+            first.get(3..).unwrap_or(&first)
+        )));
     }
     let branch =
         branch.ok_or_else(|| LoTaRError::ValidationError("Worktree branch is unknown".into()))?;
@@ -1414,7 +1434,7 @@ fn maybe_cleanup_worktree(
         None => return,
     };
     // Do not race a follow-up phase that now owns this ticket's worktree.
-    let Ok(registry) = JOB_REGISTRY.lock() else {
+    let Ok(mut registry) = JOB_REGISTRY.lock() else {
         return;
     };
     if registry
@@ -1424,7 +1444,23 @@ fn maybe_cleanup_worktree(
     {
         return;
     }
-    if check_worktree_cleanup(&repo_root, &target.path, target.branch.as_deref()).is_err() {
+    if let Err(err) = check_worktree_cleanup(
+        &repo_root,
+        &target.path,
+        target.branch.as_deref(),
+        config.agent_worktree.cleanup_ignored_files,
+    ) {
+        let reason = match err {
+            LoTaRError::ValidationError(reason) => reason,
+            other => other.to_string(),
+        };
+        let note = format!(
+            "Kept the worktree {}: {reason}. Remove it with `lotar agent worktree cleanup` once it is safe.",
+            target.path.display()
+        );
+        if let Some(state) = registry.jobs.get_mut(job_id) {
+            record_and_emit(state, "agent_job_progress", Some(note));
+        }
         return;
     }
 

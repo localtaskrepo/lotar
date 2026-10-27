@@ -1682,7 +1682,8 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
         && worktree.cleanup_on_done.is_none()
         && worktree.cleanup_on_failure.is_none()
         && worktree.cleanup_on_cancel.is_none()
-        && worktree.cleanup_delete_branches.is_none();
+        && worktree.cleanup_delete_branches.is_none()
+        && worktree.cleanup_ignored_files.is_none();
     if empty {
         config.agent_worktree = None;
     }

@@ -900,6 +900,8 @@ export interface AgentWorktreeConfig {
     cleanup_on_failure?: boolean
     cleanup_on_cancel?: boolean
     cleanup_delete_branches?: boolean
+    /** Git-ignored files don't block cleanup (default true). */
+    cleanup_ignored_files?: boolean
 }
 
 export interface SprintDefaultsConfig {

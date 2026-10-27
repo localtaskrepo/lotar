@@ -286,6 +286,12 @@ pub struct AgentWorktreeConfig {
     /// Delete the worktree branch when cleanup runs.
     #[serde(default)]
     pub cleanup_delete_branches: bool,
+    /// Let cleanup remove a worktree that still holds git-ignored files
+    /// (build and test output, which `git worktree remove` deletes anyway).
+    /// Untracked and modified files always keep the worktree. When false,
+    /// any ignored file keeps it too.
+    #[serde(default = "default_true")]
+    pub cleanup_ignored_files: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -307,6 +313,8 @@ pub struct AgentWorktreeConfigOverride {
     pub cleanup_on_cancel: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cleanup_delete_branches: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cleanup_ignored_files: Option<bool>,
 }
 
 impl Default for AgentWorktreeConfig {
@@ -320,6 +328,7 @@ impl Default for AgentWorktreeConfig {
             cleanup_on_failure: false,
             cleanup_on_cancel: false,
             cleanup_delete_branches: false,
+            cleanup_ignored_files: true,
         }
     }
 }

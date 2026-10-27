@@ -1102,6 +1102,9 @@ fn apply_agent_worktree_override(
     if let Some(cleanup_delete_branches) = override_config.cleanup_delete_branches {
         target.cleanup_delete_branches = cleanup_delete_branches;
     }
+    if let Some(cleanup_ignored_files) = override_config.cleanup_ignored_files {
+        target.cleanup_ignored_files = cleanup_ignored_files;
+    }
 }
 
 /// Invalidate the cached resolved configuration for a specific tasks_dir.

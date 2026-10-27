@@ -288,6 +288,7 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
     field("agent_worktree_cleanup_on_cancel").source("agent.worktree.cleanup_on_cancel"),
     field("agent_worktree_cleanup_delete_branches")
         .source("agent.worktree.cleanup_delete_branches"),
+    field("agent_worktree_cleanup_ignored_files").source("agent.worktree.cleanup_ignored_files"),
     field("agent_automation").aliases(&["agent.automation"]),
     field("agent_worktree").aliases(&["agent.worktree"]),
     field("remotes").both().aliases(&["sync.remotes"]),
@@ -713,6 +714,11 @@ mod tests {
             "agent.worktree.cleanup_delete_branches",
             "agent_worktree_cleanup_delete_branches",
             "agent_worktree_cleanup_delete_branches",
+        ),
+        (
+            "agent.worktree.cleanup_ignored_files",
+            "agent_worktree_cleanup_ignored_files",
+            "agent_worktree_cleanup_ignored_files",
         ),
         (
             "branch.type-aliases",

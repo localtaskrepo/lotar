@@ -860,3 +860,55 @@ mod git_required {
         );
     }
 }
+
+/// DEV-207: build output that git ignores no longer keeps a finished
+/// ticket's worktree (git worktree remove drops it too), unless
+/// agent.worktree.cleanup_ignored_files is turned off. A kept worktree is
+/// explained in the job log.
+#[test]
+fn automatic_cleanup_removes_worktrees_with_only_ignored_files_unless_disabled() {
+    common::require_git();
+    for strict in [false, true] {
+        let (fixture, ticket) = setup("mkdir -p build && echo out > build/app.o", true);
+        let root = fixture.get_temp_path();
+        fs::write(root.join(".gitignore"), "build/\n").unwrap();
+        git(root, &["add", ".gitignore"]);
+        git(root, &["commit", "-m", "Ignore build output"]);
+        if strict {
+            let config_path = fixture.tasks_root.join("config.yml");
+            let config = fs::read_to_string(&config_path).unwrap().replace(
+                "    cleanup_delete_branches: true\n",
+                "    cleanup_delete_branches: true\n    cleanup_ignored_files: false\n",
+            );
+            fs::write(&config_path, config).unwrap();
+        }
+        let path = fixture.tasks_root.join("SAFE/1.yml");
+        let mut task: serde_yaml_ng::Value =
+            serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        task["status"] = "Done".into();
+        fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root)
+            .unwrap();
+        wait_idle();
+        let job = AgentJobService::get_job(&job.id).unwrap();
+        assert_eq!(job.status, "completed", "{:?}", job.last_message);
+        let worktree = Path::new(job.worktree_path.as_deref().unwrap());
+        let kept_note = AgentJobService::events_for(&job.id).iter().any(|event| {
+            event
+                .message
+                .as_deref()
+                .is_some_and(|m| m.contains("Kept the worktree") && m.contains("build/app.o"))
+        });
+        if strict {
+            assert!(worktree.exists(), "strict cleanup keeps ignored files");
+            assert!(kept_note, "a kept worktree is explained in the log");
+        } else {
+            assert!(
+                !worktree.exists(),
+                "ignored build output must not block cleanup"
+            );
+            assert!(!kept_note);
+        }
+    }
+}

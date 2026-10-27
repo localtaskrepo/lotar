@@ -1,13 +1,16 @@
 title: Agent worktree cleanup never runs when the worktree has build output
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-26T20:21:32.319496+00:00
-modified: 2026-10-26T22:22:14.332904+00:00
+modified: 2026-10-27T00:10:37.276705+00:00
 comments:
 - date: 2026-10-26T22:22:14.332904+00:00
   text: Make the behavior dependent on a config value, and set the default to what you proposed.
+- date: 2026-10-27T00:10:37.238780+00:00
+  text: 'Done as decided: new agent.worktree.cleanup_ignored_files (default true). Automatic cleanup and lotar agent worktree cleanup no longer count git-ignored files (git worktree remove deletes them anyway) but still refuse untracked/modified files, unmerged branches and the other DEV-53 guards; false restores the strict check. When automatic cleanup keeps a worktree, the job log says why (with an example path) and how to remove it later. Tests: agent_safety_test automatic_cleanup_removes_worktrees_with_only_ignored_files_unless_disabled (both modes) plus the existing safety tests. Docs: agent.md, config-reference.md. Gates: lint, 1736 Rust + 1225 UI, 352 smoke.'
 description: |-
   Found in the DEV-201 live run of the agent-pipeline template. cleanup_on_done (and lotar agent worktree cleanup) refuse to remove a worktree whose git status --ignored lists anything, a guard added in the DEV-53 security pass. Agents almost always leave build or test output (__pycache__, node_modules, target/), usually git-ignored, so in practice finished tickets keep their worktree and agent/ branch.
 
@@ -17,3 +20,21 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-26T22:41:19.678929+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T00:10:37.238780+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T00:10:37.276705+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

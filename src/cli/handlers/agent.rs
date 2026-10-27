@@ -650,10 +650,21 @@ impl AgentHandler {
                 ));
                 continue;
             }
+            let allow_ignored = wt
+                .ticket_id
+                .rsplit_once('-')
+                .and_then(|(project, _)| {
+                    crate::config::resolution::config_for_project(&resolver.path, Some(project))
+                        .ok()
+                })
+                .map_or(config.agent_worktree.cleanup_ignored_files, |c| {
+                    c.agent_worktree.cleanup_ignored_files
+                });
             if let Err(err) = crate::services::agent_job_service::check_worktree_cleanup(
                 &repo_root,
                 std::path::Path::new(&wt.path),
                 Some(&wt.branch),
+                allow_ignored,
             ) {
                 errors.push(format!("{}: {}", wt.ticket_id, err));
                 renderer.emit_warning(format!("Preserving worktree {}: {}", wt.ticket_id, err));

@@ -35,6 +35,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - agent.worktree.branch_prefix: string (default "agent/") — prefix used when creating agent branches.
 - agent.worktree.max_parallel_jobs: optional positive integer (unset means unlimited)
 - agent.worktree.cleanup_on_done / cleanup_on_failure / cleanup_on_cancel / cleanup_delete_branches: booleans (default false). Eligibility and clean/merged/active-job safeguards still apply; see [Agent Jobs](./agent.md).
+- agent.worktree.cleanup_ignored_files: boolean (default true). When true, git-ignored files (build output) don't keep a worktree from being cleaned up; untracked and modified files always do. Set false to keep any worktree that holds ignored files.
 - agent.automation.on_start / on_success / on_failure / on_cancel: legacy lifecycle maps that are still accepted but not applied. Job lifecycle changes (for example InProgress on start, NeedsReview on success) come from `job_started` / `job_completed` / `job_failed` / `job_cancelled` rules in the automation file; see [Automation Rules](./automation.md#agent-job-queueing).
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
   - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `command`

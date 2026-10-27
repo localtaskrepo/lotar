@@ -204,6 +204,7 @@ agent:
     cleanup_on_failure: false     # Remove worktrees after failed jobs (default: false)
     cleanup_on_cancel: false      # Remove worktrees after cancelled jobs (default: false)
     cleanup_delete_branches: true # Delete worktree branches during cleanup
+    cleanup_ignored_files: true   # Git-ignored files (build output) don't block cleanup (default: true)
 ```
 
 When enabled:
@@ -211,6 +212,7 @@ When enabled:
 - A branch is created at `<branch_prefix><ticket-id>` (e.g., `agent/TEST-1`)
 - Multiple job phases for the same ticket reuse the same worktree
 - The worktree persists after the job completes unless cleanup is enabled
+- Cleanup only removes a worktree whose ticket is done, whose branch is merged into the main checkout, and that has no untracked or modified files. Git-ignored files such as build and test output are removed with it; set `cleanup_ignored_files: false` to keep any worktree that still holds ignored files. When cleanup keeps a worktree, the job log says why.
 - Merge-profile jobs require worktrees so merges happen on isolated branches
 - When worktrees are enabled, setup failure fails the job; the runner never falls back to the repository checkout.
 - Git setup, checks, cleanup, and runners discard inherited/profile repository-selection overrides (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, object/discovery overrides, and `GIT_CONFIG*`). Worktree top-level and common-directory identity are verified. SSH/askpass and author/committer identity environment variables are retained.
