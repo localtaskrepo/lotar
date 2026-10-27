@@ -3,7 +3,7 @@ import type { Page, Route } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
-import { withPage } from '../helpers/ui.js';
+import { withBrowser } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 // DEV-65 durable browser coverage: the keyed query layer must keep project/
@@ -111,6 +111,28 @@ describe('UI DEV-65 query isolation and live convergence', () => {
         };
     }
 
+    /**
+     * Opens `url` with list tracking attached BEFORE navigation. Attaching it
+     * after `goto` (which resolves at DOMContentLoaded) can miss the page's
+     * first /api/tasks/list request under load, so `settle(1)` would wait for
+     * a request that already happened.
+     */
+    async function withTrackedPage<T>(
+        url: string,
+        callback: (page: Page, lists: ReturnType<typeof trackListRequests>) => Promise<T>,
+    ): Promise<T> {
+        return withBrowser({}, async (context) => {
+            const page = await context.newPage();
+            try {
+                const lists = trackListRequests(page);
+                await page.goto(url, { waitUntil: 'domcontentloaded' });
+                return await callback(page, lists);
+            } finally {
+                await page.close();
+            }
+        });
+    }
+
     async function openFilterPanel(page: Page) {
         await page.click('[data-testid="filter-toggle"]');
         const panel = page.locator('[data-testid="filter-panel"]');
@@ -136,8 +158,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                 env: { LOTAR_ENABLE_POLL_WATCH: '1' },
             });
             try {
-                await withPage(`${server.url}/?project=${basePrefix}`, async (page) => {
-                    const lists = trackListRequests(page);
+                await withTrackedPage(`${server.url}/?project=${basePrefix}`, async (page, lists) => {
                     await page.waitForSelector('tbody tr:has-text("Dev65 base anchor")', { timeout: 20_000 });
                     await lists.settle(1);
 
@@ -204,8 +225,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                 env: { LOTAR_ENABLE_POLL_WATCH: '1' },
             });
             try {
-                await withPage(`${server.url}/?project=${basePrefix}`, async (page) => {
-                    const lists = trackListRequests(page);
+                await withTrackedPage(`${server.url}/?project=${basePrefix}`, async (page, lists) => {
                     await page.waitForSelector('tbody tr:has-text("Dev65 stale base anchor")', {
                         timeout: 20_000,
                     });
@@ -334,8 +354,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                 env: { LOTAR_ENABLE_POLL_WATCH: '1' },
             });
             try {
-                await withPage(`${server.url}/?project=BASE`, async (page) => {
-                    const lists = trackListRequests(page);
+                await withTrackedPage(`${server.url}/?project=BASE`, async (page, lists) => {
                     await page.waitForSelector('tbody tr:has-text("Dev65 flux keeper")', {
                         timeout: 20_000,
                     });
@@ -447,8 +466,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                 env: { LOTAR_ENABLE_POLL_WATCH: '1' },
             });
             try {
-                await withPage(`${server.url}/boards?project=BASE`, async (page) => {
-                    const lists = trackListRequests(page);
+                await withTrackedPage(`${server.url}/boards?project=BASE`, async (page, lists) => {
                     await page.waitForSelector('[data-status="Todo"] article:has-text("Dev65 board keeper")', {
                         timeout: 20_000,
                     });
@@ -533,8 +551,7 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                 env: { LOTAR_ENABLE_POLL_WATCH: '1' },
             });
             try {
-                await withPage(`${server.url}/calendar?project=BASE`, async (page) => {
-                    const lists = trackListRequests(page);
+                await withTrackedPage(`${server.url}/calendar?project=BASE`, async (page, lists) => {
                     await page.waitForSelector(`[data-date="${today}"] .task-item:has-text("Dev65 calendar anchor")`, {
                         timeout: 20_000,
                     });

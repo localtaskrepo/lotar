@@ -1,7 +1,31 @@
 title: Board-state smoke test fails under load (scroll restore)
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-27T22:32:35.678773+00:00
+modified: 2026-10-27T23:37:51.146576+00:00
+comments:
+- date: 2026-10-27T23:37:50.961046+00:00
+  text: 'Fixed: the board-state test now waits for the filtered query to land before scrolling, and checks Back-navigation scroll restore against the router''s 1.5 s restore budget (view/utils/routerScroll.ts): a round where the board rendered tall enough within the budget must restore exactly; slower rounds retry up to three times and the test fails if none is fast enough. Verified in the loaded run (48/48) and full smoke 359/359.'
 description: tests/ui.board-state.smoke.spec.ts 'keeps filter, sort, grouping, collapsed lanes, expanded columns and scroll' fails with 'expected +0 to be 400' (scroll position not restored yet) in full smoke runs on a heavily loaded machine (load average 40+), seen during DEV-219 and DEV-222; it passes when run alone. Likely the check reads scrollTop before the board finished restoring; wait for the restored state instead of a fixed point in time.
+history:
+- at: 2026-10-27T22:39:17.473920+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T23:37:50.961046+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:37:51.146576+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

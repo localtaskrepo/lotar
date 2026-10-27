@@ -1,10 +1,11 @@
 title: Local full-parallel smoke runs intermittently fail two UI specs
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-24T23:52:53.970680+00:00
-modified: 2026-10-26T22:36:18.038499+00:00
+modified: 2026-10-27T23:37:51.094567+00:00
 comments:
 - date: 2026-10-25T00:07:23.315288+00:00
   text: 'Another occurrence 2026-10-24 (full smoke after applying Dependabot #44/#45/#47 locally): ui.insights-isolation ''drawer open and feed refresh cannot alter the Insights activity chart (mocked feed, isolated scopes)'' failed once in a full parallel run, then passed 3/3 in isolation and the next full run passed 343/343. Same load-timing pattern.'
@@ -18,6 +19,10 @@ comments:
   text: 'Load-only failure (2026-10-24): ui.insights-isolation ''Insights requests stay explicitly project-scoped'' lists.settle poll timed out in the full run; passed 3/3 in isolation. Same settle-timeout pattern as ui.query-isolation.'
 - date: 2026-10-26T22:36:18.038499+00:00
   text: 'Seen again during the 2026-10-26 agent work (full npm run test:smoke:agent, machine busy with builds): ui.backlog-order (drag at 390px), ui.filter-panel (desktop and mobile cases, ''Matcher did not succeed in time'') and ui.query-isolation failed once; each passed when rerun alone (filter-panel 3 of 3). None of these specs touch agent code.'
+- date: 2026-10-27T23:11:30.236235+00:00
+  text: 'Plan/progress: root causes found. (1) Shared: Vitest''s default expect.poll budget is 1 s and it also bounds the FIRST call of the polled function; under load one Playwright round-trip can exceed it (''expect.poll() function didn''t resolve in time'' / ''Matcher did not succeed in time''), reproduced in ui.insights and ui.backlog-order under load. Fix: smoke/vitest.config.ts expect.poll.timeout 15s (explicit per-poll timeouts still override). (2) ui.query-isolation: list tracking was attached after withPage''s goto, so the first /api/tasks/list could be missed and lists.settle(1) waited for a request that already happened; now tracks before navigation (withTrackedPage). (3) one-shot reads turned into polls: ui.relationships restored filter input value, ui.filter-panel structured field:iteration request. ui.insights-isolation no longer exists (replaced by ui.insights in DEV-91/DEV-187, which already tracks before navigating). Next: repeated runs under induced load.'
+- date: 2026-10-27T23:37:50.930811+00:00
+  text: 'Fixed (test-side): smoke/vitest.config.ts gives expect.poll a 15 s default budget (Vitest''s 1 s default also bounds the first Playwright round-trip, which under load fails polls whose condition already holds); ui.query-isolation attaches list tracking before navigation so settle() cannot miss the first request; ui.relationships and ui.filter-panel poll for values that hydrate after the URL changes. Verified: one loaded run of the affected specs at load average ~180 passed 48/48; full smoke 359/359 at 16:37. Limit: the planned repeated loaded runs were cut short (the helper agent''s loop stopped after one iteration), so a rare flake may remain; reopen with the failing spec if one shows up.'
 description: 'Observed 2026-10-24 on macOS full smoke runs (test:smoke:agent / test:smoke:quick:agent), all passing when rerun in isolation: ui.query-isolation ''surfaces failed calendar query switches without stale rows and recovers via retry'' (once), ui.query-isolation ''keeps a foreign-project task out of the active filtered view while it stays reachable via its own project'' (once) and ui.relationships ''ranks exact IDs first across lookup fields and restores searched content after leaving the view'' (once); about 1 failing run in 5. Same pattern as DEV-132/DEV-136: timing under full parallel load. Next: capture the assertion and timing evidence for each and make the waits condition-based.'
 history:
 - at: 2026-10-25T00:07:23.315288+00:00
@@ -44,3 +49,25 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-27T22:39:17.433452+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T23:11:30.236235+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:37:50.930811+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:37:51.094567+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

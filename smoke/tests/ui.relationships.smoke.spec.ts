@@ -1007,7 +1007,9 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                     await page.waitForURL(
                         (url) => url.pathname === '/dependencies' && url.searchParams.get('q') === target.id,
                     );
-                    expect(await page.getByTestId('filter-search').inputValue()).toBe(target.id);
+                    // The URL can update before the remounted filter bar has
+                    // hydrated its input, so wait for the restored value.
+                    await expect.poll(() => page.getByTestId('filter-search').inputValue()).toBe(target.id);
                     await expect
                         .poll(() => page.locator(`.dependency-selected[data-task-id="${target.id}"]`).count())
                         .toBe(1);

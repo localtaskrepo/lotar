@@ -36,6 +36,40 @@ async function leaveAndReturn(page: Page, via: 'nav' | 'back') {
     await page.waitForSelector('article.task');
 }
 
+const SCROLL_TOP = 400;
+// Mirrors view/utils/routerScroll.ts: on Back the router waits at most this
+// long for the page to grow tall enough before restoring the saved position.
+const RESTORE_BUDGET_MS = 1500;
+
+type ReachProbe = { reachedAfter: number | null };
+
+/**
+ * Starts an in-page clock just before Back. It records how long it takes for
+ * the board to render tall enough to scroll to `SCROLL_TOP`. The clock starts
+ * before the router's own wait does, so the measured time is an upper bound.
+ */
+async function startReachProbe(page: Page) {
+    await page.evaluate((top) => {
+        const start = performance.now();
+        const probe: ReachProbe = { reachedAfter: null };
+        (window as unknown as { __boardReach: ReachProbe }).__boardReach = probe;
+        const check = () => {
+            const elapsed = performance.now() - start;
+            const onBoard = location.pathname.startsWith('/boards') && document.querySelector('article.task');
+            if (onBoard && document.documentElement.scrollHeight - window.innerHeight >= top) {
+                probe.reachedAfter = elapsed;
+            } else if (elapsed < 60_000) {
+                window.setTimeout(check, 10);
+            }
+        };
+        check();
+    }, SCROLL_TOP);
+}
+
+function reachedAfter(page: Page) {
+    return page.evaluate(() => (window as unknown as { __boardReach?: ReachProbe }).__boardReach?.reachedAfter ?? null);
+}
+
 describe.concurrent('Board view state (DEV-180)', () => {
     it('keeps filter, sort, grouping, collapsed lanes, expanded columns and scroll', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({ seedFiles: seed() });
@@ -53,22 +87,67 @@ describe.concurrent('Board view state (DEV-180)', () => {
                     await page.getByTestId('board-sortby').selectOption('id');
                     await expect.poll(async () => (await ids()).slice(0, 3)).toEqual(['PRB-1', 'PRB-2', 'PRB-3']);
 
+                    // The unfiltered board also shows 30 cards, and the filtered
+                    // query starts after a debounce and swaps the grid for a
+                    // loader while it is new. Wait for it to land so later
+                    // scrolling happens on the final, full-height board.
+                    const filtered = page.waitForResponse((response) => {
+                        const url = new URL(response.url());
+                        return url.pathname === '/api/tasks/list' && url.searchParams.get('q') === 'Card';
+                    });
                     await search.fill('Card');
                     await search.press('Enter');
+                    expect((await filtered).status()).toBe(200);
                     await expect.poll(() => page.url()).toContain('project=PRB');
                     await expect.poll(cards).toBe(30);
                     await page.locator('.show-more-btn').first().click();
                     await expect.poll(cards).toBe(35);
 
-                    for (const via of ['nav', 'back'] as const) {
-                        await page.evaluate(() => window.scrollTo(0, 400));
-                        await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(400);
-                        await leaveAndReturn(page, via);
+                    const scrollY = () => page.evaluate(() => window.scrollY);
+                    const scrollDown = async () => {
+                        await page.evaluate((top) => window.scrollTo(0, top), SCROLL_TOP);
+                        await expect.poll(scrollY).toBe(SCROLL_TOP);
+                    };
+                    const expectKeptState = async () => {
                         await expect.poll(() => search.inputValue()).toBe('Card');
                         await expect.poll(() => page.getByTestId('board-sortby').inputValue()).toBe('id');
                         await expect.poll(cards).toBe(35);
-                        if (via === 'back') await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(400);
+                    };
+
+                    await scrollDown();
+                    await leaveAndReturn(page, 'nav');
+                    await expectKeptState();
+
+                    // Back restores the scroll position. The router only waits
+                    // RESTORE_BUDGET_MS for the board to render tall enough, so
+                    // under heavy load the restore can legitimately give up. A
+                    // round in which the board rendered within the budget must
+                    // restore exactly; a slower round is retried, and the test
+                    // fails if no round is fast enough.
+                    const slowRounds: number[] = [];
+                    let restored = false;
+                    for (let round = 0; round < 3 && !restored; round += 1) {
+                        await scrollDown();
+                        const nav = page.getByRole('navigation');
+                        await nav.getByRole('link', { name: 'Tasks', exact: true }).click();
+                        await page.waitForURL((url) => !url.pathname.startsWith('/boards'));
+                        await startReachProbe(page);
+                        await page.goBack();
+                        await page.waitForSelector('article.task');
+                        await expectKeptState();
+                        await expect.poll(() => reachedAfter(page)).not.toBeNull();
+                        const elapsed = (await reachedAfter(page))!;
+                        if (elapsed < RESTORE_BUDGET_MS) {
+                            await expect.poll(scrollY).toBe(SCROLL_TOP);
+                            restored = true;
+                        } else {
+                            slowRounds.push(Math.round(elapsed));
+                        }
                     }
+                    expect(
+                        restored,
+                        `the board never rendered within the ${RESTORE_BUDGET_MS} ms restore budget (took ${slowRounds.join(', ')} ms)`,
+                    ).toBe(true);
 
                     await page.getByTestId('board-groupby').selectOption('priority');
                     await page.locator('.swimlane-header').filter({ hasText: 'Low' }).click();

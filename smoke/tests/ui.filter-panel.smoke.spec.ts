@@ -152,11 +152,14 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         await expect.poll(() => page.getByText('Beta task', { exact: true }).count()).toBe(1);
                         expect(await page.getByText('Foreign task', { exact: true }).count()).toBe(0);
                         expect(await page.getByText('Deleted beta task', { exact: true }).count()).toBe(0);
-                        expect(
-                            listQueries.some(
-                                (query) => new URLSearchParams(query).get('field:iteration') === 'beta release',
-                            ),
-                        ).toBe(true);
+                        // The structured request can still be on its way when the rows settle under load.
+                        await expect
+                            .poll(() =>
+                                listQueries.some(
+                                    (query) => new URLSearchParams(query).get('field:iteration') === 'beta release',
+                                ),
+                            )
+                            .toBe(true);
                         expect(await page.getByTestId('filter-chips').textContent()).toContain('beta release');
                         const clearSearch = page.getByRole('button', { name: 'Clear search', exact: true });
                         await clearSearch.click();

@@ -42,6 +42,13 @@ export default defineConfig({
         maxConcurrency: 4,
         testTimeout: 120_000,
         hookTimeout: 120_000,
+        // Vitest's default poll budget (1 s) also bounds the FIRST call of the
+        // polled function. Under full-parallel load (load average 40+), one
+        // Playwright round-trip alone can exceed it, so a poll fails with
+        // "function didn't resolve in time" even when the condition already
+        // holds. Polls stay condition-based; they only get a realistic budget.
+        // Explicit per-poll timeouts still override this.
+        expect: { poll: { timeout: 15_000 } },
         setupFiles: ['helpers/setup.ts'],
         env: {
             LOTAR_TEST_SILENT: '1',
