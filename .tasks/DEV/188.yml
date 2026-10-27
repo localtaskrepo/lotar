@@ -1,7 +1,31 @@
 title: New preview location changes create task position
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-25T03:32:30.133593+00:00
+modified: 2026-10-27T23:37:51.046485+00:00
+comments:
+- date: 2026-10-27T23:00:01.106443+00:00
+  text: 'Fixed: the description editor is 30px taller while editing (room for the Preview toggle), so collapsing it on mouse-down moved Create task before mouse-up and the click was lost. Leaving the editor during a press now waits for pointerup and the click before collapsing; keyboard focus moves still collapse immediately. Smoke: ui.description-preview ''creates the task on the first click straight from the description editor'' (1280x1400, 150ms press) fails on the old build and passes now.'
 description: the preview button was moved inside the details textbox of the task panel. When it shows up it changes the height of the details box, so that when you want to press on "create task" the unfocus event causes the details box to shrink in size and the button is then in a different location, which doesn't feel very smooth as a user. It means you click and then click again to create a task.
+history:
+- at: 2026-10-27T22:53:05.006178+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T23:00:01.106443+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:37:51.046485+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

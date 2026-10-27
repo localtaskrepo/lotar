@@ -1444,13 +1444,28 @@ function startEditingDescription() {
   })
 }
 
+// Pressed pointers, so leaving the editor mid-click can wait for the click.
+const pressedPointers = new Set<number>()
+const trackPointerDown = (event: PointerEvent) => pressedPointers.add(event.pointerId)
+const trackPointerUp = (event: PointerEvent) => pressedPointers.delete(event.pointerId)
+window.addEventListener('pointerdown', trackPointerDown, true)
+window.addEventListener('pointerup', trackPointerUp, true)
+window.addEventListener('pointercancel', trackPointerUp, true)
+let pendingDescriptionClose: (() => void) | null = null
+onUnmounted(() => {
+  window.removeEventListener('pointerdown', trackPointerDown, true)
+  window.removeEventListener('pointerup', trackPointerUp, true)
+  window.removeEventListener('pointercancel', trackPointerUp, true)
+  pendingDescriptionClose?.()
+})
+
 function onDescriptionFocusOut(_event: FocusEvent) {
   if (!editingDescription.value) return
 
   descriptionFocusoutTick.value += 1
   const tick = descriptionFocusoutTick.value
 
-  setTimeout(() => {
+  const close = () => {
     if (tick !== descriptionFocusoutTick.value) return
 
     const active = document.activeElement as HTMLElement | null
@@ -1459,6 +1474,30 @@ function onDescriptionFocusOut(_event: FocusEvent) {
     editingDescription.value = false
     descriptionPreview.value = false
     onFieldBlur('description')
+  }
+
+  setTimeout(() => {
+    if (!pressedPointers.size) {
+      close()
+      return
+    }
+    // A press moved focus away (e.g. onto "Create task" below). Closing now
+    // shrinks the editor and moves that button before the click lands
+    // (DEV-188), so wait until the press ends and its click has run.
+    pendingDescriptionClose?.()
+    const finish = () => {
+      window.removeEventListener('pointerup', finish, true)
+      window.removeEventListener('pointercancel', finish, true)
+      if (pendingDescriptionClose === cancel) pendingDescriptionClose = null
+      setTimeout(close, 0)
+    }
+    const cancel = () => {
+      window.removeEventListener('pointerup', finish, true)
+      window.removeEventListener('pointercancel', finish, true)
+    }
+    pendingDescriptionClose = cancel
+    window.addEventListener('pointerup', finish, true)
+    window.addEventListener('pointercancel', finish, true)
   }, 0)
 }
 

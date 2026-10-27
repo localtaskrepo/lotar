@@ -70,4 +70,50 @@ describe.concurrent('UI description preview toggle', () => {
             }
         });
     }
+
+    // DEV-188: leaving the description editor shrinks it (the toggle's
+    // reserved padding goes away). Pressing "Create task" right below used to
+    // collapse the editor on mouse-down, so the button moved away before the
+    // mouse-up and the first click did nothing.
+    it('creates the task on the first click straight from the description editor', async ({ expect }) => {
+        const workspace = await SmokeWorkspace.create();
+        try {
+            await workspace.addTask('Existing task');
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(server.url, async (page) => {
+                    // Tall enough that the panel does not scroll, so the
+                    // footer moves when the editor shrinks.
+                    await page.setViewportSize({ width: 1280, height: 1400 });
+                    const addRequests: unknown[] = [];
+                    page.on('request', (request) => {
+                        if (new URL(request.url()).pathname === '/api/tasks/add')
+                            addRequests.push(request.postDataJSON());
+                    });
+                    await page.getByTestId('global-new-task').click();
+                    const panel = page.locator('.task-panel');
+                    const create = panel.getByRole('button', { name: 'Create task', exact: true });
+                    await expect.poll(() => create.isEnabled(), { timeout: 15_000 }).toBe(true);
+                    await panel.locator('input[placeholder="Title"]').fill('Created from the description');
+                    await panel.locator('.task-panel__description-display').click();
+                    const textarea = panel.locator('.task-panel__description-body textarea');
+                    await textarea.fill('Some details');
+                    expect(await textarea.evaluate((el) => el === document.activeElement)).toBe(true);
+
+                    // Hold the button like a person does; an instant click
+                    // releases before the editor collapses.
+                    await create.click({ delay: 150 });
+                    await expect.poll(() => addRequests.length, { timeout: 10_000 }).toBe(1);
+                    expect(addRequests[0]).toMatchObject({
+                        title: 'Created from the description',
+                        description: 'Some details',
+                    });
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
 });
