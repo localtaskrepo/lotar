@@ -66,6 +66,8 @@ pub struct SprintLifecycleStatus {
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
     pub computed_end: Option<DateTime<Utc>>,
+    /// When the sprint turns overdue: `computed_end` plus `plan.overdue_after`.
+    pub overdue_at: Option<DateTime<Utc>>,
     pub warnings: Vec<SprintStatusWarning>,
 }
 
@@ -105,6 +107,27 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
         plan.and_then(|p| p.length.as_ref()),
         &mut warnings,
     );
+    // Grace period after the end before the sprint counts as overdue
+    // (DEV-154). Unreadable legacy values warn and give no grace.
+    let grace = plan
+        .and_then(|p| p.overdue_after.as_ref())
+        .and_then(|raw| {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return None;
+            }
+            match time::parse_sprint_overdue_after(trimmed) {
+                Ok(duration) => Some(duration),
+                Err(_) => {
+                    warnings.push(SprintStatusWarning::UnparseableLength {
+                        field: "plan.overdue_after",
+                        value: raw.clone(),
+                    });
+                    None
+                }
+            }
+        })
+        .unwrap_or_else(Duration::zero);
 
     let computed_end = if let Some(end) = planned_end {
         Some(end)
@@ -117,10 +140,12 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
         None
     };
 
+    let overdue_at = computed_end.map(|end| end.checked_add_signed(grace).unwrap_or(end));
+
     let state = if actual_end.is_some() {
         SprintLifecycleState::Complete
-    } else if let Some(end_at) = computed_end.as_ref() {
-        if now > *end_at {
+    } else if let Some(overdue_at) = overdue_at {
+        if now > overdue_at {
             SprintLifecycleState::Overdue
         } else if actual_start.is_some() {
             SprintLifecycleState::Active
@@ -140,6 +165,7 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
         actual_start,
         actual_end,
         computed_end,
+        overdue_at,
         warnings,
     }
 }

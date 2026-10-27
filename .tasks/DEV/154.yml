@@ -1,7 +1,31 @@
 title: Sprint overdue_after grace period has no effect on overdue status
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-24T21:32:01.331415+00:00
+modified: 2026-10-27T23:37:50.995986+00:00
+comments:
+- date: 2026-10-27T23:00:01.021755+00:00
+  text: 'Fixed: plan.overdue_after is now a grace period. derive_status keeps a sprint Active/Pending until computed_end + overdue_after and exposes overdue_at; the CLI close-time overdue warning uses it too. Empty/zero means overdue right after the end; an unreadable legacy value adds a status warning (plan.overdue_after, invalid duration) and counts as no grace. The calendar no longer tries overdue_after as an end-date fallback (it is a duration). Docs: sprints help. Tests: sprint_status_unit_test (grace delays overdue, zero/none, unreadable warns), sprintCalendar.spec.'
 description: 'Found during DEV-111. plan.overdue_after (and sprints.defaults.overdue_after, CLI --overdue-after described as ''Grace period before overdue warnings'') is stored, defaulted and displayed, but src/services/sprint_status.rs derives Overdue purely from now > computed_end and nothing parses overdue_after at runtime. DEV-111 added mutation-time validation of the default (time::parse_sprint_overdue_after: zero or more h/d/w, max ten years). Decide whether the grace period should delay the Overdue state and overdue warnings (then apply it with that parser, tolerate legacy unparseable values with a warning, and cover CLI/REST/UI lifecycle labels), or document it as informational only.'
+history:
+- at: 2026-10-27T22:49:29.739142+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-27T23:00:01.021755+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T23:37:50.995986+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

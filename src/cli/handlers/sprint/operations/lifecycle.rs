@@ -381,8 +381,8 @@ fn warn_about_overdue_close(
         return;
     }
 
-    if let Some(computed_end) = lifecycle.computed_end
-        && close_instant > computed_end
+    if let (Some(computed_end), Some(overdue_at)) = (lifecycle.computed_end, lifecycle.overdue_at)
+        && close_instant > overdue_at
     {
         renderer.emit_warning(format_args!(
             "Sprint #{} ({}) was scheduled to end by {} and is overdue to close.",

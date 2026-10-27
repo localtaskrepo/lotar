@@ -30,6 +30,18 @@ describe('sprint calendar helpers', () => {
         expect(toDateKey(window!.plannedEnd)).toBe(toDateKey(new Date('2024-01-10T00:00:00Z')))
     })
 
+    it('ignores the overdue grace period when placing the end (DEV-154)', () => {
+        const sprint = baseSprint({
+            id: 11,
+            state: 'pending',
+            planned_start: '2024-01-02T00:00:00Z',
+            plan_length: '1w',
+            overdue_after: '3d',
+        })
+        const window = __test_only_normalizeSprintWindow(sprint)
+        expect(toDateKey(window!.plannedEnd)).toBe(toDateKey(new Date('2024-01-08T00:00:00Z')))
+    })
+
     it('builds schedule across overlapping sprints', () => {
         const rangeStart = new Date('2024-02-01T00:00:00Z')
         const rangeEnd = new Date('2024-02-10T00:00:00Z')

@@ -57,11 +57,7 @@ function parsePlanLengthDays(value?: string | null): number | null {
 function normalizeSprintWindow(sprint: SprintListItem): SprintWindow | null {
     const plannedStart = parseDate(sprint.planned_start) || parseDate(sprint.actual_start)
     let plannedEnd =
-        parseDate(sprint.planned_end) ||
-        parseDate(sprint.computed_end) ||
-        parseDate(sprint.overdue_after) ||
-        parseDate(sprint.actual_end) ||
-        null
+        parseDate(sprint.planned_end) || parseDate(sprint.computed_end) || parseDate(sprint.actual_end) || null
 
     if (!plannedStart) {
         return null

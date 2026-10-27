@@ -131,3 +131,58 @@ fn warnings_emitted_for_invalid_inputs() {
             })
     );
 }
+
+fn ended_sprint(overdue_after: Option<&str>) -> Sprint {
+    Sprint {
+        plan: Some(SprintPlan {
+            ends_at: Some("2025-09-08T09:00:00Z".to_string()),
+            overdue_after: overdue_after.map(str::to_string),
+            ..SprintPlan::default()
+        }),
+        actual: Some(SprintActual {
+            started_at: Some("2025-09-01T09:00:00Z".to_string()),
+            ..SprintActual::default()
+        }),
+        ..Sprint::default()
+    }
+}
+
+#[test]
+fn overdue_after_delays_the_overdue_state() {
+    let sprint = ended_sprint(Some("12h"));
+    let within_grace = Utc.with_ymd_and_hms(2025, 9, 8, 20, 0, 0).unwrap();
+    let status = derive_status(&sprint, within_grace);
+    assert_eq!(status.state, SprintLifecycleState::Active);
+    assert_eq!(
+        status.overdue_at,
+        Some(Utc.with_ymd_and_hms(2025, 9, 8, 21, 0, 0).unwrap())
+    );
+    assert!(status.warnings.is_empty());
+
+    let after_grace = Utc.with_ymd_and_hms(2025, 9, 8, 21, 0, 1).unwrap();
+    assert_eq!(
+        derive_status(&sprint, after_grace).state,
+        SprintLifecycleState::Overdue
+    );
+
+    // Zero grace and no grace behave the same: overdue right after the end.
+    let just_after_end = Utc.with_ymd_and_hms(2025, 9, 8, 9, 0, 1).unwrap();
+    for value in [None, Some("0h")] {
+        assert_eq!(
+            derive_status(&ended_sprint(value), just_after_end).state,
+            SprintLifecycleState::Overdue
+        );
+    }
+}
+
+#[test]
+fn unreadable_overdue_after_warns_and_gives_no_grace() {
+    let sprint = ended_sprint(Some("soon"));
+    let just_after_end = Utc.with_ymd_and_hms(2025, 9, 8, 9, 0, 1).unwrap();
+    let status = derive_status(&sprint, just_after_end);
+    assert_eq!(status.state, SprintLifecycleState::Overdue);
+    assert!(status.warnings.iter().any(|warning| matches!(
+        warning,
+        SprintStatusWarning::UnparseableLength { field, .. } if *field == "plan.overdue_after"
+    )));
+}

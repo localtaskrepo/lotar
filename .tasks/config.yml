@@ -1,2 +1,4 @@
+ui:
+  theme: synthwave:ice
 default:
   project: DEV
