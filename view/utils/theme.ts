@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import { storageGet, storageRemove, storageSet } from './storage'
 import { darken, getContrastingColor, normalizeHex, withAlpha } from './color'
 import { DEFAULT_THEME, effectivePalette, formatThemeValue, parseThemeValue } from './themes'
@@ -53,7 +54,12 @@ function normalise(value: unknown): string | null {
     return choice ? formatThemeValue(choice) : null
 }
 
-let repositoryTheme: string | null = normalise(storageGet(REPOSITORY_THEME_KEY))
+// Reactive, so views showing the configured theme (e.g. the Preferences
+// select's "Configured" tag) update when the configuration changes.
+const repositoryTheme = ref<string | null>(normalise(storageGet(REPOSITORY_THEME_KEY)))
+// An unsaved value being edited in Config → Appearance (undefined = none);
+// previewed live for everyone who follows the configured theme.
+let configuredPreview: string | null | undefined = undefined
 
 /** The user's own theme choice, or null to follow the configured default. */
 export function readThemeNamePreference(): string | null {
@@ -68,20 +74,33 @@ export function storeThemeNamePreference(theme: string | null) {
 
 /** The configured default (`ui.theme`), as last reported by the server. */
 export function getRepositoryTheme(): string {
-    return repositoryTheme ?? DEFAULT_THEME
+    return repositoryTheme.value ?? DEFAULT_THEME
 }
 
 /** Record the configured default and re-apply when the user follows it. */
 export function setRepositoryTheme(theme: string | null | undefined) {
-    repositoryTheme = normalise(theme)
-    if (repositoryTheme) storageSet(REPOSITORY_THEME_KEY, repositoryTheme)
+    repositoryTheme.value = normalise(theme)
+    if (repositoryTheme.value) storageSet(REPOSITORY_THEME_KEY, repositoryTheme.value)
     else storageRemove(REPOSITORY_THEME_KEY)
+    applyThemeName(readThemeNamePreference())
+}
+
+/**
+ * Preview an unsaved configured theme (null = not set, i.e. the built-in
+ * default; undefined ends the preview). Applies only to people following the
+ * configuration: a personal choice other than the saved configured theme
+ * stays as it is.
+ */
+export function previewConfiguredTheme(theme: string | null | undefined) {
+    configuredPreview = theme === undefined ? undefined : (normalise(theme) ?? DEFAULT_THEME)
     applyThemeName(readThemeNamePreference())
 }
 
 /** Theme in effect: the user's choice, else the configured default. */
 export function effectiveThemeName(choice: string | null = readThemeNamePreference()): string {
-    return choice ?? getRepositoryTheme()
+    // A stored choice equal to the configured theme still follows it.
+    if (choice && choice !== getRepositoryTheme()) return choice
+    return configuredPreview ?? getRepositoryTheme()
 }
 
 /** Apply a theme choice (null = configured default) to <html>. */

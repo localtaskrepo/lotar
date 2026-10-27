@@ -1,0 +1,7 @@
+title: Board-state smoke test fails under load (scroll restore)
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-27T22:32:35.678773+00:00
+description: tests/ui.board-state.smoke.spec.ts 'keeps filter, sort, grouping, collapsed lanes, expanded columns and scroll' fails with 'expected +0 to be 400' (scroll position not restored yet) in full smoke runs on a heavily loaded machine (load average 40+), seen during DEV-219 and DEV-222; it passes when run alone. Likely the check reads scrollTop before the board finished restoring; wait for the restored state instead of a fixed point in time.

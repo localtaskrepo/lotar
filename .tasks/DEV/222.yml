@@ -1,0 +1,29 @@
+title: Paper inks and live configured theme preview
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-27T22:28:41.804433+00:00
+modified: 2026-10-27T22:32:35.762541+00:00
+comments:
+- date: 2026-10-27T22:32:35.733130+00:00
+  text: 'Done. Paper palettes now tint the text itself (the ink), light and dark: blue (default) fg #1e3a7a, black #1c1a17, red #5e1a26, green #1d4a2b, with matching muted and dark-mode tints; all 32 combos pass the checker (Paper light fg/bg 9.2-15.7). Config → Appearance previews the edited theme live via previewConfiguredTheme for anyone following the configuration (no personal choice or one equal to the saved configured theme), not when their ~/.lotar overrides it; leaving the page ends the preview. The configured theme is now reactive state, so Preferences'' select and Configured tag follow config changes. Verified: npm run lint, npm test (1805 Rust + 1281 UI), npm run smoke (356; one load-related failure in ui.board-state passed 2x alone, filed DEV-223), theming smoke covers the live preview and the Preferences tag, ink screenshots light/dark.'
+description: 'Feedback on DEV-220: Paper''s ink palettes looked identical (only the rarely used accent changed). Config → Appearance should preview theme changes live for people who follow the configured theme (no personal choice, or one equal to the saved configured theme), and Preferences must show the current configured theme in its select.'
+history:
+- at: 2026-10-27T22:28:41.868698+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-10-27T22:32:35.733130+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-27T22:32:35.762541+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

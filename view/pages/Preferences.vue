@@ -247,10 +247,7 @@ const theme = ref<ThemePreference>('system')
 // DEV-220: one list; the configured theme is tagged. Choosing it stores
 // nothing (the browser follows the configuration); anything else is kept here.
 const branding = useBranding()
-const configuredTheme = computed(() => {
-  void branding.theme
-  return getRepositoryTheme()
-})
+const configuredTheme = computed(() => getRepositoryTheme())
 // Usually a person's own ~/.lotar sets this; otherwise the repository.
 const configuredSource = computed(() => {
   if (branding.themeSource === 'home') return 'your ~/.lotar'

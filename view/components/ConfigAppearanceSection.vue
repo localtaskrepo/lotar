@@ -104,11 +104,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref, type Ref } from 'vue'
+import { computed, onUnmounted, reactive, ref, watch, type Ref } from 'vue'
 import { api } from '../api/client'
 import { useBranding } from '../composables/useBranding'
 import { fileToBase64 } from '../utils/taskAttachments'
 import { parseThemeValue, themeLabel } from '../utils/themes'
+import { previewConfiguredTheme } from '../utils/theme'
 import ConfigGroup from './ConfigGroup.vue'
 import ThemeSelect from './ThemeSelect.vue'
 import UiButton from './UiButton.vue'
@@ -143,6 +144,18 @@ const themeModel = computed<string | null>({
     emit('validate', 'ui_theme')
   },
 })
+
+// Live preview: while editing, show the theme to everyone here who follows the
+// configuration (not when their own ~/.lotar overrides it). Leaving the page
+// ends the preview, so unsaved edits never stick.
+watch(
+  () => uiTheme.value,
+  (value) => {
+    if (branding.themeSource === 'home') return
+    previewConfiguredTheme(value.trim() || null)
+  },
+)
+onUnmounted(() => previewConfiguredTheme(undefined))
 // A personal ~/.lotar theme wins over the repository's for this person.
 const homeOverride = computed(() => {
   if (branding.themeSource !== 'home' || !branding.theme) return null

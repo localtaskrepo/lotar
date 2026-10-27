@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { computed, nextTick } from 'vue'
 import {
     applyThemeName,
     applyThemePreference,
     effectiveThemeName,
+    getRepositoryTheme,
+    previewConfiguredTheme,
     initializeThemeFromStorage,
     readThemeNamePreference,
     setRepositoryTheme,
@@ -40,6 +43,38 @@ describe('theme selection', () => {
         expect(document.documentElement.dataset.themeName).toBe('matrix')
         // The default palette is applied by id too.
         expect(document.documentElement.dataset.themePalette).toBe('green')
+    })
+
+    it('previews unsaved configured themes only for people following the configuration', () => {
+        const name = () => document.documentElement.dataset.themeName
+        setRepositoryTheme('classic')
+        previewConfiguredTheme('matrix:red')
+        expect(name()).toBe('matrix')
+        expect(document.documentElement.dataset.themePalette).toBe('red')
+        previewConfiguredTheme(null) // "Not set": the built-in default
+        expect(name()).toBe('classic')
+        previewConfiguredTheme(undefined)
+        expect(name()).toBe('classic')
+
+        // A personal choice other than the saved configured theme is kept.
+        storeThemeNamePreference('terminal:red')
+        previewConfiguredTheme('matrix')
+        expect(name()).toBe('terminal')
+        // A stored choice equal to the configured theme still follows it.
+        localStorage.setItem('lotar.themeName', 'classic')
+        previewConfiguredTheme('paper')
+        expect(name()).toBe('paper')
+        previewConfiguredTheme(undefined)
+        expect(name()).toBe('classic')
+    })
+
+    it('exposes the configured theme reactively', async () => {
+        const configured = computed(() => getRepositoryTheme())
+        setRepositoryTheme('candy:mint')
+        expect(configured.value).toBe('candy:mint')
+        setRepositoryTheme('ocean')
+        await nextTick()
+        expect(configured.value).toBe('classic:ocean')
     })
 
     it('ignores unknown themes and palettes', () => {

@@ -1345,8 +1345,9 @@
     --color-surface-contrast: #fffcf4;
     --color-border: #e1d5bb;
     --color-border-strong: #c2af8b;
-    --color-fg: #2b2118;
-    --color-muted: #66553f;
+    /* The palette is the ink: text is written in it, not just links. */
+    --color-fg: #1e3a7a;
+    --color-muted: #4a5d8a;
     --color-accent: #2c4f8a;
     --color-accent-strong: #223f70;
     --color-accent-contrast: #ffffff;
@@ -1396,8 +1397,8 @@
     --color-surface-contrast: #1f1913;
     --color-border: #3a2f23;
     --color-border-strong: #574634;
-    --color-fg: #f1e6d2;
-    --color-muted: #bfae94;
+    --color-fg: #dbe5fb;
+    --color-muted: #9fb2db;
     --color-accent: #9db8ec;
     --color-accent-strong: #b5caf2;
     --color-accent-contrast: #12100c;
@@ -1420,12 +1421,16 @@
 
 /* Paper · black: Black ink. */
 [data-theme-name='paper'][data-theme-palette='black'] {
+    --color-fg: #1c1a17;
+    --color-muted: #5a554c;
     --color-accent: #2b2b2b;
     --color-accent-strong: #000000;
     --color-accent-contrast: #ffffff;
 }
 
 [data-theme-name='paper'][data-theme-palette='black'][data-mode='dark'] {
+    --color-fg: #efe9de;
+    --color-muted: #bdb5a6;
     --color-accent: #e8e2d6;
     --color-accent-strong: #ffffff;
     --color-accent-contrast: #12100c;
@@ -1433,6 +1438,8 @@
 
 /* Paper · red: Red ink (burgundy); danger shifts to orange-red. */
 [data-theme-name='paper'][data-theme-palette='red'] {
+    --color-fg: #5e1a26;
+    --color-muted: #7a4a53;
     --color-accent: #9e2a3a;
     --color-accent-strong: #7f1f2d;
     --color-accent-contrast: #ffffff;
@@ -1440,6 +1447,8 @@
 }
 
 [data-theme-name='paper'][data-theme-palette='red'][data-mode='dark'] {
+    --color-fg: #fbdfe4;
+    --color-muted: #d7a3ad;
     --color-accent: #f093a8;
     --color-accent-strong: #f5b3c2;
     --color-accent-contrast: #12100c;
@@ -1448,12 +1457,16 @@
 
 /* Paper · green: Green ink. */
 [data-theme-name='paper'][data-theme-palette='green'] {
+    --color-fg: #1d4a2b;
+    --color-muted: #4b6b52;
     --color-accent: #2f6b3f;
     --color-accent-strong: #24552f;
     --color-accent-contrast: #ffffff;
 }
 
 [data-theme-name='paper'][data-theme-palette='green'][data-mode='dark'] {
+    --color-fg: #dcf2dd;
+    --color-muted: #a2c8a6;
     --color-accent: #9fd8a8;
     --color-accent-strong: #bfe8c4;
     --color-accent-contrast: #12100c;

@@ -89,6 +89,8 @@ describe('UI theming and repository branding (DEV-218)', () => {
                     await expect(page.getByRole('option', { name: /Repository skin/ })).toHaveCount(0);
                     await page.getByRole('option', { name: /Paper/ }).click();
                     await section.getByTestId('theme-palettes').getByRole('radio', { name: 'Green ink' }).click();
+                    // Previewed live while editing, for people following the configuration.
+                    await expect.poll(async () => (await rootState(page)).theme).toBe('paper:green');
                     await section.getByLabel('Name').fill('Acme Tracker');
                     await section.getByLabel('Logo', { exact: true }).fill('assets/logo.svg');
                     await section.getByLabel('App icon').fill('assets/app-icon.svg');
@@ -107,6 +109,13 @@ describe('UI theming and repository branding (DEV-218)', () => {
                     await expect
                         .poll(async () => (await rootState(page)).theme, { timeout: 15_000 })
                         .toBe('paper:green');
+
+                    // Preferences shows the new configured theme, tagged.
+                    await page.goto(`${server.url}/preferences`);
+                    const select = page.getByTestId('theme-select');
+                    await expect(select).toContainText('Paper · Green ink');
+                    await expect(select.locator('.theme-select__tag')).toHaveText('Configured');
+                    await page.goto(`${server.url}/config`);
                     const brand = page.locator('a.brand');
                     await expect(brand).toHaveAttribute('aria-label', 'Acme Tracker home');
                     await expect(brand.locator('.brand__name')).toHaveText('Acme Tracker');
