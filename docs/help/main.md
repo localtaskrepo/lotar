@@ -9,7 +9,7 @@ LoTaR keeps lightweight task trackers inside your repository so you can plan wor
 lotar add "Implement OAuth" --type feature --priority high
 
 # Review work
-lotar list --status todo --mine
+lotar list status:todo mine:true
 
 # Move the work forward
 lotar status 1 in_progress
@@ -28,7 +28,7 @@ lotar serve --open
 | Need to… | Command |
 | --- | --- |
 | Capture new work | `lotar add` with title, type, priority, tags, and custom fields |
-| Find tasks | `lotar list` with filters such as `--status`, `--priority`, `--mine`, `--tag`, or `--where key=value` |
+| Find tasks | `lotar list` with the web search syntax, such as `status:todo priority:high mine:true tag:ui component=editor` |
 | Move tasks through states | `lotar status <id> <new_status>` (supports dry-run + explain) |
 | Update ownership | `lotar assignee <id> <name|@me>` |
 | Track deadlines and estimates | `lotar due-date`, `lotar effort` |

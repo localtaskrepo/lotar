@@ -119,12 +119,18 @@ fn main() {
     };
 
     // Parse with Clap
+    let removed_hint = lotar::cli::preprocess::removed_flag_hint(&normalized_args);
     let cli = match Cli::try_parse_from(normalized_args) {
         Ok(cli) => cli,
         Err(e) => {
             let renderer =
                 output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_raw_stderr(e.to_string());
+            if e.kind() == clap::error::ErrorKind::UnknownArgument
+                && let Some(hint) = removed_hint
+            {
+                renderer.emit_raw_stderr(hint);
+            }
             std::process::exit(1);
         }
     };

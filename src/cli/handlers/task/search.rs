@@ -24,7 +24,7 @@ impl CommandHandler for SearchHandler {
         renderer.log_info("list: begin");
         let ctx = TaskCommandContext::new(resolver, project, None)?;
         let project_prefix = project.map(|p| ctx.project_prefix_for(Some(p)));
-        let (input, matches_nothing) = Self::query_input(&args, project_prefix, &ctx.config)?;
+        let input = Self::query_input(&args, project_prefix, &ctx.config)?;
         // Enums and fields validate against the context's configuration (the
         // detected project's when there is one), as the CLI always has.
         let query = input
@@ -42,11 +42,7 @@ impl CommandHandler for SearchHandler {
             })?;
 
         renderer.log_debug("list: executing search");
-        let tasks = if matches_nothing {
-            Vec::new()
-        } else {
-            crate::services::task_list::run(&ctx.storage, &query, chrono::Utc::now())
-        };
+        let tasks = crate::services::task_list::run(&ctx.storage, &query, chrono::Utc::now());
         let total_matching = tasks.len();
         let (offset, limit) = Self::resolve_pagination(&args)?;
         let (start, end) = crate::utils::pagination::slice_bounds(total_matching, offset, limit);
@@ -59,54 +55,23 @@ impl CommandHandler for SearchHandler {
 }
 
 impl SearchHandler {
-    /// The shared query input for the CLI flags. Shortcut flags map onto
-    /// the shared filters: `--mine` is `@me`, `--high`/`--critical` add
-    /// priorities, `--overdue` is the overdue bucket and `--due-soon[=N]`
-    /// is due within N days. The flag is true when nothing can match: only
-    /// priority shortcuts were given and the project has none of them.
+    /// The shared query input: the value flags, then the search text in the
+    /// web search-box syntax (DEV-231), which adds to list filters and wins
+    /// for single values.
     fn query_input(
         args: &TaskSearchArgs,
         project: Option<String>,
         config: &ResolvedConfig,
-    ) -> Result<(TaskQueryInput, bool), String> {
-        let mut priority = args.priority.clone();
-        // A shortcut for a priority the project doesn't use matches nothing
-        // rather than failing: `--critical` is a quick look, not a value.
-        let shortcuts: Vec<&str> = [(args.high, "high"), (args.critical, "critical")]
-            .into_iter()
-            .filter_map(|(on, name)| on.then_some(name))
-            .collect();
-        let usable: Vec<&str> = shortcuts
-            .iter()
-            .copied()
-            .filter(|name| crate::types::Priority::parse_with_config(name, config).is_ok())
-            .collect();
-        let matches_nothing = !shortcuts.is_empty() && usable.is_empty() && priority.is_empty();
-        priority.extend(usable.into_iter().map(str::to_string));
-        let assignee = if args.mine {
-            Some("@me".to_string())
-        } else if args.unassigned {
-            Some("__none__".to_string())
-        } else {
-            args.assignee.clone()
-        };
-        let due = if args.overdue {
-            Some("overdue".to_string())
-        } else {
-            args.due.clone()
-        };
+    ) -> Result<TaskQueryInput, String> {
         let csv = |values: &[String]| (!values.is_empty()).then(|| values.join(","));
-
-        let input = TaskQueryInput {
+        let mut input = TaskQueryInput {
             project,
             status: args.status.clone(),
-            priority,
+            priority: args.priority.clone(),
             task_type: args.task_type.clone(),
             tags: args.tag.clone(),
-            text: args.query.clone().filter(|q| !q.is_empty()),
             sprints: args.sprint.clone(),
-            assignee,
-            fields: Self::where_fields(args, config)?,
+            assignee: args.assignee.clone(),
             deletion: if args.deleted {
                 DeletionFilter::Deleted
             } else if args.include_deleted {
@@ -114,8 +79,8 @@ impl SearchHandler {
             } else {
                 DeletionFilter::Active
             },
-            due,
-            due_within: args.due_soon.map(|days| days.unwrap_or(7).to_string()),
+            due: args.due.clone(),
+            due_within: args.due_within.map(|days| days.to_string()),
             recent: args.recent.clone(),
             needs: csv(&args.needs),
             has: csv(&args.has),
@@ -126,49 +91,14 @@ impl SearchHandler {
                 .as_deref()
                 .map(|key| Self::sort_key(key, config))
                 .transpose()?,
-            order: Some(Self::order(args).to_string()),
+            ..TaskQueryInput::default()
         };
-        Ok((input, matches_nothing))
-    }
-
-    /// `--where` pairs. The CLI is stricter than REST: only equality on a
-    /// supported builtin or a known custom field.
-    fn where_fields(
-        args: &TaskSearchArgs,
-        config: &ResolvedConfig,
-    ) -> Result<Vec<(String, String)>, String> {
-        let mut fields = Vec::new();
-        for (key, value) in &args.r#where {
-            let key = key.trim();
-            if key.is_empty()
-                || value.trim().is_empty()
-                || key.ends_with(['!', '<', '>'])
-                || key.eq_ignore_ascii_case("field:")
-            {
-                return Err(format!(
-                    "Invalid --where '{key}={value}': only non-empty key=value equality predicates are supported"
-                ));
-            }
-            // Builtins take precedence over wildcard custom fields, while
-            // explicit field:<name> remains an unambiguous custom-field query.
-            if let Some(field) = crate::utils::fields::is_reserved_field(key) {
-                if !matches!(
-                    field,
-                    "assignee" | "reporter" | "status" | "priority" | "type" | "tags" | "project"
-                ) {
-                    return Err(format!("Unsupported --where field '{key}'"));
-                }
-                fields.push((field.to_string(), value.clone()));
-            } else if let Some(name) = crate::utils::custom_fields::resolve_filter_name(key, config)
-            {
-                fields.push((format!("field:{name}"), value.clone()));
-            } else {
-                return Err(format!(
-                    "Unknown --where field '{key}': use a supported builtin, configured custom field, or field:<name>"
-                ));
-            }
+        let search = crate::utils::search_syntax::parse(&args.query.join(" "));
+        input.add_search(&search).map_err(|e| e.to_string())?;
+        if input.order.is_none() {
+            input.order = Some(Self::order(input.sort_by.as_deref(), args.reverse).to_string());
         }
-        Ok(fields)
+        Ok(input)
     }
 
     /// `--sort-by` for the shared query. The CLI also accepts a bare declared
@@ -193,31 +123,16 @@ impl SearchHandler {
         ))
     }
 
-    /// Without `--sort-by`: newest change first (`--reverse` has no effect).
-    /// With a key: ascending, `--reverse` descending. Relevance lists the
-    /// best match first, `--reverse` the weakest.
-    fn order(args: &TaskSearchArgs) -> &'static str {
-        let relevance = args
-            .sort_by
-            .as_deref()
-            .is_some_and(|key| key.trim().eq_ignore_ascii_case("relevance"));
-        match (args.sort_by.is_some(), relevance, args.reverse) {
-            (false, _, _) => "desc",
-            (true, true, reverse) => {
-                if reverse {
-                    "asc"
-                } else {
-                    "desc"
-                }
-            }
-            (true, false, reverse) => {
-                if reverse {
-                    "desc"
-                } else {
-                    "asc"
-                }
-            }
-        }
+    /// Order when none is given (`order=asc|desc` sets it): without a sort
+    /// key, newest change first; with one, ascending (`--reverse`:
+    /// descending); relevance lists the best match first (`--reverse`: the
+    /// weakest).
+    fn order(sort_by: Option<&str>, reverse: bool) -> &'static str {
+        let Some(key) = sort_by else {
+            return "desc";
+        };
+        let relevance = key.trim().eq_ignore_ascii_case("relevance");
+        if relevance != reverse { "desc" } else { "asc" }
     }
 
     fn resolve_pagination(args: &TaskSearchArgs) -> Result<(usize, usize), String> {

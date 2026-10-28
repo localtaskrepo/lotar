@@ -905,7 +905,7 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
     let fx = Fixture::new("PM");
     std::fs::write(
         fx.tasks_dir.join("config.yml"),
-        // DEV-21: `--overdue` excludes terminal tasks, so Todo must not be
+        // DEV-21: `due:overdue` excludes terminal tasks, so Todo must not be
         // the (last = inferred-terminal) state list's final entry.
         "issue.states: [Todo, Done]\nissue.types: [Task]\ncustom_fields: [size]\n",
     )
@@ -958,13 +958,13 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
     let payload = cli_list_json(&fx.tasks_dir, &["--sort-by", "size"]).unwrap();
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[1, 2, 3, 4]));
 
-    // --overdue uses the shared date bucket: yesterday only (a due later
+    // due:overdue uses the shared date bucket: yesterday only (a due later
     // today is "today", never overdue, regardless of wall-clock).
-    let payload = cli_list_json(&fx.tasks_dir, &["--overdue", "--page-size", "50"]).unwrap();
+    let payload = cli_list_json(&fx.tasks_dir, &["due:overdue", "--page-size", "50"]).unwrap();
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[3]));
 
-    // --due-soon window includes today through today+7 inclusive.
-    let payload = cli_list_json(&fx.tasks_dir, &["--due-soon", "--page-size", "50"]).unwrap();
+    // A due_within window includes today through today+N inclusive.
+    let payload = cli_list_json(&fx.tasks_dir, &["due_within:7", "--page-size", "50"]).unwrap();
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[1]));
 
     // Custom window: today..=today+3 (nothing here fits since PM-1 is today
@@ -973,10 +973,11 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
         5,
         &mk(5, "2026-01-15T00:00:00Z", &[("due_date", date_only(3))]),
     );
-    let payload = cli_list_json(&fx.tasks_dir, &["--due-soon=3", "--page-size", "50"]).unwrap();
+    let payload =
+        cli_list_json(&fx.tasks_dir, &["--due-within", "3", "--page-size", "50"]).unwrap();
     // Default order (modified desc) applies within the filtered set.
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[5, 1]));
-    let payload = cli_list_json(&fx.tasks_dir, &["--due-soon=2", "--page-size", "50"]).unwrap();
+    let payload = cli_list_json(&fx.tasks_dir, &["due_within:2", "--page-size", "50"]).unwrap();
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[1]));
 
     // Assignee matching is fuzzy like the API: stored "Alice" vs --assignee alice.

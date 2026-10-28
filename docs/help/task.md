@@ -46,15 +46,15 @@ lotar task add --title "Task title" [--type|-t] [--priority|-P] [--reporter|-R] 
 ```
 
 - Uses the same pipeline as `lotar add`, so status/priority/type defaults, auto-tags, branch inference, and validation all match the dedicated command.
-- Legacy mode only exposes the core fields. Flags such as `--dry-run`, `--explain`, `--bug`, `--epic`, `--critical`, and `--high` live exclusively on the top-level `lotar add` command.
+- Legacy mode only exposes the core fields. Flags such as `--dry-run` and `--explain` live exclusively on the top-level `lotar add` command.
 
 ### list
 
 ```bash
-lotar task list [QUERY] [--assignee|-a <VALUE>] [--mine|-m] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--high|-H] [--critical|-C] [--sort-by|-S FIELD] [--reverse|-R] [--page-size|-L N] [--offset N | --page N] [--unassigned] [--sprint ID...] [--overdue] [--due-soon[=DAYS]] [--due BUCKET] [--recent 7d] [--needs FIELDS] [--has KINDS] [--where key=value ...] [--effort-min VALUE] [--effort-max VALUE] [--deleted | --include-deleted] [--details]
+lotar task list [QUERY...] [--assignee|-a <VALUE>] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--sprint ID...] [--due BUCKET] [--due-within DAYS] [--recent 7d] [--needs FIELDS] [--has KINDS] [--effort-min VALUE] [--effort-max VALUE] [--sort-by|-S FIELD] [--reverse|-R] [--page-size|-L N] [--offset N | --page N] [--deleted | --include-deleted] [--details]
 ```
 
-- Mirrors the filters documented in `docs/help/list.md`, including `@me`/`--mine`, due buckets and windows, `--needs`/`--has`, sprints, unified `--where` filters, and effort bounds; the query is the one REST and MCP run.
+- Same as `lotar list`: `QUERY` uses the web search syntax (`status:todo mine:true has:tag field:area=billing`), see `docs/help/list.md`; the query is the one REST and MCP run.
 - Sorting accepts `priority|due-date|created|modified|status|assignee|type|project|id` and defaults to 20 results per page.
 - `--details` adds task descriptions to the text output.
 - Use `--page-size` (alias: `--limit`) with `--offset` or `--page` to paginate.
@@ -346,7 +346,7 @@ lotar task reference remove <link|file|code|attachment> <TASK_ID> <VALUE>
 
 ```bash
 # Quick legacy flows
-lotar tasks list --project=backend --mine --due-soon=5
+lotar tasks list --project=backend mine:true due_within:5
 lotar task edit AUTH-42 --priority=High --tag backend --tag api --dry-run --format=json
 lotar task history AUTH-42 --limit=5
 lotar tasks comment AUTH-42 -m "Ready for review" --dry-run

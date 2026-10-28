@@ -47,11 +47,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 - `--tag <TAG>`, `-i <TAG>` - Tags (can be used multiple times)
 - `--description <TEXT>`, `-D <TEXT>` - Detailed description
 
-### Shortcuts
-- `--bug` - Shorthand for --type=bug
-- `--epic` - Shorthand for --type=epic
-- `--critical` - Shorthand for --priority=critical
-- `--high` - Shorthand for --priority=high
+Types and priorities are whatever your configuration defines, so there are no shortcuts such as `--bug` or `--high`: use `--type bug` or `--priority high` (matched case-insensitively against the configured values).
 
 ### Planning and diagnostics
 - `--dry-run` - Preview the task that would be created without writing
@@ -197,7 +193,7 @@ See `lotar config help` for how to configure alias maps.
 lotar add "Implement dark mode" --type=feature --assignee=alice@company.com --due=2025-08-15
 
 # Bug reporting
-lotar add "Login page crashes on mobile" --bug --critical --tag=mobile --tag=urgent
+lotar add "Login page crashes on mobile" --type=bug --priority=critical --tag=mobile --tag=urgent
 
 # Technical debt
 lotar add "Refactor authentication module" --type=chore --effort=3d
@@ -206,7 +202,7 @@ lotar add "Refactor authentication module" --type=chore --effort=3d
 ### Project Management
 ```bash
 # Epic planning
-lotar add "User Management System" --epic --field=story_points=21 --field=quarter=Q3
+lotar add "User Management System" --type=epic --field=story_points=21 --field=quarter=Q3
 
 # Custom sprint label (not sprint membership)
 lotar add "Design user profile page" --field=sprint=15 --field=team=frontend

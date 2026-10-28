@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
     canonicalCustomFilterKey,
@@ -829,4 +831,30 @@ describe('due_within and effort bounds (DEV-230)', () => {
         const chips = chipsForFilterValue({ effort_min: '2h', due_within: '3' }, {})
         expect(chips.map((chip) => `${chip.label}=${chip.value}`)).toEqual(['Effort at least=2h', 'Due within days=3'])
     })
+})
+
+describe('repeated colon filters (DEV-231)', () => {
+    it('adds up repeated multi-select colon tokens', () => {
+        expect(parseFilterQuery('status:Todo status:Done').filters.status).toBe('Todo,Done')
+        expect(parseFilterQuery('has:tag with:image').filters.has).toBe('tag,image')
+        expect(parseFilterQuery('due:soon due:later').filters.due).toBe('later')
+    })
+})
+
+describe('shared search syntax cases (DEV-231)', () => {
+    // The CLI parser (src/utils/search_syntax.rs) runs the same cases.
+    const cases = JSON.parse(
+        readFileSync(resolve(__dirname, '../../tests/fixtures/search_syntax_cases.json'), 'utf8'),
+    ) as Array<{ input: string; text: string; filters: Record<string, string>; errors?: string[] }>
+
+    it('has cases', () => expect(cases.length).toBeGreaterThan(20))
+
+    for (const testCase of cases) {
+        it(`parses ${testCase.input}`, () => {
+            const parsed = parseFilterQuery(testCase.input)
+            expect(parsed.text).toBe(testCase.text)
+            expect({ ...parsed.filters }).toEqual(testCase.filters)
+            expect(parsed.errors ?? []).toEqual(testCase.errors ?? [])
+        })
+    }
 })

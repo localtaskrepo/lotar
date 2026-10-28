@@ -13,6 +13,7 @@ pub mod pagination;
 pub mod paths;
 pub mod project;
 pub mod scan;
+pub mod search_syntax;
 pub mod tags;
 pub mod task_intel;
 pub mod text_search;

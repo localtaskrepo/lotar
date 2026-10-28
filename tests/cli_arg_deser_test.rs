@@ -94,7 +94,7 @@ fn task_search_args_aliases_and_defaults() {
         "limit": 5
     });
     let args: cli::TaskSearchArgs = serde_json::from_value(payload).expect("valid search");
-    assert_eq!(args.query.as_deref(), Some("server"));
+    assert_eq!(args.query, vec!["server"]);
     assert_eq!(args.status, vec!["Todo", "InProgress"]);
     assert_eq!(args.priority, vec!["High"]);
     assert_eq!(args.task_type, vec!["Bug"]);

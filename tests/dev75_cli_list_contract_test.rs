@@ -1,4 +1,6 @@
-//! DEV-75: executable list examples and explicit unsupported-predicate errors.
+//! DEV-75: executable list examples and explicit errors for malformed terms.
+//! DEV-231: field equalities are written in the web search syntax
+//! (`key=value`, `field:name=value`) instead of the removed `--where` flag.
 
 mod common;
 
@@ -81,17 +83,14 @@ fn documented_custom_and_builtin_equalities_filter_exact_task_sets() {
     let fixtures = fixture();
     let body = list_json(
         &fixtures,
-        &[
-            "--where",
-            "component=editor",
-            "--where",
-            "field:sprint=2025-W35",
-        ],
+        // `sprint` is also a builtin key, so the custom field is quoted.
+        &["component=editor", "field:\"sprint\"=2025-W35"],
     );
     assert_eq!(ids(&body), vec!["LIST-1"]);
-    let body = list_json(&fixtures, &["--where", "assignee=alice"]);
+    let body = list_json(&fixtures, &["assignee=alice"]);
     assert_eq!(ids(&body), vec!["LIST-1", "LIST-5"]);
-    let body = list_json(&fixtures, &["--where", "component=editor", "component=api"]);
+    // Values of one field are ORed; a repeated `key=value` replaces.
+    let body = list_json(&fixtures, &["component=editor,api"]);
     assert_eq!(ids(&body), vec!["LIST-1", "LIST-2", "LIST-5"]);
     for (predicate, expected) in [
         ("reporter=reportowner", vec!["LIST-1"]),
@@ -101,10 +100,7 @@ fn documented_custom_and_builtin_equalities_filter_exact_task_sets() {
         ("type=Feature", vec![]),
         ("project=OTHER", vec![]),
     ] {
-        assert_eq!(
-            ids(&list_json(&fixtures, &["--where", predicate])),
-            expected
-        );
+        assert_eq!(ids(&list_json(&fixtures, &[predicate])), expected);
     }
 }
 
@@ -115,58 +111,52 @@ fn reserved_where_fields_are_not_custom_fields_under_wildcard_config() {
         &fixtures.tasks_root,
         "default.project: LIST\ncustom_fields: ['*']\n",
     );
-    let body = list_json(&fixtures, &["--where", "assignee=alice"]);
+    let body = list_json(&fixtures, &["assignee=alice"]);
     assert_eq!(ids(&body), vec!["LIST-1", "LIST-5"]);
 }
 
 #[test]
 fn explicit_custom_fields_keep_literal_reserved_names_and_case_insensitive_keys() {
     let fixtures = fixture();
+    // A custom field named like a builtin is quoted, as in the web UI.
     assert_eq!(
-        ids(&list_json(&fixtures, &["--where", "field:ASSIGNEE=shadow"])),
+        ids(&list_json(&fixtures, &["field:\"ASSIGNEE\"=shadow"])),
         vec!["LIST-1"]
     );
     assert_eq!(
-        ids(&list_json(&fixtures, &["--where", "AssIgNee=alice"])),
+        ids(&list_json(&fixtures, &["AssIgNee=alice"])),
         vec!["LIST-1", "LIST-5"]
     );
     assert_eq!(
         ids(&list_json(
             &fixtures,
-            &["--where", "Component=editor", "field:COMPONENT=api"]
+            &["Component=editor", "field:COMPONENT=api"]
         )),
         vec!["LIST-1", "LIST-2", "LIST-5"]
     );
 }
 
 #[test]
-fn unsupported_where_predicates_fail_even_when_the_workspace_is_empty() {
+fn malformed_terms_fail_even_when_the_workspace_is_empty() {
     let fixtures = fixture();
     std::fs::remove_dir_all(fixtures.tasks_root.join("LIST")).unwrap();
-    for (predicate, expected_error) in [
-        ("assignee=", "only non-empty key=value equality"),
-        ("assignee!=Alice", "only non-empty key=value equality"),
-        ("assignee!=", "only non-empty key=value equality"),
-        ("priority>=High", "only non-empty key=value equality"),
-        ("=Alice", "only non-empty key=value equality"),
-        ("unknown=Alice", "Unknown --where field"),
-        ("title=Control", "Unsupported --where field"),
-        ("field:=editor", "only non-empty key=value equality"),
+    for (term, expected_error) in [
+        ("assignee=", "Add a value for \"assignee\""),
+        ("=Alice", "Missing key before \"=\""),
+        ("field:=editor", "Invalid filter name"),
+        ("status:\"open", "Unmatched quote"),
     ] {
         let mut cmd = common::cargo_bin_in(&fixtures);
-        let output = cmd.args(["list", "--where", predicate]).assert().failure();
+        let output = cmd.args(["list", term]).assert().failure();
         let diagnostic = format!(
             "{}{}",
             String::from_utf8_lossy(&output.get_output().stdout),
             String::from_utf8_lossy(&output.get_output().stderr),
         );
-        assert!(
-            diagnostic.contains(expected_error),
-            "{predicate}: {diagnostic}"
-        );
+        assert!(diagnostic.contains(expected_error), "{term}: {diagnostic}");
     }
     common::cargo_bin_in(&fixtures)
-        .args(["list", "--where"])
+        .args(["list", "--where", "assignee=alice"])
         .assert()
         .failure();
 }
@@ -189,11 +179,11 @@ fn list_help_matches_the_actual_predicate_and_format_contract() {
         .success();
     let text = String::from_utf8_lossy(&output.get_output().stdout);
     for fragment in [
-        "optional positional text",
+        "same syntax as the web UI search box",
         // DEV-167 search rules and the fields they cover.
         "Every word must match",
         "ID, title, subtitle, description, acceptance criteria, tags, references, and comments",
-        "non-empty equality predicates only",
+        "`key:value` adds to a list filter; `key=value` replaces it",
         "no aligned table or Markdown table is generated",
     ] {
         assert!(text.contains(fragment), "missing help contract: {fragment}");
@@ -224,9 +214,9 @@ fn valid_and_rejected_list_queries_do_not_rewrite_tasks_or_configuration() {
             )
         })
         .collect();
-    list_json(&fixtures, &["titlequartz", "--where", "component=editor"]);
+    list_json(&fixtures, &["titlequartz", "component=editor"]);
     common::cargo_bin_in(&fixtures)
-        .args(["list", "--where", "assignee!=Alice"])
+        .args(["list", "assignee="])
         .assert()
         .failure();
     for (path, expected) in paths.iter().zip(before) {

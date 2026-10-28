@@ -75,10 +75,6 @@ impl CommandHandler for TaskHandler {
                     description: add_args.description,
                     tags: add_args.tags,
                     fields: add_args.fields,
-                    bug: false,
-                    epic: false,
-                    critical: false,
-                    high: false,
                     dry_run: false,
                     explain: false,
                 };

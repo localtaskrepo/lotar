@@ -361,7 +361,13 @@ function parseColonToken(
         words.push(raw)
         return
     }
-    filters[meta.key] = meta.values === 'flag' ? 'true' : value
+    const next = meta.values === 'flag' ? 'true' : value
+    const previous = filters[meta.key]
+    // Repeated colon tokens for a multi-select add up (`status:todo
+    // status:done`), as the CLI parser does (DEV-231). After an `=` the last
+    // token still decides the value and the policy.
+    const adds = previous && assignmentKeys[meta.key] === false && CSV_VALUE_KEYS.has(meta.key)
+    filters[meta.key] = adds ? `${previous},${next}` : next
     // A later colon token switches the key's policy back to merge semantics.
     assignmentKeys[meta.key] = false
 }

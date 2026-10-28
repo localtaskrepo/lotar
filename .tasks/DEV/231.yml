@@ -1,0 +1,57 @@
+title: lotar list uses the web search syntax; remove hard-coded CLI shortcuts
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T19:49:58.059316+00:00
+modified: 2026-10-28T20:08:21.073229+00:00
+relationships:
+  related:
+  - DEV-230
+comments:
+- date: 2026-10-28T20:08:21.023658+00:00
+  text: |-
+    Outcome: lotar list [QUERY...] takes the web search-box syntax (status:todo,done prio:p1 has:tag owner:alice field:area=billing "phrase" -word title:x). Parser src/utils/search_syntax.rs mirrors view/composables/useFilterGrammar.ts; both run the 52 shared cases in tests/fixtures/search_syntax_cases.json. TaskQueryInput::add_search maps it onto the shared query; value flags still work and add to it. Removed list --high/-H, --critical/-C, --mine/-m, --unassigned, --overdue, --due-soon, --where and add --high, --critical, --bug, --epic (decided: remove now). Added --due-within. Removed flags print a hint with the replacement (removed_flag_hint). Web parser fix: repeated colon list filters now add up (status:todo status:done was Done only).
+    Behaviour notes: custom fields named like a builtin key need quotes (field:"sprint"=x), as in the web UI; unknown bare keys and non-filterable builtins (title=x) match nothing rather than erroring, as in the web UI.
+    Evidence: tests/dev231_cli_search_syntax_test.rs (P0-P2 priorities, quoted statuses, custom fields, mixing flags and query, malformed terms, removed flags), dev75/dev57/dev21/dev230/due_date/cli_commands tests converted; vitest shared-case suite. lint:agent, test:agent (1827 Rust then 1828 after the hint, 1352 UI), test:smoke:agent (361) pass.
+    Docs: list.md rewritten (filter table with aliases and REST/MCP names, rules, flags, migration line), add.md, task.md, main.md, developers/cli.md, README.
+    Remaining: uncommitted. Follow-ups: stats/sprint --where and stats --overdue selectors still use the old style; clap is built without error-context, so other unknown flags still print a bare "unexpected argument found".
+    Guidance: no durable finding.
+description: |-
+  The CLI hard-codes English value names (--high, --critical, --bug, --epic) that break with configured priorities and types (default priorities have no Critical; P0-P3 projects match nothing), and its shortcuts overlap or differ subtly from the shared filters (--overdue vs due:overdue, --due-soon vs due:soon, --mine, --where key=value vs key=value in the web UI).
+
+  Scope:
+  - lotar list [QUERY...] accepts the web search-box syntax: key:value (aliases, CSV), key=value, field:name=value, q=, order=, sort_by=, deletion=, mine:true, quoted phrases, -word, /regex/, field scopes; unknown key:value stays search text, as in the UI.
+  - One Rust parser that mirrors view/composables/useFilterGrammar.ts, checked against a shared case file run by both the Rust and the vitest suites so they cannot drift.
+  - Remove list --high, --critical, --overdue, --due-soon, --mine, --where, --unassigned and add --high, --critical, --bug, --epic (decided 2026-10-28: remove now, pre-1.0). Plain value flags stay; --due-within N replaces --due-soon.
+  - Docs, help and tests updated; README, main/list/task/add help, developer CLI notes.
+
+  Out of scope (follow-up): stats and sprint --where/--overdue selectors.
+
+  Acceptance: CLI queries written in the web syntax give the same tasks as the web UI for the same text; shared grammar cases pass in Rust and vitest; lint, test, smoke pass.
+history:
+- at: 2026-10-28T19:50:01.673322+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-230"]}'
+- at: 2026-10-28T19:50:01.899177+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T20:08:21.023658+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T20:08:21.073229+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

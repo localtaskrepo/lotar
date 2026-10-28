@@ -219,7 +219,7 @@ fn list_overdue_and_due_soon_filters() {
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
-        .arg("--overdue")
+        .arg("due:overdue")
         .arg("--format=json")
         .assert()
         .success();
@@ -233,7 +233,7 @@ fn list_overdue_and_due_soon_filters() {
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
-        .arg("--due-soon")
+        .arg("due_within:7")
         .arg("--format=json")
         .assert()
         .success();

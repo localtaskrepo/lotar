@@ -5,13 +5,14 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-28T19:10:36.188977+00:00
-modified: 2026-10-28T19:49:22.477878+00:00
+modified: 2026-10-28T19:50:01.672464+00:00
 relationships:
   related:
   - DEV-3
   - DEV-5
   - DEV-13
   - DEV-57
+  - DEV-231
 comments:
 - date: 2026-10-28T19:12:39.798631+00:00
   text: |-
@@ -99,3 +100,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-28T19:50:01.672464+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57"]}'
+    new: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57","DEV-231"]}'

@@ -174,6 +174,66 @@ impl TaskQueryInput {
         })
     }
 
+    /// Add a search written in the web search-box syntax (DEV-231), e.g.
+    /// `status:todo,done has:tag owner:alice "login redirect"`. List filters
+    /// add to what is already set; single-value filters replace it; the
+    /// remaining words become the search text.
+    pub fn add_search(
+        &mut self,
+        search: &crate::utils::search_syntax::ParsedSearch,
+    ) -> Result<(), TaskQueryError> {
+        if !search.errors.is_empty() {
+            return Err(TaskQueryError::Invalid(search.errors.join("; ")));
+        }
+        let csv = |value: &str| -> Vec<String> {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|part| !part.is_empty())
+                .map(str::to_string)
+                .collect()
+        };
+        let merge = |current: &Option<String>, value: &str| match current {
+            Some(existing) if !existing.trim().is_empty() => format!("{existing},{value}"),
+            _ => value.to_string(),
+        };
+        let mut text = (!search.text.is_empty()).then(|| search.text.clone());
+        for (key, value) in &search.filters {
+            match key.as_str() {
+                "status" => self.status.extend(csv(value)),
+                "priority" => self.priority.extend(csv(value)),
+                "type" => self.task_type.extend(csv(value)),
+                "tags" => self.tags.extend(csv(value)),
+                "sprints" => self.sprints.extend(parse_sprints_csv(Some(value))?),
+                "project" => self.project = Some(value.clone()),
+                "assignee" => self.assignee = Some(value.clone()),
+                "mine" => self.assignee = Some("@me".to_string()),
+                "due" => self.due = Some(value.clone()),
+                "due_within" => self.due_within = Some(value.clone()),
+                "recent" => self.recent = Some(value.clone()),
+                "needs" => self.needs = Some(merge(&self.needs, value)),
+                "has" => self.has = Some(merge(&self.has, value)),
+                "effort_min" => self.effort_min = Some(value.clone()),
+                "effort_max" => self.effort_max = Some(value.clone()),
+                "order" => self.order = Some(value.clone()),
+                "sort_by" => self.sort_by = Some(value.clone()),
+                "deletion" => self.deletion = parse_deletion(Some(value))?,
+                // `q=` sets the search text outright, as in the web UI.
+                "q" => text = Some(value.clone()),
+                _ => self
+                    .fields
+                    .extend(csv(value).into_iter().map(|v| (key.clone(), v))),
+            }
+        }
+        if let Some(text) = text {
+            self.text = Some(match self.text.take().filter(|t| !t.is_empty()) {
+                Some(existing) if !search.filters.contains_key("q") => format!("{existing} {text}"),
+                _ => text,
+            });
+        }
+        Ok(())
+    }
+
     /// Validate the input. Enums, custom field names and `@me` resolve
     /// against the requested project's configuration (else `base`), so
     /// project-only values work. Explicit invalid values are errors; nothing

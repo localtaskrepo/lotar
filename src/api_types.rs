@@ -1077,7 +1077,7 @@ pub struct TaskListFilter {
     pub deletion: DeletionFilter,
 }
 
-fn deserialize_string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
+pub(crate) fn deserialize_string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {

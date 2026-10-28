@@ -179,7 +179,7 @@ Define your own states, types, priorities, tags, and custom fields per project, 
 lotar init --template=agile --project=mobile
 lotar config set custom_fields component,team --project=mobile
 lotar add "Offline mode for the editor" --project=mobile --field component=editor
-lotar list --where component=editor
+lotar list component=editor
 ```
 
 ## How LoTaR compares

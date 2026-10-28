@@ -348,6 +348,31 @@ fn find_serve_index(raw_args: &[String]) -> Option<usize> {
     None
 }
 
+/// What to write instead of a flag removed by DEV-231, for the error shown
+/// when Clap rejects it. Values now come from the configuration.
+pub fn removed_flag_hint(args: &[String]) -> Option<String> {
+    args.iter().skip(1).find_map(|arg| {
+        let flag = arg.split('=').next().unwrap_or(arg);
+        let instead = match flag {
+            "--high" | "-H" => "`priority:high` in `lotar list`, `--priority high` in `lotar add`",
+            "--critical" | "-C" => {
+                "`priority:critical` in `lotar list`, `--priority critical` in `lotar add`"
+            }
+            "--bug" => "`--type bug`",
+            "--epic" => "`--type epic`",
+            "--mine" | "-m" => "`mine:true` (or `--assignee @me`)",
+            "--unassigned" => "`assignee:__none__`",
+            "--overdue" => "`due:overdue`",
+            "--due-soon" => "`due_within:<days>` (or `--due-within <days>`)",
+            "--where" => "`key=value` or `field:name=value` in the query",
+            _ => return None,
+        };
+        Some(format!(
+            "'{flag}' was removed; write {instead}. See `lotar help list`."
+        ))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::normalize_args;
@@ -540,5 +565,19 @@ mod tests {
         let args = to_vec(&["lotar", "sprint", "add", "-p", "TEST", "TEST-1"]);
         let normalized = normalize_args(&args).unwrap();
         assert_eq!(normalized, args);
+    }
+
+    #[test]
+    fn removed_flags_get_a_hint() {
+        let hint =
+            crate::cli::preprocess::removed_flag_hint(&to_vec(&["lotar", "list", "--due-soon=3"]))
+                .unwrap();
+        assert!(hint.contains("due_within"), "{hint}");
+        assert!(
+            crate::cli::preprocess::removed_flag_hint(&to_vec(&[
+                "lotar", "list", "--status", "todo"
+            ]))
+            .is_none()
+        );
     }
 }

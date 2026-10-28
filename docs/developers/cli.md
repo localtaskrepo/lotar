@@ -35,21 +35,21 @@ Each section links to relevant source files and tests. Additions should follow t
 - **User help:** [../help/list.md](../help/list.md)
 - **Args & handler:** `TaskSearchArgs` in `src/cli/args/task.rs`; `SearchHandler` and `TaskPostFilters` in `src/cli/handlers/task/search.rs`.
 - **Core services:** `storage::manager::Storage` for reads and text/custom-field filtering, the post-filter pipeline in `search.rs`, and the shared `services::task_query` sorting executor.
-- **Features:** alias `ls`, multi-project resolution, additive filters, non-empty `--where key=value` equality predicates, limit/sort combination, text and JSON output. `table`/`markdown`/`md` are text aliases; empty values, negation, and comparison operators fail explicitly before searching. Builtin predicate names take precedence over wildcard custom fields; `field:<name>` explicitly selects a custom field.
+- **Features:** alias `ls`, multi-project resolution, the web search syntax as the positional query (`src/utils/search_syntax.rs`, checked against `tests/fixtures/search_syntax_cases.json` together with the web parser), value flags that add to it, the shared task query (`src/services/task_list.rs`), limit/sort combination, text and JSON output. `table`/`markdown`/`md` are text aliases; malformed terms fail before searching.
 - **Tests:** `tests/cli_list_alias_test.rs`, `tests/cli_list_effort_filters_and_sort_test.rs`, `tests/cli_list_pagination_test.rs`, `tests/dev75_cli_list_contract_test.rs`.
 
 ### lotar status
 
 - **User help:** [../help/status.md](../help/status.md)
 - **Implementation:** `StatusArgs` in `src/cli/args/task.rs`; handler in `src/cli/handlers/status.rs` which reuses `TaskService::update_status` and CODEOWNERS auto-assignment hooks in `utils::codeowners.rs`.
-- **Highlights:** first-change auto-assign, dry-run/explain output, `--mine` shorthands, relationship-aware transitions.
+- **Highlights:** first-change auto-assign, dry-run/explain output, relationship-aware transitions.
 - **Tests:** `tests/cli_status_pattern_test.rs`, `tests/cli_task_dryrun_test.rs`, `tests/cli_task_relationships_test.rs`.
 
 ### lotar priority
 
 - **User help:** [../help/priority.md](../help/priority.md)
 - **Implementation:** `PriorityArgs` + `PriorityHandler` (`src/cli/handlers/priority.rs`). Validation piggybacks on `CliValidator::validate_priority`.
-- **Notes:** Accepts explicit values only; aliases (`--high`, `--critical`) are resolved upstream. JSON renderer mirrors `render_status_change` for consistency.
+- **Notes:** Accepts explicit configured values only. JSON renderer mirrors `render_status_change` for consistency.
 - **Tests:** `tests/cli_task_dryrun_test.rs`, `tests/cli_task_relationships_test.rs` (shared harness ensures preview accuracy).
 
 ### lotar assignee
@@ -149,7 +149,7 @@ Each section links to relevant source files and tests. Additions should follow t
 
 - **User help:** [../help/task.md](../help/task.md)
 - **Implementation:** `TaskHandler` in `src/cli/handlers/task/mod.rs` routes to the modern handlers for mutation/list/history operations. Maintains backwards-compatible argument shapes.
-- **Notes:** Legacy-only flags (e.g., `task list --bug`) are translated before invoking the shared search/mutation pipeline.
+- **Notes:** `task list` takes the same arguments as `lotar list` and runs the shared task query.
 
 ### lotar whoami
 

@@ -1813,14 +1813,9 @@ mod list_features {
             "priority filter must return exactly the High task"
         );
         assert_eq!(
-            titles(&list_json(temp_dir, &["list", "--high"])),
+            titles(&list_json(temp_dir, &["list", "priority:high"])),
             vec!["Bug task"],
-            "--high shortcut must match the high-priority filter"
-        );
-        assert_eq!(
-            titles(&list_json(temp_dir, &["list", "--critical"])),
-            Vec::<String>::new(),
-            "--critical must return no tasks when none are critical"
+            "priority:high in the query must match the priority flag"
         );
         assert_eq!(
             titles(&list_json(

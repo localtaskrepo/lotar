@@ -265,10 +265,6 @@ impl CommandHandler for ScanHandler {
                                 description: None,
                                 tags: inline_attrs.tags,
                                 fields: inline_attrs.fields,
-                                bug: false,
-                                epic: false,
-                                critical: false,
-                                high: false,
                                 dry_run: false,
                                 explain: false,
                             };

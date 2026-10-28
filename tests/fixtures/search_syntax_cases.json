@@ -1,0 +1,354 @@
+[
+  {
+    "input": "login redirect",
+    "text": "login redirect",
+    "filters": {}
+  },
+  {
+    "input": "status:todo",
+    "text": "",
+    "filters": {
+      "status": "todo"
+    }
+  },
+  {
+    "input": "status:Todo status:Done",
+    "text": "",
+    "filters": {
+      "status": "Todo,Done"
+    }
+  },
+  {
+    "input": "status=Todo status:Done",
+    "text": "",
+    "filters": {
+      "status": "Done"
+    }
+  },
+  {
+    "input": "state:todo,done",
+    "text": "",
+    "filters": {
+      "status": "todo,done"
+    }
+  },
+  {
+    "input": "prio:high bug",
+    "text": "bug",
+    "filters": {
+      "priority": "high"
+    }
+  },
+  {
+    "input": "kind:Bug",
+    "text": "",
+    "filters": {
+      "type": "Bug"
+    }
+  },
+  {
+    "input": "sprint:2",
+    "text": "",
+    "filters": {
+      "sprints": "2"
+    }
+  },
+  {
+    "input": "tag:ci tags:ops",
+    "text": "",
+    "filters": {
+      "tags": "ci,ops"
+    }
+  },
+  {
+    "input": "owner:alice",
+    "text": "",
+    "filters": {
+      "assignee": "alice"
+    }
+  },
+  {
+    "input": "owner=ops",
+    "text": "",
+    "filters": {
+      "owner": "ops"
+    }
+  },
+  {
+    "input": "mine:yes",
+    "text": "",
+    "filters": {
+      "mine": "true"
+    }
+  },
+  {
+    "input": "me:true",
+    "text": "",
+    "filters": {
+      "mine": "true"
+    }
+  },
+  {
+    "input": "due:overdue",
+    "text": "",
+    "filters": {
+      "due": "overdue"
+    }
+  },
+  {
+    "input": "duedate:soon",
+    "text": "",
+    "filters": {
+      "due": "soon"
+    }
+  },
+  {
+    "input": "recent:7d",
+    "text": "",
+    "filters": {
+      "recent": "7d"
+    }
+  },
+  {
+    "input": "need:effort,due",
+    "text": "",
+    "filters": {
+      "needs": "effort,due"
+    }
+  },
+  {
+    "input": "with:image has:tag",
+    "text": "",
+    "filters": {
+      "has": "image,tag"
+    }
+  },
+  {
+    "input": "due_within:3",
+    "text": "",
+    "filters": {
+      "due_within": "3"
+    }
+  },
+  {
+    "input": "effortmin:2h effort_max:\"1d 4h\"",
+    "text": "",
+    "filters": {
+      "effort_min": "2h",
+      "effort_max": "1d 4h"
+    }
+  },
+  {
+    "input": "field:iteration=wave",
+    "text": "",
+    "filters": {
+      "field:iteration": "wave"
+    }
+  },
+  {
+    "input": "field:STATE=Todo",
+    "text": "",
+    "filters": {
+      "status": "Todo"
+    }
+  },
+  {
+    "input": "field:\"sprint\"=inc-2",
+    "text": "",
+    "filters": {
+      "field:sprint": "inc-2"
+    }
+  },
+  {
+    "input": "field:task_type=Bug",
+    "text": "",
+    "filters": {
+      "type": "Bug"
+    }
+  },
+  {
+    "input": "title:login",
+    "text": "title:login",
+    "filters": {}
+  },
+  {
+    "input": "mystery:blue",
+    "text": "mystery:blue",
+    "filters": {}
+  },
+  {
+    "input": "\"login redirect\"",
+    "text": "\"login redirect\"",
+    "filters": {}
+  },
+  {
+    "input": "'a=b'",
+    "text": "\"a=b\"",
+    "filters": {}
+  },
+  {
+    "input": "/fix(es|ed)? #\\d+/",
+    "text": "/fix(es|ed)? #\\d+/",
+    "filters": {}
+  },
+  {
+    "input": "-/draft/",
+    "text": "-/draft/",
+    "filters": {}
+  },
+  {
+    "input": "https://example.com/a=b",
+    "text": "https://example.com/a=b",
+    "filters": {}
+  },
+  {
+    "input": "a=1,b=2",
+    "text": "",
+    "filters": {
+      "a": "1",
+      "b": "2"
+    }
+  },
+  {
+    "input": "tags:ci,ops",
+    "text": "",
+    "filters": {
+      "tags": "ci,ops"
+    }
+  },
+  {
+    "input": "key=\"a,b\"",
+    "text": "",
+    "filters": {
+      "key": "a,b"
+    }
+  },
+  {
+    "input": "q=\"search words\"",
+    "text": "",
+    "filters": {
+      "q": "search words"
+    }
+  },
+  {
+    "input": "order=asc sort_by=priority",
+    "text": "",
+    "filters": {
+      "order": "asc",
+      "sort_by": "priority"
+    }
+  },
+  {
+    "input": "deletion=deleted",
+    "text": "",
+    "filters": {
+      "deletion": "deleted"
+    }
+  },
+  {
+    "input": "deletion:deleted",
+    "text": "deletion:deleted",
+    "filters": {}
+  },
+  {
+    "input": "field:x=",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "Add a value for \"field:x\""
+    ]
+  },
+  {
+    "input": "=value",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "Missing key before \"=\""
+    ]
+  },
+  {
+    "input": "owner=",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "Add a value for \"owner\""
+    ]
+  },
+  {
+    "input": "status:\"In Progress\"",
+    "text": "",
+    "filters": {
+      "status": "In Progress"
+    }
+  },
+  {
+    "input": "status:\"unclosed",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "Unmatched quote in \"status:\"unclosed\""
+    ]
+  },
+  {
+    "input": "-oauth login",
+    "text": "-oauth login",
+    "filters": {}
+  },
+  {
+    "input": "status:",
+    "text": "status:",
+    "filters": {}
+  },
+  {
+    "input": "field:=x",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "Invalid filter name \"field:\""
+    ]
+  },
+  {
+    "input": "Component=editor field:COMPONENT=api",
+    "text": "",
+    "filters": {
+      "component": "editor",
+      "field:component": "api"
+    }
+  },
+  {
+    "input": "project:ALPHA",
+    "text": "",
+    "filters": {
+      "project": "ALPHA"
+    }
+  },
+  {
+    "input": "field:q=hello",
+    "text": "",
+    "filters": {
+      "q": "hello"
+    }
+  },
+  {
+    "input": "STATUS:Done Prio:High",
+    "text": "",
+    "filters": {
+      "status": "Done",
+      "priority": "High"
+    }
+  },
+  {
+    "input": "tag:\"release candidate\" ui",
+    "text": "ui",
+    "filters": {
+      "tags": "release candidate"
+    }
+  },
+  {
+    "input": "field:\"due\"=friday",
+    "text": "",
+    "filters": {
+      "field:due": "friday"
+    }
+  }
+]

@@ -158,30 +158,19 @@ impl CommandHandler for AddHandler {
         renderer.log_debug("add: arguments validated and normalized");
 
         // Process and validate arguments
-        let validated_type = if args.bug {
-            validator
-                .validate_task_type("Bug")
-                .map_err(|e| format!("Task type validation failed: {}", e))?
-        } else if args.epic {
-            validator
-                .validate_task_type("Epic")
-                .map_err(|e| format!("Task type validation failed: {}", e))?
-        } else {
-            match args.task_type {
-                Some(task_type) => validator
-                    .validate_task_type(&task_type)
-                    .map_err(|e| format!("Task type validation failed: {}", e))?,
-                None => {
-                    if let Some(t) = crate::utils::task_intel::infer_task_type_from_branch(&config)
-                    {
-                        t
-                    } else if let Ok(f) = validator.validate_task_type("Feature") {
-                        f
-                    } else if let Some(first) = config.issue_types.values.first() {
-                        first.clone()
-                    } else {
-                        TaskType::from("Feature")
-                    }
+        let validated_type = match args.task_type {
+            Some(task_type) => validator
+                .validate_task_type(&task_type)
+                .map_err(|e| format!("Task type validation failed: {}", e))?,
+            None => {
+                if let Some(t) = crate::utils::task_intel::infer_task_type_from_branch(&config) {
+                    t
+                } else if let Ok(f) = validator.validate_task_type("Feature") {
+                    f
+                } else if let Some(first) = config.issue_types.values.first() {
+                    first.clone()
+                } else {
+                    TaskType::from("Feature")
                 }
             }
         };
@@ -189,22 +178,12 @@ impl CommandHandler for AddHandler {
         // Infer status/priority from branch if not provided via args
 
         // Priority
-        let validated_priority = if args.critical {
-            validator
-                .validate_priority("Critical")
-                .map_err(|e| format!("Priority validation failed: {}", e))?
-        } else if args.high {
-            validator
-                .validate_priority("High")
-                .map_err(|e| format!("Priority validation failed: {}", e))?
-        } else {
-            match args.priority {
-                Some(priority) => validator
-                    .validate_priority(&priority)
-                    .map_err(|e| format!("Priority validation failed: {}", e))?,
-                None => crate::utils::task_intel::infer_priority_from_branch(&config)
-                    .unwrap_or_else(|| Self::get_default_priority(&config)),
-            }
+        let validated_priority = match args.priority {
+            Some(priority) => validator
+                .validate_priority(&priority)
+                .map_err(|e| format!("Priority validation failed: {}", e))?,
+            None => crate::utils::task_intel::infer_priority_from_branch(&config)
+                .unwrap_or_else(|| Self::get_default_priority(&config)),
         };
 
         // Validate assignee if provided

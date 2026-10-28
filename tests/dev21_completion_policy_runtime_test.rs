@@ -4,7 +4,7 @@
 //! - `task_state` computed on TaskDTO get/list/update (and the task YAML
 //!   staying untouched);
 //! - overdue terminal exclusion with per-project policies across REST
-//!   list/export, MCP, the CLI `--overdue` flag, and the `stats due`
+//!   list/export, MCP, the CLI `due:overdue` filter, and the `stats due`
 //!   histogram (due-today stays today even when done);
 //! - mixed-project sprint review/velocity/burndown resolving each task
 //!   against its own project policy;
@@ -282,7 +282,7 @@ fn cli_overdue_and_stats_due_use_project_policies() {
         .env("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref())
         .arg("--format")
         .arg("json")
-        .args(["list", "--overdue"])
+        .args(["list", "due:overdue"])
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
