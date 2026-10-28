@@ -5,6 +5,8 @@ const SHA = /^[a-f0-9]{40}$/i;
 const PREFIX = /^[\p{Alphabetic}\p{Number}][\p{Alphabetic}\p{Number}_-]*$/u;
 const TOKEN = /[\p{Alphabetic}\p{Number}_-]+/gu;
 const U64_MAX = 18446744073709551615n;
+// Attachment images a release page may show (DEV-225).
+const IMAGE_FILE = /\.(png|jpe?g|gif|webp)$/i;
 
 function validPrefix(prefix) {
   return Buffer.byteLength(prefix, 'utf8') <= 64 && PREFIX.test(prefix);
@@ -25,7 +27,7 @@ function safePath(path) {
 }
 
 async function loadTicketSnapshot({ github, owner, repo, tag, warn = () => {} }) {
-  const snapshot = { owner, repo, revision: null, tickets: new Map() };
+  const snapshot = { owner, repo, revision: null, tickets: new Map(), blobs: new Map(), images: new Map() };
   try {
     const { data: commit } = await github.rest.repos.getCommit({ owner, repo, ref: tag });
     if (!SHA.test(commit?.sha) || !SHA.test(commit?.commit?.tree?.sha)) throw new Error('commit');
@@ -38,12 +40,24 @@ async function loadTicketSnapshot({ github, owner, repo, tag, warn = () => {} })
     const { data: tree } = await github.rest.git.getTree({ owner, repo, tree_sha: roots[0].sha, recursive: '1' });
     if (tree?.truncated !== false || !Array.isArray(tree.tree)) throw new Error('tree');
     const ambiguous = new Set();
+    const ambiguousImages = new Set();
     for (const entry of tree.tree) {
       const modes = { blob: ['100644', '100755', '120000'], tree: ['040000'], commit: ['160000'] };
       if (!safePath(entry.path) || !modes[entry.type]?.includes(entry.mode)
         || !SHA.test(entry.sha)) throw new Error('entry');
       if (entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) continue;
       const parts = entry.path.split('/');
+      // Attachment stores are '@' folders (.tasks/@attachments, DEV/@attachments).
+      const name = parts.at(-1);
+      if (IMAGE_FILE.test(name) && parts.slice(0, -1).some((part) => part.startsWith('@'))) {
+        if (snapshot.images.has(name) || ambiguousImages.has(name)) {
+          snapshot.images.delete(name);
+          ambiguousImages.add(name);
+        } else {
+          snapshot.images.set(name, { path: `.tasks/${entry.path}`, sha: entry.sha });
+        }
+        continue;
+      }
       const prefix = parts[0];
       if (parts.length < 2 || !validPrefix(prefix) || parts.slice(1, -1).some((part) => part.startsWith('@'))) continue;
       const match = /^([0-9]+)\.ya?ml$/.exec(parts.at(-1));
@@ -55,11 +69,14 @@ async function loadTicketSnapshot({ github, owner, repo, tag, warn = () => {} })
         ambiguous.add(id);
       } else {
         snapshot.tickets.set(id, `.tasks/${entry.path}`);
+        snapshot.blobs.set(`.tasks/${entry.path}`, entry.sha);
       }
     }
     return snapshot;
   } catch {
     snapshot.tickets.clear();
+    snapshot.blobs.clear();
+    snapshot.images.clear();
     warn(WARNING);
     return snapshot;
   }
@@ -204,7 +221,8 @@ function linkTicketReferences(subject, snapshot) {
  * Commit subjects for the release page: first line of each message (up to
  * `maxCommits` commits), identical subjects collapsed into one line (follow-up
  * commits reuse their ticket's "DEV-N Title" subject), sorted
- * case-insensitively. `remaining` counts commits beyond `maxCommits`.
+ * case-insensitively with numbers in numeric order. `remaining` counts
+ * commits beyond `maxCommits`.
  */
 function releaseCommitSubjects(commits, maxCommits = 100) {
   const list = Array.isArray(commits) ? commits : [];
@@ -213,8 +231,195 @@ function releaseCommitSubjects(commits, maxCommits = 100) {
       .slice(0, maxCommits)
       .map((c) => (c?.commit?.message ?? '').split('\n')[0].trim() || '(no message)'),
   );
-  const subjects = [...unique].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  // Numeric: DEV-12 sorts before DEV-111 (DEV-177).
+  const subjects = [...unique].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }));
   return { subjects, remaining: Math.max(0, list.length - maxCommits) };
 }
 
-module.exports = { loadTicketSnapshot, linkTicketReferences, releaseCommitSubjects };
+// ---------------------------------------------------------------------------
+// Release page sections (DEV-177) and feature screenshots (DEV-225)
+// ---------------------------------------------------------------------------
+
+const DETAILS_WARNING = 'Release ticket types unavailable for some tickets; they are listed under Other changes.';
+const SECTIONS = [
+  { type: 'feature', title: 'Features' },
+  { type: 'bug', title: 'Bug fixes' },
+  { type: 'chore', title: 'Chores' },
+];
+const OTHER_SECTION = 'Other changes';
+const IMAGES_PER_FEATURE = 2;
+const IMAGES_PER_RELEASE = 12;
+const MAX_IMAGE_WIDTH = 720;
+
+function unquote(value) {
+  const text = value.trim();
+  if (text.length >= 2 && text.startsWith("'") && text.endsWith("'")) return text.slice(1, -1).replace(/''/g, "'");
+  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) return text.slice(1, -1).replace(/\\"/g, '"');
+  return text;
+}
+
+/**
+ * The few ticket fields a release page needs, read from LoTaR's own YAML
+ * layout: top-level `type` and `title`, and `attachment:` entries in the
+ * top-level `references` list.
+ */
+function parseTicketYaml(text) {
+  const ticket = { type: null, title: null, attachments: [] };
+  let inReferences = false;
+  for (const line of String(text).split(/\r?\n/)) {
+    const top = /^([A-Za-z_][\w-]*):(.*)$/.exec(line);
+    if (top) {
+      inReferences = top[1] === 'references';
+      if (top[1] === 'type' && top[2].trim()) ticket.type = unquote(top[2]);
+      if (top[1] === 'title' && top[2].trim()) ticket.title = unquote(top[2]);
+      continue;
+    }
+    if (!inReferences) continue;
+    const attachment = /^\s*(?:-\s+)?attachment:\s*(.+?)\s*$/.exec(line);
+    if (attachment) ticket.attachments.push(unquote(attachment[1]));
+  }
+  return ticket;
+}
+
+/** Ticket IDs mentioned in `subject` that exist in the snapshot, in order. */
+function ticketIdsIn(subject, snapshot) {
+  const ids = [];
+  for (const match of String(subject).matchAll(TOKEN)) {
+    const raw = match[0];
+    const split = raw.lastIndexOf('-');
+    const prefix = raw.slice(0, split);
+    const suffix = split > 0 && validPrefix(prefix) ? number(raw.slice(split + 1)) : null;
+    const id = suffix === null ? null : `${prefix}-${suffix}`;
+    if (id && snapshot?.tickets?.has(id) && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+async function readBlob(github, owner, repo, sha) {
+  const { data } = await github.rest.git.getBlob({ owner, repo, file_sha: sha });
+  if (data?.encoding !== 'base64' || typeof data.content !== 'string') throw new Error('blob');
+  return Buffer.from(data.content, 'base64');
+}
+
+/** Type, title and attachments of every snapshot ticket the subjects mention. */
+async function loadTicketDetails({ github, owner, repo, snapshot, subjects, warn = () => {} }) {
+  const details = new Map();
+  if (!SHA.test(snapshot?.revision ?? '')) return details;
+  let failed = false;
+  for (const id of new Set(subjects.flatMap((subject) => ticketIdsIn(subject, snapshot)))) {
+    const sha = snapshot.blobs?.get(snapshot.tickets.get(id));
+    if (!SHA.test(sha ?? '')) continue;
+    try {
+      details.set(id, parseTicketYaml((await readBlob(github, owner, repo, sha)).toString('utf8')));
+    } catch {
+      failed = true;
+    }
+  }
+  if (failed) warn(DETAILS_WARNING);
+  return details;
+}
+
+/** Pixel size from a PNG, GIF, WebP or JPEG header; null when unknown. */
+function imageSize(bytes) {
+  const b = Buffer.from(bytes);
+  if (b.length >= 24 && b.readUInt32BE(0) === 0x89504e47) return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+  if (b.length >= 10 && b.toString('latin1', 0, 4) === 'GIF8') return { width: b.readUInt16LE(6), height: b.readUInt16LE(8) };
+  if (b.length >= 30 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') {
+    const chunk = b.toString('latin1', 12, 16);
+    if (chunk === 'VP8X') return { width: 1 + b.readUIntLE(24, 3), height: 1 + b.readUIntLE(27, 3) };
+    if (chunk === 'VP8 ') return { width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff };
+    if (chunk === 'VP8L') {
+      const bits = b.readUInt32LE(21);
+      return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+    }
+    return null;
+  }
+  if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+    for (let i = 2; i + 9 < b.length;) {
+      if (b[i] !== 0xff) return null;
+      const marker = b[i + 1];
+      const length = b.readUInt16BE(i + 2);
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+        return { width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5) };
+      }
+      i += 2 + length;
+    }
+  }
+  return null;
+}
+
+function escapeAttribute(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** An <img> for a snapshot attachment at its CSS size: `name-2x.*` (a scale-2 capture) is halved. */
+function screenshotTag(snapshot, image, size, alt) {
+  if (!safePath(image.path) || !size?.width) return null;
+  const scale = Number(/-([1-4])x\./.exec(image.path.split('/').at(-1))?.[1] ?? 1);
+  const width = Math.max(1, Math.min(MAX_IMAGE_WIDTH, Math.round(size.width / scale)));
+  const url = `https://raw.githubusercontent.com/${encodeSegment(snapshot.owner)}/${encodeSegment(snapshot.repo)}/${snapshot.revision}/${image.path.split('/').map(encodeSegment).join('/')}`;
+  return `<img src="${url}" alt="${escapeAttribute(alt)}" width="${width}">`;
+}
+
+/**
+ * The release page's change list. With ticket details, subjects are grouped
+ * into Features, Bug fixes, Chores and Other changes by the type of the first
+ * ticket they name, and features show up to two attached screenshots. Without
+ * details (no snapshot) it stays one alphabetical list.
+ */
+async function renderReleaseChanges({ github, owner, repo, subjects, remaining = 0, snapshot, details, warn = () => {} }) {
+  const line = (subject) => `- ${linkTicketReferences(subject, snapshot)}`;
+  const tail = remaining > 0 ? [`- …and ${remaining} more`] : [];
+  if (!details?.size) return [...subjects.map(line), ...tail];
+
+  const groups = new Map([...SECTIONS.map((section) => [section.title, []]), [OTHER_SECTION, []]]);
+  for (const subject of subjects) {
+    const ticket = ticketIdsIn(subject, snapshot).map((id) => ({ id, ...details.get(id) })).find((t) => t.type);
+    const type = (ticket?.type ?? '').toLowerCase();
+    const section = SECTIONS.find((s) => s.type === type)?.title ?? OTHER_SECTION;
+    groups.get(section).push({ subject, ticket });
+  }
+
+  let imageBudget = IMAGES_PER_RELEASE;
+  let imagesFailed = false;
+  const lines = [];
+  for (const [title, entries] of groups) {
+    if (!entries.length) continue;
+    if (lines.length) lines.push('');
+    lines.push(`### ${title}`);
+    for (const { subject, ticket } of entries) {
+      lines.push(line(subject));
+      if (title !== 'Features' || !ticket) continue;
+      const tags = [];
+      for (const name of ticket.attachments ?? []) {
+        if (tags.length >= IMAGES_PER_FEATURE || imageBudget <= 0) break;
+        const image = snapshot.images?.get(name);
+        if (!image || !SHA.test(image.sha)) continue;
+        try {
+          const tag = screenshotTag(snapshot, image, imageSize(await readBlob(github, owner, repo, image.sha)), `${ticket.id} ${ticket.title ?? ''}`.trim());
+          if (tag) {
+            tags.push(tag);
+            imageBudget -= 1;
+          }
+        } catch {
+          imagesFailed = true;
+        }
+      }
+      if (tags.length) lines.push(`  <br>${tags.join(' ')}`);
+    }
+  }
+  if (imagesFailed) warn('Some release screenshots could not be read and were left out.');
+  // A blank line separates the first heading from the "Changes:" label.
+  return ['', ...lines, ...tail];
+}
+
+module.exports = {
+  imageSize,
+  linkTicketReferences,
+  loadTicketDetails,
+  loadTicketSnapshot,
+  parseTicketYaml,
+  releaseCommitSubjects,
+  renderReleaseChanges,
+  ticketIdsIn,
+};

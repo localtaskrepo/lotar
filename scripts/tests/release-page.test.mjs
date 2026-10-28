@@ -21,10 +21,27 @@ function fixture({
     subjects = ['DEV-109 Fix backlog ordering'],
     previous = true,
     snapshotError = false,
+    types = { 109: 'Feature', 62: 'Bug', 63: 'Chore' },
+    attachments = {},
+    images = {},
 } = {}) {
     const updates = [];
     const calls = [];
     const warnings = [];
+    // Blob contents by SHA: ticket YAML (DEV-177) and attachment images (DEV-225).
+    const blobs = new Map();
+    const ticketSha = (id) => id.toString(16).padStart(40, '0');
+    for (const id of [109, 62, 63]) {
+        const references = (attachments[id] ?? []).map((name) => `- attachment: ${name}`);
+        const yaml = [`title: Ticket ${id}`, `status: Done`, ...(types[id] ? [`type: ${types[id]}`] : [])];
+        if (references.length) yaml.push('references:', ...references);
+        blobs.set(ticketSha(id), Buffer.from(`${yaml.join('\n')}\n`));
+    }
+    const imageEntries = Object.entries(images).map(([name, bytes], index) => {
+        const sha = (index + 1).toString(16).padStart(40, 'e');
+        blobs.set(sha, bytes);
+        return { path: `DEV/@attachments/${name}`, type: 'blob', mode: '100644', sha };
+    });
     const github = {
         rest: {
             repos: {
@@ -65,14 +82,24 @@ function fixture({
                     return {
                         data: {
                             truncated: false,
-                            tree: [109, 62, 63].map((id) => ({
-                                path: `DEV/${id}.yml`,
-                                type: 'blob',
-                                mode: '100644',
-                                sha: 'd'.repeat(40),
-                            })),
+                            tree: [
+                                ...[109, 62, 63].map((id) => ({
+                                    path: `DEV/${id}.yml`,
+                                    type: 'blob',
+                                    mode: '100644',
+                                    sha: ticketSha(id),
+                                })),
+                                ...imageEntries,
+                            ],
                         },
                     };
+                },
+                getBlob: async (params) => {
+                    calls.push({ method: 'getBlob', ...params });
+                    assert.deepEqual(Object.keys(params).sort(), ['file_sha', 'owner', 'repo']);
+                    const content = blobs.get(params.file_sha);
+                    if (!content) throw new Error(`unknown blob ${params.file_sha}`);
+                    return { data: { encoding: 'base64', content: content.toString('base64') } };
                 },
             },
         },
@@ -133,8 +160,19 @@ test('actual workflow links all known mentions to immutable release files and pr
     assert.ok(body.includes(retained));
     assert.ok(body.includes(`releases/download/${tag}/lotar-${tag}-macos-arm64.tar.gz`));
     assert.ok(body.includes('mallox/lotar:0.9.1'));
-    assert.ok(body.indexOf('- A maintenance change') < body.indexOf('- [DEV-62]'));
-    assert.ok(body.indexOf('- [DEV-62]') < body.indexOf('- Security Pass'));
+    // Grouped by the type of the first ticket a subject names (DEV-177).
+    const order = [
+        '### Features',
+        '- Security Pass',
+        '### Bug fixes',
+        '- [DEV-62]',
+        '### Other changes',
+        '- A maintenance change',
+    ];
+    for (let i = 1; i < order.length; i += 1) {
+        assert.ok(body.indexOf(order[i - 1]) < body.indexOf(order[i]), `${order[i - 1]} before ${order[i]}`);
+    }
+    assert.ok(!body.includes('### Chores'), 'empty sections are left out');
     assert.equal(sample.warnings.length, 0);
     assert.ok(sample.calls.some((call) => call.method === 'getCommit'));
     assert.ok(
@@ -214,4 +252,69 @@ test('release renderer regression suite runs in the existing Node-enabled CI lan
             job,
         );
     }
+});
+
+// 1x1 PNG header with a 640x120 size, and a 600x80 one for a scale-2 capture.
+function png(width, height) {
+    const bytes = Buffer.alloc(33);
+    bytes.writeUInt32BE(0x89504e47, 0);
+    bytes.writeUInt32BE(0x0d0a1a0a, 4);
+    bytes.writeUInt32BE(13, 8);
+    bytes.write('IHDR', 12, 'latin1');
+    bytes.writeUInt32BE(width, 16);
+    bytes.writeUInt32BE(height, 20);
+    return bytes;
+}
+
+test('features come first, then bug fixes, chores and other changes (DEV-177)', async () => {
+    const body = await fixture({
+        subjects: ['DEV-63 Tidy the build', 'DEV-62 Fix a crash', 'Bump a dependency', 'DEV-109 Add themes'],
+    }).render();
+    const sections = [...body.matchAll(/^### (.+)$/gm)].map((match) => match[1]);
+    assert.deepEqual(sections, ['Features', 'Bug fixes', 'Chores', 'Other changes']);
+    assert.ok(body.indexOf('Add themes') < body.indexOf('Fix a crash'));
+    assert.ok(body.indexOf('Fix a crash') < body.indexOf('Tidy the build'));
+    assert.ok(body.indexOf('Tidy the build') < body.indexOf('Bump a dependency'));
+});
+
+test('tickets without a known type and unreadable tickets land in Other changes', async () => {
+    const body = await fixture({ subjects: ['DEV-109 Mystery', 'DEV-62 Fix'], types: { 62: 'Bug' } }).render();
+    assert.ok(body.indexOf('### Bug fixes') < body.indexOf('### Other changes'));
+    assert.ok(body.indexOf('### Other changes') < body.indexOf('Mystery'));
+});
+
+test('feature tickets show up to two attached screenshots from the release snapshot (DEV-225)', async () => {
+    const sample = fixture({
+        subjects: ['DEV-109 Add themes', 'DEV-62 Fix a crash'],
+        attachments: {
+            109: ['notes.txt', 'theme-picker-2x.abc.png', 'missing.png', 'theme-dark.def.png', 'third.ghi.png'],
+            62: ['crash.jkl.png'],
+        },
+        images: {
+            'theme-picker-2x.abc.png': png(1200, 160),
+            'theme-dark.def.png': png(2000, 400),
+            'third.ghi.png': png(10, 10),
+            'crash.jkl.png': png(10, 10),
+        },
+    });
+    const body = await sample.render();
+    const raw = `https://raw.githubusercontent.com/localtaskrepo/lotar/${revision}/.tasks/DEV/%40attachments`;
+    assert.ok(body.includes(`<img src="${raw}/theme-picker-2x.abc.png" alt="DEV-109 Ticket 109" width="600">`), body);
+    // Capped to the page width.
+    assert.ok(body.includes(`<img src="${raw}/theme-dark.def.png" alt="DEV-109 Ticket 109" width="720">`));
+    assert.ok(!body.includes('third.ghi.png'), 'at most two per feature');
+    assert.ok(!body.includes('crash.jkl.png'), 'only features show screenshots');
+    assert.ok(body.indexOf('Add themes') < body.indexOf('theme-picker-2x'));
+    assert.equal(sample.warnings.length, 0);
+});
+
+test('screenshots are optional: an unreadable image is left out with a warning', async () => {
+    const sample = fixture({
+        subjects: ['DEV-109 Add themes'],
+        attachments: { 109: ['broken.png'] },
+        images: { 'broken.png': Buffer.from('not an image') },
+    });
+    const body = await sample.render();
+    assert.ok(body.includes('Add themes'));
+    assert.ok(!body.includes('<img'));
 });

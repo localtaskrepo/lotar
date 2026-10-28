@@ -328,7 +328,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const { loadTicketSnapshot, linkTicketReferences, releaseCommitSubjects } = require('./.github/scripts/release-ticket-links.cjs');
+            const { loadTicketDetails, loadTicketSnapshot, releaseCommitSubjects, renderReleaseChanges } = require('./.github/scripts/release-ticket-links.cjs');
             const { owner, repo } = context.repo;
             const tag = process.env.GITHUB_REF_NAME;
             const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
@@ -357,14 +357,13 @@ jobs:
 
               const { subjects, remaining } = releaseCommitSubjects(comparison.data.commits ?? [], 100);
 
-              const snapshot = await loadTicketSnapshot({
-                github, owner, repo, tag, warn: (message) => core.warning(message),
+              const warn = (message) => core.warning(message);
+              const snapshot = await loadTicketSnapshot({ github, owner, repo, tag, warn });
+              // Grouped by ticket type, with feature screenshots (DEV-177, DEV-225).
+              const details = await loadTicketDetails({ github, owner, repo, snapshot, subjects, warn });
+              const lines = await renderReleaseChanges({
+                github, owner, repo, subjects, remaining, snapshot, details, warn,
               });
-              const lines = subjects.map((s) => `- ${linkTicketReferences(s, snapshot)}`);
-
-              if (remaining > 0) {
-                lines.push(`- …and ${remaining} more`);
-              }
 
               commitsSectionBody = lines.length ? lines.join('\n') : '_No commits found in this range._';
             }

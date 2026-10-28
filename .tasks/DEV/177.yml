@@ -1,9 +1,33 @@
 title: Better Release Ordering
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-25T00:22:37.376652+00:00
+modified: 2026-10-28T01:25:37.328763+00:00
+comments:
+- date: 2026-10-28T01:13:45.961792+00:00
+  text: 'Done: the release page groups the Changes list by the type of the first ticket each subject names (Features, Bug fixes, Chores, Other changes; empty groups left out), read from the ticket YAML in the release snapshot (git getBlob, one call per ticket). Subjects sort with ticket numbers in numeric order (DEV-12 before DEV-111). If ticket details cannot be read, those subjects go to Other changes with one warning; without a snapshot the list stays flat as before. Code: .github/scripts/release-ticket-links.cjs (parseTicketYaml, ticketIdsIn, loadTicketDetails, renderReleaseChanges), release.yml. Tests: npm run test:release 33/33. Previewed v0.9.1..v0.10.0 locally: 28 features, 21 bug fixes, 31 chores, 3 other. Docs: docs/release-guide.md.'
 description: |-
   The feature page currently shows all tickets in an order that could be improved.
   Features should come first, bug fixes second, and then chores, followed by any others should there be any.
+history:
+- at: 2026-10-28T01:09:28.165753+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T01:13:45.961792+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T01:25:37.328763+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -1,0 +1,31 @@
+title: Show feature screenshots on the release page
+status: Done
+priority: Low
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T01:02:27.372098+00:00
+modified: 2026-10-28T01:25:37.372526+00:00
+comments:
+- date: 2026-10-28T01:13:45.989579+00:00
+  text: 'Done: feature entries on the release page show up to two image attachments of their ticket (12 per release) as <img> from raw.githubusercontent.com at the release commit; the snapshot indexes images in ''@'' folders (e.g. .tasks/DEV/@attachments). Width comes from the image header (PNG/GIF/WebP/JPEG), halved for *-2x.* names (scale-2 captures from scripts/ticket-screenshot.mjs, which now adds that suffix), capped at 720. Unreadable images are skipped with a warning. Tests in release-page.test.mjs and release-ticket-links.test.mjs. Local preview shows DEV-184''s heading snippet at 695 px.'
+description: The release page lists commits by ticket. For feature tickets in a release that carry image attachments, show their screenshots (from the release's git snapshot) so readers see what changed.
+history:
+- at: 2026-10-28T01:09:28.218813+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T01:13:45.989579+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T01:25:37.372526+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

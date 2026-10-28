@@ -5,9 +5,12 @@ import { micromark } from 'micromark';
 
 const require = createRequire(import.meta.url);
 const {
+    imageSize,
     loadTicketSnapshot,
     linkTicketReferences,
+    parseTicketYaml,
     releaseCommitSubjects,
+    ticketIdsIn,
 } = require('../../.github/scripts/release-ticket-links.cjs');
 const revision = 'a'.repeat(40);
 const rootSha = 'b'.repeat(40);
@@ -297,4 +300,75 @@ test('release commit subjects dedupe identical first lines, sort, and count over
     // Different text stays separate; overflow counts commits, not unique subjects.
     assert.deepEqual(releaseCommitSubjects(commits, 3), { subjects: ['dev-1 a', 'DEV-2 b'], remaining: 3 });
     assert.deepEqual(releaseCommitSubjects(undefined), { subjects: [], remaining: 0 });
+    // Ticket numbers sort numerically (DEV-177).
+    const numbered = ['DEV-111 c', 'DEV-12 b', 'DEV-9 a'].map((message) => ({ commit: { message } }));
+    assert.deepEqual(releaseCommitSubjects(numbered).subjects, ['DEV-9 a', 'DEV-12 b', 'DEV-111 c']);
+});
+
+test('reads type, title and attachment references from ticket YAML (DEV-177/225)', () => {
+    const ticket = parseTicketYaml(
+        [
+            "title: 'Show the user''s name'",
+            'status: Done',
+            'type: Feature',
+            'description: |-',
+            '  type: Bug is just text here',
+            '  - attachment: not-a-reference.png',
+            'references:',
+            '- attachment: heading-2x.abc.webp',
+            '- link: https://example.com',
+            "- attachment: 'phone.def.png'",
+            'history:',
+            '- attachment: also-not.png',
+        ].join('\n'),
+    );
+    assert.deepEqual(ticket, {
+        type: 'Feature',
+        title: "Show the user's name",
+        attachments: ['heading-2x.abc.webp', 'phone.def.png'],
+    });
+    assert.deepEqual(parseTicketYaml('status: Todo\n'), { type: null, title: null, attachments: [] });
+});
+
+test('finds snapshot ticket IDs in a subject, first mention first', () => {
+    const snapshot = {
+        tickets: new Map([
+            ['DEV-62', 'x'],
+            ['DEV-63', 'y'],
+        ]),
+    };
+    assert.deepEqual(ticketIdsIn('DEV-63, DEV-404 and DEV-62 then DEV-63 again', snapshot), ['DEV-63', 'DEV-62']);
+    assert.deepEqual(ticketIdsIn('No tickets', snapshot), []);
+});
+
+test('reads image sizes from PNG, GIF, WebP and JPEG headers', () => {
+    const pngBytes = Buffer.alloc(24);
+    pngBytes.writeUInt32BE(0x89504e47, 0);
+    pngBytes.writeUInt32BE(320, 16);
+    pngBytes.writeUInt32BE(48, 20);
+    assert.deepEqual(imageSize(pngBytes), { width: 320, height: 48 });
+
+    const gif = Buffer.from('GIF89a\x40\x01\x30\x00', 'latin1');
+    assert.deepEqual(imageSize(gif), { width: 320, height: 48 });
+
+    const vp8x = Buffer.alloc(30);
+    vp8x.write('RIFF', 0, 'latin1');
+    vp8x.write('WEBPVP8X', 8, 'latin1');
+    vp8x.writeUIntLE(319, 24, 3);
+    vp8x.writeUIntLE(47, 27, 3);
+    assert.deepEqual(imageSize(vp8x), { width: 320, height: 48 });
+
+    const vp8l = Buffer.alloc(30);
+    vp8l.write('RIFF', 0, 'latin1');
+    vp8l.write('WEBPVP8L', 8, 'latin1');
+    vp8l.writeUInt32LE(319 | (47 << 14), 21);
+    assert.deepEqual(imageSize(vp8l), { width: 320, height: 48 });
+
+    // SOI, an APP0 segment, then SOF0 with height 48 and width 320.
+    const jpeg = Buffer.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x30, 0x01, 0x40, 0x03,
+    ]);
+    assert.deepEqual(imageSize(jpeg), { width: 320, height: 48 });
+
+    assert.equal(imageSize(Buffer.from('not an image')), null);
 });
