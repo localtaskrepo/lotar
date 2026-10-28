@@ -620,7 +620,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Smart filter CSV: keep tasks carrying every listed kind of reference (attachment, image, link; plurals accepted). Blank explicit values and invalid entries return 400."
+            "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
           }
         ],
         "responses": {
@@ -2953,7 +2953,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Smart filter CSV: keep tasks carrying every listed kind of reference (attachment, image, link; plurals accepted). Blank explicit values and invalid entries return 400."
+            "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
           }
         ]
       }

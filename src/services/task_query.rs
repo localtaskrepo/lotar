@@ -96,6 +96,8 @@ pub enum HasFlag {
     Image,
     /// A link reference.
     Link,
+    /// At least one tag (DEV-228).
+    Tag,
 }
 
 /// Extensions treated as images by the `has:image` filter and the web UI.
@@ -246,7 +248,7 @@ pub fn parse_needs(raw: &str) -> Result<BTreeSet<NeedsFlag>, String> {
 pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
     if raw.trim().is_empty() {
         return Err(
-            "Invalid has: must not be blank (omit the parameter or supply attachment, image, link)"
+            "Invalid has: must not be blank (omit the parameter or supply attachment, image, link, tag)"
                 .to_string(),
         );
     }
@@ -256,15 +258,16 @@ pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
             "attachment" | "attachments" | "file" | "files" => HasFlag::Attachment,
             "image" | "images" => HasFlag::Image,
             "link" | "links" => HasFlag::Link,
+            "tag" | "tags" => HasFlag::Tag,
             "" => {
                 return Err(
-                    "Invalid has: empty entry (expected CSV of attachment, image, link)"
+                    "Invalid has: empty entry (expected CSV of attachment, image, link, tag)"
                         .to_string(),
                 );
             }
             other => {
                 return Err(format!(
-                    "Invalid has entry: '{other}' (expected attachment, image or link)"
+                    "Invalid has entry: '{other}' (expected attachment, image, link or tag)"
                 ));
             }
         };
@@ -571,12 +574,14 @@ fn is_image_name(name: &str) -> bool {
 }
 
 fn task_matches_has(task: &TaskDTO, has: &BTreeSet<HasFlag>) -> bool {
-    has.iter().all(|flag| {
-        task.references.iter().any(|reference| match flag {
-            HasFlag::Attachment => reference.attachment.is_some(),
-            HasFlag::Image => reference.attachment.as_deref().is_some_and(is_image_name),
-            HasFlag::Link => reference.link.is_some(),
-        })
+    has.iter().all(|flag| match flag {
+        HasFlag::Tag => !task.tags.is_empty(),
+        HasFlag::Attachment => task.references.iter().any(|r| r.attachment.is_some()),
+        HasFlag::Image => task
+            .references
+            .iter()
+            .any(|r| r.attachment.as_deref().is_some_and(is_image_name)),
+        HasFlag::Link => task.references.iter().any(|r| r.link.is_some()),
     })
 }
 
@@ -1123,5 +1128,25 @@ mod tests {
         // Exact cutoff is included (>=), one second older is excluded; needs
         // requires blank effort AND blank due, which the fixture has.
         assert_eq!(ids, vec!["A-1", "C-1"]);
+    }
+
+    #[test]
+    fn has_tag_keeps_tasks_with_any_tag() {
+        // DEV-228
+        let has = parse_has("tag").unwrap();
+        assert!(has.contains(&HasFlag::Tag));
+        assert_eq!(parse_has("Tags").unwrap(), has);
+        let now = Utc::now();
+        let mut tagged = dto("A-1", now.to_rfc3339().as_str());
+        tagged.tags = vec!["ui".to_string()];
+        let untagged = dto("B-1", now.to_rfc3339().as_str());
+        let mut tasks = vec![("A-1".to_string(), tagged), ("B-1".to_string(), untagged)];
+        let options = TaskQueryOptions {
+            has,
+            ..TaskQueryOptions::default()
+        };
+        apply_smart_filters(&mut tasks, &options, now);
+        let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(ids, vec!["A-1"]);
     }
 }

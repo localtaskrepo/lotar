@@ -118,7 +118,7 @@ export const GRAMMAR_FIXED_VALUES: Partial<Record<string, string[]>> = {
     due: ['today', 'soon', 'later', 'overdue'],
     recent: ['7d'],
     needs: ['effort', 'due'],
-    has: ['attachment', 'image', 'link'],
+    has: ['attachment', 'image', 'link', 'tag'],
 }
 
 export function findGrammarKey(token: string): GrammarKeyMeta | null {

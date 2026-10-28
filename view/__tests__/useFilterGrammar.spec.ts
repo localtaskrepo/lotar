@@ -808,3 +808,10 @@ describe('chipsForFilterValue', () => {
         expect(chips[0]!.key).toBe('field:greeting')
     })
 })
+
+describe('has:tag (DEV-228)', () => {
+    it('suggests tag among the has: values', () => {
+        const inserts = suggestForFragment('has:t', {}).map((suggestion) => suggestion.insert)
+        expect(inserts).toContain('has:tag')
+    })
+})

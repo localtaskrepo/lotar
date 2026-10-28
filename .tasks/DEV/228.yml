@@ -1,0 +1,37 @@
+title: Search filter has:tag
+status: Done
+priority: Low
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T03:41:45.954453+00:00
+modified: 2026-10-28T19:08:46.376866+00:00
+comments:
+- date: 2026-10-28T03:52:12.327532+00:00
+  text: 'Done: has:tag (also tags) keeps tasks with at least one tag. Shared filter in task_query (REST /api/tasks/list and export, MCP task_list with schema enum, UI search grammar and suggestions); the CLI list command has no has: option. Docs: openapi (2 params), api-quick-reference, mcp-tools, serve.md. Tests: has_tag_keeps_tasks_with_any_tag, useFilterGrammar has:tag suggestion; npm run lint, npm test (1821 Rust, 1295 UI), smoke 361.'
+description: 'Add tag to the has: filter (attachment, image, link) so has:tag finds tasks with at least one tag, on every surface that supports has: today (REST list/export, MCP task_list, UI search grammar and suggestions). The CLI list command has no has: option yet; CLI parity is tracked separately.'
+history:
+- at: 2026-10-28T03:41:48.667738+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T03:52:12.327532+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T03:52:12.392407+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-28T19:08:46.376866+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: 'Add tag to the has: filter (attachment, image, link) so has:tag finds tasks with at least one tag, on every surface that supports has: (CLI, REST, MCP, UI search grammar and suggestions).'
+    new: 'Add tag to the has: filter (attachment, image, link) so has:tag finds tasks with at least one tag, on every surface that supports has: today (REST list/export, MCP task_list, UI search grammar and suggestions). The CLI list command has no has: option yet; CLI parity is tracked separately.'

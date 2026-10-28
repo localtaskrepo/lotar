@@ -688,8 +688,8 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         "has".into(),
         json!({
             "type": ["string", "array", "null"],
-            "items": {"type": "string", "enum": ["attachment", "image", "link"]},
-            "description": "Smart filter: keep only tasks with an attachment, an image attachment, or a link (all listed kinds must be present). Accepts CSV string or array. Blank explicit values are errors."
+            "items": {"type": "string", "enum": ["attachment", "image", "link", "tag"]},
+            "description": "Smart filter: keep only tasks with an attachment, an image attachment, a link, or at least one tag (all listed kinds must be present). Accepts CSV string or array. Blank explicit values are errors."
         }),
     );
 

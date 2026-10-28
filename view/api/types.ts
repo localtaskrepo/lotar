@@ -498,7 +498,7 @@ export interface TaskListFilter {
     recent?: string
     /** CSV of missing-field filters: `effort`, `due`. */
     needs?: string
-    /** CSV of reference kinds tasks must carry: `attachment`, `image`, `link`. */
+    /** CSV of kinds tasks must carry: `attachment`, `image`, `link`, `tag` (at least one tag). */
     has?: string
     /**
      * DEV-92 deletion visibility: `active` (default, server-side), `deleted`
