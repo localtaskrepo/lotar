@@ -34,7 +34,16 @@ impl CommandHandler for StatsHandler {
                 distribution,
                 limit,
                 global,
-            } => age::run(distribution, limit, global, project, resolver, renderer),
+                filter,
+            } => age::run(
+                distribution,
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
             StatsAction::Status {
                 id,
                 time_in_status,
@@ -54,11 +63,13 @@ impl CommandHandler for StatsHandler {
                 until,
                 limit,
                 global,
+                filter,
             } => status::run_time_in_status(
                 since.as_deref(),
                 until.as_deref(),
                 limit,
                 global,
+                &filter.join(" "),
                 project,
                 resolver,
                 renderer,
@@ -85,32 +96,70 @@ impl CommandHandler for StatsHandler {
                 resolver,
                 renderer,
             ),
-            StatsAction::CommentsTop { limit, global } => {
-                comments::run_top(limit, global, project, resolver, renderer)
-            }
-            StatsAction::CommentsByAuthor { limit, global } => {
-                comments::run_by_author(limit, global, project, resolver, renderer)
-            }
-            StatsAction::CustomKeys { limit, global } => {
-                custom::run_keys(limit, global, project, resolver, renderer)
-            }
+            StatsAction::CommentsTop {
+                limit,
+                global,
+                filter,
+            } => comments::run_top(
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
+            StatsAction::CommentsByAuthor {
+                limit,
+                global,
+                filter,
+            } => comments::run_by_author(
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
+            StatsAction::CustomKeys {
+                limit,
+                global,
+                filter,
+            } => custom::run_keys(
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
             StatsAction::CustomField {
                 name,
                 limit,
                 global,
-            } => custom::run_field(&name, limit, global, project, resolver, renderer),
+                filter,
+            } => custom::run_field(
+                &name,
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
             StatsAction::Changed {
                 since,
                 until,
                 author,
                 limit,
                 global,
+                filter,
             } => history::run_changed(
                 since.as_deref(),
                 until.as_deref(),
                 author.as_deref(),
                 limit,
                 global,
+                &filter.join(" "),
                 project,
                 resolver,
                 renderer,
@@ -121,12 +170,14 @@ impl CommandHandler for StatsHandler {
                 author,
                 limit,
                 global,
+                filter,
             } => history::run_churn(
                 since.as_deref(),
                 until.as_deref(),
                 author.as_deref(),
                 limit,
                 global,
+                &filter.join(" "),
                 project,
                 resolver,
                 renderer,
@@ -165,22 +216,57 @@ impl CommandHandler for StatsHandler {
                 threshold,
                 limit,
                 global,
-            } => stale::run(&threshold, limit, global, project, resolver, renderer),
-            StatsAction::Tags { limit, global } => {
-                tags::run(limit, global, project, resolver, renderer)
-            }
+                filter,
+            } => stale::run(
+                &threshold,
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
+            StatsAction::Tags {
+                limit,
+                global,
+                filter,
+            } => tags::run(
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
             StatsAction::Distribution {
                 field,
                 limit,
                 global,
-            } => distribution::run(field, limit, global, project, resolver, renderer),
+                filter,
+            } => distribution::run(
+                field,
+                limit,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
+            ),
             StatsAction::Due {
                 buckets,
                 overdue,
                 threshold,
                 global,
+                filter,
             } => due::run(
-                buckets, overdue, threshold, global, project, resolver, renderer,
+                buckets,
+                overdue,
+                threshold,
+                global,
+                &filter.join(" "),
+                project,
+                resolver,
+                renderer,
             ),
         }
     }

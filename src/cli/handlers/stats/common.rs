@@ -7,9 +7,8 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value, json};
 
-use crate::api_types::{TaskDTO, TaskListFilter};
+use crate::api_types::TaskDTO;
 use crate::output::{OutputFormat, OutputRenderer};
-use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
 use crate::workspace::TasksDirectoryResolver;
 
@@ -33,16 +32,49 @@ pub(crate) fn scope_project(
 }
 
 /// Current task snapshot for the scope (all projects when `None`).
+/// Tasks in scope that match `filter`, a query in the web search syntax,
+/// run as the shared task query (DEV-238). An empty filter keeps every task.
 pub(crate) fn list_tasks(
     scope_project: Option<&str>,
     resolver: &TasksDirectoryResolver,
-) -> Vec<(String, TaskDTO)> {
-    let storage = Storage::new(&resolver.path);
-    let filter = TaskListFilter {
+    filter: &str,
+) -> Result<Vec<(String, TaskDTO)>, String> {
+    let base = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+        .map_err(|e| format!("Failed to load config: {e}"))?;
+    let mut input = crate::services::task_list::TaskQueryInput {
         project: scope_project.map(str::to_string),
         ..Default::default()
     };
-    TaskService::list(&storage, &filter)
+    input
+        .add_search(&crate::utils::search_syntax::parse(filter))
+        .map_err(|e| e.cli_message())?;
+    let query = input
+        .resolve(&base, resolver.path.as_path())
+        .map_err(|e| e.cli_message())?;
+    let storage = Storage::new(&resolver.path);
+    Ok(crate::services::task_list::run(
+        &storage,
+        &query,
+        chrono::Utc::now(),
+    ))
+}
+
+/// The IDs `filter` keeps, for stats that list tickets from git; `None`
+/// when there is no filter.
+pub(crate) fn filter_ids(
+    scope_project: Option<&str>,
+    resolver: &TasksDirectoryResolver,
+    filter: &str,
+) -> Result<Option<std::collections::HashSet<String>>, String> {
+    if filter.trim().is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(
+        list_tasks(scope_project, resolver, filter)?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect(),
+    ))
 }
 
 /// Common JSON envelope fields for a stats result.

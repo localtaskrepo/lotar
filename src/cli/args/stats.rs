@@ -25,6 +25,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Show tickets with highest churn (commit count) in a window
@@ -44,6 +47,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// List top authors (by commits touching tasks) in a window
@@ -92,6 +98,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Top tags across tasks (current state snapshot)
@@ -102,6 +111,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Distribution of tasks by a field (snapshot)
@@ -115,11 +127,14 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Due date buckets summary (snapshot)
     Due {
-        /// Buckets to include (comma-separated). Default: overdue,today,week,month,later
+        /// Buckets to include (comma-separated): overdue, today, soon (next 7 days), later. Default: all
         #[arg(long)]
         buckets: Option<String>,
         /// Show only overdue items with optional threshold (e.g., 0d, 7d)
@@ -131,6 +146,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Age of tasks since creation, grouped by day|week|month (snapshot)
@@ -144,6 +162,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Aggregate effort estimates across tasks (snapshot)
@@ -182,6 +203,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Comments grouped by author (snapshot)
@@ -192,6 +216,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Custom fields: list top keys present across tasks (snapshot)
@@ -202,6 +229,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Custom fields: distribution of values for a specific field (snapshot)
@@ -215,6 +245,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Compute time spent in each status for tasks within a window (git-based)
@@ -231,6 +264,9 @@ pub enum StatsAction {
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
     },
 
     /// Per-ticket statistics

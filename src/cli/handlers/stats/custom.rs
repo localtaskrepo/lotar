@@ -7,12 +7,13 @@ use crate::workspace::TasksDirectoryResolver;
 pub(crate) fn run_keys(
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let scope = scope_project(global, project, resolver);
-    let tasks = list_tasks(scope.as_deref(), resolver);
+    let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
     let counts = tally(
         tasks
             .into_iter()
@@ -34,12 +35,13 @@ pub(crate) fn run_field(
     name: &str,
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let scope = scope_project(global, project, resolver);
-    let tasks = list_tasks(scope.as_deref(), resolver);
+    let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
     let counts = tally(
         tasks
             .iter()

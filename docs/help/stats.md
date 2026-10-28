@@ -17,6 +17,7 @@ Global flags available on all subcommands:
 
 - Standard CLI flags apply everywhere: `--project` (override auto-detected project), `--tasks-dir` (custom `.tasks` path), `--format` (text/table/json/markdown), and `--log-level` / `--verbose`.
 - Unless otherwise noted, `--global` is the stats-scoped flag that spans every project under `.tasks`. Without it the active project (auto-detected or supplied via `--project`) scopes the query.
+- `--filter '<query>'` (every command that counts or lists tasks: changed, churn, stale, tags, distribution, due, time-in-status, age, effort, comments, custom fields) keeps only tasks matching a query in the [web search syntax](./list.md#filters-in-the-query), e.g. `lotar stats tags --filter 'status:todo prio:high'`. It runs the same query as `lotar list`, so a stat and a list with the same filter always describe the same tasks. `authors` and `activity` count commits rather than tasks and take no filter.
 - Time windows (`--since`, `--until`, `--threshold`, etc.) accept RFC3339 timestamps (`2025-08-01T10:00Z`), ISO dates, or relative tokens like `14d`, `yesterday`, and weekday names. When both flags are omitted the commands default to `since = now - 30d` and `until = now`.
 
 ## Subcommands
@@ -143,11 +144,11 @@ Summarize tasks into due-date buckets (snapshot), or show only overdue items wit
 Overdue excludes tasks finished under their own project's [Done States](./config.md#done-states). A due date on today is not overdue. Date-only values and timestamp due values use the same server-local calendar interpretation as task queries; completed tasks can remain in non-overdue date buckets. This is independent of the task's status label being literally `Done`.
 
 ```bash
-lotar stats due [--buckets overdue,today,week,month,later] [--global]
+lotar stats due [--buckets overdue,today,soon,later] [--filter '<query>'] [--global]
 lotar stats due --overdue [--threshold 0d|7d] [--global]
 ```
 Defaults:
-- Buckets: `overdue,today,week,month,later`
+- Buckets: `overdue,today,soon,later`, the same as `due:<bucket>` in `lotar list` and the Insights due outlook: `soon` is the 7 days after today, `later` anything after that
 - Overdue threshold: `0d` (include any overdue)
 
 Example JSON output:
@@ -155,14 +156,13 @@ Example JSON output:
 {
   "status": "ok",
   "action": "stats.due",
-  "buckets": "overdue,today,week,month,later",
+  "buckets": "overdue,today,soon,later",
   "overdue_only": false,
   "items": [
     { "bucket": "overdue", "count": 2 },
     { "bucket": "today", "count": 1 },
-    { "bucket": "week", "count": 3 },
-    { "bucket": "month", "count": 5 },
-    { "bucket": "later", "count": 7 }
+    { "bucket": "soon", "count": 3 },
+    { "bucket": "later", "count": 12 }
   ]
 }
 ```

@@ -192,14 +192,58 @@ fn stats_due_buckets_snapshot() {
     let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "Later", "--due", &later]).success();
 
+    // The shared buckets (DEV-238): soon is the next 7 days, later the rest.
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(&mut c, &temp, &["stats", "due", "--global"]) // default buckets
-        .success()
-        .stdout(predicate::str::contains("overdue"))
-        .stdout(predicate::str::contains("today"))
-        .stdout(predicate::str::contains("week"))
-        .stdout(predicate::str::contains("month"))
-        .stdout(predicate::str::contains("later"));
+    let out = run(
+        &mut c,
+        &temp,
+        &["--format", "json", "stats", "due", "--global"],
+    )
+    .success();
+    let v: serde_json::Value = serde_json::from_slice(&out.get_output().stdout).unwrap();
+    let counts: std::collections::BTreeMap<String, u64> = v["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| {
+            (
+                i["bucket"].as_str().unwrap().to_string(),
+                i["count"].as_u64().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        counts,
+        [("later", 2), ("overdue", 1), ("soon", 1), ("today", 1)]
+            .into_iter()
+            .map(|(k, n)| (k.to_string(), n))
+            .collect()
+    );
+
+    // --filter narrows the counted tasks with the web search syntax.
+    let mut c = crate::common::lotar_cmd().unwrap();
+    let out = run(
+        &mut c,
+        &temp,
+        &[
+            "--format", "json", "stats", "due", "--global", "--filter", "Later",
+        ],
+    )
+    .success();
+    let v: serde_json::Value = serde_json::from_slice(&out.get_output().stdout).unwrap();
+    let total: u64 = v["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["count"].as_u64().unwrap())
+        .sum();
+    assert_eq!(total, 1);
+
+    // The old week/month buckets are gone.
+    let mut c = crate::common::lotar_cmd().unwrap();
+    run(&mut c, &temp, &["stats", "due", "--buckets", "week"])
+        .failure()
+        .stderr(predicate::str::contains("Invalid bucket 'week'"));
 }
 
 #[test]

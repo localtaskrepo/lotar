@@ -8,13 +8,14 @@ pub(crate) fn run(
     distribution: StatsAgeDistribution,
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
     let scope_project = super::common::scope_project(global, project, resolver);
 
-    let tasks = super::common::list_tasks(scope_project.as_deref(), resolver);
+    let tasks = super::common::list_tasks(scope_project.as_deref(), resolver, filter)?;
     // ...existing code...
 
     // Now is reference point

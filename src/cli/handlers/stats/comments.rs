@@ -15,10 +15,11 @@ fn rank_by_comments(
     global: bool,
     project: Option<&str>,
     limit: usize,
+    filter: &str,
     resolver: &TasksDirectoryResolver,
-) -> CommentRanking {
+) -> Result<CommentRanking, String> {
     let scope = scope_project(global, project, resolver);
-    let tasks = list_tasks(scope.as_deref(), resolver);
+    let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
     let rows = ranked_counts(
         tasks
             .iter()
@@ -29,21 +30,22 @@ fn rank_by_comments(
         .into_iter()
         .map(|(id, task)| (id, task.title))
         .collect();
-    CommentRanking {
+    Ok(CommentRanking {
         scope,
         rows,
         titles,
-    }
+    })
 }
 
 pub(crate) fn run_top(
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let ranking = rank_by_comments(global, project, limit, resolver);
+    let ranking = rank_by_comments(global, project, limit, filter, resolver)?;
     emit_items(
         renderer,
         header("stats.comments.top", global, ranking.scope.as_deref()),
@@ -59,11 +61,12 @@ pub(crate) fn run_top(
 pub(crate) fn run_by_author(
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let ranking = rank_by_comments(global, project, limit, resolver);
+    let ranking = rank_by_comments(global, project, limit, filter, resolver)?;
     emit_items(
         renderer,
         header("stats.comments.by_task", global, ranking.scope.as_deref()),

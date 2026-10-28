@@ -322,9 +322,10 @@ fn cli_overdue_and_stats_due_use_project_policies() {
         .collect();
     assert_eq!(items.get("overdue"), Some(&2), "items: {items:?}");
     assert_eq!(items.get("today"), Some(&2), "items: {items:?}");
-    // +10 days lands in the legacy "month" bucket (<=31 days), not "later".
-    assert_eq!(items.get("month"), Some(&1), "items: {items:?}");
-    assert_eq!(items.get("later"), Some(&0), "items: {items:?}");
+    // +10 days is past the 7-day "soon" window, so it is "later", the same
+    // bucket `due:later` uses (DEV-238).
+    assert_eq!(items.get("soon"), Some(&0), "items: {items:?}");
+    assert_eq!(items.get("later"), Some(&1), "items: {items:?}");
 }
 
 fn sprint_window(tasks: &[&str], start: &str, end: &str) -> Sprint {

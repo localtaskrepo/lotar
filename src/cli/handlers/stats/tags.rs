@@ -5,12 +5,13 @@ use crate::workspace::TasksDirectoryResolver;
 pub(crate) fn run(
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let scope = scope_project(global, project, resolver);
-    let tasks = list_tasks(scope.as_deref(), resolver);
+    let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
     let rows = ranked_counts(
         tally(tasks.into_iter().flat_map(|(_, task)| task.tags)),
         limit,

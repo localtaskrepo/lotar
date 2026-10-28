@@ -21,22 +21,8 @@ pub(crate) fn run(
 ) -> Result<(), String> {
     let scope_project = super::common::scope_project(global, project, resolver);
 
-    // The tasks to aggregate: the scope plus `--filter`, run as the shared
-    // task query (DEV-231).
-    let base = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
-        .map_err(|e| format!("Failed to load config: {}", e))?;
-    let mut input = crate::services::task_list::TaskQueryInput {
-        project: scope_project.clone(),
-        ..Default::default()
-    };
-    input
-        .add_search(&crate::utils::search_syntax::parse(filter))
-        .map_err(|e| e.cli_message())?;
-    let query = input
-        .resolve(&base, resolver.path.as_path())
-        .map_err(|e| e.cli_message())?;
-    let storage = crate::storage::manager::Storage::new(&resolver.path);
-    let mut tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now());
+    // The tasks to aggregate: the scope plus `--filter` (DEV-232/238).
+    let mut tasks = super::common::list_tasks(scope_project.as_deref(), resolver, filter)?;
     // Performance guardrail: cap tasks processed for aggregation
     let cap: usize = std::env::var("LOTAR_STATS_EFFORT_CAP")
         .ok()
@@ -350,7 +336,8 @@ pub(crate) fn run(
     };
 
     // Custom field keys for grouping resolve against the base configuration.
-    let cfg = base;
+    let cfg = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+        .map_err(|e| format!("Failed to load config: {}", e))?;
 
     // Aggregate: keep both time hours and points totals to support unit modes
     let mut agg: BTreeMap<String, (f64, f64, usize)> = BTreeMap::new(); // (hours, points, count)

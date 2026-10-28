@@ -1,32 +1,45 @@
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one parameter per CLI flag; this handler forwards them unchanged"
+)]
 pub(crate) fn run(
     buckets: Option<String>,
     overdue: bool,
     threshold: String,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
     let scope_project = super::common::scope_project(global, project, resolver);
-    let tasks = super::common::list_tasks(scope_project.as_deref(), resolver);
+    let tasks = super::common::list_tasks(scope_project.as_deref(), resolver, filter)?;
 
+    // The shared due buckets (DEV-238), the same as `due:<bucket>` in
+    // `lotar list` and the Insights due outlook: soon is the 7 days after
+    // today, later anything after that.
+    const BUCKETS: [&str; 4] = ["overdue", "today", "soon", "later"];
     let buckets_csv = if overdue {
         // In overdue-only mode, force buckets to just 'overdue'
         "overdue".to_string()
     } else {
-        buckets.unwrap_or_else(|| "overdue,today,week,month,later".to_string())
+        buckets.unwrap_or_else(|| BUCKETS.join(","))
     };
-    let mut enabled: std::collections::BTreeSet<String> = buckets_csv
+    let mut enabled: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for bucket in buckets_csv
         .split(',')
         .map(|s| s.trim().to_lowercase())
         .filter(|s| !s.is_empty())
-        .collect();
+    {
+        if !BUCKETS.contains(&bucket.as_str()) {
+            return Err(format!(
+                "Invalid bucket '{bucket}' (expected overdue, today, soon, later)"
+            ));
+        }
+        enabled.insert(bucket);
+    }
     if enabled.is_empty() {
-        enabled.extend(
-            ["overdue", "today", "week", "month", "later"]
-                .iter()
-                .map(|s| s.to_string()),
-        );
+        enabled.extend(BUCKETS.iter().map(|s| s.to_string()));
     }
 
     // DEV-21: shared due parser + local calendar day (injectable-clock
@@ -62,39 +75,40 @@ pub(crate) fn run(
         counts.insert(k.clone(), 0usize);
     }
 
+    use crate::services::task_query::{DueFilter, due_raw_matches_bucket};
     for (_id, t) in tasks.into_iter() {
-        if let Some(due_raw) = t.due_date.as_deref()
-            && let Some(due) = crate::services::task_query::parse_stored_due(due_raw)
-        {
-            let date = due.local_date();
-            let diff = (date - today).num_days();
+        let Some(due_raw) = t.due_date.as_deref() else {
+            continue;
+        };
+        let bucket = [
+            (DueFilter::Overdue, "overdue"),
+            (DueFilter::Today, "today"),
+            (DueFilter::Soon, "soon"),
+            (DueFilter::Later, "later"),
+        ]
+        .into_iter()
+        .find(|(filter, _)| due_raw_matches_bucket(Some(due_raw), *filter, today))
+        .map(|(_, name)| name);
+        let Some(bucket) = bucket.filter(|name| enabled.contains(*name)) else {
+            continue;
+        };
+        if bucket == "overdue" {
             // Terminal tasks are never overdue (DEV-21); the classification
             // comes from the task's own project policy via task_state.
-            let is_done = t.task_state.as_ref().is_some_and(|state| state.is_done);
-            // Classify
-            if diff < 0 && enabled.contains("overdue") {
-                if is_done {
+            if t.task_state.as_ref().is_some_and(|state| state.is_done) {
+                continue;
+            }
+            // In overdue-only mode, count only tasks overdue by the threshold.
+            if overdue {
+                let days_overdue = crate::services::task_query::parse_stored_due(due_raw)
+                    .map(|due| (today - due.local_date()).num_days())
+                    .unwrap_or(0);
+                if days_overdue < overdue_cutoff_days {
                     continue;
                 }
-                // In overdue-only mode, filter by threshold age
-                if overdue {
-                    let age_days = -diff; // how many days overdue
-                    if age_days >= overdue_cutoff_days {
-                        *counts.entry("overdue".to_string()).or_insert(0) += 1
-                    }
-                } else {
-                    *counts.entry("overdue".to_string()).or_insert(0) += 1
-                }
-            } else if diff == 0 && enabled.contains("today") {
-                *counts.entry("today".to_string()).or_insert(0) += 1
-            } else if diff <= 7 && enabled.contains("week") {
-                *counts.entry("week".to_string()).or_insert(0) += 1
-            } else if diff <= 31 && enabled.contains("month") {
-                *counts.entry("month".to_string()).or_insert(0) += 1
-            } else if enabled.contains("later") {
-                *counts.entry("later".to_string()).or_insert(0) += 1
             }
         }
+        *counts.entry(bucket.to_string()).or_insert(0) += 1;
     }
 
     match renderer.format {

@@ -1,0 +1,31 @@
+title: Stats commands filter with the shared query
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T20:58:57.149889+00:00
+modified: 2026-10-28T21:16:17.923753+00:00
+comments:
+- date: 2026-10-28T21:16:17.905248+00:00
+  text: 'Outcome: --filter ''<query>'' (web search syntax, shared task query via stats common::list_tasks/filter_ids) on stats changed, churn, stale, tags, distribution, due, time-in-status, age, effort, comments-top, comments-by-author, custom-keys, custom-field; authors/activity count commits and take none. stats due buckets are the shared overdue/today/soon/later (week/month removed; invalid bucket errors). Evidence: stats_snapshot_test (exact bucket counts, --filter, invalid bucket), dev21 due test updated; lint:agent, 1830 Rust, 1352 UI, release 33, hooks 5, smoke 361. Docs: stats.md. Remaining: stale overlaps DEV-3. Guidance: no durable finding.'
+description: Only stats effort takes a filter (--filter, DEV-232); tags, distribution, due, age, comments, custom-keys and custom-field count every task in scope, while web Insights computes from the filtered list. Add --filter '<query>' (web search syntax, shared task query) to every stats command that counts tasks, and to the ones that list tickets from git (changed, churn, stale, time-in-status) by keeping matching IDs. stats due buckets become the shared ones (overdue, today, soon = next 7 days, later; week/month removed), matching due:<bucket> in lotar list and the Insights due outlook. stats authors/activity count commits, not tasks, and stay unfiltered. stats stale overlaps DEV-3 (age filter) and is revisited there.
+history:
+- at: 2026-10-28T21:05:01.519018+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T21:16:17.905248+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T21:16:17.923753+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

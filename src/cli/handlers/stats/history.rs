@@ -8,6 +8,7 @@ pub(crate) fn run_changed(
     author: Option<&str>,
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
@@ -42,7 +43,13 @@ pub(crate) fn run_changed(
     )?;
 
     // Apply limit
-    let limited: Vec<_> = items.into_iter().take(limit).collect();
+    // Only tickets matching `--filter` (DEV-238).
+    let keep = super::common::filter_ids(scope_project.as_deref(), resolver, filter)?;
+    let limited: Vec<_> = items
+        .into_iter()
+        .filter(|i| keep.as_ref().is_none_or(|ids| ids.contains(&i.id)))
+        .take(limit)
+        .collect();
 
     // Render
     super::common::emit_items(
@@ -85,6 +92,7 @@ pub(crate) fn run_churn(
     author: Option<&str>,
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
@@ -128,7 +136,13 @@ pub(crate) fn run_churn(
             .cmp(&a.commits)
             .then(b.last_date.cmp(&a.last_date))
     });
-    let limited: Vec<_> = items.into_iter().take(limit).collect();
+    // Only tickets matching `--filter` (DEV-238).
+    let keep = super::common::filter_ids(scope_project.as_deref(), resolver, filter)?;
+    let limited: Vec<_> = items
+        .into_iter()
+        .filter(|i| keep.as_ref().is_none_or(|ids| ids.contains(&i.id)))
+        .take(limit)
+        .collect();
 
     super::common::emit_items(
         renderer,

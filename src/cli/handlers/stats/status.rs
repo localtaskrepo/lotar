@@ -121,11 +121,16 @@ pub(crate) fn run_status(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one parameter per CLI flag; this handler forwards them unchanged"
+)]
 pub(crate) fn run_time_in_status(
     since: Option<&str>,
     until: Option<&str>,
     limit: usize,
     global: bool,
+    filter: &str,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
@@ -169,6 +174,10 @@ pub(crate) fn run_time_in_status(
             task_files.push((id, rel.to_path_buf()));
         }
     }
+
+    // Only tickets matching `--filter` (DEV-238).
+    let keep = super::common::filter_ids(scope_project.as_deref(), resolver, filter)?;
+    task_files.retain(|(id, _)| keep.as_ref().is_none_or(|ids| ids.contains(id)));
 
     // For each task file, list commits in window and build status timeline
     // Then compute durations per status on [since, until]
