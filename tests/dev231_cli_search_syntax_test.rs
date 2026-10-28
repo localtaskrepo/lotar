@@ -126,6 +126,11 @@ fn query_mixes_filters_custom_fields_and_search_text() {
 #[test]
 fn malformed_terms_and_removed_shortcuts_are_errors() {
     let ws = workspace();
+    let err = run(&ws, &["--stauts", "todo"]).unwrap_err();
+    assert!(
+        err.contains("a similar argument exists: '--status'"),
+        "{err}"
+    );
     let err = run(&ws, &["owner="]).unwrap_err();
     assert!(err.contains("Add a value for"), "{err}");
     let err = run(&ws, &["status:\"unclosed"]).unwrap_err();
@@ -139,7 +144,11 @@ fn malformed_terms_and_removed_shortcuts_are_errors() {
         "--unassigned",
     ] {
         let err = run(&ws, &[removed]).unwrap_err();
-        assert!(err.contains("unexpected argument"), "{removed}: {err}");
+        // The error names the flag (DEV-237) and says what to write instead.
+        assert!(
+            err.contains(&format!("unexpected argument '{removed}'")),
+            "{removed}: {err}"
+        );
         assert!(err.contains("was removed; write"), "{removed}: {err}");
     }
 }

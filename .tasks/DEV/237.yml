@@ -1,0 +1,31 @@
+title: Unknown CLI flags name the flag and suggest a fix
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T20:58:57.035254+00:00
+modified: 2026-10-28T21:16:17.874111+00:00
+comments:
+- date: 2026-10-28T21:16:17.845514+00:00
+  text: 'Outcome: clap error-context and suggestions features on; unknown flags are named (''unexpected argument --stauts found'', tip: similar argument --status) and removed flags still add the migration hint. Cargo.lock gains strsim. Evidence: dev231 test asserts the named flag and the suggestion; lint/test/smoke pass (with DEV-238). Guidance: no durable finding.'
+description: 'clap is built without its error-context and suggestions features, so every unknown flag prints only ''error: unexpected argument found'' without naming the flag. Enable them (Cargo.toml clap features), keep the removed-flag hints from DEV-231/232, and check tests that assert error text.'
+history:
+- at: 2026-10-28T21:03:17.328197+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T21:16:17.845514+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T21:16:17.874111+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
