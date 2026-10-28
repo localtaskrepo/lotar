@@ -3746,3 +3746,66 @@ sleep 300
         sleep(Duration::from_millis(50));
     }
 }
+
+/// An agent that exits without reading its prompt still ends by its exit
+/// status. The prompt is bigger than a pipe buffer, so sending it always
+/// fails with a broken pipe once the stub exits; that alone must not fail
+/// the job (it made CI flaky on Linux, where small prompts lose the race).
+#[cfg(unix)]
+#[test]
+fn an_agent_that_never_reads_its_prompt_still_completes() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "deaf-agent.sh",
+        r#"#!/bin/sh
+exec 0<&-
+echo '{"type":"system","subtype":"init","session_id":"p1"}'
+echo '{"type":"result","subtype":"success","is_error":false,"result":"done without reading","session_id":"p1"}'
+exit 0
+"#,
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: PIPE\nagents:\n  deaf:\n    runner: claude\n    command: \"{}\"\n",
+            script.display()
+        ),
+    );
+    let mut storage = fixtures.create_storage();
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Unread prompt".to_string(),
+            project: Some("PIPE".to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let job = AgentJobService::start_job_with_tasks_dir(
+        AgentJobCreateRequest {
+            ticket_id: created.id.clone(),
+            prompt: "x".repeat(256 * 1024),
+            agent: Some("deaf".to_string()),
+            ..Default::default()
+        },
+        fixtures.tasks_root.as_path(),
+    )
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let job = loop {
+        let current = AgentJobService::get_job(&job.id).expect("job exists");
+        if current.status != "queued" && current.status != "running" {
+            break current;
+        }
+        assert!(Instant::now() < deadline, "job never finished");
+        sleep(Duration::from_millis(25));
+    };
+    assert_eq!(
+        job.status, "completed",
+        "job ended as {} ({:?})",
+        job.status, job.last_message
+    );
+}

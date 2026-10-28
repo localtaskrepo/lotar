@@ -166,7 +166,8 @@ fn agent_jobs_get_the_running_lotar_binary() {
 }
 
 /// The runner's final answer is the job summary even when a note (denied
-/// tools) is logged just before it.
+/// tools) is logged just before it. The stub runner is a shell script.
+#[cfg(unix)]
 #[test]
 fn agent_job_summary_is_the_final_answer() {
     let fixtures = TestFixtures::new();

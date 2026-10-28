@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-26T18:11:32.217488+00:00
-modified: 2026-10-26T21:43:47.806566+00:00
+modified: 2026-10-28T00:18:27.542455+00:00
 comments:
 - date: 2026-10-26T20:43:02.311910+00:00
   text: 'From DEV-201 live runs: Codex runs commands through a login shell (bash -lc) and puts its own directory first on PATH, so prepending the lotar directory to PATH is not enough for Codex; it kept calling Homebrew''s lotar 0.9.1, whose assignee validation rejected the reporter on hand-back. Prefer an absolute path (e.g. LOTAR_BIN in the job env and in the built-in instructions) or the MCP route.'
@@ -13,6 +13,10 @@ comments:
   text: 'Done: jobs get LOTAR_BIN (absolute path of the lotar that started the job) and the built-in instructions run "${LOTAR_BIN:-lotar}". Test: cli_agent_check_test::agent_jobs_get_the_running_lotar_binary. Live: codex and claude handback pass without any PATH change (codex previously hit Homebrew 0.9.1). The MCP injection option is split into a separate low-priority ticket since the CLI route now works on all three CLIs. Gates: lint, 1728 Rust + 1214 UI, 350 smoke.'
 - date: 2026-10-26T21:43:47.806566+00:00
   text: 'Follow-up after the Agents page browser check: Claude Code refuses ${...} expansions and a variable as the command, so "${LOTAR_BIN:-lotar}" made Claude fall back to the PATH lotar. Now the ''This job'' section names the absolute lotar path, its directory goes first on PATH, LOTAR_BIN stays set, and the examples use plain lotar and "$VAR" arguments (new LOTAR_TICKET_PROJECT replaces ${LOTAR_TICKET_ID%-*}). Also: denied-tool notes list each denied command, and the runner''s final answer is the job summary instead of that note. Live: claude and codex handback pass, both calling target/debug/lotar by absolute path. Gates: lint, 1729 Rust + 1214 UI, 350 smoke.'
+- date: 2026-10-28T00:03:21.939966+00:00
+  text: 'Follow-up: agent_job_summary_is_the_final_answer used Unix-only file permissions (shell-script stub) without #[cfg(unix)], so the Windows CI compile check failed from ad8de9b on. Gated it like the other stub-runner tests; all other std::os::unix uses in tests/ and src/ are already gated.'
+- date: 2026-10-28T00:18:27.542455+00:00
+  text: 'Follow-up 2: Linux CI failed backward_compat_old_yaml_keys_still_work (job did not complete in 3 s) on b66b928 and 21e22cf. Cause: when an agent exits before reading its prompt, sending the prompt fails with a broken pipe, and the job was marked failed despite a clean exit. A broken pipe now only logs a progress note; the exit status decides. New test an_agent_that_never_reads_its_prompt_still_completes (256 KB prompt, stub closes stdin) fails before the fix and passes after; full Rust suite 1811/1811.'
 description: |-
   Agents update their ticket through the lotar CLI today, which works but depends on whichever lotar binary is on PATH (the live checks ran Homebrew's 0.9.1 instead of the build that started the job).
 
@@ -44,6 +48,14 @@ history:
     old: InProgress
     new: Done
 - at: 2026-10-26T21:43:47.806566+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T00:03:21.939966+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T00:18:27.542455+00:00
   actor: mallox
   changes:
   - field: comment_added

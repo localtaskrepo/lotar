@@ -1835,8 +1835,14 @@ fn run_job(
                 writer.flush()
             });
         if let Err(err) = written {
+            // A broken pipe means the agent closed its input or already
+            // exited without reading the prompt; its exit status decides
+            // how the job ends. Any other write error fails the job.
+            let broken_pipe = err.kind() == std::io::ErrorKind::BrokenPipe;
             update_job(&job_id, |state| {
-                state.runner_failed = true;
+                if !broken_pipe {
+                    state.runner_failed = true;
+                }
                 record_and_emit(
                     state,
                     "agent_job_progress",
