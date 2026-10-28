@@ -1,5 +1,6 @@
 import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
-import type { AgentInstructionsValue, ConfigInspectResult, ConfigSource, ProjectDTO } from '../api/types'
+import type { AgentInstructionsValue, ConfigInspectResult, ConfigSource, ProjectDTO, TagProperties } from '../api/types'
+import { resolveTagColor } from '../utils/tagColors'
 import { parseThemeValue } from '../utils/themes'
 import { provenanceClass as getProvenanceClass, provenanceLabel as getProvenanceLabel } from '../utils/provenance'
 
@@ -19,6 +20,12 @@ export type AgentInstructionsMode = 'inherit' | 'builtin' | 'inline' | 'file'
 export interface BranchAliasEntry {
     key: string
     value: string
+}
+
+/** One tag colour row on the Config page (DEV-20). */
+export interface TagColorEntry {
+    tag: string
+    color: string
 }
 
 export interface ConfigFormState {
@@ -67,6 +74,8 @@ export interface ConfigFormState {
     branchTypeAliases: BranchAliasEntry[]
     branchStatusAliases: BranchAliasEntry[]
     branchPriorityAliases: BranchAliasEntry[]
+    /** Tag colours of this scope (global, or the project's own overrides). */
+    tagColors: TagColorEntry[]
     syncReportsDir: string
     syncWriteReports: ToggleValue
     agentContextEnabled: ToggleValue
@@ -168,6 +177,8 @@ type UseConfigFormReturn = {
     sourceFor: (field: string) => ConfigSource | undefined
     addAliasEntry: (field: AliasField) => void
     removeAliasEntry: (field: AliasField, index: number) => void
+    addTagColor: (tag?: string) => void
+    removeTagColor: (index: number) => void
     clearAliasField: (field: AliasField) => void
     validateField: (field: string) => void
     validateAll: () => boolean
@@ -222,6 +233,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         branchTypeAliases: [],
         branchStatusAliases: [],
         branchPriorityAliases: [],
+        tagColors: [],
         syncReportsDir: '',
         syncWriteReports: 'true',
         agentContextEnabled: 'true',
@@ -335,6 +347,61 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             normalized[key.toLowerCase()] = value
         }
         return normalized
+    }
+
+    /**
+     * Tag properties as loaded for this scope. Saving rebuilds the map from
+     * the colour rows and keeps every other property of a tag (DEV-20).
+     */
+    let loadedTagProperties: Record<string, TagProperties> = {}
+
+    function tagColorEntries(map: Record<string, TagProperties> | null | undefined): TagColorEntry[] {
+        if (!map) return []
+        return Object.entries(map)
+            .filter(([, props]) => typeof props?.color === 'string' && props.color.trim())
+            .map(([tag, props]) => ({ tag, color: String(props.color).trim() }))
+            .sort((a, b) => a.tag.localeCompare(b.tag))
+    }
+
+    /** The full `tag_properties` map for the colour rows, sorted by tag. */
+    function tagPropertiesFromEntries(entries: TagColorEntry[]): Record<string, TagProperties> {
+        const next: Record<string, TagProperties> = {}
+        for (const [tag, props] of Object.entries(loadedTagProperties)) {
+            const { color: _color, ...rest } = props ?? {}
+            if (Object.keys(rest).length) next[tag] = { ...rest }
+        }
+        for (const entry of entries) {
+            const tag = entry.tag.trim()
+            const color = entry.color.trim()
+            if (!tag || !color) continue
+            next[tag] = { ...(next[tag] ?? {}), color }
+        }
+        return Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)))
+    }
+
+    function validateTagColors(entries: TagColorEntry[]): string | null {
+        const seen = new Set<string>()
+        for (const entry of entries) {
+            const tag = entry.tag.trim()
+            const color = entry.color.trim()
+            if (!tag && !color) continue
+            if (!tag) return 'Name the tag for each colour.'
+            if (tag === '*') return 'Pick a tag name, not *.'
+            if (!resolveTagColor(color)) return `"${color}" is not a colour: use #rrggbb or a colour name.`
+            const key = tag.toLowerCase()
+            if (seen.has(key)) return `"${tag}" has more than one colour.`
+            seen.add(key)
+        }
+        return null
+    }
+
+    function addTagColor(tag = '') {
+        form.tagColors.push({ tag, color: '#0ea5e9' })
+    }
+
+    function removeTagColor(index: number) {
+        form.tagColors.splice(index, 1)
+        validateField('tag_properties')
     }
 
     function aliasEntriesEqual(a: BranchAliasEntry[], b: BranchAliasEntry[]): boolean {
@@ -1002,6 +1069,10 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 errors.branch_type_aliases = validateAliasEntries(form.branchTypeAliases, 'branch type')
                 break
             }
+            case 'tag_properties': {
+                errors.tag_properties = validateTagColors(form.tagColors)
+                break
+            }
             case 'branch_status_aliases': {
                 errors.branch_status_aliases = validateAliasEntries(form.branchStatusAliases, 'branch status')
                 break
@@ -1047,6 +1118,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'branch_type_aliases',
             'branch_status_aliases',
             'branch_priority_aliases',
+            'tag_properties',
         ]
         if (isGlobal.value) {
             fields.push(
@@ -1149,6 +1221,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.branchTypeAliases = mapToAliasEntries(effective.branch_type_aliases)
         form.branchStatusAliases = mapToAliasEntries(effective.branch_status_aliases)
         form.branchPriorityAliases = mapToAliasEntries(effective.branch_priority_aliases)
+        loadedTagProperties = { ...(effective.tag_properties ?? {}) }
+        form.tagColors = tagColorEntries(loadedTagProperties)
         if (!isGlobal.value) {
             const raw = ((data.project_raw as any) || {}) as Record<string, any>
             form.projectName = raw.project_name || currentProject.value?.name || ''
@@ -1219,6 +1293,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             if (raw.branch_priority_aliases) {
                 form.branchPriorityAliases = mapToAliasEntries(raw.branch_priority_aliases)
             }
+            // A project edits its own tag colours; the rest are inherited.
+            loadedTagProperties = { ...((raw.tag_properties as Record<string, TagProperties> | null) ?? {}) }
+            form.tagColors = tagColorEntries(loadedTagProperties)
         } else {
             form.projectName = ''
             form.issueDoneStates = normalizeDoneStatesRaw((data.global_raw as any)?.issue_done_states)
@@ -1425,6 +1502,13 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addAliasMap('branchStatusAliases', 'branch_status_aliases')
         addAliasMap('branchPriorityAliases', 'branch_priority_aliases')
 
+        {
+            const next = JSON.stringify(tagPropertiesFromEntries(current.tagColors))
+            if (next !== JSON.stringify(tagPropertiesFromEntries(base.tagColors))) {
+                payload.tag_properties = next === '{}' ? '' : next
+            }
+        }
+
         return payload
     }
 
@@ -1465,6 +1549,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         sourceFor,
         addAliasEntry,
         removeAliasEntry,
+        addTagColor,
+        removeTagColor,
         clearAliasField,
         validateField,
         validateAll,

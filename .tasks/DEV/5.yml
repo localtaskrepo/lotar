@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.711139+00:00
-modified: 2026-09-06T13:12:53.777324+00:00
+modified: 2026-10-28T02:12:36.907512+00:00
 comments:
 - date: 2026-09-06T11:21:52.630479+00:00
   text: 'Backlog reconciliation: Remains Todo for a general AND/OR/NOT custom-query language with defined precedence/grouping. Current repeated key/value filters and automation conditions are not equivalent. DEV-57 and DEV-75 cover current query parity/basic documented predicates; preserve this broader feature as a separate scope.'
@@ -12,6 +12,8 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 5: Extend custom fields to support more complex queries (AND/OR logic, NOT operations, etc.)
+- date: 2026-10-28T02:06:17.858945+00:00
+  text: Feature should probably be expanded to consider complex queries for any field and as an extension of the existing query language
 description: |-
   Migrated checklist requirements:
   Define custom-field AND/OR/NOT expressions, precedence and grouping, then implement consistent query semantics. Existing repeated key/value filters and automation conditions are not this general language. Coordinate DEV-57/75 without duplicating those narrower parity fixes.
@@ -31,3 +33,19 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-28T02:06:17.858945+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T02:12:26.147810+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-3"]}'
+- at: 2026-10-28T02:12:36.907512+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3"]}'
+    new: '{}'

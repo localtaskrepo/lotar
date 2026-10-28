@@ -2,7 +2,7 @@ use crate::types::{Priority, TaskStatus, TaskType};
 #[cfg(feature = "schema")]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTemplate {
@@ -419,6 +419,40 @@ impl<'de> Deserialize<'de> for StringConfigField {
     }
 }
 
+/// Properties of one tag (DEV-20). In YAML they sit in the `issue.tags` list
+/// as objects, `- { name: ui, color: "#0ea5e9" }`, next to plain names;
+/// loading splits them into `tag_properties` so `tags` stays a name list.
+/// Unknown keys are kept, so newer properties survive older writers.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct TagProperties {
+    /// `#rgb`, `#rrggbb`, or one of [`TAG_COLOR_NAMES`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+impl TagProperties {
+    pub fn is_empty(&self) -> bool {
+        self.color.is_none() && self.extra.is_empty()
+    }
+}
+
+/// Named tag colours; the web UI maps each to a theme-friendly hex value.
+pub const TAG_COLOR_NAMES: &[&str] = &[
+    "red", "orange", "amber", "yellow", "lime", "green", "teal", "cyan", "sky", "blue", "indigo",
+    "violet", "purple", "pink", "rose", "brown", "gray", "grey",
+];
+
+/// Whether `value` is a tag colour LoTaR understands.
+pub fn is_valid_tag_color(value: &str) -> bool {
+    let v = value.trim();
+    if let Some(hex) = v.strip_prefix('#') {
+        return matches!(hex.len(), 3 | 6) && hex.chars().all(|c| c.is_ascii_hexdigit());
+    }
+    TAG_COLOR_NAMES.contains(&v.to_ascii_lowercase().as_str())
+}
+
 impl StringConfigField {
     pub fn new_wildcard() -> Self {
         Self {
@@ -464,6 +498,9 @@ pub struct ProjectConfig {
     pub issue_priorities: Option<ConfigurableField<Priority>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tags: Option<StringConfigField>,
+    /// Per-tag properties (DEV-20), merged over the global ones per tag.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tag_properties: Option<BTreeMap<String, TagProperties>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_assignee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -591,6 +628,7 @@ impl ProjectConfig {
             branch_type_aliases: None,
             branch_status_aliases: None,
             branch_priority_aliases: None,
+            tag_properties: None,
 
             attachments_dir: None,
             attachments_max_upload_mb: None,
@@ -636,6 +674,9 @@ pub struct GlobalConfig {
     pub issue_priorities: ConfigurableField<Priority>,
     #[serde(default = "default_tags")]
     pub tags: StringConfigField,
+    /// Per-tag properties (DEV-20).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tag_properties: BTreeMap<String, TagProperties>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_assignee: Option<String>,
@@ -778,6 +819,8 @@ pub struct ResolvedConfig {
     pub issue_types: ConfigurableField<TaskType>,
     pub issue_priorities: ConfigurableField<Priority>,
     pub tags: StringConfigField,
+    /// Effective per-tag properties: global, then project entries per tag.
+    pub tag_properties: BTreeMap<String, TagProperties>,
     pub default_assignee: Option<String>,
     pub default_reporter: Option<String>,
     pub default_tags: Vec<String>,
@@ -1049,6 +1092,7 @@ impl Default for GlobalConfig {
             issue_types: default_issue_types(),
             issue_priorities: default_issue_priorities(),
             tags: default_tags(),
+            tag_properties: BTreeMap::new(),
             default_assignee: None,
             default_reporter: None,
             default_tags: Vec::new(),

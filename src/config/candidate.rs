@@ -455,6 +455,7 @@ fn project_overrides_field(cfg: &ProjectConfig, field: &str) -> bool {
         "strict_members" => cfg.strict_members.is_some(),
         "branch_type_aliases" => cfg.branch_type_aliases.is_some(),
         "branch_status_aliases" => cfg.branch_status_aliases.is_some(),
+        "tag_properties" => cfg.tag_properties.is_some(),
         "branch_priority_aliases" => cfg.branch_priority_aliases.is_some(),
         "agents" => cfg.agents.is_some(),
         _ => false,

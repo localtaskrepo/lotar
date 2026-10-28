@@ -967,6 +967,13 @@ export interface SprintDefaultsConfig {
     overdue_after?: string | null
 }
 
+/** Properties of one tag (DEV-20); unknown keys from newer servers are kept. */
+export interface TagProperties {
+    /** `#rgb`, `#rrggbb` or a named colour. */
+    color?: string | null
+    [key: string]: unknown
+}
+
 export interface ResolvedConfigDTO {
     /** Project-only named reviewers; empty keeps reporter-only review authorization. */
     review_reviewers: string[]
@@ -1011,6 +1018,8 @@ export interface ResolvedConfigDTO {
     branch_type_aliases: Record<string, string>
     branch_status_aliases: Record<string, string>
     branch_priority_aliases: Record<string, string>
+    /** Per-tag properties such as colours (DEV-20). */
+    tag_properties?: Record<string, TagProperties>
     // Always sent by the server; optional so partial fixtures stay valid.
     members?: string[]
     strict_members?: boolean
@@ -1061,6 +1070,8 @@ export interface GlobalConfigRaw {
     branch_type_aliases: Record<string, string>
     branch_status_aliases: Record<string, string>
     branch_priority_aliases: Record<string, string>
+    /** Per-tag properties such as colours (DEV-20). */
+    tag_properties?: Record<string, TagProperties>
     /** Global-only external web bundle path; absent when unset. */
     web_ui_path?: string | null
     ui_theme?: string | null
@@ -1118,6 +1129,7 @@ export interface ProjectConfigRaw {
     branch_type_aliases?: Record<string, string>
     branch_status_aliases?: Record<string, string>
     branch_priority_aliases?: Record<string, string>
+    tag_properties?: Record<string, TagProperties> | null
     remotes?: Record<string, SyncRemoteConfig>
     auth_profiles?: Record<string, SyncAuthProfile>
 }

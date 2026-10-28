@@ -141,6 +141,10 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
         .aliases(&["taxonomy.tags", "issue.tags"])
         .source_as("issue.tags", "issue_tags")
         .resolved(),
+    field("tag_properties")
+        .both()
+        .aliases(&["issue.tag_properties"])
+        .source("issue.tag-properties"),
     field("custom_fields")
         .both()
         .aliases(&["custom.fields"])
@@ -388,6 +392,7 @@ mod tests {
         "default_priority",
         "default_status",
         "tags",
+        "tag_properties",
         "custom_fields",
         "issue_states",
         "issue_done_states",
@@ -462,6 +467,7 @@ mod tests {
         "issue_types",
         "issue_priorities",
         "tags",
+        "tag_properties",
         "custom_fields",
         "auto_set_reporter",
         "auto_assign_on_status",
@@ -543,6 +549,7 @@ mod tests {
         ("auto.branch_infer_priority", "auto_branch_infer_priority"),
         ("branch.type_aliases", "branch_type_aliases"),
         ("branch.status_aliases", "branch_status_aliases"),
+        ("issue.tag_properties", "tag_properties"),
         ("branch.priority_aliases", "branch_priority_aliases"),
         ("attachments.dir", "attachments_dir"),
         ("attachments.max_upload_mb", "attachments_max_upload_mb"),
@@ -585,6 +592,7 @@ mod tests {
         ("issue.types", "issue_types", "issue_types"),
         ("issue.priorities", "issue_priorities", "issue_priorities"),
         ("issue.tags", "issue_tags", "tags"),
+        ("issue.tag-properties", "tag_properties", "tag_properties"),
         ("custom.fields", "custom_fields", "custom_fields"),
         (
             "scan.signal-words",

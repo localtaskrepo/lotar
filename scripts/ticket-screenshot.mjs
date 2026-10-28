@@ -188,13 +188,17 @@ async function capture(opts) {
             const setup = await import(pathToFileURL(path.resolve(opts.setup)).href);
             await setup.default({ page });
         }
-        const target = page.locator(opts.waitFor ?? opts.selector).first();
+        // The first VISIBLE match: pages keep hidden copies of some elements.
+        const target = page
+            .locator(opts.waitFor ?? opts.selector)
+            .filter({ visible: true })
+            .first();
         await target.waitFor({ state: 'visible', timeout: 15_000 });
         await page.evaluate(() => document.fonts?.ready);
         // Let transitions and lazy images finish.
         await page.waitForTimeout(400);
 
-        const element = page.locator(opts.selector).first();
+        const element = page.locator(opts.selector).filter({ visible: true }).first();
         await element.scrollIntoViewIfNeeded();
         const box = await element.boundingBox();
         if (!box) throw new Error(`${opts.selector} has no visible box`);

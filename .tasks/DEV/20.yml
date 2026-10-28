@@ -1,10 +1,11 @@
 title: Tag colors (config-stored, backwards compatible)
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.798862+00:00
-modified: 2026-09-06T13:12:54.133770+00:00
+modified: 2026-10-28T03:36:38.532509+00:00
 comments:
 - date: 2026-09-06T11:21:52.718614+00:00
   text: 'Backlog reconciliation: Remains Todo for config-stored tag colors. Existing generic styling is not persisted per-tag configuration. Define global/project inheritance, missing-color fallback, contrast, and compatibility with existing string tag lists before implementation.'
@@ -12,6 +13,12 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 21: Allow tags to be assigned a color (Store it in the project config under tags, but keep it backwards compatible)
+- date: 2026-10-28T03:36:38.495694+00:00
+  text: 'Done. Format (developer chose nested): issue.tags entries are plain names or objects { name, color, ...more later }; loading splits them into tag_properties so tags stays a name list (REST/UI shape additive), writing folds them back (wildcard lists take coloured tags as objects). A project that inherits the tag list uses issue.tag_properties. Global and project merge per tag, project wins. Colours: #rgb, #rrggbb or 17 names; unknown values show uncoloured and config validate warns; unknown keys are preserved. CLI: config set tag_properties accepts a YAML/JSON map or ''ui=#0ea5e9, backend=teal''; config show lists them. UI: coloured chips (tint + border + dot, theme text colour) in task list, board, sprints, hover cards and task panel, fed by the per-project config the completion-policy cache already fetches; Config page ''Tag colours'' editor (name with suggestions, picker, named colours, live preview, project page shows global colours). Docs: config.md Tag colours, config-reference. Verified: npm run lint, npm test (1820 Rust incl. config_tag_properties_test, 1292 UI, 33 release), npm run smoke 361 (new ui.tag-colors), screenshots light/dark/Terminal/390px. Also: ticket-screenshot.mjs now picks the first visible match.'
+references:
+- attachment: tag-colours-config-2x.f5be1253ce5aaae7278e40b57b2b801a.webp
+- attachment: tag-colours-board-2x.3568d05adc14af838a9bd8704d93139a.webp
+- attachment: tag-colours-board-dark-2x.6bb2ba8ef38e48d200d6f316794e0881.webp
 description: |-
   Migrated checklist requirements:
   Support per-tag colors stored in project configuration under the tags concept while remaining compatible with existing string tag lists and colorless configs. Choose a backward-compatible representation and readable fallback/contrast behavior before implementation.
@@ -31,3 +38,36 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-28T02:00:52.861159+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T02:49:19.842370+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:tag-colours-config-2x.f5be1253ce5aaae7278e40b57b2b801a.webp
+- at: 2026-10-28T02:52:29.290+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:tag-colours-board-2x.3568d05adc14af838a9bd8704d93139a.webp
+- at: 2026-10-28T02:52:41.659232+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:tag-colours-board-dark-2x.6bb2ba8ef38e48d200d6f316794e0881.webp
+- at: 2026-10-28T03:36:38.495694+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T03:36:38.532509+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

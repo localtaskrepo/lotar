@@ -351,6 +351,7 @@ fn source_label_for_global(
         ),
         "branch_type_aliases" => scope_field!(branch_type_aliases),
         "branch_status_aliases" => scope_field!(branch_status_aliases),
+        "tag_properties" => scope_field!(tag_properties),
         "branch_priority_aliases" => scope_field!(branch_priority_aliases),
         _ => "default",
     }
@@ -620,6 +621,13 @@ fn source_label_for_project(
                 .is_some();
             let diff = resolved_project.branch_type_aliases != base_config.branch_type_aliases;
             project_scope!("branch_type_aliases", has_override, diff)
+        }
+        "tag_properties" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.tag_properties.as_ref())
+                .is_some();
+            let diff = resolved_project.tag_properties != base_config.tag_properties;
+            project_scope!("tag_properties", has_override, diff)
         }
         "branch_status_aliases" => {
             let has_override = project_cfg

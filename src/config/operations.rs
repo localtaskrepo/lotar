@@ -202,6 +202,81 @@ fn parse_simple_csv(value: &str) -> Vec<String> {
         .collect()
 }
 
+/// Tag properties for `config set tag_properties` (DEV-20): a YAML/JSON map
+/// (`{ui: {color: "#0ea5e9"}}`) or colour shorthand (`ui=#0ea5e9, backend=teal`).
+/// Empty means none. Colours must be valid; names must be unique ignoring case.
+pub fn parse_tag_properties(
+    value: &str,
+) -> Result<std::collections::BTreeMap<String, TagProperties>, ConfigError> {
+    use std::collections::BTreeMap;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let parsed: BTreeMap<String, TagProperties> =
+        match serde_yaml_ng::from_str::<BTreeMap<String, TagProperties>>(trimmed) {
+            Ok(map) => map,
+            Err(_) if !trimmed.starts_with('{') => {
+                let mut map = BTreeMap::new();
+                for part in trimmed.split([',', ';', '\n']) {
+                    let part = part.trim();
+                    if part.is_empty() {
+                        continue;
+                    }
+                    let (name, color) = part.split_once('=').ok_or_else(|| {
+                        ConfigError::ParseError(format!(
+                            "Tag colour '{part}' must be written as name=colour"
+                        ))
+                    })?;
+                    map.insert(
+                        name.trim().to_string(),
+                        TagProperties {
+                            color: Some(color.trim().to_string()),
+                            ..TagProperties::default()
+                        },
+                    );
+                }
+                map
+            }
+            Err(_) => {
+                return Err(ConfigError::ParseError(
+                "Tag properties must map tag names to properties, e.g. {ui: {color: \"#0ea5e9\"}}"
+                    .into(),
+            ));
+            }
+        };
+    let mut seen = std::collections::HashSet::new();
+    let mut out = BTreeMap::new();
+    for (name, mut props) in parsed {
+        let name = name.trim().to_string();
+        if name.is_empty() || name == "*" {
+            return Err(ConfigError::ParseError(
+                "Tag properties need a tag name".into(),
+            ));
+        }
+        if !seen.insert(name.to_lowercase()) {
+            return Err(ConfigError::ParseError(format!(
+                "Tag '{name}' has properties more than once"
+            )));
+        }
+        if let Some(color) = props.color.as_mut() {
+            *color = color.trim().to_string();
+            if color.is_empty() {
+                props.color = None;
+            } else if !is_valid_tag_color(color) {
+                return Err(ConfigError::ParseError(format!(
+                    "Tag '{name}' has an unknown colour '{color}': use #rgb, #rrggbb or one of {}",
+                    TAG_COLOR_NAMES.join(", ")
+                )));
+            }
+        }
+        if !props.is_empty() {
+            out.insert(name, props);
+        }
+    }
+    Ok(out)
+}
+
 fn parse_alias_map<T>(value: &str, label: &str) -> Result<HashMap<String, T>, ConfigError>
 where
     T: std::str::FromStr + DeserializeOwned,
@@ -751,6 +826,9 @@ pub fn apply_field_to_global_config(
             let map = parse_alias_map::<TaskStatus>(value, "branch status alias")?;
             config.branch_status_aliases = map;
         }
+        "tag_properties" => {
+            config.tag_properties = parse_tag_properties(value)?;
+        }
         "branch_priority_aliases" => {
             let map = parse_alias_map::<Priority>(value, "branch priority alias")?;
             config.branch_priority_aliases = map;
@@ -1145,6 +1223,14 @@ pub fn apply_field_to_project_config(
                 config.branch_type_aliases = Some(map);
             }
         }
+        "tag_properties" => {
+            let properties = parse_tag_properties(value)?;
+            config.tag_properties = if properties.is_empty() {
+                None
+            } else {
+                Some(properties)
+            };
+        }
         "branch_status_aliases" => {
             if value.trim().is_empty() {
                 config.branch_status_aliases = None;
@@ -1453,6 +1539,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
             if !value.trim().is_empty() => {
                 parse_alias_map::<TaskType>(value, "branch type alias")?;
             }
+        "tag_properties" => {
+            parse_tag_properties(value)?;
+        }
         "branch_status_aliases"
             if !value.trim().is_empty() => {
                 parse_alias_map::<TaskStatus>(value, "branch status alias")?;
@@ -1555,6 +1644,7 @@ pub fn clear_project_override_field(
         "scan_strip_attributes" => config.scan_strip_attributes = None,
         "branch_type_aliases" => config.branch_type_aliases = None,
         "branch_status_aliases" => config.branch_status_aliases = None,
+        "tag_properties" => config.tag_properties = None,
         "branch_priority_aliases" => config.branch_priority_aliases = None,
         "agent_context_enabled" => config.agent_context_enabled = None,
         "agent_context_extension" => config.agent_context_extension = None,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tagAttrs } from '../composables/useTagColors'
 import { computed, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { customFieldEntriesFromTask } from '../composables/useColumns'
@@ -207,7 +208,7 @@ const dueInfo = computed(() => {
     </div>
   </dl>
   <div v-if="showTags && tags.length" class="task-hover-card__tags">
-    <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
+    <span v-for="tag in tags" :key="tag" class="tag" v-bind="tagAttrs(task?.id, tag)">{{ tag }}</span>
   </div>
 </template>
 

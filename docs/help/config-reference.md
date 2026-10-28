@@ -19,7 +19,8 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - issue.done_states: optional nonempty string[] of finished task statuses, all drawn from the effective `issue.states`. An explicit list replaces inference; omitted project values inherit, and without any explicit list LoTaR infers completion after resolving the project's workflow. See [Done States](./config.md#done-states).
 - issue.types: string[] (built-in [Feature, Bug, Chore])
 - issue.priorities: string[] (built-in [Low, Medium, High]; Critical requires configuration)
-- issue.tags: string[] (default wildcard ["*"])
+- issue.tags: list of tag names (default wildcard ["*"]); an entry can also be an object with properties, `{ name: ui, color: "#0ea5e9" }`. See [Tag colours](./config.md#tag-colours)
+- issue.tag_properties: map of tag name to properties (`color`), for a project that colours inherited tags without its own `issue.tags` list; `config set tag_properties` writes it
 - custom_fields: string[] (default wildcard ["*"])
   - For both lists, `["*"]` allows any value, a named list allows only those values, and `[]` allows none (for example, it turns custom fields off). In project scope a blank `config set` value clears the override, so set an explicit empty list with `lotar config set custom_fields '[]' --project=DEMO`.
 - attachments.dir: string (default "@attachments")

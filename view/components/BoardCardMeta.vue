@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tagAttrs } from '../composables/useTagColors'
 import { computed } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { customFieldEntriesFromTask, injectColumnStore } from '../composables/useColumns'
@@ -109,7 +110,7 @@ const hasMeta = computed(() => hasPrimaryMeta.value || showSprints.value)
         <IconGlyph name="paperclip" />{{ attachments.length }}
       </span>
       <template v-if="visibleFields?.isVisible('tags')">
-        <span v-for="tag in task.tags || []" :key="tag" class="tag">{{ tag }}</span>
+        <span v-for="tag in task.tags || []" :key="tag" class="tag" v-bind="tagAttrs(task.id, tag)">{{ tag }}</span>
       </template>
       <span v-for="cf in customEntries" :key="`cf-${task.id}-${cf.key}`" class="muted task-meta__custom-field">
         <span class="muted task-meta__custom-field__label">{{ cf.label }}:</span>

@@ -234,6 +234,27 @@ fn render_resolved_config_yaml(
         sources.get("issue.tags"),
         options,
     );
+    // Tag properties (DEV-20) as one flow mapping per tag.
+    let tag_properties: Vec<(String, String)> = resolved
+        .tag_properties
+        .iter()
+        .map(|(name, props)| {
+            (
+                name.clone(),
+                serde_json::to_string(props).unwrap_or_else(|_| "{}".to_string()),
+            )
+        })
+        .collect();
+    if !tag_properties.is_empty() {
+        issue_written |= write_mapping_entries(
+            &mut issue_body,
+            2,
+            "tag-properties",
+            &tag_properties,
+            sources.get("issue.tag-properties"),
+            options,
+        );
+    }
     if issue_written {
         sections.push(format!("issue:\n{}", issue_body));
     }

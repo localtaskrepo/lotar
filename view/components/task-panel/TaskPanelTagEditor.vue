@@ -15,7 +15,7 @@
     </div>
 
     <div v-if="tags.length" class="task-panel__tags-list" aria-label="Tags">
-      <span v-for="tag in tags" :key="tag" class="tag task-panel__tag">
+      <span v-for="tag in tags" :key="tag" class="tag task-panel__tag" v-bind="tagAttrsForProject(project, tag)">
         <span class="task-panel__tag-label">{{ tag }}</span>
         <button
           type="button"
@@ -64,6 +64,7 @@
                     v-for="tag in tags"
                     :key="tag"
                     :class="['tag', 'task-panel__tag', { 'task-panel__tag--recent': tag === lastAddedTag }]"
+                    v-bind="tagAttrsForProject(project, tag)"
                   >
                     <span class="task-panel__tag-label">{{ tag }}</span>
                     <button
@@ -143,6 +144,7 @@
 </template>
 
 <script setup lang="ts">
+import { tagAttrsForProject } from '../../composables/useTagColors'
 import { computed, nextTick, ref } from 'vue'
 import IconGlyph from '../IconGlyph.vue'
 import UiButton from '../UiButton.vue'
@@ -155,6 +157,8 @@ const props = defineProps<{
   configuredTags: string[]
   knownTags: string[]
   allowCustomTags: boolean
+  /** Project prefix whose tag colours apply (DEV-20). */
+  project?: string
 }>()
 
 const emit = defineEmits<{

@@ -343,6 +343,23 @@ p {
 	text-overflow: ellipsis;
 }
 
+/* A configured tag colour (DEV-20): a tint and a coloured border, with the
+   theme's own text colour so the label stays readable in every theme. */
+.tag--colored {
+	border-color: color-mix(in oklab, var(--tag-color) 60%, var(--color-border));
+	background: color-mix(in oklab, var(--tag-color) 18%, var(--color-surface, transparent));
+	color: var(--color-fg, inherit);
+}
+
+.tag--colored::before {
+	content: '';
+	flex: none;
+	width: 0.5em;
+	height: 0.5em;
+	border-radius: 50%;
+	background: var(--tag-color);
+}
+
 .tag--interactive {
 	cursor: pointer;
 }

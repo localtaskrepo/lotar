@@ -4,4 +4,15 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-10-25T03:09:51.512208+00:00
+modified: 2026-10-28T02:08:54.209415+00:00
+comments:
+- date: 2026-10-28T02:08:54.209415+00:00
+  text: |-
+    Take care to think about how this affect history, references, and IDs.
+    However, do not introduce an index counter as we have managed to do it without so far.
 description: Once a ticket is created, there's no way to move it to another project. We want to support this on all interfaces.
+history:
+- at: 2026-10-28T02:08:54.209415+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

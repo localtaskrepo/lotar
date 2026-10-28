@@ -246,6 +246,35 @@ Copy settings between projects while preserving unique identifiers:
 lotar config init --project=new-service --copy-from=existing-service
 ```
 
+## Tag colours
+
+A tag can have a colour, shown on its chips everywhere in the web UI. Give it in the tag list itself: an entry is either a plain name or an object with a `name` and properties. Lists without colours stay plain strings, so existing configs keep working.
+
+```yaml
+issue:
+  tags:
+    - "*"            # any tag is still allowed
+    - bug
+    - name: ui
+      color: "#0ea5e9"
+    - name: backend
+      color: teal
+```
+
+- Colours are `#rgb`, `#rrggbb`, or one of `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `pink`, `rose`, `brown`, `gray`. An unknown colour shows the tag uncoloured, and `config validate` warns about it.
+- Coloured chips get a tinted background and border; the text keeps the theme's colour, so it stays readable in every theme.
+- A project's colours override global ones per tag. A project that inherits the global tag list colours tags under `issue.tag_properties` instead, because its own `issue.tags` list would replace the global one:
+
+```yaml
+# .tasks/DEMO/config.yml
+issue:
+  tag_properties:
+    ui: { color: green }
+```
+
+- Set colours on the Config page (Tags & fields), or with `lotar config set tag_properties 'ui=#0ea5e9, backend=teal' --global` (a YAML/JSON map such as `{ui: {color: "#0ea5e9"}}` works too; an empty value clears them).
+- Other properties in a tag object are kept when LoTaR rewrites the config, so newer versions can add more.
+
 ## Done States
 
 `issue.done_states` defines which task statuses count as finished. It is independent of sprint lifecycle states and agent-job states. The dotted spelling, nested YAML spelling, and flat `issue_done_states` alias address the same field.
@@ -281,7 +310,8 @@ Resolved configuration responses expose `effective_done_states`, `done_states_mo
 - `issue.done_states` - Explicit finished task statuses; a nonempty subset of the effective `issue.states`. Omit or clear the override to inherit.
 - `issue.types` - Available task types  
 - `issue.priorities` - Available priorities
-- `issue.tags` - Available tags
+- `issue.tags` - Available tags, optionally with properties such as a colour ([Tag colours](#tag-colours))
+- `issue.tag_properties` - Tag colours for inherited tags
 - `default.assignee` - Default task assignee
 - `default.reporter` - Default task reporter (also used for auto-assign resolution)
 - `default.tags` - Default tags for new tasks (applied when no tags provided)

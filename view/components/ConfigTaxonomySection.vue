@@ -26,6 +26,20 @@
         <p v-if="tagsError" class="field-error">{{ tagsError }}</p>
       </div>
 
+      <ConfigTagColorsField
+        v-model:entries="tagColors"
+        :is-global="isGlobal"
+        :suggestions="tagColorSuggestions"
+        :inherited-properties="globalTagProperties"
+        :error="tagColorsError"
+        :source="tagColorsSource"
+        :provenance-label="provenanceLabel"
+        :provenance-class="provenanceClass"
+        @add="emit('addTagColor')"
+        @remove="emit('removeTagColor', $event)"
+        @validate="emit('validate', 'tag_properties')"
+      />
+
       <div class="field field--full" data-testid="config-custom-fields">
         <label class="field-label" :for="`${uid}-custom-fields-mode`">
           <span>Custom fields</span>
@@ -64,17 +78,20 @@
 </template>
 
 <script setup lang="ts">
-import { useId } from 'vue'
-import type { ConfigSource } from '../api/types'
+import { computed, useId } from 'vue'
+import type { ConfigSource, TagProperties } from '../api/types'
 import type { ListMode } from '../composables/useConfigForm'
+import type { TagColorEntry } from '../composables/useConfigForm'
 import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
+import ConfigTagColorsField from './ConfigTagColorsField.vue'
 import UiSelect from './UiSelect.vue'
 
 const tagsMode = defineModel<ListMode>('tagsMode', { required: true })
 const tags = defineModel<string[]>('tags', { required: true })
 const customFieldsMode = defineModel<ListMode>('customFieldsMode', { required: true })
 const customFields = defineModel<string[]>('customFields', { required: true })
+const tagColors = defineModel<TagColorEntry[]>('tagColors', { required: true })
 
 const {
   description,
@@ -85,6 +102,10 @@ const {
   customFieldsError = null,
   tagsSource,
   customFieldsSource,
+  tagSuggestions = [],
+  globalTagProperties = null,
+  tagColorsError = null,
+  tagColorsSource,
   provenanceLabel,
   provenanceClass,
 } = defineProps<{
@@ -97,13 +118,26 @@ const {
   customFieldsError?: string | null
   tagsSource?: ConfigSource
   customFieldsSource?: ConfigSource
+  /** Known tags, offered when naming a tag colour. */
+  tagSuggestions?: string[]
+  /** Project scope: global tag properties, shown for reference. */
+  globalTagProperties?: Record<string, TagProperties> | null
+  tagColorsError?: string | null
+  tagColorsSource?: ConfigSource
   provenanceLabel: (source: ConfigSource | undefined) => string
   provenanceClass: (source: ConfigSource | undefined) => string
 }>()
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'tags' | 'custom_fields'): void
+  (e: 'validate', field: 'tags' | 'custom_fields' | 'tag_properties'): void
+  (e: 'addTagColor'): void
+  (e: 'removeTagColor', index: number): void
 }>()
+
+// The listed tags first, then other known tags, without the wildcard.
+const tagColorSuggestions = computed(() =>
+  [...new Set([...tags.value, ...tagSuggestions])].filter((tag) => tag && tag !== '*'),
+)
 
 const uid = useId()
 

@@ -23,6 +23,9 @@ impl ConfigValidator {
 
     pub fn validate_project_config(&self, config: &ProjectConfig) -> ValidationResult {
         let mut result = ValidationResult::new();
+        if let Some(properties) = &config.tag_properties {
+            self.validate_tag_properties(properties, config.tags.as_ref(), &mut result);
+        }
 
         // Validate project name
         self.validate_project_name(&config.project_name, &mut result);
@@ -194,6 +197,7 @@ impl ConfigValidator {
 
     pub fn validate_global_config(&self, config: &GlobalConfig) -> ValidationResult {
         let mut result = ValidationResult::new();
+        self.validate_tag_properties(&config.tag_properties, Some(&config.tags), &mut result);
 
         // Validate server port
         if config.server_port < 1024 {
@@ -1028,6 +1032,48 @@ impl ConfigValidator {
                     allowed_field_label, field_name
                 )),
             );
+        }
+    }
+
+    /// Tag properties (DEV-20): unknown colours are ignored by the UI, and
+    /// properties of a tag a fixed list does not allow never show.
+    fn validate_tag_properties(
+        &self,
+        properties: &std::collections::BTreeMap<String, crate::config::types::TagProperties>,
+        tags: Option<&StringConfigField>,
+        result: &mut ValidationResult,
+    ) {
+        for (name, props) in properties {
+            if let Some(color) = &props.color
+                && !crate::config::types::is_valid_tag_color(color)
+            {
+                result.add_error(
+                    ValidationError::warning(
+                        Some("tag_properties".to_string()),
+                        format!(
+                            "Tag '{name}' has an unknown colour '{color}'; it is shown without one"
+                        ),
+                    )
+                    .with_fix(format!(
+                        "Use #rgb, #rrggbb or one of {}",
+                        crate::config::types::TAG_COLOR_NAMES.join(", ")
+                    )),
+                );
+            }
+            if let Some(tags) = tags
+                && !tags.has_wildcard()
+                && !tags.values.iter().any(|tag| tag.eq_ignore_ascii_case(name))
+            {
+                result.add_error(
+                    ValidationError::warning(
+                        Some("tag_properties".to_string()),
+                        format!("Tag '{name}' has properties but is not in the tag list"),
+                    )
+                    .with_fix(format!(
+                        "Add '{name}' to issue.tags or remove its properties"
+                    )),
+                );
+            }
         }
     }
 

@@ -2,6 +2,7 @@ import { getCurrentScope, onScopeDispose, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { TaskDTO, TaskDueBucket } from '../api/types'
 import { MS_PER_DAY, parseTaskDate, startOfLocalDay } from '../utils/date'
+import { recordTagProperties } from '../utils/tagPropertiesStore'
 import { projectOf } from '../utils/text'
 import { useSse } from './useSse'
 
@@ -110,6 +111,8 @@ async function fetchPolicy(prefix: string, { force = false }: { force?: boolean 
     }
     // A newer request for this prefix superseded this response.
     if (requestSeq.get(prefix) !== seq) return
+    // Tag colours (DEV-20) ride on the same per-project config response.
+    recordTagProperties(prefix, config)
     const policy = extractPolicy(prefix, config)
     if (policy) {
         policyRecords.set(prefix, { ...policy, fetchedAt: Date.now() })

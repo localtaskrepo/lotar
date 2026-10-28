@@ -379,6 +379,7 @@
                     :configured-tags="configTagOptions"
                     :known-tags="knownTags"
                     :allow-custom-tags="allowCustomTags"
+                    :project="form.project"
                     @update:tags="setTags"
                     @discoveredTags="mergeKnownTags"
                   />

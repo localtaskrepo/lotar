@@ -209,9 +209,16 @@
               :custom-fields-error="errors.custom_fields"
               :tags-source="sourceFor('tags')"
               :custom-fields-source="sourceFor('custom_fields')"
+              v-model:tag-colors="form.tagColors"
+              :tag-suggestions="tagSuggestions"
+              :global-tag-properties="isGlobal ? null : (inspectData.global_effective?.tag_properties ?? null)"
+              :tag-colors-error="errors.tag_properties"
+              :tag-colors-source="sourceFor('tag_properties')"
               :provenance-label="provenanceLabel"
               :provenance-class="provenanceClass"
               @validate="validateField"
+              @add-tag-color="addTagColor()"
+              @remove-tag-color="removeTagColor"
             />
           </div>
         </section>
@@ -910,6 +917,8 @@ const {
   sourceFor,
   addAliasEntry,
   removeAliasEntry,
+  addTagColor,
+  removeTagColor,
   clearAliasField,
   validateField,
   validateAll,

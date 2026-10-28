@@ -214,6 +214,10 @@ fn cli_hint_for_field(scope: &ValidationScope, error: &ValidationError) -> Optio
     let scope_flag = scope.cli_suffix();
 
     match field {
+        "tag_properties" => Some(format!(
+            "Fix the colours with `lotar config set tag_properties 'ui=#0ea5e9, backend=teal'{flag}` or clear them via `lotar config set tag_properties ''{flag}`",
+            flag = scope_flag,
+        )),
         "branch_status_aliases" | "branch_type_aliases" | "branch_priority_aliases" => {
             Some(format!(
                 "Update {} with `lotar config set {} '<alias:Target,...>'{flag}` or clear it via `lotar config set {} ''{flag}`",

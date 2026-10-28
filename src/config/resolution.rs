@@ -519,6 +519,8 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.tags.values != defaults.tags.values {
         base.tags = override_config.tags;
     }
+    // Tag properties merge per tag: a later layer wins for the tags it names.
+    base.tag_properties.extend(override_config.tag_properties);
 
     // Optional fields
     if override_config.default_assignee.is_some() {
@@ -692,6 +694,9 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if override_config.tags.values != defaults.tags.values {
         resolved.tags = override_config.tags;
     }
+    resolved
+        .tag_properties
+        .extend(override_config.tag_properties);
 
     if override_config.default_assignee.is_some() {
         resolved.default_assignee = override_config.default_assignee;
@@ -931,6 +936,9 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(tags) = project_config.tags {
         resolved.tags = tags;
     }
+    if let Some(properties) = project_config.tag_properties {
+        resolved.tag_properties.extend(properties);
+    }
     if let Some(default_tags) = project_config.default_tags {
         resolved.default_tags = default_tags;
     }
@@ -1162,6 +1170,7 @@ impl ResolvedConfig {
             issue_types: global.issue_types,
             issue_priorities: global.issue_priorities,
             tags: global.tags,
+            tag_properties: global.tag_properties,
             default_assignee: global.default_assignee,
             default_reporter: global.default_reporter,
             default_tags: global.default_tags,

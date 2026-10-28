@@ -232,7 +232,9 @@
                   </template>
                   <template v-else-if="col === 'tags'">
                     <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center">
-                      <span v-for="tag in t.tags || []" :key="tag" class="tag">{{ tag }}</span>
+                      <span v-for="tag in t.tags || []" :key="tag" class="tag" v-bind="tagAttrs(t.id, tag)">{{
+                        tag
+                      }}</span>
                     </div>
                   </template>
                   <template v-else-if="col === 'sprints'">
@@ -409,6 +411,7 @@
 </template>
 
 <script setup lang="ts">
+import { tagAttrs } from '../composables/useTagColors'
 import AttachmentTile from './AttachmentTile.vue'
 import { taskAttachments } from '../utils/taskAttachments'
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'

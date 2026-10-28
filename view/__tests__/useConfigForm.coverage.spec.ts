@@ -224,3 +224,59 @@ describe('useConfigForm sprint duration validation (DEV-111)', () => {
         for (const bad of ['later', '87601h']) expect(check('sprints_defaults_overdue_after', bad)).toBeTruthy()
     })
 })
+
+describe('useConfigForm tag colours (DEV-20)', () => {
+    it('edits global tag colours and keeps other tag properties', () => {
+        const form = load(
+            '',
+            inspectFor('', null, {
+                tag_properties: { ui: { color: 'sky', icon: 'brush' }, api: { color: '#ff0000' } },
+            }),
+        )
+        expect(form.form.tagColors).toEqual([
+            { tag: 'api', color: '#ff0000' },
+            { tag: 'ui', color: 'sky' },
+        ])
+        expect(form.buildPayload()).toEqual({})
+
+        form.form.tagColors[1]!.color = '#22c55e'
+        form.form.tagColors.splice(0, 1)
+        form.addTagColor('docs')
+        form.form.tagColors[1]!.color = 'violet'
+        expect(JSON.parse(form.buildPayload().tag_properties!)).toEqual({
+            docs: { color: 'violet' },
+            ui: { color: '#22c55e', icon: 'brush' },
+        })
+    })
+
+    it('edits only the project overrides and clears them with a blank value', () => {
+        const form = load(
+            'TEST',
+            inspectFor(
+                'TEST',
+                { project_name: 'Test', tag_properties: { ui: { color: 'green' } } },
+                {
+                    tag_properties: { ui: { color: 'blue' }, api: { color: 'red' } },
+                },
+            ),
+        )
+        expect(form.form.tagColors).toEqual([{ tag: 'ui', color: 'green' }])
+        form.removeTagColor(0)
+        expect(form.buildPayload()).toEqual({ tag_properties: '' })
+    })
+
+    it('rejects unknown colours, nameless rows and duplicates', () => {
+        const form = load('', inspectFor('', null))
+        form.addTagColor('ui')
+        form.form.tagColors[0]!.color = 'chartreuse'
+        form.validateField('tag_properties')
+        expect(form.errors.tag_properties).toMatch(/not a colour/)
+        form.form.tagColors[0]!.color = 'red'
+        form.addTagColor('UI')
+        form.validateField('tag_properties')
+        expect(form.errors.tag_properties).toMatch(/more than one colour/)
+        form.form.tagColors[1]!.tag = ''
+        form.validateField('tag_properties')
+        expect(form.errors.tag_properties).toMatch(/Name the tag/)
+    })
+})

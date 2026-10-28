@@ -40,7 +40,9 @@
     </template>
     <template v-else-if="col === 'tags'">
       <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center">
-        <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="tag">{{ tag }}</span>
+        <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="tag" v-bind="tagAttrs(task.id, tag)">{{
+          tag
+        }}</span>
         <span v-if="!task.tags.length" class="muted">—</span>
       </div>
     </template>
@@ -85,6 +87,7 @@
 </template>
 
 <script setup lang="ts">
+import { tagAttrs } from '../composables/useTagColors'
 import type { TaskDTO } from '../api/types'
 import type { ColKey } from '../composables/useColumns'
 import { formatRelativeTime } from '../utils/date'

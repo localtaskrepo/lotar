@@ -26,6 +26,7 @@ fn expand_dotted_keys(value: Value) -> Result<Value, ConfigError> {
                         | "branch_type_aliases"
                         | "branch_status_aliases"
                         | "branch_priority_aliases"
+                        | "tag_properties"
                 ) {
                     // These maps contain user-defined names, not config paths.
                     v
@@ -153,6 +154,124 @@ pub fn parse_issue_states_tolerant(
 // are applied from legacy to canonical. Flat fields are the typed schema
 // itself, so newly shipped fields cannot silently disappear here.
 
+/// Tag lists may hold objects with properties next to plain names (DEV-20):
+/// `tags: [bug, { name: ui, color: "#0ea5e9" }]`. Replace each object with
+/// its name and move its other keys to `issue.tag_properties`, so the typed
+/// `tags` field stays a list of names. Inline entries win over entries of
+/// the same tag in an explicit `issue.tag_properties` map.
+fn split_tag_objects(data: &mut Value) -> Result<(), ConfigError> {
+    let Value::Mapping(root) = data else {
+        return Ok(());
+    };
+    let mut collected = serde_yaml_ng::Mapping::new();
+    let mut lists: Vec<&mut Value> = Vec::new();
+    let mut sections = Vec::new();
+    for (key, value) in root.iter_mut() {
+        match key.as_str() {
+            Some("tags") => lists.push(value),
+            Some("issue" | "taxonomy") => sections.push(value),
+            _ => {}
+        }
+    }
+    for section in sections {
+        if let Some(list) = section
+            .as_mapping_mut()
+            .and_then(|map| map.get_mut(Value::String("tags".into())))
+        {
+            lists.push(list);
+        }
+    }
+    for list in lists {
+        let Value::Sequence(entries) = list else {
+            continue;
+        };
+        for entry in entries.iter_mut() {
+            let Value::Mapping(object) = entry else {
+                continue;
+            };
+            let name = match object.remove(Value::String("name".into())) {
+                Some(Value::String(name)) if !name.trim().is_empty() => name.trim().to_string(),
+                _ => {
+                    return Err(ConfigError::ParseError(
+                        "Tag entries with properties need a non-empty 'name'".into(),
+                    ));
+                }
+            };
+            if !object.is_empty() {
+                collected.insert(
+                    Value::String(name.clone()),
+                    Value::Mapping(std::mem::take(object)),
+                );
+            }
+            *entry = Value::String(name);
+        }
+    }
+    if collected.is_empty() {
+        return Ok(());
+    }
+    let issue = root
+        .entry(Value::String("issue".into()))
+        .or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
+    let Value::Mapping(issue) = issue else {
+        return Err(ConfigError::ParseError(
+            "Config section for 'issue' must be a mapping".into(),
+        ));
+    };
+    let properties = issue
+        .entry(Value::String("tag_properties".into()))
+        .or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
+    let Value::Mapping(properties) = properties else {
+        return Err(ConfigError::ParseError(
+            "Config section for 'issue.tag_properties' must be a mapping".into(),
+        ));
+    };
+    properties.extend(collected);
+    Ok(())
+}
+
+/// The `issue.tags` list with properties folded back in as objects, plus the
+/// properties that have no entry in it (DEV-20). A `*` list takes every
+/// coloured tag as an object; a fixed list leaves unlisted ones over.
+fn tags_with_properties(
+    names: &[String],
+    properties: &std::collections::BTreeMap<String, crate::config::types::TagProperties>,
+) -> (Value, serde_yaml_ng::Mapping) {
+    let entry = |name: &str, props: &crate::config::types::TagProperties| {
+        let mut object = serde_yaml_ng::Mapping::new();
+        object.insert(
+            Value::String("name".into()),
+            Value::String(name.to_string()),
+        );
+        if let Value::Mapping(fields) = serde_yaml_ng::to_value(props).unwrap_or(Value::Null) {
+            object.extend(fields);
+        }
+        Value::Mapping(object)
+    };
+    let mut list: Vec<Value> = names
+        .iter()
+        .map(|name| match properties.get(name) {
+            Some(props) if !props.is_empty() => entry(name, props),
+            _ => Value::String(name.clone()),
+        })
+        .collect();
+    let wildcard = names.iter().any(|name| name == "*");
+    let mut leftover = serde_yaml_ng::Mapping::new();
+    for (name, props) in properties {
+        if props.is_empty() || names.contains(name) {
+            continue;
+        }
+        if wildcard {
+            list.push(entry(name, props));
+        } else {
+            leftover.insert(
+                Value::String(name.clone()),
+                serde_yaml_ng::to_value(props).unwrap_or(Value::Null),
+            );
+        }
+    }
+    (Value::Sequence(list), leftover)
+}
+
 fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T, ConfigError> {
     let raw: Value = serde_yaml_ng::from_str(content)
         .map_err(|_| ConfigError::ParseError("Invalid config YAML".into()))?;
@@ -165,7 +284,8 @@ fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T
     } else {
         raw
     };
-    let data = expand_dotted_keys(raw)?;
+    let mut data = expand_dotted_keys(raw)?;
+    split_tag_objects(&mut data)?;
     let input = data
         .as_mapping()
         .ok_or_else(|| ConfigError::ParseError("Config root must be a mapping".into()))?;
@@ -388,11 +508,12 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
             serde_yaml_ng::to_value(&cfg.issue_priorities.values).unwrap_or(Y::Null),
         );
     }
-    if cfg.tags.values != defaults.tags.values {
-        issue.insert(
-            Y::String("tags".into()),
-            serde_yaml_ng::to_value(&cfg.tags.values).unwrap_or(Y::Null),
-        );
+    if cfg.tags.values != defaults.tags.values || !cfg.tag_properties.is_empty() {
+        let (tags, leftover) = tags_with_properties(&cfg.tags.values, &cfg.tag_properties);
+        issue.insert(Y::String("tags".into()), tags);
+        if !leftover.is_empty() {
+            issue.insert(Y::String("tag_properties".into()), Y::Mapping(leftover));
+        }
     }
     if !issue.is_empty() {
         root.insert(Y::String("issue".into()), Y::Mapping(issue));
@@ -815,23 +936,32 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         root.insert(Y::String("issue".into()), Y::Mapping(issue));
     }
 
-    // tags under issue.* in canonical project YAML
+    // tags under issue.* in canonical project YAML. Tag properties sit in
+    // the list as objects; a project that inherits the list keeps them in
+    // issue.tag_properties instead (DEV-20).
+    let empty_properties = std::collections::BTreeMap::new();
+    let properties = cfg.tag_properties.as_ref().unwrap_or(&empty_properties);
+    let mut tag_entries = serde_yaml_ng::Mapping::new();
     if let Some(v) = &cfg.tags {
+        let (tags, leftover) = tags_with_properties(&v.values, properties);
+        tag_entries.insert(Y::String("tags".into()), tags);
+        if !leftover.is_empty() {
+            tag_entries.insert(Y::String("tag_properties".into()), Y::Mapping(leftover));
+        }
+    } else if !properties.is_empty() {
+        tag_entries.insert(
+            Y::String("tag_properties".into()),
+            serde_yaml_ng::to_value(properties).unwrap_or(Y::Null),
+        );
+    }
+    if !tag_entries.is_empty() {
         if let Some(issue_map) = root
             .get_mut(Y::String("issue".into()))
             .and_then(|v| v.as_mapping_mut())
         {
-            issue_map.insert(
-                Y::String("tags".into()),
-                serde_yaml_ng::to_value(&v.values).unwrap_or(Y::Null),
-            );
+            issue_map.extend(tag_entries);
         } else {
-            let mut im = serde_yaml_ng::Mapping::new();
-            im.insert(
-                Y::String("tags".into()),
-                serde_yaml_ng::to_value(&v.values).unwrap_or(Y::Null),
-            );
-            root.insert(Y::String("issue".into()), Y::Mapping(im));
+            root.insert(Y::String("issue".into()), Y::Mapping(tag_entries));
         }
     }
 
