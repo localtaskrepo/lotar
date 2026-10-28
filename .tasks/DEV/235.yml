@@ -1,0 +1,40 @@
+title: REST and MCP accept a query in the web search syntax
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T20:44:11.188861+00:00
+modified: 2026-10-28T20:49:54.088756+00:00
+relationships:
+  related:
+  - DEV-231
+comments:
+- date: 2026-10-28T20:49:54.059934+00:00
+  text: 'Outcome: query parameter (web search syntax, shared parser) on REST /api/tasks/list, /api/tasks/export, graph filters, and MCP task_list; added to the other params; q/search stay plain search text. Evidence: dev231 one_query_string_works_on_every_interface (CLI, REST list, export, MCP agree on 4 queries; malformed query is 400/-32602). lint:agent, test:agent (1827 Rust, 1352 UI), smoke 361 pass. Docs: openapi.json (list+export), api-quick-reference.md, mcp-tools.md, list.md, view/api/types.ts, MCP schema. Guidance: no durable finding.'
+description: 'REST q and MCP search take plain search text only, where tag:x limits a word to tags; in the web UI and lotar list tag:x is the tag filter, and an agent cannot pass on a query written in the web syntax. Add a query parameter to /api/tasks/list, /api/tasks/export, the dependency graph filters and MCP task_list, parsed by the shared parser (src/utils/search_syntax.rs) and added to the other parameters like the CLI does. Keep q/search as plain search text. Contracts: openapi.json, api-quick-reference.md, mcp-tools.md, view/api/types.ts, MCP schema.'
+history:
+- at: 2026-10-28T20:44:15.483597+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T20:44:15.587046+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-231"]}'
+- at: 2026-10-28T20:49:54.059934+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T20:49:54.088756+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

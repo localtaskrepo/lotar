@@ -1578,7 +1578,7 @@ fn task_list_input(params: &Value) -> Result<crate::services::task_list::TaskQue
         strings(params, "task_type")?
     };
 
-    Ok(crate::services::task_list::TaskQueryInput {
+    let mut input = crate::services::task_list::TaskQueryInput {
         project: params
             .get("project")
             .and_then(Value::as_str)
@@ -1607,7 +1607,14 @@ fn task_list_input(params: &Value) -> Result<crate::services::task_list::TaskQue
         effort_max: string(params, "effort_max")?,
         sort_by: string(params, "sort_by")?,
         order: string(params, "order")?,
-    })
+    };
+    // The web search syntax (DEV-235), added to the other params.
+    if let Some(text) = string(params, "query")? {
+        input
+            .add_search(&crate::utils::search_syntax::parse(&text))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(input)
 }
 
 pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {

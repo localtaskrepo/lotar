@@ -143,3 +143,81 @@ fn malformed_terms_and_removed_shortcuts_are_errors() {
         assert!(err.contains("was removed; write"), "{removed}: {err}");
     }
 }
+
+/// DEV-235: REST and MCP take the same text as a `query` parameter.
+#[test]
+fn one_query_string_works_on_every_interface() {
+    use crate::common::env_mutex::EnvVarGuard;
+    use lotar::api_server::{ApiServer, HttpRequest};
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    let ws = workspace();
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", ws.tasks_dir.to_string_lossy().as_ref());
+    let mut api = ApiServer::new();
+    lotar::routes::initialize(&mut api);
+    let rest = |path: &str, params: &[(&str, &str)]| {
+        let resp = api.handle_request(&HttpRequest {
+            method: "GET".into(),
+            path: path.into(),
+            query: params
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                .collect::<HashMap<_, _>>(),
+            headers: HashMap::new(),
+            body: Vec::new(),
+        });
+        (resp.status, String::from_utf8(resp.body).unwrap())
+    };
+    let mcp = |params: serde_json::Value| -> serde_json::Value {
+        let line = json!({"jsonrpc": "2.0", "id": 1, "method": "task/list", "params": params});
+        serde_json::from_str(&lotar::mcp::server::handle_json_line(&line.to_string())).unwrap()
+    };
+
+    for (text, expected) in [
+        ("area=billing status:todo", ids(&[2])),
+        ("prio:P0,P2 sort_by=title order=asc", ids(&[3, 1])),
+        ("field:area=billing login", ids(&[1])),
+        ("tag:docs", ids(&[3])),
+    ] {
+        assert_eq!(run(&ws, &[text]).unwrap(), expected, "cli {text}");
+
+        let (status, body) = rest("/api/tasks/list", &[("query", text)]);
+        assert_eq!(status, 200, "{body}");
+        let body: Value = serde_json::from_str(&body).unwrap();
+        let rest_ids: Vec<String> = body["data"]["tasks"]
+            .as_array()
+            .map(|t| {
+                t.iter()
+                    .map(|t| t["id"].as_str().unwrap().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert_eq!(rest_ids, expected, "rest {text}");
+
+        let (status, csv) = rest("/api/tasks/export", &[("query", text)]);
+        assert_eq!(status, 200, "{csv}");
+        let export_ids: Vec<String> = csv
+            .lines()
+            .skip(1)
+            .map(|line| line.split(',').next().unwrap().to_string())
+            .collect();
+        assert_eq!(export_ids, expected, "export {text}");
+
+        let resp = mcp(json!({"query": text}));
+        let payload: Value =
+            serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+        let mcp_ids: Vec<String> = payload["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["id"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(mcp_ids, expected, "mcp {text}");
+    }
+
+    // A malformed query is an error everywhere.
+    let (status, _) = rest("/api/tasks/list", &[("query", "owner=")]);
+    assert_eq!(status, 400);
+    assert!(mcp(json!({"query": "owner="}))["error"]["code"] == -32602);
+}

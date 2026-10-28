@@ -24,6 +24,8 @@ pub const KNOWN_QUERY_KEYS: &[&str] = &[
     "tags",
     "sprints",
     "q",
+    // The web search syntax (DEV-235), added to the other parameters.
+    "query",
     "assignee",
     "order",
     "sort_by",
@@ -143,8 +145,9 @@ impl From<String> for TaskQueryError {
 }
 
 impl TaskQueryInput {
-    /// Read a REST-style query map: CSV values, `q` for the search text, and
-    /// every key not in [`KNOWN_QUERY_KEYS`] as a field filter.
+    /// Read a REST-style query map: CSV values, `q` for the search text,
+    /// `query` in the web search syntax, and every key not in
+    /// [`KNOWN_QUERY_KEYS`] as a field filter.
     pub fn from_params(query: &HashMap<String, String>) -> Result<Self, TaskQueryError> {
         let list = |key: &str| -> Vec<String> {
             query
@@ -169,7 +172,7 @@ impl TaskQueryInput {
         }
         // Deterministic order regardless of the map's iteration order.
         fields.sort();
-        Ok(Self {
+        let mut input = Self {
             project: query.get("project").cloned(),
             status: list("status"),
             priority: list("priority"),
@@ -189,7 +192,11 @@ impl TaskQueryInput {
             effort_max: query.get("effort_max").cloned(),
             sort_by: query.get("sort_by").cloned(),
             order: query.get("order").cloned(),
-        })
+        };
+        if let Some(text) = query.get("query") {
+            input.add_search(&crate::utils::search_syntax::parse(text))?;
+        }
+        Ok(input)
     }
 
     /// Add a search written in the web search-box syntax (DEV-231), e.g.

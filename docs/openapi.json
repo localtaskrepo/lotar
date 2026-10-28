@@ -623,6 +623,14 @@
             "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
           },
           {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filters and search text in the web search-box syntax, the same as `lotar list` (e.g. `status:todo,inprogress prio:high has:tag area=billing \"login redirect\"`). Added to the other parameters: list filters add up, single values replace. Malformed terms return 400."
+          },
+          {
             "name": "due_within",
             "in": "query",
             "schema": {
@@ -2979,6 +2987,14 @@
               "type": "string"
             },
             "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filters and search text in the web search-box syntax, the same as `lotar list` (e.g. `status:todo,inprogress prio:high has:tag area=billing \"login redirect\"`). Added to the other parameters: list filters add up, single values replace. Malformed terms return 400."
           },
           {
             "name": "due_within",

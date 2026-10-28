@@ -500,6 +500,8 @@ export interface TaskListFilter {
     needs?: string
     /** CSV of kinds tasks must carry: `attachment`, `image`, `link`, `tag` (at least one tag). */
     has?: string
+    /** Filters and search text in the web search-box syntax (same as `lotar list`). */
+    query?: string
     /** Due from today through today + N days, inclusive. */
     due_within?: number | string
     /** Inclusive effort bounds such as `2h`, `1d` or `3pt`; tasks without an effort are left out. */

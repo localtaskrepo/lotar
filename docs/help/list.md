@@ -48,6 +48,8 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `deletion=deleted\|all` | deleted tasks only, or both | | `deletion` |
 | `q="exact words"` | the search text, set explicitly | | `q`; MCP `search` |
 
+REST and MCP also accept the whole query as one `query` parameter, written exactly as here, so a query works the same in the web UI, `lotar list`, REST and MCP.
+
 Rules, the same as in the web UI:
 
 - Values of one filter are ORed (`status:todo,done`, or `status:todo status:done`); different filters are ANDed.
