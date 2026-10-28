@@ -487,17 +487,23 @@ watch(
   height: 28px;
 }
 
+/* A theme whose top bar stays dark (or light) in both modes sets
+   --topbar-logo-light / --topbar-logo-dark to pick the logo itself. */
+.brand__logo--light {
+  display: var(--topbar-logo-light, block);
+}
+
 .brand__logo--dark {
-  display: none;
+  display: var(--topbar-logo-dark, none);
 }
 
 /* The whole selector sits in :global(); Vue drops anything after it. */
 :global(html[data-mode='dark'] .brand__logo--light) {
-  display: none;
+  display: var(--topbar-logo-light, none);
 }
 
 :global(html[data-mode='dark'] .brand__logo--dark) {
-  display: block;
+  display: var(--topbar-logo-dark, block);
 }
 
 /* Repository logos can have any shape; keep them within the header. */

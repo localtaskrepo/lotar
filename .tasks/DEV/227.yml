@@ -1,0 +1,38 @@
+title: Retro light theme shows the dark wordmark on its dark title bar
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T01:19:59.976552+00:00
+modified: 2026-10-28T01:25:37.460702+00:00
+comments:
+- date: 2026-10-28T01:21:59.268022+00:00
+  text: 'Fixed: themes can pick the header logo with --topbar-logo-light / --topbar-logo-dark (display values, default follows the mode); Retro sets the light-on-dark logo in both modes. Checked all nine skins in both modes with a contact sheet; only Retro light was wrong. Smoke: ui.theming ''shows the logo that contrasts with each theme''s top bar'' (classic and retro, both modes). Attached the fixed header snippet.'
+references:
+- attachment: retro-light-header.b0717b67c701f0a0f8f2e0b4dd5697bf.webp
+description: 'Found while refreshing README screenshots (DEV-226): Retro keeps a navy title bar in light mode, but the header shows the dark-text LoTaR logo there, so the wordmark is nearly invisible. Other skins are fine in both modes (checked all nine).'
+history:
+- at: 2026-10-28T01:20:02.872526+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T01:21:26.290639+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:retro-light-header.b0717b67c701f0a0f8f2e0b4dd5697bf.webp
+- at: 2026-10-28T01:21:59.268022+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T01:25:37.460702+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

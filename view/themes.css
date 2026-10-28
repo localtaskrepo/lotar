@@ -1527,6 +1527,9 @@
     --topbar-fg: #ffffff;
     --topbar-muted: #d8e4f4;
     --topbar-accent: #ffef8a;
+    /* The title bar is dark in both modes: always use the light-on-dark logo. */
+    --topbar-logo-light: none;
+    --topbar-logo-dark: block;
     --card-background: var(--color-surface-contrast);
     --card-border: var(--color-surface-contrast);
     /* Bevels: raised windows and buttons, pressed buttons, sunken fields. */

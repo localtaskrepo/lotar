@@ -162,4 +162,42 @@ describe('UI theming and repository branding (DEV-218)', () => {
             await workspace.dispose();
         }
     });
+
+    // DEV-227: Retro's title bar is dark in both modes, so it always shows the
+    // light-on-dark logo; other skins follow the mode.
+    it("shows the logo that contrasts with each theme's top bar", async () => {
+        const workspace = await SmokeWorkspace.create();
+        try {
+            await workspace.addTask('Logo check');
+            const server = await startLotarServer(workspace);
+            try {
+                const visibleLogo = (page: Page) =>
+                    page.evaluate(() => {
+                        const shown = [...document.querySelectorAll<HTMLElement>('.brand__logo')].filter(
+                            (logo) => getComputedStyle(logo).display !== 'none',
+                        );
+                        return shown.map((logo) => (logo.classList.contains('brand__logo--dark') ? 'dark' : 'light'));
+                    });
+                const cases: Array<[string, 'light' | 'dark', string]> = [
+                    ['classic', 'light', 'light'],
+                    ['classic', 'dark', 'dark'],
+                    ['retro', 'light', 'dark'],
+                    ['retro', 'dark', 'dark'],
+                ];
+                for (const [theme, mode, logo] of cases) {
+                    await withPage(server.url, async (page) => {
+                        await page.emulateMedia({ colorScheme: mode });
+                        await page.evaluate((value) => localStorage.setItem('lotar.themeName', value), theme);
+                        await page.reload();
+                        await page.locator('.brand__logo').first().waitFor({ state: 'attached', timeout: 15_000 });
+                        await expect.poll(() => visibleLogo(page)).toEqual([logo]);
+                    });
+                }
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
 });
