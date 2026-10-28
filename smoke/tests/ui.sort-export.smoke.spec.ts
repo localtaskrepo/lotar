@@ -114,7 +114,7 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
                 ['[package]', 'name = "api-service"', 'version = "0.1.0"'].join('\n'),
             );
 
-            // Lexical priority order in `asc` is high < low < medium.
+            // Priorities sort in their configured order (DEV-234): asc is low < medium < high.
             const frontendHigh = await workspace.addTask('Frontend high priority', {
                 cwd: path.join(workspace.root, frontendDir),
                 args: ['--priority', 'high'],
@@ -161,7 +161,7 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
                     await page.waitForFunction(() => window.location.search.includes('sort_by=priority'), undefined, {
                         timeout: 20_000,
                     });
-                    const expectedFirst = String(Number(frontendHigh.id.split('-').pop()));
+                    const expectedFirst = String(Number(frontendLow.id.split('-').pop()));
                     await page.waitForFunction(
                         (first: string) => {
                             const cell = document.querySelector('tbody tr td:first-child strong');
@@ -172,9 +172,9 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
                     );
                     const sortedIds = await rowNumericIds(page);
                     expect(sortedIds).toEqual([
-                        String(Number(frontendHigh.id.split('-').pop())),
                         String(Number(frontendLow.id.split('-').pop())),
                         String(Number(frontendMedium.id.split('-').pop())),
+                        String(Number(frontendHigh.id.split('-').pop())),
                     ]);
                     const savedSort = await page.evaluate(
                         (project: string) => window.localStorage.getItem(`lotar.tasks.sort::${project}`),

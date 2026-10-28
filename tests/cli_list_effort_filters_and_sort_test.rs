@@ -40,7 +40,14 @@ fn list_sort_by_effort_time_only_asc_and_desc() {
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
-        .args(["task", "list", "--format", "json", "--sort-by=effort"])
+        .args([
+            "task",
+            "list",
+            "--format",
+            "json",
+            "--sort-by=effort",
+            "order=asc",
+        ])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -61,14 +68,7 @@ fn list_sort_by_effort_time_only_asc_and_desc() {
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "task",
-            "list",
-            "--format",
-            "json",
-            "--sort-by=effort",
-            "--reverse",
-        ])
+        .args(["task", "list", "--format", "json", "--sort-by=effort"])
         .output()
         .unwrap();
     assert!(out2.status.success());
@@ -124,6 +124,7 @@ fn list_effort_min_max_time_window() {
             "--effort-max",
             "1d",
             "--sort-by=effort",
+            "order=asc",
         ])
         .output()
         .unwrap();
@@ -178,6 +179,7 @@ fn list_effort_min_points_excludes_time() {
             "--effort-min",
             "4",
             "--sort-by=effort",
+            "order=asc",
         ])
         .output()
         .unwrap();

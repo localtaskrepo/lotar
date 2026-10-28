@@ -107,7 +107,15 @@ fn cli_and_mcp_share_the_rules_and_the_error() {
             .unwrap()
             .current_dir(tmp.path())
             .env("LOTAR_TASKS_DIR", tmp.path())
-            .args(["--format", "json", "list", query, "--sort-by", "id"])
+            .args([
+                "--format",
+                "json",
+                "list",
+                query,
+                "--sort-by",
+                "id",
+                "order=asc",
+            ])
             .output()
             .unwrap()
     };

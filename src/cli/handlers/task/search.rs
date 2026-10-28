@@ -86,7 +86,7 @@ impl SearchHandler {
         let search = crate::utils::search_syntax::parse(&args.query.join(" "));
         input.add_search(&search).map_err(|e| e.to_string())?;
         if input.order.is_none() {
-            input.order = Some(Self::order(input.sort_by.as_deref(), args.reverse).to_string());
+            input.order = Some(Self::order(args.reverse).to_string());
         }
         Ok(input)
     }
@@ -113,16 +113,11 @@ impl SearchHandler {
         ))
     }
 
-    /// Order when none is given (`order=asc|desc` sets it): without a sort
-    /// key, newest change first; with one, ascending (`--reverse`:
-    /// descending); relevance lists the best match first (`--reverse`: the
-    /// weakest).
-    fn order(sort_by: Option<&str>, reverse: bool) -> &'static str {
-        let Some(key) = sort_by else {
-            return "desc";
-        };
-        let relevance = key.trim().eq_ignore_ascii_case("relevance");
-        if relevance != reverse { "desc" } else { "asc" }
+    /// Order when `order=` is not given: descending (newest first, best
+    /// match first), as in the web UI and the API; `--reverse` lists
+    /// ascending (DEV-234).
+    fn order(reverse: bool) -> &'static str {
+        if reverse { "asc" } else { "desc" }
     }
 
     fn resolve_pagination(args: &TaskSearchArgs) -> Result<(usize, usize), String> {

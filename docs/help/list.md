@@ -101,7 +101,7 @@ All formats show canonical IDs (`AUTH-12`), even if you entered `12`.
 
 Deleted tasks retain their original status and `modified` timestamp. Deletion is a separate lifecycle, not a completion status; explicitly listing deleted tasks does not add them to normal project statistics or automation workload.
 
-Default order (no sort key) is newest-modified first, matching the REST and MCP list endpoints; ties break by canonical ID ascending. With a sort key the CLI lists ascending unless `--reverse` or `order=desc` is given. Assignees match fuzzily (case and `@`-insensitive), like the API. An unknown `--sort-by` key is an error unless it names a configured custom field (bare name, `field:<name>`, or `custom:<name>`).
+Default order (no sort key) is newest-modified first, matching the REST and MCP list endpoints; ties break by canonical ID ascending. A sort key lists descending (highest, latest or best first) unless `order=asc` or `--reverse` is given, the same in the web UI, REST and MCP. `priority` and `status` sort in their configured order: priorities are listed lowest to highest, so the highest priority comes first, and statuses in workflow order, so the furthest along comes first. Assignees match fuzzily (case and `@`-insensitive), like the API. An unknown `--sort-by` key is an error unless it names a configured custom field (bare name, `field:<name>`, or `custom:<name>`).
 
 Use `--details` to include task descriptions in text output, including its aliases. Separate table and Markdown renderers are not implemented. Older-than-N-days filtering ([DEV-3](../../.tasks/DEV/3.yml)) and list grouping/sums ([DEV-13](../../.tasks/DEV/13.yml)) remain separate features.
 

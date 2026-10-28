@@ -310,7 +310,7 @@ Resolved configuration responses expose `effective_done_states`, `done_states_mo
 - `issue.states` - Available task statuses
 - `issue.done_states` - Explicit finished task statuses; a nonempty subset of the effective `issue.states`. Omit or clear the override to inherit.
 - `issue.types` - Available task types  
-- `issue.priorities` - Available priorities
+- `issue.priorities` - Available priorities, lowest to highest (sorting by priority and the board use this order)
 - `issue.tags` - Available tags, optionally with properties such as a colour ([Tag colours](#tag-colours))
 - `issue.tag_properties` - Tag colours for inherited tags
 - `default.assignee` - Default task assignee

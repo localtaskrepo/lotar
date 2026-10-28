@@ -955,7 +955,7 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
         4,
         "title: t4\nstatus: Todo\npriority: medium\ntype: Task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-03-01T00:00:00Z\ntags: []\nassignee: Alice\ncustom_fields:\n  size: small\n",
     );
-    let payload = cli_list_json(&fx.tasks_dir, &["--sort-by", "size"]).unwrap();
+    let payload = cli_list_json(&fx.tasks_dir, &["--sort-by", "size", "order=asc"]).unwrap();
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[1, 2, 3, 4]));
 
     // due:overdue uses the shared date bucket: yesterday only (a due later

@@ -386,6 +386,21 @@ impl TaskQueryInput {
             options.effort_max = Some(task_query::parse_effort_bound("effort_max", raw)?);
         }
 
+        options.ranks = task_query::SortRanks {
+            priority: config
+                .issue_priorities
+                .values
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+            status: config
+                .issue_states
+                .values
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+        };
+
         Ok(TaskQuery {
             filter,
             field_filters,

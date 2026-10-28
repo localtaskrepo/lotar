@@ -1,0 +1,31 @@
+title: A sort key without order lists descending everywhere
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T20:34:46.146133+00:00
+modified: 2026-10-28T20:44:00.324013+00:00
+comments:
+- date: 2026-10-28T20:44:00.300216+00:00
+  text: 'Outcome: without order= or --reverse every interface sorts descending (CLI matched to web UI, REST, MCP); --reverse/order=asc ascending. priority and status now sort by configured order (priorities lowest to highest, statuses in workflow order; unknown values after, by name) instead of alphabetically, matching the board and My Work views. Fixed the broken list.md anchor from DEV-231 in api-quick-reference. Evidence: dev230 priority sort parity case; CLI sort tests made explicit; smoke ui.sort-export updated for configured order. lint:agent, test:agent (1826 Rust, 1352 UI), smoke 360 + sort-export rerun 6/6. Docs: list.md, api-quick-reference.md, config.md. Guidance: no durable finding.'
+description: 'With the shared search syntax, sort_by=title listed ascending in the CLI but descending in the web UI. Decided 2026-10-28: without order= (or --reverse) every interface sorts descending, newest first; --reverse/order=asc flips it. Relevance keeps best match first. Update CLI, docs and tests.'
+history:
+- at: 2026-10-28T20:34:52.622671+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T20:44:00.300216+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T20:44:00.324013+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

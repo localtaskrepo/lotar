@@ -311,8 +311,16 @@ fn every_interface_runs_the_same_query() {
             expected: &[5, 4],
         },
         Case {
+            // Configured order, highest priority first by default (DEV-234).
+            name: "priority sort",
+            cli: &["--sort-by", "priority"],
+            rest: &[("sort_by", "priority")],
+            mcp: json!({"sort_by": "priority"}),
+            expected: &[5, 4, 1, 2, 3, 6],
+        },
+        Case {
             name: "search with filters, sorted",
-            cli: &["t tag:ui", "sort_by=title"],
+            cli: &["t tag:ui", "sort_by=title", "order=asc"],
             rest: &[
                 ("q", "t"),
                 ("tags", "ui"),

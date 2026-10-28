@@ -123,6 +123,29 @@ pub struct TaskQueryOptions {
     pub effort_max: Option<crate::utils::effort::EffortParsed>,
     /// The free-text search, used to order by relevance.
     pub search: Option<SearchQuery>,
+    /// Configured priority and status order for sorting by them.
+    pub ranks: SortRanks,
+}
+
+/// Configured value order for `priority` and `status` sorts (DEV-234):
+/// ascending follows the configuration (Low before High, Todo before Done),
+/// so the default descending order lists the highest priority first.
+/// Values the configuration does not list sort after the listed ones, by name.
+#[derive(Clone, Debug, Default)]
+pub struct SortRanks {
+    pub priority: Vec<String>,
+    pub status: Vec<String>,
+}
+
+fn compare_ranked(order: &[String], a: &str, b: &str) -> Ordering {
+    let rank = |value: &str| {
+        let key = crate::types::canonical_key(value);
+        order
+            .iter()
+            .position(|known| crate::types::canonical_key(known) == key)
+            .unwrap_or(order.len())
+    };
+    rank(a).cmp(&rank(b)).then_with(|| a.cmp(b))
 }
 
 impl Default for TaskQueryOptions {
@@ -138,6 +161,7 @@ impl Default for TaskQueryOptions {
             effort_min: None,
             effort_max: None,
             search: None,
+            ranks: SortRanks::default(),
         }
     }
 }
@@ -646,11 +670,14 @@ fn compare_by_spec<T: TaskSortFields + ?Sized>(
     id_b: &str,
     b: &T,
     spec: &SortSpec,
+    ranks: &SortRanks,
 ) -> Ordering {
     match spec {
         SortSpec::Builtin(key) => match key {
-            SortKey::Priority => a.priority_str().cmp(&b.priority_str()),
-            SortKey::Status => a.status_str().cmp(&b.status_str()),
+            SortKey::Priority => {
+                compare_ranked(&ranks.priority, &a.priority_str(), &b.priority_str())
+            }
+            SortKey::Status => compare_ranked(&ranks.status, &a.status_str(), &b.status_str()),
             SortKey::Effort => compare_effort(a.effort(), b.effort()),
             SortKey::DueDate => compare_optional_due(a.due_date(), b.due_date()),
             SortKey::Created => compare_parsed_instant(a.created(), b.created()),
@@ -673,8 +700,18 @@ fn compare_by_spec<T: TaskSortFields + ?Sized>(
 /// Sort tasks by the spec and order with the canonical-ID ascending
 /// tiebreak. The tiebreak never flips with the requested order.
 pub fn sort_tasks<T: TaskSortFields>(tasks: &mut [(String, T)], spec: &SortSpec, order: SortOrder) {
+    sort_tasks_ranked(tasks, spec, order, &SortRanks::default());
+}
+
+/// [`sort_tasks`] with the configured priority and status order.
+pub fn sort_tasks_ranked<T: TaskSortFields>(
+    tasks: &mut [(String, T)],
+    spec: &SortSpec,
+    order: SortOrder,
+    ranks: &SortRanks,
+) {
     tasks.sort_by(|(id_a, a), (id_b, b)| {
-        let primary = compare_by_spec(id_a, a, id_b, b, spec);
+        let primary = compare_by_spec(id_a, a, id_b, b, spec, ranks);
         let primary = if order.is_desc() {
             primary.reverse()
         } else {
@@ -695,7 +732,7 @@ pub fn apply(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now
     if options.sort == SortSpec::Builtin(SortKey::Relevance) {
         sort_by_relevance(tasks, options.search.as_ref(), options.order);
     } else {
-        sort_tasks(tasks, &options.sort, options.order);
+        sort_tasks_ranked(tasks, &options.sort, options.order, &options.ranks);
     }
 }
 

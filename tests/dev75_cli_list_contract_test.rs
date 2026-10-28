@@ -46,7 +46,7 @@ fn fixture() -> TestFixtures {
 fn list_json(fixtures: &TestFixtures, args: &[&str]) -> Value {
     let mut cmd = common::cargo_bin_in(fixtures);
     let output = cmd
-        .args(["--format", "json", "list", "--sort-by", "id"])
+        .args(["--format", "json", "list", "--sort-by", "id", "order=asc"])
         .args(args)
         .assert()
         .success();
@@ -245,6 +245,7 @@ fn table_and_markdown_aliases_produce_the_same_text_output() {
                 "list",
                 "--sort-by",
                 "id",
+                "order=asc",
                 "--page-size",
                 "2",
             ])

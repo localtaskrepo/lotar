@@ -673,7 +673,14 @@ mod list_effort {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args(["task", "list", "--format", "json", "--sort-by=effort"])
+            .args([
+                "task",
+                "list",
+                "--format",
+                "json",
+                "--sort-by=effort",
+                "order=asc",
+            ])
             .output()
             .unwrap();
         assert!(out.status.success());
@@ -694,14 +701,7 @@ mod list_effort {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "task",
-                "list",
-                "--format",
-                "json",
-                "--sort-by=effort",
-                "--reverse",
-            ])
+            .args(["task", "list", "--format", "json", "--sort-by=effort"])
             .output()
             .unwrap();
         assert!(out2.status.success());
@@ -757,6 +757,7 @@ mod list_effort {
                 "--effort-max",
                 "1d",
                 "--sort-by=effort",
+                "order=asc",
             ])
             .output()
             .unwrap();
@@ -811,6 +812,7 @@ mod list_effort {
                 "--effort-min",
                 "4",
                 "--sort-by=effort",
+                "order=asc",
             ])
             .output()
             .unwrap();
@@ -1929,7 +1931,10 @@ mod list_features {
             );
         }
 
-        let limited = list_json(temp_dir, &["list", "--limit=3", "--sort-by=id"]);
+        let limited = list_json(
+            temp_dir,
+            &["list", "--limit=3", "--sort-by=id", "order=asc"],
+        );
         assert_eq!(
             titles(&limited),
             vec![
@@ -1940,7 +1945,10 @@ mod list_features {
             "--limit=3 must cap results to the first three tasks"
         );
 
-        let all = list_json(temp_dir, &["list", "--sort-by=id", "--page-size=20"]);
+        let all = list_json(
+            temp_dir,
+            &["list", "--sort-by=id", "order=asc", "--page-size=20"],
+        );
         assert_eq!(
             titles(&all).len(),
             5,
@@ -1978,14 +1986,29 @@ mod list_features {
                 .collect()
         };
 
-        let first = list_json(temp_dir, &["list", "--page-size=2", "--sort-by=id"]);
+        let first = list_json(
+            temp_dir,
+            &["list", "--page-size=2", "--sort-by=id", "order=asc"],
+        );
         let by_offset = list_json(
             temp_dir,
-            &["list", "--page-size=2", "--offset=2", "--sort-by=id"],
+            &[
+                "list",
+                "--page-size=2",
+                "--offset=2",
+                "--sort-by=id",
+                "order=asc",
+            ],
         );
         let by_page = list_json(
             temp_dir,
-            &["list", "--page-size=2", "--page=2", "--sort-by=id"],
+            &[
+                "list",
+                "--page-size=2",
+                "--page=2",
+                "--sort-by=id",
+                "order=asc",
+            ],
         );
 
         assert_eq!(ids(&first).len(), 2, "first page must have two tasks");
