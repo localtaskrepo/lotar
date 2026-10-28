@@ -1983,7 +1983,7 @@
     "/api/sprints/add": {
       "post": {
         "summary": "Assign tasks to a sprint",
-        "description": "Assigns the provided task IDs to the selected sprint. Enforces single-sprint membership unless force_single is set. Returns reassignment details including explanatory messages for replaced memberships.",
+        "description": "Assigns the provided task IDs, plus any tasks `query` selects, to the selected sprint. Enforces single-sprint membership unless force_single is set. Returns reassignment details including explanatory messages for replaced memberships.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2017,7 +2017,7 @@
     "/api/sprints/remove": {
       "post": {
         "summary": "Remove tasks from a sprint",
-        "description": "Detaches the provided task IDs from the selected sprint. Returns the same reassignment payload as the assignment endpoint including any cleanup diagnostics.",
+        "description": "Detaches the provided task IDs, plus any tasks `query` selects, from the selected sprint. Returns the same reassignment payload as the assignment endpoint including any cleanup diagnostics.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2756,7 +2756,7 @@
     "/api/sprints/backlog": {
       "get": {
         "summary": "List backlog tasks (not assigned to any sprint)",
-        "description": "Filters backlog tasks and projects the ordered IDs from .tasks/@sprints/backlog.yml, followed by unlisted canonical IDs, before applying the limit. Does not change task files or sprint membership.",
+        "description": "Tasks in no sprint, selected with the shared task query: every /api/tasks/list filter is accepted, including `query` in the web search syntax (`tag` is an alias of `tags`). Ordered by .tasks/@sprints/backlog.yml, followed by unlisted canonical IDs, unless `sort_by` is given; then the limit applies. Invalid filter values return 400. Does not change task files or sprint membership.",
         "responses": {
           "200": {
             "description": "OK"
@@ -2774,6 +2774,42 @@
               "type": "string"
             },
             "description": "Project prefix"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of statuses"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of tags (alias: tag)"
+          },
+          {
+            "name": "assignee",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Member name, @me, or __none__"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filters and search text in the web search-box syntax, as for /api/tasks/list"
           },
           {
             "name": "limit",
@@ -5373,11 +5409,12 @@
           "force_single": {
             "type": "boolean",
             "default": false
+          },
+          "query": {
+            "type": "string",
+            "description": "Also act on the tasks this search selects, in the web search-box syntax (e.g. `status:todo tag:ui`), run as the shared task query. `tasks` may then be empty."
           }
-        },
-        "required": [
-          "tasks"
-        ]
+        }
       },
       "SprintReassignment": {
         "type": "object",

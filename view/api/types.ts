@@ -532,11 +532,6 @@ export interface TaskListResponse {
     tasks?: TaskDTO[]
 }
 
-export interface TaskSelection {
-    filter?: TaskListFilter
-    where?: Array<[string, string]>
-}
-
 export interface SprintBacklogItem {
     id: string
     title: string
@@ -578,7 +573,8 @@ export interface SprintAssignmentRequest {
     allow_closed?: boolean
     cleanup_missing?: boolean
     force_single?: boolean
-    selection?: TaskSelection
+    /** Also act on the tasks this search selects, in the web search syntax (e.g. `status:todo tag:ui`). */
+    query?: string
 }
 
 export interface SprintAssignmentResponse {

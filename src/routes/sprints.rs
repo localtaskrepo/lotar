@@ -141,10 +141,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
         ));
 
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
+        let tasks = try_response!(assignment_tasks(&body, &storage, &resolver));
         let outcome = match sprint_assignment::assign_tasks(
             &mut storage,
             &mut records,
-            &body.tasks,
+            &tasks,
             sprint_reference.as_deref(),
             body.allow_closed,
             body.force_single,
@@ -203,10 +204,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
         ));
 
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
+        let tasks = try_response!(assignment_tasks(&body, &storage, &resolver));
         let outcome = match sprint_assignment::remove_tasks(
             &mut storage,
             &mut records,
-            &body.tasks,
+            &tasks,
             sprint_reference.as_deref(),
         ) {
             Ok(outcome) => outcome,
@@ -330,33 +332,6 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("--limit must be greater than zero".to_string());
         }
 
-        let statuses: Vec<TaskStatus> = req
-            .query
-            .get("status")
-            .map(|value| {
-                value
-                    .split(',')
-                    .map(|token| token.trim())
-                    .filter(|token| !token.is_empty())
-                    .map(TaskStatus::from)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        let tags: Vec<String> = req
-            .query
-            .get("tag")
-            .or_else(|| req.query.get("tags"))
-            .map(|value| {
-                value
-                    .split(',')
-                    .map(|token| token.trim())
-                    .filter(|token| !token.is_empty())
-                    .map(|token| token.to_string())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
         let cleanup_missing = req
             .query
             .get("cleanup_missing")
@@ -380,11 +355,27 @@ pub(super) fn register(api_server: &mut ApiServer) {
             None
         ));
 
+        // The shared task query (DEV-236): the /api/tasks/list parameters
+        // (including query); `tag` is accepted for `tags`.
+        let mut params = req.query.clone();
+        for transport in ["limit", "cleanup_missing", "cursor", "offset"] {
+            params.remove(transport);
+        }
+        if let Some(tag) = params.remove("tag") {
+            params.entry("tags".to_string()).or_insert(tag);
+        }
+        let cfg = try_response!(load_merged_config(&resolver));
+        let input = match crate::services::task_list::TaskQueryInput::from_params(&params) {
+            Ok(input) => input,
+            Err(e) => return bad_request(e.to_string()),
+        };
+        let manual_order = input.sort_by.is_none();
         let options = sprint_assignment::SprintBacklogOptions {
-            project: req.query.get("project").cloned(),
-            tags,
-            statuses,
-            assignee: req.query.get("assignee").cloned(),
+            query: match input.resolve(&cfg, resolver.path.as_path()) {
+                Ok(query) => query,
+                Err(e) => return bad_request(e.to_string()),
+            },
+            manual_order,
             limit,
         };
 
@@ -620,4 +611,24 @@ pub(super) fn register(api_server: &mut ApiServer) {
     });
 
     // GET /api/tasks/export -> CSV of tasks using same filters as list
+}
+
+/// The tasks a sprint add/remove request names, plus those its `query`
+/// selects with the shared task query (DEV-236).
+fn assignment_tasks(
+    body: &SprintAssignmentRequest,
+    storage: &crate::storage::manager::Storage,
+    resolver: &TasksDirectoryResolver,
+) -> Result<Vec<String>, HttpResponse> {
+    let mut tasks = body.tasks.clone();
+    if let Some(search) = body.query.as_deref().filter(|q| !q.trim().is_empty()) {
+        let cfg = load_merged_config(resolver)?;
+        let selected =
+            crate::services::task_list::select_ids(storage, &cfg, resolver.path.as_path(), search)
+                .map_err(|e| bad_request(e.to_string()))?;
+        tasks.extend(selected);
+        tasks.sort();
+        tasks.dedup();
+    }
+    Ok(tasks)
 }

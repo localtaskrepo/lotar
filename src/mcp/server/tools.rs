@@ -1119,6 +1119,10 @@ fn make_sprint_add_tool() -> Value {
                     "minimum": 1,
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
+                "query": {
+                    "type": ["string", "null"],
+                    "description": "Also act on the tasks this search selects, in the web search-box syntax (same as `lotar list` and task_list query), e.g. 'status:todo tag:ui'. tasks may be omitted when query is given."
+                },
                 "tasks": {
                     "oneOf": [
                         {"type": "string"},
@@ -1136,7 +1140,6 @@ fn make_sprint_add_tool() -> Value {
                     "description": "Alias for force_single."
                 }
             },
-            "required": ["tasks"],
             "additionalProperties": false
         }
     })
@@ -1158,6 +1161,10 @@ fn make_sprint_remove_tool() -> Value {
                     "minimum": 1,
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
+                "query": {
+                    "type": ["string", "null"],
+                    "description": "Also act on the tasks this search selects, in the web search-box syntax (same as `lotar list` and task_list query), e.g. 'status:todo tag:ui'. tasks may be omitted when query is given."
+                },
                 "tasks": {
                     "oneOf": [
                         {"type": "string"},
@@ -1166,7 +1173,6 @@ fn make_sprint_remove_tool() -> Value {
                 },
                 "cleanup_missing": {"type": ["boolean", "null"]}
             },
-            "required": ["tasks"],
             "additionalProperties": false
         }
     })
@@ -1196,13 +1202,20 @@ fn make_sprint_delete_tool() -> Value {
 }
 
 fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "List tasks without sprint assignments using optional filters (project, status, tag, assignee). Pass cleanup_missing=true to strip references to deleted sprint files before listing.".to_string();
+    let description = "List tasks without sprint assignments, in manual backlog order unless query sets sort_by. Filters: project, status, tag, assignee, and query (the web search-box syntax, same as task_list query, e.g. 'prio:high has:tag area=billing'). Pass cleanup_missing=true to strip references to deleted sprint files before listing.".to_string();
 
     let mut properties = JsonMap::new();
     properties.insert("project".into(), json!({"type": ["string", "null"]}));
     properties.insert("status".into(), multi_value_string_schema());
     properties.insert("tag".into(), multi_value_string_schema());
     properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
+    properties.insert(
+        "query".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Filters and search text in the web search-box syntax (same as task_list query)."
+        }),
+    );
     properties.insert(
         "limit".into(),
         json!({"type": ["number", "null"], "minimum": 1, "maximum": 100}),

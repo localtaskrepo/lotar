@@ -40,6 +40,7 @@ pub fn execute_action(
             max_nodes,
             relationship_kinds,
             include_isolated,
+            filter,
         } => {
             let root = root
                 .map(|id| resolve_id(&id, project.as_deref(), resolver))
@@ -51,7 +52,12 @@ pub fn execute_action(
                     task_id: root,
                     depth: Some(depth),
                     max_nodes: Some(max_nodes),
-                    filters: Default::default(),
+                    // The shared task query in the web search syntax (DEV-236).
+                    filters: if filter.is_empty() {
+                        Default::default()
+                    } else {
+                        [("query".to_string(), filter.join(" "))].into()
+                    },
                     relationship_kinds: if relationship_kinds.is_empty() {
                         None
                     } else {

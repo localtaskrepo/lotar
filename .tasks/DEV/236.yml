@@ -1,0 +1,40 @@
+title: Sprint backlog, sprint add/remove over REST/MCP and the dependency graph CLI use the shared query
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T20:52:14.283527+00:00
+modified: 2026-10-28T21:01:58.576936+00:00
+relationships:
+  related:
+  - DEV-233
+comments:
+- date: 2026-10-28T21:01:58.543382+00:00
+  text: 'Outcome: sprint backlog (CLI positional query + flags, REST /api/sprints/backlog, MCP sprint_backlog) runs the shared task query: every list filter plus query; manual backlog order unless sort_by is given; invalid values now error (REST 400, MCP -32602 with enum hints) instead of empty/unvalidated. REST /api/sprints/add|remove and MCP sprint_add/remove accept query (tasks optional with it); the never-used SprintAssignmentRequest.selection/TaskSelection is removed (api_types.rs, types.ts). task relationships graph --filter ''<query>''. MCP query error mapping shared (query_error). Evidence: tests/dev236_backlog_and_selection_query_test.rs (3), task_order_test converted; lint:agent, test:agent (1830 Rust, 1352 UI), smoke 361 pass. Docs: openapi (backlog params, SprintAssignmentRequest.query), api-quick-reference (sprint add/remove/backlog entries were missing), mcp-tools, sprints.md, task.md. Closes DEV-233. Guidance: no durable finding.'
+description: 'Sprint backlog (CLI sprint backlog, REST /api/sprints/backlog, MCP sprint_backlog) filters with its own selector (project, status, tag, assignee; exact-case assignee, unvalidated statuses in CLI/REST) while the web Sprints backlog uses the shared query. REST /api/sprints/add|remove accept a selection field they ignore (DEV-233) and MCP sprint_add/remove take explicit IDs only, unlike CLI --select. lotar task relationships graph has no filter although REST/MCP/web graph do. Move all of them onto the shared task query: backlog takes every filter plus a query (keeps manual backlog order unless a sort is given), REST/MCP sprint add/remove take query (replaces the dead selection field), graph CLI takes --filter ''<query>''. Closes DEV-233.'
+history:
+- at: 2026-10-28T20:52:18.649508+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T20:52:18.737137+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-233"]}'
+- at: 2026-10-28T21:01:58.543382+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T21:01:58.576936+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

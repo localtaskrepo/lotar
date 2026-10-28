@@ -401,6 +401,10 @@ pub enum TaskRelationshipsAction {
         relationship_kinds: Vec<String>,
         #[arg(long, action = clap::ArgAction::Set)]
         include_isolated: Option<bool>,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
+        #[arg(long = "filter", value_name = "QUERY")]
+        #[serde(default)]
+        filter: Vec<String>,
     },
     /// Add a relationship relative to the source task, including its reciprocal
     Add {

@@ -427,6 +427,9 @@ impl SprintDeleteArgs {
 
 #[derive(Args, Debug, Default)]
 pub struct SprintBacklogArgs {
+    /// Filters and search text in the web search syntax, as for `lotar list`
+    #[arg(num_args = 0..)]
+    pub query: Vec<String>,
     /// Restrict results to a specific project prefix (e.g. TEST)
     #[arg(long)]
     pub project: Option<String>,

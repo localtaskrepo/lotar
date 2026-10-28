@@ -1132,15 +1132,6 @@ pub struct TaskDeleteResponse {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "schema", derive(JsonSchema))]
-pub struct TaskSelection {
-    #[serde(default)]
-    pub filter: TaskListFilter,
-    #[serde(default)]
-    pub r#where: Vec<(String, String)>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 #[serde(untagged)]
@@ -1171,8 +1162,10 @@ pub struct SprintAssignmentRequest {
     pub cleanup_missing: bool,
     #[serde(default)]
     pub force_single: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub selection: Option<TaskSelection>,
+    /// Also act on the tasks this search selects, in the web search syntax
+    /// (DEV-236), e.g. `status:todo tag:ui`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub query: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

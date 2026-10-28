@@ -198,13 +198,24 @@ fn backlog_filters_and_limits_project_the_central_order_without_replacing_it() {
         &storage.root_path,
         "tasks: [TEST-3, OTHER-1, TEST-2, TEST-1]\n",
     );
-    let options = SprintBacklogOptions {
-        project: Some("TEST".into()),
-        tags: vec!["keep".into()],
-        statuses: vec![],
-        assignee: None,
-        limit: 1,
+    // The backlog runs the shared task query (DEV-236).
+    let backlog = |search: &str| {
+        let mut input = lotar::services::task_list::TaskQueryInput {
+            project: Some("TEST".into()),
+            ..Default::default()
+        };
+        input
+            .add_search(&lotar::utils::search_syntax::parse(search))
+            .unwrap();
+        let config =
+            lotar::config::resolution::load_and_merge_configs(Some(&storage.root_path)).unwrap();
+        SprintBacklogOptions {
+            query: input.resolve(&config, &storage.root_path).unwrap(),
+            manual_order: true,
+            limit: 1,
+        }
     };
+    let options = backlog("tag:keep");
     let result = fetch_backlog(&storage, &options).unwrap();
     assert_eq!(result.entries[0].id, "TEST-3");
     assert!(result.truncated);
@@ -214,10 +225,7 @@ fn backlog_filters_and_limits_project_the_central_order_without_replacing_it() {
         fetch_backlog(&storage, &options).unwrap().entries[0].id,
         "TEST-1"
     );
-    let assigned = SprintBacklogOptions {
-        assignee: Some("alice".into()),
-        ..options
-    };
+    let assigned = backlog("tag:keep assignee:alice");
     assert_eq!(
         fetch_backlog(&storage, &assigned).unwrap().entries[0].id,
         "TEST-3"

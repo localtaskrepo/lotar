@@ -162,12 +162,12 @@ or journal data. Unavailable locks and pending recovery are reported explicitly.
 - **Response:** Same payload as the CLI sprint velocity report.
 
 ### `sprint_add`
-- **Params:** `tasks` (string or array, required), optional `sprint` (reference like `#1`, numeric id, or keyword), optional `sprint_id` (numeric id), `allow_closed` (default `false`), `force_single`/`force` (advertised aliases — force reassignments), and `cleanup_missing` (remove dangling references first).
+- **Params:** `tasks` (string or array; may be omitted when `query` is given), `query` (also act on the tasks this search selects, in the web search-box syntax, e.g. `status:todo tag:ui`), optional `sprint` (reference like `#1`, numeric id, or keyword), optional `sprint_id` (numeric id), `allow_closed` (default `false`), `force_single`/`force` (advertised aliases — force reassignments), and `cleanup_missing` (remove dangling references first).
 - **Aliases:** `force_single: null` permits the `force` alias; a boolean `force_single` takes precedence, including explicit `false`.
 - **Response:** JSON with `status`, `action` (`created|updated|moved`), `sprint_id`, `sprint_label`, lists of `modified`, `unchanged`, `replaced`, `missing_sprints`, and optional `integrity` metrics. If reassignments occur, an additional text content item lists the human-readable warnings.
 
 ### `sprint_remove`
-- **Params:** Same forms as `sprint_add` (`tasks` scalar or array, optional `sprint` reference/numeric id, optional `sprint_id`, optional `cleanup_missing`).
+- **Params:** Same forms as `sprint_add` (`tasks` scalar or array and/or `query`, optional `sprint` reference/numeric id, optional `sprint_id`, optional `cleanup_missing`).
 - **Response:** Mirrors `sprint_add` but describes removal results rather than assignments.
 
 ### `sprint_delete`
@@ -176,8 +176,8 @@ or journal data. Unavailable locks and pending recovery are reported explicitly.
 - **Response:** Two content items: a summary sentence and a JSON object containing `deleted`, `sprint_id`, `sprint_label`, `removed_references`, `updated_tasks`, and optional `integrity` data.
 
 ### `sprint_backlog`
-- **Params:** `project`, `status` list (defaults come from config), `tag` filter, `assignee`, `limit` (default 20, max 100), `cursor` (<= 5000), and `cleanup_missing`.
-- **Ordering:** Uses `.tasks/@sprints/backlog.yml` task-ID sequence, followed by unlisted IDs in canonical order. Filtering precedes ordering and cursor slicing follows it. Task files are not ranked or rewritten. See [manual backlog ordering](./sprints.md#manual-backlog-ordering).
+- **Params:** `project`, `status` list, `tag` filter, `assignee`, `query` (the web search-box syntax, same as `task_list`), `limit` (default 20, max 100), `cursor` (<= 5000), and `cleanup_missing`. Tasks are selected with the shared task query, so invalid values are `-32602` errors with enum hints, as in `task_list`.
+- **Ordering:** Unless `query` sets `sort_by`, uses `.tasks/@sprints/backlog.yml` task-ID sequence, followed by unlisted IDs in canonical order. Filtering precedes ordering and cursor slicing follows it. Task files are not ranked or rewritten. See [manual backlog ordering](./sprints.md#manual-backlog-ordering).
 
 ### `sprint_reorder`
 - **Params:** `task`, exactly one of `before`/`after`, optional positive `sprint` (omitted/null selects backlog), and `allow_closed`.

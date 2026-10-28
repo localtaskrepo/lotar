@@ -5,12 +5,8 @@ use serde::Serialize;
 
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status::{self, SprintLifecycleState};
-use crate::services::task_service::TaskService;
-use crate::storage::filter::TaskFilter;
 use crate::storage::manager::Storage;
 use crate::storage::sprint::{Sprint, SprintTaskEntry};
-use crate::types::TaskStatus;
-use crate::utils::identity::resolve_me_alias;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SprintAssignmentAction {
@@ -374,10 +370,10 @@ fn remove_task_from_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct SprintBacklogOptions {
-    pub project: Option<String>,
-    pub tags: Vec<String>,
-    pub statuses: Vec<TaskStatus>,
-    pub assignee: Option<String>,
+    /// Which tasks to consider: the shared task query (DEV-236).
+    pub query: crate::services::task_list::TaskQuery,
+    /// Keep the manual backlog order (no explicit sort was asked for).
+    pub manual_order: bool,
     pub limit: usize,
 }
 
@@ -405,73 +401,35 @@ pub fn fetch_backlog(
     storage: &Storage,
     options: &SprintBacklogOptions,
 ) -> Result<SprintBacklogResult, String> {
-    let resolved_assignee = match options.assignee.as_ref() {
-        Some(raw) => {
-            let trimmed = raw.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                resolve_me_alias(trimmed, Some(storage.root_path.as_path())).ok_or_else(|| {
-                    format!(
-                        "Unable to resolve assignee '{}'. Set LOTAR identity or provide the full value.",
-                        raw
-                    )
-                })?
-                .into()
-            }
-        }
-        None => None,
-    };
+    // Tasks the query selects that are in no sprint.
+    let mut entries: Vec<SprintBacklogEntry> =
+        crate::services::task_list::run(storage, &options.query, chrono::Utc::now())
+            .into_iter()
+            .filter(|(_, task)| task.sprints.is_empty())
+            .map(|(id, task)| SprintBacklogEntry {
+                id,
+                title: task.title,
+                status: task.status.to_string(),
+                priority: task.priority.to_string(),
+                assignee: task.assignee,
+                due_date: task.due_date,
+                tags: task.tags,
+            })
+            .collect();
 
-    let mut filter = TaskFilter {
-        project: options.project.clone(),
-        ..TaskFilter::default()
-    };
-    if !options.statuses.is_empty() {
-        filter.status = options.statuses.clone();
+    if options.manual_order {
+        let order = crate::services::task_order::backlog_order_for_ids(
+            storage,
+            entries.iter().map(|entry| entry.id.clone()),
+        )
+        .map_err(|error| error.to_string())?;
+        let positions: HashMap<_, _> = order
+            .into_iter()
+            .enumerate()
+            .map(|(index, id)| (id, index))
+            .collect();
+        entries.sort_by_key(|entry| positions.get(&entry.id).copied().unwrap_or(usize::MAX));
     }
-    if !options.tags.is_empty() {
-        filter.tags = options.tags.clone();
-    }
-
-    let use_assignee_filter = resolved_assignee.as_deref();
-
-    let sprint_lookup = TaskService::load_sprint_lookup(storage);
-    let mut entries = Vec::new();
-    for (id, task) in storage.search(&filter) {
-        if sprint_lookup.contains_key(&id) {
-            continue;
-        }
-
-        if let Some(assignee) = use_assignee_filter {
-            match task.assignee.as_ref() {
-                Some(value) if value.eq_ignore_ascii_case(assignee) => {}
-                _ => continue,
-            }
-        }
-
-        entries.push(SprintBacklogEntry {
-            id: id.clone(),
-            title: task.title.clone(),
-            status: task.status.to_string(),
-            priority: task.priority.to_string(),
-            assignee: task.assignee.clone(),
-            due_date: task.due_date.clone(),
-            tags: task.tags.clone(),
-        });
-    }
-
-    let order = crate::services::task_order::backlog_order_for_ids(
-        storage,
-        entries.iter().map(|entry| entry.id.clone()),
-    )
-    .map_err(|error| error.to_string())?;
-    let positions: HashMap<_, _> = order
-        .into_iter()
-        .enumerate()
-        .map(|(index, id)| (id, index))
-        .collect();
-    entries.sort_by_key(|entry| positions.get(&entry.id).copied().unwrap_or(usize::MAX));
 
     let mut truncated = false;
     if options.limit > 0 && entries.len() > options.limit {

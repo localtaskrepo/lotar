@@ -1,5 +1,11 @@
 use crate::LoTaRError;
 use crate::api_server::{ApiServer, HttpRequest, HttpResponse};
+use crate::api_types::{
+    ScanRequest, SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem,
+    SprintBacklogResponse, SprintCreateRequest, SprintCreateResponse, SprintDeleteRequest,
+    SprintDeleteResponse, SprintListItem, SprintListResponse, SprintUpdateRequest,
+    SprintUpdateResponse, SyncRequest, SyncValidateRequest,
+};
 use crate::config::manager::ConfigManager;
 use crate::config::resolution;
 use crate::services::automation_service::AutomationEvent;
@@ -25,15 +31,6 @@ use crate::services::{
     task_service::TaskService,
 };
 use crate::workspace::TasksDirectoryResolver;
-use crate::{
-    api_types::{
-        ScanRequest, SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem,
-        SprintBacklogResponse, SprintCreateRequest, SprintCreateResponse, SprintDeleteRequest,
-        SprintDeleteResponse, SprintListItem, SprintListResponse, SprintUpdateRequest,
-        SprintUpdateResponse, SyncRequest, SyncValidateRequest,
-    },
-    types::TaskStatus,
-};
 use chrono::Utc;
 use serde_json::json;
 

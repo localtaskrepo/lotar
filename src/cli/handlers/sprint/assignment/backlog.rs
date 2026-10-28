@@ -8,7 +8,6 @@ use crate::cli::handlers::sprint::shared::{
 };
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_assignment::{self, SprintBacklogEntry};
-use crate::types::TaskStatus;
 
 use super::context::AssignmentContext;
 
@@ -48,15 +47,30 @@ pub(crate) fn handle_backlog(
         "loading the sprint backlog",
     )?;
 
-    let options = sprint_assignment::SprintBacklogOptions {
-        project: backlog_args.project.clone(),
+    // The shared task query (DEV-236): the flags plus the search syntax.
+    let mut input = crate::services::task_list::TaskQueryInput {
+        project: backlog_args
+            .project
+            .as_deref()
+            .map(|project| crate::utils::resolve_project_input(project, tasks_root)),
+        status: backlog_args.status.clone(),
         tags: backlog_args.tag.clone(),
-        statuses: backlog_args
-            .status
-            .iter()
-            .map(|value| TaskStatus::from(value.as_str()))
-            .collect(),
         assignee: backlog_args.assignee.clone(),
+        ..Default::default()
+    };
+    input
+        .add_search(&crate::utils::search_syntax::parse(
+            &backlog_args.query.join(" "),
+        ))
+        .map_err(|e| e.cli_message())?;
+    let manual_order = input.sort_by.is_none();
+    let base = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
+        .map_err(|e| format!("Failed to load config: {e}"))?;
+    let options = sprint_assignment::SprintBacklogOptions {
+        query: input
+            .resolve(&base, tasks_root)
+            .map_err(|e| e.cli_message())?,
+        manual_order,
         limit: backlog_args.limit,
     };
 

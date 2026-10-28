@@ -1485,7 +1485,9 @@ pub(crate) fn handle_task_restore(req: JsonRpcRequest) -> JsonRpcResponse {
 
 /// Map `task_list` params onto the shared task query (DEV-230). Only JSON
 /// shape errors are reported here; values are validated by the query.
-fn task_list_input(params: &Value) -> Result<crate::services::task_list::TaskQueryInput, String> {
+pub(crate) fn task_list_input(
+    params: &Value,
+) -> Result<crate::services::task_list::TaskQueryInput, String> {
     /// A string, or for list params a CSV string or an array of strings.
     fn strings(params: &Value, key: &str) -> Result<Vec<String>, String> {
         match params.get(key) {
@@ -1617,6 +1619,57 @@ fn task_list_input(params: &Value) -> Result<crate::services::task_list::TaskQue
     Ok(input)
 }
 
+/// The MCP error for a rejected task query: invalid status, priority or
+/// type values carry enum hints from the configuration they were checked
+/// against; an unresolvable `@me` is `-32002`; anything else `-32602`.
+pub(crate) fn query_error(
+    id: Option<Value>,
+    error: TaskQueryError,
+    project: Option<&str>,
+    tasks_root: &std::path::Path,
+    base_cfg: &crate::config::types::ResolvedConfig,
+) -> JsonRpcResponse {
+    match error {
+        TaskQueryError::InvalidEnum {
+            field,
+            value,
+            message,
+        } => {
+            let prefix = project.map(str::trim).filter(|p| !p.is_empty());
+            let cfg = prefix
+                .and_then(|prefix| {
+                    crate::config::resolution::config_for_project(tasks_root, Some(prefix)).ok()
+                })
+                .unwrap_or_else(|| base_cfg.clone());
+            let scope: Vec<String> = prefix.map(str::to_string).into_iter().collect();
+            let data = EnumHints::from_resolved_config(&cfg, &scope).and_then(|h| {
+                let allowed = match field {
+                    "status" => h.statuses.as_slice(),
+                    "priority" => h.priorities.as_slice(),
+                    _ => h.types.as_slice(),
+                };
+                make_enum_error_data(field, &value, allowed)
+            });
+            err(
+                id,
+                -32602,
+                &format!("{field} validation failed: {message}"),
+                data,
+            )
+        }
+        // Fail closed: an unresolvable identity must never widen the query.
+        TaskQueryError::UnresolvedMe => err(
+            id,
+            -32002,
+            "Could not resolve @me: no identity configured",
+            Some(
+                json!({"message": "Set default_reporter in config, git user.name, or USER environment"}),
+            ),
+        ),
+        other => err(id, -32602, &other.to_string(), None),
+    }
+}
+
 pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let cfg_mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
@@ -1634,61 +1687,16 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(message) => return err(req.id, -32602, &message, None),
     };
     let project = input.project.clone();
-    let hints_for = |cfg: &crate::config::types::ResolvedConfig| {
-        let scope: Vec<String> = project.iter().cloned().collect();
-        EnumHints::from_resolved_config(cfg, &scope)
-    };
     let query = match input.resolve(base_cfg, resolver.path.as_path()) {
         Ok(query) => query,
-        Err(TaskQueryError::InvalidEnum {
-            field,
-            value,
-            message,
-        }) => {
-            // Hints come from the same configuration the value was checked
-            // against: the requested project's, else the base one.
-            let cfg = project
-                .as_deref()
-                .map(str::trim)
-                .filter(|p| !p.is_empty())
-                .and_then(|prefix| {
-                    crate::config::resolution::config_for_project(
-                        resolver.path.as_path(),
-                        Some(prefix),
-                    )
-                    .ok()
-                })
-                .unwrap_or_else(|| base_cfg.clone());
-            let data = hints_for(&cfg).and_then(|h| {
-                let allowed = match field {
-                    "status" => h.statuses.as_slice(),
-                    "priority" => h.priorities.as_slice(),
-                    _ => h.types.as_slice(),
-                };
-                make_enum_error_data(field, &value, allowed)
-            });
-            return err(
-                req.id,
-                -32602,
-                &format!("{field} validation failed: {message}"),
-                data,
-            );
+        Err(error) => {
+            return query_error(req.id, error, project.as_deref(), &resolver.path, base_cfg);
         }
-        Err(TaskQueryError::UnresolvedMe) => {
-            // Fail closed: an unresolvable identity must never widen the
-            // query to all tasks.
-            return err(
-                req.id,
-                -32002,
-                "Could not resolve @me: no identity configured",
-                Some(
-                    json!({"message": "Set default_reporter in config, git user.name, or USER environment"}),
-                ),
-            );
-        }
-        Err(other) => return err(req.id, -32602, &other.to_string(), None),
     };
-    let enum_hints = hints_for(&query.config);
+    let enum_hints = {
+        let scope: Vec<String> = project.iter().cloned().collect();
+        EnumHints::from_resolved_config(&query.config, &scope)
+    };
 
     let storage = Storage::new(&resolver.path.clone());
     // Filtered and in global order BEFORE pagination, so pages are stable

@@ -437,6 +437,23 @@ pub fn run(
     tasks
 }
 
+/// IDs of the tasks a search in the web syntax selects, for commands that
+/// act on a selection (sprint add/remove over REST and MCP, DEV-236).
+pub fn select_ids(
+    storage: &Storage,
+    base: &ResolvedConfig,
+    tasks_root: &Path,
+    search: &str,
+) -> Result<Vec<String>, TaskQueryError> {
+    let mut input = TaskQueryInput::default();
+    input.add_search(&crate::utils::search_syntax::parse(search))?;
+    let query = input.resolve(base, tasks_root)?;
+    Ok(run(storage, &query, chrono::Utc::now())
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect())
+}
+
 /// Keep tasks whose field values loosely match every field filter.
 pub fn apply_field_filters(
     tasks: &mut Vec<(String, TaskDTO)>,

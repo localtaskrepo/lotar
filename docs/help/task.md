@@ -184,6 +184,8 @@ Back returns to the previous task, including when opened over another view.
 lotar --project APP --format json task relationships graph --root APP-42 --depth 2 --max-nodes 100
 ```
 
+`--filter '<query>'` keeps only tasks matching a query in the [web search syntax](./list.md#filters-in-the-query), the same as the Dependencies page filter, e.g. `--filter 'status:todo tag:ui'`. Referenced tasks outside the filter stay as context.
+
 The graph coalesces reciprocal declarations into one typed edge with stored
 provenance. Dependency arrows run from prerequisite to dependent. Graph depth is
 bounded to 0-8 and node count to 1-500; partial/truncated output is explicit and

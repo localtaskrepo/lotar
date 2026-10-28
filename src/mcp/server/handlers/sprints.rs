@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 
-use super::super::hints::{EnumHints, enum_hints_to_value, make_enum_error_data};
+use super::super::hints::{EnumHints, enum_hints_to_value};
 use super::super::{
     JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_BACKLOG_LIMIT, MCP_DEFAULT_SPRINT_LIST_LIMIT,
     MCP_MAX_BACKLOG_LIMIT, MCP_MAX_CURSOR, MCP_MAX_SPRINT_LIST_LIMIT, domain_service_error, err,
@@ -24,7 +24,6 @@ use crate::services::sprint_velocity::{
     DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
 };
 use crate::storage::manager::Storage;
-use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
 
@@ -552,10 +551,20 @@ fn membership_request(req: &JsonRpcRequest) -> Result<MembershipRequest, JsonRpc
             .map_err(|e| {
                 internal_error(id(), format!("Failed to clean up sprint references: {}", e))
             })?;
-    let Some(raw_tasks) = req.params.get("tasks") else {
-        return Err(err(id(), -32602, "Missing required field: tasks", None));
+    // `query` selects tasks with the shared task query (DEV-236); `tasks`
+    // may then be omitted.
+    let search = req
+        .params
+        .get("query")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|q| !q.is_empty());
+    let raw_tasks = match req.params.get("tasks") {
+        Some(value) => value.clone(),
+        None if search.is_some() => Value::Array(Vec::new()),
+        None => return Err(err(id(), -32602, "Missing required field: tasks", None)),
     };
-    let tasks: Vec<String> = match raw_tasks {
+    let mut tasks: Vec<String> = match &raw_tasks {
         Value::String(value) => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
@@ -580,6 +589,20 @@ fn membership_request(req: &JsonRpcRequest) -> Result<MembershipRequest, JsonRpc
             ));
         }
     };
+    if let Some(search) = search {
+        let base = resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+            .map_err(|e| internal_error(id(), format!("Failed to load config: {e}")))?;
+        let selected = crate::services::task_list::select_ids(
+            &storage,
+            &base,
+            resolver.path.as_path(),
+            search,
+        )
+        .map_err(|e| super::tasks::query_error(id(), e, None, &resolver.path, &base))?;
+        tasks.extend(selected);
+        tasks.sort();
+        tasks.dedup();
+    }
     let sprint_ref =
         parse_sprint_reference(&req.params).map_err(|msg| err(id(), -32602, msg, None))?;
     Ok(MembershipRequest {
@@ -1006,27 +1029,13 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    fn parse_string_vec(value: Option<&Value>) -> Vec<String> {
-        match value {
-            Some(Value::String(s)) => s
-                .split(',')
-                .map(|token| token.trim())
-                .filter(|token| !token.is_empty())
-                .map(|token| token.to_string())
-                .collect(),
-            Some(Value::Array(arr)) => arr
-                .iter()
-                .filter_map(|v| v.as_str())
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .collect(),
-            _ => Vec::new(),
-        }
-    }
-
-    let status_tokens = parse_string_vec(req.params.get("status"));
-    let config = match resolution::config_for_project(&resolver.path, project.as_deref()) {
+    // The shared task query (DEV-236): every task_list filter, plus query.
+    let input = match super::tasks::task_list_input(&req.params) {
+        Ok(input) => input,
+        Err(message) => return err(req.id, -32602, &message, None),
+    };
+    let manual_order = input.sort_by.is_none();
+    let base = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
         Ok(config) => config,
         Err(error) => {
             return err(
@@ -1037,37 +1046,23 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let project_scope: Vec<String> = project.iter().cloned().collect();
-    let enum_hints = EnumHints::from_resolved_config(&config, &project_scope);
-    let mut statuses = Vec::new();
-    for token in &status_tokens {
-        match TaskStatus::parse_with_config(token, &config) {
-            Ok(status) => statuses.push(status),
-            Err(error) => {
-                let data = enum_hints
-                    .as_ref()
-                    .and_then(|hints| make_enum_error_data("status", token, &hints.statuses));
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("Status validation failed: {error}"),
-                    data,
-                );
-            }
+    let query = match input.resolve(&base, resolver.path.as_path()) {
+        Ok(query) => query,
+        Err(error) => {
+            return super::tasks::query_error(
+                req.id,
+                error,
+                project.as_deref(),
+                &resolver.path,
+                &base,
+            );
         }
-    }
-
-    let tags = parse_string_vec(req.params.get("tag"));
-
+    };
+    let project_scope: Vec<String> = project.iter().cloned().collect();
+    let enum_hints = EnumHints::from_resolved_config(&query.config, &project_scope);
     let options = SprintBacklogOptions {
-        project: project.clone(),
-        tags,
-        statuses,
-        assignee: req
-            .params
-            .get("assignee")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
+        query,
+        manual_order,
         limit: 0,
     };
 

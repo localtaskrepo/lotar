@@ -1,7 +1,34 @@
 title: REST sprint add/remove ignores the selection field
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-28T20:27:12.092805+00:00
+modified: 2026-10-28T21:01:58.629230+00:00
+relationships:
+  related:
+  - DEV-236
+comments:
+- date: 2026-10-28T21:01:58.609694+00:00
+  text: 'Fixed by DEV-236: the unused selection field is replaced by query (web search syntax, shared task query) on /api/sprints/add and /api/sprints/remove, and MCP sprint_add/remove take query too.'
 description: 'SprintAssignmentRequest (src/api_types.rs, view/api/types.ts) accepts selection: TaskSelection {filter, where}, but /api/sprints/add and /api/sprints/remove (src/routes/sprints.rs) only read body.tasks, so a client sending a selection silently selects nothing extra. Decide: implement it with the shared task query (e.g. a query string in the web search syntax, like CLI --select) or remove the field from the REST contract (api_types.rs, types.ts, openapi.json, help docs). Found while doing DEV-232.'
+history:
+- at: 2026-10-28T20:52:18.736528+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-236"]}'
+- at: 2026-10-28T21:01:58.609694+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T21:01:58.629230+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
