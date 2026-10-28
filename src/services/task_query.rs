@@ -1,8 +1,8 @@
 //! Shared task query executor and field accessor (DEV-57).
 //!
-//! One strict, deterministic post-storage pipeline for task listing across
-//! REST `/api/tasks/list`, REST `/api/tasks/export`, MCP `task_list`, and the
-//! CLI `list` comparator: smart filters (`due`, `recent`, `needs`), sorting
+//! One strict, deterministic post-storage pipeline for task listing, used by
+//! every interface through `services::task_list` (DEV-230): smart filters
+//! (`due`, `due_within`, `recent`, `needs`, `has`, effort bounds), sorting
 //! (`sort_by` builtins plus `custom:<name>` / `field:<name>`), `order`, and
 //! the canonical-ID ascending tiebreak.
 //!
@@ -116,6 +116,11 @@ pub struct TaskQueryOptions {
     pub recent: Option<RecentFilter>,
     pub needs: BTreeSet<NeedsFlag>,
     pub has: BTreeSet<HasFlag>,
+    /// Due from today through today + N days, inclusive (CLI `--due-soon`).
+    pub due_within_days: Option<u32>,
+    /// Inclusive effort bounds; tasks without a comparable effort never match.
+    pub effort_min: Option<crate::utils::effort::EffortParsed>,
+    pub effort_max: Option<crate::utils::effort::EffortParsed>,
     /// The free-text search, used to order by relevance.
     pub search: Option<SearchQuery>,
 }
@@ -129,6 +134,9 @@ impl Default for TaskQueryOptions {
             recent: None,
             needs: BTreeSet::new(),
             has: BTreeSet::new(),
+            due_within_days: None,
+            effort_min: None,
+            effort_max: None,
             search: None,
         }
     }
@@ -212,6 +220,24 @@ pub fn parse_recent(raw: &str) -> Result<RecentFilter, String> {
     }
 }
 
+/// `due_within`: a whole number of days (0 means due today).
+pub fn parse_due_within(raw: &str) -> Result<u32, String> {
+    raw.trim().parse::<u32>().map_err(|_| {
+        format!(
+            "Invalid due_within: '{}' (expected a number of days)",
+            raw.trim()
+        )
+    })
+}
+
+/// `effort_min` / `effort_max`: an effort such as `2h`, `1d 4h` or `5pt`.
+pub fn parse_effort_bound(
+    name: &str,
+    raw: &str,
+) -> Result<crate::utils::effort::EffortParsed, String> {
+    crate::utils::effort::parse_effort(raw).map_err(|e| format!("Invalid {name}: {e}"))
+}
+
 /// Strict `needs` CSV parser: every non-blank token must be `effort` or
 /// `due`; blank tokens inside a non-blank value are rejected.
 pub fn parse_needs(raw: &str) -> Result<BTreeSet<NeedsFlag>, String> {
@@ -276,38 +302,7 @@ pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
     Ok(out)
 }
 
-/// Parse the REST query parts handled by the shared executor. Absent keys
-/// keep the defaults; present-but-invalid values error.
-pub fn parse_query_options(
-    query: &std::collections::HashMap<String, String>,
-) -> Result<TaskQueryOptions, String> {
-    let mut options = TaskQueryOptions::default();
-    if let Some(raw) = query.get("sort_by") {
-        options.sort = parse_sort_by(raw)?;
-    }
-    if let Some(raw) = query.get("order") {
-        options.order = parse_order(raw)?;
-    }
-    // Explicitly supplied blank values are errors (strict blanks): callers
-    // must omit empty parameters rather than sending `due=` &c.
-    if let Some(raw) = query.get("due") {
-        options.due = Some(parse_due(raw)?);
-    }
-    if let Some(raw) = query.get("recent") {
-        options.recent = Some(parse_recent(raw)?);
-    }
-    if let Some(raw) = query.get("needs") {
-        options.needs = parse_needs(raw)?;
-    }
-    if let Some(raw) = query.get("has") {
-        options.has = parse_has(raw)?;
-    }
-    options.search = query.get("q").map(|raw| SearchQuery::parse(raw));
-    Ok(options)
-}
-
-/// Field accessor for the shared comparator, implemented for `TaskDTO`
-/// (REST/MCP) and `Task` (CLI).
+/// Field accessor for the shared comparator.
 pub trait TaskSortFields {
     fn title_str(&self) -> &str;
     fn status_str(&self) -> String;
@@ -328,51 +323,6 @@ pub trait TaskSortFields {
 }
 
 impl TaskSortFields for TaskDTO {
-    fn title_str(&self) -> &str {
-        self.title.as_str()
-    }
-    fn status_str(&self) -> String {
-        self.status.to_string()
-    }
-    fn priority_str(&self) -> String {
-        self.priority.to_string()
-    }
-    fn type_str(&self) -> String {
-        self.task_type.to_string()
-    }
-    fn assignee(&self) -> Option<&str> {
-        self.assignee.as_deref()
-    }
-    fn reporter(&self) -> Option<&str> {
-        self.reporter.as_deref()
-    }
-    fn tags(&self) -> &[String] {
-        self.tags.as_slice()
-    }
-    fn sprints(&self) -> Vec<u32> {
-        let mut ids = self.sprints.clone();
-        ids.sort_unstable();
-        ids
-    }
-    fn due_date(&self) -> Option<&str> {
-        self.due_date.as_deref()
-    }
-    fn effort(&self) -> Option<&str> {
-        self.effort.as_deref()
-    }
-    fn created(&self) -> &str {
-        self.created.as_str()
-    }
-    fn modified(&self) -> &str {
-        self.modified.as_str()
-    }
-    fn custom_field_value(&self, name: &str) -> Option<String> {
-        crate::utils::custom_fields::extract_value_strings(&self.custom_fields, name)
-            .and_then(|values| values.into_iter().next())
-    }
-}
-
-impl TaskSortFields for crate::storage::task::Task {
     fn title_str(&self) -> &str {
         self.title.as_str()
     }
@@ -592,9 +542,12 @@ pub fn apply_smart_filters(
     now: DateTime<Utc>,
 ) {
     if options.due.is_none()
+        && options.due_within_days.is_none()
         && options.recent.is_none()
         && options.needs.is_empty()
         && options.has.is_empty()
+        && options.effort_min.is_none()
+        && options.effort_max.is_none()
     {
         return;
     }
@@ -604,12 +557,39 @@ pub fn apply_smart_filters(
         options
             .due
             .is_none_or(|filter| task_matches_due(task, filter, today))
+            && options.due_within_days.is_none_or(|days| {
+                due_raw_within_window(task.due_date.as_deref(), today, i64::from(days))
+            })
             && options
                 .recent
                 .is_none_or(|_| task_matches_recent(task, cutoff))
             && task_matches_needs(task, &options.needs)
             && task_matches_has(task, &options.has)
+            && task_matches_effort(task, options)
     });
+}
+
+/// Inclusive effort bounds. A task without an effort, or with one of the
+/// other kind (time vs points), does not match a bound.
+fn task_matches_effort(task: &TaskDTO, options: &TaskQueryOptions) -> bool {
+    if options.effort_min.is_none() && options.effort_max.is_none() {
+        return true;
+    }
+    let Some(effort) = task
+        .effort
+        .as_deref()
+        .and_then(|raw| crate::utils::effort::parse_effort(raw).ok())
+    else {
+        return false;
+    };
+    options
+        .effort_min
+        .as_ref()
+        .is_none_or(|min| effort.total_cmp_ge(min))
+        && options
+            .effort_max
+            .as_ref()
+            .is_none_or(|max| effort.total_cmp_le(max))
 }
 
 fn compare_effort(a: Option<&str>, b: Option<&str>) -> Ordering {

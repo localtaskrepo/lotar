@@ -18,6 +18,7 @@ vi.mock('../composables/useProjects', async () => {
 })
 
 import FilterBar from '../components/FilterBar.vue'
+import { GRAMMAR_KEYS } from '../composables/useFilterGrammar'
 
 function findByPlaceholder(wrapper: any, ph: string) {
     return wrapper.findAll('input').find((i: any) => i.attributes('placeholder')?.includes(ph))
@@ -736,7 +737,9 @@ describe('FilterBar unified search and panel cleanup (DEV-98)', () => {
         ]) {
             expect(help.text()).toContain(key)
         }
-        expect(help.text()).toContain('today, soon, later or overdue')
+        // Every search-grammar key is documented, so new keys can't be missed.
+        for (const meta of GRAMMAR_KEYS) expect(help.text()).toContain(`${meta.key}:value${meta.label}`)
+        expect(help.text()).toContain('today, soon (the next 7 days), later, or overdue')
         expect(help.text()).toContain('7d')
         expect((wrapper.emitted('update:value') || []).length).toBe(before)
         await toggle.trigger('keydown', { key: 'Escape' })

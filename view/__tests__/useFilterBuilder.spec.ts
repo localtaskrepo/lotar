@@ -167,3 +167,11 @@ describe('normalizeFilter', () => {
         expect(built.serverFilter.sort_by).toBe('due')
     })
 })
+
+describe('buildServerFilter shared-query filters (DEV-230)', () => {
+    it('forwards due_within and effort bounds to the server', () => {
+        const { serverFilter, extras } = buildServerFilter({ due_within: '3', effort_min: '2h', effort_max: '1d' }, '')
+        expect(serverFilter).toMatchObject({ due_within: '3', effort_min: '2h', effort_max: '1d' })
+        expect(extras).toEqual({})
+    })
+})

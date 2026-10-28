@@ -69,6 +69,9 @@ export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
     { key: 'recent', aliases: ['recent'], label: 'Recent', values: 'recent' },
     { key: 'needs', aliases: ['needs', 'need'], label: 'Needs', values: 'text' },
     { key: 'has', aliases: ['has', 'with'], label: 'Has', values: 'text' },
+    { key: 'due_within', aliases: ['due_within', 'duewithin'], label: 'Due within days', values: 'text' },
+    { key: 'effort_min', aliases: ['effort_min', 'effortmin'], label: 'Effort at least', values: 'text' },
+    { key: 'effort_max', aliases: ['effort_max', 'effortmax'], label: 'Effort at most', values: 'text' },
     { key: 'mine', aliases: ['mine', 'me'], label: 'Mine', values: 'flag' },
 ]
 

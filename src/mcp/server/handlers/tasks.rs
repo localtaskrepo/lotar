@@ -5,18 +5,16 @@ use super::super::{
     JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_TASK_LIST_LIMIT, MCP_MAX_TASK_LIST_LIMIT, err,
     internal_error, ok, parse_cursor_value, parse_limit_value, resolve_tasks_dir, text_result,
 };
-use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
+use crate::api_types::{TaskCreate, TaskDTO, TaskUpdate};
 use crate::cli::project::ProjectResolver;
-use crate::cli::validation::CliValidator;
 use crate::config::manager::ConfigManager;
 use crate::errors::LoTaRError;
 use crate::services::reference_service::{ReferenceMutationOutcome, ReferenceService};
+use crate::services::task_list::TaskQueryError;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
 use crate::types::TaskRelationships;
 use crate::utils::git::find_repo_root;
-use crate::utils::identity;
-use std::collections::BTreeMap;
 
 /// Strict `sprints` parsing for task_list (DEV-57): accepts the flexible
 /// MCP shapes (single number, '#<id>' string, or array) but every entry must
@@ -1485,6 +1483,133 @@ pub(crate) fn handle_task_restore(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 }
 
+/// Map `task_list` params onto the shared task query (DEV-230). Only JSON
+/// shape errors are reported here; values are validated by the query.
+fn task_list_input(params: &Value) -> Result<crate::services::task_list::TaskQueryInput, String> {
+    /// A string, or for list params a CSV string or an array of strings.
+    fn strings(params: &Value, key: &str) -> Result<Vec<String>, String> {
+        match params.get(key) {
+            None | Some(Value::Null) => Ok(Vec::new()),
+            Some(Value::String(s)) => Ok(s
+                .split(',')
+                .map(str::trim)
+                .filter(|part| !part.is_empty())
+                .map(str::to_string)
+                .collect()),
+            Some(Value::Array(items)) => items
+                .iter()
+                .map(|item| {
+                    item.as_str()
+                        .map(|text| text.trim().to_string())
+                        .ok_or_else(|| format!("{key} entries must be strings"))
+                })
+                .filter(|item| !matches!(item, Ok(text) if text.is_empty()))
+                .collect(),
+            Some(_) => Err(format!("{key} must be a string or array of strings")),
+        }
+    }
+    /// A string param, kept as sent (blank values are errors downstream).
+    fn string(params: &Value, key: &str) -> Result<Option<String>, String> {
+        match params.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(s)) => Ok(Some(s.clone())),
+            Some(Value::Number(n)) if key == "due_within" => Ok(Some(n.to_string())),
+            Some(_) => Err(format!("{key} must be a string")),
+        }
+    }
+    /// A CSV string or an array joined into one (blank stays blank).
+    fn csv(params: &Value, key: &str) -> Result<Option<String>, String> {
+        match params.get(key) {
+            Some(Value::Array(items)) => items
+                .iter()
+                .map(|item| {
+                    item.as_str()
+                        .map(|text| text.trim().to_string())
+                        .ok_or_else(|| format!("{key} entries must be strings"))
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map(|parts| Some(parts.join(","))),
+            Some(Value::String(_)) | None | Some(Value::Null) => string(params, key),
+            Some(_) => Err(format!("{key} must be a string or array of strings")),
+        }
+    }
+
+    let deletion = match params.get("deletion") {
+        None | Some(Value::Null) => crate::storage::DeletionFilter::default(),
+        Some(Value::String(raw)) => match raw.trim() {
+            "active" => crate::storage::DeletionFilter::Active,
+            "deleted" => crate::storage::DeletionFilter::Deleted,
+            "all" => crate::storage::DeletionFilter::All,
+            other => {
+                return Err(format!(
+                    "deletion must be one of: active, deleted, all (found '{other}')"
+                ));
+            }
+        },
+        Some(_) => return Err("deletion must be a string (active|deleted|all)".to_string()),
+    };
+
+    // Custom fields go in as explicit `field:<name>` filters.
+    let mut fields = Vec::new();
+    if let Some(raw_fields) = params.get("custom_fields") {
+        let Some(map) = raw_fields.as_object() else {
+            return Err("custom_fields must be an object with string or array values".to_string());
+        };
+        for (name, value) in map {
+            let values = match value {
+                Value::String(s) => vec![s.as_str()],
+                Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
+                Value::Null => Vec::new(),
+                _ => {
+                    return Err(
+                        "custom_fields entries must be strings or arrays of strings".to_string()
+                    );
+                }
+            };
+            for value in values.into_iter().map(str::trim).filter(|v| !v.is_empty()) {
+                fields.push((format!("field:{name}"), value.to_string()));
+            }
+        }
+    }
+
+    let task_type = if params.get("type").is_some_and(|v| !v.is_null()) {
+        strings(params, "type")?
+    } else {
+        strings(params, "task_type")?
+    };
+
+    Ok(crate::services::task_list::TaskQueryInput {
+        project: params
+            .get("project")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        status: strings(params, "status")?,
+        priority: strings(params, "priority")?,
+        task_type,
+        tags: parse_tags_params(params),
+        text: params
+            .get("search")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        sprints: parse_sprint_ids_strict(params.get("sprints"))?,
+        assignee: params
+            .get("assignee")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        fields,
+        deletion,
+        due: string(params, "due")?,
+        due_within: string(params, "due_within")?,
+        recent: string(params, "recent")?,
+        needs: csv(params, "needs")?,
+        has: csv(params, "has")?,
+        effort_min: string(params, "effort_min")?,
+        effort_max: string(params, "effort_max")?,
+        sort_by: string(params, "sort_by")?,
+        order: string(params, "order")?,
+    })
+}
+
 pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let cfg_mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
@@ -1495,404 +1620,76 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     };
     let base_cfg = cfg_mgr.get_resolved_config();
 
-    let project = req
-        .params
-        .get("project")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    // Enum validation is scoped to the explicit project's resolved config
-    // when one is requested (project-only enum values validate; DEV-57);
-    // cross-project queries keep the base config.
-    let project_cfg_owner;
-    let cfg = if let Some(prefix) = project.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
-        project_cfg_owner =
-            crate::config::resolution::config_for_project(resolver.path.as_path(), Some(prefix))
-                .unwrap_or_else(|_| base_cfg.clone());
-        &project_cfg_owner
-    } else {
-        base_cfg
+    // The shared task query (DEV-230): this handler only maps JSON params
+    // onto it and reports errors with MCP codes and enum hints.
+    let input = match task_list_input(&req.params) {
+        Ok(input) => input,
+        Err(message) => return err(req.id, -32602, &message, None),
     };
-    let validator = CliValidator::new(cfg);
-    let project_scope: Vec<String> = project.iter().cloned().collect();
-    let enum_hints = EnumHints::from_resolved_config(cfg, &project_scope);
-
-    // Strict multi-value enum parsing (DEV-57): an invalid explicit value is
-    // a -32602 error carrying enum suggestions, never a silently dropped
-    // filter that widens the result set.
-    fn parse_vec_strict<T, F>(
-        req_id: &Option<Value>,
-        v: Option<&Value>,
-        field: &str,
-        hints: Option<&EnumHints>,
-        allowed: fn(&EnumHints) -> &[String],
-        f: F,
-    ) -> Result<Vec<T>, JsonRpcResponse>
-    where
-        F: Fn(&str) -> Result<T, String>,
-    {
-        let values: Vec<String> = match v {
-            None | Some(Value::Null) => Vec::new(),
-            Some(Value::String(s)) => s
-                .split(',')
-                .map(|part| part.trim().to_string())
-                .filter(|part| !part.is_empty())
-                .collect(),
-            Some(Value::Array(arr)) => {
-                let mut collected = Vec::with_capacity(arr.len());
-                for item in arr {
-                    let Some(text) = item.as_str() else {
-                        return Err(err(
-                            req_id.clone(),
-                            -32602,
-                            &format!("{field} entries must be strings"),
-                            None,
-                        ));
-                    };
-                    collected.push(text.trim().to_string());
-                }
-                collected
-            }
-            Some(_) => {
-                return Err(err(
-                    req_id.clone(),
-                    -32602,
-                    &format!("{field} must be a string or array of strings"),
-                    None,
-                ));
-            }
-        };
-        let mut out = Vec::with_capacity(values.len());
-        for raw in values {
-            if raw.is_empty() {
-                continue;
-            }
-            match f(&raw) {
-                Ok(parsed) => out.push(parsed),
-                Err(e) => {
-                    let data = hints.and_then(|h| make_enum_error_data(field, &raw, allowed(h)));
-                    return Err(err(
-                        req_id.clone(),
-                        -32602,
-                        &format!("{} validation failed: {}", field.to_lowercase(), e),
-                        data,
-                    ));
-                }
-            }
-        }
-        Ok(out)
-    }
-
-    let status = match parse_vec_strict(
-        &req.id,
-        req.params.get("status"),
-        "status",
-        enum_hints.as_ref(),
-        |h| h.statuses.as_slice(),
-        |s| validator.validate_status(s),
-    ) {
-        Ok(v) => v,
-        Err(resp) => return resp,
+    let project = input.project.clone();
+    let hints_for = |cfg: &crate::config::types::ResolvedConfig| {
+        let scope: Vec<String> = project.iter().cloned().collect();
+        EnumHints::from_resolved_config(cfg, &scope)
     };
-    let priority = match parse_vec_strict(
-        &req.id,
-        req.params.get("priority"),
-        "priority",
-        enum_hints.as_ref(),
-        |h| h.priorities.as_slice(),
-        |s| validator.validate_priority(s),
-    ) {
-        Ok(v) => v,
-        Err(resp) => return resp,
-    };
-    let task_type = match parse_vec_strict(
-        &req.id,
-        req.params
-            .get("type")
-            .filter(|v| !v.is_null())
-            .or_else(|| req.params.get("task_type")),
-        "type",
-        enum_hints.as_ref(),
-        |h| h.types.as_slice(),
-        |s| validator.validate_task_type(s),
-    ) {
-        Ok(v) => v,
-        Err(resp) => return resp,
-    };
-    // Deletion view (strict): active | deleted | all. The schema layer
-    // already rejects unknown values; the handler still fails closed so a
-    // direct call can never silently widen the view.
-    let deletion = match req.params.get("deletion") {
-        None | Some(Value::Null) => crate::storage::DeletionFilter::default(),
-        Some(Value::String(raw)) => match raw.trim() {
-            "active" => crate::storage::DeletionFilter::Active,
-            "deleted" => crate::storage::DeletionFilter::Deleted,
-            "all" => crate::storage::DeletionFilter::All,
-            other => {
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("deletion must be one of: active, deleted, all (found '{other}')"),
-                    None,
-                );
-            }
-        },
-        Some(_) => {
+    let query = match input.resolve(base_cfg, resolver.path.as_path()) {
+        Ok(query) => query,
+        Err(TaskQueryError::InvalidEnum {
+            field,
+            value,
+            message,
+        }) => {
+            // Hints come from the same configuration the value was checked
+            // against: the requested project's, else the base one.
+            let cfg = project
+                .as_deref()
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .and_then(|prefix| {
+                    crate::config::resolution::config_for_project(
+                        resolver.path.as_path(),
+                        Some(prefix),
+                    )
+                    .ok()
+                })
+                .unwrap_or_else(|| base_cfg.clone());
+            let data = hints_for(&cfg).and_then(|h| {
+                let allowed = match field {
+                    "status" => h.statuses.as_slice(),
+                    "priority" => h.priorities.as_slice(),
+                    _ => h.types.as_slice(),
+                };
+                make_enum_error_data(field, &value, allowed)
+            });
             return err(
                 req.id,
                 -32602,
-                "deletion must be a string (active|deleted|all)",
-                None,
+                &format!("{field} validation failed: {message}"),
+                data,
             );
         }
-    };
-
-    let tags = parse_tags_params(&req.params);
-    let text_query = req
-        .params
-        .get("search")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    if let Some(text) = text_query.as_deref()
-        && let Err(message) = crate::utils::text_search::SearchQuery::validate(text)
-    {
-        return err(req.id, -32602, &message, None);
-    }
-
-    let mut custom_fields: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    if let Some(raw_fields) = req.params.get("custom_fields") {
-        let Some(map) = raw_fields.as_object() else {
+        Err(TaskQueryError::UnresolvedMe) => {
+            // Fail closed: an unresolvable identity must never widen the
+            // query to all tasks.
             return err(
                 req.id,
-                -32602,
-                "custom_fields must be an object with string or array values",
-                None,
-            );
-        };
-        for (name, value) in map.iter() {
-            let mut collected: Vec<String> = Vec::new();
-            match value {
-                Value::String(s) => {
-                    let trimmed = s.trim();
-                    if !trimmed.is_empty() {
-                        collected.push(trimmed.to_string());
-                    }
-                }
-                Value::Array(items) => {
-                    for item in items {
-                        if let Some(s) = item.as_str() {
-                            let trimmed = s.trim();
-                            if !trimmed.is_empty() {
-                                collected.push(trimmed.to_string());
-                            }
-                        }
-                    }
-                }
-                Value::Null => {}
-                _ => {
-                    return err(
-                        req.id,
-                        -32602,
-                        "custom_fields entries must be strings or arrays of strings",
-                        None,
-                    );
-                }
-            }
-            if !collected.is_empty() {
-                custom_fields.insert(name.clone(), collected);
-            }
-        }
-    }
-
-    let mut filter = TaskListFilter {
-        status,
-        priority,
-        task_type,
-        project: project.clone(),
-        deletion,
-        tags,
-        text_query,
-        sprints: match parse_sprint_ids_strict(req.params.get("sprints")) {
-            Ok(v) => v,
-            Err(msg) => return err(req.id, -32602, &msg, None),
-        },
-        assignee: Vec::new(),
-        assignee_none: false,
-        custom_fields,
-    };
-
-    // Assignee filter (supports @me; resolved here, matched by TaskService::list)
-    if let Some(raw) = req.params.get("assignee").and_then(|v| v.as_str()) {
-        let trimmed = raw.trim();
-        if !trimmed.is_empty() {
-            if trimmed.eq_ignore_ascii_case("__none__") {
-                filter.assignee_none = true;
-            } else if trimmed.eq_ignore_ascii_case("@me") {
-                // Fail closed: an unresolvable identity must never widen the
-                // query to all tasks.
-                match identity::resolve_current_user_for_project(
-                    Some(resolver.path.as_path()),
-                    filter.project.as_deref(),
-                ) {
-                    Some(user) => filter.assignee.push(user),
-                    None => {
-                        return err(
-                            req.id,
-                            -32002,
-                            "Could not resolve @me: no identity configured",
-                            Some(
-                                json!({"message": "Set default_reporter in config, git user.name, or USER environment"}),
-                            ),
-                        );
-                    }
-                }
-            } else {
-                filter.assignee.push(trimmed.to_string());
-            }
-        }
-    }
-
-    // Shared strict query executor options (DEV-57): sort_by/order and the
-    // due/recent/needs smart filters, identical to the REST grammar.
-    fn opt_string_param(
-        req: &JsonRpcRequest,
-        key: &str,
-    ) -> Result<Option<String>, JsonRpcResponse> {
-        match req.params.get(key) {
-            None | Some(Value::Null) => Ok(None),
-            Some(Value::String(s)) => Ok(Some(s.clone())),
-            Some(_) => Err(err(
-                req.id.clone(),
-                -32602,
-                &format!("{key} must be a string"),
-                None,
-            )),
-        }
-    }
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
-    )]
-    fn query_parse_error(req_id: &Option<Value>, msg: String) -> JsonRpcResponse {
-        err(req_id.clone(), -32602, &msg, None)
-    }
-
-    let mut query_options = crate::services::task_query::TaskQueryOptions {
-        search: filter
-            .text_query
-            .as_deref()
-            .map(crate::utils::text_search::SearchQuery::parse),
-        ..Default::default()
-    };
-    if let Some(raw) = match opt_string_param(&req, "sort_by") {
-        Ok(v) => v,
-        Err(resp) => return resp,
-    } {
-        match crate::services::task_query::parse_sort_by(&raw) {
-            Ok(spec) => query_options.sort = spec,
-            Err(msg) => return query_parse_error(&req.id, msg),
-        }
-    }
-    if let Some(raw) = match opt_string_param(&req, "order") {
-        Ok(v) => v,
-        Err(resp) => return resp,
-    } {
-        match crate::services::task_query::parse_order(&raw) {
-            Ok(order) => query_options.order = order,
-            Err(msg) => return query_parse_error(&req.id, msg),
-        }
-    }
-    if let Some(raw) = match opt_string_param(&req, "due") {
-        Ok(v) => v,
-        Err(resp) => return resp,
-    } {
-        match crate::services::task_query::parse_due(&raw) {
-            Ok(due) => query_options.due = Some(due),
-            Err(msg) => return query_parse_error(&req.id, msg),
-        }
-    }
-    if let Some(raw) = match opt_string_param(&req, "recent") {
-        Ok(v) => v,
-        Err(resp) => return resp,
-    } {
-        match crate::services::task_query::parse_recent(&raw) {
-            Ok(recent) => query_options.recent = Some(recent),
-            Err(msg) => return query_parse_error(&req.id, msg),
-        }
-    }
-    let needs_raw: Option<String> = match req.params.get("needs") {
-        None | Some(Value::Null) => None,
-        Some(Value::String(s)) => Some(s.clone()),
-        Some(Value::Array(items)) => {
-            let mut joined = Vec::with_capacity(items.len());
-            for item in items {
-                match item.as_str() {
-                    Some(text) => joined.push(text.trim().to_string()),
-                    None => {
-                        return err(
-                            req.id.clone(),
-                            -32602,
-                            "needs entries must be strings",
-                            None,
-                        );
-                    }
-                }
-            }
-            Some(joined.join(","))
-        }
-        Some(_) => {
-            return err(
-                req.id.clone(),
-                -32602,
-                "needs must be a string or array of strings",
-                None,
+                -32002,
+                "Could not resolve @me: no identity configured",
+                Some(
+                    json!({"message": "Set default_reporter in config, git user.name, or USER environment"}),
+                ),
             );
         }
+        Err(other) => return err(req.id, -32602, &other.to_string(), None),
     };
-    if let Some(raw) = needs_raw {
-        match crate::services::task_query::parse_needs(&raw) {
-            Ok(needs) => query_options.needs = needs,
-            Err(msg) => return query_parse_error(&req.id, msg),
-        }
-    }
-
-    let has_raw: Option<String> = match req.params.get("has") {
-        None | Some(Value::Null) => None,
-        Some(Value::String(s)) => Some(s.clone()),
-        Some(Value::Array(items)) => {
-            let mut joined = Vec::with_capacity(items.len());
-            for item in items {
-                match item.as_str() {
-                    Some(text) => joined.push(text.trim().to_string()),
-                    None => {
-                        return err(req.id.clone(), -32602, "has entries must be strings", None);
-                    }
-                }
-            }
-            Some(joined.join(","))
-        }
-        Some(_) => {
-            return err(
-                req.id.clone(),
-                -32602,
-                "has must be a string or array of strings",
-                None,
-            );
-        }
-    };
-    if let Some(raw) = has_raw {
-        match crate::services::task_query::parse_has(&raw) {
-            Ok(has) => query_options.has = has,
-            Err(msg) => return query_parse_error(&req.id, msg),
-        }
-    }
+    let enum_hints = hints_for(&query.config);
 
     let storage = Storage::new(&resolver.path.clone());
-    let mut tasks = TaskService::list(&storage, &filter);
-    // Smart filters + deterministic global ordering (default modified desc,
-    // natural task ID asc tiebreak) BEFORE pagination so pages are
-    // stable and match the REST list/export order.
-    crate::services::task_query::apply(&mut tasks, &query_options, chrono::Utc::now());
-    let tasks = tasks.into_iter().map(|(_, t)| t).collect::<Vec<_>>();
+    // Filtered and in global order BEFORE pagination, so pages are stable
+    // and match the REST list/export order.
+    let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now())
+        .into_iter()
+        .map(|(_, t)| t)
+        .collect::<Vec<_>>();
     let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_TASK_LIST_LIMIT) {
         Ok(value) if (1..=MCP_MAX_TASK_LIST_LIMIT).contains(&value) => value,
         Ok(_) => {

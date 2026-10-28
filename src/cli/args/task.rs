@@ -595,14 +595,19 @@ pub struct TaskSearchArgs {
     /// Search query (optional - if not provided, lists all tasks matching filters)
     pub query: Option<String>,
 
-    /// Filter by assignee (@me for current user)
+    /// Filter by assignee (@me for current user, __none__ for unassigned)
     #[arg(long, short = 'a')]
     pub assignee: Option<String>,
 
-    /// Show only my tasks
-    #[arg(long, short = 'm')]
+    /// Show only my tasks (same as --assignee @me)
+    #[arg(long, short = 'm', conflicts_with = "assignee")]
     #[serde(default)]
     pub mine: bool,
+
+    /// Show only unassigned tasks (same as --assignee __none__)
+    #[arg(long, conflicts_with_all = ["assignee", "mine"])]
+    #[serde(default)]
+    pub unassigned: bool,
 
     /// Filter by status (can be used multiple times)
     #[arg(long, short = 's')]
@@ -624,12 +629,12 @@ pub struct TaskSearchArgs {
     #[serde(default, alias = "tags")]
     pub tag: Vec<String>,
 
-    /// Show only high priority tasks
+    /// Show high priority tasks (adds High to --priority)
     #[arg(long, short = 'H')]
     #[serde(default)]
     pub high: bool,
 
-    /// Show only critical priority tasks
+    /// Show critical priority tasks (adds Critical to --priority)
     #[arg(long, short = 'C')]
     #[serde(default)]
     pub critical: bool,
@@ -667,14 +672,37 @@ pub struct TaskSearchArgs {
     )]
     pub page: Option<usize>,
 
-    /// Show only overdue tasks (due date strictly before now)
-    #[arg(long)]
+    /// Show only overdue tasks: due before today and not done (same as --due overdue)
+    #[arg(long, conflicts_with = "due")]
     #[serde(default)]
     pub overdue: bool,
 
-    /// Show only tasks due within N days (default 7 if not provided)
+    /// Show only tasks due today through N days from now (default 7)
     #[arg(long = "due-soon", num_args = 0..=1, value_name = "DAYS")]
-    pub due_soon: Option<Option<usize>>, // --due-soon or --due-soon=N
+    pub due_soon: Option<Option<u32>>, // --due-soon or --due-soon=N
+
+    /// Due date bucket: today, soon (next 7 days), later, or overdue
+    #[arg(long, value_name = "BUCKET")]
+    pub due: Option<String>,
+
+    /// Recently modified: 7d
+    #[arg(long, value_name = "WINDOW")]
+    pub recent: Option<String>,
+
+    /// Missing fields, repeatable or comma-separated: effort, due
+    #[arg(long, value_name = "FIELDS")]
+    #[serde(default)]
+    pub needs: Vec<String>,
+
+    /// Carries every listed kind, repeatable or comma-separated: attachment, image, link, tag
+    #[arg(long, value_name = "KINDS")]
+    #[serde(default)]
+    pub has: Vec<String>,
+
+    /// In a sprint (any of the listed ids, repeatable)
+    #[arg(long, alias = "sprints", value_name = "ID", value_delimiter = ',')]
+    #[serde(default)]
+    pub sprint: Vec<u32>,
 
     /// Non-empty key=value equality filters, repeatable (assignee|reporter|status|priority|type|tag|project|field:<name>)
     #[arg(long = "where", value_parser = crate::cli::args::common::parse_key_value, num_args=1.., value_delimiter=None)]

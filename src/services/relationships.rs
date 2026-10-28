@@ -986,7 +986,6 @@ pub fn graph(
     if let Some(project) = &request.project {
         query.insert("project".into(), project.clone());
     }
-    let options = crate::services::task_query::parse_query_options(&query).map_err(invalid)?;
     // Like task-list, cross-project validation uses the selected base config;
     // explicit project validation/identity uses that project's actual root.
     let query_root = query
@@ -1013,8 +1012,14 @@ pub fn graph(
                 "Relationship filter configuration unavailable: {error}"
             ))
         })?;
-    let (filter, unknown) =
-        crate::routes::parse_task_query(&query, &query_config, query_root).map_err(invalid)?;
+    let crate::services::task_list::TaskQuery {
+        filter,
+        field_filters: unknown,
+        options,
+        config: query_config,
+    } = crate::services::task_list::TaskQueryInput::from_params(&query)
+        .and_then(|input| input.resolve(&query_config, query_root))
+        .map_err(|e| invalid(e.to_string()))?;
     // Resolve typed identity against the strict project-scoped inventory, not
     // filtered/title matches: other predicates must not hide numeric ambiguity.
     let exact = if request.relationship_kinds.is_some() || request.include_isolated.is_some() {
@@ -1138,7 +1143,11 @@ pub fn graph(
                 continue;
             }
             let mut candidate = vec![(id.clone(), dto)];
-            crate::routes::apply_unknown_key_filters(&mut candidate, &unknown, &query_config);
+            crate::services::task_list::apply_field_filters(
+                &mut candidate,
+                &unknown,
+                &query_config,
+            );
             matching.extend(candidate);
         }
     }

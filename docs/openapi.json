@@ -621,6 +621,31 @@
               "type": "string"
             },
             "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
+          },
+          {
+            "name": "due_within",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Smart filter: tasks due from today through today + N days, inclusive (0 = due today). Invalid values return 400."
+          },
+          {
+            "name": "effort_min",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Keep tasks whose effort is at least this, inclusive (e.g. 2h, 1d, 3pt). Time and points never compare with each other; tasks without an effort are left out. Invalid values return 400."
+          },
+          {
+            "name": "effort_max",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Keep tasks whose effort is at most this, inclusive (e.g. 4h, 1d, 5pt). Time and points never compare with each other; tasks without an effort are left out. Invalid values return 400."
           }
         ],
         "responses": {
@@ -2954,6 +2979,31 @@
               "type": "string"
             },
             "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
+          },
+          {
+            "name": "due_within",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Smart filter: tasks due from today through today + N days, inclusive (0 = due today). Invalid values return 400."
+          },
+          {
+            "name": "effort_min",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Keep tasks whose effort is at least this, inclusive (e.g. 2h, 1d, 3pt). Time and points never compare with each other; tasks without an effort are left out. Invalid values return 400."
+          },
+          {
+            "name": "effort_max",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Keep tasks whose effort is at most this, inclusive (e.g. 4h, 1d, 5pt). Time and points never compare with each other; tasks without an effort are left out. Invalid values return 400."
           }
         ]
       }

@@ -815,3 +815,18 @@ describe('has:tag (DEV-228)', () => {
         expect(inserts).toContain('has:tag')
     })
 })
+
+describe('due_within and effort bounds (DEV-230)', () => {
+    it('parses them as filters and suggests the keys', () => {
+        const parsed = parseFilterQuery('effort_min:2h effortmax:"1d 4h" due_within:3 login')
+        expect(parsed.filters).toMatchObject({ effort_min: '2h', effort_max: '1d 4h', due_within: '3' })
+        expect(parsed.text).toBe('login')
+        const inserts = suggestForFragment('effort', {}).map((suggestion) => suggestion.insert)
+        expect(inserts).toEqual(expect.arrayContaining(['effort_min:', 'effort_max:']))
+    })
+
+    it('shows one labelled chip per bound', () => {
+        const chips = chipsForFilterValue({ effort_min: '2h', due_within: '3' }, {})
+        expect(chips.map((chip) => `${chip.label}=${chip.value}`)).toEqual(['Effort at least=2h', 'Due within days=3'])
+    })
+})

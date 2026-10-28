@@ -51,10 +51,10 @@ lotar task add --title "Task title" [--type|-t] [--priority|-P] [--reporter|-R] 
 ### list
 
 ```bash
-lotar task list [QUERY] [--assignee|-a <VALUE>] [--mine|-m] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--high|-H] [--critical|-C] [--sort-by|-S FIELD] [--reverse|-R] [--page-size|-L N] [--offset N | --page N] [--overdue] [--due-soon[=DAYS]] [--where key=value ...] [--effort-min VALUE] [--effort-max VALUE] [--details]
+lotar task list [QUERY] [--assignee|-a <VALUE>] [--mine|-m] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--high|-H] [--critical|-C] [--sort-by|-S FIELD] [--reverse|-R] [--page-size|-L N] [--offset N | --page N] [--unassigned] [--sprint ID...] [--overdue] [--due-soon[=DAYS]] [--due BUCKET] [--recent 7d] [--needs FIELDS] [--has KINDS] [--where key=value ...] [--effort-min VALUE] [--effort-max VALUE] [--deleted | --include-deleted] [--details]
 ```
 
-- Mirrors the filters documented in `docs/help/list.md`, including `@me`/`--mine`, overdue/due-soon windows, unified `--where` filters, and effort bounds.
+- Mirrors the filters documented in `docs/help/list.md`, including `@me`/`--mine`, due buckets and windows, `--needs`/`--has`, sprints, unified `--where` filters, and effort bounds; the query is the one REST and MCP run.
 - Sorting accepts `priority|due-date|created|modified|status|assignee|type|project|id` and defaults to 20 results per page.
 - `--details` adds task descriptions to the text output.
 - Use `--page-size` (alias: `--limit`) with `--offset` or `--page` to paginate.

@@ -1,16 +1,39 @@
 title: One shared task query for CLI, REST, MCP and the web UI
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-28T19:10:36.188977+00:00
-modified: 2026-10-28T19:10:45.640397+00:00
+modified: 2026-10-28T19:49:22.477878+00:00
 relationships:
   related:
   - DEV-3
   - DEV-5
   - DEV-13
   - DEV-57
+comments:
+- date: 2026-10-28T19:12:39.798631+00:00
+  text: |-
+    Plan:
+    1. New src/services/task_list_query.rs: TaskQueryInput (raw values from any transport), TaskQueryError (invalid enum with field/value for MCP hints, unresolved @me, invalid), resolve() -> TaskQuery {filter, unknown-key filters, TaskQueryOptions}, from_params() for REST/graph, run(storage, query, now). parse_task_query and apply_unknown_key_filters move here from routes.
+    2. task_query.rs: TaskQueryOptions gains effort_min/effort_max and due_within_days (CLI --effort-min/max, --due-soon[=N]) so every transport has them.
+    3. REST list/export and the dependency graph use from_params+resolve+run; new params effort_min, effort_max, due_within.
+    4. MCP task_list: one JSON-to-input adapter replaces the per-param parsing; same error codes/messages and enum hints.
+    5. CLI list: clap args -> input (--has, --needs, --recent, --due, --sprint, --unassigned new; --high/--critical/--mine/--overdue/--due-soon map onto shared filters); renders from TaskDTO; keeps its pagination/output shape.
+    6. Remove what this replaces: CLI post-filters, TaskSortFields for raw Task if unused, CLI-only due helpers, MCP param parsing.
+    Behaviour changes to flag: CLI unresolved @me errors (was empty); --high --critical together means either (was none); --mine with --assignee conflicts.
+    Checks: parity test (same filter -> same IDs/order via CLI, REST, MCP), existing dev57/cli/mcp tests, docs/openapi/types/mcp schema, lint/test/smoke.
+- date: 2026-10-28T19:33:06.554724+00:00
+  text: |-
+    Outcome: CLI list, REST list/export, MCP task_list and the dependency graph share one query: src/services/task_list.rs (TaskQueryInput -> resolve -> run). Each interface keeps only its input mapping, pagination and output. CLI gains --has, --needs, --recent, --due, --sprint, --unassigned; effort_min/effort_max and due_within move into the shared filters (REST, MCP, web search keys effort_min:/effort_max:/due_within:). Removed: REST-only parsing in routes/mod.rs, the MCP per-param parsing, CLI post-filters, the raw-Task sort accessor. src net about -250 lines. Field names normalise (Component and field:COMPONENT are one filter, values ORed); builtins such as reporter always match the task's own value even with wildcard custom fields.
+    Behaviour changes: CLI unresolved @me now errors; --high --critical lists either priority; --mine/--unassigned conflict with --assignee; a priority shortcut the project lacks still lists nothing.
+    Evidence: tests/dev230_shared_task_query_test.rs (14 filters give identical IDs and order via CLI, REST list, REST export, MCP; 4 invalid values rejected by all); UI specs useFilterGrammar/useFilterBuilder; smoke ui.filter-autocomplete extended (effort_min:2h). npm run lint:agent, test:agent (1823 Rust, 1298 UI), test:smoke:agent (361) pass; affected CLI tests rerun after the last edit.
+    Docs: list.md, task.md, serve.md, api-quick-reference.md, mcp-tools.md, openapi.json, view/api/types.ts, MCP schema.
+    Remaining: uncommitted. Follow-ups not done: sprint assignment and stats --where still use their own raw-task matching; the web filter panel has no controls for effort/due_within (search box only); MCP schema-layer rejections say "Invalid params" with details in data. DEV-3, DEV-5, DEV-13 can now build on task_list.
+    Guidance: no durable finding.
+- date: 2026-10-28T19:49:22.477878+00:00
+  text: 'UI search help: due/needs/has wording made exact, search-text field scopes complete (id:, title:, subtitle:, desc:, criteria:, ref:, comment:), commas note includes has kinds. FilterBar.spec now checks every GRAMMAR_KEYS entry appears in the help. FilterBar.spec, lint:frontend, eslint pass.'
 description: |-
   lotar list runs its own filter pipeline (src/cli/handlers/task/search.rs) on raw tasks, while REST list/export, MCP task_list and the dependency graph share src/services/task_query.rs. Every smart filter added since DEV-57 (due buckets, recent, needs, has) reached REST/MCP/UI but not the CLI, and each transport still parses its own input (MCP ~400 lines), with small behaviour drifts (an unresolvable @me is an error in REST/MCP but an empty result in the CLI).
 
@@ -50,3 +73,29 @@ history:
   - field: relationships
     old: '{"related":["DEV-3","DEV-5","DEV-13"]}'
     new: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57"]}'
+- at: 2026-10-28T19:12:21.061894+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T19:12:39.798631+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T19:33:06.554724+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T19:33:06.589854+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-28T19:49:22.477878+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -36,31 +36,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(msg) => return bad_request(msg),
         };
-        // Load config for validation of status/priority/type
         let cfg = try_response!(load_merged_config(&resolver));
-
-        // Build filter + unknown-key map from query
-        let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
-            Ok(v) => v,
-            Err(msg) => return bad_request(msg),
+        // The shared task query (DEV-230): invalid explicit values are 400s,
+        // never silently ignored; results come filtered and in global order.
+        let query = match parse_list_query(&req.query, &cfg, &resolver) {
+            Ok(query) => query,
+            Err(response) => return response,
         };
-
-        // Shared strict executor (DEV-57): invalid explicit order/sort_by/due/
-        // recent/needs values are 400s, never silently ignored.
-        let options = match crate::services::task_query::parse_query_options(&req.query) {
-            Ok(v) => v,
-            Err(msg) => return bad_request(msg),
-        };
-
-        let tasks = TaskService::list(&storage, &filter);
-
-        // Apply in-memory filters if any
-        let mut tasks = tasks; // shadow mutable
-        apply_unknown_key_filters(&mut tasks, &uf, &cfg);
-
-        // Smart filters + deterministic global ordering (default modified desc,
-        // natural task ID asc tiebreak), then pagination.
-        crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
+        let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now());
 
         let total = tasks.len();
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
@@ -85,20 +68,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let cfg = try_response!(load_merged_config(&resolver));
-
-        let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
-            Ok(v) => v,
-            Err(msg) => return bad_request(msg),
+        // Export shares the full list query (DEV-57): every filter, the
+        // requested global order, and no pagination.
+        let query = match parse_list_query(&req.query, &cfg, &resolver) {
+            Ok(query) => query,
+            Err(response) => return response,
         };
-        // Export shares the full list grammar (DEV-57): every filter including
-        // the smart filters, the requested global order, and no pagination.
-        let options = match crate::services::task_query::parse_query_options(&req.query) {
-            Ok(v) => v,
-            Err(msg) => return bad_request(msg),
-        };
-        let mut tasks = TaskService::list(&storage, &filter);
-        apply_unknown_key_filters(&mut tasks, &uf, &cfg);
-        crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
+        let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now());
 
         // Build CSV (quoted where needed)
         fn esc(s: &str) -> String {
@@ -1200,4 +1176,16 @@ fn publish_reference_change(
         let actor = crate::utils::identity::resolve_current_user(Some(tasks_root));
         crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
     }
+}
+
+/// The shared task query (DEV-230) from REST query parameters; any invalid
+/// value is a 400.
+fn parse_list_query(
+    params: &std::collections::HashMap<String, String>,
+    cfg: &crate::config::types::ResolvedConfig,
+    resolver: &TasksDirectoryResolver,
+) -> Result<crate::services::task_list::TaskQuery, HttpResponse> {
+    crate::services::task_list::TaskQueryInput::from_params(params)
+        .and_then(|input| input.resolve(cfg, resolver.path.as_path()))
+        .map_err(|e| bad_request(e.to_string()))
 }

@@ -1,13 +1,14 @@
+use crate::api_types::TaskDTO;
 use crate::cli::TaskSearchArgs;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
-use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
-use crate::services::task_query::{SortOrder, SortSpec};
-use crate::storage::{TaskFilter, task::Task};
+use crate::services::task_list::{TaskQueryError, TaskQueryInput};
+use crate::storage::DeletionFilter;
 use crate::workspace::TasksDirectoryResolver;
 
-/// Handler for searching tasks
+/// Handler for `lotar list`: maps the flags onto the shared task query
+/// (DEV-230), then pages and prints the result.
 pub struct SearchHandler;
 
 impl CommandHandler for SearchHandler {
@@ -22,98 +23,121 @@ impl CommandHandler for SearchHandler {
     ) -> Self::Result {
         renderer.log_info("list: begin");
         let ctx = TaskCommandContext::new(resolver, project, None)?;
-        let validator = CliValidator::new(&ctx.config);
-        let build = Self::build_task_filter(&args, &validator, project, &ctx)?;
-
-        #[expect(
-            clippy::drop_non_drop,
-            reason = "marks where the validator's borrow ends before the configuration is used again"
-        )]
-        drop(validator);
+        let project_prefix = project.map(|p| ctx.project_prefix_for(Some(p)));
+        let (input, matches_nothing) = Self::query_input(&args, project_prefix, &ctx.config)?;
+        // Enums and fields validate against the context's configuration (the
+        // detected project's when there is one), as the CLI always has.
+        let query = input
+            .resolve(&ctx.config, resolver.path.as_path())
+            .map_err(|e| match e {
+                TaskQueryError::InvalidEnum { field, message, .. } => {
+                    let label = match field {
+                        "status" => "Status",
+                        "priority" => "Priority",
+                        _ => "Task type",
+                    };
+                    format!("{label} validation failed: {message}")
+                }
+                other => other.to_string(),
+            })?;
 
         renderer.log_debug("list: executing search");
-        let mut tasks: Vec<(String, Task)> =
-            ctx.storage.search(&build.task_filter).into_iter().collect();
-
-        TaskPostFilters::new(
-            &args,
-            &ctx.config,
-            resolver,
-            build.task_filter.project.as_deref(),
-            build.where_filters,
-        )
-        .apply(&mut tasks)?;
-
+        let tasks = if matches_nothing {
+            Vec::new()
+        } else {
+            crate::services::task_list::run(&ctx.storage, &query, chrono::Utc::now())
+        };
         let total_matching = tasks.len();
-        Self::apply_sort(tasks.as_mut_slice(), &args, &ctx.config)?;
-
         let (offset, limit) = Self::resolve_pagination(&args)?;
-        Self::apply_offset_and_limit(&mut tasks, offset, limit);
+        let (start, end) = crate::utils::pagination::slice_bounds(total_matching, offset, limit);
+        let page = tasks.into_iter().skip(start).take(end - start).collect();
 
-        Self::render_results(renderer, tasks, total_matching, offset, limit, args.details);
+        Self::render_results(renderer, page, total_matching, offset, limit, args.details);
 
         Ok(())
     }
 }
 
 impl SearchHandler {
-    fn build_task_filter(
+    /// The shared query input for the CLI flags. Shortcut flags map onto
+    /// the shared filters: `--mine` is `@me`, `--high`/`--critical` add
+    /// priorities, `--overdue` is the overdue bucket and `--due-soon[=N]`
+    /// is due within N days. The flag is true when nothing can match: only
+    /// priority shortcuts were given and the project has none of them.
+    fn query_input(
         args: &TaskSearchArgs,
-        validator: &CliValidator,
-        project: Option<&str>,
-        ctx: &TaskCommandContext,
-    ) -> Result<BuiltTaskFilter, String> {
-        // Deletion view: --deleted shows only soft-deleted tasks,
-        // --include-deleted shows both; default is active-only. The flags
-        // are mutually exclusive (enforced by clap).
-        let deletion = if args.deleted {
-            crate::storage::DeletionFilter::Deleted
-        } else if args.include_deleted {
-            crate::storage::DeletionFilter::All
+        project: Option<String>,
+        config: &ResolvedConfig,
+    ) -> Result<(TaskQueryInput, bool), String> {
+        let mut priority = args.priority.clone();
+        // A shortcut for a priority the project doesn't use matches nothing
+        // rather than failing: `--critical` is a quick look, not a value.
+        let shortcuts: Vec<&str> = [(args.high, "high"), (args.critical, "critical")]
+            .into_iter()
+            .filter_map(|(on, name)| on.then_some(name))
+            .collect();
+        let usable: Vec<&str> = shortcuts
+            .iter()
+            .copied()
+            .filter(|name| crate::types::Priority::parse_with_config(name, config).is_ok())
+            .collect();
+        let matches_nothing = !shortcuts.is_empty() && usable.is_empty() && priority.is_empty();
+        priority.extend(usable.into_iter().map(str::to_string));
+        let assignee = if args.mine {
+            Some("@me".to_string())
+        } else if args.unassigned {
+            Some("__none__".to_string())
         } else {
-            crate::storage::DeletionFilter::Active
+            args.assignee.clone()
         };
-        let mut task_filter = TaskFilter {
-            deletion,
-            ..Default::default()
+        let due = if args.overdue {
+            Some("overdue".to_string())
+        } else {
+            args.due.clone()
         };
+        let csv = |values: &[String]| (!values.is_empty()).then(|| values.join(","));
 
-        if let Some(query) = args.query.as_ref()
-            && !query.is_empty()
-        {
-            crate::utils::text_search::SearchQuery::validate(query)?;
-            task_filter.text_query = Some(query.clone());
-        }
+        let input = TaskQueryInput {
+            project,
+            status: args.status.clone(),
+            priority,
+            task_type: args.task_type.clone(),
+            tags: args.tag.clone(),
+            text: args.query.clone().filter(|q| !q.is_empty()),
+            sprints: args.sprint.clone(),
+            assignee,
+            fields: Self::where_fields(args, config)?,
+            deletion: if args.deleted {
+                DeletionFilter::Deleted
+            } else if args.include_deleted {
+                DeletionFilter::All
+            } else {
+                DeletionFilter::Active
+            },
+            due,
+            due_within: args.due_soon.map(|days| days.unwrap_or(7).to_string()),
+            recent: args.recent.clone(),
+            needs: csv(&args.needs),
+            has: csv(&args.has),
+            effort_min: args.effort_min.clone(),
+            effort_max: args.effort_max.clone(),
+            sort_by: args
+                .sort_by
+                .as_deref()
+                .map(|key| Self::sort_key(key, config))
+                .transpose()?,
+            order: Some(Self::order(args).to_string()),
+        };
+        Ok((input, matches_nothing))
+    }
 
-        for status in &args.status {
-            let validated_status = validator
-                .validate_status(status)
-                .map_err(|e| format!("Status validation failed: {}", e))?;
-            task_filter.status.push(validated_status);
-        }
-
-        for priority in &args.priority {
-            let validated_priority = validator
-                .validate_priority(priority)
-                .map_err(|e| format!("Priority validation failed: {}", e))?;
-            task_filter.priority.push(validated_priority);
-        }
-
-        for task_type in &args.task_type {
-            let validated_type = validator
-                .validate_task_type(task_type)
-                .map_err(|e| format!("Task type validation failed: {}", e))?;
-            task_filter.task_type.push(validated_type);
-        }
-
-        task_filter.tags = args.tag.clone();
-
-        if let Some(project_arg) = project {
-            let project_prefix = ctx.project_prefix_for(Some(project_arg));
-            task_filter.project = Some(project_prefix);
-        }
-
-        let mut where_filters = Vec::new();
+    /// `--where` pairs. The CLI is stricter than REST: only equality on a
+    /// supported builtin or a known custom field.
+    fn where_fields(
+        args: &TaskSearchArgs,
+        config: &ResolvedConfig,
+    ) -> Result<Vec<(String, String)>, String> {
+        let mut fields = Vec::new();
         for (key, value) in &args.r#where {
             let key = key.trim();
             if key.is_empty()
@@ -125,7 +149,6 @@ impl SearchHandler {
                     "Invalid --where '{key}={value}': only non-empty key=value equality predicates are supported"
                 ));
             }
-
             // Builtins take precedence over wildcard custom fields, while
             // explicit field:<name> remains an unambiguous custom-field query.
             if let Some(field) = crate::utils::fields::is_reserved_field(key) {
@@ -135,93 +158,66 @@ impl SearchHandler {
                 ) {
                     return Err(format!("Unsupported --where field '{key}'"));
                 }
-                where_filters.push((field.to_string(), value.clone()));
-            } else if let Some(name) =
-                crate::utils::custom_fields::resolve_filter_name(key, &ctx.config)
+                fields.push((field.to_string(), value.clone()));
+            } else if let Some(name) = crate::utils::custom_fields::resolve_filter_name(key, config)
             {
-                task_filter
-                    .custom_fields
-                    .entry(crate::utils::custom_fields::canonicalize(&name))
-                    .or_default()
-                    .push(value.clone());
+                fields.push((format!("field:{name}"), value.clone()));
             } else {
                 return Err(format!(
                     "Unknown --where field '{key}': use a supported builtin, configured custom field, or field:<name>"
                 ));
             }
         }
-
-        Ok(BuiltTaskFilter {
-            task_filter,
-            where_filters,
-        })
+        Ok(fields)
     }
 
-    /// Resolve the CLI sort key into the shared executor spec. CLI keeps one
-    /// extra grammar form over strict REST/MCP (DEV-57): bare declared or
-    /// wildcard custom-field names are accepted. Any other unknown key is an
-    /// explicit error, matching the shared strict-query contract.
-    fn resolve_sort_spec(sort_key: &str, config: &ResolvedConfig) -> Result<SortSpec, String> {
-        if let Ok(spec) = crate::services::task_query::parse_sort_by(sort_key) {
-            return Ok(spec);
+    /// `--sort-by` for the shared query. The CLI also accepts a bare declared
+    /// (or wildcard) custom field name; any other unknown key is an error.
+    fn sort_key(sort_key: &str, config: &ResolvedConfig) -> Result<String, String> {
+        if crate::services::task_query::parse_sort_by(sort_key).is_ok() {
+            return Ok(sort_key.to_string());
         }
-        let key_raw = sort_key.trim();
-        if !key_raw.is_empty()
+        let key = sort_key.trim();
+        if !key.is_empty()
             && (config.custom_fields.has_wildcard()
                 || config
                     .custom_fields
                     .values
                     .iter()
-                    .any(|v| v.eq_ignore_ascii_case(key_raw)))
+                    .any(|v| v.eq_ignore_ascii_case(key)))
         {
-            return Ok(SortSpec::Custom(key_raw.to_string()));
+            return Ok(format!("field:{key}"));
         }
         Err(format!(
-            "Invalid --sort-by '{key_raw}': not a builtin key or configured custom field"
+            "Invalid --sort-by '{key}': not a builtin key or configured custom field"
         ))
     }
 
-    /// Shared-executor sorting (DEV-57): without `--sort-by` the CLI now uses
-    /// the shared default order (modified desc, canonical-ID asc tie) like
-    /// REST and MCP; an invalid explicit key is an error instead of a silent
-    /// no-op; `--reverse` maps to descending order (the tiebreak never
-    /// flips).
-    fn apply_sort(
-        tasks: &mut [(String, Task)],
-        args: &TaskSearchArgs,
-        config: &ResolvedConfig,
-    ) -> Result<(), String> {
-        let (spec, order) = match args.sort_by.as_deref() {
-            Some(sort_key) => {
-                let spec = Self::resolve_sort_spec(sort_key, config)?;
-                if spec == SortSpec::Builtin(crate::services::task_query::SortKey::Relevance) {
-                    // Best match first; --reverse puts the weakest first.
-                    let order = if args.reverse {
-                        SortOrder::Asc
-                    } else {
-                        SortOrder::Desc
-                    };
-                    let search = args
-                        .query
-                        .as_deref()
-                        .map(crate::utils::text_search::SearchQuery::parse);
-                    crate::services::task_query::sort_by_relevance(tasks, search.as_ref(), order);
-                    return Ok(());
-                }
-                let order = if args.reverse {
-                    SortOrder::Desc
+    /// Without `--sort-by`: newest change first (`--reverse` has no effect).
+    /// With a key: ascending, `--reverse` descending. Relevance lists the
+    /// best match first, `--reverse` the weakest.
+    fn order(args: &TaskSearchArgs) -> &'static str {
+        let relevance = args
+            .sort_by
+            .as_deref()
+            .is_some_and(|key| key.trim().eq_ignore_ascii_case("relevance"));
+        match (args.sort_by.is_some(), relevance, args.reverse) {
+            (false, _, _) => "desc",
+            (true, true, reverse) => {
+                if reverse {
+                    "asc"
                 } else {
-                    SortOrder::Asc
-                };
-                (spec, order)
+                    "desc"
+                }
             }
-            None => (
-                SortSpec::Builtin(crate::services::task_query::SortKey::Modified),
-                SortOrder::Desc,
-            ),
-        };
-        crate::services::task_query::sort_tasks(tasks, &spec, order);
-        Ok(())
+            (true, false, reverse) => {
+                if reverse {
+                    "desc"
+                } else {
+                    "asc"
+                }
+            }
+        }
     }
 
     fn resolve_pagination(args: &TaskSearchArgs) -> Result<(usize, usize), String> {
@@ -240,21 +236,9 @@ impl SearchHandler {
         Ok((offset, page_size))
     }
 
-    fn apply_offset_and_limit(tasks: &mut Vec<(String, Task)>, offset: usize, limit: usize) {
-        if offset > 0 {
-            if offset >= tasks.len() {
-                tasks.clear();
-                return;
-            }
-            tasks.drain(..offset);
-        }
-
-        tasks.truncate(limit);
-    }
-
     fn render_results(
         renderer: &crate::output::OutputRenderer,
-        tasks: Vec<(String, Task)>,
+        tasks: Vec<(String, TaskDTO)>,
         total_matching: usize,
         offset: usize,
         limit: usize,
@@ -433,233 +417,5 @@ impl SearchHandler {
                 }
             }
         }
-    }
-}
-
-struct BuiltTaskFilter {
-    task_filter: TaskFilter,
-    where_filters: Vec<(String, String)>,
-}
-
-struct TaskPostFilters<'a> {
-    args: &'a TaskSearchArgs,
-    config: &'a ResolvedConfig,
-    resolver: &'a TasksDirectoryResolver,
-    project: Option<&'a str>,
-    where_filters: Vec<(String, String)>,
-}
-
-impl<'a> TaskPostFilters<'a> {
-    fn new(
-        args: &'a TaskSearchArgs,
-        config: &'a ResolvedConfig,
-        resolver: &'a TasksDirectoryResolver,
-        project: Option<&'a str>,
-        where_filters: Vec<(String, String)>,
-    ) -> Self {
-        Self {
-            args,
-            config,
-            resolver,
-            project,
-            where_filters,
-        }
-    }
-
-    fn apply(&self, tasks: &mut Vec<(String, Task)>) -> Result<(), String> {
-        self.apply_assignee_filter(tasks);
-        self.apply_mine_filter(tasks);
-        self.apply_priority_flags(tasks);
-        self.apply_due_filters(tasks);
-        self.apply_where_filters(tasks);
-        self.apply_effort_filters(tasks)?;
-        Ok(())
-    }
-
-    /// Assignee filtering uses the shared fuzzy member predicate
-    /// (`member_key` equality, same as REST/TaskService) instead of exact
-    /// string equality, so `--assignee alice` matches stored `Alice` and
-    /// `@alice` (DEV-57 alignment).
-    fn apply_assignee_filter(&self, tasks: &mut Vec<(String, Task)>) {
-        if let Some(assignee) = self.args.assignee.as_ref() {
-            let target = if assignee == "@me" {
-                crate::utils::identity::resolve_current_user_for_project(
-                    Some(self.resolver.path.as_path()),
-                    self.project,
-                )
-            } else {
-                Some(assignee.clone())
-            };
-
-            match target {
-                Some(user) => {
-                    let key = crate::utils::fuzzy_match::member_key(&user);
-                    tasks.retain(|(_, task)| {
-                        task.assignee
-                            .as_deref()
-                            .is_some_and(|a| crate::utils::fuzzy_match::member_key(a) == key)
-                    });
-                }
-                None => tasks.clear(),
-            }
-        }
-    }
-
-    fn apply_mine_filter(&self, tasks: &mut Vec<(String, Task)>) {
-        if self.args.mine {
-            if let Some(me) = crate::utils::identity::resolve_current_user_for_project(
-                Some(self.resolver.path.as_path()),
-                self.project,
-            ) {
-                let key = crate::utils::fuzzy_match::member_key(&me);
-                tasks.retain(|(_, task)| {
-                    task.assignee
-                        .as_deref()
-                        .is_some_and(|a| crate::utils::fuzzy_match::member_key(a) == key)
-                });
-            } else {
-                tasks.clear();
-            }
-        }
-    }
-
-    fn apply_priority_flags(&self, tasks: &mut Vec<(String, Task)>) {
-        if self.args.high {
-            tasks.retain(|(_, task)| task.priority.eq_ignore_case("high"));
-        }
-
-        if self.args.critical {
-            tasks.retain(|(_, task)| task.priority.eq_ignore_case("critical"));
-        }
-    }
-
-    /// Due flags share the executor's local-date bucket predicates
-    /// (DEV-57): `--overdue` matches due dates strictly before today and
-    /// `--due-soon[=days]` matches today through today+days inclusive, so a
-    /// task due later today is "today" work, never overdue, and stored
-    /// date-only values never depend on local-midnight resolution.
-    /// DEV-21: `--overdue` also excludes terminal tasks, each classified
-    /// under its own project's completion policy (completed work is not
-    /// overdue work).
-    fn apply_due_filters(&self, tasks: &mut Vec<(String, Task)>) {
-        if !self.args.overdue && self.args.due_soon.is_none() {
-            return;
-        }
-        let today = crate::services::task_query::today_local(chrono::Utc::now());
-        if self.args.overdue {
-            let storage = crate::storage::manager::Storage::new(&self.resolver.path);
-            let done_sets = crate::services::completion::resolve_task_done_sets(
-                &storage,
-                tasks.iter().map(|(id, _)| id),
-            );
-            tasks.retain(|(id, task)| {
-                !done_sets.is_done(id, &task.status)
-                    && crate::services::task_query::due_raw_matches_bucket(
-                        task.due_date.as_deref(),
-                        crate::services::task_query::DueFilter::Overdue,
-                        today,
-                    )
-            });
-        }
-
-        if let Some(due_soon_arg) = self.args.due_soon {
-            let days = match due_soon_arg {
-                Some(n) => n as i64,
-                None => 7,
-            };
-            tasks.retain(|(_, task)| {
-                crate::services::task_query::due_raw_within_window(
-                    task.due_date.as_deref(),
-                    today,
-                    days,
-                )
-            });
-        }
-    }
-
-    fn apply_where_filters(&self, tasks: &mut Vec<(String, Task)>) {
-        if self.where_filters.is_empty() {
-            return;
-        }
-
-        use std::collections::{HashMap, HashSet};
-
-        let mut filters: HashMap<String, HashSet<String>> = HashMap::new();
-        for (key, value) in &self.where_filters {
-            filters
-                .entry(key.clone())
-                .or_default()
-                .insert(value.clone());
-        }
-
-        let resolve_vals = |id: &str, task: &Task, key: &str| -> Option<Vec<String>> {
-            crate::utils::custom_fields::resolve_task_filter_values(id, task, key, self.config)
-        };
-
-        tasks.retain(|(id, task)| {
-            for (key, allowed) in &filters {
-                let values = match resolve_vals(id, task, key) {
-                    Some(v) => v.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>(),
-                    None => return false,
-                };
-                if values.is_empty() {
-                    return false;
-                }
-
-                let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
-                if !crate::utils::fuzzy_match::fuzzy_set_match(&values, &allowed_vec) {
-                    return false;
-                }
-            }
-            true
-        });
-    }
-
-    fn apply_effort_filters(&self, tasks: &mut Vec<(String, Task)>) -> Result<(), String> {
-        if self.args.effort_min.is_none() && self.args.effort_max.is_none() {
-            return Ok(());
-        }
-
-        let min_parsed = self
-            .args
-            .effort_min
-            .as_ref()
-            .map(|value| crate::utils::effort::parse_effort(value));
-        let max_parsed = self
-            .args
-            .effort_max
-            .as_ref()
-            .map(|value| crate::utils::effort::parse_effort(value));
-
-        let min = match min_parsed.transpose() {
-            Ok(value) => value,
-            Err(e) => return Err(format!("Invalid --effort-min: {}", e)),
-        };
-        let max = match max_parsed.transpose() {
-            Ok(value) => value,
-            Err(e) => return Err(format!("Invalid --effort-max: {}", e)),
-        };
-
-        tasks.retain(|(_, task)| {
-            let Some(effort) = task.effort.as_deref() else {
-                return false;
-            };
-
-            let parsed = match crate::utils::effort::parse_effort(effort) {
-                Ok(p) => p,
-                Err(_) => return false,
-            };
-
-            let mut keep = true;
-            if let Some(min_value) = min.as_ref() {
-                keep &= parsed.total_cmp_ge(min_value);
-            }
-            if let Some(max_value) = max.as_ref() {
-                keep &= parsed.total_cmp_le(max_value);
-            }
-            keep
-        });
-
-        Ok(())
     }
 }

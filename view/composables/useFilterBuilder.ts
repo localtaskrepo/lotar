@@ -15,6 +15,9 @@ const BUILTIN_QUERY_KEYS = new Set([
     'recent',
     'needs',
     'has',
+    'due_within',
+    'effort_min',
+    'effort_max',
     'sprints',
     'sort_by',
     'order',
@@ -84,6 +87,9 @@ export function buildServerFilter(
     if (normalized.recent) serverFilter.recent = normalized.recent
     if (normalized.needs) serverFilter.needs = normalized.needs
     if (normalized.has) serverFilter.has = normalized.has
+    if (normalized.due_within) serverFilter.due_within = normalized.due_within
+    if (normalized.effort_min) serverFilter.effort_min = normalized.effort_min
+    if (normalized.effort_max) serverFilter.effort_max = normalized.effort_max
     // DEV-92 deletion visibility; forwarded verbatim (strict server parser
     // rejects invalid values) and omitted for the default `active` view so
     // URLs stay clean.

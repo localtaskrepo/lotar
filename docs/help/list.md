@@ -19,7 +19,9 @@ lotar list "login" --project AUTH --priority high --page-size 50
 lotar --format json list --due-soon --tag release
 ```
 
-`<SEARCH>` is optional positional text, not a `--search` flag. Other filters are applied alongside it.
+`<SEARCH>` is optional positional text, not a `--search` flag. Other filters are applied alongside it. There is no separate `search` command: `list` with search text is the search.
+
+`lotar list`, the web UI, the REST `/api/tasks/list` and `/api/tasks/export` endpoints and the MCP `task_list` tool share one query: the same filter finds the same tasks in the same order everywhere. The [REST](api-quick-reference.md) and [MCP](mcp-tools.md) names for each flag are in the table below.
 
 ## Search text
 
@@ -38,21 +40,24 @@ Results keep the usual order. Add `--sort-by relevance` to list the best matches
 
 ## Build the perfect filter
 
-| Category | Useful flags |
-| --- | --- |
-| Project or workspace | `--project/-p`, `--tasks-dir`, `--tag/-i` |
-| Status & priority | `--status/-s`, `--priority/-P`, plus shortcuts `--high` and `--critical` |
-| Type & ownership | `--type/-t`, `--assignee/-a`, `--mine/-m`, `--where assignee=alice` |
-| Deletion | Active tasks by default; `--deleted` for deleted tasks only, or `--include-deleted` for both (mutually exclusive) |
-| Dates | `--overdue` (due before today), `--due-soon[=days]` (due today through today+days inclusive) |
-| Equality predicates | `--where key=value` or `--where field:<name>=value` (non-empty values; repeat as needed) |
-| Effort windows | `--effort-min 2h`, `--effort-max 1d`, accepts time or points |
+| Category | Useful flags | REST / MCP |
+| --- | --- | --- |
+| Project or workspace | `--project/-p`, `--tasks-dir`, `--tag/-i` | `project`, `tags` (MCP also `tag`) |
+| Status & priority | `--status/-s`, `--priority/-P`, plus shortcuts `--high` and `--critical` (each adds that priority) | `status`, `priority` |
+| Type & ownership | `--type/-t`, `--assignee/-a`, `--mine/-m` (`@me`), `--unassigned` (`__none__`), `--where assignee=alice` | `type`, `assignee` |
+| Sprints | `--sprint 3` (repeat or comma-separate for any of several) | `sprints` |
+| Deletion | Active tasks by default; `--deleted` for deleted tasks only, or `--include-deleted` for both (mutually exclusive) | `deletion` |
+| Dates | `--due today\|soon\|later\|overdue` (soon: the next 7 days after today), `--overdue` (same as `--due overdue`: before today and not done), `--due-soon[=days]` (due today through today+days inclusive, default 7), `--recent 7d` (modified in the last 7 days) | `due`, `due_within`, `recent` |
+| Missing or present | `--needs effort,due` (missing all listed fields), `--has attachment,image,link,tag` (carries all listed kinds) | `needs`, `has` |
+| Equality predicates | `--where key=value` or `--where field:<name>=value` (non-empty values; repeat as needed) | any other key; MCP `custom_fields` |
+| Effort windows | `--effort-min 2h`, `--effort-max 1d`, inclusive, time or points (they never compare with each other; tasks without an effort are left out) | `effort_min`, `effort_max` |
 | Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
 | Output | `--format text|json`, `--log-level info`, `--details`; `table`/`markdown`/`md` are text aliases |
 
 Tips:
 
-- Combine multiple values by repeating the flag (`--status todo --status in_progress`).
+- Combine multiple values by repeating the flag (`--status todo --status in_progress`). Values of one flag are ORed; different flags are ANDed.
+- `--mine` and `--assignee @me` fail with an error when no identity is configured, rather than listing nothing.
 - `--where` supports non-empty equality predicates only. Empty values (`assignee=`), inequality (`assignee!=alice`), and comparison operators are rejected rather than silently returning an empty result. Missing-field and general boolean expressions are not implemented; [DEV-5](../../.tasks/DEV/5.yml) owns the broader query language.
 - Built-in predicate keys are `assignee`, `reporter`, `status`, `priority`, `type`, `tag`/`tags`, and `project`. Built-ins take precedence over wildcard custom fields. Other bare keys must be configured custom fields (or allowed by `custom_fields: ['*']`); `field:<name>` explicitly addresses a stored custom field.
 - Different predicate keys are ANDed. Repeated equality values for the same key are ORed and use the existing fuzzy matching rules. Use `--mine` or `--assignee @me` to resolve the current user; `--where assignee=@me` is a literal comparison, not identity resolution.
@@ -85,6 +90,12 @@ lotar list --where field:sprint=2025-W35 --sort-by field:sprint --reverse
 
 # Risk board for PMs
 lotar --format json list --project ENG --overdue --page-size 100
+
+# Sprint 4 work that still needs an estimate
+lotar list --sprint 4 --needs effort
+
+# Tasks with screenshots, changed this week
+lotar list --has image --recent 7d
 
 # In-progress release work
 lotar list --status in_progress --tag release --sort-by due-date

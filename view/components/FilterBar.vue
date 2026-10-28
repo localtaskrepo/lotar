@@ -142,9 +142,10 @@
         </div>
       </dl>
       <p>
-        Use commas for multiple statuses, priorities, types, sprints, tags or missing fields. For multi-select filters,
-        colon adds selections; <code>key=value</code> replaces them. Custom fields use <code>field:name=value</code> or
-        <code>name=value</code>; quote reserved custom names, such as <code>field:"sprint"=inc-2</code>.
+        Use commas for multiple statuses, priorities, types, sprints, tags, missing fields or kinds. For multi-select
+        filters, colon adds selections; <code>key=value</code> replaces them. Custom fields use
+        <code>field:name=value</code> or <code>name=value</code>; quote reserved custom names, such as
+        <code>field:"sprint"=inc-2</code>.
       </p>
       <p>
         Suggestions combine configured options with values from tasks loaded in the current project scope. Search text,
@@ -516,7 +517,16 @@ let filtersHydrated = false
 let pendingHydrationEmit = false
 // Keys that have dedicated UI controls and must not fall through to the
 // custom-field map. Derived from the grammar so aliases stay in one place.
-const CUSTOM_UI_KEYS = new Set(['q', 'order', 'deletion', 'sort_by', ...GRAMMAR_KEYS.map((meta) => meta.key)])
+// Grammar keys without a control of their own (DEV-230) travel with the
+// custom filters: kept, shown as chips and removed like them.
+const PASS_THROUGH_KEYS = new Set(['due_within', 'effort_min', 'effort_max'])
+const CUSTOM_UI_KEYS = new Set([
+  'q',
+  'order',
+  'deletion',
+  'sort_by',
+  ...GRAMMAR_KEYS.map((meta) => meta.key).filter((key) => !PASS_THROUGH_KEYS.has(key)),
+])
 const showStatusSelect = computed(() => props.showStatus)
 const showOrderSelect = computed(() => props.showOrder !== false)
 
@@ -530,10 +540,13 @@ const helpDescriptions: Record<string, string> = {
   project: 'Project prefixes.',
   assignee: 'Member name, @me for yourself, or __none__ for unassigned tasks.',
   tags: 'Existing tags, or a tag you type.',
-  due: 'today, soon, later or overdue.',
+  due: 'today, soon (the next 7 days), later, or overdue (before today and not done).',
   recent: '7d: modified within the last seven days.',
-  needs: 'effort or due: tasks missing those fields.',
-  has: 'attachment, image or link: tasks carrying one.',
+  needs: 'effort, due or both: tasks missing every listed field.',
+  has: 'attachment, image, link or tag: tasks carrying every listed kind.',
+  due_within: 'A number of days: due from today through that many days ahead.',
+  effort_min: 'An effort such as 2h, 1d or 3pt: tasks with at least that much.',
+  effort_max: 'An effort such as 4h, 1d or 5pt: tasks with at most that much.',
   mine: 'true: tasks assigned to you.',
 }
 const filterHelp = computed(() => [
@@ -553,7 +566,7 @@ const filterHelp = computed(() => [
     syntax: 'q="search words"',
     label: 'Search text',
     description:
-      'Plain words must all match, in any order. Quote a phrase, exclude with -word, search one field with title:, desc: or comment:, or use /regex/; small typos are forgiven. q= explicitly sets the search text.',
+      'Plain words must all match, in any order. Quote a phrase, exclude with -word, search one field with id:, title:, subtitle:, desc:, criteria:, ref: or comment: (tag: is the tag filter), or use /regex/; small typos are forgiven. q= explicitly sets the search text.',
     aliases: '',
   },
   { syntax: 'deletion=active', label: 'Visibility', description: 'active, deleted or all.', aliases: '' },

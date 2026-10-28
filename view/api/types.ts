@@ -500,6 +500,11 @@ export interface TaskListFilter {
     needs?: string
     /** CSV of kinds tasks must carry: `attachment`, `image`, `link`, `tag` (at least one tag). */
     has?: string
+    /** Due from today through today + N days, inclusive. */
+    due_within?: number | string
+    /** Inclusive effort bounds such as `2h`, `1d` or `3pt`; tasks without an effort are left out. */
+    effort_min?: string
+    effort_max?: string
     /**
      * DEV-92 deletion visibility: `active` (default, server-side), `deleted`
      * (trash only), or `all`. Part of the canonical query key, so each

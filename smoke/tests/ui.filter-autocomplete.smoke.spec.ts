@@ -68,6 +68,7 @@ function seed(): Record<string, string> {
             modified: `${today}T00:00:00Z`,
             custom_fields: { iteration, sprint: sprintValue },
             tags,
+            ...(id === 'ALPHA-1' ? { effort: '3h' } : {}),
             ...(project === 'ALPHA' ? { sprints: [1] } : {}),
         });
     }
@@ -85,6 +86,9 @@ const HELP_KEYS = [
     'due',
     'recent',
     'needs',
+    'due_within',
+    'effort_min',
+    'effort_max',
     'mine',
     'field',
     'q',
@@ -368,6 +372,19 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         expect(customSprintQuery).toBeDefined();
                         expect(customSprintQuery!.get('sprints')).toBeNull();
                         await page.getByRole('button', { name: 'Remove filter sprint relay', exact: true }).click();
+                        await expect.poll(() => alphaApi.count()).toBe(1);
+
+                        // Effort bounds run on the server's shared query (DEV-230).
+                        await search.fill('effort_min:2h');
+                        await search.press('Enter');
+                        await expect.poll(() => alphaUi.count()).toBe(1);
+                        await expect.poll(() => alphaApi.count()).toBe(0);
+                        expect(
+                            appliedListQuery(listQueries, (params) => params.get('effort_min') === '2h'),
+                        ).toBeDefined();
+                        await page
+                            .getByRole('button', { name: 'Remove filter Effort at least 2h', exact: true })
+                            .click();
                         await expect.poll(() => alphaApi.count()).toBe(1);
 
                         await search.fill('deletion=');
