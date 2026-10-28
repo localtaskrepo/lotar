@@ -5,12 +5,15 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-25T03:10:57.163420+00:00
-modified: 2026-10-27T23:37:51.194247+00:00
+modified: 2026-10-28T01:11:26.943731+00:00
 comments:
 - date: 2026-10-27T23:29:44.842484+00:00
   text: 'Pages now show project names instead of prefixes: page headings (Boards, Calendar, Insights, Dependencies; hover shows ''Name (PREFIX)''), the project filter chip, Dependencies validation text, the Insights refresh toast, the Agents ''Add to'' option and the Sync override button/toasts. One shared formatter (formatProjectLabel) replaces three copies and no longer prints ''DEV (DEV)''; useProjectNames shares one project list. Task IDs, CLI commands and external Jira keys keep prefixes. Long names end in an ellipsis in headings (own line on phones) and chips (24ch). Also fixed at phone width: task panel fieldsets and custom-field rows overflowed the panel (fieldset min-content default), independent of names. Checked 11 pages at 1280/390 with a 60-char name: no horizontal overflow. Tests: projectLabels.spec, useFilterGrammar.spec, page specs updated; smoke ui.project-names at 1280/390.'
 - date: 2026-10-27T23:31:44.386224+00:00
   text: 'Also: the 404 page overflowed phones by about 11px (card width 100% plus padding with content-box sizing; long paths did not wrap). Fixed with border-box and wrapping of long paths; the ui.project-names smoke now checks the 404 page at 1280 and 390.'
+references:
+- attachment: project-name-heading-2x.ce9d27f4ff1f5ab55b50d3c1ba60270d.webp
+- attachment: project-name-heading-phone-2x.c8a9637d99298f2573e35eac8ee70042.webp
 description: Almost everywhere we show the project prefix and don't show the project name, which would probably be nicer to see.
 history:
 - at: 2026-10-27T23:19:59.116180+00:00
@@ -35,3 +38,43 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-28T01:08:47.662192+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:project-name-heading.f0f4667b64dcdcab3836ef5bd0939e99.webp
+- at: 2026-10-28T01:08:48.633141+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:project-name-heading-phone.c8a9637d99298f2573e35eac8ee70042.webp
+- at: 2026-10-28T01:09:17.828409+00:00
+  actor: mallox
+  changes:
+  - field: reference_removed
+    old: attachment:project-name-heading.f0f4667b64dcdcab3836ef5bd0939e99.webp
+- at: 2026-10-28T01:09:19.303415+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:project-name-heading.ce9d27f4ff1f5ab55b50d3c1ba60270d.webp
+- at: 2026-10-28T01:11:24.217082+00:00
+  actor: mallox
+  changes:
+  - field: reference_removed
+    old: attachment:project-name-heading-phone.c8a9637d99298f2573e35eac8ee70042.webp
+- at: 2026-10-28T01:11:24.265163+00:00
+  actor: mallox
+  changes:
+  - field: reference_removed
+    old: attachment:project-name-heading.ce9d27f4ff1f5ab55b50d3c1ba60270d.webp
+- at: 2026-10-28T01:11:25.859077+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:project-name-heading-2x.ce9d27f4ff1f5ab55b50d3c1ba60270d.webp
+- at: 2026-10-28T01:11:26.943731+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:project-name-heading-phone-2x.c8a9637d99298f2573e35eac8ee70042.webp

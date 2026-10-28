@@ -27,3 +27,4 @@ excludeAgent: ["code-review"]
 
 - Stay within the task's scope; don't refactor unrelated UI.
 - If changing UX/behavior, add/update Vitest coverage where it fits, and verify visually (Playwright smoke / vision tools — see `review-handoff`) rather than eyeballing.
+- Attach cropped result snippets to tickets that change how the UI looks (`scripts/ticket-screenshot.mjs`, see `review-handoff`).

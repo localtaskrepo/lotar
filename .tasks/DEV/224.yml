@@ -1,0 +1,37 @@
+title: Attach result screenshots to UI tickets
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T01:02:27.292430+00:00
+modified: 2026-10-28T01:25:37.278700+00:00
+comments:
+- date: 2026-10-28T01:09:28.123320+00:00
+  text: 'Done so far: (1) AttachmentService::upload_and_attach is the one upload path (size limit, image check, metadata strip, dedup, rollback on attach failure); the REST upload route uses it. (2) New CLI: lotar task reference add upload <ID> <FILE> prints ''Stored as <name>''. (3) DEV stores attachments in the tracked .tasks/DEV/@attachments (project attachments.dir: DEV/@attachments); .attachments-store.lock is ignored. (4) scripts/ticket-screenshot.mjs captures an element crop (padding, width, theme, scale) as WebP and attaches it; snippets are 3-15 KB. (5) Guidance: review-handoff skill + frontend instructions. (6) docs/help/task.md documents reference incl. upload. Tests: cli_task_references_test upload case, 40 attachment tests, scripts/tests/ticket-screenshot.test.mjs (wired into CI). Example: DEV-184 now carries two heading snippets (desktop and 390px).'
+- date: 2026-10-28T01:25:37.212052+00:00
+  text: 'Verified: npm run lint, npm test (1812 Rust, 1285 UI, 33 release, hooks), npm run smoke 360/360, ticket-screenshot unit tests 7/7. Used on DEV-184 and DEV-227.'
+description: 'Tickets that change the UI carry small cropped screenshots of the result, attached so the task panel shows them. Needs: a CLI way to upload a local file as an attachment (today only the web UI/REST/MCP can upload), DEV attachments stored in a git-tracked folder (.tasks/@attachments is ignored), a helper that captures element-cropped, compressed snippets from a running server and attaches them, and guidance in the development workflow. Keep snippets small (WebP, cropped, no full-page shots).'
+history:
+- at: 2026-10-28T01:02:38.657132+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T01:09:28.123320+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T01:25:37.212052+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T01:25:37.278700+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -351,6 +351,8 @@ pub enum TaskReferenceKindAdd {
     File { id: String, path: String },
     /// Add a managed attachment reference (stored attachments blob name)
     Attachment { id: String, name: String },
+    /// Upload a local file into the attachments store and attach it
+    Upload { id: String, path: String },
     /// Add a code reference (e.g. src/lib.rs#10-12)
     Code { id: String, code: String },
 }

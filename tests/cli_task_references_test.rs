@@ -282,3 +282,103 @@ fn task_reference_add_and_remove_attachment_kind() {
         .assert()
         .failure();
 }
+
+/// `reference add upload` stores a local file in the task project's
+/// attachments store and attaches it (DEV-224): one stored copy per identical
+/// file, the project's own `attachments.dir`, and nothing stored for an
+/// unknown task.
+#[test]
+fn task_reference_upload_stores_and_attaches_a_local_file() {
+    let temp = TempDir::new().unwrap();
+    let tasks_dir = temp.path().join(".tasks");
+    std::fs::create_dir_all(tasks_dir.join("TEST")).unwrap();
+    write_minimal_config(&tasks_dir);
+    // The project keeps its attachments inside its own folder.
+    std::fs::write(
+        tasks_dir.join("TEST").join("config.yml"),
+        "attachments:\n  dir: TEST/@attachments\n",
+    )
+    .unwrap();
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+
+    let mut storage = Storage::new(&tasks_dir.clone());
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Upload CLI".to_string(),
+            project: Some("TEST".to_string()),
+            ..TaskCreate::default()
+        },
+    )
+    .expect("create task");
+
+    let shot = temp.path().join("board header.txt");
+    std::fs::write(&shot, b"snippet-bytes").unwrap();
+    let upload = |id: &str| {
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        cmd.current_dir(temp.path()).args([
+            "task",
+            "reference",
+            "add",
+            "upload",
+            id,
+            shot.to_str().unwrap(),
+        ]);
+        cmd
+    };
+
+    upload(&created.id)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stored as board-header."))
+        .stdout(predicate::str::contains("reference updated"));
+    let store = tasks_dir.join("TEST").join("@attachments");
+    let stored: Vec<String> = std::fs::read_dir(&store)
+        .unwrap()
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter(|name| !name.starts_with('.'))
+        .collect();
+    assert_eq!(stored.len(), 1, "one stored file: {stored:?}");
+    let task = Storage::new(&tasks_dir.clone())
+        .get(&created.id, "TEST")
+        .expect("task should exist");
+    assert!(
+        task.references
+            .iter()
+            .any(|r| r.attachment.as_deref() == Some(stored[0].as_str())),
+        "the task references the stored file: {:?}",
+        task.references
+    );
+
+    // Uploading the same file again keeps one copy and one reference.
+    upload(&created.id)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("already in desired state"));
+    assert_eq!(
+        std::fs::read_dir(&store)
+            .unwrap()
+            .filter(|entry| entry
+                .as_ref()
+                .is_ok_and(|e| !e.file_name().to_string_lossy().starts_with('.')))
+            .count(),
+        1
+    );
+
+    // An unknown task stores nothing new.
+    upload("TEST-99").assert().failure();
+    let missing = temp.path().join("missing.png");
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(temp.path())
+        .args([
+            "task",
+            "reference",
+            "add",
+            "upload",
+            &created.id,
+            missing.to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Cannot read"));
+}

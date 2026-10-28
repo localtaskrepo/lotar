@@ -10,6 +10,36 @@ use std::path::{Component, Path, PathBuf};
 
 pub struct AttachmentService;
 
+/// Result of [`AttachmentService::upload_and_attach`].
+pub struct UploadOutcome {
+    /// Stored blob name in the attachments store.
+    pub stored: String,
+    /// The attach mutation; `changed` is false when already attached.
+    pub attach: ReferenceMutationOutcome,
+    pub metadata_removed: bool,
+    pub warnings: Vec<String>,
+}
+
+/// Why an upload did not attach.
+#[derive(Debug)]
+pub enum UploadFailure {
+    /// Refused by configuration (disabled or too large): a client error.
+    Rejected(String),
+    /// Writing the blob failed: a server error.
+    Store(String),
+    /// Resolving the store, locking, or attaching failed.
+    Failed(LoTaRError),
+}
+
+impl std::fmt::Display for UploadFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UploadFailure::Rejected(msg) | UploadFailure::Store(msg) => f.write_str(msg),
+            UploadFailure::Failed(err) => write!(f, "{err}"),
+        }
+    }
+}
+
 impl AttachmentService {
     pub fn compute_attachments_root(
         tasks_dir: &Path,
@@ -435,6 +465,110 @@ impl AttachmentService {
             Some(ext) => format!("{}.{}", display_stem, ext),
             None => display_stem.to_string(),
         }
+    }
+
+    /// Store `bytes` as an attachment of `task_id` and attach it: the shared
+    /// upload path behind the REST upload route and `lotar task reference
+    /// add upload` (DEV-224). Enforces `attachments.max_upload_mb`, strips
+    /// photo metadata (DEV-216), deduplicates by content, and removes a blob
+    /// this call created when attaching fails. The caller checks that the
+    /// task exists in `tasks_root` first, so a refused target never leaves an
+    /// orphaned file.
+    pub fn upload_and_attach(
+        tasks_root: &Path,
+        config: &crate::config::types::ResolvedConfig,
+        task_id: &str,
+        filename: &str,
+        bytes: Vec<u8>,
+    ) -> Result<UploadOutcome, UploadFailure> {
+        match config.attachments_max_upload_mb {
+            0 => {
+                return Err(UploadFailure::Rejected(
+                    "Attachment uploads are disabled by configuration".to_string(),
+                ));
+            }
+            n if n > 0 => {
+                let max_bytes = i128::from(n).checked_mul(1024 * 1024).unwrap_or(i128::MAX);
+                if (bytes.len() as i128) > max_bytes {
+                    return Err(UploadFailure::Rejected(format!(
+                        "Attachment too large: {} bytes (max {} MiB)",
+                        bytes.len(),
+                        n
+                    )));
+                }
+            }
+            _ => {}
+        }
+
+        // Photos carry GPS position, device serials and capture times, and
+        // attachments end up in git: strip that before storing (DEV-216).
+        // Only container bytes change; pixels are never re-encoded.
+        let mut bytes = bytes;
+        let mut warnings = Vec::new();
+        let extension = filename
+            .rsplit_once('.')
+            .map(|(_, ext)| ext.trim().to_ascii_lowercase())
+            .unwrap_or_default();
+        if crate::services::task_query::IMAGE_EXTENSIONS.contains(&extension.as_str())
+            && crate::services::attachment_metadata::sniff_image_format(&bytes).is_none()
+        {
+            warnings.push(format!(
+                "{} is named like an image but does not contain one; it was attached as is and will have no preview",
+                filename.trim()
+            ));
+        }
+        let metadata_removed = match crate::services::attachment_metadata::strip_metadata(&bytes) {
+            Some(clean) => {
+                bytes = clean;
+                true
+            }
+            None => false,
+        };
+
+        let root =
+            Self::resolve_attachments_root(tasks_root, config).map_err(UploadFailure::Failed)?;
+
+        // Serialize blob create/dedup + attach + failure cleanup for this
+        // store ACROSS PROCESSES: a concurrent upload of identical content
+        // must never dedupe-and-attach a blob this call might still roll
+        // back. Lock order is store-lock -> task-lock (see lock_store). The
+        // guard drops with this block, before any post-commit hook runs.
+        let (outcome, stored) = {
+            let _store_guard = Self::lock_store(&root).map_err(UploadFailure::Failed)?;
+            let (stored, created) = Self::store_bytes(&root, filename, &bytes)
+                .map_err(|e| UploadFailure::Store(e.to_string()))?;
+
+            #[cfg(test)]
+            upload_fault::park_after_store_if_armed();
+
+            let mut storage = Storage::new(tasks_root);
+            #[cfg(test)]
+            let outcome = if upload_fault::take_fail_next_attach() {
+                Err(LoTaRError::ValidationError(
+                    "injected attach failure".to_string(),
+                ))
+            } else {
+                Self::attach_managed_reference(&mut storage, task_id, &stored)
+            };
+            #[cfg(not(test))]
+            let outcome = Self::attach_managed_reference(&mut storage, task_id, &stored);
+            drop(storage);
+
+            // A failure here is a write/lock error: remove the file this call
+            // created, still under the store lock. Deduped pre-existing
+            // content (created == false) stays.
+            if outcome.is_err() && created {
+                Self::remove_created_file(&root, &stored);
+            }
+            (outcome, stored)
+        };
+
+        Ok(UploadOutcome {
+            stored,
+            attach: outcome.map_err(UploadFailure::Failed)?,
+            metadata_removed,
+            warnings,
+        })
     }
 
     /// Attach a MANAGED attachment reference (typed `attachment` entry

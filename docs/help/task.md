@@ -33,6 +33,7 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `diff` | Show the latest (or specific) git diff for a task. | History/diff helper. |
 | `at` | Print the file at a specific commit. | History helper. |
 | `comment` | Add or list comments for a task. | `lotar comment`. |
+| `reference` | Add or remove links, repository files, code ranges and attachments. | Reference and attachment services. |
 
 Each action below highlights the legacy-specific nuances; for behavior details see the dedicated help pages linked in the rightmost column.
 
@@ -325,6 +326,21 @@ lotar task comment <TASK_ID> [TEXT] [--message|-m TEXT] [--file|-F PATH] [--dry-
 
 - Shares `CommentHandler` with `lotar comment`: TEXT can come from the positional argument, `--message`, `--file`, or stdin. Without comment content the command lists existing comments.
 - See `docs/help/comment.md` for JSON payloads and formatting rules.
+
+### reference
+
+```bash
+lotar task reference add link <TASK_ID> <URL>
+lotar task reference add file <TASK_ID> <REPO_PATH>
+lotar task reference add code <TASK_ID> <PATH#LINE[-LINE]>
+lotar task reference add attachment <TASK_ID> <STORED_NAME>
+lotar task reference add upload <TASK_ID> <LOCAL_FILE>
+lotar task reference remove <link|file|code|attachment> <TASK_ID> <VALUE>
+```
+
+- `upload` copies a local file into the attachments store and attaches it, with the same checks as the web UI: `attachments.max_upload_mb`, photo metadata stripping, and one stored copy per identical file. It prints the stored name (`Stored as <name>`); link it from a description or comment as `![caption](attachment:<name>)`. The task is checked before anything is stored.
+- `attachment` attaches a file already in the store by its stored name.
+- The store is `attachments.dir` of the task's project (default `@attachments` in the tasks directory). A project can point it at a folder inside its own directory, such as `DEV/@attachments`, to keep its attachments in git when other projects are ignored.
 
 ## Tips and examples
 

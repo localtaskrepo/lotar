@@ -275,6 +275,10 @@ jobs:
     - name: Run compress-web unit tests
       run: node --test scripts/tests/compress-web.test.mjs
 
+    # Option parsing and crop maths of the ticket screenshot helper (DEV-224).
+    - name: Run ticket-screenshot unit tests
+      run: node --test scripts/tests/ticket-screenshot.test.mjs
+
     - name: Verify release ticket links and page rendering
       run: npm run test:release
 

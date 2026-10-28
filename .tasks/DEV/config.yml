@@ -1,5 +1,5 @@
 project:
-  name: DEV
+  name: Local Task Repo
 members:
 - mallox
 issue:
@@ -9,3 +9,5 @@ issue:
   - Blocked
   - NeedsReview
   - Done
+attachments:
+  dir: DEV/@attachments

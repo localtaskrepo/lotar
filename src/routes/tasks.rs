@@ -230,57 +230,6 @@ pub(super) fn register(api_server: &mut ApiServer) {
         Err(_) => return bad_request("Invalid base64 content".into()),
     };
 
-    if config.attachments_max_upload_mb > 0 {
-        let max_bytes = match i128::from(config.attachments_max_upload_mb)
-            .checked_mul(1024)
-            .and_then(|v| v.checked_mul(1024))
-        {
-            Some(v) if v > 0 => v,
-            _ => 0,
-        };
-
-        if max_bytes > 0 && (bytes.len() as i128) > max_bytes {
-            return bad_request(format!(
-                "Attachment too large: {} bytes (max {} MiB)",
-                bytes.len(),
-                config.attachments_max_upload_mb
-            ));
-        }
-    }
-
-    // Photos carry GPS position, device serials and capture times, and
-    // attachments end up in git: strip that before storing (DEV-216). Only
-    // container bytes change; pixels are never re-encoded.
-    let mut bytes = bytes;
-    let mut warnings: Vec<String> = Vec::new();
-    let extension = payload
-        .filename
-        .rsplit_once('.')
-        .map(|(_, ext)| ext.trim().to_ascii_lowercase())
-        .unwrap_or_default();
-    if crate::services::task_query::IMAGE_EXTENSIONS.contains(&extension.as_str())
-        && crate::services::attachment_metadata::sniff_image_format(&bytes).is_none()
-    {
-        warnings.push(format!(
-            "{} is named like an image but does not contain one; it was attached as is and will have no preview",
-            payload.filename.trim()
-        ));
-    }
-    let metadata_removed = match crate::services::attachment_metadata::strip_metadata(&bytes) {
-        Some(clean) => {
-            bytes = clean;
-            true
-        }
-        None => false,
-    };
-
-    let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config)
-    {
-        // Store-root resolution failures are server-side (DEV-58).
-        Ok(p) => p,
-        Err(e) => return map_lotar_error(e),
-    };
-
     // Identity and mutation access resolve BEFORE any file bytes are written:
     // the ID must be canonical, exist exactly once, and be mutable from this
     // workspace (uploads attach a reference, which is a mutation). Nested,
@@ -313,68 +262,33 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     }
 
-    let (attach_outcome, stored) = {
-        // Serialize blob create/dedup + attach + failure cleanup for this
-        // attachments store ACROSS PROCESSES: a concurrent upload of
-        // identical content must never dedupe-and-attach a blob that this
-        // request might still roll back. Lock order is store-lock ->
-        // task-lock (see lock_store docs); contention fails closed after
-        // the standard bound. The guard drops with this block, after the
-        // LAST blob operation and before any post-commit hook runs.
-        let _store_guard = match AttachmentService::lock_store(&root) {
-            Ok(guard) => guard,
-            Err(e) => return map_lotar_error(e),
-        };
-
-        let (stored, created) =
-            match AttachmentService::store_bytes(&root, &payload.filename, &bytes) {
-                Ok(result) => result,
-                Err(e) => {
-                    return internal_error(e.to_string())
-                }
-            };
-
-        #[cfg(test)]
-        crate::services::attachment_service::upload_fault::park_after_store_if_armed();
-
-        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        #[cfg(test)]
-        let outcome =
-            if crate::services::attachment_service::upload_fault::take_fail_next_attach() {
-                Err(LoTaRError::ValidationError(
-                    "injected attach failure".to_string(),
-                ))
-            } else {
-                AttachmentService::attach_managed_reference(&mut storage, task_id, &stored)
-            };
-        #[cfg(not(test))]
-        let outcome =
-            AttachmentService::attach_managed_reference(&mut storage, task_id, &stored);
-        drop(storage);
-
-        // The precheck passed, so a failure here is a write/lock error:
-        // remove the file this request created so no orphan remains, still
-        // under the store lock. Deduped pre-existing content
-        // (created == false) is preserved.
-        if outcome.is_err() && created {
-            AttachmentService::remove_created_file(&root, &stored);
-        }
-        (outcome, stored)
-    };
-
-    // The store guard has dropped: post-commit hooks are safe to run.
-    let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-    match attach_outcome {
-        Ok(outcome) => {
+    match AttachmentService::upload_and_attach(
+        resolver.path.as_path(),
+        &config,
+        task_id,
+        &payload.filename,
+        bytes,
+    ) {
+        Ok(upload) => {
+            // The store guard has dropped: post-commit hooks are safe to run.
             // A no-op attach (already referenced; attached=false) changed
             // only the blob store, not the task, so it emits no task event.
-            publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+            publish_reference_change(&mut storage, resolver.path.as_path(), &upload.attach);
             ok_json(
                 200,
-                json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached: outcome.changed, task: outcome.task, metadata_removed, warnings }}),
+                json!({"data": crate::api_types::AttachmentUploadResponse {
+                    stored_path: upload.stored,
+                    attached: upload.attach.changed,
+                    task: upload.attach.task,
+                    metadata_removed: upload.metadata_removed,
+                    warnings: upload.warnings,
+                }}),
             )
         }
-        Err(e) => map_lotar_error(e),
+        Err(crate::services::attachment_service::UploadFailure::Rejected(msg)) => bad_request(msg),
+        Err(crate::services::attachment_service::UploadFailure::Store(msg)) => internal_error(msg),
+        Err(crate::services::attachment_service::UploadFailure::Failed(e)) => map_lotar_error(e),
     }
 });
 

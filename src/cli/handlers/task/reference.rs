@@ -28,6 +28,9 @@ pub fn handle_reference(
             TaskReferenceKindAdd::Attachment { id, name } => {
                 handle_add_attachment(&id, &name, project, resolver, renderer)
             }
+            TaskReferenceKindAdd::Upload { id, path } => {
+                handle_upload_attachment(&id, &path, project, resolver, renderer)
+            }
             TaskReferenceKindAdd::Code { id, code } => {
                 handle_add_code(&id, &code, project, resolver, renderer)
             }
@@ -244,6 +247,62 @@ fn handle_remove_file(
 
 /// Managed attachment references serialize with upload/remove reclamation
 /// under the store coordination lock (store-lock -> task-lock order).
+/// Upload a local file as a managed attachment (DEV-224): the same checks,
+/// metadata stripping and dedup as uploads from the web UI.
+fn handle_upload_attachment(
+    task_id: &str,
+    path: &str,
+    project: Option<&str>,
+    resolver: &TasksDirectoryResolver,
+    renderer: &OutputRenderer,
+) -> Result<(), String> {
+    let source = std::path::Path::new(path);
+    let filename = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .ok_or_else(|| format!("'{path}' is not a file name"))?
+        .to_string();
+    let bytes = std::fs::read(source).map_err(|e| format!("Cannot read '{path}': {e}"))?;
+
+    let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
+    // Resolves the task first, so an unknown ID never stores a blob.
+    let loaded = load_task(&mut ctx, task_id, project)?;
+    let storage_root = ctx.storage_root().to_path_buf();
+    let parsed = crate::storage::TaskId::parse(&loaded.full_id).map_err(|e| e.to_string())?;
+    let config =
+        crate::config::resolution::config_for_project(&storage_root, Some(&parsed.project))
+            .map_err(|e| format!("Failed to load project config: {e}"))?;
+
+    let upload = AttachmentService::upload_and_attach(
+        &storage_root,
+        &config,
+        &loaded.full_id,
+        &filename,
+        bytes,
+    )
+    .map_err(|e| e.to_string())?;
+    // The store guard has dropped: post-commit hooks are safe to run.
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &upload.attach);
+    for warning in &upload.warnings {
+        renderer.emit_warning(format_args!("{warning}"));
+    }
+    if !matches!(renderer.format, OutputFormat::Json) {
+        // The stored name is what descriptions and comments link to:
+        // ![caption](attachment:<name>).
+        renderer.emit_info(format_args!("Stored as {}", upload.stored));
+    }
+    emit_reference_result(
+        renderer,
+        "add",
+        "attachment",
+        &loaded.full_id,
+        &upload.stored,
+        upload.attach.changed,
+        &upload.attach.task,
+    )
+}
+
 fn handle_add_attachment(
     task_id: &str,
     name: &str,

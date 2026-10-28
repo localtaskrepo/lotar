@@ -18,6 +18,14 @@ it to the reference using available image tools. Text output is preferable to
 screenshot OCR for CLI/server diagnostics. Use isolated smoke workspaces or seeded
 local scenario data; do not mutate the tracked DEV backlog to test the UI.
 
+When a ticket changes what the UI looks like, attach one to three cropped snippets
+of the result so the task panel shows it: `node scripts/ticket-screenshot.mjs
+--ticket DEV-N --url <page> --selector <element>` (add `--width 390` or `--theme
+dark` where the change differs). Crop to the changed element, not the whole page,
+and capture seeded scenario data, never personal data or the DEV backlog itself.
+DEV attachments live in the tracked `.tasks/DEV/@attachments`, so they are committed
+with the ticket.
+
 If browser or vision tools are unavailable, report the limitation and the evidence
 you do have. Static code inspection alone does not establish working UI behavior.
 See [testing-strategy](../testing-strategy/SKILL.md) and, for environment failures,
