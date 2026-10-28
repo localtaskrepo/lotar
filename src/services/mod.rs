@@ -37,4 +37,3 @@ pub mod theme_file;
 
 pub mod task_list;
 pub mod task_query;
-pub mod task_selection;

@@ -1,16 +1,8 @@
-use std::collections::{BTreeMap, BTreeSet};
-
-pub type PartitionedWhereFilters = (
-    BTreeMap<String, Vec<String>>,
-    Vec<(String, String)>,
-    BTreeSet<String>,
-);
-
 use crate::config::types::ResolvedConfig;
 use crate::types::{CustomFields, custom_value_to_string};
 
 /// Task types that can feed filter-value resolution (reserved or custom keys).
-/// Implemented for `TaskDTO` (REST/MCP surfaces) and `Task` (CLI stats/search).
+/// Implemented for `TaskDTO`, the shape every task query works on.
 pub trait TaskFilterSource {
     /// Values for a reserved field ("assignee", "reporter", "type", "status",
     /// "priority", "tags"); `None` when the field is not recognized.
@@ -19,23 +11,6 @@ pub trait TaskFilterSource {
 }
 
 impl TaskFilterSource for crate::api_types::TaskDTO {
-    fn reserved_field_values(&self, field: &str) -> Option<Vec<String>> {
-        match field {
-            "assignee" => Some(vec![self.assignee.clone().unwrap_or_default()]),
-            "reporter" => Some(vec![self.reporter.clone().unwrap_or_default()]),
-            "type" => Some(vec![self.task_type.to_string()]),
-            "status" => Some(vec![self.status.to_string()]),
-            "priority" => Some(vec![self.priority.to_string()]),
-            "tags" => Some(self.tags.clone()),
-            _ => None,
-        }
-    }
-    fn custom_fields(&self) -> &CustomFields {
-        &self.custom_fields
-    }
-}
-
-impl TaskFilterSource for crate::storage::task::Task {
     fn reserved_field_values(&self, field: &str) -> Option<Vec<String>> {
         match field {
             "assignee" => Some(vec![self.assignee.clone().unwrap_or_default()]),
@@ -129,28 +104,6 @@ pub fn canonicalize(name: &str) -> String {
     name.trim().to_ascii_lowercase()
 }
 
-/// Partition an incoming list of `--where` filters into custom-field filters
-/// (returned as a map) and remaining filters that should be applied later.
-pub fn partition_where_filters(
-    filters: &[(String, String)],
-    config: &ResolvedConfig,
-) -> PartitionedWhereFilters {
-    let mut custom: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut remainder: Vec<(String, String)> = Vec::new();
-    let mut applied: BTreeSet<String> = BTreeSet::new();
-
-    for (key, value) in filters {
-        if let Some(name) = resolve_filter_name(key, config) {
-            custom.entry(name.clone()).or_default().push(value.clone());
-            applied.insert(canonicalize(&name));
-        } else {
-            remainder.push((key.clone(), value.clone()));
-        }
-    }
-
-    (custom, remainder, applied)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,23 +153,5 @@ mod tests {
 
         let case_insensitive = extract_value_strings(&fields, "iteration").unwrap();
         assert_eq!(case_insensitive, vec!["beta".to_string()]);
-    }
-
-    #[test]
-    fn partition_where_filters_separates_custom_field_entries() {
-        let config = config_with_fields(&["sprint"]);
-        let filters = vec![
-            ("field:sprint".to_string(), "W35".to_string()),
-            ("status".to_string(), "Todo".to_string()),
-            ("sprint".to_string(), "w35".to_string()),
-        ];
-
-        let (custom, remainder, applied) = partition_where_filters(&filters, &config);
-        assert_eq!(
-            custom.get("sprint"),
-            Some(&vec!["W35".to_string(), "w35".to_string()])
-        );
-        assert_eq!(remainder, vec![("status".to_string(), "Todo".to_string())]);
-        assert!(applied.contains(&canonicalize("sprint")));
     }
 }

@@ -3,7 +3,7 @@ use crate::cli::TaskSearchArgs;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::config::types::ResolvedConfig;
-use crate::services::task_list::{TaskQueryError, TaskQueryInput};
+use crate::services::task_list::TaskQueryInput;
 use crate::storage::DeletionFilter;
 use crate::workspace::TasksDirectoryResolver;
 
@@ -29,17 +29,7 @@ impl CommandHandler for SearchHandler {
         // detected project's when there is one), as the CLI always has.
         let query = input
             .resolve(&ctx.config, resolver.path.as_path())
-            .map_err(|e| match e {
-                TaskQueryError::InvalidEnum { field, message, .. } => {
-                    let label = match field {
-                        "status" => "Status",
-                        "priority" => "Priority",
-                        _ => "Task type",
-                    };
-                    format!("{label} validation failed: {message}")
-                }
-                other => other.to_string(),
-            })?;
+            .map_err(|e| e.cli_message())?;
 
         renderer.log_debug("list: executing search");
         let tasks = crate::services::task_list::run(&ctx.storage, &query, chrono::Utc::now());

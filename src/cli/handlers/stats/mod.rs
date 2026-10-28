@@ -65,7 +65,7 @@ impl CommandHandler for StatsHandler {
             ),
             StatsAction::Effort {
                 by,
-                r#where,
+                filter,
                 unit,
                 limit,
                 global,
@@ -74,7 +74,7 @@ impl CommandHandler for StatsHandler {
                 transitions,
             } => effort::run(
                 &by,
-                r#where,
+                &filter.join(" "),
                 unit,
                 limit,
                 global,

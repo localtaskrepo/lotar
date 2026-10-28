@@ -118,6 +118,24 @@ impl fmt::Display for TaskQueryError {
     }
 }
 
+impl TaskQueryError {
+    /// The message as the CLI prints it: enum errors name the field
+    /// (`Status validation failed: ...`).
+    pub fn cli_message(&self) -> String {
+        match self {
+            TaskQueryError::InvalidEnum { field, message, .. } => {
+                let label = match *field {
+                    "status" => "Status",
+                    "priority" => "Priority",
+                    _ => "Task type",
+                };
+                format!("{label} validation failed: {message}")
+            }
+            other => other.to_string(),
+        }
+    }
+}
+
 impl From<String> for TaskQueryError {
     fn from(message: String) -> Self {
         TaskQueryError::Invalid(message)

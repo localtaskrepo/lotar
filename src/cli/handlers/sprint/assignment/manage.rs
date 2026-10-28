@@ -2,20 +2,18 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::api_types::TaskSelection;
 use crate::cli::args::sprint::{
     SprintAddArgs, SprintMoveArgs, SprintRemoveArgs, TaskSelectionArgs,
 };
 use crate::cli::handlers::sprint::shared::{
     SprintAssignmentIntegrityPayload, build_assignment_integrity,
 };
-use crate::cli::validation::CliValidator;
 use crate::config::manager::ConfigManager;
 use crate::config::types::ResolvedConfig;
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_assignment;
 use crate::services::sprint_service::SprintRecord;
-use crate::services::task_selection;
+use crate::services::task_list::TaskQueryInput;
 use crate::storage::manager::Storage;
 use crate::utils::resolve_project_input;
 use crate::workspace::{TasksDirectoryResolver, TasksDirectorySource};
@@ -44,17 +42,12 @@ pub(crate) fn handle_add(
         &add_args.items,
     )?;
 
-    if let Some(selection) =
-        build_selection_from_args(&add_args.select, &resolver, &resolved_config)?
-    {
-        let mut selected = task_selection::select_task_ids(
-            &context.storage,
-            &selection,
-            &resolver,
-            &resolved_config,
-        )?;
-        tasks.append(&mut selected);
-    }
+    tasks.extend(select_task_ids(
+        &add_args.select,
+        &context.storage,
+        &resolver,
+        &resolved_config,
+    )?);
 
     tasks.sort();
     tasks.dedup();
@@ -156,17 +149,12 @@ pub(crate) fn handle_move(
         &move_args.items,
     )?;
 
-    if let Some(selection) =
-        build_selection_from_args(&move_args.select, &resolver, &resolved_config)?
-    {
-        let mut selected = task_selection::select_task_ids(
-            &context.storage,
-            &selection,
-            &resolver,
-            &resolved_config,
-        )?;
-        tasks.append(&mut selected);
-    }
+    tasks.extend(select_task_ids(
+        &move_args.select,
+        &context.storage,
+        &resolver,
+        &resolved_config,
+    )?);
 
     tasks.sort();
     tasks.dedup();
@@ -268,17 +256,12 @@ pub(crate) fn handle_remove(
         &remove_args.items,
     )?;
 
-    if let Some(selection) =
-        build_selection_from_args(&remove_args.select, &resolver, &resolved_config)?
-    {
-        let mut selected = task_selection::select_task_ids(
-            &context.storage,
-            &selection,
-            &resolver,
-            &resolved_config,
-        )?;
-        tasks.append(&mut selected);
-    }
+    tasks.extend(select_task_ids(
+        &remove_args.select,
+        &context.storage,
+        &resolver,
+        &resolved_config,
+    )?);
 
     tasks.sort();
     tasks.dedup();
@@ -382,67 +365,41 @@ fn load_resolved_config(resolver: &TasksDirectoryResolver) -> Result<ResolvedCon
     Ok(manager.get_resolved_config().clone())
 }
 
-fn build_selection_from_args(
+/// Task IDs chosen by the `--select*` flags: the value flags plus a
+/// `--select` query in the web search syntax, run as the shared task query
+/// (DEV-231). Empty when no selection flag is given.
+fn select_task_ids(
     args: &TaskSelectionArgs,
+    storage: &Storage,
     resolver: &TasksDirectoryResolver,
     config: &ResolvedConfig,
-) -> Result<Option<TaskSelection>, String> {
+) -> Result<Vec<String>, String> {
     if !args.is_active() {
-        return Ok(None);
+        return Ok(Vec::new());
     }
-
-    let validator = CliValidator::new(config);
-    let mut filter = crate::api_types::TaskListFilter::default();
-
-    if let Some(query) = args
-        .query
-        .as_ref()
-        .map(|q| q.trim())
-        .filter(|q| !q.is_empty())
-    {
-        filter.text_query = Some(query.to_string());
-    }
-
-    for status in &args.status {
-        let validated = validator
-            .validate_status(status)
-            .map_err(|e| format!("Status validation failed: {}", e))?;
-        filter.status.push(validated);
-    }
-
-    for priority in &args.priority {
-        let validated = validator
-            .validate_priority(priority)
-            .map_err(|e| format!("Priority validation failed: {}", e))?;
-        filter.priority.push(validated);
-    }
-
-    for task_type in &args.task_type {
-        let validated = validator
-            .validate_task_type(task_type)
-            .map_err(|e| format!("Type validation failed: {}", e))?;
-        filter.task_type.push(validated);
-    }
-
-    if !args.tag.is_empty() {
-        filter.tags = args.tag.clone();
-    }
-
-    if let Some(project) = args.project.as_deref() {
-        let prefix = resolve_project_input(project, resolver.path.as_path());
-        filter.project = Some(prefix);
-    }
-
-    let (custom_where, remaining_where, _) =
-        crate::utils::custom_fields::partition_where_filters(&args.r#where, config);
-    for (name, values) in custom_where {
-        filter.custom_fields.entry(name).or_default().extend(values);
-    }
-
-    Ok(Some(TaskSelection {
-        filter,
-        r#where: remaining_where,
-    }))
+    let mut input = TaskQueryInput {
+        project: args
+            .project
+            .as_deref()
+            .map(|project| resolve_project_input(project, resolver.path.as_path())),
+        status: args.status.clone(),
+        priority: args.priority.clone(),
+        task_type: args.task_type.clone(),
+        tags: args.tag.clone(),
+        ..TaskQueryInput::default()
+    };
+    input
+        .add_search(&crate::utils::search_syntax::parse(&args.select.join(" ")))
+        .map_err(|e| e.cli_message())?;
+    let query = input
+        .resolve(config, resolver.path.as_path())
+        .map_err(|e| e.cli_message())?;
+    Ok(
+        crate::services::task_list::run(storage, &query, chrono::Utc::now())
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect(),
+    )
 }
 
 #[derive(Debug, Serialize)]

@@ -1,4 +1,3 @@
-use crate::cli::args::common::parse_key_value;
 use crate::services::sprint_metrics::SprintBurndownMetric;
 use clap::{Args, Subcommand};
 
@@ -57,9 +56,9 @@ pub enum SprintAction {
 
 #[derive(Args, Debug, Default, Clone)]
 pub struct TaskSelectionArgs {
-    /// Free-form search query applied before other filters
-    #[arg(long = "select-query")]
-    pub query: Option<String>,
+    /// Select tasks with the web search syntax, e.g. `--select 'status:todo tag:ui area=billing'`
+    #[arg(long = "select", value_name = "QUERY")]
+    pub select: Vec<String>,
 
     /// Filter by status (repeatable)
     #[arg(long = "select-status")]
@@ -80,15 +79,6 @@ pub struct TaskSelectionArgs {
     /// Restrict selection to a specific project prefix
     #[arg(long = "select-project")]
     pub project: Option<String>,
-
-    /// Additional key=value filters (same semantics as `lotar task list --where`)
-    #[arg(
-        long = "select-where",
-        value_parser = parse_key_value,
-        num_args = 0..,
-        value_delimiter = None
-    )]
-    pub r#where: Vec<(String, String)>,
 }
 
 #[derive(Args, Debug)]
@@ -111,16 +101,12 @@ pub struct SprintOrderArgs {
 
 impl TaskSelectionArgs {
     pub fn is_active(&self) -> bool {
-        self.query
-            .as_ref()
-            .map(|q| !q.trim().is_empty())
-            .unwrap_or(false)
+        self.select.iter().any(|q| !q.trim().is_empty())
             || !self.status.is_empty()
             || !self.priority.is_empty()
             || !self.task_type.is_empty()
             || !self.tag.is_empty()
             || self.project.is_some()
-            || !self.r#where.is_empty()
     }
 }
 

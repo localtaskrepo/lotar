@@ -1,4 +1,5 @@
 use crate::cli::args::stats::StatsEffortUnit;
+use std::collections::BTreeMap;
 
 #[expect(
     clippy::too_many_arguments,
@@ -7,7 +8,7 @@ use crate::cli::args::stats::StatsEffortUnit;
 )]
 pub(crate) fn run(
     by: &str,
-    r#where: Vec<(String, String)>,
+    filter: &str,
     unit: StatsEffortUnit,
     limit: usize,
     global: bool,
@@ -20,7 +21,22 @@ pub(crate) fn run(
 ) -> Result<(), String> {
     let scope_project = super::common::scope_project(global, project, resolver);
 
-    let mut tasks = super::common::list_tasks(scope_project.as_deref(), resolver);
+    // The tasks to aggregate: the scope plus `--filter`, run as the shared
+    // task query (DEV-231).
+    let base = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+        .map_err(|e| format!("Failed to load config: {}", e))?;
+    let mut input = crate::services::task_list::TaskQueryInput {
+        project: scope_project.clone(),
+        ..Default::default()
+    };
+    input
+        .add_search(&crate::utils::search_syntax::parse(filter))
+        .map_err(|e| e.cli_message())?;
+    let query = input
+        .resolve(&base, resolver.path.as_path())
+        .map_err(|e| e.cli_message())?;
+    let storage = crate::storage::manager::Storage::new(&resolver.path);
+    let mut tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now());
     // Performance guardrail: cap tasks processed for aggregation
     let cap: usize = std::env::var("LOTAR_STATS_EFFORT_CAP")
         .ok()
@@ -333,70 +349,12 @@ pub(crate) fn run(
         crate::utils::custom_fields::resolve_task_filter_values(id, t, key, cfg)
     };
 
-    // Parse where filters as (key -> allowed set); simple equality only for now
-    use std::collections::{BTreeMap, BTreeSet};
-    let mut filters: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for (k, v) in r#where.into_iter() {
-        // Resolve '@me' to current username for assignee filter
-        let filter_value = if k.eq_ignore_ascii_case("assignee") && v == "@me" {
-            crate::utils::identity::resolve_me_alias_for_project(
-                &v,
-                Some(resolver.path.as_path()),
-                scope_project.as_deref(),
-            )
-            .unwrap_or(v)
-        } else {
-            v
-        };
-        filters.entry(k).or_default().insert(filter_value);
-    }
-
-    // Load config once to resolve custom field keys
-    let cfg = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
-        .map_err(|e| format!("Failed to load config: {}", e))?;
+    // Custom field keys for grouping resolve against the base configuration.
+    let cfg = base;
 
     // Aggregate: keep both time hours and points totals to support unit modes
     let mut agg: BTreeMap<String, (f64, f64, usize)> = BTreeMap::new(); // (hours, points, count)
     for (id, t) in tasks {
-        // Apply filters
-        let mut passes = true;
-        for (fk, allowed) in &filters {
-            if let Some(vals) = resolve_group_key(&id, &t, fk, &cfg)
-                .map(|vs| vs.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>())
-            {
-                if std::env::var("LOTAR_DEBUG").is_ok() {
-                    // Debug output for filter matching
-                    use std::fs::OpenOptions;
-                    use std::io::Write;
-                    if let Ok(mut f) = OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open("/tmp/lotar_stats_debug.log")
-                    {
-                        let _ = writeln!(
-                            f,
-                            "[FILTER] key={}, allowed={:?}, vals={:?}",
-                            fk, allowed, vals
-                        );
-                    }
-                }
-                // Use centralized fuzzy property matching utility
-                use crate::utils::fuzzy_match::fuzzy_set_match;
-                let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
-                let vals_vec: Vec<String> = vals.to_vec();
-                if vals_vec.is_empty() || !fuzzy_set_match(&vals_vec, &allowed_vec) {
-                    passes = false;
-                    break;
-                }
-            } else {
-                passes = false;
-                break;
-            }
-        }
-        if !passes {
-            continue;
-        }
-
         // Parse effort into hours or points
         let (hours, points, effort_kind) = if let Some(e) = t.effort.as_deref() {
             match crate::utils::effort::parse_effort(e) {

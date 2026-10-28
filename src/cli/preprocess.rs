@@ -364,7 +364,10 @@ pub fn removed_flag_hint(args: &[String]) -> Option<String> {
             "--unassigned" => "`assignee:__none__`",
             "--overdue" => "`due:overdue`",
             "--due-soon" => "`due_within:<days>` (or `--due-within <days>`)",
-            "--where" => "`key=value` or `field:name=value` in the query",
+            "--where" => {
+                "`key=value` or `field:name=value` in the search syntax: the `lotar list` query, `--filter` in `stats effort`"
+            }
+            "--select-where" | "--select-query" => "`--select '<query>'` in the search syntax",
             _ => return None,
         };
         Some(format!(

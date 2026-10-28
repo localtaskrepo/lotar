@@ -1524,7 +1524,7 @@ fn sprint_add_appends_select_filter_results() {
         "--sprint",
         "1",
         &manual_id,
-        "--select-where",
+        "--select",
         "field:iteration=beta",
     ])
     .assert()

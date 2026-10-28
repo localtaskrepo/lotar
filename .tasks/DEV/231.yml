@@ -5,10 +5,11 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-28T19:49:58.059316+00:00
-modified: 2026-10-28T20:08:21.073229+00:00
+modified: 2026-10-28T20:25:10.991680+00:00
 relationships:
   related:
   - DEV-230
+  - DEV-232
 comments:
 - date: 2026-10-28T20:08:21.023658+00:00
   text: |-
@@ -55,3 +56,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-28T20:25:10.991680+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-230"]}'
+    new: '{"related":["DEV-230","DEV-232"]}'

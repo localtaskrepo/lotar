@@ -1,0 +1,40 @@
+title: Sprint selection and stats effort use the web search syntax
+status: Done
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T20:25:10.829850+00:00
+modified: 2026-10-28T20:30:25.717149+00:00
+relationships:
+  related:
+  - DEV-231
+comments:
+- date: 2026-10-28T20:30:25.685590+00:00
+  text: 'Outcome: sprint add/move/remove --select ''<query>'' and stats effort --filter ''<query>'' take the web search syntax and run the shared task query; --select-status/-priority/-type/-tag/-project stay. Removed --select-where, --select-query, stats effort --where (hints printed). Deleted services/task_selection.rs, partition_where_filters and the raw-Task TaskFilterSource impl. Docs: sprints.md (selection was undocumented), stats.md. Evidence: cli_sprint_basic_test and stats_snapshot_test converted; lint:agent, test:agent (1826 Rust, 1352 UI), test:smoke:agent (361) pass. Remaining: uncommitted. Follow-ups: DEV-233 (REST selection ignored); audit gaps reported to the developer (sort default, sprint backlog, graph filter, other stats, API search syntax, MCP sprint selection, clap error-context). Guidance: no durable finding.'
+description: 'Follow-up to DEV-231. Sprint add/move/remove --select-where and --select-query, and stats effort --where, used their own key=value matching. Replace them with --select ''<query>'' (sprint) and --filter ''<query>'' (stats effort) in the web search syntax, run as the shared task query so results match lotar list. Keep the --select-status/-priority/-type/-tag/-project value flags. Remove the old selection service and where-splitting helper. Removed flags print a hint. Acceptance: converted sprint and stats tests pass; docs (sprints.md, stats.md) updated; lint/test/smoke pass.'
+history:
+- at: 2026-10-28T20:25:10.992401+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-231"]}'
+- at: 2026-10-28T20:25:11.115122+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T20:30:25.685590+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T20:30:25.717149+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

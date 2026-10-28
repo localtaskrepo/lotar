@@ -151,9 +151,9 @@ pub enum StatsAction {
         /// Grouping key (built-ins: assignee|type|project|status|priority|reporter|tag|field:<name>)
         #[arg(long = "by", default_value = "assignee")]
         by: String,
-        /// Filters: --where key=value (repeatable). Keys same as --by; for custom fields use field:<name>.
-        #[arg(long = "where", value_parser = crate::cli::args::common::parse_key_value, num_args=0.., value_delimiter=None)]
-        r#where: Vec<(String, String)>,
+        /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui area=billing')
+        #[arg(long = "filter", value_name = "QUERY")]
+        filter: Vec<String>,
         /// Output unit: hours|days|weeks|points|auto
         #[arg(long = "unit", value_enum, default_value_t = StatsEffortUnit::Hours)]
         unit: StatsEffortUnit,

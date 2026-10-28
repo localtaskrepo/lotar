@@ -248,7 +248,7 @@ Aggregate effort estimates across tasks (snapshot). Effort strings support h (ho
 
 Options:
 - `--by <key>` grouping key. Built-ins: assignee, reporter, type, status, priority, project, tag. Declared custom fields are accepted directly (e.g., `--by sprint`). You can also use `field:<name>` explicitly. Default: `assignee`.
-- `--where key=value` (repeatable) filters. Keys follow the same rules as `--by`. Tags accept `tag` or `tags`.
+- `--filter <query>` aggregates only the tasks matching a query in the [web search syntax](./list.md#filters-in-the-query), e.g. `--filter 'status:todo tag:ui area=billing'`. It runs the same query as `lotar list`, so the two always agree. (Replaces `--where`.)
 - `--unit hours|days|weeks|points|auto` select output unit; auto picks hours if any present, else points. Default: `hours`.
 - `--since <date>` / `--until <date>` window filters (RFC3339 or relative like `14d`, `yesterday`, weekday names).
 - `--transitions <STATUS>` include only tasks that transitioned into STATUS within the window (requires git).
@@ -258,8 +258,8 @@ Options:
 Examples:
 ```bash
 lotar stats effort --by assignee --unit hours
-lotar stats effort --by sprint --where sprint=2025-W35
-lotar stats effort --by field:sprint --where status=todo --since 14d
+lotar stats effort --by sprint --filter 'field:"sprint"=2025-W35'
+lotar stats effort --by field:sprint --filter status:todo --since 14d
 ```
 
 Tip: Use an RFC3339 window like `--since 2025-08-11T00:00:00Z --until 2025-08-13T00:00:00Z` to precisely target a day when testing transitions.

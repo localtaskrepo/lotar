@@ -1,6 +1,6 @@
 [package]
 name = "lotar"
-version = "0.10.1"
+version = "0.11.0"
 edition = "2024"
 default-run = "lotar"
 authors = ["Ravi Gairola <mallox@pyxzl.net>"]
