@@ -1,0 +1,60 @@
+title: Colour tags without a configured colour automatically
+status: Done
+priority: Low
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T03:41:46.008245+00:00
+modified: 2026-10-28T03:52:12.443111+00:00
+comments:
+- date: 2026-10-28T03:52:12.359497+00:00
+  text: 'Done: tags without a configured colour get a stable colour from their name (FNV-1a over the lower-cased name into 11 distinct hues; gray, brown and near twins left out). Configured colours always win; an invalid configured colour falls back to the automatic one. Preferences > Appearance > Tag colours turns automatic colours off per person (localStorage, default on) with a live preview. Chips wait for the project''s config before colouring so a configured colour never flashes in. Config ''Tag colours'' editor lists tags in use without a row (fetched once with has:tag, up to 1000 tasks) in their current colour; clicking adds a row prefilled with it. Docs: config.md. Tests: tagColors.spec (stability, precedence, preference), smoke ui.tag-colors extended (auto colour, Preferences switch, one-click override); npm run lint, npm test, smoke 361. Snippets attached.'
+references:
+- attachment: tags-in-use-2x.43e3e4a9afd3f803b833839386e78085.webp
+- attachment: task-list-auto-colours-2x.8110a6d6449c29f39a3813fc9c27c34e.webp
+- attachment: preferences-auto-colours-2x.31e4ba8ec6aa1de92ae036142a2f0c19.webp
+description: Tags without a configured colour get a stable colour derived from their name, the same on every page and for everyone. A Preferences switch turns it off. The Config tag colour editor lists tags in use with their automatic colour; one click adds an override row prefilled with it.
+history:
+- at: 2026-10-28T03:43:19.831905+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T03:50:56.450371+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:tags-in-use-2x.43e3e4a9afd3f803b833839386e78085.webp
+- at: 2026-10-28T03:50:57.480683+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:preferences-auto-colours-2x.f21cb13a54c6239c63dffa87e07c4ebf.webp
+- at: 2026-10-28T03:50:58.631170+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:task-list-auto-colours-2x.8110a6d6449c29f39a3813fc9c27c34e.webp
+- at: 2026-10-28T03:51:50.274759+00:00
+  actor: mallox
+  changes:
+  - field: reference_removed
+    old: attachment:preferences-auto-colours-2x.f21cb13a54c6239c63dffa87e07c4ebf.webp
+- at: 2026-10-28T03:51:52.078105+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:preferences-auto-colours-2x.31e4ba8ec6aa1de92ae036142a2f0c19.webp
+- at: 2026-10-28T03:52:12.359497+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T03:52:12.443111+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

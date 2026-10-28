@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.705315+00:00
-modified: 2026-10-28T02:11:56.174985+00:00
+modified: 2026-10-28T19:10:45.761454+00:00
 comments:
 - date: 2026-09-06T11:21:52.619873+00:00
   text: 'Backlog reconciliation: Remains Todo for nested-folder ticket storage plus archive lifecycle/query behavior. DEV-56 owns canonical identity/multi-root lookup correctness, and DEV-53 storage safety is implemented; neither closes archive support.'
@@ -14,6 +14,8 @@ comments:
     Former TODO.md line 4: Allow ticket files to be stored in nested folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
 - date: 2026-10-28T02:11:56.174985+00:00
   text: Need to consider how to migrate from a repo that doesn't use any folders yet and how to act on a config change that would modify the folder structure.
+- date: 2026-10-28T19:10:45.761454+00:00
+  text: 'Follow-up from DEV-229: the Config tag colour editor lists tags in use from the newest 1000 active tasks (one /api/tasks/list call with has=tag). A server-side listing of all tags in use would remove that cap; lotar stats tags already counts tags and could back it. Decide with archive support whether tags on archived tasks count as in use.'
 description: |-
   Migrated checklist requirements:
   Support transparent nested ticket discovery and mutation so manual grouping does not break scanning or lookup in large repositories. Retain archive support as a proposed extension requiring defined lifecycle/query semantics, not a silently assumed implementation. DEV-56 covers identity/multi-root correctness, not the complete nested/archive feature.
@@ -34,6 +36,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-10-28T02:11:56.174985+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T19:10:45.761454+00:00
   actor: mallox
   changes:
   - field: comment_added

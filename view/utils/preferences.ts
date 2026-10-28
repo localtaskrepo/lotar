@@ -14,6 +14,8 @@ const SHARE_FILTERS_KEY = 'lotar.preferences.filters.shareAcrossPages'
 export const SINGLE_KEY_SHORTCUTS_KEY = 'lotar.preferences.shortcuts.singleKey'
 /** Whether the header shows the command palette button (DEV-219). */
 export const PALETTE_BUTTON_KEY = 'lotar.preferences.header.paletteButton'
+/** Whether tags without a configured colour get an automatic one (DEV-229). */
+export const AUTO_TAG_COLORS_KEY = 'lotar.preferences.tags.autoColors'
 /** Saved search and filters used by every page when sharing is on (DEV-142). */
 export const SHARED_FILTER_STORAGE_KEY = 'lotar.shared.filter'
 
@@ -134,6 +136,14 @@ export function readPaletteButtonPreference(): boolean {
 
 export function storePaletteButtonPreference(value: boolean) {
     storeBooleanPreference(PALETTE_BUTTON_KEY, value)
+}
+
+export function readAutoTagColorsPreference(): boolean {
+    return readBooleanPreference(AUTO_TAG_COLORS_KEY, true)
+}
+
+export function storeAutoTagColorsPreference(value: boolean) {
+    storeBooleanPreference(AUTO_TAG_COLORS_KEY, value)
 }
 
 /** Where a page's FilterBar saves its search and filters: its own key, or the shared one. */

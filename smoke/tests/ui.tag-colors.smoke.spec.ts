@@ -46,15 +46,44 @@ describe.concurrent('UI tag colours (DEV-20)', () => {
                     const ui = row.locator('.tag', { hasText: 'ui' });
                     await expect.poll(() => ui.getAttribute('class')).toContain('tag--colored');
                     expect(await ui.getAttribute('style')).toContain('--tag-color: #ef4444');
-                    // An uncoloured tag keeps the plain chip.
+                    // A tag without a configured colour gets an automatic one (DEV-229)...
                     const plain = row.locator('.tag', { hasText: 'plain' });
-                    expect(await plain.getAttribute('class')).not.toContain('tag--colored');
+                    await expect.poll(() => plain.getAttribute('class')).toContain('tag--colored');
+                    const autoStyle = await plain.getAttribute('style');
+                    expect(autoStyle).toMatch(/--tag-color: #[0-9a-f]{6}/);
                     // The tint keeps the theme's text colour.
                     const colors = await ui.evaluate((el) => {
                         const style = getComputedStyle(el);
                         return { fg: style.color, bg: style.backgroundColor };
                     });
                     expect(colors.bg).not.toBe('rgba(0, 0, 0, 0)');
+
+                    // ...unless the Preferences switch turns automatic colours off.
+                    await page.goto(`${server.url}/preferences`);
+                    await page.getByTestId('preferences-auto-tag-colors').uncheck();
+                    await page.goto(`${server.url}/?project=ALPHA`);
+                    await row.waitFor({ timeout: 15_000 });
+                    await expect
+                        .poll(() => row.locator('.tag', { hasText: 'plain' }).getAttribute('class'))
+                        .not.toContain('tag--colored');
+                    await expect
+                        .poll(() => row.locator('.tag', { hasText: 'ui' }).getAttribute('class'))
+                        .toContain('tag--colored');
+                });
+
+                // The Config editor offers tags in use for a one-click override.
+                await withPage(`${server.url}/config?section=fields`, async (page) => {
+                    const inUse = page.getByTestId('tag-colors-in-use');
+                    const plain = inUse.getByRole('button', { name: 'plain', exact: true });
+                    await plain.waitFor({ timeout: 15_000 });
+                    expect(await inUse.getByRole('button', { name: 'ui', exact: true }).count()).toBe(0);
+                    await plain.click();
+                    await expect
+                        .poll(() =>
+                            page.getByTestId('config-tag-colors').getByLabel('Tag 2', { exact: true }).inputValue(),
+                        )
+                        .toBe('plain');
+                    expect(await inUse.getByRole('button', { name: 'plain', exact: true }).count()).toBe(0);
                 });
             } finally {
                 await server.stop();

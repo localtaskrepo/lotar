@@ -1050,9 +1050,7 @@ impl ConfigValidator {
                 result.add_error(
                     ValidationError::warning(
                         Some("tag_properties".to_string()),
-                        format!(
-                            "Tag '{name}' has an unknown colour '{color}'; it is shown without one"
-                        ),
+                        format!("Tag '{name}' has an unknown colour '{color}'; it is ignored"),
                     )
                     .with_fix(format!(
                         "Use #rgb, #rrggbb or one of {}",

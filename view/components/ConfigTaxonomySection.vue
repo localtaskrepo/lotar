@@ -29,13 +29,14 @@
       <ConfigTagColorsField
         v-model:entries="tagColors"
         :is-global="isGlobal"
+        :project="project"
         :suggestions="tagColorSuggestions"
         :inherited-properties="globalTagProperties"
         :error="tagColorsError"
         :source="tagColorsSource"
         :provenance-label="provenanceLabel"
         :provenance-class="provenanceClass"
-        @add="emit('addTagColor')"
+        @add="(tag?: string, color?: string) => emit('addTagColor', tag, color)"
         @remove="emit('removeTagColor', $event)"
         @validate="emit('validate', 'tag_properties')"
       />
@@ -96,6 +97,7 @@ const tagColors = defineModel<TagColorEntry[]>('tagColors', { required: true })
 const {
   description,
   isGlobal,
+  project = '',
   globalTags = [],
   globalCustomFields = [],
   tagsError = null,
@@ -111,6 +113,8 @@ const {
 } = defineProps<{
   description: string
   isGlobal: boolean
+  /** Project prefix of the scope; empty for global. */
+  project?: string
   /** Effective global values, summarized in the project inherit option. */
   globalTags?: string[]
   globalCustomFields?: string[]
@@ -130,7 +134,7 @@ const {
 
 const emit = defineEmits<{
   (e: 'validate', field: 'tags' | 'custom_fields' | 'tag_properties'): void
-  (e: 'addTagColor'): void
+  (e: 'addTagColor', tag?: string, color?: string): void
   (e: 'removeTagColor', index: number): void
 }>()
 

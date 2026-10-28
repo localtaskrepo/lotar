@@ -61,6 +61,24 @@
             </p>
           </div>
         </fieldset>
+
+        <fieldset class="appearance__group">
+          <legend>Tag colours</legend>
+          <div class="col" style="gap: 12px">
+            <label class="row" style="gap: 8px; align-items: center">
+              <input v-model="autoTagColors" type="checkbox" data-testid="preferences-auto-tag-colors" />
+              Colour tags that have no colour set
+            </label>
+            <div class="row tag-colors-preview" style="gap: 6px; flex-wrap: wrap" aria-hidden="true">
+              <span v-for="tag in tagPreview" :key="tag" class="tag" v-bind="tagChipAttrs(previewColor(tag))">{{
+                tag
+              }}</span>
+            </div>
+            <p class="muted" style="margin: 0">
+              Each tag gets a colour from its name, the same everywhere. Colours set in Config always win.
+            </p>
+          </div>
+        </fieldset>
       </div>
     </UiCard>
 
@@ -200,6 +218,7 @@ import UiSelect from '../components/UiSelect.vue'
 import { NAV_TABS, useNavTabs } from '../composables/useNavTabs'
 import { getContrastingColor } from '../utils/color'
 import { paletteShortcutLabel } from '../utils/keyboardShortcuts'
+import { autoTagColor, tagChipAttrs } from '../utils/tagColors'
 import {
   DEFAULT_STARTUP_DESTINATION,
   DEFAULT_TASKS_PAGE_SIZE,
@@ -216,6 +235,8 @@ import {
   storeSingleKeyShortcutsPreference,
   storePaletteButtonPreference,
   readPaletteButtonPreference,
+  readAutoTagColorsPreference,
+  storeAutoTagColorsPreference,
   storeStartupDestination,
   storeTaskPanelAutoDetectLinksPreference,
   storeTaskPanelShowAttachmentsPreference,
@@ -285,6 +306,11 @@ const autoDetectLinks = ref(true)
 const shareFilters = ref(false)
 const singleKeyShortcuts = ref(true)
 const showPaletteButton = ref(readPaletteButtonPreference())
+const autoTagColors = ref(readAutoTagColorsPreference())
+const tagPreview = ['frontend', 'backend', 'auth', 'ui', 'docs']
+function previewColor(tag: string) {
+  return autoTagColors.value ? autoTagColor(tag) : null
+}
 const paletteLabel = paletteShortcutLabel()
 
 const tasksPageSizeOptions = [25, 50, 100, 200]
@@ -360,6 +386,10 @@ watch(singleKeyShortcuts, (value) => {
 
 watch(showPaletteButton, (value) => {
   storePaletteButtonPreference(!!value)
+})
+
+watch(autoTagColors, (value) => {
+  storeAutoTagColorsPreference(!!value)
 })
 
 watch(showAttachments, (value) => {

@@ -53,6 +53,20 @@
         </UiButton>
       </li>
     </ul>
+    <div v-if="uncoloured.length" class="tag-colors__in-use" data-testid="tag-colors-in-use">
+      <span class="muted">Tags in use, click one to set its colour:</span>
+      <button
+        v-for="item in uncoloured"
+        :key="item.tag"
+        type="button"
+        class="tag tag--interactive"
+        v-bind="tagChipAttrs(item.color)"
+        :title="`Set a colour for ${item.tag}`"
+        @click="emit('add', item.tag, item.color)"
+      >
+        {{ item.tag }}
+      </button>
+    </div>
     <datalist :id="listId">
       <option v-for="tag in suggestions" :key="tag" :value="tag" />
     </datalist>
@@ -74,10 +88,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
+import { api } from '../api/client'
 import type { ConfigSource, TagProperties } from '../api/types'
 import type { TagColorEntry } from '../composables/useConfigForm'
-import { resolveTagColor, TAG_COLOR_NAMES, tagChipAttrs, tagColorOf } from '../utils/tagColors'
+import { autoTagColor, resolveTagColor, TAG_COLOR_NAMES, tagChipAttrs, tagColorOf } from '../utils/tagColors'
 import IconGlyph from './IconGlyph.vue'
 import UiButton from './UiButton.vue'
 import UiInput from './UiInput.vue'
@@ -88,6 +103,7 @@ const entries = defineModel<TagColorEntry[]>('entries', { required: true })
 
 const {
   isGlobal,
+  project = '',
   suggestions = [],
   inheritedProperties = null,
   error = null,
@@ -96,6 +112,8 @@ const {
   provenanceClass,
 } = defineProps<{
   isGlobal: boolean
+  /** Project prefix of the scope; empty for global (every project). */
+  project?: string
   /** Known tags offered while typing a name. */
   suggestions?: string[]
   /** Project scope: the global tag properties, shown for reference. */
@@ -107,7 +125,7 @@ const {
 }>()
 
 const emit = defineEmits<{
-  (e: 'add'): void
+  (e: 'add', tag?: string, color?: string): void
   (e: 'remove', index: number): void
   (e: 'validate'): void
 }>()
@@ -124,6 +142,43 @@ const inherited = computed(() =>
         .filter((item): item is { tag: string; color: string } => !!item.color)
         .sort((a, b) => a.tag.localeCompare(b.tag)),
 )
+
+// Tags on tasks in this scope (DEV-229), so colours can be set for tags that
+// are in use but not configured. One request; failures just hide the list.
+// Only the newest 1000 tasks are read; a server-side tag listing is a DEV-4
+// follow-up.
+const tagsInUse = ref<string[]>([])
+let tagsRequest = 0
+watch(
+  () => project,
+  async (scope) => {
+    const request = ++tagsRequest
+    try {
+      const response = await api.listTasks({ project: scope || undefined, has: 'tag', limit: 1000 })
+      // A newer scope's request superseded this one.
+      if (request !== tagsRequest) return
+      const seen = new Map<string, string>()
+      for (const task of response.tasks ?? []) {
+        for (const tag of task.tags ?? []) {
+          const trimmed = tag.trim()
+          if (trimmed && !seen.has(trimmed.toLowerCase())) seen.set(trimmed.toLowerCase(), trimmed)
+        }
+      }
+      tagsInUse.value = [...seen.values()].sort((a, b) => a.localeCompare(b))
+    } catch {
+      if (request === tagsRequest) tagsInUse.value = []
+    }
+  },
+  { immediate: true },
+)
+
+/** Tags in use without a row here, in the colour they show now. */
+const uncoloured = computed(() => {
+  const rows = new Set(entries.value.map((entry) => entry.tag.trim().toLowerCase()))
+  return tagsInUse.value
+    .filter((tag) => !rows.has(tag.toLowerCase()))
+    .map((tag) => ({ tag, color: tagColorOf(inheritedProperties, tag) ?? autoTagColor(tag) }))
+})
 
 function label(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1)
@@ -194,6 +249,18 @@ function setColor(index: number, color: string) {
 .tag-colors__preview {
   min-width: 0;
   overflow: hidden;
+}
+
+.tag-colors__in-use {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+.tag-colors__in-use .tag {
+  font: inherit;
+  font-size: var(--text-xs);
 }
 
 .tag-colors__inherited {

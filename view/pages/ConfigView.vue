@@ -217,7 +217,8 @@
               :provenance-label="provenanceLabel"
               :provenance-class="provenanceClass"
               @validate="validateField"
-              @add-tag-color="addTagColor()"
+              :project="isGlobal ? '' : project"
+              @add-tag-color="(tag?: string, color?: string) => addTagColor(tag, color)"
               @remove-tag-color="removeTagColor"
             />
           </div>

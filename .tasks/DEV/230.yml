@@ -1,0 +1,52 @@
+title: One shared task query for CLI, REST, MCP and the web UI
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-10-28T19:10:36.188977+00:00
+modified: 2026-10-28T19:10:45.640397+00:00
+relationships:
+  related:
+  - DEV-3
+  - DEV-5
+  - DEV-13
+  - DEV-57
+description: |-
+  lotar list runs its own filter pipeline (src/cli/handlers/task/search.rs) on raw tasks, while REST list/export, MCP task_list and the dependency graph share src/services/task_query.rs. Every smart filter added since DEV-57 (due buckets, recent, needs, has) reached REST/MCP/UI but not the CLI, and each transport still parses its own input (MCP ~400 lines), with small behaviour drifts (an unresolvable @me is an error in REST/MCP but an empty result in the CLI).
+
+  Scope:
+  - One transport-neutral query input, parser and executor in services (parse_task_query and the unknown-field filter move out of routes). REST list/export, MCP task_list, the dependency graph and CLI list all use it; the CLI renders from the shared task DTO.
+  - CLI list gains the shared filters: --has, --needs, --recent, --due <bucket>, --sprint, --unassigned. Existing flags keep working (--overdue, --due-soon[=N], --mine, --high/--critical, --effort-min/--effort-max, --where).
+  - Filters that only the CLI has today (effort range, due within N days) move into the shared executor and are exposed in REST and MCP too.
+  - Same errors everywhere: invalid values and an unresolvable @me fail instead of widening or emptying the result.
+  - Remove the duplicated parsing and filtering code this replaces.
+  - Docs and contracts: list.md, mcp-tools.md, api-quick-reference.md, openapi.json, view/api/types.ts.
+
+  Out of scope, building on this: DEV-3 (age filters), DEV-5 (AND/OR/NOT), DEV-13 (group-by/sum), DEV-4 (archives).
+
+  Acceptance: the same filter gives the same tasks in the same order from CLI, REST and MCP (parity test); existing CLI, REST and MCP tests pass; lint, test and smoke pass.
+history:
+- at: 2026-10-28T19:10:45.169765+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-3"]}'
+- at: 2026-10-28T19:10:45.333773+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3"]}'
+    new: '{"related":["DEV-3","DEV-5"]}'
+- at: 2026-10-28T19:10:45.490880+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-5"]}'
+    new: '{"related":["DEV-3","DEV-5","DEV-13"]}'
+- at: 2026-10-28T19:10:45.640397+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-5","DEV-13"]}'
+    new: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57"]}'

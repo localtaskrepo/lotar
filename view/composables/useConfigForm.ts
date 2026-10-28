@@ -177,7 +177,7 @@ type UseConfigFormReturn = {
     sourceFor: (field: string) => ConfigSource | undefined
     addAliasEntry: (field: AliasField) => void
     removeAliasEntry: (field: AliasField, index: number) => void
-    addTagColor: (tag?: string) => void
+    addTagColor: (tag?: string, color?: string) => void
     removeTagColor: (index: number) => void
     clearAliasField: (field: AliasField) => void
     validateField: (field: string) => void
@@ -395,8 +395,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         return null
     }
 
-    function addTagColor(tag = '') {
-        form.tagColors.push({ tag, color: '#0ea5e9' })
+    function addTagColor(tag = '', color = '#0ea5e9') {
+        form.tagColors.push({ tag, color })
+        if (tag) validateField('tag_properties')
     }
 
     function removeTagColor(index: number) {

@@ -4,7 +4,10 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.711139+00:00
-modified: 2026-10-28T02:12:36.907512+00:00
+modified: 2026-10-28T19:10:45.334491+00:00
+relationships:
+  related:
+  - DEV-230
 comments:
 - date: 2026-09-06T11:21:52.630479+00:00
   text: 'Backlog reconciliation: Remains Todo for a general AND/OR/NOT custom-query language with defined precedence/grouping. Current repeated key/value filters and automation conditions are not equivalent. DEV-57 and DEV-75 cover current query parity/basic documented predicates; preserve this broader feature as a separate scope.'
@@ -49,3 +52,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-3"]}'
     new: '{}'
+- at: 2026-10-28T19:10:45.334491+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-230"]}'

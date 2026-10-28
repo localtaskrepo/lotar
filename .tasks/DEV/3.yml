@@ -4,10 +4,11 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.698804+00:00
-modified: 2026-10-28T02:12:40.843267+00:00
+modified: 2026-10-28T19:10:45.170597+00:00
 relationships:
   related:
   - DEV-13
+  - DEV-230
 comments:
 - date: 2026-09-06T11:21:52.608760+00:00
   text: 'Backlog reconciliation: Remains Todo for CLI list/search filtering by age older than N days. Existing age/stale statistics are not this filter. Specify created versus modified time and boundary semantics. Coordinate DEV-57 query parity and DEV-75 CLI contracts; neither automatically implements this feature.'
@@ -52,3 +53,9 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-13"]}'
+- at: 2026-10-28T19:10:45.170597+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-13"]}'
+    new: '{"related":["DEV-13","DEV-230"]}'

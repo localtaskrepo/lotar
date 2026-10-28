@@ -261,7 +261,7 @@ issue:
       color: teal
 ```
 
-- Colours are `#rgb`, `#rrggbb`, or one of `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `pink`, `rose`, `brown`, `gray`. An unknown colour shows the tag uncoloured, and `config validate` warns about it.
+- Colours are `#rgb`, `#rrggbb`, or one of `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `pink`, `rose`, `brown`, `gray`. An unknown colour is ignored (the tag falls back to its automatic colour), and `config validate` warns about it.
 - Coloured chips get a tinted background and border; the text keeps the theme's colour, so it stays readable in every theme.
 - A project's colours override global ones per tag. A project that inherits the global tag list colours tags under `issue.tag_properties` instead, because its own `issue.tags` list would replace the global one:
 
@@ -272,7 +272,8 @@ issue:
     ui: { color: green }
 ```
 
-- Set colours on the Config page (Tags & fields), or with `lotar config set tag_properties 'ui=#0ea5e9, backend=teal' --global` (a YAML/JSON map such as `{ui: {color: "#0ea5e9"}}` works too; an empty value clears them).
+- Tags without a configured colour get an automatic one, picked from their name, so a tag looks the same on every page and for everyone. Anyone can turn automatic colours off for themselves in Preferences (Appearance → Tag colours); configured colours always show.
+- Set colours on the Config page (Tags & fields): it lists the tags in use, and clicking one adds a row with its current colour to adjust. Or use `lotar config set tag_properties 'ui=#0ea5e9, backend=teal' --global` (a YAML/JSON map such as `{ui: {color: "#0ea5e9"}}` works too; an empty value clears them).
 - Other properties in a tag object are kept when LoTaR rewrites the config, so newer versions can add more.
 
 ## Done States
