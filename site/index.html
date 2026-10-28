@@ -115,7 +115,7 @@
                             <h3>Built for agents</h3>
                             <p>
                                 Coding agents read and update tasks through MCP, and LoTaR can run Claude Code, Codex,
-                                Copilot CLI or Gemini CLI on a task for you.
+                                Copilot CLI, Gemini CLI and six more agent CLIs on a task for you.
                             </p>
                         </li>
                     </ul>
@@ -132,7 +132,9 @@
                             <p>
                                 Set up an agent profile once, then assign tasks to it like a teammate. Each job runs the
                                 agent CLI in a dedicated worktree on its own branch, with the output streamed live.
-                                Automation rules decide what happens when a job starts, finishes or fails.
+                                Choose the model and effort per profile or per run, see each job's tokens and cost, and
+                                let the agent update its own task through LoTaR's MCP server. Automation rules decide
+                                what happens when a job starts, finishes or fails.
                             </p>
                             <pre><code><span class="c"># .tasks/automation.yml</span>
 <span class="k">automation</span>:
@@ -162,8 +164,9 @@
                             <h3>A local web UI</h3>
                             <p>
                                 <code>lotar serve</code> opens a task list, a board with WIP limits, sprints with
-                                burndown and velocity, a calendar, and insights for every role on the team. Changes from
-                                the CLI or an agent show up live.
+                                burndown and velocity, a calendar, a dependency graph, and insights for every role on
+                                the team. Paste screenshots onto a task, jump anywhere with the command palette, and see
+                                changes from the CLI or an agent live.
                             </p>
                             <a class="more" href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/serve.md"
                                 >Web UI and server</a
@@ -230,7 +233,110 @@
                             </picture>
                             <span>Insights</span>
                         </li>
+                        <li>
+                            <picture>
+                                <source
+                                    media="(prefers-color-scheme: dark)"
+                                    srcset="assets/screenshots/task-attachments-dark.webp"
+                                />
+                                <img
+                                    src="assets/screenshots/task-attachments-light.webp"
+                                    width="1600"
+                                    height="1000"
+                                    loading="lazy"
+                                    alt=""
+                                />
+                            </picture>
+                            <span>Image attachments</span>
+                        </li>
+                        <li>
+                            <picture>
+                                <source
+                                    media="(prefers-color-scheme: dark)"
+                                    srcset="assets/screenshots/command-palette-dark.webp"
+                                />
+                                <img
+                                    src="assets/screenshots/command-palette-light.webp"
+                                    width="1600"
+                                    height="1000"
+                                    loading="lazy"
+                                    alt=""
+                                />
+                            </picture>
+                            <span>Command palette</span>
+                        </li>
+                        <li>
+                            <picture>
+                                <source
+                                    media="(prefers-color-scheme: dark)"
+                                    srcset="assets/screenshots/scan-dark.webp"
+                                />
+                                <img
+                                    src="assets/screenshots/scan-light.webp"
+                                    width="1600"
+                                    height="1000"
+                                    loading="lazy"
+                                    alt=""
+                                />
+                            </picture>
+                            <span>TODO scanner</span>
+                        </li>
                     </ul>
+
+                    <article class="feature">
+                        <div class="feature__copy">
+                            <h3>Make it yours</h3>
+                            <p>
+                                Pick Classic, High contrast, or a playful skin such as Terminal, Matrix, Synthwave,
+                                Blueprint, Paper, Retro or Candy, each in light and dark and most with several colour
+                                palettes. Everyone chooses their own theme; a repository can set the default, its name,
+                                logo and icon, and even ship its own skin.
+                            </p>
+                            <a
+                                class="more"
+                                href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/serve.md#web-interface"
+                                >Themes and branding</a
+                            >
+                        </div>
+                        <ul class="theme-grid" aria-label="The board in four themes">
+                            <li>
+                                <img
+                                    src="assets/screenshots/theme-terminal.webp"
+                                    width="1280"
+                                    height="800"
+                                    loading="lazy"
+                                    alt="Board in the Terminal theme: green monospace text on black"
+                                />
+                            </li>
+                            <li>
+                                <img
+                                    src="assets/screenshots/theme-synthwave.webp"
+                                    width="1280"
+                                    height="800"
+                                    loading="lazy"
+                                    alt="Board in the Synthwave theme: neon pink and purple on dark"
+                                />
+                            </li>
+                            <li>
+                                <img
+                                    src="assets/screenshots/theme-paper.webp"
+                                    width="1280"
+                                    height="800"
+                                    loading="lazy"
+                                    alt="Board in the Paper theme: serif text in blue ink on warm paper"
+                                />
+                            </li>
+                            <li>
+                                <img
+                                    src="assets/screenshots/theme-retro.webp"
+                                    width="1280"
+                                    height="800"
+                                    loading="lazy"
+                                    alt="Board in the Retro theme: grey bevelled 90s desktop chrome"
+                                />
+                            </li>
+                        </ul>
+                    </article>
 
                     <div class="feature-grid">
                         <article>

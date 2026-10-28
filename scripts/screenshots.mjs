@@ -11,6 +11,7 @@
 //
 // Output (docs/assets/screenshots/ by default):
 //   <shot>-light.webp / <shot>-dark.webp   1440x900 viewport at 2x, both themes
+//   theme-<skin>.webp                      the board in a few UI themes (1280x800 at 1x)
 //   hero-agent-loop.webp                   animated agent loop (needs ffmpeg + img2webp, else GIF via ffmpeg)
 //   terminal.gif                           CLI tour recorded with vhs (skipped when vhs is missing)
 //   ../social-preview.png                  1280x640 GitHub social preview
@@ -281,8 +282,88 @@ function defineShots(demo) {
                 await settle(page, 600);
             },
         },
+        {
+            // The task panel's image attachments (seeded by seedAttachments).
+            name: 'task-attachments',
+            path: `/boards?project=${demo.project}`,
+            attachments: true,
+            async prepare(page) {
+                await openTaskFromBoard(page, demo.byKey.offline.title);
+                const gallery = page.locator('.task-panel img').first();
+                await gallery.waitFor({ state: 'visible', timeout: 10_000 });
+                await settle(page, 600);
+            },
+        },
+        {
+            name: 'command-palette',
+            path: `/?project=${demo.project}`,
+            async prepare(page) {
+                await page.getByTestId('command-palette-trigger').click();
+                await page.getByTestId('command-palette-input').fill('sync');
+                await settle(page, 500);
+            },
+        },
         { name: 'config', path: '/config?section=workflow' },
     ];
+}
+
+// Themes shown in the README: a skin, its palette, and the mode it is shown in.
+const THEME_SHOTS = [
+    { name: 'terminal', theme: 'terminal:green', mode: 'dark' },
+    { name: 'synthwave', theme: 'synthwave', mode: 'dark' },
+    { name: 'paper', theme: 'paper', mode: 'light' },
+    { name: 'retro', theme: 'retro', mode: 'light' },
+];
+
+async function captureThemes(browser, server, demo, opts) {
+    for (const shot of THEME_SHOTS) {
+        const context = await browser.newContext({
+            ...PAGE_DEFAULTS,
+            viewport: { width: 1280, height: 800 },
+            deviceScaleFactor: 1,
+            colorScheme: shot.mode,
+            reducedMotion: 'reduce',
+        });
+        await context.addInitScript((theme) => {
+            if (location.protocol === 'http:' || location.protocol === 'https:') {
+                localStorage.clear();
+                sessionStorage.clear();
+                localStorage.setItem('lotar.themeName', theme);
+            }
+        }, shot.theme);
+        const page = await newCapturePage(context);
+        await page.goto(`${server.base}/boards?project=${demo.project}`);
+        await settle(page, 900);
+        const png = await page.screenshot({ type: 'png' });
+        const file = path.join(opts.out, `theme-${shot.name}.webp`);
+        writeFileSync(file, await toWebp(page, png));
+        console.log(`  ${path.relative(ROOT, file)} (${kb(file)})`);
+        await context.close();
+    }
+}
+
+// A design mockup attached to the showcased task, so the task panel shows an
+// image attachment. Rendered here, so the demo needs no binary fixtures.
+async function seedAttachments(page, server, demo) {
+    await page.setContent(`<!doctype html><html><body style="margin:0;font-family:system-ui,sans-serif;background:#f1f5f9">
+        <div id="mock" style="width:560px;padding:28px;background:#f1f5f9">
+          <div style="background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);overflow:hidden">
+            <div style="background:#fef3c7;color:#92400e;padding:12px 18px;font-weight:600">Reconnecting… 3 offline edits waiting to sync</div>
+            <div style="padding:18px">
+              <div style="height:12px;width:70%;background:#e2e8f0;border-radius:6px;margin-bottom:10px"></div>
+              <div style="height:12px;width:90%;background:#e2e8f0;border-radius:6px;margin-bottom:10px"></div>
+              <div style="height:12px;width:55%;background:#e2e8f0;border-radius:6px;margin-bottom:18px"></div>
+              <div style="display:flex;gap:10px"><span style="background:#0ea5e9;color:#fff;padding:8px 14px;border-radius:8px;font-weight:600">Keep my edits</span>
+              <span style="border:1px solid #cbd5e1;padding:8px 14px;border-radius:8px">Review changes</span></div>
+            </div>
+          </div>
+        </div></body></html>`);
+    const png = await page.locator('#mock').screenshot({ type: 'png' });
+    await api(server.base, '/api/tasks/attachments/upload', {
+        id: demo.ids.offline,
+        filename: 'reconnect-banner-mockup.png',
+        content_base64: png.toString('base64'),
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +413,7 @@ async function captureShots(browser, server, demo, opts) {
         }
     });
     const page = await newCapturePage(context);
+    if (shots.some((shot) => shot.attachments)) await seedAttachments(page, server, demo);
     for (const theme of THEMES) {
         await page.emulateMedia({ colorScheme: theme });
         for (const shot of shots) {
@@ -594,6 +676,10 @@ async function main() {
     try {
         console.log('Screenshots');
         const page = await captureShots(browser, server, demo, opts);
+        if (!opts.only || opts.only.has('themes')) {
+            console.log('Themes');
+            await captureThemes(browser, server, demo, opts);
+        }
         if (opts.gitHistory && opts.hero && (!opts.only || opts.only.has('hero'))) {
             console.log('Hero recording');
             const { video, startAt, endAt } = await recordHero(browser, server, demo, opts, tmp);

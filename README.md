@@ -51,7 +51,7 @@ The first command creates `.tasks/` with sensible defaults. Commit it along with
 
 ### Agents and automation
 
-Configure an agent profile once, then assign a task to it like you would to a teammate. LoTaR queues a job, runs the agent CLI (Claude Code, Codex, Copilot CLI, or Gemini CLI) in a dedicated worktree on its own branch, and streams the output to the CLI and the web UI. Automation rules in YAML decide what happens on start, success, and failure, and also react to ordinary task changes. See [Agent jobs](docs/help/agent.md) and [Automation rules](docs/help/automation.md).
+Configure an agent profile once, then assign a task to it like you would to a teammate. LoTaR queues a job, runs the agent CLI in a dedicated worktree on its own branch, and streams the output to the CLI and the web UI. Claude Code, Codex, Copilot CLI and Gemini CLI are supported, with Cursor, Amp, Droid, OpenCode, Kilo and Antigravity following their documented headless modes. Choose the model and reasoning effort per profile or per run, see each job's token usage and cost, and let the agent update its own task through LoTaR's MCP server. Automation rules in YAML decide what happens on start, success, and failure, and also react to ordinary task changes. See [Agent jobs](docs/help/agent.md) and [Automation rules](docs/help/automation.md).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/agents-dark.webp">
@@ -72,7 +72,7 @@ automation:
 
 ### Web UI: board, sprints, calendar, insights
 
-`lotar serve` starts a local web app on the same files: a filterable task list, a board with WIP limits, sprints with burndown and velocity, a calendar of due dates and sprint windows, and project insights. Changes made in the CLI or by agents show up live. See [Serve](docs/help/serve.md) and [Sprints](docs/help/sprints.md).
+`lotar serve` starts a local web app on the same files: a filterable task list, a board with WIP limits, sprints with burndown and velocity, a calendar of due dates and sprint windows, a dependency graph, and insights for developers, leads and managers. Changes made in the CLI or by agents show up live. See [Serve](docs/help/serve.md) and [Sprints](docs/help/sprints.md).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/board-dark.webp">
@@ -84,6 +84,30 @@ automation:
     <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/sprints-dark.webp"><img src="docs/assets/screenshots/sprints-light.webp" alt="Sprint burndown chart for the active sprint"></picture></td>
     <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/calendar-dark.webp"><img src="docs/assets/screenshots/calendar-light.webp" alt="Calendar with task due dates"></picture></td>
     <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/insights-dark.webp"><img src="docs/assets/screenshots/insights-light.webp" alt="Insights overview with headline numbers and a created vs completed trend"></picture></td>
+  </tr>
+</table>
+
+Paste or drop screenshots and files onto a task: images get previews, a cover on the board card and a full-size viewer, and photo location data is removed before anything is stored. `lotar task reference add upload` attaches files from the command line. The command palette (<kbd>⌘K</kbd> / <kbd>Ctrl K</kbd>) jumps to any page or task and runs task actions, and keyboard shortcuts cover navigation and lists.
+
+<table>
+  <tr>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/task-attachments-dark.webp"><img src="docs/assets/screenshots/task-attachments-light.webp" alt="Task panel with an attached design mockup shown as an image preview"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/command-palette-dark.webp"><img src="docs/assets/screenshots/command-palette-light.webp" alt="Command palette searching for sync, listing the Sync page and matching tasks"></picture></td>
+  </tr>
+</table>
+
+### Themes and branding
+
+Pick from Classic and High contrast or playful skins such as Terminal, Matrix, Synthwave, Blueprint, Paper, Retro and Candy, each in light and dark and most with several colour palettes. Everyone chooses their own theme in Preferences; a repository can set the default, its name, logo and browser icon, and even ship its own skin file. See [Serve](docs/help/serve.md#web-interface).
+
+<table>
+  <tr>
+    <td><img src="docs/assets/screenshots/theme-terminal.webp" alt="Board in the Terminal theme: green monospace text on black"></td>
+    <td><img src="docs/assets/screenshots/theme-synthwave.webp" alt="Board in the Synthwave theme: neon pink and purple on dark"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/theme-paper.webp" alt="Board in the Paper theme: serif text in blue ink on warm paper"></td>
+    <td><img src="docs/assets/screenshots/theme-retro.webp" alt="Board in the Retro theme: grey bevelled 90s desktop chrome"></td>
   </tr>
 </table>
 
@@ -185,6 +209,7 @@ Pick GitHub Issues or Jira when you need a hosted tracker for non-developers, pe
 ├── config.yml          # workspace defaults: states, types, members, agent profiles
 ├── automation.yml      # optional automation rules
 ├── @sprints/1.yml      # sprint plans and actual start/close times
+├── @attachments/       # attached files, stored once per content
 └── ATLS/               # one folder per project
     ├── config.yml      # optional project overrides and sync remotes
     ├── 26.yml          # one file per task

@@ -1,0 +1,49 @@
+title: Refresh the README features and screenshots
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-28T01:02:27.410375+00:00
+modified: 2026-10-28T01:50:01.036725+00:00
+comments:
+- date: 2026-10-28T01:21:59.227723+00:00
+  text: 'README: agents paragraph lists all ten runners (four live-tested, six from docs), per-profile/run model and effort, usage and cost, MCP for agent runs; Web UI paragraph adds the dependency graph, role-based insights, image attachments (paste/drop, previews, covers, viewer, metadata stripped, CLI upload) and the command palette; new Themes and branding section with a 2x2 grid; tree shows @attachments. scripts/screenshots.mjs: new task-attachments (seeds a rendered mockup via the upload API), command-palette and theme-<skin> shots (Terminal green dark, Synthwave dark, Paper light, Retro light at 1280x800 1x). Regenerated all media with the full pipeline (hero, terminal, social preview); 4.4 MB of WebP in total. Found DEV-227 (Retro light logo) on the way. Not done: site/index.html still names four agent CLIs and has no themes section - possible follow-up.'
+- date: 2026-10-28T01:50:00.990499+00:00
+  text: 'Homepage (site/index.html, site/style.css), as the developer asked: agent principle mentions the six extra CLIs; agents copy adds model/effort, tokens and cost, MCP for agent runs; web UI copy adds the dependency graph, pasted screenshots and the command palette; gallery grows to six (adds image attachments, command palette, TODO scanner); new ''Make it yours'' feature with a 2x2 theme grid. Verified: prettier check, node scripts/build-site.mjs (21 screenshots copied), browser check at 1280 light and 390 dark: no horizontal overflow, no failed requests or broken images.'
+description: Update the README with the most important current features (themes and branding, image attachments, agents and their CLIs, etc.) and regenerate/add screenshots with scripts/screenshots.mjs.
+history:
+- at: 2026-10-28T01:13:46.024824+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T01:21:59.227723+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T01:25:37.416968+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-28T01:48:49.513170+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-10-28T01:50:00.990499+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T01:50:01.036725+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
