@@ -9,6 +9,16 @@ const LAST_VISITED_SECTION_KEY = 'lotar.preferences.lastVisitedSection'
 const TASK_PANEL_SHOW_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showAttachments'
 const TASK_PANEL_SHOW_LINKS_IN_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showLinksInAttachments'
 const TASK_PANEL_AUTO_DETECT_LINKS_KEY = 'lotar.preferences.taskPanel.autoDetectLinks'
+/** Which view the task panel opens in, for existing and for new tasks (DEV-239). */
+export const TASK_VIEW_EXISTING_KEY = 'lotar.preferences.taskPanel.viewExisting'
+export const TASK_VIEW_NEW_KEY = 'lotar.preferences.taskPanel.viewNew'
+
+/** The side panel on the right, or the large centered view. */
+export type TaskViewMode = 'panel' | 'large'
+export const TASK_VIEW_OPTIONS: Array<{ value: TaskViewMode; label: string }> = [
+    { value: 'panel', label: 'Side panel' },
+    { value: 'large', label: 'Large view' },
+]
 
 const SHARE_FILTERS_KEY = 'lotar.preferences.filters.shareAcrossPages'
 export const SINGLE_KEY_SHORTCUTS_KEY = 'lotar.preferences.shortcuts.singleKey'
@@ -188,6 +198,18 @@ export function readTaskPanelAutoDetectLinksPreference(): boolean {
 
 export function storeTaskPanelAutoDetectLinksPreference(value: boolean) {
     storeBooleanPreference(TASK_PANEL_AUTO_DETECT_LINKS_KEY, value)
+}
+
+/** The view a task opens in: `existing` for saved tasks, `new` for the create form. */
+export function readTaskViewPreference(kind: 'existing' | 'new'): TaskViewMode {
+    const raw = storageGet(kind === 'new' ? TASK_VIEW_NEW_KEY : TASK_VIEW_EXISTING_KEY)
+    return raw === 'large' ? 'large' : 'panel'
+}
+
+export function storeTaskViewPreference(kind: 'existing' | 'new', value: TaskViewMode) {
+    const key = kind === 'new' ? TASK_VIEW_NEW_KEY : TASK_VIEW_EXISTING_KEY
+    storageSet(key, value === 'large' ? 'large' : 'panel')
+    emitPreferencesChanged(key)
 }
 
 export function resolveStartupPath(destination: StartupDestination, lastVisited: string | null): string {

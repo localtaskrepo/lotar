@@ -37,6 +37,8 @@ type IconName =
   | 'refresh'
   | 'help'
   | 'close'
+  | 'expand'
+  | 'collapse'
   | 'dots-horizontal'
   | 'chevron-left'
   | 'chevron-right'
@@ -122,6 +124,13 @@ const ICONS: Record<IconName, IconDef> = {
   },
   close: {
     paths: ['M6 6l12 12', 'M6 18L18 6'],
+  },
+  // Arrows pointing out to the corners, and back in (DEV-239 task view).
+  expand: {
+    paths: ['M14 4h6v6', 'M20 4l-6 6', 'M10 20H4v-6', 'M4 20l6-6'],
+  },
+  collapse: {
+    paths: ['M20 10h-6V4', 'M14 10l6-6', 'M4 14h6v6', 'M10 14l-6 6'],
   },
   'dots-horizontal': {
     paths: ['M6 12h.01', 'M12 12h.01', 'M18 12h.01'],

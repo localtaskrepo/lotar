@@ -266,6 +266,13 @@ const taskCommands = computed<PaletteCommand[]>(() => {
       run: () => void open.assignToMe(),
     },
     {
+      id: 'task-toggle-view',
+      group: 'This task',
+      label: open.isLargeView() ? 'Switch to side panel' : 'Switch to large view',
+      keywords: `${open.taskId} expand bigger wide full screen layout`,
+      run: () => open.toggleView(),
+    },
+    {
       id: 'task-copy-id',
       group: 'This task',
       label: `Copy task ID ${open.taskId}`,

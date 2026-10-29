@@ -1,9 +1,75 @@
 title: Larger task view
-status: Todo
+status: Done
 priority: High
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-29T01:14:42.029215+00:00
+modified: 2026-10-29T20:38:39.540937+00:00
+comments:
+- date: 2026-10-29T19:53:23.021430+00:00
+  text: 'Plan (developer chose per-browser Preferences for the settings): a header button in TaskPanel switches between the side panel and a large centered view (two columns on wide screens: summary, details and activity on the left; people, sprints and custom fields in a sticky right column; single column below ~960px; button hidden on phones where both are full screen). Preferences > Task panel gets ''Open existing tasks in'' and ''Open new tasks in'' (Side panel | Large view, default Side panel); each open of the panel starts from them, switching applies until the panel closes and survives moving to another task. Files: view/utils/preferences.ts, view/components/TaskPanel.vue, view/pages/Preferences.vue, docs/help/preferences.md + serve.md. Checks: unit tests (toggle, preference choice), smoke with screenshots at 1440/1024/390, lint/test/smoke.'
+- date: 2026-10-29T20:01:34.035537+00:00
+  text: |-
+    Outcome: the task panel header has a button (next to Close) that switches between the side panel and a large centered view (up to 1280px wide). When that view is at least 900px wide (container query) it shows summary, details and activity on the left and ownership, sprints and custom fields on the right; narrower it stacks in one column; on phones both views are full screen and the button is hidden. Preferences > Task panel: 'Open existing tasks in' and 'Open new tasks in' (Side panel | Large view, default Side panel), stored per browser (developer's choice). Each open starts from the preference; the button applies until the panel closes, including when moving to another task. New expand/collapse icons. Docs: docs/help/preferences.md (Task Panel), serve.md.
+    Evidence: view/__tests__/TaskPanel.viewMode.spec.ts (4 tests); UI suite 1386 passed; new smoke smoke/tests/ui.task-view.smoke.spec.ts (1440/820/390, preferences, new and existing tasks); full smoke 364 with one load timeout (ui.global-actions) that passes on rerun; lint clean. Rust unchanged, not rerun.
+    Remaining: none.
+    Guidance: no durable finding.
+- date: 2026-10-29T20:01:41.348228+00:00
+  text: Committed as 8ca446e on main (not pushed).
+- date: 2026-10-29T20:38:39.540937+00:00
+  text: |-
+    Design pass on the large view (amended into the DEV-239 commit): once the panel is at least 900px wide (measured with a ResizeObserver, so the layout follows the panel rather than the window), the title becomes an editable heading (the header keeps ID and badges), Project/Type/Status/Priority move to a labelled Properties group in the right column, tags move there too, due date and effort get labels, and the right column stays in view and scrolls on its own. The command palette gains 'Switch to large view / side panel'. Also fixed a bug in both views: reporter/assignee stayed in the custom-input mode (name shown twice) when the task loaded before the people list; they now return to the list unless the user picked Custom. Side panel layout unchanged otherwise.
+    Evidence: view/__tests__/useTaskPanelOwnership.spec.ts (2 tests), smoke ui.task-view extended (labels, title heading, tags column, palette switch); UI 1388 passed, smoke 364 passed, lint clean. Screenshot replaced.
+    Considered, not done: relationships summary in the right column, keyboard shortcut for the switch, comment card spacing.
+references:
+- attachment: large-task-view-two-columns.b5b7862f446392bc6cb18994e679bf11.webp
 description: |-
   RIght now you can only see tasks in the side panel on the right with all the details. Allow a ticket to be view in a larger view that takes up more of the screen.
   A button at the top of the side panel could allow to switch views. And the UI config should have options which view to open first for both new tickets and existing ones.
+history:
+- at: 2026-10-29T19:53:22.963638+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-29T19:53:23.021430+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T20:01:22.789538+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:large-task-view.654b3848e65132bde9867236bd60d986.webp
+- at: 2026-10-29T20:01:34.035537+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T20:01:34.067162+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-29T20:01:41.348228+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T20:38:17.191186+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:large-task-view-two-columns.b5b7862f446392bc6cb18994e679bf11.webp
+- at: 2026-10-29T20:38:17.238171+00:00
+  actor: mallox
+  changes:
+  - field: reference_removed
+    old: attachment:large-task-view.654b3848e65132bde9867236bd60d986.webp
+- at: 2026-10-29T20:38:39.540937+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

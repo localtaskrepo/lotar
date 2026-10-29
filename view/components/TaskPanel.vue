@@ -1,13 +1,23 @@
 <template>
   <Teleport to="body">
     <Transition name="task-panel">
-      <div v-if="open" class="task-panel__overlay" @click.self="closePanel">
+      <div
+        v-if="open"
+        class="task-panel__overlay"
+        :class="{ 'task-panel__overlay--large': largeView }"
+        @click.self="closePanel"
+      >
         <aside
+          ref="panelRef"
           class="task-panel"
           role="dialog"
           aria-modal="true"
           :aria-label="mode === 'create' ? 'Create task' : `Task ${form.id || ''}`"
-          :class="{ 'task-panel--drag-active': attachmentsDragActive }"
+          :class="{
+            'task-panel--drag-active': attachmentsDragActive,
+            'task-panel--large': largeView,
+            'task-panel--split': splitLayout,
+          }"
           @dragenter.capture="onAttachmentsDragEnter"
           @dragover.capture="onAttachmentsDragOver"
           @dragleave.capture="onAttachmentsDragLeave"
@@ -53,6 +63,19 @@
               >
                 <IconGlyph name="refresh" />
                 <span>Sync issue</span>
+              </UiButton>
+              <UiButton
+                variant="ghost"
+                icon-only
+                type="button"
+                class="task-panel__view-toggle"
+                data-testid="task-view-toggle"
+                :aria-pressed="largeView ? 'true' : 'false'"
+                :aria-label="largeView ? 'Switch to side panel' : 'Switch to large view'"
+                :title="largeView ? 'Switch to side panel' : 'Switch to large view'"
+                @click="largeView = !largeView"
+              >
+                <IconGlyph :name="largeView ? 'collapse' : 'expand'" />
               </UiButton>
               <UiButton
                 variant="ghost"
@@ -123,6 +146,8 @@
                    Mutations are also rejected server-side. -->
               <fieldset class="task-panel__form-fieldset" :disabled="isReadOnly">
                 <TaskPanelSummarySection
+                  class="task-panel__main"
+                  :part="splitLayout ? 'title' : 'all'"
                   :form="form"
                   :mode="mode"
                   :projects="projects"
@@ -135,7 +160,7 @@
                   @updateStatus="updateStatus"
                 />
 
-                <fieldset class="task-panel__group">
+                <fieldset class="task-panel__group task-panel__main">
                   <legend>Details</legend>
                   <div ref="descriptionEditorRoot" class="task-panel__description" @focusout="onDescriptionFocusOut">
                     <div
@@ -410,6 +435,7 @@
                     </div>
                   </div>
                   <TaskPanelTagEditor
+                    v-if="!splitLayout"
                     ref="tagEditorRef"
                     :tags="form.tags"
                     :configured-tags="configTagOptions"
@@ -421,88 +447,118 @@
                   />
                 </fieldset>
 
-                <TaskPanelOwnershipSection
-                  :form="form"
-                  :ordered-known-users="orderedKnownUsers"
-                  :whoami="whoami"
-                  :reporter-selection="reporterSelection"
-                  :assignee-selection="assigneeSelection"
-                  :reporter-mode="reporterMode"
-                  :assignee-mode="assigneeMode"
-                  :reporter-custom="reporterCustom"
-                  :assignee-custom="assigneeCustom"
-                  @update:reporterSelection="setReporterSelection"
-                  @update:assigneeSelection="setAssigneeSelection"
-                  @update:reporterCustom="setReporterCustom"
-                  @update:assigneeCustom="setAssigneeCustom"
-                  @commitReporterCustom="commitReporterCustom"
-                  @commitAssigneeCustom="commitAssigneeCustom"
-                  @resetReporterSelection="resetReporterSelection"
-                  @resetAssigneeSelection="resetAssigneeSelection"
-                  @fieldBlur="handleFieldBlur"
-                />
-
-                <fieldset v-if="sprintsLoading || hasSprints" class="task-panel__group">
-                  <legend>Sprints</legend>
-                  <div v-if="sprintsLoading" class="task-panel__sprints-loading">
-                    <UiLoader size="sm">Loading sprint info…</UiLoader>
+                <!-- DEV-239: the right-hand column of the large view; flat in the side panel. -->
+                <div class="task-panel__side">
+                  <TaskPanelSummarySection
+                    v-if="splitLayout"
+                    part="fields"
+                    :form="form"
+                    :mode="mode"
+                    :projects="projects"
+                    :project-label="projectLabel"
+                    :types="typeOptions"
+                    :statuses="statusOptions"
+                    :priorities="priorityOptions"
+                    @fieldBlur="handleFieldBlur"
+                    @projectChange="onProjectChange"
+                    @updateStatus="updateStatus"
+                  />
+                  <TaskPanelOwnershipSection
+                    :labelled="splitLayout"
+                    :form="form"
+                    :ordered-known-users="orderedKnownUsers"
+                    :whoami="whoami"
+                    :reporter-selection="reporterSelection"
+                    :assignee-selection="assigneeSelection"
+                    :reporter-mode="reporterMode"
+                    :assignee-mode="assigneeMode"
+                    :reporter-custom="reporterCustom"
+                    :assignee-custom="assigneeCustom"
+                    @update:reporterSelection="setReporterSelection"
+                    @update:assigneeSelection="setAssigneeSelection"
+                    @update:reporterCustom="setReporterCustom"
+                    @update:assigneeCustom="setAssigneeCustom"
+                    @commitReporterCustom="commitReporterCustom"
+                    @commitAssigneeCustom="commitAssigneeCustom"
+                    @resetReporterSelection="resetReporterSelection"
+                    @resetAssigneeSelection="resetAssigneeSelection"
+                    @fieldBlur="handleFieldBlur"
+                  />
+                  <div v-if="splitLayout" class="task-panel__group">
+                    <TaskPanelTagEditor
+                      ref="tagEditorRef"
+                      :tags="form.tags"
+                      :configured-tags="configTagOptions"
+                      :known-tags="knownTags"
+                      :allow-custom-tags="allowCustomTags"
+                      :project="form.project"
+                      @update:tags="setTags"
+                      @discoveredTags="mergeKnownTags"
+                    />
                   </div>
-                  <div v-else class="task-panel__sprint-area">
-                    <ChipListField
-                      class="task-panel__sprint-field"
-                      :model-value="sprintChipLabels"
-                      empty-label="Not assigned to a sprint."
-                      add-label="Assign sprint"
-                      add-behavior="external"
-                      :removable="false"
-                      :chip-class="null"
-                      @add-click="openSprintDialog('add')"
-                    >
-                      <template #chip="{ index }">
-                        <span
-                          v-if="assignedSprints[index]"
-                          :class="[
-                            'task-panel__sprint-chip',
-                            `task-panel__sprint-chip--${assignedSprints[index].state}`,
-                            { 'task-panel__sprint-chip--missing': assignedSprints[index].missing },
-                          ]"
-                        >
-                          {{ assignedSprints[index].label }}
-                          <button
-                            type="button"
-                            class="task-panel__sprint-chip-remove"
-                            :aria-label="`Remove ${assignedSprints[index].label}`"
-                            :title="`Remove ${assignedSprints[index].label}`"
-                            :disabled="removingSprintId === assignedSprints[index].id"
-                            @click.stop="removeSprintChip(assignedSprints[index].id)"
+
+                  <fieldset v-if="sprintsLoading || hasSprints" class="task-panel__group">
+                    <legend>Sprints</legend>
+                    <div v-if="sprintsLoading" class="task-panel__sprints-loading">
+                      <UiLoader size="sm">Loading sprint info…</UiLoader>
+                    </div>
+                    <div v-else class="task-panel__sprint-area">
+                      <ChipListField
+                        class="task-panel__sprint-field"
+                        :model-value="sprintChipLabels"
+                        empty-label="Not assigned to a sprint."
+                        add-label="Assign sprint"
+                        add-behavior="external"
+                        :removable="false"
+                        :chip-class="null"
+                        @add-click="openSprintDialog('add')"
+                      >
+                        <template #chip="{ index }">
+                          <span
+                            v-if="assignedSprints[index]"
+                            :class="[
+                              'task-panel__sprint-chip',
+                              `task-panel__sprint-chip--${assignedSprints[index].state}`,
+                              { 'task-panel__sprint-chip--missing': assignedSprints[index].missing },
+                            ]"
                           >
-                            <IconGlyph name="close" />
-                          </button>
-                        </span>
-                      </template>
-                    </ChipListField>
-                    <p v-if="assignedSprintNotice" class="task-panel__sprint-warning">
-                      {{ assignedSprintNotice }}
-                    </p>
-                  </div>
-                </fieldset>
+                            {{ assignedSprints[index].label }}
+                            <button
+                              type="button"
+                              class="task-panel__sprint-chip-remove"
+                              :aria-label="`Remove ${assignedSprints[index].label}`"
+                              :title="`Remove ${assignedSprints[index].label}`"
+                              :disabled="removingSprintId === assignedSprints[index].id"
+                              @click.stop="removeSprintChip(assignedSprints[index].id)"
+                            >
+                              <IconGlyph name="close" />
+                            </button>
+                          </span>
+                        </template>
+                      </ChipListField>
+                      <p v-if="assignedSprintNotice" class="task-panel__sprint-warning">
+                        {{ assignedSprintNotice }}
+                      </p>
+                    </div>
+                  </fieldset>
 
-                <TaskPanelCustomFieldsSection
-                  :custom-fields="customFields"
-                  :custom-field-keys="customFieldKeys"
-                  :new-field-key="newField.key"
-                  :new-field-value="newField.value"
-                  :allow-new-fields="allowNewCustomFields"
-                  @updateCustomFieldKey="updateCustomFieldKey"
-                  @updateCustomFieldValue="updateCustomFieldValue"
-                  @updateNewFieldKey="updateNewFieldKey"
-                  @updateNewFieldValue="updateNewFieldValue"
-                  @addField="addField"
-                  @removeField="removeField"
-                  @commit="commitCustomFields"
-                />
+                  <TaskPanelCustomFieldsSection
+                    :custom-fields="customFields"
+                    :custom-field-keys="customFieldKeys"
+                    :new-field-key="newField.key"
+                    :new-field-value="newField.value"
+                    :allow-new-fields="allowNewCustomFields"
+                    @updateCustomFieldKey="updateCustomFieldKey"
+                    @updateCustomFieldValue="updateCustomFieldValue"
+                    @updateNewFieldKey="updateNewFieldKey"
+                    @updateNewFieldValue="updateNewFieldValue"
+                    @addField="addField"
+                    @removeField="removeField"
+                    @commit="commitCustomFields"
+                  />
+                </div>
 
-                <section class="task-panel__group task-panel__activity">
+                <section class="task-panel__group task-panel__activity task-panel__main">
                   <div class="task-panel__tabs" role="tablist">
                     <button
                       v-for="tab in activityTabs"
@@ -593,7 +649,7 @@
                   />
                 </section>
 
-                <footer class="task-panel__footer">
+                <footer class="task-panel__footer task-panel__main">
                   <div v-if="Object.keys(errors).length" class="task-panel__errors">
                     <p v-for="(message, field) in errors" :key="field">{{ message }}</p>
                   </div>
@@ -824,6 +880,7 @@ import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../util
 import { useTaskStore } from '../composables/useTaskStore'
 import { setTaskPanelCommands } from '../composables/useTaskPanelController'
 import { recordRecentTask } from '../utils/recentTasks'
+import { readTaskViewPreference } from '../utils/preferences'
 import ChipListField from './ChipListField.vue'
 import AttachmentTile from './AttachmentTile.vue'
 import AttachmentViewer from './AttachmentViewer.vue'
@@ -998,6 +1055,10 @@ watch(
       setStatus: (status) => updateStatus(status),
       setPriority: (priority) => applyPatch({ priority }),
       assignToMe: () => applyPatch({ assignee: '@me' }),
+      isLargeView: () => largeView.value,
+      toggleView: () => {
+        largeView.value = !largeView.value
+      },
     })
   },
   { immediate: true },
@@ -1621,6 +1682,38 @@ watch(
   },
 )
 
+// DEV-239: side panel or large view. Each time the panel opens it starts from
+// the preference for new or existing tasks; the header button switches until
+// it closes, including while moving between tasks.
+const largeView = ref(false)
+watch(
+  () => [props.open, mode.value] as const,
+  ([isOpen, currentMode], previous) => {
+    if (!isOpen || previous?.[0]) return
+    largeView.value = readTaskViewPreference(currentMode === 'create' ? 'new' : 'existing') === 'large'
+  },
+  { immediate: true },
+)
+
+// The large view splits into two columns once the panel itself is this wide;
+// narrower windows keep it in one column like the side panel.
+const SPLIT_MIN_WIDTH = 900
+const panelRef = ref<HTMLElement | null>(null)
+const panelWidth = ref(0)
+let panelObserver: ResizeObserver | null = null
+watch(panelRef, (element) => {
+  panelObserver?.disconnect()
+  panelObserver = null
+  if (!element || typeof ResizeObserver === 'undefined') return
+  panelObserver = new ResizeObserver(() => {
+    panelWidth.value = element.clientWidth
+  })
+  panelObserver.observe(element)
+  panelWidth.value = element.clientWidth
+})
+onUnmounted(() => panelObserver?.disconnect())
+const splitLayout = computed(() => largeView.value && panelWidth.value >= SPLIT_MIN_WIDTH)
+
 const tagEditorRef = ref<{ openTagDialog: () => void } | null>(null)
 
 watch(
@@ -2098,6 +2191,10 @@ async function removeSprintChip(sprintId: number) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4, 1rem);
+}
+
+.task-panel__side {
+  display: contents;
 }
 
 .task-panel__form-fieldset:disabled {
@@ -3276,6 +3373,111 @@ textarea {
 .task-panel-leave-to {
   opacity: 0;
   transform: translateX(40px);
+}
+
+/* -- DEV-239: large view ---------------------------------------------------- */
+
+.task-panel__overlay--large {
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-5, 1.5rem);
+}
+
+.task-panel--large {
+  width: min(1280px, 100%);
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: var(--radius-lg, 0.75rem);
+  overflow: hidden;
+}
+
+.task-panel--large .task-panel__header,
+.task-panel--large .task-panel__body {
+  padding-inline: var(--space-5, 1.5rem);
+}
+
+.task-panel__overlay--large.task-panel-enter-from,
+.task-panel__overlay--large.task-panel-leave-to {
+  transform: translateY(12px);
+}
+
+/* Two columns once the large view is wide enough (splitLayout): the task on
+   the left, its properties in a right column that stays in view and scrolls on
+   its own. */
+.task-panel--split .task-panel__body {
+  container-type: size;
+}
+
+.task-panel--split .task-panel__form-fieldset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-rows: repeat(4, auto) 1fr;
+  align-items: start;
+  gap: var(--space-4, 1rem) var(--space-5, 1.5rem);
+}
+
+.task-panel--split .task-panel__main {
+  grid-column: 1;
+}
+
+.task-panel--split .task-panel__side {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  position: sticky;
+  top: 0;
+  max-height: 100cqh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+/* The title is edited in place as the heading, so the header keeps only the
+   ID and badges. */
+.task-panel--split .task-panel__title h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.task-panel__title-input {
+  width: 100%;
+  font-size: var(--text-xl, 1.4rem);
+  font-weight: 600;
+  line-height: 1.3;
+  padding-block: var(--space-2, 0.5rem);
+}
+
+.task-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.task-panel__field-label {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  color: var(--color-muted, var(--muted));
+}
+
+/* On phones both views fill the screen, so there is nothing to switch. */
+@media (max-width: 720px) {
+  .task-panel__view-toggle {
+    display: none;
+  }
+
+  .task-panel__overlay--large {
+    padding: 0;
+  }
+
+  .task-panel--large {
+    border: 0;
+    border-radius: 0;
+  }
 }
 
 .task-panel-enter-active,

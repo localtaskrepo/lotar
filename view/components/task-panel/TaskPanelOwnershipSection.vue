@@ -64,8 +64,25 @@
       </div>
     </div>
     <div class="task-panel__row">
-      <UiInput v-model="form.due_date" type="date" placeholder="Due date" @blur="emitFieldBlur('due_date')" />
-      <UiInput v-model="form.effort" placeholder="Effort (e.g., 3d, 5h)" @blur="emitFieldBlur('effort')" />
+      <label class="task-panel__field">
+        <span v-if="labelled" class="task-panel__field-label">Due date</span>
+        <UiInput
+          v-model="form.due_date"
+          type="date"
+          placeholder="Due date"
+          aria-label="Due date"
+          @blur="emitFieldBlur('due_date')"
+        />
+      </label>
+      <label class="task-panel__field">
+        <span v-if="labelled" class="task-panel__field-label">Effort</span>
+        <UiInput
+          v-model="form.effort"
+          placeholder="Effort (e.g., 3d, 5h)"
+          aria-label="Effort"
+          @blur="emitFieldBlur('effort')"
+        />
+      </label>
     </div>
   </fieldset>
 </template>
@@ -85,6 +102,8 @@ defineProps<{
   assigneeMode: 'select' | 'custom'
   reporterCustom: string
   assigneeCustom: string
+  /** Show visible labels for due date and effort (large view). */
+  labelled?: boolean
 }>()
 
 const emit = defineEmits<{

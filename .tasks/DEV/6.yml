@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.720192+00:00
-modified: 2026-10-29T19:07:18.788220+00:00
+modified: 2026-10-29T19:07:39.474571+00:00
 comments:
 - date: 2026-09-06T11:21:52.641675+00:00
   text: 'Backlog reconciliation: Remains Todo: MarkdownContent currently renders sanitized GFM without task-ID transformation or hover-card binding. Existing general task hover components do not fulfill markdown references. Remaining acceptance: recognize task references while preserving code blocks/ordinary links and sanitization, then attach the shared hover UI.'
@@ -23,6 +23,8 @@ comments:
     Evidence: view/__tests__/markdownTaskReferences.spec.ts and MarkdownContent.spec.ts (new cases); UI suite 1382 passed; new smoke smoke/tests/ui.task-references.smoke.spec.ts; full smoke 363 passed after fixing ui.sprints smoke, which clicked the first panel header button and hit DEV-4's new Archive button instead of Close; lint clean. Rust unchanged since the last full nextest pass, so not rerun.
     Remaining: none. Hover is mouse/keyboard only; on touch a tap opens the task.
     Guidance: no durable finding.
+- date: 2026-10-29T19:07:39.474571+00:00
+  text: Committed as 74c62b5 on main (not pushed).
 references:
 - attachment: task-reference-hover-card-2x.0af87ca52ee9989ab9f75cc502be66e2.webp
 description: |-
@@ -75,3 +77,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-29T19:07:39.474571+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -1,34 +1,66 @@
 <template>
-  <fieldset class="task-panel__group">
-    <legend>Summary</legend>
-    <UiInput v-model="form.title" placeholder="Title" required aria-required="true" @blur="emitFieldBlur('title')" />
+  <!-- DEV-239: the large two-column view shows the title on its own (part
+       "title") and the properties, labelled, in the right column ("fields"). -->
+  <div v-if="part === 'title'" class="task-panel__title-field">
+    <UiInput
+      v-model="form.title"
+      class="task-panel__title-input"
+      placeholder="Title"
+      aria-label="Title"
+      required
+      aria-required="true"
+      @blur="emitFieldBlur('title')"
+    />
+  </div>
+  <fieldset v-else class="task-panel__group" :class="{ 'task-panel__properties': labelled }">
+    <legend>{{ labelled ? 'Properties' : 'Summary' }}</legend>
+    <UiInput
+      v-if="part === 'all'"
+      v-model="form.title"
+      placeholder="Title"
+      required
+      aria-required="true"
+      @blur="emitFieldBlur('title')"
+    />
     <div class="task-panel__row">
-      <UiSelect
-        v-model="form.project"
-        :disabled="mode === 'edit'"
-        required
-        aria-required="true"
-        @change="emitProjectChange"
-      >
-        <option value="" disabled>Select project…</option>
-        <option v-for="p in projectOptions" :key="p.prefix" :value="p.prefix">
-          {{ projectLabel(p) }}
-        </option>
-      </UiSelect>
-      <UiSelect v-model="form.task_type" required aria-required="true" @change="emitFieldBlur('task_type')">
-        <option value="" disabled>Type</option>
-        <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
-      </UiSelect>
+      <label class="task-panel__field">
+        <span v-if="labelled" class="task-panel__field-label">Project</span>
+        <UiSelect
+          v-model="form.project"
+          :disabled="mode === 'edit'"
+          required
+          aria-required="true"
+          @change="emitProjectChange"
+        >
+          <option value="" disabled>Select project…</option>
+          <option v-for="p in projectOptions" :key="p.prefix" :value="p.prefix">
+            {{ projectLabel(p) }}
+          </option>
+        </UiSelect>
+      </label>
+      <label class="task-panel__field">
+        <span v-if="labelled" class="task-panel__field-label">Type</span>
+        <UiSelect v-model="form.task_type" required aria-required="true" @change="emitFieldBlur('task_type')">
+          <option value="" disabled>Type</option>
+          <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
+        </UiSelect>
+      </label>
     </div>
     <div class="task-panel__row">
-      <UiSelect v-model="form.status" required aria-required="true" @change="emitStatusChange">
-        <option value="" disabled>Status</option>
-        <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
-      </UiSelect>
-      <UiSelect v-model="form.priority" required aria-required="true" @change="emitFieldBlur('priority')">
-        <option value="" disabled>Priority</option>
-        <option v-for="p in priorityOptions" :key="p" :value="p">{{ p }}</option>
-      </UiSelect>
+      <label class="task-panel__field">
+        <span v-if="labelled" class="task-panel__field-label">Status</span>
+        <UiSelect v-model="form.status" required aria-required="true" @change="emitStatusChange">
+          <option value="" disabled>Status</option>
+          <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
+        </UiSelect>
+      </label>
+      <label class="task-panel__field">
+        <span v-if="labelled" class="task-panel__field-label">Priority</span>
+        <UiSelect v-model="form.priority" required aria-required="true" @change="emitFieldBlur('priority')">
+          <option value="" disabled>Priority</option>
+          <option v-for="p in priorityOptions" :key="p" :value="p">{{ p }}</option>
+        </UiSelect>
+      </label>
     </div>
   </fieldset>
 </template>
@@ -63,7 +95,11 @@ const props = defineProps({
     type: [Array, Object] as PropType<string[] | Ref<string[]>>,
     default: () => [],
   },
+  /** `all` (side panel), or the large view's separate `title` and `fields` parts. */
+  part: { type: String as PropType<'all' | 'title' | 'fields'>, default: 'all' },
 })
+
+const labelled = computed(() => props.part === 'fields')
 
 const projectOptions = computed(() => toArray<ProjectOption>(props.projects))
 const typeOptions = computed(() => toArray<string>(props.types))

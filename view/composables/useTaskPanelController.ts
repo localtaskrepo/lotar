@@ -98,6 +98,9 @@ export interface TaskPanelCommands {
     setStatus: (status: string) => Promise<void>
     setPriority: (priority: string) => Promise<void>
     assignToMe: () => Promise<void>
+    /** DEV-239: whether the panel shows the large view, and switching it. */
+    isLargeView: () => boolean
+    toggleView: () => void
 }
 
 const panelCommands = shallowRef<TaskPanelCommands | null>(null)

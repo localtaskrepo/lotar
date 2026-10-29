@@ -44,6 +44,12 @@ Select **Clear last used filter** to remove the saved search and filters of ever
 
 Use **Default page size** (25, 50, 100, or 200; default 50) for Tasks and the independent Sprint/backlog pagers. It is browser-scoped; an explicit Tasks URL page size takes precedence. See [list pagination](./list.md#pagination) for the separate CLI contract.
 
+## Task Panel
+
+Tasks open in the **side panel** on the right, or in the **large view**, a centered window that uses most of the screen. When the large view is at least 900 pixels wide it splits into two columns: the title as an editable heading, the description, attachments, comments and other activity on the left, and the labelled properties (project, type, status, priority), ownership, due date, effort, tags, sprints and custom fields on the right. The right column stays in view and scrolls on its own while you read a long thread. Narrower windows keep the large view in one column, laid out like the side panel. **Open existing tasks in** and **Open new tasks in** pick the view each opens in (both default to Side panel); they are stored as `lotar.preferences.taskPanel.viewExisting` and `lotar.preferences.taskPanel.viewNew`. The button next to Close in the panel header, or **Switch to large view** / **Switch to side panel** in the command palette, switches views for the panel you have open, including when you move on to another task from it, and the next panel opens in the preferred view again. On phones both views fill the screen, so the button is hidden.
+
+The same card has the attachment and link options: show attachments, show link references next to them, and detect links in the title and description.
+
 ## Navigation
 
 Hide tabs you do not use to reduce clutter in the main navigation. Uncheck a tab on the Preferences page and it disappears from the nav immediately; the page itself stays reachable by URL. Preferences is always visible so you can restore tabs. The setting persists in `localStorage` (key `lotar.preferences.hiddenTabs`).

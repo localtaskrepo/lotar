@@ -35,6 +35,10 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     const assigneeMode = ref<OwnershipMode>('select')
     const reporterCustom = ref('')
     const assigneeCustom = ref('')
+    // Custom mode turned on because the name was not (yet) in the people list,
+    // rather than picked by the user; it reverts once the list knows the name.
+    let reporterAutoCustom = false
+    let assigneeAutoCustom = false
 
     const orderedKnownUsers = computed(() => {
         const base = knownUsers.value.slice().filter(Boolean)
@@ -81,6 +85,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         },
         set(value) {
             if (value === '__custom') {
+                reporterAutoCustom = false
                 reporterMode.value = 'custom'
                 reporterCustom.value = options.form.reporter || reporterCustom.value || ''
                 return
@@ -102,6 +107,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         },
         set(value) {
             if (value === '__custom') {
+                assigneeAutoCustom = false
                 assigneeMode.value = 'custom'
                 assigneeCustom.value = options.form.assignee || assigneeCustom.value || ''
                 return
@@ -163,11 +169,13 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             return
         }
         if (orderedKnownUsers.value.includes(value)) {
-            if (assigneeMode.value !== 'custom') {
+            if (assigneeMode.value !== 'custom' || assigneeAutoCustom) {
+                assigneeAutoCustom = false
                 assigneeMode.value = 'select'
                 assigneeCustom.value = ''
             }
         } else {
+            if (assigneeMode.value !== 'custom') assigneeAutoCustom = true
             assigneeMode.value = 'custom'
             assigneeCustom.value = value
         }
@@ -183,11 +191,13 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             return
         }
         if (orderedKnownUsers.value.includes(value)) {
-            if (reporterMode.value !== 'custom') {
+            if (reporterMode.value !== 'custom' || reporterAutoCustom) {
+                reporterAutoCustom = false
                 reporterMode.value = 'select'
                 reporterCustom.value = ''
             }
         } else {
+            if (reporterMode.value !== 'custom') reporterAutoCustom = true
             reporterMode.value = 'custom'
             reporterCustom.value = value
         }
@@ -234,6 +244,8 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     }
 
     function resetOwnership() {
+        reporterAutoCustom = false
+        assigneeAutoCustom = false
         reporterMode.value = 'select'
         assigneeMode.value = 'select'
         reporterCustom.value = ''

@@ -185,6 +185,22 @@
         <UiCard>
           <h3>Task panel</h3>
           <div class="col" style="gap: 10px">
+            <label class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
+              <span class="muted">Open existing tasks in</span>
+              <UiSelect v-model="taskViewExisting" data-testid="preferences-task-view-existing">
+                <option v-for="opt in TASK_VIEW_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </UiSelect>
+            </label>
+            <label class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
+              <span class="muted">Open new tasks in</span>
+              <UiSelect v-model="taskViewNew" data-testid="preferences-task-view-new">
+                <option v-for="opt in TASK_VIEW_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </UiSelect>
+            </label>
+            <p class="muted" style="margin: 0">
+              The large view uses more of the screen. The button next to Close in the panel switches views for the task
+              you have open.
+            </p>
             <label class="row" style="gap: 8px; align-items: center">
               <input type="checkbox" v-model="showAttachments" /> Show attachments
             </label>
@@ -228,6 +244,10 @@ import {
   readTaskPanelAutoDetectLinksPreference,
   SHARED_FILTER_STORAGE_KEY,
   readTaskPanelShowAttachmentsPreference,
+  readTaskViewPreference,
+  storeTaskViewPreference,
+  TASK_VIEW_OPTIONS,
+  type TaskViewMode,
   readTaskPanelShowLinksInAttachmentsPreference,
   readTasksPageSizePreference,
   STARTUP_DESTINATION_OPTIONS,
@@ -302,6 +322,8 @@ const startupDestinationOptions = STARTUP_DESTINATION_OPTIONS
 const showAttachments = ref(true)
 const showLinksInAttachments = ref(true)
 const autoDetectLinks = ref(true)
+const taskViewExisting = ref<TaskViewMode>(readTaskViewPreference('existing'))
+const taskViewNew = ref<TaskViewMode>(readTaskViewPreference('new'))
 
 const shareFilters = ref(false)
 const singleKeyShortcuts = ref(true)
@@ -341,7 +363,12 @@ onMounted(() => {
   showAttachments.value = readTaskPanelShowAttachmentsPreference()
   showLinksInAttachments.value = readTaskPanelShowLinksInAttachmentsPreference()
   autoDetectLinks.value = readTaskPanelAutoDetectLinksPreference()
+  taskViewExisting.value = readTaskViewPreference('existing')
+  taskViewNew.value = readTaskViewPreference('new')
 })
+
+watch(taskViewExisting, (value) => storeTaskViewPreference('existing', value))
+watch(taskViewNew, (value) => storeTaskViewPreference('new', value))
 
 watch(theme, (value) => {
   applyThemePreference(value)
