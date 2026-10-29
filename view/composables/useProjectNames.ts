@@ -4,17 +4,21 @@ import { useProjects } from './useProjects'
 
 let shared: ReturnType<typeof useProjects> | null = null
 
+function sharedProjects() {
+    if (!shared) {
+        shared = effectScope(true).run(() => useProjects())!
+    }
+    if (shared.status?.value === 'idle') void shared.refresh?.()?.catch(() => {})
+    return shared
+}
+
 /**
  * Project names by prefix, for showing "Platform" instead of "PLAT"
  * (DEV-184). One project list is shared by every caller and loaded on first
  * use; it refreshes when projects change. Unknown prefixes show as-is.
  */
 export function useProjectNames() {
-    if (!shared) {
-        shared = effectScope(true).run(() => useProjects())!
-    }
-    const projects = shared
-    if (projects.status?.value === 'idle') void projects.refresh?.()?.catch(() => {})
+    const projects = sharedProjects()
 
     const byPrefix = computed(
         () => new Map((projects.projects?.value ?? []).map((project) => [project.prefix, project])),
@@ -35,5 +39,10 @@ export function useProjectNames() {
         return project ? formatProjectLabel(project) : key
     }
 
-    return { projectName, projectLabel }
+    /** Whether a project with exactly this prefix exists (false until the list loads). */
+    function isProject(prefix: string): boolean {
+        return byPrefix.value.has(prefix)
+    }
+
+    return { projectName, projectLabel, isProject }
 }

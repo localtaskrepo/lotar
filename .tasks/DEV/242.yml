@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-29T17:35:06.657425+00:00
-modified: 2026-10-29T17:41:55.786831+00:00
+modified: 2026-10-29T18:23:03.601905+00:00
 comments:
 - date: 2026-10-29T17:35:21.562571+00:00
   text: 'Plan: keyword copy in site/index.html head and hero; JSON-LD SoftwareApplication; og:site_name/og:image:alt; site/sitemap.xml; site/compare.html (shared style.css) with facts checked against each tool''s own docs; footer/nav link to it. Check: npm run site:build, open target/site in the browser at phone and desktop widths, validate JSON-LD parses.'
@@ -17,6 +17,8 @@ comments:
     Guidance: no durable finding.
 - date: 2026-10-29T17:41:55.786831+00:00
   text: Committed as 3d803d2 on main (not pushed; pushing deploys the site).
+- date: 2026-10-29T18:23:03.601905+00:00
+  text: 'Pushed; site live with compare page and sitemap. Google Search Console verified (URL-prefix property https://localtaskrepo.github.io/lotar/, meta tag). Next by owner: submit sitemap.xml, request indexing of both URLs, import into Bing Webmaster Tools.'
 description: |-
   Search for the homepage in terms people use (git-based task manager, task tracker, local-first, Jira alternative).
 
@@ -51,6 +53,10 @@ history:
     old: InProgress
     new: Done
 - at: 2026-10-29T17:41:55.786831+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T18:23:03.601905+00:00
   actor: mallox
   changes:
   - field: comment_added

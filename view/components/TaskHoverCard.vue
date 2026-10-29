@@ -1,5 +1,11 @@
 <template>
+  <Teleport v-if="external" to="body">
+    <div ref="cardRef" :class="cardClasses" role="tooltip" :style="teleportStyle">
+      <TaskHoverCardBody :task="task" :fields="fields" />
+    </div>
+  </Teleport>
   <div
+    v-else
     ref="triggerRef"
     :class="rootClasses"
     @mouseenter="handleTriggerEnter"
@@ -32,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
 import TaskHoverCardBody from './TaskHoverCardBody.vue'
 
@@ -59,6 +65,12 @@ const props = withDefaults(
     placement?: 'left' | 'right'
     block?: boolean
     teleportToBody?: boolean
+    /**
+     * Show the card beside this element instead of wrapping a trigger, for
+     * triggers the component cannot wrap (links inside rendered markdown).
+     * The card is open while the element is set.
+     */
+    anchor?: HTMLElement | null
     fields?: Partial<
       Record<
         | 'id'
@@ -92,7 +104,8 @@ const hoveringTrigger = ref(false)
 const hoveringCard = ref(false)
 let closeTimer: number | null = null
 
-const teleportToBody = computed(() => Boolean(props.teleportToBody))
+const external = computed(() => props.anchor !== undefined)
+const teleportToBody = computed(() => external.value || Boolean(props.teleportToBody))
 
 const teleportPos = ref<{ top: number; left: number }>({ top: 0, left: 0 })
 
@@ -123,7 +136,7 @@ function scheduleClose() {
 
 function updateTeleportPosition() {
   if (!teleportToBody.value) return
-  const trigger = triggerRef.value
+  const trigger = external.value ? props.anchor : triggerRef.value
   const card = cardRef.value
   if (!trigger || !card) return
 
@@ -185,6 +198,18 @@ function handleWindowChange() {
   if (!open.value) return
   updateTeleportPosition()
 }
+
+watch(
+  () => [props.anchor, props.task] as const,
+  async ([anchor]) => {
+    if (!external.value) return
+    open.value = Boolean(anchor)
+    if (!anchor) return
+    await nextTick()
+    updateTeleportPosition()
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   window.addEventListener('resize', handleWindowChange)

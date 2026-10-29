@@ -290,7 +290,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     const finalBacklogRow = await page.$(backlogRowSelector);
                     expect(finalBacklogRow).toBeNull();
 
-                    await page.click('.task-panel__header-actions button');
+                    await page.click('.task-panel__header-actions button[aria-label="Close panel"]');
                     await page.waitForSelector('.task-panel', { state: 'detached', timeout: 10_000 });
                 });
             } finally {
