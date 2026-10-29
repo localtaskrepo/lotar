@@ -162,16 +162,11 @@ pub(crate) fn run_time_in_status(
         base.clone()
     };
     for p in crate::utils::filesystem::list_files_with_ext_recursive(&walker_root, "yml") {
-        if let Some(stem) = p.file_stem().and_then(|s| s.to_str())
-            && let Ok(num) = stem.parse::<u64>()
-            && let Some(project) = p
-                .parent()
-                .and_then(|q| q.file_name())
-                .and_then(|s| s.to_str())
+        if let Ok(in_tasks) = p.strip_prefix(&base)
+            && let Some(task) = crate::storage::layout::parse_relative(in_tasks)
             && let Ok(rel) = p.strip_prefix(&repo_root)
         {
-            let id = format!("{}-{}", project, num);
-            task_files.push((id, rel.to_path_buf()));
+            task_files.push((task.id(), rel.to_path_buf()));
         }
     }
 
@@ -276,7 +271,7 @@ fn status_durations(
         .iter()
         .filter(|c| c.date <= until_dt)
         .filter_map(|c| {
-            AuditService::show_file_at(repo_root, &c.commit, file_rel)
+            AuditService::show_file_at(repo_root, &c.commit, &c.path)
                 .ok()
                 .map(|content| (c.date, parse_status_from_yaml(&content)))
         })

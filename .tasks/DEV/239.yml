@@ -1,0 +1,9 @@
+title: Larger task view
+status: Todo
+priority: High
+type: Feature
+reporter: mallox
+created: 2026-10-29T01:14:42.029215+00:00
+description: |-
+  RIght now you can only see tasks in the side panel on the right with all the details. Allow a ticket to be view in a larger view that takes up more of the screen.
+  A button at the top of the side panel could allow to switch views. And the UI config should have options which view to open first for both new tickets and existing ones.

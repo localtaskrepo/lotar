@@ -88,6 +88,12 @@ impl ApiServer {
     }
 
     pub fn handle_request(&self, req: &HttpRequest) -> HttpResponse {
+        // Archived tasks are read-only unless the request is forced (DEV-4).
+        let _archived_writes = crate::storage::operations::allow_archived_writes(
+            req.query
+                .get("force_archived")
+                .is_some_and(|value| matches!(value.as_str(), "true" | "1" | "yes")),
+        );
         let key = Self::normalize_key(&req.method, &req.path);
         if let Some(handler) = self.handlers.get(&key) {
             (handler.callback)(req)

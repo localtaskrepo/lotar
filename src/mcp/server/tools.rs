@@ -100,7 +100,49 @@ fn reference_kinds() -> Vec<String> {
         .to_vec()
 }
 
+/// Tools that write task files; they accept `force_archived` (DEV-4).
+pub(crate) const FORCE_ARCHIVED_TOOLS: &[&str] = &[
+    "task_update",
+    "task_comment_add",
+    "task_comment_update",
+    "task_bulk_update",
+    "task_bulk_comment_add",
+    "task_bulk_reference_add",
+    "task_bulk_reference_remove",
+    "task_reference_add",
+    "task_reference_remove",
+    "task_delete",
+    "task_restore",
+    "relationship_mutate",
+    "relationship_repair",
+    "sync_pull",
+];
+
 pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
+    let mut tools = all_tool_definitions(enum_hints);
+    for tool in &mut tools {
+        let is_writer = tool
+            .get("name")
+            .and_then(Value::as_str)
+            .is_some_and(|name| FORCE_ARCHIVED_TOOLS.contains(&name));
+        if is_writer
+            && let Some(properties) = tool
+                .pointer_mut("/inputSchema/properties")
+                .and_then(Value::as_object_mut)
+        {
+            properties.insert(
+                "force_archived".into(),
+                json!({
+                    "type": ["boolean", "null"],
+                    "description": "Allow changing archived tasks, which are read-only otherwise."
+                }),
+            );
+        }
+    }
+    tools
+}
+
+fn all_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
     vec![
         make_whoami_tool(),
         make_task_create_tool(enum_hints),
@@ -116,6 +158,8 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_task_reference_remove_tool(enum_hints),
         make_task_delete_tool(enum_hints),
         make_task_restore_tool(enum_hints),
+        make_task_archive_tool(enum_hints, true),
+        make_task_archive_tool(enum_hints, false),
         make_task_list_tool(enum_hints),
         json!({
             "name": "relationship_graph",
@@ -582,8 +626,41 @@ fn make_task_restore_tool(enum_hints: Option<&EnumHints>) -> Value {
     tool
 }
 
+fn make_task_archive_tool(enum_hints: Option<&EnumHints>, archive: bool) -> Value {
+    let (name, description) = if archive {
+        (
+            "task_archive",
+            "Archive a task by id (optional project override): its file moves into the project's @archive folder. Archived tasks are hidden from task_list unless archived is yes or all, stay findable by id, keep their status and links, and are read-only until task_unarchive (or force_archived). Returns the task DTO.",
+        )
+    } else {
+        (
+            "task_unarchive",
+            "Bring an archived task back out of the project's @archive folder, by id (optional project override). Its stored values must be valid under the current project config. Returns the task DTO.",
+        )
+    };
+    let mut tool = json!({
+        "name": name,
+        "description": description,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": ["string", "null"]}
+            },
+            "required": ["id"],
+            "additionalProperties": false
+        }
+    });
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
+    );
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
+    tool
+}
+
 fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "List tasks using optional filters. deletion selects the deletion view: active (default) excludes soft-deleted tasks, deleted returns only soft-deleted tasks, all returns both. status/priority/type accept a single string, comma-separated string, or array and are validated via project config (invalid values error). assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). query takes the web search-box syntax (filters plus search text, as in `lotar list`; a leading minus excludes a filter, e.g. -status:done). search requires every word to match (any order) across id, title, subtitle, description, acceptance criteria, tags, references and comments; \"quoted phrases\" match together, -word excludes, title:/desc:/comment: (also id, subtitle, criteria, tag, ref) limit a term to one field, /regex/ is a case-insensitive regular expression, and small typos are tolerated. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids. due (today|soon|later|overdue; overdue excludes terminal tasks under the task's project issue.done_states policy), due_within (N days from today), recent (Nd or Nw, modified within), needs (CSV of effort,due), has (CSV of attachment,image,link,tag) and effort_min/effort_max (inclusive effort bounds) are smart filters. assignee also accepts '__none__' for unassigned tasks. sort_by orders globally (builtins: priority, status, effort, due-date, created, modified, assignee, type, project, id, relevance (best search match first); or custom:<name> / field:<name>); order is asc|desc. Default: modified desc with natural task ID ascending tiebreak (A-2 before A-10). Invalid explicit filter/sort values error instead of being dropped.\n\nPAGINATION: Results are paginated over that deterministic global order. Default page size is 50 (max 200). The response includes `total`, `count`, `cursor`, `limit`, `hasMore`, and `nextCursor`. When `hasMore` is true, call the tool again with `cursor: <nextCursor>` (or `offset`) to fetch the next page. The `message` field summarizes what is shown vs. total. Do NOT assume the first response contains every matching task — always check `hasMore`/`total` before reasoning about completeness.".to_string();
+    let description = "List tasks using optional filters. deletion selects the deletion view: active (default) excludes soft-deleted tasks, deleted returns only soft-deleted tasks, all returns both. archived (no|yes|all) includes tasks archived with task_archive; the default leaves them out. status/priority/type accept a single string, comma-separated string, or array and are validated via project config (invalid values error). assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). query takes the web search-box syntax (filters plus search text, as in `lotar list`; a leading minus excludes a filter, e.g. -status:done). search requires every word to match (any order) across id, title, subtitle, description, acceptance criteria, tags, references and comments; \"quoted phrases\" match together, -word excludes, title:/desc:/comment: (also id, subtitle, criteria, tag, ref) limit a term to one field, /regex/ is a case-insensitive regular expression, and small typos are tolerated. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids. due (today|soon|later|overdue; overdue excludes terminal tasks under the task's project issue.done_states policy), due_within (N days from today), recent (Nd or Nw, modified within), needs (CSV of effort,due), has (CSV of attachment,image,link,tag) and effort_min/effort_max (inclusive effort bounds) are smart filters. assignee also accepts '__none__' for unassigned tasks. sort_by orders globally (builtins: priority, status, effort, due-date, created, modified, assignee, type, project, id, relevance (best search match first); or custom:<name> / field:<name>); order is asc|desc. Default: modified desc with natural task ID ascending tiebreak (A-2 before A-10). Invalid explicit filter/sort values error instead of being dropped.\n\nPAGINATION: Results are paginated over that deterministic global order. Default page size is 50 (max 200). The response includes `total`, `count`, `cursor`, `limit`, `hasMore`, and `nextCursor`. When `hasMore` is true, call the tool again with `cursor: <nextCursor>` (or `offset`) to fetch the next page. The `message` field summarizes what is shown vs. total. Do NOT assume the first response contains every matching task — always check `hasMore`/`total` before reasoning about completeness.".to_string();
 
     let mut properties = JsonMap::new();
     properties.insert("project".into(), json!({"type": ["string", "null"]}));
@@ -593,6 +670,14 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
             "type": ["string", "null"],
             "enum": ["active", "deleted", "all", null],
             "description": "Deletion view: active (default) excludes soft-deleted tasks, deleted returns only soft-deleted tasks, all returns both."
+        }),
+    );
+    properties.insert(
+        "archived".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["no", "yes", "all", null],
+            "description": "Archived tasks: no (default) leaves them out, yes returns only archived tasks, all returns both."
         }),
     );
     properties.insert("status".into(), multi_value_string_schema());

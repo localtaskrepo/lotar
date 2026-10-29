@@ -24,11 +24,6 @@
       "count": 2
     }
   },
-  "view/components/TaskPanel.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    }
-  },
   "view/components/analytics/BurndownChart.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2

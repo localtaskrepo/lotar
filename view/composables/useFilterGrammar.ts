@@ -99,6 +99,7 @@ const RESERVED_FIELD_ALIASES: Record<string, string> = (() => {
         sort_by: 'sort_by',
         sortby: 'sort_by',
         deletion: 'deletion',
+        archived: 'archived',
     })
     for (const meta of GRAMMAR_KEYS) {
         for (const alias of meta.aliases) map[alias] = meta.key
@@ -374,7 +375,7 @@ function parseColonToken(
 }
 
 /** Routing keys a leading minus cannot exclude. */
-const UNNEGATABLE_KEYS = new Set(['q', 'order', 'sort_by', 'deletion'])
+const UNNEGATABLE_KEYS = new Set(['q', 'order', 'sort_by', 'deletion', 'archived'])
 
 function parseToken(
     raw: string,
@@ -650,6 +651,9 @@ function candidatesForKey(key: string, source: FilterValueSource): ValueCandidat
     if (key === 'deletion') {
         return ['active', 'deleted', 'all'].map((value) => ({ value, label: value, hint: 'Visibility' }))
     }
+    if (key === 'archived') {
+        return ['yes', 'all', 'no'].map((value) => ({ value, label: value, hint: 'Archived tasks' }))
+    }
     if (key === 'order') {
         return ['asc', 'desc'].map((value) => ({ value, label: value, hint: 'Sort order' }))
     }
@@ -709,6 +713,7 @@ const SORT_BY_SUGGESTION_LIMIT = 30
  */
 const ASSIGNMENT_KEY_PREFIXES: SuggestionItem[] = [
     { insert: 'deletion=', label: 'deletion=', hint: 'Visibility' },
+    { insert: 'archived=', label: 'archived=', hint: 'Archived tasks' },
     { insert: 'order=', label: 'order=', hint: 'Sort order' },
     { insert: 'sort_by=', label: 'sort_by=', hint: 'Sort field' },
     { insert: 'q=', label: 'q=', hint: 'Search text' },

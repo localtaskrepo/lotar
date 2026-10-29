@@ -1483,6 +1483,36 @@ pub(crate) fn handle_task_restore(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 }
 
+pub(crate) fn handle_task_archive(req: JsonRpcRequest) -> JsonRpcResponse {
+    archive_tool(req, true)
+}
+
+pub(crate) fn handle_task_unarchive(req: JsonRpcRequest) -> JsonRpcResponse {
+    archive_tool(req, false)
+}
+
+fn archive_tool(req: JsonRpcRequest, archive: bool) -> JsonRpcResponse {
+    let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
+        return err(req.id, -32602, "Missing id", None);
+    };
+    let project = req.params.get("project").and_then(|v| v.as_str());
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
+    let mut storage = Storage::new(&resolver.path);
+    match TaskService::archive_with_receipt(&mut storage, id, project, archive) {
+        Ok(receipt) => text_result(req.id, &receipt.dto),
+        Err(e) => err(
+            req.id,
+            -32007,
+            if archive {
+                "Task archive failed"
+            } else {
+                "Task unarchive failed"
+            },
+            Some(json!({"message": e.to_string()})),
+        ),
+    }
+}
+
 /// Map `task_list` params onto the shared task query (DEV-230). Only JSON
 /// shape errors are reported here; values are validated by the query.
 pub(crate) fn task_list_input(
@@ -1600,6 +1630,10 @@ pub(crate) fn task_list_input(
             .map(str::to_string),
         fields,
         deletion,
+        archived: string(params, "archived")?
+            .map(|raw| crate::storage::layout::ArchiveFilter::parse(&raw))
+            .transpose()?
+            .unwrap_or_default(),
         due: string(params, "due")?,
         due_within: string(params, "due_within")?,
         recent: string(params, "recent")?,

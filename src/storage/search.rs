@@ -81,15 +81,18 @@ impl StorageSearch {
                     StorageLocator::project_folders_for_name(&candidate_root, project);
                 for project_folder in project_folders {
                     let project_path = candidate_root.join(&project_folder);
-                    let files = crate::utils::filesystem::list_files_with_ext(&project_path, "yml");
+                    let files = crate::storage::layout::unique_numbers(
+                        &project_folder,
+                        crate::storage::layout::task_files(&project_path, filter.archived),
+                    );
 
                     #[cfg(feature = "parallel")]
                     let mut partial: Vec<(String, Task)> = files
                         .par_iter()
-                        .filter_map(|path| {
-                            let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
-                            let task_id = format!("{}-{}", project_folder, numeric_id);
-                            let task = Self::load_task_file(path)?;
+                        .filter_map(|file| {
+                            let task_id = format!("{}-{}", project_folder, file.number);
+                            let mut task = Self::load_task_file(&file.path)?;
+                            task.archived = file.archived;
                             if Self::task_matches_filter(&task_id, &task, filter) {
                                 Some((task_id, task))
                             } else {
@@ -101,10 +104,10 @@ impl StorageSearch {
                     #[cfg(not(feature = "parallel"))]
                     let mut partial: Vec<(String, Task)> = files
                         .iter()
-                        .filter_map(|path| {
-                            let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
-                            let task_id = format!("{}-{}", project_folder, numeric_id);
-                            let task = Self::load_task_file(path)?;
+                        .filter_map(|file| {
+                            let task_id = format!("{}-{}", project_folder, file.number);
+                            let mut task = Self::load_task_file(&file.path)?;
+                            task.archived = file.archived;
                             if Self::task_matches_filter(&task_id, &task, filter) {
                                 Some((task_id, task))
                             } else {
@@ -129,11 +132,16 @@ impl StorageSearch {
                             (project_folder, dir_path, candidate_root.clone())
                         })
                 });
-            let all_files: Vec<(String, std::path::PathBuf)> = subdirs
+            let all_files: Vec<(String, crate::storage::layout::TaskFile)> = subdirs
                 .into_iter()
                 .flat_map(|(project_folder, dir_path, _root)| {
-                    let files = crate::utils::filesystem::list_files_with_ext(&dir_path, "yml");
-                    files.into_iter().map(move |p| (project_folder.clone(), p))
+                    let files = crate::storage::layout::unique_numbers(
+                        &project_folder,
+                        crate::storage::layout::task_files(&dir_path, filter.archived),
+                    );
+                    files
+                        .into_iter()
+                        .map(move |file| (project_folder.clone(), file))
                 })
                 .collect();
 
@@ -141,10 +149,10 @@ impl StorageSearch {
             {
                 results = all_files
                     .par_iter()
-                    .filter_map(|(project_folder, task_path)| {
-                        let numeric_id = crate::utils::filesystem::file_numeric_stem(task_path)?;
-                        let task_id = format!("{}-{}", project_folder, numeric_id);
-                        let task = Self::load_task_file(task_path)?;
+                    .filter_map(|(project_folder, file)| {
+                        let task_id = format!("{}-{}", project_folder, file.number);
+                        let mut task = Self::load_task_file(&file.path)?;
+                        task.archived = file.archived;
                         if Self::task_matches_filter(&task_id, &task, filter) {
                             Some((task_id, task))
                         } else {
@@ -157,14 +165,10 @@ impl StorageSearch {
             {
                 results = all_files
                     .iter()
-                    .filter_map(|(project_folder, task_path)| {
-                        let numeric_id =
-                            match crate::utils::filesystem::file_numeric_stem(task_path) {
-                                Some(n) => n,
-                                None => return None,
-                            };
-                        let task_id = format!("{}-{}", project_folder, numeric_id);
-                        let task = Self::load_task_file(task_path)?;
+                    .filter_map(|(project_folder, file)| {
+                        let task_id = format!("{}-{}", project_folder, file.number);
+                        let mut task = Self::load_task_file(&file.path)?;
+                        task.archived = file.archived;
                         if Self::task_matches_filter(&task_id, &task, filter) {
                             Some((task_id, task))
                         } else {

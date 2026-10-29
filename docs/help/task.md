@@ -29,6 +29,7 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `effort` | Show, set, or clear effort estimates. | `lotar effort`. |
 | `delete` | Soft-delete a task, or permanently remove it with `--hard`. | Delete helper. |
 | `restore` | Restore a soft-deleted task. | Restore helper. |
+| `archive` / `unarchive` | Move tasks into the project's `@archive` folder (read-only) or back. | Archive helper. |
 | `history` / `history-field` | Git history utilities. | See `docs/help/history.md`. |
 | `diff` | Show the latest (or specific) git diff for a task. | History/diff helper. |
 | `at` | Print the file at a specific commit. | History helper. |
@@ -300,7 +301,7 @@ lotar task delete <TASK_ID> [--hard] [--dry-run] [--force | --yes | -y]
 - `--hard` permanently removes the task file. Attachment blobs are **not** deleted: warnings list retained attachments and detectable incoming task relationships. Related task files are not rewritten.
 - `--force`, `--yes`, and `-y` only skip confirmation; they never select hard deletion. `--dry-run` previews the selected deletion mode without writing.
 - Use `lotar list --deleted` to list deleted tasks, or `--include-deleted` to list active and deleted tasks together. These flags are mutually exclusive.
-- Physical file removal remains supported. Missing IDs do not prevent other tasks from loading. ID allocation uses the highest existing numeric filename plus one: tombstones reserve IDs, while removing the highest file permits its number to be reused. Reuse can associate old relationships, Git history, and agent records with a different task; increment the filename manually when retaining that distinction matters.
+- Physical file removal remains supported. Missing IDs do not prevent other tasks from loading. ID allocation uses the highest numeric filename anywhere in the project folder (subfolders and `@archive` included) plus one: tombstones reserve IDs, while removing the highest file permits its number to be reused. Reuse can associate old relationships, Git history, and agent records with a different task; increment the filename manually when retaining that distinction matters.
 
 ### restore
 
@@ -312,6 +313,21 @@ lotar task restore <TASK_ID> [--dry-run]
 - `--dry-run` previews restoration without changing task data.
 - Restore requires values compatible with the current project configuration; it does not invent a replacement workflow status.
 - Hard-deleted tasks cannot be restored by this command because their file is gone. User-managed history or backups remain independent recovery options.
+
+### archive / unarchive
+
+```bash
+lotar task archive [TASK_ID...] [--select '<query>'] [--dry-run|-n]
+lotar task unarchive [TASK_ID...] [--select '<query>'] [--dry-run|-n]
+```
+
+- Archiving moves the task file into its project's `@archive` folder, keeping the path below the project folder (`DEV/web/12.yml` becomes `DEV/@archive/web/12.yml`); unarchiving moves it back. Nothing else in the file changes except an `archived`/`unarchived` history entry; status, links and `modified` stay as they are.
+- Archived tasks are left out of lists, search, boards, task stats and tag suggestions unless a query asks for them with `archived=yes` (only archived) or `archived=all`. Looking a task up by ID still finds it, so links, the dependency graph and sprint history keep working, and a `Done` dependency stays done.
+- Archived tasks are read-only everywhere (web UI, CLI, REST, MCP, automations). To change one anyway, add the global `--force-archived` flag (`lotar --force-archived comment DEV-12 -m "..."`); REST takes `?force_archived=true` and MCP `force_archived: true`.
+- `--select` takes the same query as `lotar list` and adds every match: `lotar task archive --select 'status:done -recent:30d'` archives finished tasks nobody changed for 30 days. For `unarchive` the query looks inside the archive. Run it from cron or CI to archive on a schedule, or use the automation action `archive: true` to archive right when something happens.
+- Soft-deleted tasks can be archived too. Unarchiving requires the stored status, priority and type to be valid under the current configuration, like `restore`.
+- Tasks can also be grouped in any subfolder of their project folder by hand (`DEV/backend/12.yml` is still `DEV-12`). Folders starting with `.` or `@` are not scanned, except `@archive`. Moving a file with `git mv` archives it just like the command does. A number stored twice in one project (for example after a merge) is listed once with a warning, and changes to that ID are refused until one copy is removed or renumbered.
+- LoTaR versions before 0.11 only read the top level of a project folder: they do not see nested or archived tasks and can hand out their numbers again. Upgrade every client before archiving or nesting tasks.
 
 ### Git history helpers (`history`, `history-field`, `diff`, `at`)
 

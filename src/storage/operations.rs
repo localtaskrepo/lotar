@@ -28,6 +28,52 @@ impl TaskMutationOutcome {
     }
 }
 
+thread_local! {
+    static ARCHIVED_WRITES_ALLOWED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Lets writes to archived tasks through while alive (DEV-4). Archived tasks
+/// are read-only everywhere; CLI `--force-archived`, REST `?force_archived=true`
+/// and MCP `force_archived: true` open this guard around the forced operation.
+/// Restores the previous state on drop.
+pub struct ArchivedWriteGuard {
+    previous: bool,
+}
+
+impl Drop for ArchivedWriteGuard {
+    fn drop(&mut self) {
+        ARCHIVED_WRITES_ALLOWED.with(|cell| cell.set(self.previous));
+    }
+}
+
+/// Allow writes to archived tasks on this thread until the guard drops.
+/// `force == false` returns a guard that changes nothing.
+pub fn allow_archived_writes(force: bool) -> ArchivedWriteGuard {
+    let previous = ARCHIVED_WRITES_ALLOWED.with(|cell| {
+        let previous = cell.get();
+        cell.set(previous || force);
+        previous
+    });
+    ArchivedWriteGuard { previous }
+}
+
+/// Fail closed when `file` is an archived task and no force guard is open.
+pub(crate) fn ensure_writable(project_path: &Path, file: &Path, id: &str) -> LoTaRResult<()> {
+    archived_refusal(project_path, file, id)
+        .map_or(Ok(()), |message| Err(LoTaRError::ValidationError(message)))
+}
+
+/// The refusal message for writing an archived task, if it applies.
+fn archived_refusal(project_path: &Path, file: &Path, id: &str) -> Option<String> {
+    (crate::storage::layout::is_archived(project_path, file)
+        && !ARCHIVED_WRITES_ALLOWED.with(|cell| cell.get()))
+    .then(|| {
+        format!(
+            "Task '{id}' is archived and read-only; unarchive it first, or force the change (--force-archived, or force_archived: true over REST/MCP)"
+        )
+    })
+}
+
 /// Core CRUD operations for task storage
 pub struct StorageOperations;
 
@@ -149,7 +195,12 @@ impl StorageOperations {
         match locations.len() {
             0 => None,
             // Route through the content-validated parse cache shared with search
-            1 => crate::storage::search::StorageSearch::load_task_file(&locations[0].file),
+            1 => crate::storage::search::StorageSearch::load_task_file(&locations[0].file).map(
+                |mut task| {
+                    task.archived = locations[0].archived;
+                    task
+                },
+            ),
             // Duplicate ID across roots: identity is ambiguous, never guess.
             _ => None,
         }
@@ -174,13 +225,15 @@ impl StorageOperations {
         if parsed.project != project_name {
             return None;
         }
-        let file_path = root_path
-            .join(&parsed.project)
-            .join(format!("{}.yml", parsed.number));
-        if file_path.is_file() {
-            crate::storage::search::StorageSearch::load_task_file(&file_path)
-        } else {
-            None
+        let project_path = root_path.join(&parsed.project);
+        match crate::storage::layout::find(&project_path, parsed.number).as_slice() {
+            [file] => {
+                crate::storage::search::StorageSearch::load_task_file(&file.path).map(|mut task| {
+                    task.archived = file.archived;
+                    task
+                })
+            }
+            _ => None,
         }
     }
 
@@ -221,6 +274,9 @@ impl StorageOperations {
                 Some(path) => path,
                 None => return Err("Task file not found".into()),
             };
+            if let Some(message) = archived_refusal(&project_path, &file_path, id) {
+                return Err(message.into());
+            }
             let content = fs::read_to_string(&file_path)?;
             let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
                 .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
@@ -282,6 +338,7 @@ impl StorageOperations {
                     ));
                 }
             };
+            ensure_writable(&project_path, &file_path, id)?;
             let content = fs::read_to_string(&file_path)?;
             let before =
                 crate::storage::task::parse_task_yaml_tolerant(&content).ok_or_else(|| {
@@ -319,6 +376,9 @@ impl StorageOperations {
             Some(path) => path,
             None => return Err("Task file not found".into()),
         };
+        if let Some(message) = archived_refusal(project_path, &file_path, id) {
+            return Err(message.into());
+        }
 
         // Read fresh rather than using a potentially stale caller snapshot.
         // DTO-based replacements do not carry YAML extensions.
@@ -335,6 +395,8 @@ impl StorageOperations {
     /// extensions win per key, mirroring the historical edit behavior.
     fn merge_task_extensions(stored: &Task, replacement: &Task) -> Task {
         let mut merged = replacement.clone();
+        // Location, not content: never let a caller snapshot change it.
+        merged.archived = stored.archived;
         let mut extras = stored.extra_fields.clone();
         extras.extend(merged.extra_fields.clone());
         merged.extra_fields = extras;
@@ -380,6 +442,9 @@ impl StorageOperations {
                 Some(path) => path,
                 None => return Ok(false), // Task file not found
             };
+            if let Some(message) = archived_refusal(&project_path, &file_path, id) {
+                return Err(message.into());
+            }
 
             match fs::remove_file(file_path) {
                 Ok(_) => {
@@ -397,6 +462,52 @@ impl StorageOperations {
         })
     }
 
+    /// Move a task file into its project's `@archive` folder (`archive ==
+    /// true`) or back to where it came from (DEV-4). Returns the old and new
+    /// path, or `None` when the task already is where it should be. Locked
+    /// to the issuing root like [`Self::edit`]; refuses duplicates and an
+    /// occupied target instead of overwriting anything.
+    pub fn move_archive(
+        root_path: &Path,
+        id: &str,
+        archive: bool,
+    ) -> LoTaRResult<Option<(PathBuf, PathBuf)>> {
+        let parsed =
+            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        Self::refuse_cross_root(root_path, id)
+            .map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
+        let project_path = root_path.join(&parsed.project);
+        with_storage_lock(&project_path, "task", || {
+            let file = match crate::storage::layout::find(&project_path, parsed.number).as_slice() {
+                [file] => file.path.clone(),
+                [] => return Err(LoTaRError::TaskNotFound(parsed.canonical())),
+                _ => {
+                    return Err(LoTaRError::ValidationError(format!(
+                        "Task '{}' is stored in more than one file; keep one copy before archiving",
+                        parsed.canonical()
+                    )));
+                }
+            };
+            let Some(target) =
+                crate::storage::layout::archive_target(&project_path, &file, archive)
+            else {
+                return Ok(None);
+            };
+            if fs::symlink_metadata(&target).is_ok() {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Cannot move '{}': {} already exists",
+                    parsed.canonical(),
+                    target.display()
+                )));
+            }
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::rename(&file, &target)?;
+            Ok(Some((file, target)))
+        })
+    }
+
     /// Get file path for a task
     pub fn get_file_path(project_folder: &str, numeric_id: u64, root_path: &Path) -> PathBuf {
         let mut file_path = root_path.to_path_buf();
@@ -405,31 +516,24 @@ impl StorageOperations {
         file_path
     }
 
-    /// Get the file path for a task ID (relative to tasks root).
-    /// Uses the canonical parse: the FINAL dash-separated segment is the
-    /// numeric suffix, so hyphenated prefixes (`ABC-OPS-12`) resolve to
-    /// `ABC-OPS/12.yml`, and padded aliases (`TP-001`) resolve to `TP/1.yml`.
+    /// The single file storing a task ID inside `project_path`, in any
+    /// subfolder or the archive (DEV-4). Uses the canonical parse: the FINAL
+    /// dash-separated segment is the numeric suffix, so hyphenated prefixes
+    /// (`ABC-OPS-12`) resolve inside `ABC-OPS/`, and padded aliases (`TP-001`)
+    /// resolve to `1.yml`. `None` when missing or stored more than once;
+    /// [`TaskId::locate`] reports the duplicates.
     pub fn get_file_path_for_id(project_path: &Path, task_id: &str) -> Option<PathBuf> {
         let id = TaskId::parse(task_id).ok()?;
-        let file_path = project_path.join(format!("{}.yml", id.number));
-        if file_path.exists() {
-            Some(file_path)
-        } else {
-            None
+        match crate::storage::layout::find(project_path, id.number).as_slice() {
+            [file] => Some(file.path.clone()),
+            _ => None,
         }
     }
 
-    /// Get the current highest task ID by scanning the project directory
+    /// Highest task number stored in the project, nested folders and the
+    /// archive included, so new tasks never reuse a number.
     pub fn get_current_id(project_path: &Path) -> u64 {
-        crate::utils::filesystem::list_files_with_ext(project_path, "yml")
-            .into_iter()
-            .filter_map(|p| {
-                p.file_stem()
-                    .and_then(|s| s.to_str())
-                    .and_then(|s| s.parse::<u64>().ok())
-            })
-            .max()
-            .unwrap_or(0)
+        crate::storage::layout::max_number(project_path)
     }
 
     /// Get the actual project folder name for a given task ID, from the

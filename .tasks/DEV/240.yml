@@ -1,0 +1,9 @@
+title: Add time triggers to automation
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-29T01:26:09.915651+00:00
+description: |-
+  To support triggering events at a certain time we can offer eventual triggers that fire, either when the server is currently active and a timer is hit or the next a command is executed and a configured timer is triggering an automation at that time.
+  We just need to be clear int he documentation and UI that this is how they work.

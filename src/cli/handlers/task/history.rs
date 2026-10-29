@@ -92,7 +92,7 @@ pub fn handle_history_by_field(
         if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(
             &context.repo_root,
             &c.commit,
-            &context.file_repo_path,
+            &c.path,
         ) && let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(&content)
         {
             snapshots.push((
@@ -197,39 +197,26 @@ pub fn handle_diff(
 ) -> Result<(), String> {
     let context = resolve_task_file(id, project, resolver)?;
 
+    use crate::services::audit_service::AuditService;
+    let commits = AuditService::list_commits_for_file(&context.repo_root, &context.file_repo_path)?;
     let commit_sha = if let Some(c) = commit {
         c
     } else {
-        let commits = crate::services::audit_service::AuditService::list_commits_for_file(
-            &context.repo_root,
-            &context.file_repo_path,
-        )?;
         commits
             .first()
             .map(|c| c.commit.clone())
             .ok_or_else(|| "No commits for this task file".to_string())?
     };
+    let path_at = |sha: &str| {
+        AuditService::path_at_commit(&commits, sha, &context.file_repo_path).to_path_buf()
+    };
 
     if fields {
-        let parent_commit = {
-            let commits = crate::services::audit_service::AuditService::list_commits_for_file(
-                &context.repo_root,
-                &context.file_repo_path,
-            )?;
-            commits.get(1).map(|c| c.commit.clone())
-        };
-        let current = crate::services::audit_service::AuditService::show_file_at(
-            &context.repo_root,
-            &commit_sha,
-            &context.file_repo_path,
-        )?;
+        let parent_commit = commits.get(1).map(|c| c.commit.clone());
+        let current =
+            AuditService::show_file_at(&context.repo_root, &commit_sha, &path_at(&commit_sha))?;
         let prev = if let Some(pc) = parent_commit {
-            crate::services::audit_service::AuditService::show_file_at(
-                &context.repo_root,
-                &pc,
-                &context.file_repo_path,
-            )
-            .ok()
+            AuditService::show_file_at(&context.repo_root, &pc, &path_at(&pc)).ok()
         } else {
             None
         };
@@ -368,11 +355,8 @@ pub fn handle_diff(
             }
         }
     } else {
-        let patch = crate::services::audit_service::AuditService::show_file_diff(
-            &context.repo_root,
-            &commit_sha,
-            &context.file_repo_path,
-        )?;
+        let patch =
+            AuditService::show_file_diff(&context.repo_root, &commit_sha, &path_at(&commit_sha))?;
         match renderer.format {
             crate::output::OutputFormat::Json => {
                 let obj = serde_json::json!({
@@ -433,10 +417,13 @@ pub fn handle_at(
 ) -> Result<(), String> {
     let context = resolve_task_file(id, project, resolver)?;
 
-    let content = crate::services::audit_service::AuditService::show_file_at(
+    use crate::services::audit_service::AuditService;
+    let commits = AuditService::list_commits_for_file(&context.repo_root, &context.file_repo_path)
+        .unwrap_or_default();
+    let content = AuditService::show_file_at(
         &context.repo_root,
         commit,
-        &context.file_repo_path,
+        AuditService::path_at_commit(&commits, commit, &context.file_repo_path),
     )?;
     match renderer.format {
         crate::output::OutputFormat::Json => {

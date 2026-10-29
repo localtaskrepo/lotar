@@ -1925,7 +1925,7 @@ impl TaskService {
             // Validate the stored fields against the CURRENT config before
             // clearing the tombstone; a config change that invalidated the
             // stored values blocks the restore without any mutation.
-            Self::validate_stored_enums(task, &config, &canonical_guard)?;
+            Self::validate_stored_enums(task, &config, &canonical_guard, "restore")?;
 
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
@@ -1945,6 +1945,67 @@ impl TaskService {
         Ok(TaskUpdateReceipt {
             dto,
             changed: outcome.changed,
+        })
+    }
+
+    /// Archive a task, or bring it back (`archive == false`), DEV-4: the file
+    /// moves into or out of `<project>/@archive/` and an `archived` or
+    /// `unarchived` history entry is appended. Status, links and `modified`
+    /// stay as they are. Works for soft-deleted tasks too. Bringing a task
+    /// back validates its stored values against the current config, like
+    /// [`Self::restore`]. Already in the requested place: no-op, unchanged.
+    pub fn archive_with_receipt(
+        storage: &mut Storage,
+        id: &str,
+        project: Option<&str>,
+        archive: bool,
+    ) -> LoTaRResult<TaskUpdateReceipt> {
+        let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
+        if !archive {
+            let config = Self::restore_config(storage.root_path.as_path(), &derived)?;
+            let stored = storage
+                .get(&canonical, &derived)
+                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
+            if stored.archived {
+                Self::validate_stored_enums(&stored, &config, &canonical, "unarchive")?;
+            }
+        }
+
+        let moved =
+            StorageOperations::move_archive(storage.root_path.as_path(), &canonical, archive)?;
+        let changed = moved.is_some();
+        let task = if changed {
+            // The history entry lands in the moved file, archived or not.
+            let _writable = crate::storage::operations::allow_archived_writes(true);
+            let root_path = storage.root_path.clone();
+            let field = if archive { "archived" } else { "unarchived" };
+            storage
+                .mutate_task(&canonical, move |task| {
+                    task.history.push(TaskChangeLogEntry {
+                        at: chrono::Utc::now().to_rfc3339(),
+                        actor: resolve_current_user_for_project(
+                            Some(root_path.as_path()),
+                            Some(&derived),
+                        ),
+                        changes: vec![TaskChange {
+                            field: field.into(),
+                            old: None,
+                            new: None,
+                        }],
+                    });
+                    Ok(true)
+                })?
+                .after
+        } else {
+            storage
+                .get(&canonical, &derived)
+                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?
+        };
+        let mut task = task;
+        task.archived = archive;
+        Ok(TaskUpdateReceipt {
+            dto: Self::dto_from_task(storage, &canonical, task),
+            changed,
         })
     }
 
@@ -1972,25 +2033,30 @@ impl TaskService {
     /// Enum validation of already-stored values against a resolved config:
     /// canonicalizes nothing and mutates nothing, it only fails closed with
     /// a field-specific message.
-    fn validate_stored_enums(task: &Task, config: &ResolvedConfig, id: &str) -> LoTaRResult<()> {
+    fn validate_stored_enums(
+        task: &Task,
+        config: &ResolvedConfig,
+        id: &str,
+        action: &str,
+    ) -> LoTaRResult<()> {
         if !task.status.is_empty() {
             validation::parse_status(task.status.as_str(), config).map_err(|err| {
                 LoTaRError::ValidationError(format!(
-                    "cannot restore '{id}': stored status is invalid under the current config: {err}"
+                    "cannot {action} '{id}': stored status is invalid under the current config: {err}"
                 ))
             })?;
         }
         if !task.priority.is_empty() {
             validation::parse_priority(task.priority.as_str(), config).map_err(|err| {
                 LoTaRError::ValidationError(format!(
-                    "cannot restore '{id}': stored priority is invalid under the current config: {err}"
+                    "cannot {action} '{id}': stored priority is invalid under the current config: {err}"
                 ))
             })?;
         }
         if !task.task_type.is_empty() {
             validation::parse_task_type(task.task_type.as_str(), config).map_err(|err| {
                 LoTaRError::ValidationError(format!(
-                    "cannot restore '{id}': stored task type is invalid under the current config: {err}"
+                    "cannot {action} '{id}': stored task type is invalid under the current config: {err}"
                 ))
             })?;
         }
@@ -2066,6 +2132,7 @@ impl TaskService {
             sprints: Vec::new(),
             custom_fields: filter.custom_fields.clone(),
             deletion: filter.deletion,
+            archived: filter.archived,
         };
 
         // DEV-21 review F1: cache keyed by (actual root, prefix). A
@@ -2194,6 +2261,7 @@ impl TaskService {
             status: task.status,
             task_state,
             deleted_at: task.deleted_at,
+            archived: task.archived,
             priority: task.priority,
             task_type: task.task_type,
             reporter: task.reporter,

@@ -16,6 +16,10 @@ pub struct FileCommitEvent {
     pub email: String,
     pub date: DateTime<Utc>,
     pub message: String,
+    /// Repo-relative path of the file in this commit. Differs from the
+    /// current path once the task moved (nested folder or archive, DEV-4).
+    #[serde(skip)]
+    pub path: PathBuf,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -307,43 +311,79 @@ impl AuditService {
         Ok(())
     }
 
-    /// List commits touching a specific file (relative to repo root)
+    /// List commits touching a specific file (relative to repo root),
+    /// newest first. Follows renames, so a task moved into a subfolder or the
+    /// archive keeps its earlier history; each event carries the file's path
+    /// in that commit (DEV-4).
     pub fn list_commits_for_file(
         repo_root: &Path,
         file_rel: &Path,
     ) -> Result<Vec<FileCommitEvent>, String> {
-        let stdout = Self::run_git_log(
-            repo_root,
-            None,
-            None,
-            true,
-            false,
-            0,
-            &[file_rel.to_path_buf()],
-        )?;
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(repo_root)
+            .args(["log", "--no-merges", "--follow", "--name-status"])
+            .arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s")
+            .arg("--")
+            .arg(Self::git_path_arg(file_rel))
+            .output()
+            .map_err(|e| format!("Failed to run git: {}", e))?;
+        if !output.status.success() {
+            if !Self::has_commits(repo_root) {
+                return Ok(Vec::new());
+            }
+            return Err(format!(
+                "git log failed (status {}): {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
 
-        let mut items = Vec::new();
+        let mut items: Vec<FileCommitEvent> = Vec::new();
         for line in stdout.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 continue;
             }
-            let Some(header) = Self::parse_commit_header(trimmed) else {
-                continue;
-            };
-            let Some(message) = header.message else {
-                continue;
-            };
-            items.push(FileCommitEvent {
-                commit: header.sha,
-                author: header.author,
-                email: header.email,
-                date: header.date,
-                message,
-            });
+            if let Some(header) = Self::parse_commit_header(trimmed) {
+                let Some(message) = header.message else {
+                    continue;
+                };
+                items.push(FileCommitEvent {
+                    commit: header.sha,
+                    author: header.author,
+                    email: header.email,
+                    date: header.date,
+                    message,
+                    path: file_rel.to_path_buf(),
+                });
+            } else if let Some(last) = items.last_mut()
+                && let Some(path) = trimmed.rsplit('\t').next()
+                && trimmed.contains('\t')
+            {
+                // `M\tpath` or `R097\told\tnew`: the file is at the last path.
+                last.path = PathBuf::from(path);
+            }
         }
 
         Ok(items)
+    }
+
+    /// The file's path in `commit`, from a [`Self::list_commits_for_file`]
+    /// result; the current path when the commit is not in the list.
+    pub fn path_at_commit<'a>(
+        events: &'a [FileCommitEvent],
+        commit: &str,
+        current: &'a Path,
+    ) -> &'a Path {
+        events
+            .iter()
+            .find(|event| {
+                event.commit == commit || (commit.len() >= 4 && event.commit.starts_with(commit))
+            })
+            .map(|event| event.path.as_path())
+            .unwrap_or(current)
     }
 
     pub fn list_activity_feed(
@@ -624,7 +664,7 @@ impl AuditService {
                 continue;
             }
 
-            let tasks = fs::read_dir(&project_path).map_err(|e| {
+            fs::read_dir(&project_path).map_err(|e| {
                 format!(
                     "Failed to read project directory {}: {}",
                     project_path.display(),
@@ -632,12 +672,7 @@ impl AuditService {
                 )
             })?;
 
-            for task_entry in tasks.flatten() {
-                let file_path = task_entry.path();
-                if file_path.extension().and_then(|ext| ext.to_str()) != Some("yml") {
-                    continue;
-                }
-
+            for file_path in Self::all_task_files(tasks_root_abs, Some(&project_name)) {
                 let rel = match file_path.strip_prefix(tasks_root_abs) {
                     Ok(rel) => rel,
                     Err(_) => continue,
@@ -797,13 +832,28 @@ impl AuditService {
         best_time.map(|(commit, _)| commit)
     }
 
+    /// Task ID and project of a repo-relative path under the tasks folder,
+    /// in any subfolder or the archive (DEV-4).
     fn task_id_from_path(tasks_rel: &Path, file_rel: &Path) -> Option<(String, String)> {
         let rel = file_rel.strip_prefix(tasks_rel).ok()?;
-        let project = rel.parent()?.file_name()?.to_str()?.to_string();
-        let stem = rel.file_stem()?.to_str()?;
-        let _numeric: u64 = stem.parse().ok()?;
-        let id = format!("{}-{}", project, stem);
-        Some((id, project))
+        let task = crate::storage::layout::parse_relative(rel)?;
+        Some((task.id(), task.project))
+    }
+
+    /// Every task file under the tasks folder (or one project), archive
+    /// included: history views cover tasks archived since.
+    fn all_task_files(tasks_abs: &Path, project_filter: Option<&str>) -> Vec<PathBuf> {
+        let projects: Vec<(String, PathBuf)> = match project_filter {
+            Some(project) => vec![(project.to_string(), tasks_abs.join(project))],
+            None => crate::utils::filesystem::list_visible_subdirs(tasks_abs),
+        };
+        projects
+            .into_iter()
+            .flat_map(|(_, dir)| {
+                crate::storage::layout::task_files(&dir, crate::storage::layout::ArchiveFilter::All)
+            })
+            .map(|file| file.path)
+            .collect()
     }
 
     fn parse_task_yaml(content: &str) -> Option<Task> {
@@ -824,13 +874,7 @@ impl AuditService {
         project_filter: Option<&str>,
     ) -> Result<Vec<ChangedTaskSummary>, String> {
         let tasks_abs = repo_root.join(tasks_rel);
-        let files: Vec<PathBuf> = match project_filter {
-            Some(project) => crate::utils::filesystem::list_files_with_ext_recursive(
-                &tasks_abs.join(project),
-                "yml",
-            ),
-            None => crate::utils::filesystem::list_files_with_ext_recursive(&tasks_abs, "yml"),
-        };
+        let files = Self::all_task_files(&tasks_abs, project_filter);
 
         let mut items: Vec<ChangedTaskSummary> = Vec::new();
         for abs_path in files {
@@ -846,23 +890,9 @@ impl AuditService {
                 continue;
             }
 
-            let file_name = match rel_path.file_stem().and_then(|s| s.to_str()) {
-                Some(name) => name,
-                None => continue,
+            let Some((id, project)) = Self::task_id_from_path(tasks_rel, &rel_path) else {
+                continue;
             };
-            let numeric: u64 = match file_name.parse() {
-                Ok(n) => n,
-                Err(_) => continue,
-            };
-            let project = match rel_path
-                .parent()
-                .and_then(|p| p.file_name())
-                .and_then(|s| s.to_str())
-            {
-                Some(p) => p.to_string(),
-                None => continue,
-            };
-            let id = format!("{}-{}", project, numeric);
 
             let log1_out = match Self::run_git_log(
                 repo_root,

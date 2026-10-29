@@ -162,11 +162,12 @@ fn stats_distribution_snapshot() {
 
 #[test]
 fn stats_due_buckets_snapshot() {
-    use chrono::{Duration, Utc};
+    use chrono::{Duration, Local};
 
     let temp = crate::common::temp_dir();
 
-    let today = Utc::now().date_naive();
+    // Due buckets use the local calendar day, so the test must too.
+    let today = Local::now().date_naive();
     let fmt = |d: chrono::NaiveDate| d.format("%Y-%m-%d").to_string();
 
     let overdue = fmt(today - Duration::days(1));
@@ -248,11 +249,12 @@ fn stats_due_buckets_snapshot() {
 
 #[test]
 fn stats_due_overdue_threshold_snapshot() {
-    use chrono::{Duration, Utc};
+    use chrono::{Duration, Local};
 
     let temp = crate::common::temp_dir();
 
-    let today = Utc::now().date_naive();
+    // Due buckets use the local calendar day, so the test must too.
+    let today = Local::now().date_naive();
     let fmt = |d: chrono::NaiveDate| d.format("%Y-%m-%d").to_string();
 
     let overdue_1 = fmt(today - Duration::days(1));

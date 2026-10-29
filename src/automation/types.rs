@@ -207,6 +207,10 @@ pub struct AutomationAction {
     /// ticket to an agent profile.
     #[serde(default)]
     pub agent: Option<AutomationAgentAction>,
+    /// `true` archives the task, `false` brings it back (DEV-4). Runs after
+    /// every other part of the action, since archived tasks are read-only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive: Option<bool>,
 }
 
 /// How the agent job started by an action's assignment should run. Each

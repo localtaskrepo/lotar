@@ -12,6 +12,7 @@ use crate::cli::handlers::{
 };
 use crate::workspace::TasksDirectoryResolver;
 
+mod archive;
 pub(crate) mod context;
 mod delete;
 mod edit;
@@ -144,6 +145,10 @@ impl CommandHandler for TaskHandler {
             }
             TaskAction::Restore(restore_args) => {
                 RestoreHandler::execute(restore_args, project, resolver, renderer)
+            }
+            TaskAction::Archive(args) => archive::execute(&args, true, project, resolver, renderer),
+            TaskAction::Unarchive(args) => {
+                archive::execute(&args, false, project, resolver, renderer)
             }
             TaskAction::Comment {
                 id,

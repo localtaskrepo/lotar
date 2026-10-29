@@ -30,4 +30,7 @@ pub struct TaskFilter {
     pub custom_fields: BTreeMap<String, Vec<String>>,
     #[serde(default)]
     pub deletion: DeletionFilter,
+    /// Whether the project `@archive` folders are scanned (DEV-4).
+    #[serde(default)]
+    pub archived: crate::storage::layout::ArchiveFilter,
 }

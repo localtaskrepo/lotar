@@ -519,7 +519,7 @@ let pendingHydrationEmit = false
 // custom-field map. Derived from the grammar so aliases stay in one place.
 // Grammar keys without a control of their own (DEV-230) travel with the
 // custom filters: kept, shown as chips and removed like them.
-const PASS_THROUGH_KEYS = new Set(['due_within', 'effort_min', 'effort_max'])
+const PASS_THROUGH_KEYS = new Set(['due_within', 'effort_min', 'effort_max', 'archived'])
 const CUSTOM_UI_KEYS = new Set([
   'q',
   'order',
@@ -577,6 +577,12 @@ const filterHelp = computed(() => [
     aliases: '',
   },
   { syntax: 'deletion=active', label: 'Visibility', description: 'active, deleted or all.', aliases: '' },
+  {
+    syntax: 'archived=yes',
+    label: 'Archived',
+    description: 'yes (only archived), all, or no (default).',
+    aliases: '',
+  },
   { syntax: 'order=asc', label: 'Sort direction', description: 'asc or desc.', aliases: '' },
   {
     syntax: 'sort_by=priority',
@@ -1065,8 +1071,8 @@ function isCompletingGrammar(fragment: string): boolean {
     (lower.includes('=') ||
       lower.startsWith('field:') ||
       (lower.includes(':') && !!findGrammarKey(lower.split(':')[0] || '')) ||
-      ['field', 'q', 'order', 'sort_by', 'deletion', ...GRAMMAR_KEYS.flatMap((meta) => meta.aliases)].some((key) =>
-        key.startsWith(lower),
+      ['field', 'q', 'order', 'sort_by', 'deletion', 'archived', ...GRAMMAR_KEYS.flatMap((meta) => meta.aliases)].some(
+        (key) => key.startsWith(lower),
       ))
   )
 }
@@ -1336,6 +1342,8 @@ function applySearchDraft() {
     errors.push('Sort direction must be asc or desc.')
   if (parsed.filters.deletion && !['active', 'deleted', 'all'].includes(parsed.filters.deletion))
     errors.push('Visibility must be active, deleted, or all.')
+  if (parsed.filters.archived && !['no', 'yes', 'all'].includes(parsed.filters.archived))
+    errors.push('Archived must be no, yes, or all.')
   searchErrors.value = errors
   if (errors.length) return
   applyGrammarFilters(parsed.filters, parsed.replaceKeys)

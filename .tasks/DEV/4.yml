@@ -1,10 +1,11 @@
 title: Nested folder ticket storage with archive support
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.705315+00:00
-modified: 2026-10-28T19:10:45.761454+00:00
+modified: 2026-10-29T04:00:12.739235+00:00
 comments:
 - date: 2026-09-06T11:21:52.619873+00:00
   text: 'Backlog reconciliation: Remains Todo for nested-folder ticket storage plus archive lifecycle/query behavior. DEV-56 owns canonical identity/multi-root lookup correctness, and DEV-53 storage safety is implemented; neither closes archive support.'
@@ -16,6 +17,25 @@ comments:
   text: Need to consider how to migrate from a repo that doesn't use any folders yet and how to act on a config change that would modify the folder structure.
 - date: 2026-10-28T19:10:45.761454+00:00
   text: 'Follow-up from DEV-229: the Config tag colour editor lists tags in use from the newest 1000 active tasks (one /api/tasks/list call with has=tag). A server-side listing of all tags in use would remove that cap; lotar stats tags already counts tags and could back it. Decide with archive support whether tags on archived tasks count as in use.'
+- date: 2026-10-29T01:25:08.711224+00:00
+  text: |-
+    Plan (decided with mallox 2026-10-29):
+    - Location carries no meaning except one folder. Tickets may sit in any subfolder of their project folder; the ID stays <PROJECT>-<number>. Folders starting with . or @ are skipped, except <PROJECT>/@archive which normal scans skip and lookups by ID still find. No storage-layout config, so config changes never move files; flat repos need no migration.
+    - Archive is storage, not a lifecycle state: no new YAML field. Archiving moves the file into <PROJECT>/@archive/ (per project only, no shared archive). Status, links and history stay; dependencies on archived Done tasks stay resolved. Soft-deleted tasks can be archived too.
+    - Archived tasks are read-only everywhere (UI, CLI, REST, MCP); CLI/REST/MCP can force an edit. Unarchive moves the file back.
+    - Query: archived=yes|all widens scans to @archive (default excludes). Tags only on archived tasks do not count as in use (DEV-229 follow-up).
+    - Commands: lotar archive / unarchive <ids|query> using the shared query; REST + MCP equivalents; automation action archive: true. Time-based sweeps run "lotar archive status:done -recent:30d" from cron/CI (no schedule trigger in scope).
+    - Steps: (1) one task locator module replacing ~22 hard-coded <project>/<n>.yml paths and flat scans, no behaviour change; (2) recursive discovery, next ID over the whole project tree incl. @archive, duplicate-number detection (lookup error + scan/validate report), git audit maps project from the first path component; (3) archive feature + docs.
+    - Compat risk: pre-0.11 clients only read the top-level folder and could reuse a number of a nested/archived ticket; document "upgrade all clients first"; duplicate detection catches it.
+    Checks: targeted nextest per step, then lint, test, smoke.
+- date: 2026-10-29T01:47:48.727527+00:00
+  text: 'Progress: steps 1-2 in place. New src/storage/layout.rs is the one place that maps IDs to files (find, task_files with ArchiveFilter, max_number, parse_relative, archive_target). identity locate/resolve_numeric, StorageOperations get/get_in_root/get_file_path_for_id/get_current_id, search, relationship inventory, config conflict validation (archived excluded), git audit/changelog/stats status+effort, REST commit routes, SSE watcher, and sync identity now use it. Duplicate numbers: lookups and writes refuse (existing Ambiguous error), listings show one copy and warn once. Per-file git history uses --follow and records the path per commit. Archived read-only guard: storage edit/mutate/prepare_task_edit/delete and relationship staging refuse archived files unless allow_archived_writes(force) is open. Task.archived is a serde(skip) flag set at load. Full nextest: 1838 passed. Also fixed tests/stats_snapshot_test.rs to use the local date (failed between 17:00 and midnight PDT). Next: archive/unarchive service + CLI/REST/MCP/automation, archived= query key, DTO field, UI read-only, docs.'
+- date: 2026-10-29T04:00:12.594800+00:00
+  text: |-
+    Outcome: tasks may sit in any subfolder of their project folder (ID stays PROJECT-NUMBER; . and @ folders skipped). <PROJECT>/@archive holds archived tasks: hidden from queries unless archived=yes|all, found by ID, read-only everywhere unless forced (CLI --force-archived, REST ?force_archived=true, MCP force_archived: true). Archive = file move only (path kept below the project, history entry, modified unchanged); unarchive re-validates enums against the current config; config validation ignores archived tasks. Surfaces: lotar task archive/unarchive [IDs] [--select query] [-n]; POST /api/tasks/archive|unarchive; MCP task_archive/task_unarchive and archived on task_list; automation action archive: true|false (also kept by the web rules editor); web UI Archive button, archived banner with Unarchive, read-only form, table badge, archived= search key. Next numbers count nested and archived files. Duplicate numbers in one project are listed once with a warning; lookups name both files and writes are refused. Git history follows moves (--follow, path per commit). Docs: task.md, list.md, task-model.md, automation.md, api-quick-reference.md, mcp-tools.md, mcp.md, main.md, openapi.json.
+    Evidence: tests/dev4_archive_test.rs (6), layout unit tests, smoke/tests/ui.archive.smoke.spec.ts. lint:agent clean; nextest 1844 passed; UI 1372 passed (needed --maxWorkers=3 under load); release + hooks passed; smoke 362 (21 load timeouts passed on rerun with 2 workers). Also fixed tests/stats_snapshot_test.rs local-date bug and replaced TaskPanel's 9 explicit any (pruned its eslint suppression).
+    Remaining: none in scope. Not done: built-in time trigger (DEV-240); relationship inventory still caps at 10000 files incl. archive; sprint-integrity scans skip archived tasks. Older clients (<0.11) cannot see nested/archived files and may reuse their numbers (documented).
+    Guidance: no durable finding.
 description: |-
   Migrated checklist requirements:
   Support transparent nested ticket discovery and mutation so manual grouping does not break scanning or lookup in large repositories. Retain archive support as a proposed extension requiring defined lifecycle/query semantics, not a silently assumed implementation. DEV-56 covers identity/multi-root correctness, not the complete nested/archive feature.
@@ -43,3 +63,29 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-29T01:25:08.664143+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-29T01:25:08.711224+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T01:47:48.727527+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T04:00:12.594800+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T04:00:12.739235+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

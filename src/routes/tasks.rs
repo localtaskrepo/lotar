@@ -889,6 +889,37 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
 
+    // POST /api/tasks/archive {id}[?project=PREFIX] and /api/tasks/unarchive (DEV-4)
+    for (path, archive) in [
+        ("/api/tasks/archive", true),
+        ("/api/tasks/unarchive", false),
+    ] {
+        api_server.register_handler("POST", path, move |req: &HttpRequest| {
+            let resolver = try_response!(resolve_tasks_dir());
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let id = match body.get("id").and_then(|v| v.as_str()) {
+                Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+                _ => return bad_request("Missing id".into()),
+            };
+            match TaskService::archive_with_receipt(
+                &mut storage,
+                &id,
+                req.query.get("project").map(|s| s.as_str()),
+                archive,
+            ) {
+                Ok(receipt) => {
+                    if receipt.changed {
+                        let actor = crate::utils::identity::resolve_current_user(None);
+                        crate::api_events::emit_task_updated(&receipt.dto, actor.as_deref());
+                    }
+                    ok_json(200, json!({"data": receipt.dto}))
+                }
+                Err(err) => map_lotar_error(err),
+            }
+        });
+    }
+
     // GET /api/config/show
 
     api_server.register_handler("GET", "/api/tasks/history", |req: &HttpRequest| {
@@ -902,9 +933,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(parsed) => parsed,
             Err(_) => return bad_request("Invalid task id".into()),
         };
-        let file_rel = tasks_rel
-            .join(&parsed.project)
-            .join(format!("{}.yml", parsed.number));
+        let file_rel = task_file_rel(&repo_root, &tasks_rel, &parsed);
         let mut commits = match crate::services::audit_service::AuditService::list_commits_for_file(
             &repo_root, &file_rel,
         ) {
@@ -937,11 +966,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(parsed) => parsed,
             Err(_) => return bad_request("Invalid task id".into()),
         };
-        let file_rel = tasks_rel
-            .join(&parsed.project)
-            .join(format!("{}.yml", parsed.number));
+        let file_rel = task_file_rel(&repo_root, &tasks_rel, &parsed);
+        let commits = crate::services::audit_service::AuditService::list_commits_for_file(
+            &repo_root, &file_rel,
+        )
+        .unwrap_or_default();
+        let at_commit = crate::services::audit_service::AuditService::path_at_commit(
+            &commits, &commit, &file_rel,
+        );
         match crate::services::audit_service::AuditService::show_file_diff(
-            &repo_root, &commit, &file_rel,
+            &repo_root, &commit, at_commit,
         ) {
             Ok(diff) => ok_json(200, json!({"data": diff})),
             Err(e) => internal_error(e),
@@ -1188,4 +1222,29 @@ fn parse_list_query(
     crate::services::task_list::TaskQueryInput::from_params(params)
         .and_then(|input| input.resolve(cfg, resolver.path.as_path()))
         .map_err(|e| bad_request(e.to_string()))
+}
+
+/// Repo-relative path of a task's current file, in whatever subfolder or
+/// archive it sits (DEV-4); the top-level spelling when the file is gone,
+/// so git history of a removed task still resolves.
+fn task_file_rel(
+    repo_root: &std::path::Path,
+    tasks_rel: &std::path::Path,
+    parsed: &crate::storage::TaskId,
+) -> std::path::PathBuf {
+    let tasks_abs = repo_root.join(tasks_rel);
+    crate::storage::operations::StorageOperations::get_file_path_for_id(
+        &tasks_abs.join(&parsed.project),
+        &parsed.canonical(),
+    )
+    .and_then(|file| {
+        file.strip_prefix(&tasks_abs)
+            .ok()
+            .map(|rel| tasks_rel.join(rel))
+    })
+    .unwrap_or_else(|| {
+        tasks_rel
+            .join(&parsed.project)
+            .join(format!("{}.yml", parsed.number))
+    })
 }

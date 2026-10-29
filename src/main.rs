@@ -146,6 +146,9 @@ fn main() {
         std::process::exit(1);
     }
 
+    // Archived tasks are read-only unless the command was forced (DEV-4).
+    let _archived_writes = lotar::storage::operations::allow_archived_writes(cli.force_archived);
+
     // Resolve tasks directory
     let relationship_command = matches!(
         &cli.command,
@@ -698,24 +701,16 @@ fn main() {
                         if rel_path.extension().and_then(|e| e.to_str()) != Some("yml") {
                             continue;
                         }
-                        // Resolve ID from path .tasks/<PROJECT>/<NUM>.yml
-                        let file_name = match rel_path.file_stem().and_then(|s| s.to_str()) {
-                            Some(s) => s,
-                            None => continue,
+                        // Resolve ID from .tasks/<PROJECT>/[folders/]<NUM>.yml
+                        let Some(task_path) = rel_path
+                            .strip_prefix(&tasks_rel)
+                            .ok()
+                            .and_then(lotar::storage::layout::parse_relative)
+                        else {
+                            continue;
                         };
-                        let numeric: u64 = match file_name.parse() {
-                            Ok(n) => n,
-                            Err(_) => continue,
-                        };
-                        let project = match rel_path
-                            .parent()
-                            .and_then(|p| p.file_name())
-                            .and_then(|s| s.to_str())
-                        {
-                            Some(p) => p.to_string(),
-                            None => continue,
-                        };
-                        let id = format!("{}-{}", project, numeric);
+                        let id = task_path.id();
+                        let project = task_path.project.clone();
 
                         // Load snapshots with tolerant fallback for mixed-case enums in YAML
                         let load_yaml_as_task =

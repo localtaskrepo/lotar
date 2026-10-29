@@ -90,7 +90,7 @@ Actions define what happens at different points in the automation lifecycle:
 
 Older files may use `job_start`, `complete`/`success`, `error`/`failure` and `cancel` for the job hooks; they still work.
 
-Actions support `set`, `add`, `remove`, `comment`, `run`, and `agent`.
+Actions support `set`, `add`, `remove`, `comment`, `run`, `agent`, and `archive`.
 
 ```yaml
 on:
@@ -117,6 +117,19 @@ on:
 - `run`: execute a command when the action fires
 - `comment`: add a comment to the task
 - `agent`: `model`, `effort` and `prompt` for the agent job this action starts by assigning the ticket to an agent profile (see below)
+- `archive`: `true` moves the task into its project's `@archive` folder, `false` brings it back (see `lotar task archive`). It runs after every other part of the action, because archived tasks are read-only. Automations react to events only; to archive tasks some time after they finish, run `lotar task archive --select 'status:done -recent:30d'` on a schedule.
+
+```yaml
+automation:
+  rules:
+    - name: Archive finished work
+      when:
+        status: Done
+      on:
+        updated:
+          comment: "Done; archiving."
+          archive: true
+```
 
 Relationship actions use the shared relationship mutation rules: adding or
 removing `depends_on`, `blocks`, or `related` also updates its reciprocal

@@ -23,6 +23,7 @@ const BUILTIN_QUERY_KEYS = new Set([
     'sort_by',
     'order',
     'deletion',
+    'archived',
 ])
 
 export function listFromCsv(value: string): string[] {
@@ -96,6 +97,10 @@ export function buildServerFilter(
     // URLs stay clean.
     if (normalized.deletion) {
         serverFilter.deletion = normalized.deletion as TaskListFilter['deletion']
+    }
+    // DEV-4 archive visibility, forwarded the same way (default `no` omitted).
+    if (normalized.archived) {
+        serverFilter.archived = normalized.archived as TaskListFilter['archived']
     }
     const sortByRaw = (normalized.sort_by || '').trim()
     if (sortByRaw) serverFilter.sort_by = normalizeSortBy(sortByRaw) ?? sortByRaw

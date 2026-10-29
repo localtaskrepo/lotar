@@ -251,6 +251,7 @@ impl SearchHandler {
                     created: task.created,
                     modified: task.modified,
                     deleted_at: task.deleted_at,
+                    archived: task.archived,
                     custom_fields: task.custom_fields,
                 }
             })
@@ -316,6 +317,9 @@ impl SearchHandler {
                     // never rewritten; tombstones carry their timestamp.
                     if let Some(deleted_at) = task.deleted_at.as_deref() {
                         line.push_str(&format!(" | deleted: {}", deleted_at));
+                    }
+                    if task.archived {
+                        line.push_str(" | archived");
                     }
 
                     renderer.emit_raw_stdout(line);

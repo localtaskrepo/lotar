@@ -10,6 +10,7 @@ use crate::api_types::{TaskDTO, TaskListFilter};
 use crate::config::types::ResolvedConfig;
 use crate::services::task_query::{self, SortKey, SortSpec, TaskQueryOptions};
 use crate::storage::DeletionFilter;
+use crate::storage::layout::ArchiveFilter;
 use crate::storage::manager::Storage;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
@@ -43,6 +44,8 @@ pub const KNOWN_QUERY_KEYS: &[&str] = &[
     // RESERVED lifecycle property key (DEV-92): strict active|deleted|all
     // grammar, never interpreted as a custom-field filter.
     "deletion",
+    // RESERVED (DEV-4): no|yes|all, whether `@archive` folders are scanned.
+    "archived",
 ];
 
 /// Raw query terms, as the interface received them. Values are trimmed and
@@ -64,6 +67,8 @@ pub struct TaskQueryInput {
     /// `field:<name>`) and builtin fields such as `reporter`, matched loosely.
     pub fields: Vec<(String, String)>,
     pub deletion: DeletionFilter,
+    /// Whether archived tasks are included (DEV-4).
+    pub archived: ArchiveFilter,
     pub due: Option<String>,
     /// Due from today through today + N days, inclusive.
     pub due_within: Option<String>,
@@ -188,6 +193,11 @@ impl TaskQueryInput {
             assignee: query.get("assignee").cloned(),
             fields,
             deletion: parse_deletion(query.get("deletion").map(String::as_str))?,
+            archived: query
+                .get("archived")
+                .map(|raw| ArchiveFilter::parse(raw))
+                .transpose()?
+                .unwrap_or_default(),
             due: query.get("due").cloned(),
             due_within: query.get("due_within").cloned(),
             recent: query.get("recent").cloned(),
@@ -261,6 +271,7 @@ impl TaskQueryInput {
                 "order" => self.order = Some(value.clone()),
                 "sort_by" => self.sort_by = Some(value.clone()),
                 "deletion" => self.deletion = parse_deletion(Some(value))?,
+                "archived" => self.archived = ArchiveFilter::parse(value)?,
                 // `q=` sets the search text outright, as in the web UI.
                 "q" => text = Some(value.clone()),
                 _ => self
@@ -308,6 +319,7 @@ impl TaskQueryInput {
             text_query: self.text.clone(),
             sprints: self.sprints,
             deletion: self.deletion,
+            archived: self.archived,
             ..TaskListFilter::default()
         };
         for raw in &self.status {
@@ -433,6 +445,7 @@ impl TaskQueryInput {
             .into_iter()
             .map(|mut exclusion| {
                 exclusion.deletion = DeletionFilter::All;
+                exclusion.archived = filter.archived;
                 exclusion.resolve(base, tasks_root)
             })
             .collect::<Result<Vec<_>, _>>()?;

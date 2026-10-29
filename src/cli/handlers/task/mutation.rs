@@ -64,7 +64,7 @@ pub fn load_task_including_deleted(
         }
     }
 
-    let task = task_opt.ok_or_else(|| format!("Task '{}' not found", raw_id))?;
+    let task = task_opt.ok_or_else(|| missing_task_message(ctx, raw_id, &full_id))?;
 
     ctx.update_effective_project(Some(project_prefix.as_str()))?;
 
@@ -108,7 +108,7 @@ pub fn load_task(
         }
     }
 
-    let task = task_opt.ok_or_else(|| format!("Task '{}' not found", raw_id))?;
+    let task = task_opt.ok_or_else(|| missing_task_message(ctx, raw_id, &full_id))?;
 
     if task.deleted_at.is_some() {
         return Err(format!(
@@ -186,5 +186,16 @@ pub fn render_edit_preview(renderer: &OutputRenderer, id: &str, task: &Task) {
                 }
             ));
         }
+    }
+}
+
+/// Why a task could not be loaded: a duplicated ID names every file that
+/// stores it (DEV-4), anything else is "not found".
+fn missing_task_message(ctx: &TaskCommandContext, raw_id: &str, full_id: &str) -> String {
+    match ctx.storage.resolve_task_location(full_id) {
+        Err(error @ crate::storage::identity::TaskLookupError::Ambiguous { .. }) => {
+            error.to_string()
+        }
+        _ => format!("Task '{}' not found", raw_id),
     }
 }

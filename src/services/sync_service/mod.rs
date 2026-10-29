@@ -622,6 +622,7 @@ mod tests {
         TaskDTO {
             task_state: None,
             deleted_at: None,
+            archived: false,
             id: "TEST-1".to_string(),
             title: "Example".to_string(),
             status: TaskStatus::from("Todo"),

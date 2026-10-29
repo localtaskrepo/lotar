@@ -11,8 +11,8 @@ pub use args::{
     ConfigShowArgs, ConfigValidateArgs, GitAction, GitHooksAction, GitHooksInstallArgs, ScanArgs,
     ServeArgs, SortField, SprintAction, SprintArgs, SprintCreateArgs, SprintListArgs,
     SprintShowArgs, StatsArgs, SyncArgs, SyncCheckArgs, SyncCommandAction, SyncCommandArgs,
-    TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskRestoreArgs, TaskSearchArgs,
-    TaskStatusArgs, parse_key_value,
+    TaskAction, TaskAddArgs, TaskArchiveArgs, TaskDeleteArgs, TaskEditArgs, TaskRestoreArgs,
+    TaskSearchArgs, TaskStatusArgs, parse_key_value,
 };
 pub mod preprocess;
 
@@ -49,6 +49,10 @@ pub struct Cli {
     /// Backward-compat verbose flag (maps to Info level)
     #[arg(long, short = 'v', global = true, hide = true)]
     pub verbose: bool,
+
+    /// Allow this command to change archived tasks, which are read-only otherwise
+    #[arg(long, global = true)]
+    pub force_archived: bool,
 
     #[command(subcommand)]
     pub command: Commands,

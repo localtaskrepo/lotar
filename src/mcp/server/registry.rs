@@ -33,11 +33,11 @@ use super::handlers::{
     handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create, handle_sprint_delete,
     handle_sprint_get, handle_sprint_list, handle_sprint_remove, handle_sprint_reorder,
     handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull,
-    handle_sync_push, handle_task_bulk_comment_add, handle_task_bulk_reference_add,
-    handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add,
-    handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get,
-    handle_task_list, handle_task_reference_add, handle_task_reference_remove, handle_task_restore,
-    handle_task_update, handle_whoami,
+    handle_sync_push, handle_task_archive, handle_task_bulk_comment_add,
+    handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
+    handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete,
+    handle_task_get, handle_task_list, handle_task_reference_add, handle_task_reference_remove,
+    handle_task_restore, handle_task_unarchive, handle_task_update, handle_whoami,
 };
 use super::schema::{unsupported_keywords, validate_instance};
 use super::tools::build_tool_definitions;
@@ -165,6 +165,16 @@ pub(crate) fn tool_specs() -> &'static [ToolSpec] {
             name: "task_restore",
             method: "task/restore",
             handler: handle_task_restore,
+        },
+        ToolSpec {
+            name: "task_archive",
+            method: "task/archive",
+            handler: handle_task_archive,
+        },
+        ToolSpec {
+            name: "task_unarchive",
+            method: "task/unarchive",
+            handler: handle_task_unarchive,
         },
         ToolSpec {
             name: "task_list",
@@ -389,6 +399,13 @@ pub(crate) fn invoke_tool(
         return (invalid_params(id, spec.name, &issues), None);
     }
 
+    // Archived tasks are read-only unless the call is forced (DEV-4).
+    let _archived_writes = crate::storage::operations::allow_archived_writes(
+        arguments
+            .get("force_archived")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    );
     let request = JsonRpcRequest {
         jsonrpc: "2.0".into(),
         id,
@@ -521,7 +538,7 @@ mod tests {
             })
             .collect();
         advertised.sort();
-        assert_eq!(advertised.len(), 43, "advertised tool count changed");
+        assert_eq!(advertised.len(), 45, "advertised tool count changed");
         assert!(advertised.iter().any(|name| name == "sprint_reorder"));
         for name in [
             "relationship_graph",

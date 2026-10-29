@@ -51,6 +51,21 @@ pub fn warn_corrupt_once(path: &Path, reason: &str) {
     }
 }
 
+/// Warn once per process that a task ID is stored in more than one file.
+pub fn warn_duplicate_once(id: &str) {
+    static REPORTED: LazyLock<Mutex<HashSet<String>>> =
+        LazyLock::new(|| Mutex::new(HashSet::new()));
+    let should_report = REPORTED
+        .lock()
+        .map(|mut seen| seen.insert(id.to_string()))
+        .unwrap_or(false);
+    if should_report {
+        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(format_args!(
+            "Task {id} is stored in more than one file; listing one of them. Delete or renumber the extra copy; `lotar show {id}` names the files, and changes to {id} are refused until then"
+        ));
+    }
+}
+
 pub fn sprint_lock_name() -> &'static str {
     SPRINT_LOCK_NAME
 }

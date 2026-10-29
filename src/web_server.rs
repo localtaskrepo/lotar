@@ -1018,21 +1018,21 @@ fn start_tasks_watcher() {
                                     // to avoid treating sprint file changes as task events.
                                     if !project.starts_with('@') {
                                         proj = Some(project.to_string());
-                                        // Detect task file changes: <PROJECT>/<NUM>.yml
-                                        if let Some(file) = p.file_name().and_then(|s| s.to_str())
-                                            && file.ends_with(".yml")
-                                        {
-                                            let stem = file.trim_end_matches(".yml");
-                                            if stem.chars().all(|c| c.is_ascii_digit()) {
-                                                task_id = Some(format!("{}-{}", project, stem));
-                                            }
-                                        }
+                                        // Task files: <PROJECT>/[folders/]<NUM>.yml (DEV-4)
+                                        task_id = crate::storage::layout::parse_relative(relative)
+                                            .map(|task| task.id());
                                     }
                                 }
                             }
                             if let Some(task_id) = task_id.clone() {
+                                // A file moved into or out of `@archive` (or another
+                                // folder) is removed in one place only: still stored
+                                // means updated, not deleted.
+                                let still_stored = matches!(event.kind, EventKind::Remove(_))
+                                    && crate::storage::TaskId::parse(&task_id)
+                                        .is_ok_and(|id| !id.locate(&tasks_dir).is_empty());
                                 match event.kind {
-                                    EventKind::Remove(_) => {
+                                    EventKind::Remove(_) if !still_stored => {
                                         crate::api_events::emit(&crate::api_events::ApiEvent {
                                             kind: "task_deleted".to_string(),
                                             data: serde_json::json!({ "id": task_id }),

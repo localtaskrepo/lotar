@@ -9,6 +9,7 @@
 // - sprint: Sprint entity definition and helpers
 pub mod filter;
 pub mod identity;
+pub mod layout;
 pub mod locator;
 pub mod manager;
 pub mod operations;

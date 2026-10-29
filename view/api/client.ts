@@ -222,6 +222,14 @@ export const api = {
     restoreTask(id: string, project?: string): Promise<TaskDTO> {
         return post('/api/tasks/restore' + qs({ project }), { id })
     },
+    /** DEV-4: move a task into its project's @archive folder (read-only there). */
+    archiveTask(id: string, project?: string): Promise<TaskDTO> {
+        return post('/api/tasks/archive' + qs({ project }), { id })
+    },
+    /** DEV-4: bring an archived task back. */
+    unarchiveTask(id: string, project?: string): Promise<TaskDTO> {
+        return post('/api/tasks/unarchive' + qs({ project }), { id })
+    },
     /**
      * Upload an attachment. With `onProgress`, the request goes through
      * XMLHttpRequest so the panel can show per-file progress (fetch has no

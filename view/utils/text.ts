@@ -18,6 +18,8 @@ export function applyTaskSnapshot(target: TaskDTO, source: Partial<TaskDTO> | nu
     if (!target || !source) return
     Object.assign(target, source)
     if (!isDeletedTask(source)) target.deleted_at = undefined
+    // `archived` is omitted when false, so clear a stale flag the same way.
+    if (!source.archived) target.archived = undefined
 }
 
 /** Capitalize the first character of a string. */

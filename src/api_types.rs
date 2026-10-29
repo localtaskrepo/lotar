@@ -225,6 +225,10 @@ pub struct TaskDTO {
     /// transitions never touch `modified`.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub deleted_at: Option<String>,
+    /// The task is archived (DEV-4): its file is in the project's
+    /// `@archive` folder and it is read-only. Serialized only when true.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub archived: bool,
     /// Server-computed runtime projection (DEV-21): completion flag, due
     /// bucket, and the server-local calendar day at build time. Computed
     /// from the task's own project configuration and the shared due
@@ -1075,6 +1079,10 @@ pub struct TaskListFilter {
     /// `deleted` selects only tombstones, `all` returns everything.
     #[serde(default)]
     pub deletion: DeletionFilter,
+    /// Archive visibility (DEV-4): `no` (default) skips `@archive` folders,
+    /// `yes` lists only archived tasks, `all` lists both.
+    #[serde(default)]
+    pub archived: crate::storage::layout::ArchiveFilter,
 }
 
 pub(crate) fn deserialize_string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>

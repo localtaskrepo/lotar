@@ -785,6 +785,17 @@ fn describe_action(
         });
     }
 
+    if let Some(archive) = action.archive {
+        actions.push(SimulatedAction {
+            action: if archive { "archive" } else { "unarchive" }.to_string(),
+            description: if archive {
+                "Archive the task (move it into @archive)".to_string()
+            } else {
+                "Bring the task back out of @archive".to_string()
+            },
+        });
+    }
+
     // Detect if assignee change would trigger agent job
     if let Some(set) = action.set.as_ref()
         && let Some(assignee) = set.assignee.as_ref()
@@ -1677,6 +1688,10 @@ fn apply_action(
             action_context,
             &tmpl,
         )?;
+    }
+
+    if let Some(archive) = action.archive {
+        TaskService::archive_with_receipt(storage, &current.id, None, archive)?;
     }
 
     Ok(())
@@ -2580,6 +2595,7 @@ mod dev21_cross_root_dependency_tests {
         TaskDTO {
             task_state: None,
             deleted_at: None,
+            archived: false,
             id: id.to_string(),
             title: "dependent".to_string(),
             status: crate::types::TaskStatus::from("Todo"),

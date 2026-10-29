@@ -94,6 +94,8 @@ export interface AutomationEventActionDraft {
     agentModel: string
     agentEffort: string
     agentPrompt: string
+    /** `archive: true|false` (DEV-4); empty leaves the archive alone. */
+    archive: '' | 'archive' | 'unarchive'
 }
 
 export interface AutomationRuleDraft {
@@ -961,6 +963,10 @@ function extractEventActionDraft(event: AutomationEventKey, action: unknown): Au
         draft.agentPrompt = typeof record.agent.prompt === 'string' ? record.agent.prompt : ''
     }
 
+    if (typeof record.archive === 'boolean') {
+        draft.archive = record.archive ? 'archive' : 'unarchive'
+    }
+
     return draft
 }
 
@@ -983,6 +989,7 @@ function createEventActionDraft(event: AutomationEventKey): AutomationEventActio
         agentModel: '',
         agentEffort: '',
         agentPrompt: '',
+        archive: '',
     }
 }
 
@@ -990,6 +997,7 @@ function hasActionContent(value: AutomationRecord): boolean {
     return Boolean(
         value.comment ||
         value.run ||
+        typeof value.archive === 'boolean' ||
         (isRecord(value.agent) && Object.keys(value.agent).length) ||
         (value.set && Object.keys(value.set).length) ||
         (value.add && Object.keys(value.add).length) ||
@@ -1156,6 +1164,10 @@ function buildActionFromDraft(actionDraft: AutomationEventActionDraft): Automati
     if (actionDraft.agentPrompt.trim()) agent.prompt = actionDraft.agentPrompt.trim()
     if (Object.keys(agent).length) {
         action.agent = agent
+    }
+
+    if (actionDraft.archive) {
+        action.archive = actionDraft.archive === 'archive'
     }
 
     return action

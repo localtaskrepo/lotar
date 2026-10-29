@@ -299,12 +299,13 @@ impl Inventory {
                         directory.display()
                     ))
                 };
-                for entry in fs::read_dir(&directory).map_err(unavailable)? {
-                    let entry = entry.map_err(unavailable)?;
-                    let path = entry.path();
-                    if path.extension().is_some_and(|ext| ext == "yml") {
-                        paths.push((project.clone(), path));
-                    }
+                fs::read_dir(&directory).map_err(unavailable)?;
+                // Archived tasks included: links to them must still resolve (DEV-4).
+                for file in crate::storage::layout::task_files(
+                    &directory,
+                    crate::storage::layout::ArchiveFilter::All,
+                ) {
+                    paths.push((project.clone(), file.path));
                 }
                 let config = crate::utils::paths::project_config_path(&root, &project);
                 hash_file(&mut hash, &config)?;
@@ -1074,6 +1075,7 @@ pub fn graph(
         text_query: filter.text_query.clone(),
         custom_fields: filter.custom_fields.clone(),
         deletion: filter.deletion,
+        archived: filter.archived,
         sprints: Vec::new(),
     };
     let exact_filter = crate::storage::TaskFilter {
@@ -1657,6 +1659,12 @@ fn stage_tasks(
         }
         let parsed = TaskId::parse(&id).unwrap();
         txn.ensure_covers(std::slice::from_ref(&parsed.project))?;
+        // Reciprocal links write both tasks; an archived one stays read-only.
+        crate::storage::operations::ensure_writable(
+            &record.root.join(&parsed.project),
+            &record.path,
+            &id,
+        )?;
         let now = chrono::Utc::now().to_rfc3339();
         task.modified = now.clone();
         task.history.push(TaskChangeLogEntry {

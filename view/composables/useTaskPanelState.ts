@@ -333,9 +333,10 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             mode,
             ready,
             suppressWatch,
-            scope: () => `${props.open}:${props.taskId}:${task.deleted_at || ''}:${panelGeneration.value}`,
+            scope: () =>
+                `${props.open}:${props.taskId}:${task.deleted_at || ''}:${task.archived ? 'a' : ''}:${panelGeneration.value}`,
             taskId: () => task.id || '',
-            editable: () => props.open && !task.deleted_at,
+            editable: () => props.open && !task.deleted_at && !task.archived,
             execute: async (intent) => {
                 await api.relationshipMutate(relationshipMutation(task.id, intent))
             },

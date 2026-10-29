@@ -928,6 +928,7 @@ mod tests {
         crate::api_types::TaskDTO {
             task_state: None,
             deleted_at: None,
+            archived: false,
             id: id.to_string(),
             title: format!("task {id}"),
             status: crate::types::TaskStatus::from("Todo"),

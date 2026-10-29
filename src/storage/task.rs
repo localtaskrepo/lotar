@@ -72,6 +72,12 @@ pub struct Task {
     /// User-owned YAML extensions, intentionally absent from API DTOs.
     #[serde(flatten, default, serialize_with = "serialize_extra_fields")]
     pub extra_fields: BTreeMap<String, serde_yaml_ng::Value>,
+
+    /// The file sits in the project's `@archive` folder (DEV-4). Set by
+    /// storage when loading; never written to YAML, since the location is
+    /// the only source of truth.
+    #[serde(skip)]
+    pub archived: bool,
 }
 
 fn is_builtin_key(key: &str) -> bool {

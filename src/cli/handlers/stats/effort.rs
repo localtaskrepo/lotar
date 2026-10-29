@@ -93,9 +93,16 @@ pub(crate) fn run(
             let Ok(parsed) = crate::storage::TaskId::parse(id) else {
                 return false;
             };
-            let file_rel = tasks_rel
-                .join(&parsed.project)
-                .join(format!("{}.yml", parsed.number));
+            let Some(file_abs) =
+                crate::storage::operations::StorageOperations::get_file_path_for_id(
+                    &tasks_abs_real.join(&parsed.project),
+                    id,
+                )
+            else {
+                return false;
+            };
+            let file_rel =
+                tasks_rel.join(file_abs.strip_prefix(&tasks_abs_real).unwrap_or(&file_abs));
             let mut commits =
                 match crate::services::audit_service::AuditService::list_commits_for_file(
                     &repo_root_real,
@@ -134,7 +141,7 @@ pub(crate) fn run(
                 if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(
                     &repo_root_real,
                     &c.commit,
-                    &file_rel,
+                    &c.path,
                 ) && let Some(ts) = parse_status_from_yaml(&content)
                 {
                     let curr_status = ts.to_string();
@@ -215,21 +222,16 @@ pub(crate) fn run(
                         Some(s) => s.to_string(),
                         None => continue,
                     };
-                    // List .yml files in this project folder
-                    for fpath in fs::read_dir(&p)
-                        .map(|rd| {
-                            rd.flatten()
-                                .map(|e| e.path())
-                                .collect::<Vec<std::path::PathBuf>>()
-                        })
-                        .unwrap_or_default()
-                    {
-                        let num = match crate::utils::filesystem::file_numeric_stem(&fpath) {
-                            Some(n) => n,
-                            None => continue,
-                        };
+                    // Task files in this project folder (nested folders too)
+                    for file in crate::storage::layout::task_files(
+                        &p,
+                        crate::storage::layout::ArchiveFilter::Exclude,
+                    ) {
+                        let num = file.number;
                         let id = format!("{}-{}", project_folder, num);
-                        let file_rel = tasks_rel.join(&project_folder).join(format!("{}.yml", num));
+                        let abs_file = file.path;
+                        let file_rel = tasks_rel
+                            .join(abs_file.strip_prefix(&tasks_abs_real).unwrap_or(&abs_file));
                         let mut commits =
                             crate::services::audit_service::AuditService::list_commits_for_file(
                                 &repo_root_real,
@@ -250,7 +252,7 @@ pub(crate) fn run(
                                 crate::services::audit_service::AuditService::show_file_at(
                                     &repo_root_real,
                                     &c.commit,
-                                    &file_rel,
+                                    &c.path,
                                 )
                                 && let Some(ts) = parse_status_from_yaml(&content)
                             {
@@ -270,9 +272,6 @@ pub(crate) fn run(
                             continue;
                         }
                         // Build a TaskDTO by tolerantly reading current YAML
-                        let abs_file = tasks_abs_real
-                            .join(&project_folder)
-                            .join(format!("{}.yml", num));
                         let task = crate::storage::task::parse_task_yaml_tolerant(
                             &fs::read_to_string(&abs_file).unwrap_or_default(),
                         )
@@ -283,6 +282,7 @@ pub(crate) fn run(
                             .unwrap_or_default();
                         let dto = crate::api_types::TaskDTO {
                             task_state: None,
+                            archived: false,
                             id: id.clone(),
                             title: task.title,
                             status: task.status,

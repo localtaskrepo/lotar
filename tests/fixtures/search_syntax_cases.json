@@ -251,6 +251,29 @@
     "filters": {}
   },
   {
+    "input": "archived=all status:done",
+    "text": "",
+    "filters": {
+      "archived": "all",
+      "status": "done"
+    }
+  },
+  {
+    "input": "field:archived=yes",
+    "text": "",
+    "filters": {
+      "archived": "yes"
+    }
+  },
+  {
+    "input": "-archived=yes",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "\"-archived=yes\" cannot be excluded"
+    ]
+  },
+  {
     "input": "field:x=",
     "text": "",
     "filters": {},

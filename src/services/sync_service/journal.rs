@@ -315,7 +315,8 @@ pub(super) fn canonical_sync_task_id(root: &Path, project: &str, id: &str) -> Lo
     let path = StorageOperations::get_file_path_for_id(&root.join(&project), id)
         .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?
         .canonicalize()?;
-    if path.parent() != Some(root.join(&project).canonicalize()?.as_path()) || !path.is_file() {
+    // Any folder inside the project counts (DEV-4); outside it never does.
+    if !path.starts_with(root.join(&project).canonicalize()?) || !path.is_file() {
         return Err(LoTaRError::ValidationError(
             "Sync task identity crosses its project boundary".into(),
         ));

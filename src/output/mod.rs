@@ -75,6 +75,9 @@ pub struct TaskDisplayInfo {
     /// Soft-deletion tombstone timestamp; omitted for active tasks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<String>,
+    /// Archived (DEV-4); omitted for tasks that are not.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub archived: bool,
     pub custom_fields: crate::types::CustomFields,
 }
 

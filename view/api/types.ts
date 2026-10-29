@@ -142,6 +142,8 @@ export interface TaskDTO {
      * the deletion lifecycle signal, never modified ordering.
      */
     deleted_at?: string | null
+    /** DEV-4: the task is in its project's @archive folder and read-only. */
+    archived?: boolean
     /** Optional runtime completion metadata; may be omitted in test fixtures. */
     task_state?: TaskRuntimeState
     due_date?: string | null
@@ -513,6 +515,8 @@ export interface TaskListFilter {
      * visibility mode owns its own query entry.
      */
     deletion?: 'active' | 'deleted' | 'all'
+    /** DEV-4 archive visibility: `no` (default) leaves archived tasks out, `yes` only them, `all` both. */
+    archived?: 'no' | 'yes' | 'all'
     [key: string]: any
 }
 

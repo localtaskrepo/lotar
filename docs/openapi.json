@@ -3,7 +3,7 @@
   "info": {
     "title": "LoTaR API",
     "version": "1.0.0",
-    "description": "REST API for LoTaR task management. Includes task CRUD, projects, config, and realtime events via SSE. Task/sprint domain failures use the existing error envelope: invalid input/identity/safety refusals return 400 INVALID_ARGUMENT, missing resources return 404 NOT_FOUND, and I/O/serialization/index failures return 500 INTERNAL."
+    "description": "REST API for LoTaR task management. Includes task CRUD, projects, config, and realtime events via SSE. Archived tasks (DEV-4) are read-only: any request that would change one is refused with 400 unless it passes the query parameter force_archived=true. Task/sprint domain failures use the existing error envelope: invalid input/identity/safety refusals return 400 INVALID_ARGUMENT, missing resources return 404 NOT_FOUND, and I/O/serialization/index failures return 500 INTERNAL."
   },
   "servers": [
     {
@@ -473,6 +473,16 @@
               "default": "active"
             },
             "description": "Task lifecycle visibility. Deleted tasks are hidden by default. Invalid or blank explicit values return 400."
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["no", "yes", "all"],
+              "default": "no"
+            },
+            "description": "Archived tasks (DEV-4): no (default) leaves tasks in a project's @archive folder out, yes returns only archived tasks, all returns both."
           },
           {
             "name": "project",
@@ -1161,6 +1171,74 @@
         "responses": {
           "200": {
             "description": "Restored task",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EnvelopeTask" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/tasks/archive": {
+      "post": {
+        "summary": "Archive a task",
+        "description": "Moves the task file into its project's @archive folder (DEV-4) and records an archived history entry; status, links and modified stay as they are. Archived tasks are left out of list and export unless archived=yes|all, are still returned by id, and refuse changes unless a request passes force_archived=true. Already archived: no change.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskRestoreRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Archived task",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EnvelopeTask" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/tasks/unarchive": {
+      "post": {
+        "summary": "Unarchive a task",
+        "description": "Moves an archived task back out of @archive and records an unarchived history entry. Stored values must satisfy the current project configuration. Not archived: no change.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskRestoreRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/EnvelopeTask" }
@@ -2887,6 +2965,16 @@
             "description": "Same lifecycle visibility as /api/tasks/list; deleted tasks are excluded by default."
           },
           {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["no", "yes", "all"],
+              "default": "no"
+            },
+            "description": "Same archive visibility as /api/tasks/list; archived tasks are excluded by default."
+          },
+          {
             "name": "project",
             "in": "query",
             "required": false,
@@ -4045,6 +4133,10 @@
             "type": "string",
             "format": "date-time",
             "description": "Soft-deletion timestamp; omitted for active tasks. Delete and restore do not change modified."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "True while the task file is in its project's @archive folder (DEV-4); archived tasks are read-only. Omitted otherwise."
           },
           "due_date": {
             "type": "string"

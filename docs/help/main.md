@@ -44,6 +44,7 @@ See [Agent Jobs](./agent.md) for the full CLI workflow and wrapper requirements.
 | --- | --- |
 | `--format text|table|json|markdown` | Pick an output style once and reuse it everywhere. |
 | `--log-level <level>` / `--verbose` | Control how chatty the command should be. |
+| `--force-archived` | Let this command change archived tasks, which are read-only otherwise (see [task archive](./task.md#archive--unarchive)). |
 | `--project, -p <PREFIX>` | Force a project context when auto-detection isn’t enough. Note: `lotar serve` ignores the project flag on purpose; use `--port`/`-p <PORT>` (after `serve`) to change the server port. |
 | `--tasks-dir <PATH>` | Point at a completely different workspace; the folder is created automatically when missing. |
 

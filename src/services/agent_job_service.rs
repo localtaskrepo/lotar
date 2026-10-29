@@ -2762,6 +2762,7 @@ mod tests {
         crate::api_types::TaskDTO {
             task_state: None,
             deleted_at: None,
+            archived: false,
             id: "TEST-1".to_string(),
             title: "Test task".to_string(),
             status: crate::types::TaskStatus::from("Todo"),

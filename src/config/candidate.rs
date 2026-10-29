@@ -586,11 +586,15 @@ fn enumerate_project_tasks(
     if !project_dir.is_dir() {
         return Ok(Vec::new());
     }
-    let mut files: Vec<PathBuf> = crate::utils::filesystem::list_files_with_ext(project_dir, "yml")
-        .into_iter()
-        .filter(|path| crate::utils::filesystem::file_numeric_stem(path).is_some())
-        .collect();
-    files.sort();
+    // Nested folders count; archived tasks do not, so old values kept only
+    // by archived tasks never block a config change (unarchive re-validates).
+    let files: Vec<PathBuf> = crate::storage::layout::task_files(
+        project_dir,
+        crate::storage::layout::ArchiveFilter::Exclude,
+    )
+    .into_iter()
+    .map(|file| file.path)
+    .collect();
     let mut tasks = Vec::new();
     for path in files {
         let numeric = crate::utils::filesystem::file_numeric_stem(&path).unwrap_or_default();

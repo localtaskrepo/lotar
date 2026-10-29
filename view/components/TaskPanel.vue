@@ -27,8 +27,22 @@
               <span v-if="isDeleted" class="badge task-panel__deleted-badge" data-testid="task-panel-deleted-badge"
                 >Deleted</span
               >
+              <span v-if="isArchived" class="badge task-panel__deleted-badge" data-testid="task-panel-archived-badge"
+                >Archived</span
+              >
             </div>
             <div class="task-panel__header-actions">
+              <UiButton
+                v-if="mode === 'edit' && task.id && !isReadOnly"
+                variant="ghost"
+                type="button"
+                data-testid="task-archive"
+                title="Move this task into the project's archive (read-only)"
+                :disabled="archiveSubmitting"
+                @click="setTaskArchived(true)"
+              >
+                {{ archiveSubmitting ? 'Archiving…' : 'Archive' }}
+              </UiButton>
               <UiButton
                 v-if="mode === 'edit' && hasSyncRemotes"
                 class="task-panel__header-sync"
@@ -81,11 +95,33 @@
                 </UiButton>
               </div>
             </div>
+            <div
+              v-else-if="isArchived"
+              class="task-panel__deleted-banner"
+              role="status"
+              data-testid="task-archived-banner"
+            >
+              <div class="task-panel__deleted-banner-text">
+                <strong>Archived</strong>
+                <span class="muted">This task is in the project archive and read-only. Unarchive it to change it.</span>
+              </div>
+              <div class="task-panel__deleted-banner-actions">
+                <UiButton
+                  variant="primary"
+                  type="button"
+                  data-testid="task-unarchive"
+                  :disabled="archiveSubmitting"
+                  @click="setTaskArchived(false)"
+                >
+                  {{ archiveSubmitting ? 'Unarchiving…' : 'Unarchive' }}
+                </UiButton>
+              </div>
+            </div>
             <form class="task-panel__form" @submit.prevent="handleSubmit">
-              <!-- DEV-92: a deleted task is read-only; the fieldset disables
-                   every nested form control in one place. Mutations are also
-                   rejected server-side ("restore it first"). -->
-              <fieldset class="task-panel__form-fieldset" :disabled="isDeleted">
+              <!-- DEV-92 / DEV-4: deleted and archived tasks are read-only; the
+                   fieldset disables every nested form control in one place.
+                   Mutations are also rejected server-side. -->
+              <fieldset class="task-panel__form-fieldset" :disabled="isReadOnly">
                 <TaskPanelSummarySection
                   :form="form"
                   :mode="mode"
@@ -508,7 +544,7 @@
                     :relationships="relationships"
                     :task-id="task.id"
                     :project="form.project"
-                    :disabled="isDeleted || !ready"
+                    :disabled="isReadOnly || !ready"
                     :mutate="mutateRelationship"
                   />
 
@@ -759,6 +795,7 @@ import { api } from '../api/client'
 import type {
   AttachmentInfo,
   ConfigInspectResult,
+  SprintAssignmentRequest,
   SprintIntegrityDiagnostics,
   SyncRemoteConfig,
   SyncRequest,
@@ -938,7 +975,9 @@ const panelTaskId = computed(() => (task.id || '').trim())
 // DEV-198: offer this task's actions to the command palette and remember it
 // as a recent task, while an existing, editable task is shown.
 const paletteTaskId = computed(() =>
-  mode.value === 'edit' && ready.value && panelTaskId.value && !isDeletedTask(task) ? panelTaskId.value : '',
+  mode.value === 'edit' && ready.value && panelTaskId.value && !isDeletedTask(task) && !task.archived
+    ? panelTaskId.value
+    : '',
 )
 watch(
   () => [paletteTaskId.value, task.title, task.status, task.priority, statusOptions.value, priorityOptions.value],
@@ -968,6 +1007,30 @@ onUnmounted(() => setTaskPanelCommands(null))
 // -- DEV-92: deleted (trash) task mode --------------------------------------
 
 const isDeleted = computed(() => isDeletedTask(task))
+// DEV-4: archived tasks are read-only too, until unarchived.
+const isArchived = computed(() => Boolean(task.archived))
+const isReadOnly = computed(() => isDeleted.value || isArchived.value)
+
+const archiveSubmitting = ref(false)
+
+async function setTaskArchived(archive: boolean) {
+  if (!task.id || archiveSubmitting.value) return
+  const id = task.id
+  archiveSubmitting.value = true
+  try {
+    const updated = await taskStore.setArchived(id, archive, projectPrefixOfTaskId(id) || undefined)
+    if (!props.open || task.id !== id || props.taskId !== id) return
+    applyTaskSnapshot(task, updated)
+    emit('updated', updated)
+    showToast(archive ? 'Task archived' : 'Task unarchived')
+  } catch (error) {
+    showToast(
+      (error as Error | undefined)?.message || (archive ? 'Failed to archive task' : 'Failed to unarchive task'),
+    )
+  } finally {
+    archiveSubmitting.value = false
+  }
+}
 
 const deletedAtLabel = computed(() => {
   const stamp = task.deleted_at
@@ -1000,8 +1063,8 @@ async function restoreDeletedTask() {
     emit('updated', restored)
     showToast('Task restored')
     await reloadTask()
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to restore task')
+  } catch (error) {
+    showToast((error as Error | undefined)?.message || 'Failed to restore task')
   } finally {
     restoreSubmitting.value = false
   }
@@ -1028,8 +1091,8 @@ async function submitHardDelete() {
     showToast('Task permanently deleted')
     hardDeleteDialogOpen.value = false
     closePanel()
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to delete task')
+  } catch (error) {
+    showToast((error as Error | undefined)?.message || 'Failed to delete task')
   } finally {
     hardDeleteSubmitting.value = false
   }
@@ -1164,7 +1227,7 @@ const {
   task,
   mode,
   taskId: panelTaskId,
-  isDeleted,
+  isDeleted: isReadOnly,
   isOpen: () => props.open,
   targetTaskId: () => props.taskId,
   preferences: attachmentPreferences,
@@ -1178,7 +1241,7 @@ function onReferencesUpdated(updated: TaskDTO) {
 }
 
 // Files can be attached once the task exists and is not deleted.
-const canAttachFiles = computed(() => mode.value === 'edit' && !isDeleted.value && Boolean(task.id))
+const canAttachFiles = computed(() => mode.value === 'edit' && !isReadOnly.value && Boolean(task.id))
 const attachmentPicker = ref<HTMLInputElement | null>(null)
 function onAttachmentPicked(event: Event) {
   const input = event.target as HTMLInputElement
@@ -1437,6 +1500,10 @@ function startEditingDescription() {
     showToast('Restore the task before editing the description')
     return
   }
+  if (isArchived.value) {
+    showToast('Unarchive the task before editing the description')
+    return
+  }
   editingDescription.value = true
   descriptionPreview.value = false
   nextTick(() => {
@@ -1633,7 +1700,7 @@ async function submitSprintDialog() {
   }
   sprintDialogSubmitting.value = true
   try {
-    const payload: Record<string, unknown> = {
+    const payload: SprintAssignmentRequest = {
       tasks: [taskId],
       cleanup_missing: true,
     }
@@ -1642,8 +1709,7 @@ async function submitSprintDialog() {
     if (sprintDialogMode.value === 'add' && sprintDialogAllowClosed.value) {
       payload.allow_closed = true
     }
-    const response =
-      sprintDialogMode.value === 'add' ? await api.sprintAdd(payload as any) : await api.sprintRemove(payload as any)
+    const response = sprintDialogMode.value === 'add' ? await api.sprintAdd(payload) : await api.sprintRemove(payload)
     const changed = response.modified.length
     const replacedCount = Array.isArray(response.replaced) ? response.replaced.length : 0
     const cleanedReferences = response.integrity?.auto_cleanup?.removed_references ?? 0
@@ -1673,9 +1739,10 @@ async function submitSprintDialog() {
       await refreshSprintDataAfterMutation()
     }
     closeSprintDialog(true)
-  } catch (error: any) {
+  } catch (error) {
     showToast(
-      error?.message || (sprintDialogMode.value === 'add' ? 'Failed to assign sprint' : 'Failed to remove sprint'),
+      (error as Error | undefined)?.message ||
+        (sprintDialogMode.value === 'add' ? 'Failed to assign sprint' : 'Failed to remove sprint'),
     )
   } finally {
     sprintDialogSubmitting.value = false
@@ -1768,8 +1835,8 @@ async function submitSyncDialog() {
     }
     await reloadTask()
     closeSyncDialog(true)
-  } catch (error: any) {
-    showToast(error?.message || `Failed to ${syncDialogAction.value} sync`)
+  } catch (error) {
+    showToast((error as Error | undefined)?.message || `Failed to ${syncDialogAction.value} sync`)
   } finally {
     syncDialogSubmitting.value = false
   }
@@ -1794,7 +1861,7 @@ async function removeSprintChip(sprintId: number) {
       tasks: [taskId],
       sprint: sprintId,
       cleanup_missing: true,
-    } as any)
+    })
     const changed = response.modified.length
     const replacedCount = Array.isArray(response.replaced) ? response.replaced.length : 0
     const cleanedReferences = response.integrity?.auto_cleanup?.removed_references ?? 0
@@ -1812,8 +1879,8 @@ async function removeSprintChip(sprintId: number) {
     if (changed > 0 || replacedCount > 0 || cleanedReferences > 0) {
       await refreshSprintDataAfterMutation()
     }
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to remove sprint')
+  } catch (error) {
+    showToast((error as Error | undefined)?.message || 'Failed to remove sprint')
   } finally {
     removingSprintId.value = null
   }

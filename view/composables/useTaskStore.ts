@@ -195,6 +195,8 @@ export interface TaskStoreState {
     remove(id: string, opts?: { project?: string; hard?: boolean }): Promise<TaskDeleteResponse>
     /** DEV-92: restore a soft-deleted task (same `modified`; lifecycle only). */
     restore(id: string, project?: string): Promise<TaskDTO>
+    /** DEV-4: archive a task (`archive = false` brings it back). */
+    setArchived(id: string, archive: boolean, project?: string): Promise<TaskDTO>
     /**
      * DEV-92: restore a soft-deleted task (same `modified`; lifecycle only).
      * Ordinary `upsert` snapshots cannot clear a live tombstone — restore
@@ -298,6 +300,23 @@ export function matchesDeletionMode(task: TaskDTO, mode: DeletionMode): boolean 
     if (mode === 'all') return true
     const deleted = isDeletedTask(task)
     return mode === 'deleted' ? deleted : !deleted
+}
+
+/** DEV-4 archive visibility a query was created with. */
+export type ArchivedMode = 'no' | 'yes' | 'all'
+
+export function archivedModeOfFilter(filter?: TaskListFilter): ArchivedMode {
+    const value = (filter as Record<string, unknown> | undefined)?.archived
+    return value === 'yes' || value === 'all' ? value : 'no'
+}
+
+/** Whether a task renders for a query's deletion and archive visibility. */
+export function matchesVisibility(task: TaskDTO, filter?: TaskListFilter): boolean {
+    const archivedMode = archivedModeOfFilter(filter)
+    const archived = Boolean(task.archived)
+    if (archivedMode === 'no' && archived) return false
+    if (archivedMode === 'yes' && !archived) return false
+    return matchesDeletionMode(task, deletionModeOfFilter(filter))
 }
 
 function createTaskStore(client: ApiClient): TaskStoreState {
@@ -662,13 +681,12 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         // this handle. Membership still belongs to the server, but a trash DTO
         // in the shared map must never leak into an active query's rows (and
         // vice versa) during the window before the authoritative refresh lands.
-        const deletionMode = deletionModeOfFilter(entry.filter)
         const tasks = computed<TaskDTO[]>(() => {
             void version.value
             const out: TaskDTO[] = []
             for (const id of entry.ids.value) {
                 const task = _map.value.get(id)
-                if (task && matchesDeletionMode(task, deletionMode)) out.push(task)
+                if (task && matchesVisibility(task, entry.filter)) out.push(task)
             }
             return out
         })
@@ -715,14 +733,13 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         if (!entry) {
             // No query yet: the flat fallback only ever shows active entities —
             // trash rows belong to deletion=deleted queries.
-            return Array.from(_map.value.values()).filter((task) => matchesDeletionMode(task, 'active'))
+            return Array.from(_map.value.values()).filter((task) => matchesVisibility(task))
         }
         void entry.ids.value
-        const mode = deletionModeOfFilter(entry.filter)
         const out: TaskDTO[] = []
         for (const id of entry.ids.value) {
             const task = _map.value.get(id)
-            if (task && matchesDeletionMode(task, mode)) out.push(task)
+            if (task && matchesVisibility(task, entry.filter)) out.push(task)
         }
         return out
     })
@@ -883,6 +900,14 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         return restored
     }
 
+    async function setArchived(id: string, archive: boolean, project?: string): Promise<TaskDTO> {
+        const requestClock = writeClock
+        const updated = archive ? await client.archiveTask(id, project) : await client.unarchiveTask(id, project)
+        applyMutationOutcome(updated, requestClock)
+        invalidateRetainedQueries()
+        return updated
+    }
+
     function upsert(task: TaskDTO, opts?: { restore?: boolean }) {
         if (!task?.id) return
         const current = _map.value.get(task.id)
@@ -1041,6 +1066,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         update,
         remove,
         restore,
+        setArchived,
         upsert,
         evict,
         isHardDeleted: (id: string) => tombstones.has(id),

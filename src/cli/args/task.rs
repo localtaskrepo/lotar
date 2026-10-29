@@ -236,6 +236,12 @@ pub enum TaskAction {
     /// Restore a soft-deleted task
     Restore(TaskRestoreArgs),
 
+    /// Move tasks into the project's @archive folder (read-only until unarchived)
+    Archive(TaskArchiveArgs),
+
+    /// Move archived tasks back out of @archive
+    Unarchive(TaskArchiveArgs),
+
     /// Show git history for a task file (read-only)
     History {
         /// Task ID (with or without project prefix)
@@ -721,6 +727,23 @@ pub struct TaskDeleteArgs {
 
     /// Preview deletion without removing the file
     #[arg(long)]
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskArchiveArgs {
+    /// Task IDs (with or without project prefix)
+    #[serde(default)]
+    pub ids: Vec<String>,
+
+    /// Also act on every task matching this query, e.g. 'status:done -recent:30d'
+    #[arg(long, value_name = "QUERY", allow_hyphen_values = true)]
+    #[serde(default)]
+    pub select: Option<String>,
+
+    /// Preview without moving any file
+    #[arg(long, short = 'n')]
     #[serde(default)]
     pub dry_run: bool,
 }

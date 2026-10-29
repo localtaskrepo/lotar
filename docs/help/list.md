@@ -46,6 +46,7 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `field:iteration=wave-2`, `iteration=wave-2` | a custom field | | any other key; MCP `custom_fields` |
 | `sort_by=due-date`, `order=asc` | sort key and direction | | `sort_by`, `order` |
 | `deletion=deleted\|all` | deleted tasks only, or both | | `deletion` |
+| `archived=yes\|all` | archived tasks only, or both (default `no` leaves them out) | | `archived` |
 | `q="exact words"` | the search text, set explicitly | | `q`; MCP `search` |
 | `-status:done`, `-tag:wip,draft`, `-field:area=billing` | leaves out tasks matching that filter (any of the values) | | in `query` |
 
@@ -54,7 +55,7 @@ REST and MCP also accept the whole query as one `query` parameter, written exact
 Rules, the same as in the web UI:
 
 - Values of one filter are ORed (`status:todo,done`, or `status:todo status:done`); different filters are ANDed. There is no OR across different filters.
-- A minus in front of any filter leaves out the tasks that match it: `-status:done` (not done), `-tag:wip,draft` (neither tag), `-has:tag` (no tags), `-mine:true`. In `lotar list` they work as plain arguments (`lotar list -status:done --page-size 50`). A minus on a word (`-oauth`) excludes search text; quote it with other words (`lotar list 'login -oauth'`) so it is not read as a flag. `q=`, `order=`, `sort_by=` and `deletion=` cannot be excluded.
+- A minus in front of any filter leaves out the tasks that match it: `-status:done` (not done), `-tag:wip,draft` (neither tag), `-has:tag` (no tags), `-mine:true`. In `lotar list` they work as plain arguments (`lotar list -status:done --page-size 50`). A minus on a word (`-oauth`) excludes search text; quote it with other words (`lotar list 'login -oauth'`) so it is not read as a flag. `q=`, `order=`, `sort_by=`, `deletion=` and `archived=` cannot be excluded.
 - `key:value` adds to a list filter; `key=value` replaces it. Quote values with spaces: `status:"In Progress"`.
 - Keys are case-insensitive. A word with a colon whose key is not in the table, such as `title:login`, stays search text.
 - A custom field whose name is also a key above must be quoted: `field:"due"=friday`.

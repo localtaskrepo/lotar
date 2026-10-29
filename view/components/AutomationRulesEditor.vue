@@ -723,6 +723,20 @@
                     ></textarea>
                   </div>
 
+                  <div class="field">
+                    <label class="field-label" for="automation-archive">Archive</label>
+                    <UiSelect
+                      id="automation-archive"
+                      v-model="activeCustomAction.archive"
+                      data-testid="automation-archive"
+                    >
+                      <option value="">Leave as is</option>
+                      <option value="archive">Archive the ticket</option>
+                      <option value="unarchive">Bring it back from the archive</option>
+                    </UiSelect>
+                    <p class="field-hint">Runs after everything else; archived tickets are read-only.</p>
+                  </div>
+
                   <div class="field" data-testid="automation-agent-settings">
                     <label class="field-label">Agent run settings</label>
                     <p class="field-hint">
@@ -1476,7 +1490,7 @@ function inferRecipe(draft: AutomationRuleDraft): GuidedRecipe {
     (entry.runMode === 'shell' && Boolean(entry.runShell.trim())) ||
     (entry.runMode === 'command' && Boolean(entry.runCommand.trim()))
   // Only the custom form shows agent run settings, so keep them editable there.
-  if (entry.agentModel.trim() || entry.agentEffort.trim() || entry.agentPrompt.trim()) return 'custom'
+  if (entry.agentModel.trim() || entry.agentEffort.trim() || entry.agentPrompt.trim() || entry.archive) return 'custom'
 
   if (hasComment && !setFields.length && !addFields.length && !removeFields.length && !hasRun) return 'comment'
   if (hasRun && !setFields.length && !addFields.length && !removeFields.length && !hasComment) return 'command'
@@ -1624,6 +1638,7 @@ function emptyEventAction(event: AutomationEventKey): AutomationEventActionDraft
     agentModel: '',
     agentEffort: '',
     agentPrompt: '',
+    archive: '',
   }
 }
 
@@ -1639,7 +1654,8 @@ function hasDraftActionContent(draft: AutomationRuleDraft) {
       (entry.runMode === 'command' && entry.runCommand.trim()) ||
       entry.agentModel.trim() ||
       entry.agentEffort.trim() ||
-      entry.agentPrompt.trim(),
+      entry.agentPrompt.trim() ||
+      entry.archive,
     )
   })
 }

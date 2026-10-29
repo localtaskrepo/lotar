@@ -126,22 +126,22 @@ impl TaskId {
         format!("{}-{}", self.project, self.number)
     }
 
-    /// Every candidate location whose `<root>/<project>/<number>.yml` exists.
-    /// Candidates are the provided root plus sibling workspace roots, in the
-    /// sorted order of [`StorageLocator::candidate_task_roots`] (no priority:
-    /// a single match is required for resolution). Multiple results mean the
-    /// same ID is stored in more than one root and identity is ambiguous.
+    /// Every stored file for this ID: `<root>/<project>/**/<number>.yml`,
+    /// archive included (see [`crate::storage::layout`]). Candidates are the
+    /// provided root plus sibling workspace roots, in the sorted order of
+    /// [`StorageLocator::candidate_task_roots`] (no priority: a single match
+    /// is required for resolution). Multiple results mean the same ID is
+    /// stored more than once (two roots, or two folders of one project) and
+    /// identity is ambiguous.
     pub fn locate(&self, root: &Path) -> Vec<TaskLocation> {
         let mut out = Vec::new();
         for candidate in StorageLocator::candidate_task_roots(root) {
-            let file = candidate
-                .join(&self.project)
-                .join(format!("{}.yml", self.number));
-            if file.is_file() {
+            for file in crate::storage::layout::find(&candidate.join(&self.project), self.number) {
                 out.push(TaskLocation {
-                    root: candidate,
+                    root: candidate.clone(),
                     id: self.clone(),
-                    file,
+                    file: file.path,
+                    archived: file.archived,
                 });
             }
         }
@@ -174,6 +174,8 @@ pub struct TaskLocation {
     pub id: TaskId,
     /// Absolute path of the task YAML file.
     pub file: PathBuf,
+    /// The file is in the project's `@archive` folder (DEV-4).
+    pub archived: bool,
 }
 
 impl TaskLocation {
@@ -263,12 +265,15 @@ pub fn resolve_numeric(root: &Path, raw: &str) -> Result<TaskLocation, TaskLooku
             if !is_valid_project_prefix(&project) {
                 continue;
             }
-            let file = dir.join(format!("{}.yml", number));
-            if file.is_file() {
+            for file in crate::storage::layout::find(&dir, number) {
                 matches.push(TaskLocation {
                     root: candidate.clone(),
-                    id: TaskId { project, number },
-                    file,
+                    id: TaskId {
+                        project: project.clone(),
+                        number,
+                    },
+                    file: file.path,
+                    archived: file.archived,
                 });
             }
         }

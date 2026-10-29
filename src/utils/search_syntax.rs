@@ -64,7 +64,7 @@ pub const LIST_KEYS: &[&str] = &[
 ];
 
 /// Routing keys a leading minus cannot exclude.
-const UNNEGATABLE_KEYS: &[&str] = &["q", "order", "sort_by", "deletion"];
+const UNNEGATABLE_KEYS: &[&str] = &["q", "order", "sort_by", "deletion", "archived"];
 
 /// The search key for an alias, ignoring case.
 pub fn find_key(token: &str) -> Option<&'static SearchKey> {
@@ -86,6 +86,7 @@ fn reserved_field_alias(name: &str) -> Option<&'static str> {
         "order" | "sort" => return Some("order"),
         "sortby" => return Some("sort_by"),
         "deletion" => return Some("deletion"),
+        "archived" => return Some("archived"),
         _ => {}
     }
     SEARCH_KEYS.iter().find_map(|meta| {

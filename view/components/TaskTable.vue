@@ -200,6 +200,13 @@
                         data-testid="task-deleted-at"
                         >Deleted {{ relativeTime(t.deleted_at) }}</span
                       >
+                      <span
+                        v-if="t.archived"
+                        class="tag task-table__deleted-badge"
+                        title="In the project archive; read-only"
+                        data-testid="task-archived"
+                        >Archived</span
+                      >
                       <div v-if="touchesMap[t.id]" class="session-touch">
                         <span class="session-touch__badge" :class="touchesMap[t.id]!.kind">{{
                           touchBadge(touchesMap[t.id]!)
