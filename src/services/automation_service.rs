@@ -93,6 +93,9 @@ pub enum AutomationEvent {
     JobCompleted,
     JobFailed,
     JobCancelled,
+
+    // Started on purpose: `lotar automation run`, cron, "Run now" (DEV-241)
+    Manual,
 }
 
 impl std::fmt::Display for AutomationEvent {
@@ -107,6 +110,7 @@ impl std::fmt::Display for AutomationEvent {
             Self::JobCompleted => "job_completed",
             Self::JobFailed => "job_failed",
             Self::JobCancelled => "job_cancelled",
+            Self::Manual => "manual",
         })
     }
 }
@@ -124,8 +128,9 @@ impl std::str::FromStr for AutomationEvent {
             "job_completed" | "complete" | "success" => Ok(Self::JobCompleted),
             "job_failed" | "error" | "failure" => Ok(Self::JobFailed),
             "job_cancelled" | "cancel" => Ok(Self::JobCancelled),
+            "manual" => Ok(Self::Manual),
             _ => Err(format!(
-                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled",
+                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual",
                 s
             )),
         }
@@ -523,24 +528,59 @@ impl AutomationService {
         let task = TaskService::get(&storage, ticket_id, None)?;
         let (automation, _) =
             load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
+        Self::simulate_rules(
+            &storage,
+            &task,
+            &config,
+            automation.automation.rules(),
+            event,
+        )
+    }
 
-        let active_sprints = compute_active_sprint_ids(&storage);
+    /// [`Self::simulate`] for one rule that is not saved yet, e.g. the rule
+    /// being edited in the web UI (DEV-241). A rule that is switched off is
+    /// simulated anyway: the editor shows what it would do once on.
+    pub fn simulate_rule(
+        tasks_dir: &Path,
+        ticket_id: &str,
+        event: AutomationEvent,
+        rule: &AutomationRule,
+    ) -> LoTaRResult<SimulateResult> {
+        let project_prefix = crate::storage::TaskId::parse(ticket_id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
+        let config = resolve_config_for_project(tasks_dir, Some(&project_prefix))?;
+        let storage = Storage::new(tasks_dir);
+        let task = TaskService::get(&storage, ticket_id, None)?;
+        let mut rule = rule.clone();
+        rule.enabled = None;
+        Self::simulate_rules(&storage, &task, &config, std::slice::from_ref(&rule), event)
+    }
 
-        for rule in automation.automation.rules() {
+    fn simulate_rules(
+        storage: &Storage,
+        task: &TaskDTO,
+        config: &ResolvedConfig,
+        rules: &[AutomationRule],
+        event: AutomationEvent,
+    ) -> LoTaRResult<SimulateResult> {
+        let active_sprints = compute_active_sprint_ids(storage);
+
+        for rule in rules {
             if !matches_rule(
                 rule,
-                &task,
-                &ChangeSet::empty(&task),
+                task,
+                &ChangeSet::empty(task),
                 MatchMode::Current,
-                &config,
+                config,
                 &active_sprints,
             ) {
                 continue;
             }
             if let Some(action) = resolve_action_for_event_with_fallback(&rule.on, event) {
-                let mut preview = PreviewContext::new(&task);
-                let actions = describe_action(action, &task, &config, &mut preview);
-                let task_after = simulate_action(&task, action, &config, &storage, &mut preview);
+                let mut preview = PreviewContext::new(task);
+                let actions = describe_action(action, task, config, &mut preview);
+                let task_after = simulate_action(task, action, config, storage, &mut preview);
                 return Ok(SimulateResult {
                     matched: true,
                     rule_name: rule.name.clone(),
@@ -560,6 +600,158 @@ impl AutomationService {
     }
 }
 
+/// One rule acting on one task in a manual run (DEV-241).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ManualRunEntry {
+    pub rule: String,
+    pub task: String,
+    /// What the action does (or would do, in a dry run).
+    pub actions: Vec<SimulatedAction>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+    /// Why the action failed; the run carries on with the next task.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// The outcome of [`AutomationService::run_manual`].
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ManualRunReport {
+    pub dry_run: bool,
+    /// Rules with an `on.manual` action that were considered.
+    pub rules: Vec<String>,
+    /// How many tasks were checked against them.
+    pub checked: usize,
+    pub entries: Vec<ManualRunEntry>,
+}
+
+impl AutomationService {
+    /// Run the `on.manual` actions of the named rules (or of every rule that
+    /// has one) on each task they match right now (DEV-241). This is how
+    /// automations run on a schedule: from cron, `lotar automation run`.
+    /// `query` narrows the tasks with the search syntax of `lotar list`.
+    /// Each task's own project rules apply; disabled rules never run.
+    pub fn run_manual(
+        storage: &mut Storage,
+        rule_names: &[String],
+        query: Option<&str>,
+        dry_run: bool,
+    ) -> LoTaRResult<ManualRunReport> {
+        let tasks_dir = storage.root_path.clone();
+        let base = resolve_config_for_project(&tasks_dir, None)?;
+        let ids: Vec<String> = match query.map(str::trim).filter(|q| !q.is_empty()) {
+            Some(search) => {
+                crate::services::task_list::select_ids(storage, &base, &tasks_dir, search)
+                    .map_err(|err| LoTaRError::ValidationError(err.cli_message()))?
+            }
+            None => TaskService::list(storage, &crate::api_types::TaskListFilter::default())
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect(),
+        };
+        let wanted: Vec<String> = rule_names
+            .iter()
+            .map(|name| name.trim().to_lowercase())
+            .filter(|name| !name.is_empty())
+            .collect();
+        let active_sprints = compute_active_sprint_ids(storage);
+        let mut rules_seen: Vec<String> = Vec::new();
+        let mut found: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut entries = Vec::new();
+        let mut cache: HashMap<String, (ResolvedConfig, AutomationFile)> = HashMap::new();
+
+        for id in &ids {
+            let Ok(task) = TaskService::get(storage, id, None) else {
+                continue;
+            };
+            let project = crate::storage::TaskId::parse(&task.id)
+                .map(|parsed| parsed.project)
+                .unwrap_or_default();
+            if !cache.contains_key(&project) {
+                let config = resolve_config_for_project(&tasks_dir, Some(&project))?;
+                let (file, _) = load_effective_automation(&tasks_dir, Some(&project), None)?;
+                cache.insert(project.clone(), (config, file));
+            }
+            let (config, file) = cache.get(&project).expect("cached above").clone();
+            for (index, rule) in file.automation.rules().iter().enumerate() {
+                let Some(action) = rule.on.manual.as_ref() else {
+                    continue;
+                };
+                let name = rule
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| format!("Rule {}", index + 1));
+                if !wanted.is_empty() && !wanted.contains(&name.to_lowercase()) {
+                    continue;
+                }
+                found.insert(name.to_lowercase());
+                if !rule.is_enabled() {
+                    continue;
+                }
+                if !rules_seen.contains(&name) {
+                    rules_seen.push(name.clone());
+                }
+                let changes = ChangeSet::empty(&task);
+                if !matches_rule(
+                    rule,
+                    &task,
+                    &changes,
+                    MatchMode::Current,
+                    &config,
+                    &active_sprints,
+                ) {
+                    continue;
+                }
+                let key = rule_identity(rule, index);
+                if !dry_run && !cooldown_allows(rule, &key, &task.id) {
+                    continue;
+                }
+                let mut preview = PreviewContext::new(&task);
+                let actions = describe_action(action, &task, &config, &mut preview);
+                let mut entry = ManualRunEntry {
+                    rule: name.clone(),
+                    task: task.id.clone(),
+                    actions,
+                    warnings: if dry_run {
+                        preview.into_warnings()
+                    } else {
+                        Vec::new()
+                    },
+                    error: None,
+                };
+                if !dry_run {
+                    let context = AutomationActionContext {
+                        event: AutomationEvent::Manual,
+                        job: None,
+                        previous: None,
+                        comment_text: None,
+                    };
+                    match apply_action(storage, &task, &config, action, &context) {
+                        Ok(()) => cooldown_record(rule, &key, &task.id),
+                        Err(err) => entry.error = Some(err.to_string()),
+                    }
+                }
+                entries.push(entry);
+            }
+        }
+
+        if let Some(missing) = wanted
+            .iter()
+            .find(|name| !ids.is_empty() && !found.contains(*name))
+        {
+            return Err(LoTaRError::ValidationError(format!(
+                "No rule named '{missing}' with a manual action (on.manual) applies to the selected tasks"
+            )));
+        }
+        Ok(ManualRunReport {
+            dry_run,
+            rules: rules_seen,
+            checked: ids.len(),
+            entries,
+        })
+    }
+}
+
 /// Result of simulating automation rules
 pub struct SimulateResult {
     pub matched: bool,
@@ -571,6 +763,7 @@ pub struct SimulateResult {
 }
 
 /// A single simulated action
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SimulatedAction {
     pub action: String,
     pub description: String,
@@ -1040,6 +1233,7 @@ fn resolve_action_for_event(
         AutomationEvent::JobCompleted => on.job_completed.as_ref(),
         AutomationEvent::JobFailed => on.job_failed.as_ref(),
         AutomationEvent::JobCancelled => on.job_cancelled.as_ref(),
+        AutomationEvent::Manual => on.manual.as_ref(),
     }
 }
 

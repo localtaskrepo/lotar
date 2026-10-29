@@ -66,8 +66,24 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 Err(e) => return bad_request(format!("Task not found: {}", e)),
             };
 
-        // Simulate automation
-        match AutomationService::simulate(resolver.path.as_path(), ticket_id, event) {
+        // Simulate automation: the saved rules, or the rule being edited (DEV-241)
+        let outcome = match body.rule.as_ref() {
+            Some(value) => {
+                match serde_json::from_value::<crate::automation::types::AutomationRule>(
+                    value.clone(),
+                ) {
+                    Ok(rule) => AutomationService::simulate_rule(
+                        resolver.path.as_path(),
+                        ticket_id,
+                        event,
+                        &rule,
+                    ),
+                    Err(e) => return bad_request(format!("Invalid rule: {}", e)),
+                }
+            }
+            None => AutomationService::simulate(resolver.path.as_path(), ticket_id, event),
+        };
+        match outcome {
             Ok(result) => {
                 let actions: Vec<crate::api_types::AutomationSimulatedAction> = result
                     .actions
@@ -90,6 +106,57 @@ pub(super) fn register(api_server: &mut ApiServer) {
                             "warnings": result.warnings,
                         }
                     }),
+                )
+            }
+            Err(e) => bad_request(e.to_string()),
+        }
+    });
+
+    // POST /api/automation/run - run manual (on.manual) actions (DEV-241)
+    api_server.register_handler("POST", "/api/automation/run", |req: &HttpRequest| {
+        let resolver = try_response!(resolve_tasks_dir());
+        let body: crate::api_types::AutomationRunRequest = if req.body.is_empty() {
+            Default::default()
+        } else {
+            match serde_json::from_slice(&req.body) {
+                Ok(b) => b,
+                Err(e) => return bad_request(format!("Invalid request: {}", e)),
+            }
+        };
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        match AutomationService::run_manual(
+            &mut storage,
+            &body.rules,
+            body.query.as_deref(),
+            body.dry_run,
+        ) {
+            Ok(report) => {
+                let entries = report
+                    .entries
+                    .into_iter()
+                    .map(|entry| crate::api_types::AutomationRunEntry {
+                        rule: entry.rule,
+                        task: entry.task,
+                        actions: entry
+                            .actions
+                            .into_iter()
+                            .map(|a| crate::api_types::AutomationSimulatedAction {
+                                action: a.action,
+                                description: a.description,
+                            })
+                            .collect(),
+                        warnings: entry.warnings,
+                        error: entry.error,
+                    })
+                    .collect();
+                ok_json(
+                    200,
+                    json!({"data": crate::api_types::AutomationRunResponse {
+                        dry_run: report.dry_run,
+                        rules: report.rules,
+                        checked: report.checked,
+                        entries,
+                    }}),
                 )
             }
             Err(e) => bad_request(e.to_string()),

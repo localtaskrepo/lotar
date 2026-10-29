@@ -58,10 +58,21 @@ pub struct AutomationRule {
     /// When set, the rule will not fire again on the same ticket within this duration.
     #[serde(default)]
     pub cooldown: Option<String>,
+    /// `false` keeps the rule in the file but stops it from running
+    /// (DEV-241). Absent means on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
     #[serde(default, alias = "triggers")]
     pub when: Option<AutomationConditionGroup>,
     #[serde(default)]
     pub on: AutomationRuleActions,
+}
+
+impl AutomationRule {
+    /// Rules run unless they say `enabled: false`.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled != Some(false)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -92,6 +103,13 @@ pub struct AutomationRuleActions {
     pub job_failed: Option<AutomationAction>,
     #[serde(default, alias = "cancel", alias = "job_cancel")]
     pub job_cancelled: Option<AutomationAction>,
+
+    /// Runs only when started on purpose: `lotar automation run` (for
+    /// example from cron), the REST endpoint, or "Run now" in the web UI
+    /// (DEV-241). The rule's conditions are checked against each task as it
+    /// is now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manual: Option<AutomationAction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

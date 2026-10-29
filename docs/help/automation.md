@@ -1,6 +1,8 @@
 # Automation Rules
 
-Automation rules live in a dedicated YAML file separate from the main config. Rules are evaluated when a task is created, updated, or commented on, and can also respond to agent job lifecycle events.
+Automation rules live in a dedicated YAML file separate from the main config. Rules are evaluated when a task is created, updated, or commented on, can respond to agent job lifecycle events, and can be run on purpose, for example from cron (see [Running rules on a schedule](#running-rules-on-a-schedule)).
+
+In the web UI, the **Automations** page lists every rule as plain sentences ("When an agent job finishes, if assignee is @agent: then set status to NeedsReview"), with an on/off switch, **Run now** for manual rules, and the rule editor: one screen with **When** (triggers), **If** (conditions) and **Then** (actions for each trigger). Values come from your project (statuses, priorities, types, tags, people and agent profiles); text fields have an **Insert value** menu and suggest placeholders as you type `${{`, with a preview on a real task; **Try it** shows what the rule would do to a task without changing it; and **Start from** offers ready-made examples.
 
 ## File locations & precedence
 
@@ -50,6 +52,23 @@ Supported combinators:
 
 A field condition can also test the value with a regular expression, e.g. `title: { matches: '^\[ops\]' }`. Patterns use the same syntax as [search text](list.md#search-text); an invalid pattern is rejected when the rules are saved through LoTaR.
 
+### Time conditions
+
+Three fields name a moment in the task's past and take `older_than`, `within` or `before` (and `exists`). They always look at the task as it is now, so they work in every rule:
+
+- `created`: when the task was created.
+- `modified`: when it last changed.
+- `status_changed`: when it entered its current status (the latest status change in its history, else its creation).
+
+`older_than: 30d` means more than 30 days ago; `within: 7d` means in the last 7 days. Spans take `h`, `d` and `w` (for example `12h`, `30d`, `2w`); an unreadable span, or one of these fields without a time operator, is rejected when saving through LoTaR. For `due_date`, `within` looks ahead instead (due in the next N days).
+
+```yaml
+when:
+  all:
+    - status: Done
+    - status_changed: { older_than: 30d }
+```
+
 Examples:
 
 ```yaml
@@ -86,6 +105,7 @@ Actions define what happens at different points in the automation lifecycle:
 - `job_completed`: when an agent job succeeds
 - `job_failed`: when an agent job fails
 - `job_cancelled`: when an agent job is cancelled
+- `manual`: only when started on purpose: **Run now** in the web UI, `lotar automation run`, `POST /api/automation/run`, or cron calling one of them (see below)
 - `start`: legacy catch-all that fires on every matching task change, after the specific hook
 
 Older files may use `job_start`, `complete`/`success`, `error`/`failure` and `cancel` for the job hooks; they still work.
@@ -117,7 +137,7 @@ on:
 - `run`: execute a command when the action fires
 - `comment`: add a comment to the task
 - `agent`: `model`, `effort` and `prompt` for the agent job this action starts by assigning the ticket to an agent profile (see below)
-- `archive`: `true` moves the task into its project's `@archive` folder, `false` brings it back (see `lotar task archive`). It runs after every other part of the action, because archived tasks are read-only. Automations react to events only; to archive tasks some time after they finish, run `lotar task archive --select 'status:done -recent:30d'` on a schedule.
+- `archive`: `true` moves the task into its project's `@archive` folder, `false` brings it back (see `lotar task archive`). It runs after every other part of the action, because archived tasks are read-only. To archive tasks some time after they finish, use a manual rule run from cron (below), or `lotar task archive --select 'status:done -recent:30d'`.
 
 ```yaml
 automation:
@@ -260,6 +280,47 @@ on:
 - Conditions, template variables (`ticket.*`, `previous.*`, `comment.*`), and assignee alias tokens resolve against the task as it was when the event fired, not against values written by earlier actions in the same dispatch.
 - Actions in one dispatch run sequentially but are not atomic: another writer editing the task between two actions can still interleave with the sequence.
 
+## Running rules on a schedule
+
+LoTaR has no clock of its own: rules react to events. For anything time-based, give a rule a `manual` action and run it from cron, CI or any scheduler:
+
+```yaml
+automation:
+  rules:
+    - name: Archive finished work
+      when:
+        all:
+          - status: Done
+          - status_changed: { older_than: 30d }
+      on:
+        manual:
+          comment: "Done for a month; archiving."
+          archive: true
+```
+
+```bash
+# crontab: every night at 02:00, from the repository
+0 2 * * * cd /path/to/repo && lotar automation run "Archive finished work"
+```
+
+- `lotar automation run [RULE...] [--select '<query>'] [--dry-run|-n]` runs the `manual` action of the named rules (all rules that have one when no name is given) on every task their conditions match right now. `--select` narrows the tasks with the [search syntax of `lotar list`](list.md#filters-in-the-query); `--dry-run` lists what would change. Each task's own project rules apply, and `--format json` gives a report for scripts. It exits with an error when an action fails.
+- `POST /api/automation/run` (`{ rules?, query?, dry_run? }`) does the same over REST; the web UI's **Run now** previews first, then runs on confirmation.
+- Manual rules never run on events, and switched-off rules never run at all. Cooldowns apply as usual, so a rule with `cooldown: 1d` skips tasks it already handled within a day.
+- Write conditions so a task stops matching once it is handled (for example, archived tasks drop out of the default task set, and a tag can mark tasks already processed). Then running a rule twice, or from two machines, changes nothing the second time.
+
+## Turning rules off
+
+`enabled: false` keeps a rule in the file but stops it from running, for events and manual runs alike; remove the key (or use the switch in the web UI) to turn it back on.
+
+```yaml
+- name: Paused for the release
+  enabled: false
+  when: { status: InProgress }
+  on:
+    updated:
+      comment: "..."
+```
+
 ## Cooldown
 
 Actions that resolve to the same event can trigger further automation. To prevent infinite loops, rules support a cooldown window and a maximum iteration count (`max_iterations`, default 10). Set `cooldown` to a nonnegative integer followed by `s`, `m`, `h`, or `d`, such as `30s` or `5m`; `0s` permits immediate firing. Invalid or overflowing durations are rejected when saving through LoTaR. If malformed cooldowns are introduced by hand-editing YAML, those rules are skipped rather than disabling loop protection. If a rule has already fired for the same task within the cooldown period, subsequent matches are skipped.
@@ -270,7 +331,10 @@ Use `lotar automation simulate` to test what actions a rule change would produce
 
 ```bash
 lotar automation simulate --ticket PROJ-1
+lotar automation simulate --ticket PROJ-1 --event manual
 ```
+
+The web UI's rule editor runs the same simulation on the rule you are editing (**Try it**), before it is saved.
 
 The preview applies the matched action the same way a real run would, without writing anything: every `set` field (including due date, effort, custom fields and the `labels` alias), templates built from the ticket's current values, `@me`/`@reporter`/`@assignee`/`@assignee_or_reporter`/`@least_busy` assignees, and case-insensitive tag adds and removes. A few things can only be known when the rule actually runs; the preview lists them as warnings instead of guessing:
 

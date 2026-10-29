@@ -49,6 +49,8 @@ pub(crate) fn validate_rules(file: &AutomationFile, config: &ResolvedConfig) -> 
         validate_action(rule.on.job_completed.as_ref(), config, &mut result);
         validate_action(rule.on.job_failed.as_ref(), config, &mut result);
         validate_action(rule.on.job_cancelled.as_ref(), config, &mut result);
+        // Started on purpose (DEV-241)
+        validate_action(rule.on.manual.as_ref(), config, &mut result);
     }
     result
 }
@@ -114,6 +116,35 @@ fn validate_condition_value(
                 "Automation condition on '{field}' has an invalid pattern '{pattern}': {reason}."
             ),
         ));
+    }
+    // Time operators need a readable span (DEV-241).
+    for (operator, span) in [("within", &map.within), ("older_than", &map.older_than)] {
+        if let Some(span) = span.as_deref()
+            && crate::utils::time::parse_duration_like(span).is_none()
+        {
+            result.add_error(ValidationError::error(
+                Some("automation".to_string()),
+                format!(
+                    "Automation condition on '{field}' has an unreadable {operator} '{span}'; use a number and a unit, such as 12h, 7d or 2w."
+                ),
+            ));
+        }
+    }
+    if matches!(
+        field.to_lowercase().as_str(),
+        "created" | "modified" | "status_changed"
+    ) && map.before.is_none()
+        && map.within.is_none()
+        && map.older_than.is_none()
+        && map.exists.is_none()
+    {
+        result.add_error(ValidationError::error(
+            Some("automation".to_string()),
+            format!(
+                "Automation condition on '{field}' needs older_than, within or before, e.g. {field}: {{ older_than: 30d }}."
+            ),
+        ));
+        return;
     }
     let Some(target) = map.equals.as_ref() else {
         if let Some(values) = map.any.as_ref() {

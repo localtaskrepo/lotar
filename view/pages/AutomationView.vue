@@ -86,6 +86,11 @@
           :available-priorities="availablePriorities"
           :available-types="availableTypes"
           :available-tags="availableTags"
+          :available-members="availablePeople"
+          :available-custom-fields="availableCustomFields"
+          :project="project"
+          :dirty="rulesDirty"
+          @ran="onRulesRan"
         />
       </div>
 
@@ -104,7 +109,8 @@
       <UiCard class="simulator-card">
         <h3 style="margin: 0 0 12px 0">Test automation rules</h3>
         <p class="muted" style="margin: 0 0 16px 0; font-size: 13px">
-          Select a job lifecycle event and a ticket to see which rules would trigger.
+          Pick an event and a task to see which saved rule would act on it and what it would do. To try a rule while
+          editing it, use “Try it” in the rule dialog.
         </p>
 
         <div class="col" style="gap: 12px">
@@ -113,10 +119,16 @@
               <label class="muted" style="font-size: 12px">Event type</label>
               <UiSelect v-model="simEvent" aria-label="Event type">
                 <option value="">Select event…</option>
-                <option value="job_start">job_start</option>
-                <option value="complete">complete</option>
-                <option value="error">error</option>
-                <option value="cancel">cancel</option>
+                <option value="created">Task created</option>
+                <option value="updated">Task updated</option>
+                <option value="assigned">Assigned</option>
+                <option value="commented">Comment added</option>
+                <option value="sprint_changed">Sprint changed</option>
+                <option value="job_start">Job started</option>
+                <option value="complete">Job completed</option>
+                <option value="error">Job failed</option>
+                <option value="cancel">Job cancelled</option>
+                <option value="manual">Run manually / cron</option>
               </UiSelect>
             </div>
             <div class="col" style="gap: 4px; flex: 1">
@@ -197,7 +209,8 @@ import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
-import type { AutomationSimulateResponse, ConfigInspectResult, ProjectDTO } from '../api/types'
+import type { AutomationRunResponse, AutomationSimulateResponse, ConfigInspectResult, ProjectDTO } from '../api/types'
+import { showToast } from '../components/toast'
 import { formatProjectLabel } from '../utils/projectLabels'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import UiButton from '../components/UiButton.vue'
@@ -229,6 +242,15 @@ const availableStatuses = computed(() => configData.value?.effective.issue_state
 const availablePriorities = computed(() => configData.value?.effective.issue_priorities ?? [])
 const availableTypes = computed(() => configData.value?.effective.issue_types ?? [])
 const availableTags = computed(() => configData.value?.effective.tags ?? [])
+const availableCustomFields = computed(() =>
+  (configData.value?.effective.custom_fields ?? []).filter((field) => field !== '*'),
+)
+const agentProfiles = ref<string[]>([])
+// People for assignee/reporter pickers: members, then agent profiles (DEV-241).
+const availablePeople = computed(() => {
+  const members = (configData.value?.effective.members ?? []).filter((member) => member && member !== '*')
+  return [...new Set([...members, ...agentProfiles.value.map((name) => `@${name}`)])]
+})
 
 const automationSourceLabel = computed(() => {
   switch (automationSource.value) {
@@ -266,11 +288,16 @@ async function refresh() {
   error.value = ''
   rulesSaveError.value = ''
   try {
-    const [automationResponse, configResponse] = await Promise.all([
+    const [automationResponse, configResponse, profilesResponse] = await Promise.all([
       api.inspectAutomation(scope || undefined),
       api.inspectConfig(scope || undefined).catch(() => null),
+      // Agent profiles only fill pickers; never let them block the page.
+      Promise.resolve()
+        .then(() => api.listAgentProfiles(scope || undefined))
+        .catch(() => null),
     ])
     if (request !== generation) return
+    agentProfiles.value = (profilesResponse?.profiles ?? []).map((profile) => profile.name)
     automationSource.value = automationResponse.source || ''
     scopeYaml.value = automationResponse.scope_yaml || ''
     effectiveYaml.value = automationResponse.effective_yaml || ''
@@ -307,6 +334,15 @@ async function saveRules() {
   } finally {
     if (request === generation) savingRules.value = false
   }
+}
+
+function onRulesRan(result: AutomationRunResponse) {
+  const failed = result.entries.filter((entry) => entry.error).length
+  showToast(
+    failed
+      ? `Ran on ${result.entries.length - failed} task(s); ${failed} failed`
+      : `Ran on ${result.entries.length} task(s)`,
+  )
 }
 
 function resetRules() {

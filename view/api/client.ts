@@ -1,4 +1,6 @@
 import type {
+    AutomationRunRequest,
+    AutomationRunResponse,
     TaskMoveRequest,
     TaskMoveResponse,
     ActivityFeedItem,
@@ -408,6 +410,10 @@ export const api = {
     },
     simulateAutomation(payload: AutomationSimulateRequest): Promise<AutomationSimulateResponse> {
         return post('/api/automation/simulate', payload)
+    },
+    /** DEV-241: run manual (cron-style) rules now, or preview them with `dry_run`. */
+    runAutomation(payload: AutomationRunRequest): Promise<AutomationRunResponse> {
+        return post('/api/automation/run', payload)
     },
     getAgentJobLogs(id: string): Promise<AgentJobLogsResponse> {
         return get('/api/jobs/logs', { id })

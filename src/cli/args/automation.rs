@@ -11,6 +11,20 @@ pub enum AutomationAction {
     /// Simulate automation rules for a ticket and event (dry-run, no side effects)
     #[command(alias = "dry-run")]
     Simulate(AutomationSimulateArgs),
+    /// Run rules' manual actions (on.manual) on the tasks they match now, e.g. from cron
+    Run(AutomationRunArgs),
+}
+
+#[derive(Args)]
+pub struct AutomationRunArgs {
+    /// Names of the rules to run (default: every rule with a manual action)
+    pub rules: Vec<String>,
+    /// Only consider tasks matching this query (the `lotar list` search syntax)
+    #[arg(long, value_name = "QUERY", allow_hyphen_values = true)]
+    pub select: Option<String>,
+    /// Show what would change without changing anything
+    #[arg(long, short = 'n')]
+    pub dry_run: bool,
 }
 
 #[derive(Args)]

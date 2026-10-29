@@ -144,7 +144,7 @@ describe.concurrent('Accessible shared dialogs (DEV-69)', () => {
                         await page.goto(`${server.url}/automations`);
                         await exercise(
                             page.getByRole('button', { name: 'New rule', exact: true }),
-                            'Create automation rule',
+                            'New automation rule',
                             'automation',
                         );
                         await page.goto(`${server.url}/sync`);

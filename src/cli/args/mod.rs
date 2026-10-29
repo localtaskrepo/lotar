@@ -16,7 +16,7 @@ pub use agent::{
     AgentAction, AgentArgs, AgentCheckArgs, AgentListJobsArgs, AgentQueueAction, AgentQueueArgs,
     AgentRunArgs, AgentWorkerArgs, WorktreeAction, WorktreeArgs, WorktreeCleanupArgs,
 };
-pub use automation::{AutomationAction, AutomationArgs, AutomationSimulateArgs};
+pub use automation::{AutomationAction, AutomationArgs, AutomationRunArgs, AutomationSimulateArgs};
 pub use common::parse_key_value;
 pub use completions::{CompletionShell, CompletionsAction, CompletionsArgs};
 pub use config::{

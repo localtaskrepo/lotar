@@ -24,6 +24,7 @@ export type AutomationEventKey =
     | 'complete'
     | 'error'
     | 'cancel'
+    | 'manual'
 
 export type AutomationConditionOperator =
     | 'equals'
@@ -100,6 +101,8 @@ export interface AutomationEventActionDraft {
 
 export interface AutomationRuleDraft {
     name: string
+    /** `false` writes `enabled: false`: the rule stays but never runs (DEV-241). */
+    enabled: boolean
     cooldown: string
     matchMode: 'all' | 'any'
     conditions: AutomationConditionDraft[]
@@ -142,6 +145,9 @@ export type ConditionFieldOptionValue =
     | 'description'
     | 'due_date'
     | 'effort'
+    | 'created'
+    | 'modified'
+    | 'status_changed'
     | 'custom_field'
     | 'other'
 
@@ -172,6 +178,7 @@ const EVENT_LABELS: Record<AutomationEventKey, string> = {
     complete: 'Job completed',
     error: 'Job failed',
     cancel: 'Job cancelled',
+    manual: 'Run manually or from cron',
 }
 
 const EVENT_ALIAS_TO_KEY: Record<string, AutomationEventKey> = {
@@ -195,6 +202,7 @@ const EVENT_ALIAS_TO_KEY: Record<string, AutomationEventKey> = {
     cancel: 'cancel',
     job_cancel: 'cancel',
     job_cancelled: 'cancel',
+    manual: 'manual',
 }
 
 const YAML_EVENT_KEYS: Record<AutomationEventKey, string> = {
@@ -209,6 +217,7 @@ const YAML_EVENT_KEYS: Record<AutomationEventKey, string> = {
     complete: 'job_completed',
     error: 'job_failed',
     cancel: 'job_cancelled',
+    manual: 'manual',
 }
 
 const CONDITION_OPERATORS: AutomationConditionOperator[] = [
@@ -226,8 +235,8 @@ const CONDITION_OPERATORS: AutomationConditionOperator[] = [
     'older_than',
 ]
 
-const SUPPORTED_RULE_KEYS = new Set(['name', 'cooldown', 'when', 'triggers', 'on'])
-const SUPPORTED_ACTION_KEYS = new Set(['set', 'add', 'remove', 'run', 'comment', 'agent'])
+const SUPPORTED_RULE_KEYS = new Set(['name', 'enabled', 'cooldown', 'when', 'triggers', 'on'])
+const SUPPORTED_ACTION_KEYS = new Set(['set', 'add', 'remove', 'run', 'comment', 'agent', 'archive'])
 const SUPPORTED_WHEN_KEYS = new Set(['all', 'any', 'changes', 'custom_fields'])
 const SUPPORTED_SET_FIELDS = new Set([
     'status',
@@ -267,6 +276,9 @@ export const automationConditionFieldOptions: NamedOption<ConditionFieldOptionVa
     { value: 'description', label: 'Description' },
     { value: 'due_date', label: 'Due date' },
     { value: 'effort', label: 'Effort' },
+    { value: 'created', label: 'Created' },
+    { value: 'modified', label: 'Last changed' },
+    { value: 'status_changed', label: 'Time in current status' },
     { value: 'custom_field', label: 'Custom field' },
     { value: 'other', label: 'Other field' },
 ]
@@ -374,6 +386,7 @@ export function getEditableRuleState(rule: AutomationRecord): AutomationEditable
 export function createEmptyRuleDraft(): AutomationRuleDraft {
     return {
         name: '',
+        enabled: true,
         cooldown: '',
         matchMode: 'all',
         conditions: [createConditionDraft()],
@@ -386,6 +399,9 @@ export function buildAutomationRuleFromDraft(draft: AutomationRuleDraft): Automa
     const rule: AutomationRecord = {}
     if (draft.name.trim()) {
         rule.name = draft.name.trim()
+    }
+    if (draft.enabled === false) {
+        rule.enabled = false
     }
     if (draft.cooldown.trim()) {
         rule.cooldown = draft.cooldown.trim()
@@ -775,6 +791,7 @@ function createRuleDraftFromRule(rule: AutomationRecord): AutomationRuleDraft {
 
     return {
         name: typeof rule.name === 'string' ? rule.name : '',
+        enabled: rule.enabled !== false,
         cooldown: typeof rule.cooldown === 'string' ? rule.cooldown : '',
         matchMode: when.matchMode,
         conditions: when.conditions.length ? when.conditions : [createConditionDraft()],

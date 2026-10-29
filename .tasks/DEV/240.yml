@@ -1,9 +1,35 @@
 title: Add time triggers to automation
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-29T01:26:09.915651+00:00
+modified: 2026-10-29T23:15:38.205835+00:00
+comments:
+- date: 2026-10-29T23:15:27.954611+00:00
+  text: 'Won''t do (developer decision, 2026-10-29): built-in time triggers would make every checkout and CI run the same schedules and need shared run state. Instead, automations can be started from cron: DEV-241 adds an on.manual hook, ''lotar automation run'' (with --select and --dry-run), REST and a ''Run now'' button, plus created/modified/time-in-status conditions so a cron job can select e.g. tasks Done for 30 days.'
 description: |-
   To support triggering events at a certain time we can offer eventual triggers that fire, either when the server is currently active and a timer is hit or the next a command is executed and a configured timer is triggering an automation at that time.
   We just need to be clear int he documentation and UI that this is how they work.
+tags:
+- wont-do
+history:
+- at: 2026-10-29T23:15:27.954611+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T23:15:28.233083+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-10-29T23:15:38.205835+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: ''
+    new: wont-do

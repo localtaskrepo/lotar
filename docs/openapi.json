@@ -3175,6 +3175,36 @@
         ]
       }
     },
+    "/api/automation/run": {
+      "post": {
+        "summary": "Run manual automation rules now",
+        "description": "Runs the on.manual actions of the named rules (or of every rule that has one) on each task their conditions match right now (DEV-241). This is how automations run on a schedule: call it, or `lotar automation run`, from cron. query narrows the tasks with the task-list search syntax; dry_run reports without changing anything. Switched-off rules (enabled: false) never run; each task's own project rules apply.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AutomationRunRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Run report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/AutomationRunResponse" } },
+                  "required": ["data"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
     "/api/automation/simulate": {
       "post": {
         "summary": "Simulate automation rules for an event",
@@ -8020,6 +8050,37 @@
           "errors"
         ]
       },
+      "AutomationRunRequest": {
+        "type": "object",
+        "properties": {
+          "rules": { "type": "array", "items": { "type": "string" }, "description": "Rule names; empty runs every rule with a manual action" },
+          "query": { "type": "string", "description": "Only tasks matching this query (task list search syntax)" },
+          "dry_run": { "type": "boolean" }
+        }
+      },
+      "AutomationRunResponse": {
+        "type": "object",
+        "properties": {
+          "dry_run": { "type": "boolean" },
+          "rules": { "type": "array", "items": { "type": "string" } },
+          "checked": { "type": "integer", "description": "Tasks checked" },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rule": { "type": "string" },
+                "task": { "type": "string" },
+                "actions": { "type": "array", "items": { "$ref": "#/components/schemas/AutomationSimulatedAction" } },
+                "warnings": { "type": "array", "items": { "type": "string" } },
+                "error": { "type": "string" }
+              },
+              "required": ["rule", "task", "actions"]
+            }
+          }
+        },
+        "required": ["dry_run", "rules", "checked", "entries"]
+      },
       "AutomationSimulateRequest": {
         "type": "object",
         "properties": {
@@ -8029,7 +8090,7 @@
           },
           "event": {
             "type": "string",
-            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
+            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
             "examples": [
               "created",
               "updated",
@@ -8043,6 +8104,11 @@
               "null"
             ],
             "description": "Ignored: the automation scope always follows the ticket's project prefix. null is accepted and treated as omitted (no clear)."
+          },
+          "rule": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Simulate this rule (an automation rule object, as in automation.yml) instead of the saved ones, e.g. while it is being edited (DEV-241). It is simulated even when it says enabled: false."
           }
         },
         "required": [

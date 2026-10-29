@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-25T03:09:51.512208+00:00
-modified: 2026-10-29T22:36:08.922153+00:00
+modified: 2026-10-29T23:06:31.441149+00:00
 comments:
 - date: 2026-10-28T02:08:54.209415+00:00
   text: |-
@@ -31,7 +31,7 @@ comments:
     Known limits: pending sync journal links from an interrupted sync that name a task moved since fail closed with the 'moved to' message (rerun the sync); global activity feeds show the move twice (stub and task entries); single-task sync push with an old ID pushes the moved task through the remote you name.
     Guidance: no durable finding.
 - date: 2026-10-29T22:35:34.982726+00:00
-  text: 'Not committed yet: the commit was blocked because signing (1Password) failed; retry pending.'
+  text: Committed as 2ad9b7c on main (not pushed); developer verified the move in the web UI.
 references:
 - attachment: task-move-dialog-2x.5eba3ea322ce4ff81a4615deecf50c1b.webp
 description: Once a ticket is created, there's no way to move it to another project. We want to support this on all interfaces.
@@ -77,3 +77,9 @@ history:
   - field: comment#4
     old: Committed as d70d9a2 on main (not pushed).
     new: 'Not committed yet: the commit was blocked because signing (1Password) failed; retry pending.'
+- at: 2026-10-29T23:06:31.441149+00:00
+  actor: mallox
+  changes:
+  - field: comment#4
+    old: 'Not committed yet: the commit was blocked because signing (1Password) failed; retry pending.'
+    new: Committed as 2ad9b7c on main (not pushed); developer verified the move in the web UI.

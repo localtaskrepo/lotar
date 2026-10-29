@@ -730,6 +730,46 @@ pub struct AutomationSetResponse {
     pub errors: Vec<String>,
 }
 
+/// Run rules' manual actions (`on.manual`) on the tasks they match now
+/// (DEV-241). This is how automations run on a schedule: from cron.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationRunRequest {
+    /// Names of the rules to run; empty runs every rule with a manual action.
+    #[serde(default)]
+    pub rules: Vec<String>,
+    /// Only consider tasks matching this query (search syntax of the task list).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// Report what would change without changing anything.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+/// One rule acting on one task in a manual run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationRunEntry {
+    pub rule: String,
+    pub task: String,
+    pub actions: Vec<AutomationSimulatedAction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationRunResponse {
+    pub dry_run: bool,
+    /// Enabled rules with a manual action that were considered.
+    pub rules: Vec<String>,
+    /// How many tasks were checked.
+    pub checked: usize,
+    pub entries: Vec<AutomationRunEntry>,
+}
+
 /// Request to simulate automation rules for a given event
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
@@ -738,14 +778,19 @@ pub struct AutomationSimulateRequest {
     pub ticket_id: String,
     /// The event to simulate. Canonical names: "created", "updated",
     /// "assigned", "commented", "sprint_changed", "job_started",
-    /// "job_completed", "job_failed", "job_cancelled". Matching is
-    /// case-insensitive and legacy aliases are accepted ("job_start",
+    /// "job_completed", "job_failed", "job_cancelled", "manual". Matching
+    /// is case-insensitive and legacy aliases are accepted ("job_start",
     /// "complete", "success", "error", "failure", "cancel").
     pub event: String,
     /// Optional in the payload but ignored: the automation scope always
     /// follows the ticket's project prefix.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub project: Option<String>,
+    /// Simulate this rule (an automation rule object, as in automation.yml)
+    /// instead of the saved ones, e.g. while it is still being edited
+    /// (DEV-241). Its conditions are checked against the task as it is.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub rule: Option<serde_json::Value>,
 }
 
 /// Response showing what would happen when automation rules are applied

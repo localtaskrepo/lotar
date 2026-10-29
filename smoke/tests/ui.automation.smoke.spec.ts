@@ -234,84 +234,61 @@ describe.concurrent('UI Automation page smoke tests', () => {
         }
     });
 
-    it('creates a rule through the guided dialog', async () => {
+    it('creates a rule on one screen, tries it on a task and saves it (DEV-241)', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
-            seedFiles: {
-                '.tasks/config.yml': BASE_CONFIG,
-            },
+            seedFiles: { '.tasks/config.yml': BASE_CONFIG },
         });
-
         try {
+            const task = await workspace.addTask('Try target');
             const server = await startLotarServer(workspace);
             try {
                 await withPage(`${server.url}/automations`, async (page) => {
-                    await page.waitForSelector('h1', { timeout: 15_000 });
+                    await page.setViewportSize({ width: 1280, height: 1000 });
+                    await page.getByTestId('automation-new-rule').click();
+                    const dialog = page.getByTestId('automation-rule-dialog');
+                    await dialog.waitFor();
+                    await dialog.getByTestId('automation-rule-name').fill('Deploy complete');
+                    await dialog.getByTestId('automation-trigger-complete').click();
+                    await dialog.getByTestId('automation-add-action-complete').selectOption('set:status');
+                    const status = dialog.getByTestId('automation-set-status');
+                    await status.fill('Done');
+                    // Configured statuses are offered as suggestions.
+                    const listId = await status.getAttribute('list');
+                    const options = await page
+                        .locator(`#${listId} option`)
+                        .evaluateAll((els) => els.map((el) => el.getAttribute('value')));
+                    expect(options).toEqual(expect.arrayContaining(['Todo', 'InProgress', 'Review', 'Done']));
+                    await dialog.getByTestId('automation-add-action-complete').selectOption('comment');
+                    await dialog.getByTestId('automation-comment').fill('Shipped ${{ticket.title}}');
 
-                    // Open the create dialog
-                    await page.click('button:has-text("New rule")');
-                    await page.waitForSelector('.automation-builder__dialog', { timeout: 5_000 });
-
-                    // Step 0 (Goal): pick "Move a task" recipe
-                    await page.click('.automation-builder__recipe-card:has-text("Move a task")');
-
-                    // Fill in rule name
-                    await page.fill('input[placeholder="Human review after testing"]', 'Deploy complete');
-
-                    // Click Next to go to step 1 (Trigger)
-                    await page.click('button:has-text("Next")');
-
-                    // Step 1: pick the "complete" trigger
-                    await page.click('.automation-builder__event-toggle:has-text("complete")');
-
-                    // Click Next to go to step 2 (Result)
-                    await page.click('button:has-text("Next")');
-
-                    // Step 2: fill in status value
-                    await page.fill('input[placeholder="Done"]', 'Done');
-
-                    // Click Next to go to step 3 (Review)
-                    await page.click('button:has-text("Next")');
-
-                    // Step 3: verify the review shows our rule
-                    const reviewText = await page.textContent('.automation-builder__dialog');
-                    expect(reviewText).toContain('Deploy complete');
-                    expect(reviewText).toContain('complete');
-
-                    // Save the rule
-                    await page.click('button:has-text("Create rule")');
-
-                    // Dialog should close and the new rule card should appear
-                    await page.waitForSelector('.rule-card', { timeout: 5_000 });
-                    const ruleNames = await page.$$eval('.rule-name', (els) => els.map((el) => el.textContent?.trim()));
-                    expect(ruleNames).toContain('Deploy complete');
-
-                    // Save button should be enabled (dirty state)
-                    const saveButton = page.locator('button:has-text("Save rules")');
-                    await saveButton.waitFor({ state: 'visible', timeout: 3_000 });
-                    const disabled = await saveButton.isDisabled();
-                    expect(disabled).toBe(false);
-
-                    // Save the rules to persist
-                    await saveButton.click();
-
-                    // Wait for save to complete — save button should become disabled again
-                    await page.waitForFunction(
-                        () => {
-                            const btn = [...document.querySelectorAll('button')].find((b) =>
-                                b.textContent?.includes('Save rules'),
-                            );
-                            return btn?.hasAttribute('disabled');
-                        },
-                        { timeout: 10_000 },
+                    await dialog.getByTestId('automation-try-task').fill(task.id);
+                    await dialog.getByTestId('automation-try-task').dispatchEvent('change');
+                    await dialog.getByTestId('automation-try').click();
+                    const result = dialog.getByTestId('automation-try-result');
+                    await result.waitFor({ timeout: 10_000 });
+                    expect(await result.textContent()).toContain('Shipped Try target');
+                    expect(await dialog.getByTestId('automation-comment-preview').textContent()).toContain(
+                        `On ${task.id}: Shipped Try target`,
                     );
 
-                    // Verify the rule persisted by refreshing
+                    await dialog.getByTestId('automation-rule-save').click();
+                    await dialog.waitFor({ state: 'detached' });
+                    await page.getByRole('button', { name: 'Save rules', exact: true }).click();
+                    await page.waitForFunction(() =>
+                        [...document.querySelectorAll('button')]
+                            .find((b) => b.textContent?.includes('Save rules'))
+                            ?.hasAttribute('disabled'),
+                    );
                     await page.click('button[title="Refresh automations"]');
                     await page.waitForSelector('.rule-card', { timeout: 10_000 });
-                    const refreshedNames = await page.$$eval('.rule-name', (els) =>
-                        els.map((el) => el.textContent?.trim()),
+                    const summary = (await page.getByTestId('automation-rule-0').textContent()) ?? '';
+                    expect(summary).toContain('Deploy complete');
+                    expect(summary.replace(/\s+/g, ' ')).toContain(
+                        'When an agent job finishes: then set status to Done, comment',
                     );
-                    expect(refreshedNames).toContain('Deploy complete');
+                    const saved = await workspace.read('.tasks/automation.yml');
+                    expect(saved).toContain('job_completed:');
+                    expect(saved).toContain('status: Done');
                 });
             } finally {
                 await server.stop();
@@ -321,48 +298,59 @@ describe.concurrent('UI Automation page smoke tests', () => {
         }
     });
 
-    it('guided dialog shows project-aware suggestions', async () => {
+    it('runs a manual rule now, and a switched-off rule cannot run (DEV-241)', async ({ expect }) => {
+        const rules = `automation:
+  rules:
+    - name: Flag finished work
+      when:
+        status: Done
+      on:
+        manual:
+          add:
+            tags: [flagged]
+`;
         const workspace = await SmokeWorkspace.create({
-            seedFiles: {
-                '.tasks/config.yml': BASE_CONFIG,
-            },
+            seedFiles: { '.tasks/config.yml': BASE_CONFIG, '.tasks/automation.yml': rules },
         });
-
         try {
+            const done = await workspace.addTask('Finished one', { args: ['--status=Done'] });
+            await workspace.addTask('Still open');
             const server = await startLotarServer(workspace);
             try {
                 await withPage(`${server.url}/automations`, async (page) => {
-                    await page.waitForSelector('h1', { timeout: 15_000 });
+                    await page.setViewportSize({ width: 1280, height: 900 });
+                    await page.getByTestId('automation-run-0').click();
+                    const dialog = page.getByTestId('automation-run-dialog');
+                    const preview = dialog.getByTestId('automation-run-preview');
+                    await preview.waitFor({ timeout: 10_000 });
+                    expect(await preview.textContent()).toContain(done.id);
+                    expect(await preview.textContent()).not.toContain('Still open');
+                    expect(await workspace.readTaskYaml(done.id)).not.toContain('flagged');
+                    await dialog.getByTestId('automation-run-confirm').click();
+                    await expect
+                        .poll(async () => workspace.readTaskYaml(done.id), {
+                            timeout: 10_000,
+                        })
+                        .toContain('flagged');
+                    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
-                    // Open the create dialog
-                    await page.click('button:has-text("New rule")');
-                    await page.waitForSelector('.automation-builder__dialog', { timeout: 5_000 });
+                    // Off: the switch marks it, and Run now waits until it is on again.
+                    await page.getByTestId('automation-rule-toggle-0').uncheck();
+                    expect(await page.getByTestId('automation-run-0').isDisabled()).toBe(true);
+                    await page.getByRole('button', { name: 'Save rules', exact: true }).click();
+                    await expect
+                        .poll(async () => workspace.read('.tasks/automation.yml'), { timeout: 10_000 })
+                        .toContain('enabled: false');
 
-                    // Select "Move a task" recipe
-                    await page.click('.automation-builder__recipe-card:has-text("Move a task")');
-
-                    // Go to trigger step
-                    await page.click('button:has-text("Next")');
-                    await page.click('.automation-builder__event-toggle:has-text("complete")');
-
-                    // Go to result step
-                    await page.click('button:has-text("Next")');
-
-                    // Status field should have a datalist with configured statuses
-                    const datalist = page.locator('#automation-status-suggestions');
-                    const options = datalist.locator('option');
-                    const count = await options.count();
-                    expect(count).toBeGreaterThanOrEqual(4);
-
-                    // Check that our configured statuses are present
-                    const values: string[] = [];
-                    for (let i = 0; i < count; i++) {
-                        const value = await options.nth(i).getAttribute('value');
-                        if (value) values.push(value);
-                    }
-                    expect(values).toContain('Todo');
-                    expect(values).toContain('Done');
-                    expect(values).toContain('InProgress');
+                    // The editor fits a phone.
+                    await page.setViewportSize({ width: 390, height: 844 });
+                    await page.getByTestId('automation-new-rule').click();
+                    await page.getByTestId('automation-rule-dialog').waitFor();
+                    await page.getByTestId('automation-recipe-agent-handback').click();
+                    const overflow = await page.evaluate(
+                        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+                    );
+                    expect(overflow).toBeLessThanOrEqual(0);
                 });
             } finally {
                 await server.stop();

@@ -176,6 +176,9 @@ pub(crate) fn matches_rule(
     config: &ResolvedConfig,
     active_sprint_ids: &[u32],
 ) -> bool {
+    if !rule.is_enabled() {
+        return false;
+    }
     let Some(group) = rule.when.as_ref() else {
         return true;
     };
@@ -289,6 +292,16 @@ fn matches_field_map(
                 if !matches_value_condition(condition, assignee_value.as_ref()) {
                     return false;
                 }
+            }
+            continue;
+        }
+
+        // Moments in the task's past (DEV-241): only the time operators apply,
+        // always to the task as it is now, so they also work for rules run on
+        // a schedule (`on.manual`) where nothing changed.
+        if let Some(moment) = past_moment(field_key.as_str(), current) {
+            if !matches_past_moment(moment.as_deref(), &condition.as_map()) {
+                return false;
             }
             continue;
         }
@@ -586,6 +599,80 @@ fn resolve_date_reference(s: &str) -> Option<chrono::NaiveDate> {
     crate::utils::time::parse_human_datetime_to_utc(s)
         .ok()
         .map(|dt| dt.with_timezone(&chrono::Local).date_naive())
+}
+
+/// Fields that name a moment in the task's past: when it was created, last
+/// modified, or entered its current status (the latest status change in its
+/// history, else its creation). `None` for other fields; `Some(None)` when
+/// the moment is unknown.
+fn past_moment(field: &str, task: &TaskDTO) -> Option<Option<String>> {
+    match field {
+        "created" => Some(Some(task.created.clone())),
+        "modified" => Some(Some(task.modified.clone()).filter(|v| !v.is_empty())),
+        "status_changed" => Some(
+            task.history
+                .iter()
+                .filter(|entry| entry.changes.iter().any(|change| change.field == "status"))
+                .map(|entry| entry.at.clone())
+                .max()
+                .or_else(|| Some(task.created.clone())),
+        ),
+        _ => None,
+    }
+}
+
+/// `older_than` and `within` count back from now (`within: 7d` means in the
+/// last seven days); `before` compares with a date; `exists` checks presence.
+/// Other operators never match a moment.
+fn matches_past_moment(
+    value: Option<&str>,
+    map: &crate::automation::types::AutomationFieldConditionMap,
+) -> bool {
+    let has_time_operator =
+        map.before.is_some() || map.within.is_some() || map.older_than.is_some();
+    if let Some(exists) = map.exists
+        && value.is_some() != exists
+    {
+        return false;
+    }
+    if !has_time_operator {
+        return map.exists.is_some()
+            && map.equals.is_none()
+            && map.r#in.is_none()
+            && map.contains.is_none()
+            && map.matches.is_none();
+    }
+    let Some(moment) =
+        value.and_then(|raw| crate::utils::time::parse_human_datetime_to_utc(raw).ok())
+    else {
+        return false;
+    };
+    let now = chrono::Utc::now();
+    if let Some(reference) = map.before.as_deref() {
+        let Some(date) = resolve_date_reference(reference) else {
+            return false;
+        };
+        if moment.with_timezone(&chrono::Local).date_naive() >= date {
+            return false;
+        }
+    }
+    if let Some(span) = map.within.as_deref() {
+        let Some(duration) = parse_date_offset(span) else {
+            return false;
+        };
+        if moment < now - duration || moment > now {
+            return false;
+        }
+    }
+    if let Some(span) = map.older_than.as_deref() {
+        let Some(duration) = parse_date_offset(span) else {
+            return false;
+        };
+        if moment > now - duration {
+            return false;
+        }
+    }
+    true
 }
 
 /// Parse a duration string like "3d", "2w", "30d" into chrono::Duration.

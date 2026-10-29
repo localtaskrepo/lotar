@@ -93,7 +93,23 @@ describe('automation rule form round trips', () => {
         const reasons = state.unsupportedReasons.join(' ')
         expect(reasons).toContain('run.shell')
         expect(reasons).toContain('run.env values must be strings')
-        expect(reasons).toContain('archive')
+        // DEV-241: archive (DEV-4) is editable in the builder.
+        expect(reasons).not.toContain('archive')
+    })
+
+    it('reads and writes enabled: false and the manual hook (DEV-241)', () => {
+        const rule = {
+            name: 'Nightly',
+            enabled: false,
+            when: { modified: { older_than: '7d' } },
+            on: { manual: { add: { tags: ['stale', 'old'] } } },
+        }
+        const state = getEditableRuleState(rule)
+        expect(state.editable).toBe(true)
+        expect(state.draft.enabled).toBe(false)
+        expect(buildAutomationRuleFromDraft(state.draft)).toEqual(rule)
+        state.draft.enabled = true
+        expect(buildAutomationRuleFromDraft(state.draft)).not.toHaveProperty('enabled')
     })
 })
 

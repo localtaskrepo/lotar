@@ -1,7 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import { parseAutomationYamlDocument } from '../utils/automationRules'
+
+const api = vi.hoisted(() => ({
+    runAutomation: vi.fn(),
+    simulateAutomation: vi.fn(),
+    suggestTasks: vi.fn(async () => []),
+    getTask: vi.fn(),
+}))
+vi.mock('../api/client', () => ({ api }))
 
 vi.mock('../components/UiModal.vue', () => ({
     default: {
@@ -12,248 +20,7 @@ vi.mock('../components/UiModal.vue', () => ({
     },
 }))
 
-function findButton(wrapper: ReturnType<typeof mount>, text: string) {
-    return wrapper.findAll('button').find((button) => button.text().includes(text))
-}
-
-describe('AutomationRulesEditor', () => {
-    it('emits generated yaml when a rule is created from the dialog', async () => {
-        const wrapper = mount(AutomationRulesEditor, {
-            props: {
-                modelValue: '',
-            },
-            attachTo: document.body,
-        })
-
-        await findButton(wrapper, 'New rule')?.trigger('click')
-        await flushPromises()
-
-        await wrapper
-            .findAll('button')
-            .find((button) => button.text().includes('Move a task'))
-            ?.trigger('click')
-        await flushPromises()
-
-        await wrapper.find('input[placeholder="Human review after testing"]').setValue('Ship after tests')
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-
-        await wrapper.find('input[placeholder="Done"]').setValue('Done')
-
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-        await findButton(wrapper, 'Create rule')?.trigger('click')
-        await flushPromises()
-
-        const emitted = wrapper.emitted('update:modelValue')
-        expect(emitted).toBeTruthy()
-        const lastPayload = emitted![emitted!.length - 1]![0] as string
-        expect(lastPayload).toContain('name: Ship after tests')
-        expect(lastPayload).toContain('job_completed:')
-        expect(lastPayload).toContain('status: Done')
-
-        wrapper.unmount()
-    })
-
-    it('creates a comment rule through the dialog', async () => {
-        const wrapper = mount(AutomationRulesEditor, {
-            props: { modelValue: '' },
-            attachTo: document.body,
-        })
-
-        await findButton(wrapper, 'New rule')?.trigger('click')
-        await flushPromises()
-
-        await wrapper
-            .findAll('button')
-            .find((b) => b.text().includes('Leave a comment'))
-            ?.trigger('click')
-        await flushPromises()
-
-        await wrapper.find('input[placeholder="Human review after testing"]').setValue('Notify reviewer')
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-
-        // Default trigger for comment is 'complete' — just click Next
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-
-        // Fill in the comment
-        const textarea = wrapper.find('.automation-builder__textarea')
-        expect(textarea.exists()).toBe(true)
-        await textarea.setValue('Ready for review')
-
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-        await findButton(wrapper, 'Create rule')?.trigger('click')
-        await flushPromises()
-
-        const emitted = wrapper.emitted('update:modelValue')
-        expect(emitted).toBeTruthy()
-        const lastPayload = emitted![emitted!.length - 1]![0] as string
-        expect(lastPayload).toContain('name: Notify reviewer')
-        expect(lastPayload).toContain('comment:')
-        expect(lastPayload).toContain('Ready for review')
-
-        wrapper.unmount()
-    })
-
-    it('renders project-aware suggestions when availableStatuses is passed', async () => {
-        const wrapper = mount(AutomationRulesEditor, {
-            props: {
-                modelValue: '',
-                availableStatuses: ['Todo', 'InProgress', 'Review', 'Done'],
-            },
-            attachTo: document.body,
-        })
-
-        // Open dialog and select status recipe
-        await findButton(wrapper, 'New rule')?.trigger('click')
-        await flushPromises()
-
-        await wrapper
-            .findAll('button')
-            .find((b) => b.text().includes('Move a task'))
-            ?.trigger('click')
-        await flushPromises()
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-
-        // The datalist should exist with status options
-        const datalist = wrapper.find('#automation-status-suggestions')
-        expect(datalist.exists()).toBe(true)
-        const options = datalist.findAll('option')
-        expect(options.length).toBe(4)
-        expect(options.map((o) => o.attributes('value'))).toEqual(['Todo', 'InProgress', 'Review', 'Done'])
-
-        // The hint within the dialog should reference configured statuses
-        const dialogHints = wrapper.find('.automation-builder__dialog').findAll('.field-hint')
-        const statusHint = dialogHints.find((h) => h.text().includes('configured statuses'))
-        expect(statusHint).toBeTruthy()
-
-        wrapper.unmount()
-    })
-
-    it('renders existing rules and allows editing', async () => {
-        const existingYaml = `automation:
-  rules:
-    - name: Close after complete
-      on:
-        complete:
-          set:
-            status: Done`
-
-        const wrapper = mount(AutomationRulesEditor, {
-            props: { modelValue: existingYaml },
-            attachTo: document.body,
-        })
-        await flushPromises()
-
-        // Verify the rule card is rendered
-        const ruleNames = wrapper.findAll('.rule-name')
-        expect(ruleNames.length).toBe(1)
-        expect(ruleNames[0]!.text()).toBe('Close after complete')
-
-        // Click Edit
-        await findButton(wrapper, 'Edit')?.trigger('click')
-        await flushPromises()
-
-        // Dialog should open at step 0 with "Move a task" recipe pre-selected
-        const activeRecipe = wrapper.find('.automation-builder__recipe-card--active')
-        expect(activeRecipe.exists()).toBe(true)
-        expect(activeRecipe.text()).toContain('Move a task')
-
-        // Name should be pre-filled
-        const nameInput = wrapper.find('input[placeholder="Human review after testing"]')
-        expect((nameInput.element as HTMLInputElement).value).toBe('Close after complete')
-
-        wrapper.unmount()
-    })
-
-    it('keeps agent run settings when a hand-over rule is edited', async () => {
-        const existingYaml = `automation:
-  rules:
-    - name: Hand over to testing
-      on:
-        job_completed:
-          set:
-            assignee: "@test"
-          agent:
-            model: haiku
-            effort: low
-            prompt: Run the tests`
-        const wrapper = mount(AutomationRulesEditor, {
-            props: { modelValue: existingYaml },
-            attachTo: document.body,
-        })
-        await flushPromises()
-        await findButton(wrapper, 'Edit')?.trigger('click')
-        await flushPromises()
-
-        // The guided assignment form has no agent fields, so the rule opens as custom.
-        expect(wrapper.find('.automation-builder__recipe-card--active').text()).toContain('Custom')
-        for (let step = 0; step < 4 && !wrapper.find('#automation-agent-model').exists(); step++) {
-            await findButton(wrapper, 'Next')?.trigger('click')
-            await flushPromises()
-        }
-        const model = wrapper.find<HTMLInputElement>('#automation-agent-model')
-        expect(model.element.value).toBe('haiku')
-        await model.setValue('sonnet')
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-        await findButton(wrapper, 'Save rule')?.trigger('click')
-        await flushPromises()
-
-        const emitted = wrapper.emitted('update:modelValue')!
-        const rules = parseAutomationYamlDocument(emitted[emitted.length - 1]![0] as string).rules
-        expect((rules[0]!.on as Record<string, unknown>).job_completed).toEqual({
-            set: { assignee: '@test' },
-            agent: { model: 'sonnet', effort: 'low', prompt: 'Run the tests' },
-        })
-        wrapper.unmount()
-    })
-
-    it('assigns tags through the guided dialog', async () => {
-        const wrapper = mount(AutomationRulesEditor, {
-            props: {
-                modelValue: '',
-                availableTags: ['urgent', 'ready-for-review', 'needs-qa'],
-            },
-            attachTo: document.body,
-        })
-
-        await findButton(wrapper, 'New rule')?.trigger('click')
-        await flushPromises()
-
-        await wrapper
-            .findAll('button')
-            .find((b) => b.text().includes('Manage tags'))
-            ?.trigger('click')
-        await flushPromises()
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-
-        // Default trigger for tags is 'updated' — click Next
-        await findButton(wrapper, 'Next')?.trigger('click')
-        await flushPromises()
-
-        // Verify ChipListField rendered with the suggestions prop
-        // The ChipListField shows suggestions when the composer is open
-        const chipField = wrapper.findComponent({ name: 'ChipListField' })
-        expect(chipField.exists()).toBe(true)
-        expect(chipField.props('suggestions')).toEqual(['urgent', 'ready-for-review', 'needs-qa'])
-
-        wrapper.unmount()
-    })
-})
-
-describe('AutomationRulesEditor rule list actions', () => {
-    const twoRules = `automation:
+const RULES = `automation:
   max_iterations: 5
   rules:
     - name: First
@@ -261,158 +28,264 @@ describe('AutomationRulesEditor rule list actions', () => {
         created:
           set:
             status: Todo
-    - name: Second
+    - name: Agent lifecycle
+      when:
+        assignee: "@agent"
       on:
-        assigned:
-          comment: Picked up
+        job_started:
+          set:
+            status: InProgress
+        job_completed:
+          set:
+            status: NeedsReview
+          agent:
+            model: haiku
+            prompt: "Test \${{ticket.id}}"
+          archive: true
+    - name: Archive finished work
+      when:
+        all:
+          - status: Done
+          - status_changed: { older_than: 30d }
+      on:
+        manual:
+          archive: true
 `
 
-    function lastRuleNames(wrapper: ReturnType<typeof mount>) {
-        const emitted = wrapper.emitted('update:modelValue')
-        expect(emitted).toBeTruthy()
-        const yaml = emitted![emitted!.length - 1]![0] as string
-        const parsed = parseAutomationYamlDocument(yaml)
-        expect(parsed.maxIterations).toBe('5')
-        return parsed.rules.map((rule) => rule.name)
-    }
+function lastYaml(wrapper: ReturnType<typeof mount>) {
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted).toBeTruthy()
+    return emitted![emitted!.length - 1]![0] as string
+}
 
-    function ruleButton(wrapper: ReturnType<typeof mount>, ruleIndex: number, text: string) {
-        const card = wrapper.findAll('.automation-builder__rule-actions')[ruleIndex]!
-        return card.findAll('button').find((button) => button.text().includes(text))!
-    }
+function byTestId(wrapper: ReturnType<typeof mount>, id: string) {
+    return wrapper.find(`[data-testid="${id}"]`)
+}
+
+describe('AutomationRulesEditor rule list (DEV-241)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('describes each trigger on its own line, with only its own steps', async () => {
+        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: RULES } })
+        await flushPromises()
+        const lines = byTestId(wrapper, 'automation-rule-1')
+            .findAll('[data-testid="automation-rule-summary"] li')
+            .map((line) => line.text().replace(/\s+/g, ' '))
+        expect(lines).toEqual([
+            'When an agent job starts, if assignee is @agent: then set status to InProgress.',
+            'When an agent job finishes, if assignee is @agent: then set status to NeedsReview, run the agent with model haiku, a custom prompt, archive the task.',
+        ])
+        const manual = byTestId(wrapper, 'automation-rule-2').text().replace(/\s+/g, ' ')
+        expect(manual).toContain('Manual / cron')
+        expect(manual).toContain('in its current status for more than 30d')
+        wrapper.unmount()
+    })
 
     it.each([
-        ['Down', 0, ['Second', 'First']],
-        ['Up', 1, ['Second', 'First']],
-        ['Duplicate', 0, ['First', 'First', 'Second']],
-        ['Delete', 0, ['Second']],
-    ] as const)('%s on rule %i keeps max_iterations and reorders rules', async (action, index, expected) => {
-        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: twoRules } })
+        ['Move down', 0, ['Agent lifecycle', 'First', 'Archive finished work']],
+        ['Move up', 1, ['Agent lifecycle', 'First', 'Archive finished work']],
+        ['Duplicate', 0, ['First', 'First (copy)', 'Agent lifecycle', 'Archive finished work']],
+        ['Delete', 0, ['Agent lifecycle', 'Archive finished work']],
+    ] as const)('%s on rule %i keeps max_iterations', async (label, index, expected) => {
+        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: RULES } })
         await flushPromises()
-
-        await ruleButton(wrapper, index, action).trigger('click')
-        expect(lastRuleNames(wrapper)).toEqual(expected)
+        await byTestId(wrapper, `automation-rule-${index}`).find(`button[aria-label="${label}"]`).trigger('click')
+        const parsed = parseAutomationYamlDocument(lastYaml(wrapper))
+        expect(parsed.maxIterations).toBe('5')
+        expect(parsed.rules.map((rule) => rule.name)).toEqual(expected)
         wrapper.unmount()
     })
 
-    it('disables moving past either end of the list', async () => {
-        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: twoRules } })
+    it('switches a rule off and on through enabled: false', async () => {
+        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: RULES } })
         await flushPromises()
-
-        expect(ruleButton(wrapper, 0, 'Up').attributes('disabled')).toBeDefined()
-        expect(ruleButton(wrapper, 1, 'Down').attributes('disabled')).toBeDefined()
+        await byTestId(wrapper, 'automation-rule-toggle-0').setValue(false)
+        let yaml = lastYaml(wrapper)
+        expect(parseAutomationYamlDocument(yaml).rules[0]).toMatchObject({ name: 'First', enabled: false })
+        await wrapper.setProps({ modelValue: yaml })
+        expect(byTestId(wrapper, 'automation-rule-0').text()).toContain('Off')
+        await byTestId(wrapper, 'automation-rule-toggle-0').setValue(true)
+        yaml = lastYaml(wrapper)
+        expect(parseAutomationYamlDocument(yaml).rules[0]).not.toHaveProperty('enabled')
         wrapper.unmount()
     })
 
-    it('rewrites max_iterations without touching the rules', async () => {
-        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: twoRules } })
+    it('runs a manual rule after previewing it, but not with unsaved changes', async () => {
+        api.runAutomation.mockImplementation(async (request: { dry_run?: boolean }) => ({
+            dry_run: Boolean(request.dry_run),
+            rules: ['Archive finished work'],
+            checked: 3,
+            entries: [
+                {
+                    rule: 'Archive finished work',
+                    task: 'AM-1',
+                    actions: [{ action: 'archive', description: 'Archive the task' }],
+                },
+            ],
+        }))
+        const wrapper = mount(AutomationRulesEditor, {
+            props: { modelValue: RULES, project: 'AM', dirty: true },
+            attachTo: document.body,
+        })
         await flushPromises()
+        expect(byTestId(wrapper, 'automation-run-0').exists()).toBe(false)
+        expect(byTestId(wrapper, 'automation-run-2').attributes('disabled')).toBeDefined()
 
-        await wrapper.find('.automation-builder__max-iterations input').setValue('9')
-        const emitted = wrapper.emitted('update:modelValue')!
-        const parsed = parseAutomationYamlDocument(emitted[emitted.length - 1]![0] as string)
-        expect(parsed.maxIterations).toBe('9')
-        expect(parsed.rules.map((rule) => rule.name)).toEqual(['First', 'Second'])
+        await wrapper.setProps({ dirty: false })
+        await byTestId(wrapper, 'automation-run-2').trigger('click')
+        await flushPromises()
+        expect(api.runAutomation).toHaveBeenLastCalledWith({
+            rules: ['Archive finished work'],
+            query: 'project=AM',
+            dry_run: true,
+        })
+        expect(byTestId(wrapper, 'automation-run-preview').text()).toContain('AM-1')
+
+        await byTestId(wrapper, 'automation-run-confirm').trigger('click')
+        await flushPromises()
+        expect(api.runAutomation).toHaveBeenLastCalledWith(expect.objectContaining({ dry_run: false }))
+        expect(wrapper.emitted('ran')).toHaveLength(1)
         wrapper.unmount()
     })
 })
 
-describe('AutomationRulesEditor dialog migration', () => {
-    it('renders the rule dialog through UiModal with a bound title id', async () => {
+describe('AutomationRuleDialog (DEV-241)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+    afterEach(() => {
+        document.body.innerHTML = ''
+    })
+
+    async function openNew(props: Record<string, unknown> = {}) {
         const wrapper = mount(AutomationRulesEditor, {
-            props: { modelValue: '' },
+            props: {
+                modelValue: '',
+                availableStatuses: ['Todo', 'InProgress', 'NeedsReview', 'Done'],
+                availablePriorities: ['Low', 'High'],
+                availableMembers: ['priya', '@claude'],
+                ...props,
+            },
             attachTo: document.body,
         })
-
-        await findButton(wrapper, 'New rule')?.trigger('click')
+        await byTestId(wrapper, 'automation-new-rule').trigger('click')
         await flushPromises()
+        return wrapper
+    }
 
-        const modal = wrapper.findComponent({ name: 'UiModal' })
-        expect(modal.props('open')).toBe(true)
+    it('builds a rule from triggers, conditions and actions on one screen', async () => {
+        const wrapper = await openNew()
+        const save = () => byTestId(wrapper, 'automation-rule-save')
+        expect(save().attributes('disabled')).toBeDefined()
 
-        const heading = wrapper.find('.automation-builder__dialog-header h2')
-        expect(heading.text()).toBe('Create automation rule')
-        expect(heading.attributes('id')).toBeTruthy()
-        expect(modal.props('ariaLabelledby')).toBe(heading.attributes('id'))
+        await byTestId(wrapper, 'automation-rule-name').setValue('Ship after tests')
+        await byTestId(wrapper, 'automation-trigger-complete').trigger('click')
+        await byTestId(wrapper, 'automation-add-condition').trigger('click')
+        await byTestId(wrapper, 'automation-condition-value').setValue('InProgress')
+        await byTestId(wrapper, 'automation-add-action-complete').setValue('set:status')
+        await byTestId(wrapper, 'automation-set-status').setValue('Done')
+        await byTestId(wrapper, 'automation-add-action-complete').setValue('comment')
+        await byTestId(wrapper, 'automation-comment').setValue('Shipped ${{ticket.id}}')
 
-        // migrated shell: UiModal owns the overlay, the content hook class remains
-        expect(wrapper.find('.automation-builder__dialog').exists()).toBe(true)
-        expect(wrapper.find('.automation-builder__dialog-backdrop').exists()).toBe(false)
-
+        expect(byTestId(wrapper, 'automation-rule-sentence').text()).toBe(
+            'When an agent job finishes, if status is InProgress: set status to Done, comment “Shipped ${{ticket.id}}”.',
+        )
+        expect(save().attributes('disabled')).toBeUndefined()
+        await save().trigger('click')
+        const rule = parseAutomationYamlDocument(lastYaml(wrapper)).rules[0]
+        expect(rule).toEqual({
+            name: 'Ship after tests',
+            when: { status: 'InProgress' },
+            on: { job_completed: { set: { status: 'Done' }, comment: 'Shipped ${{ticket.id}}' } },
+        })
         wrapper.unmount()
     })
 
-    it('keeps the bound title id in sync when editing an existing rule', async () => {
-        const existingYaml = `automation:
-  rules:
-    - name: Close after complete
-      on:
-        complete:
-          set:
-            status: Done`
-
-        const wrapper = mount(AutomationRulesEditor, {
-            props: { modelValue: existingYaml },
-            attachTo: document.body,
+    it('starts from recipes that use the project values', async () => {
+        const wrapper = await openNew()
+        await byTestId(wrapper, 'automation-recipe-archive-done').trigger('click')
+        await byTestId(wrapper, 'automation-rule-save').trigger('click')
+        const rule = parseAutomationYamlDocument(lastYaml(wrapper)).rules[0]
+        expect(rule).toEqual({
+            name: 'Archive finished work',
+            when: { all: [{ status: 'Done' }, { status_changed: { older_than: '30d' } }] },
+            on: { manual: { archive: true } },
         })
-        await flushPromises()
-
-        await findButton(wrapper, 'Edit')?.trigger('click')
-        await flushPromises()
-
-        const modal = wrapper.findComponent({ name: 'UiModal' })
-        expect(modal.props('open')).toBe(true)
-
-        const heading = wrapper.find('.automation-builder__dialog-header h2')
-        expect(heading.text()).toBe('Edit automation rule')
-        expect(modal.props('ariaLabelledby')).toBe(heading.attributes('id'))
-
         wrapper.unmount()
     })
 
-    it('closes safely from the UiModal close event without emitting yaml', async () => {
-        const wrapper = mount(AutomationRulesEditor, {
-            props: { modelValue: '' },
-            attachTo: document.body,
+    it('keeps agent settings and archive when an existing rule is saved unchanged', async () => {
+        const wrapper = mount(AutomationRulesEditor, { props: { modelValue: RULES }, attachTo: document.body })
+        await byTestId(wrapper, 'automation-edit-1').trigger('click')
+        await flushPromises()
+        await byTestId(wrapper, 'automation-rule-save').trigger('click')
+        const before = parseAutomationYamlDocument(RULES).rules[1]
+        const after = parseAutomationYamlDocument(lastYaml(wrapper)).rules[1]
+        expect(after).toEqual(before)
+        wrapper.unmount()
+    })
+
+    it('offers placeholders for the chosen triggers and previews them on a task', async () => {
+        api.getTask.mockResolvedValue({ id: 'DEV-7', title: 'Fix login', tags: [], status: 'Todo' })
+        api.simulateAutomation.mockResolvedValue({
+            matched: true,
+            rule_name: null,
+            actions: [{ action: 'comment', description: 'Add comment: Done with Fix login' }],
+            task_before: {},
+            task_after: { status: 'Done', tags: [] },
+            warnings: [],
         })
+        const wrapper = await openNew()
+        await byTestId(wrapper, 'automation-trigger-updated').trigger('click')
+        await byTestId(wrapper, 'automation-add-action-updated').setValue('comment')
 
-        await findButton(wrapper, 'New rule')?.trigger('click')
-        await flushPromises()
-        await wrapper
-            .findAll('button')
-            .find((button) => button.text().includes('Move a task'))
-            ?.trigger('click')
-        await flushPromises()
+        await byTestId(wrapper, 'automation-comment-insert').trigger('click')
+        const groups = wrapper.findAll('.template-field__group').map((group) => group.text())
+        expect(groups).toEqual(['Task', 'Before the change'])
+        const option = wrapper.findAll('.template-field__option').find((item) => item.text().includes('ticket.title'))
+        await option!.trigger('mousedown')
+        expect((byTestId(wrapper, 'automation-comment').element as HTMLTextAreaElement).value).toBe('${{ticket.title}}')
 
-        wrapper.findComponent({ name: 'UiModal' }).vm.$emit('close')
+        await byTestId(wrapper, 'automation-try-task').setValue('DEV-7')
+        await byTestId(wrapper, 'automation-try-task').trigger('change')
         await flushPromises()
+        expect(byTestId(wrapper, 'automation-comment-preview').text()).toContain('On DEV-7: Fix login')
 
-        expect(wrapper.find('.automation-builder__dialog').exists()).toBe(false)
+        await byTestId(wrapper, 'automation-try').trigger('click')
+        await flushPromises()
+        expect(api.simulateAutomation).toHaveBeenCalledWith(
+            expect.objectContaining({ ticket_id: 'DEV-7', event: 'updated', rule: expect.any(Object) }),
+        )
+        expect(byTestId(wrapper, 'automation-try-result').text()).toContain('Done with Fix login')
+        wrapper.unmount()
+    })
+
+    it('suggests placeholders while typing ${{', async () => {
+        const wrapper = await openNew()
+        await byTestId(wrapper, 'automation-trigger-commented').trigger('click')
+        await byTestId(wrapper, 'automation-add-action-commented').setValue('comment')
+        const field = byTestId(wrapper, 'automation-comment')
+        const element = field.element as HTMLTextAreaElement
+        element.value = 'Reply: ${{comm'
+        element.setSelectionRange(element.value.length, element.value.length)
+        await field.trigger('input')
+        await flushPromises()
+        const options = wrapper.findAll('.template-field__option').map((item) => item.text())
+        expect(options).toEqual(['The new commentcomment.text', 'Latest commentticket.comments[-1].text'])
+        await field.trigger('keydown', { key: 'Enter' })
+        await flushPromises()
+        expect(element.value).toBe('Reply: ${{comment.text}}')
+        wrapper.unmount()
+    })
+
+    it('closes without emitting anything on Cancel', async () => {
+        const wrapper = await openNew()
+        const cancel = wrapper.findAll('button').find((button) => button.text() === 'Cancel')
+        await cancel!.trigger('click')
         expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-
-        wrapper.unmount()
-    })
-
-    it('closes safely from the Cancel button without emitting yaml', async () => {
-        const wrapper = mount(AutomationRulesEditor, {
-            props: { modelValue: '' },
-            attachTo: document.body,
-        })
-
-        await findButton(wrapper, 'New rule')?.trigger('click')
-        await flushPromises()
-        await wrapper
-            .findAll('button')
-            .find((button) => button.text().includes('Move a task'))
-            ?.trigger('click')
-        await flushPromises()
-
-        await findButton(wrapper, 'Cancel')?.trigger('click')
-        await flushPromises()
-
-        expect(wrapper.find('.automation-builder__dialog').exists()).toBe(false)
-        expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-
+        expect(byTestId(wrapper, 'automation-rule-dialog').exists()).toBe(false)
         wrapper.unmount()
     })
 })

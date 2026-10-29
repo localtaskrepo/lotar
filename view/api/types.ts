@@ -1505,6 +1505,32 @@ export interface AutomationSimulateRequest {
     event: string
     /** Accepted but ignored: scope follows the ticket's project prefix. */
     project?: string | null
+    /** DEV-241: simulate this rule (as in automation.yml) instead of the saved ones. */
+    rule?: Record<string, unknown>
+}
+
+/** DEV-241: run rules' manual actions (`on.manual`) on the tasks they match now. */
+export interface AutomationRunRequest {
+    /** Rule names; empty runs every rule with a manual action. */
+    rules?: string[]
+    /** Only tasks matching this query (task list search syntax). */
+    query?: string
+    dry_run?: boolean
+}
+
+export interface AutomationRunEntry {
+    rule: string
+    task: string
+    actions: AutomationSimulatedAction[]
+    warnings?: string[]
+    error?: string
+}
+
+export interface AutomationRunResponse {
+    dry_run: boolean
+    rules: string[]
+    checked: number
+    entries: AutomationRunEntry[]
 }
 
 export interface AutomationSimulatedAction {
