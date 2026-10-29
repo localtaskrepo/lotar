@@ -101,6 +101,8 @@ export interface TaskPanelCommands {
     /** DEV-239: whether the panel shows the large view, and switching it. */
     isLargeView: () => boolean
     toggleView: () => void
+    /** DEV-183: open the move dialog for this task. */
+    moveTask: () => void
 }
 
 const panelCommands = shallowRef<TaskPanelCommands | null>(null)

@@ -113,6 +113,7 @@ pub(crate) const FORCE_ARCHIVED_TOOLS: &[&str] = &[
     "task_reference_remove",
     "task_delete",
     "task_restore",
+    "task_move",
     "relationship_mutate",
     "relationship_repair",
     "sync_pull",
@@ -160,6 +161,7 @@ fn all_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
         make_task_restore_tool(enum_hints),
         make_task_archive_tool(enum_hints, true),
         make_task_archive_tool(enum_hints, false),
+        make_task_move_tool(enum_hints),
         make_task_list_tool(enum_hints),
         json!({
             "name": "relationship_graph",
@@ -648,6 +650,35 @@ fn make_task_archive_tool(enum_hints: Option<&EnumHints>, archive: bool) -> Valu
                 "project": {"type": ["string", "null"]}
             },
             "required": ["id"],
+            "additionalProperties": false
+        }
+    });
+    attach_field_hints(
+        &mut tool,
+        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
+    );
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
+    tool
+}
+
+fn make_task_move_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "task_move",
+        "description": "Move a task to another project (DEV-183). It gets the next free number there (or its old number back when it returns to a project it came from); the old ID keeps working everywhere as a redirect and is listed in the task's moved_from. status, task_type and priority default to the current value when the target project has it, else to the target's default; set them to choose. reporter/assignee (empty clears) and custom_fields (null or empty string drops a field) adjust the task for the target. dry_run previews the new ID and changes. Refused for deleted tasks, tasks with a running or queued agent job, and archived tasks unless force_archived. Returns {from, to, changes, dry_run, task}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": "string", "description": "Target project prefix"},
+                "status": {"type": ["string", "null"]},
+                "task_type": {"type": ["string", "null"]},
+                "priority": {"type": ["string", "null"]},
+                "reporter": {"type": ["string", "null"]},
+                "assignee": {"type": ["string", "null"]},
+                "custom_fields": {"type": ["object", "null"]},
+                "dry_run": {"type": "boolean"}
+            },
+            "required": ["id", "project"],
             "additionalProperties": false
         }
     });

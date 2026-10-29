@@ -16,7 +16,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/jobs", |req: &HttpRequest| {
         let mut jobs = crate::services::agent_job_service::AgentJobService::list_jobs();
         if let Some(ticket_id) = req.query.get("ticket_id") {
-            jobs.retain(|job| job.ticket_id == *ticket_id);
+            // Jobs from before a move name the task's old ID (DEV-183).
+            match resolve_tasks_dir() {
+                Ok(resolver) => {
+                    let moves = crate::storage::moves::MoveResolver::new(&resolver.path);
+                    jobs.retain(|job| {
+                        job.ticket_id == *ticket_id || moves.same(&job.ticket_id, ticket_id)
+                    });
+                }
+                Err(_) => jobs.retain(|job| job.ticket_id == *ticket_id),
+            }
         }
         if let Some(status) = req.query.get("status") {
             jobs.retain(|job| job.status.eq_ignore_ascii_case(status));

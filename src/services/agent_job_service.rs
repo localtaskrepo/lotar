@@ -195,6 +195,12 @@ impl AgentJobService {
                 "Ticket id is required".to_string(),
             ));
         }
+        // A job started on an old ID of a moved task works on the task it
+        // became, under its current ID (DEV-183).
+        let ticket_id = match crate::storage::moves::follow(tasks_dir, &ticket_id) {
+            Ok(Some(current)) => current,
+            _ => ticket_id,
+        };
 
         let parsed_ticket = crate::storage::TaskId::parse(&ticket_id).map_err(|err| {
             LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}"))
@@ -2763,6 +2769,7 @@ mod tests {
             task_state: None,
             deleted_at: None,
             archived: false,
+            moved_from: Vec::new(),
             id: "TEST-1".to_string(),
             title: "Test task".to_string(),
             status: crate::types::TaskStatus::from("Todo"),

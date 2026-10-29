@@ -266,6 +266,13 @@ const taskCommands = computed<PaletteCommand[]>(() => {
       run: () => void open.assignToMe(),
     },
     {
+      id: 'task-move',
+      group: 'This task',
+      label: 'Move to another project…',
+      keywords: `${open.taskId} project transfer relocate`,
+      run: () => open.moveTask(),
+    },
+    {
       id: 'task-toggle-view',
       group: 'This task',
       label: open.isLargeView() ? 'Switch to side panel' : 'Switch to large view',

@@ -40,6 +40,8 @@ export interface TaskPanelEmit {
     (event: 'close'): void
     (event: 'created', task: TaskDTO): void
     (event: 'updated', task: TaskDTO): void
+    /** DEV-183: the requested ID belongs to a moved task, now under `id`. */
+    (event: 'redirected', id: string): void
 }
 
 type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'references'
@@ -553,6 +555,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             getTask: (id: string) => api.getTask(id, undefined, { includeDeleted: true }),
         },
         showToast,
+        onRedirect: (id: string) => emit('redirected', id),
         buildRelationships,
         buildCustomFields,
         applyTask,

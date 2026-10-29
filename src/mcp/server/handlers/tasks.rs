@@ -1513,6 +1513,42 @@ fn archive_tool(req: JsonRpcRequest, archive: bool) -> JsonRpcResponse {
     }
 }
 
+pub(crate) fn handle_task_move(req: JsonRpcRequest) -> JsonRpcResponse {
+    let request: crate::api_types::TaskMoveRequest =
+        match serde_json::from_value(req.params.clone()) {
+            Ok(request) => request,
+            Err(e) => {
+                return err(
+                    req.id,
+                    -32602,
+                    "Invalid task_move params",
+                    Some(json!({"message": e.to_string()})),
+                );
+            }
+        };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
+    let mut storage = Storage::new(&resolver.path);
+    match TaskService::move_task(&mut storage, &request) {
+        Ok(response) => {
+            if !response.dry_run {
+                let actor = crate::utils::identity::resolve_current_user(None);
+                crate::api_events::emit_task_moved(
+                    &response.from,
+                    &response.task,
+                    actor.as_deref(),
+                );
+            }
+            text_result(req.id, &response)
+        }
+        Err(e) => err(
+            req.id,
+            -32007,
+            "Task move failed",
+            Some(json!({"message": e.to_string()})),
+        ),
+    }
+}
+
 /// Map `task_list` params onto the shared task query (DEV-230). Only JSON
 /// shape errors are reported here; values are validated by the query.
 pub(crate) fn task_list_input(

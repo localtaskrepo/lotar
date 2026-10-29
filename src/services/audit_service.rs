@@ -370,6 +370,46 @@ impl AuditService {
         Ok(items)
     }
 
+    /// [`Self::list_commits_for_file`] for a task file, plus the commits of
+    /// the files it had under earlier IDs before it moved to another project
+    /// (DEV-183, `moved_from`). Newest first; a commit touching both files
+    /// (the move itself) is listed once, with the task's own path.
+    pub fn list_commits_for_task(
+        repo_root: &Path,
+        tasks_root: &Path,
+        file_rel: &Path,
+    ) -> Result<Vec<FileCommitEvent>, String> {
+        let mut events = Self::list_commits_for_file(repo_root, file_rel)?;
+        let moved_from = std::fs::read_to_string(repo_root.join(file_rel))
+            .ok()
+            .and_then(|content| crate::storage::task::parse_task_yaml_tolerant(&content))
+            .map(|task| task.moved_from)
+            .unwrap_or_default();
+        if moved_from.is_empty() {
+            return Ok(events);
+        }
+        let tasks_rel = crate::utils::git::repo_relative_path(repo_root, tasks_root)
+            .unwrap_or_else(|| tasks_root.to_path_buf());
+        let mut seen: std::collections::HashSet<String> =
+            events.iter().map(|event| event.commit.clone()).collect();
+        for old in moved_from {
+            let Ok(location) = crate::storage::identity::resolve(tasks_root, &old) else {
+                continue;
+            };
+            let Ok(inner) = location.file.strip_prefix(&location.root) else {
+                continue;
+            };
+            let old_rel = tasks_rel.join(inner);
+            for event in Self::list_commits_for_file(repo_root, &old_rel)? {
+                if seen.insert(event.commit.clone()) {
+                    events.push(event);
+                }
+            }
+        }
+        events.sort_by_key(|event| std::cmp::Reverse(event.date));
+        Ok(events)
+    }
+
     /// The file's path in `commit`, from a [`Self::list_commits_for_file`]
     /// result; the current path when the commit is not in the list.
     pub fn path_at_commit<'a>(
@@ -703,6 +743,9 @@ impl AuditService {
                 entries.sort_by(|a, b| a.at.cmp(&b.at));
 
                 let task_title = task.title.clone();
+                // Commit messages from before a move name an old ID (DEV-183).
+                let mut aliases = vec![task_id.clone()];
+                aliases.extend(task.moved_from.iter().cloned());
 
                 for entry in entries.into_iter() {
                     let entry_time = match Self::parse_history_timestamp(&entry) {
@@ -712,7 +755,7 @@ impl AuditService {
                     let actor = entry.actor.clone();
                     let matched_commit = Self::match_commit_for_entry(
                         &commit_refs,
-                        &task_id,
+                        &aliases,
                         entry_time,
                         actor.as_deref(),
                     );
@@ -780,7 +823,7 @@ impl AuditService {
 
     fn match_commit_for_entry<'a>(
         commits: &'a [ParsedCommit],
-        task_id: &str,
+        task_ids: &[String],
         entry_time: DateTime<Utc>,
         actor: Option<&str>,
     ) -> Option<&'a ParsedCommit> {
@@ -788,10 +831,11 @@ impl AuditService {
             return None;
         }
 
-        let id_upper = task_id.to_uppercase();
+        let ids_upper: Vec<String> = task_ids.iter().map(|id| id.to_uppercase()).collect();
         let mut best: Option<(&ParsedCommit, i64)> = None;
         for commit in commits {
-            if commit.message.to_uppercase().contains(&id_upper) {
+            let message = commit.message.to_uppercase();
+            if ids_upper.iter().any(|id| message.contains(id)) {
                 let diff = (commit.date - entry_time).num_seconds().abs();
                 if best.is_none_or(|(_, best_diff)| diff < best_diff) {
                     best = Some((commit, diff));

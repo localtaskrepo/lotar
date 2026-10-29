@@ -113,6 +113,8 @@ pub struct SearchDocument<'a> {
     pub acceptance_criteria: &'a [String],
     pub comments: &'a [TaskComment],
     pub references: &'a [ReferenceEntry],
+    /// Earlier IDs of a moved task (DEV-183): searching an old ID finds it.
+    pub moved_from: &'a [String],
 }
 
 /// Tasks that can be searched: stored tasks (CLI, storage filter) and API
@@ -132,6 +134,7 @@ impl Searchable for crate::storage::task::Task {
             acceptance_criteria: &self.acceptance_criteria,
             comments: &self.comments,
             references: &self.references,
+            moved_from: &self.moved_from,
         }
     }
 }
@@ -147,6 +150,7 @@ impl Searchable for crate::api_types::TaskDTO {
             acceptance_criteria: &self.acceptance_criteria,
             comments: &self.comments,
             references: &self.references,
+            moved_from: &self.moved_from,
         }
     }
 }
@@ -235,7 +239,9 @@ impl SearchQuery {
             }
         }
         if !self.whole.is_empty() {
-            if fold(doc.id) == self.whole {
+            if fold(doc.id) == self.whole
+                || doc.moved_from.iter().any(|old| fold(old) == self.whole)
+            {
                 total += EXACT_ID_BONUS;
             }
             let title = collapse_whitespace(&fold(doc.title));
@@ -428,6 +434,9 @@ fn folded_fields<'a>(doc: &SearchDocument<'a>) -> Vec<FoldedField<'a>> {
         }
     };
     push(Field::Id, doc.id);
+    for old in doc.moved_from {
+        push(Field::Id, old);
+    }
     push(Field::Title, doc.title);
     for tag in doc.tags {
         push(Field::Tag, tag);
@@ -619,6 +628,7 @@ mod tests {
             acceptance_criteria: &[],
             comments: &[],
             references: &[],
+            moved_from: &[],
         }
     }
 
@@ -743,6 +753,7 @@ mod tests {
             acceptance_criteria: &criteria,
             comments: &comments,
             references: &references,
+            moved_from: &[],
         };
         assert!(matches("safari", &task));
         assert!(matches("offline", &task));
@@ -822,6 +833,7 @@ mod tests {
             acceptance_criteria: &[],
             comments: &comments,
             references: &[],
+            moved_from: &[],
         };
         assert!(matches("title:login", &task));
         assert!(!matches("title:oauth", &task));

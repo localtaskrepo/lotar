@@ -27,7 +27,7 @@
         <span v-if="labelled" class="task-panel__field-label">Project</span>
         <UiSelect
           v-model="form.project"
-          :disabled="mode === 'edit'"
+          :title="mode === 'edit' ? 'Choose another project to move the task there' : undefined"
           required
           aria-required="true"
           @change="emitProjectChange"

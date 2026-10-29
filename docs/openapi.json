@@ -1251,6 +1251,37 @@
         }
       }
     },
+    "/api/tasks/move": {
+      "post": {
+        "summary": "Move a task to another project",
+        "description": "Gives the task the next free number in the target project (or its old number when it returns to a project it came from) and leaves a soft-deleted stub with moved_to at the old ID. Every endpoint that takes a task ID accepts the old ID and answers for the moved task. Status, type and priority the target lacks fall back to its defaults unless set; a custom field the target does not allow is a 400 until it is set or dropped (null). Refused for deleted tasks, tasks with a running or queued agent job, and archived tasks without force_archived. dry_run previews without writing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskMoveRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Move result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/TaskMoveResponse" } },
+                  "required": ["data"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
     "/api/tasks/references/link/add": {
       "post": {
         "summary": "Attach a link reference to a task",
@@ -4138,6 +4169,11 @@
             "type": "boolean",
             "description": "True while the task file is in its project's @archive folder (DEV-4); archived tasks are read-only. Omitted otherwise."
           },
+          "moved_from": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Earlier IDs of a task moved to another project, oldest first (DEV-183). Requests may use them. Omitted when empty."
+          },
           "due_date": {
             "type": "string"
           },
@@ -4543,6 +4579,47 @@
         "required": [
           "id"
         ]
+      },
+      "TaskMoveRequest": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "project": { "type": "string", "description": "Target project prefix" },
+          "status": { "type": "string" },
+          "task_type": { "type": "string" },
+          "priority": { "type": "string" },
+          "reporter": { "type": "string", "description": "Empty string clears" },
+          "assignee": { "type": "string", "description": "Empty string clears" },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Values to set; null or an empty string drops a field"
+          },
+          "dry_run": { "type": "boolean" }
+        },
+        "required": ["id", "project"]
+      },
+      "TaskMoveResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": { "type": "string" },
+                "old": { "type": "string" },
+                "new": { "type": "string" }
+              },
+              "required": ["field"]
+            }
+          },
+          "dry_run": { "type": "boolean" },
+          "task": { "$ref": "#/components/schemas/TaskDTO" }
+        },
+        "required": ["from", "to", "task"]
       },
       "TaskRestoreRequest": {
         "type": "object",

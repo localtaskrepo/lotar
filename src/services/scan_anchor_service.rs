@@ -144,7 +144,14 @@ pub fn run_anchor_pass(
             let Ok(content) = std::fs::read_to_string(&file) else {
                 continue;
             };
-            let candidates = line_scanner.key_mention_lines(&file, &content, &task_id);
+            // Comments written before the task moved project still name an
+            // old ID (DEV-183); they anchor the task as well.
+            let mut candidates = line_scanner.key_mention_lines(&file, &content, &task_id);
+            for old in &task.moved_from {
+                candidates.extend(line_scanner.key_mention_lines(&file, &content, old));
+            }
+            candidates.sort_unstable();
+            candidates.dedup();
             if candidates.is_empty() {
                 if options.prune_dead {
                     plan.push((code_ref, AnchorChange::Remove));

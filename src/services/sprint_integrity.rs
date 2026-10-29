@@ -249,6 +249,7 @@ fn cleanup_under_transaction(
         }
 
         let touched = TaskService::apply_memberships_to_records(
+            &storage.root_path,
             working_records.as_mut_slice(),
             &task_id,
             &desired,

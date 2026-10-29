@@ -30,6 +30,7 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `delete` | Soft-delete a task, or permanently remove it with `--hard`. | Delete helper. |
 | `restore` | Restore a soft-deleted task. | Restore helper. |
 | `archive` / `unarchive` | Move tasks into the project's `@archive` folder (read-only) or back. | Archive helper. |
+| `move` | Move tasks to another project; old IDs keep working. | Move helper. |
 | `history` / `history-field` | Git history utilities. | See `docs/help/history.md`. |
 | `diff` | Show the latest (or specific) git diff for a task. | History/diff helper. |
 | `at` | Print the file at a specific commit. | History helper. |
@@ -328,6 +329,24 @@ lotar task unarchive [TASK_ID...] [--select '<query>'] [--dry-run|-n]
 - Soft-deleted tasks can be archived too. Unarchiving requires the stored status, priority and type to be valid under the current configuration, like `restore`.
 - Tasks can also be grouped in any subfolder of their project folder by hand (`DEV/backend/12.yml` is still `DEV-12`). Folders starting with `.` or `@` are not scanned, except `@archive`. Moving a file with `git mv` archives it just like the command does. A number stored twice in one project (for example after a merge) is listed once with a warning, and changes to that ID are refused until one copy is removed or renumbered.
 - LoTaR versions before 0.11 only read the top level of a project folder: they do not see nested or archived tasks and can hand out their numbers again. Upgrade every client before archiving or nesting tasks.
+
+### move
+
+```bash
+lotar task move [TASK_ID...] --to <PROJECT> [--select '<query>'] [--status S] [--type T] [--priority P]
+                [--reporter R] [--assignee A] [--field key=value ...] [--dry-run|-n]
+lotar task move <OLD_ID> --record <NEW_ID>
+```
+
+- The task gets the next free number in the target project (`DEV-12` becomes `WEB-40`) and keeps its title, description, comments, references, attachments, tags, relationships, sprints and history. Its history gains a `moved` entry and `moved_from: [DEV-12]` lists its earlier IDs. The target project must exist.
+- The old file stays behind as a small *stub*: a soft-deleted task with `moved_to: WEB-40`. It keeps the number taken and makes the old ID a redirect. Every command, the REST API, MCP and the web UI accept `DEV-12` and act on `WEB-40`: links in descriptions, URLs and bookmarks, relationships, sprint and backlog lists, commit messages, TODO comments in code and `lotar list DEV-12` all find the moved task. Nothing else is rewritten; when LoTaR saves a list anyway (a sprint reorder, a relationship change) it stores the current ID. Stubs are hidden from every list, the trash included, and cannot be edited or restored.
+- Values the target project does not have are fitted to it: a status, type or priority it does not know becomes its default (the change is printed), unless you choose one with `--status`, `--type` or `--priority`. A custom field the target does not allow stops the move; set it with `--field name=value` or drop it with `--field name=`. `--reporter` and `--assignee` change people for projects with strict members (an empty value clears). `--dry-run` shows the new ID and every change without moving anything.
+- A task moved back to a project it came from takes its old number again. Moves chain: after `DEV-12` -> `WEB-40` -> `OPS-3`, all three IDs reach the task.
+- Refused: moving within the same project, deleted tasks (restore them first), tasks with an agent job running or queued, and archived tasks unless `--force-archived` is given (the task then lands in the target's `@archive`). Both files are written in one transaction, so a failed move leaves nothing half done. Attachment files are copied when the projects keep attachments in different folders, and the agent context file is renamed with the task.
+- `lotar task history`, `history-field`, `diff` and the stats commands include the commits from before the move, made to the old file.
+- Moved a file by hand (`git mv DEV/12.yml WEB/40.yml`)? Run `lotar task move DEV-12 --record WEB-40` to add the redirect and the `moved_from` entry afterwards.
+- A sync pull of the old project keeps matching the remote issue to the stub (it carries the remote reference) and skips it, rather than importing it again; sync the moved task from its new project.
+- LoTaR versions before 0.11 show the stub as a deleted task and do not follow the redirect.
 
 ### Git history helpers (`history`, `history-field`, `diff`, `at`)
 

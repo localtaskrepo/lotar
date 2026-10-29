@@ -27,7 +27,7 @@ pub(super) use tasks::{
     handle_task_archive, handle_task_bulk_comment_add, handle_task_bulk_reference_add,
     handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add,
     handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get,
-    handle_task_list, handle_task_reference_add, handle_task_reference_remove, handle_task_restore,
-    handle_task_unarchive, handle_task_update,
+    handle_task_list, handle_task_move, handle_task_reference_add, handle_task_reference_remove,
+    handle_task_restore, handle_task_unarchive, handle_task_update,
 };
 pub(super) use whoami::handle_whoami;

@@ -104,8 +104,9 @@ pub(crate) fn run(
             let file_rel =
                 tasks_rel.join(file_abs.strip_prefix(&tasks_abs_real).unwrap_or(&file_abs));
             let mut commits =
-                match crate::services::audit_service::AuditService::list_commits_for_file(
+                match crate::services::audit_service::AuditService::list_commits_for_task(
                     &repo_root_real,
+                    &tasks_abs_real,
                     &file_rel,
                 ) {
                     Ok(c) => c,
@@ -227,14 +228,19 @@ pub(crate) fn run(
                         &p,
                         crate::storage::layout::ArchiveFilter::Exclude,
                     ) {
+                        // Move stubs stand for tasks that live on elsewhere (DEV-183).
+                        if crate::storage::moves::stub_target(&file.path).is_some() {
+                            continue;
+                        }
                         let num = file.number;
                         let id = format!("{}-{}", project_folder, num);
                         let abs_file = file.path;
                         let file_rel = tasks_rel
                             .join(abs_file.strip_prefix(&tasks_abs_real).unwrap_or(&abs_file));
                         let mut commits =
-                            crate::services::audit_service::AuditService::list_commits_for_file(
+                            crate::services::audit_service::AuditService::list_commits_for_task(
                                 &repo_root_real,
+                                &tasks_abs_real,
                                 &file_rel,
                             )
                             .unwrap_or_default();
@@ -283,6 +289,7 @@ pub(crate) fn run(
                         let dto = crate::api_types::TaskDTO {
                             task_state: None,
                             archived: false,
+                            moved_from: Vec::new(),
                             id: id.clone(),
                             title: task.title,
                             status: task.status,

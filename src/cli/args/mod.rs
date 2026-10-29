@@ -34,7 +34,7 @@ pub use stats::{StatsAction, StatsArgs};
 pub use sync::{SyncArgs, SyncCheckArgs, SyncCommandAction, SyncCommandArgs};
 pub use task::{
     AddArgs, RelationshipKind, SortField, TaskAction, TaskAddArgs, TaskArchiveArgs, TaskDeleteArgs,
-    TaskEditArgs, TaskReferenceAction, TaskReferenceAddArgs, TaskReferenceArgs,
+    TaskEditArgs, TaskMoveArgs, TaskReferenceAction, TaskReferenceAddArgs, TaskReferenceArgs,
     TaskReferenceKindAdd, TaskReferenceKindRemove, TaskReferenceRemoveArgs, TaskRelationshipsArgs,
     TaskRestoreArgs, TaskSearchArgs, TaskStatusArgs,
 };

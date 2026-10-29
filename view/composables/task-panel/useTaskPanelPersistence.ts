@@ -45,6 +45,8 @@ interface UseTaskPanelPersistenceOptions {
     loading: Ref<boolean>
     apiClient: TaskPanelApiClient
     showToast: (message: string) => void
+    /** DEV-183: the server answered for a moved task under its new ID. */
+    onRedirect?: (id: string) => void
     buildRelationships: () => unknown
     buildCustomFields: () => Record<string, unknown>
     applyTask: (data: TaskDTO) => void
@@ -531,6 +533,12 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         try {
             const data = await options.apiClient.getTask(id)
             if (!current()) return undefined
+            if (data.id && data.id !== id && options.onRedirect) {
+                // An old ID of a moved task: show the task under its current
+                // ID, so edits, events and the URL all use that one.
+                options.onRedirect(data.id)
+                return undefined
+            }
             await options.refreshConfig(projectOf(id) || '')
             if (!current()) return undefined
             applyTaskSnapshot(options.task, data)

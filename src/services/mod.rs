@@ -36,4 +36,5 @@ pub mod task_validation;
 pub mod theme_file;
 
 pub mod task_list;
+pub mod task_move;
 pub mod task_query;

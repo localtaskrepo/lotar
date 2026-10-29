@@ -74,6 +74,14 @@ fn archived_refusal(project_path: &Path, file: &Path, id: &str) -> Option<String
     })
 }
 
+/// The refusal for writing a move stub (DEV-183): its task lives on under
+/// the new ID, which callers resolve before writing.
+fn stub_refusal(task: &Task, id: &str) -> Option<String> {
+    task.moved_to
+        .as_ref()
+        .map(|target| format!("Task '{id}' was moved to '{target}'; change '{target}' instead"))
+}
+
 /// Core CRUD operations for task storage
 pub struct StorageOperations;
 
@@ -280,6 +288,9 @@ impl StorageOperations {
             let content = fs::read_to_string(&file_path)?;
             let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
                 .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
+            if let Some(message) = stub_refusal(&old_task, id) {
+                return Err(message.into());
+            }
             let merged = Self::merge_task_extensions(&old_task, new_task);
             // DEV-102 semantic no-op guard: when the stored task and the
             // merged replacement are structurally equal, keep the original
@@ -347,6 +358,9 @@ impl StorageOperations {
                             .to_string(),
                     )
                 })?;
+            if let Some(message) = stub_refusal(&before, id) {
+                return Err(LoTaRError::ValidationError(message));
+            }
             let mut after = before.clone();
             let changed = mutation(&mut after)?;
             if changed {
@@ -385,6 +399,9 @@ impl StorageOperations {
         let content = fs::read_to_string(&file_path)?;
         let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
             .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
+        if let Some(message) = stub_refusal(&old_task, id) {
+            return Err(message.into());
+        }
         let merged = Self::merge_task_extensions(&old_task, new_task);
         let file_string = serde_yaml_ng::to_string(&merged)?;
         Ok((file_path, file_string))

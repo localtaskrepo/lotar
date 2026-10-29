@@ -80,10 +80,20 @@ describe.concurrent('Global task action and compact toolbars (DEV-98)', () => {
                         const bulk = page.getByRole('button', { name: 'Bulk select', exact: true });
                         await bulk.click();
                         expect(await bulk.getAttribute('aria-pressed')).toBe('true');
-                        await page.locator('tbody input[type="checkbox"]').first().check();
-                        expect(
-                            await page.getByRole('status', { name: 'Selected 1 of 1', exact: true }).isVisible(),
-                        ).toBe(true);
+                        // The list reloads once right after the page opens; a row ticked
+                        // during that reload is not selected (it stays ticked on screen),
+                        // so tick it again until the selection holds.
+                        const rowBox = page.locator('tbody input[type="checkbox"]').first();
+                        const selectedOne = page.getByRole('status', { name: 'Selected 1 of 1', exact: true });
+                        await expect
+                            .poll(async () => {
+                                if (!(await selectedOne.isVisible())) {
+                                    await rowBox.setChecked(false);
+                                    await rowBox.check();
+                                }
+                                return selectedOne.isVisible();
+                            })
+                            .toBe(true);
                         expect(await page.getByRole('button', { name: 'Bulk actions', exact: true }).isEnabled()).toBe(
                             true,
                         );

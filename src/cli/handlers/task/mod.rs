@@ -18,6 +18,7 @@ mod delete;
 mod edit;
 pub(crate) mod errors;
 mod history;
+mod move_task;
 pub(crate) mod mutation;
 mod reference;
 pub(crate) mod render;
@@ -150,6 +151,7 @@ impl CommandHandler for TaskHandler {
             TaskAction::Unarchive(args) => {
                 archive::execute(&args, false, project, resolver, renderer)
             }
+            TaskAction::Move(args) => move_task::execute(&args, project, resolver, renderer),
             TaskAction::Comment {
                 id,
                 text,

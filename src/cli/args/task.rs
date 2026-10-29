@@ -242,6 +242,9 @@ pub enum TaskAction {
     /// Move archived tasks back out of @archive
     Unarchive(TaskArchiveArgs),
 
+    /// Move tasks to another project; old IDs keep working as redirects
+    Move(TaskMoveArgs),
+
     /// Show git history for a task file (read-only)
     History {
         /// Task ID (with or without project prefix)
@@ -743,6 +746,65 @@ pub struct TaskArchiveArgs {
     pub select: Option<String>,
 
     /// Preview without moving any file
+    #[arg(long, short = 'n')]
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskMoveArgs {
+    /// Task IDs (with or without project prefix)
+    #[serde(default)]
+    pub ids: Vec<String>,
+
+    /// Project to move the tasks to
+    #[arg(long, value_name = "PROJECT")]
+    #[serde(default)]
+    pub to: Option<String>,
+
+    /// The task file was already moved by hand to this ID: only write the
+    /// redirect from the old ID (one ID, no --to)
+    #[arg(long, value_name = "NEW_ID", conflicts_with_all = ["to", "select"])]
+    #[serde(default)]
+    pub record: Option<String>,
+
+    /// Also move every task matching this query, e.g. 'tag:web status:todo'
+    #[arg(long, value_name = "QUERY", allow_hyphen_values = true)]
+    #[serde(default)]
+    pub select: Option<String>,
+
+    /// Status in the target project (default: keep it when the target has
+    /// it, else the target's default status)
+    #[arg(long)]
+    #[serde(default)]
+    pub status: Option<String>,
+
+    /// Type in the target project (same fallback as --status)
+    #[arg(long = "type")]
+    #[serde(default, rename = "type")]
+    pub task_type: Option<String>,
+
+    /// Priority in the target project (same fallback as --status)
+    #[arg(long)]
+    #[serde(default)]
+    pub priority: Option<String>,
+
+    /// New reporter; an empty value clears it
+    #[arg(long)]
+    #[serde(default)]
+    pub reporter: Option<String>,
+
+    /// New assignee; an empty value clears it
+    #[arg(long)]
+    #[serde(default)]
+    pub assignee: Option<String>,
+
+    /// Set a custom field for the target project (key=value); key= drops it
+    #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
+    #[serde(default, deserialize_with = "deserialize_kv_pairs")]
+    pub fields: Vec<(String, String)>,
+
+    /// Preview the new ID and value changes without moving anything
     #[arg(long, short = 'n')]
     #[serde(default)]
     pub dry_run: bool,

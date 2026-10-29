@@ -415,7 +415,12 @@ impl TaskService {
         let mut records = SprintService::list(storage)?;
         let next_numeric_id = StorageOperations::get_current_id(project_path) + 1;
         let id = format!("{}-{}", project, next_numeric_id);
-        let touched = Self::apply_memberships_to_records(records.as_mut_slice(), &id, desired_set)?;
+        let touched = Self::apply_memberships_to_records(
+            &storage.root_path,
+            records.as_mut_slice(),
+            &id,
+            desired_set,
+        )?;
         for record in &records {
             if touched.contains(&record.id) {
                 SprintService::stage_update(
@@ -640,6 +645,32 @@ impl TaskService {
         Self::get_with_deletion(storage, id, project, false)
     }
 
+    /// The ID a request means today (DEV-183). An old ID of a moved task
+    /// follows its move stub to the current ID, and an explicit project that
+    /// named the old ID's project follows along. Anything else passes through
+    /// unchanged, so the caller's own lookup reports unknown or malformed IDs
+    /// exactly as before. A chain that ends nowhere is reported as missing.
+    pub(crate) fn follow_moves(
+        storage: &Storage,
+        id: &str,
+        project: Option<&str>,
+    ) -> LoTaRResult<(String, Option<String>)> {
+        match crate::storage::moves::follow(&storage.root_path, id) {
+            Ok(Some(current)) => {
+                let original = TaskId::parse(id.trim()).map(|parsed| parsed.project).ok();
+                let project = match project {
+                    Some(explicit) if Some(explicit) == original.as_deref() => {
+                        TaskId::parse(&current).ok().map(|parsed| parsed.project)
+                    }
+                    other => other.map(str::to_string),
+                };
+                Ok((current, project))
+            }
+            Ok(None) => Ok((id.to_string(), project.map(str::to_string))),
+            Err(err) => Err(LoTaRError::TaskNotFound(err.to_string())),
+        }
+    }
+
     /// Fetch a task including its soft-deletion tombstone state (DEV-92).
     /// Returns the DTO with `deleted_at` set for deleted tasks instead of
     /// the default `TaskNotFound` projection.
@@ -657,6 +688,8 @@ impl TaskService {
         project: Option<&str>,
         include_deleted: bool,
     ) -> LoTaRResult<TaskDTO> {
+        let (id, project) = Self::follow_moves(storage, id, project)?;
+        let (id, project) = (id.as_str(), project.as_deref());
         // Canonical parse: the project prefix is everything before the FINAL
         // numeric suffix (ABCD-1 -> ABCD, ABC-OPS-12 -> ABC-OPS).
         let parsed =
@@ -678,6 +711,11 @@ impl TaskService {
                 };
                 let config = Self::resolve_config_for_project(config_root.as_path(), &p);
                 Self::ensure_task_defaults(&mut t, &config, false);
+                // Links to moved tasks show their current IDs (DEV-183).
+                if !t.relationships.is_empty() {
+                    let moves = crate::storage::moves::MoveResolver::new(&storage.root_path);
+                    crate::storage::moves::current_relationships(&moves, &mut t.relationships);
+                }
                 let sprint_lookup = Self::load_sprint_lookup(storage);
                 // Padded aliases (TP-001) surface the canonical spelling (TP-1)
                 // so all transports agree on the task identity.
@@ -722,6 +760,8 @@ impl TaskService {
         text: &str,
         context: CommentContext,
     ) -> LoTaRResult<TaskDTO> {
+        let (id, _) = Self::follow_moves(storage, id, None)?;
+        let id = id.as_str();
         let parsed =
             TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let canonical = parsed.canonical();
@@ -796,6 +836,8 @@ impl TaskService {
         index: usize,
         text: &str,
     ) -> LoTaRResult<TaskUpdateReceipt> {
+        let (id, _) = Self::follow_moves(storage, id, None)?;
+        let id = id.as_str();
         let parsed =
             TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let canonical = parsed.canonical();
@@ -924,6 +966,8 @@ impl TaskService {
         context: TaskUpdateContext,
         relationship_delta: Option<F>,
     ) -> LoTaRResult<TaskUpdateReceipt> {
+        let (id, _) = Self::follow_moves(storage, id, None)?;
+        let id = id.as_str();
         // Derive the project prefix from the canonical ID parse (final numeric
         // suffix) to locate the task. `canonical` (padded aliases collapsed,
         // e.g. TP-001 -> TP-1) is the single identity used for every
@@ -1266,6 +1310,7 @@ impl TaskService {
                 .into_iter()
                 .collect();
             let records = SprintService::list(storage)?;
+            let moves = crate::storage::moves::MoveResolver::new(&storage.root_path);
             let current_set: BTreeSet<u32> = records
                 .iter()
                 .filter(|record| {
@@ -1275,7 +1320,7 @@ impl TaskService {
                         .sprint
                         .tasks
                         .iter()
-                        .any(|entry| entry_matches_task(&entry.id, &canonical))
+                        .any(|entry| entry_matches_task(&moves, &entry.id, &canonical))
                 })
                 .map(|record| record.id)
                 .collect();
@@ -1351,6 +1396,7 @@ impl TaskService {
         // Stage in deterministic order: sprints, config, task file.
         if let Some((mut records, desired_set)) = sprint_change {
             let touched = Self::apply_memberships_to_records(
+                &storage.root_path,
                 records.as_mut_slice(),
                 &canonical,
                 &desired_set,
@@ -1664,15 +1710,20 @@ impl TaskService {
     ) -> LoTaRResult<(String, String)> {
         let parsed =
             TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
-        let derived = parsed.project.clone();
-        let canonical = parsed.canonical();
         if let Some(explicit) = project
-            && explicit != derived
+            && explicit != parsed.project
         {
             return Err(LoTaRError::ValidationError(format!(
-                "Task ID '{id}' belongs to project '{derived}', not '{explicit}'; refusing to cross projects"
+                "Task ID '{id}' belongs to project '{}', not '{explicit}'; refusing to cross projects",
+                parsed.project
             )));
         }
+        // An old ID of a moved task acts on the task it became (DEV-183).
+        let (current, _) = Self::follow_moves(storage, id, None)?;
+        let parsed = TaskId::parse(&current)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{current}: {err}")))?;
+        let derived = parsed.project.clone();
+        let canonical = parsed.canonical();
         match storage.resolve_task_location(&canonical) {
             Ok(location) if !location.is_in_root(&storage.root_path) => {
                 Err(LoTaRError::ValidationError(format!(
@@ -1807,7 +1858,16 @@ impl TaskService {
     /// tombstoned — whose relationships point at the deleted task. Nothing
     /// is cleaned up; the caller merely reports the hazards.
     fn hard_delete_warnings(storage: &Storage, canonical: &str, task: &Task) -> Vec<String> {
+        let moves = crate::storage::moves::MoveResolver::new(&storage.root_path);
         let mut warnings = Vec::new();
+        // DEV-183: old IDs redirect here through their stubs; without this
+        // file they lead nowhere.
+        if !task.moved_from.is_empty() {
+            warnings.push(format!(
+                "old ID(s) {} redirect to this task and will no longer resolve",
+                task.moved_from.join(", ")
+            ));
+        }
 
         let parsed = TaskId::parse(canonical).ok();
         let config_root = match storage.resolve_task_location(canonical) {
@@ -1842,37 +1902,49 @@ impl TaskService {
             if rel
                 .depends_on
                 .iter()
-                .any(|v| entry_matches_task(v, canonical))
+                .any(|v| entry_matches_task(&moves, v, canonical))
             {
                 fields.push("depends_on");
             }
-            if rel.blocks.iter().any(|v| entry_matches_task(v, canonical)) {
+            if rel
+                .blocks
+                .iter()
+                .any(|v| entry_matches_task(&moves, v, canonical))
+            {
                 fields.push("blocks");
             }
-            if rel.related.iter().any(|v| entry_matches_task(v, canonical)) {
+            if rel
+                .related
+                .iter()
+                .any(|v| entry_matches_task(&moves, v, canonical))
+            {
                 fields.push("related");
             }
             if rel
                 .parent
                 .as_deref()
-                .is_some_and(|v| entry_matches_task(v, canonical))
+                .is_some_and(|v| entry_matches_task(&moves, v, canonical))
             {
                 fields.push("parent");
             }
             if rel
                 .children
                 .iter()
-                .any(|v| entry_matches_task(v, canonical))
+                .any(|v| entry_matches_task(&moves, v, canonical))
             {
                 fields.push("children");
             }
-            if rel.fixes.iter().any(|v| entry_matches_task(v, canonical)) {
+            if rel
+                .fixes
+                .iter()
+                .any(|v| entry_matches_task(&moves, v, canonical))
+            {
                 fields.push("fixes");
             }
             if rel
                 .duplicate_of
                 .as_deref()
-                .is_some_and(|v| entry_matches_task(v, canonical))
+                .is_some_and(|v| entry_matches_task(&moves, v, canonical))
             {
                 fields.push("duplicate_of");
             }
@@ -2088,7 +2160,14 @@ impl TaskService {
             .into_iter()
             .filter_map(|(id, task)| {
                 let parsed = TaskId::parse(&id).ok()?;
-                let (rank, score) = if query.is_empty() || full_id.as_ref() == Some(&parsed) {
+                // An old ID of a moved task counts as an exact match (DEV-183).
+                let was = full_id.as_ref().is_some_and(|wanted| {
+                    task.moved_from
+                        .iter()
+                        .any(|old| TaskId::parse(old).is_ok_and(|old| &old == wanted))
+                });
+                let (rank, score) = if query.is_empty() || full_id.as_ref() == Some(&parsed) || was
+                {
                     (0, 0)
                 } else if number == Some(parsed.number) {
                     (1, 0)
@@ -2120,7 +2199,28 @@ impl TaskService {
             .collect()
     }
 
+    /// Tasks matching `filter`. Move stubs (DEV-183) are left out of every
+    /// listing, the trash included: they stand for tasks that live on under
+    /// another ID.
     pub fn list(storage: &Storage, filter: &TaskListFilter) -> Vec<(String, TaskDTO)> {
+        Self::list_matching(storage, filter, false)
+    }
+
+    /// [`Self::list`] including move stubs, for scans that must recognize
+    /// them (sync pulls match a remote issue to its stub and skip it instead
+    /// of importing it again).
+    pub(crate) fn list_with_moved(
+        storage: &Storage,
+        filter: &TaskListFilter,
+    ) -> Vec<(String, TaskDTO)> {
+        Self::list_matching(storage, filter, true)
+    }
+
+    fn list_matching(
+        storage: &Storage,
+        filter: &TaskListFilter,
+        include_moved: bool,
+    ) -> Vec<(String, TaskDTO)> {
         // Map API filter to storage filter
         let storage_filter = crate::storage::TaskFilter {
             status: filter.status.clone(),
@@ -2146,6 +2246,7 @@ impl TaskService {
         let mut results: Vec<(String, TaskDTO)> = storage
             .search(&storage_filter)
             .into_iter()
+            .filter(|(_, task)| include_moved || task.moved_to.is_none())
             .filter(|(id, _)| {
                 if requested_sprints.is_empty() {
                     return true;
@@ -2262,6 +2363,7 @@ impl TaskService {
             task_state,
             deleted_at: task.deleted_at,
             archived: task.archived,
+            moved_from: task.moved_from,
             priority: task.priority,
             task_type: task.task_type,
             reporter: task.reporter,
@@ -2317,6 +2419,7 @@ impl TaskService {
             Err(_) => return map,
         };
 
+        let moves = crate::storage::moves::MoveResolver::new(&storage.root_path);
         for record in records {
             let sprint_id = record.id;
             let mut fallback_order = 1u32;
@@ -2325,9 +2428,10 @@ impl TaskService {
                 if task_id.is_empty() {
                     continue;
                 }
-                // Key canonically so legacy padded spellings (TP-001) are
-                // found by canonical lookups; unparseable ids stay verbatim.
-                let key = canonical_membership_key(task_id);
+                // Key canonically so legacy padded spellings (TP-001) and old
+                // IDs of moved tasks (DEV-183) are found by the task's current
+                // ID; unparseable ids stay verbatim.
+                let key = moves.current(task_id);
                 let slot = map.entry(key).or_default();
                 let order = entry.order.unwrap_or_else(|| {
                     let value = fallback_order;
@@ -2402,10 +2506,12 @@ impl TaskService {
     }
 
     pub(crate) fn apply_memberships_to_records(
+        root: &Path,
         records: &mut [SprintRecord],
         task_id: &str,
         desired: &BTreeSet<u32>,
     ) -> LoTaRResult<HashSet<u32>> {
+        let moves = crate::storage::moves::MoveResolver::new(root);
         let mut touched: HashSet<u32> = HashSet::new();
         let mut found: BTreeSet<u32> = BTreeSet::new();
 
@@ -2417,14 +2523,14 @@ impl TaskService {
                 .sprint
                 .tasks
                 .iter()
-                .any(|entry| entry_matches_task(&entry.id, task_id));
+                .any(|entry| entry_matches_task(&moves, &entry.id, task_id));
             let should_have = desired.contains(&record.id);
 
             if contains && !should_have {
                 record
                     .sprint
                     .tasks
-                    .retain(|entry| !entry_matches_task(&entry.id, task_id));
+                    .retain(|entry| !entry_matches_task(&moves, &entry.id, task_id));
                 touched.insert(record.id);
             }
 
@@ -2645,21 +2751,20 @@ impl TaskService {
 /// Canonical membership comparison: two sprint entry ids denote the same
 /// member when their canonical parses agree. Unparseable ids compare
 /// verbatim so malformed legacy entries are still matched exactly.
-fn entry_matches_task(entry_id: &str, task_id: &str) -> bool {
+fn entry_matches_task(
+    moves: &crate::storage::moves::MoveResolver,
+    entry_id: &str,
+    task_id: &str,
+) -> bool {
     match (
         TaskId::parse(entry_id.trim()),
         TaskId::parse(task_id.trim()),
     ) {
-        (Ok(entry), Ok(task)) => entry == task,
+        // Padded spellings and old IDs of moved tasks (DEV-183) name the
+        // same task.
+        (Ok(entry), Ok(task)) => entry == task || moves.same(entry_id, task_id),
         _ => entry_id.trim() == task_id.trim(),
     }
-}
-
-/// Canonical map key for a sprint membership entry id.
-fn canonical_membership_key(raw: &str) -> String {
-    TaskId::parse(raw.trim())
-        .map(|parsed| parsed.canonical())
-        .unwrap_or_else(|_| raw.trim().to_string())
 }
 
 /// Canonical alias equality for ticket identifiers (TP-1 == TP-001);

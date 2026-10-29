@@ -1,0 +1,10 @@
+title: Ticking a row while the task list reloads leaves it ticked but not selected
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-29T22:27:42.103246+00:00
+description: |-
+  Found while fixing ui.global-actions smoke (DEV-183). The Tasks page loads its list twice right after opening (a second config/show + tasks/list about 150ms after the first). A row ticked in bulk mode during that reload is dropped from the selection (TasksList selected-ids setter filters by the tasks shown at that moment), but its checkbox stays ticked on screen because the component state never changed, so the counter says 0 while the row looks selected.
+
+  Acceptance: a tick during a reload either sticks or visibly clears; the extra reload after opening the page is avoided if it is not needed. The smoke test currently re-ticks until the selection holds.

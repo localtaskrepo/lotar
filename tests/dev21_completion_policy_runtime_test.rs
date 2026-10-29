@@ -583,6 +583,7 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
         task_type: lotar::types::TaskType::from("Feature"),
         deleted_at: None,
         archived: false,
+        moved_from: Vec::new(),
         reporter: None,
         assignee: None,
         created: now.to_rfc3339(),

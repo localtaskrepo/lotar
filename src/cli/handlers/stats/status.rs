@@ -60,7 +60,8 @@ pub(crate) fn run_status(
         rel_file
     };
 
-    let Some(durations) = status_durations(&repo_root, &file_rel, since_dt, until_dt)? else {
+    let Some(durations) = status_durations(&repo_root, &tasks_abs, &file_rel, since_dt, until_dt)?
+    else {
         match renderer.format {
             crate::output::OutputFormat::Json => {
                 let obj = serde_json::json!({
@@ -165,6 +166,9 @@ pub(crate) fn run_time_in_status(
         if let Ok(in_tasks) = p.strip_prefix(&base)
             && let Some(task) = crate::storage::layout::parse_relative(in_tasks)
             && let Ok(rel) = p.strip_prefix(&repo_root)
+            // A move stub's past belongs to the task it became (DEV-183),
+            // which reports it; counting the stub too would count it twice.
+            && crate::storage::moves::stub_target(&p).is_none()
         {
             task_files.push((task.id(), rel.to_path_buf()));
         }
@@ -178,7 +182,8 @@ pub(crate) fn run_time_in_status(
     // Then compute durations per status on [since, until]
     let mut results: Vec<serde_json::Value> = Vec::new();
     for (id, file_rel) in task_files.into_iter() {
-        let Some(durations) = status_durations(&repo_root, &file_rel, since_dt, until_dt)? else {
+        let Some(durations) = status_durations(&repo_root, &base, &file_rel, since_dt, until_dt)?
+        else {
             continue;
         };
         // Skip empty
@@ -259,13 +264,15 @@ type StatusSnapshot = (
 /// from its git history. `None` when the file has no commits up to `until`.
 fn status_durations(
     repo_root: &std::path::Path,
+    tasks_root: &std::path::Path,
     file_rel: &std::path::Path,
     since_dt: chrono::DateTime<chrono::Utc>,
     until_dt: chrono::DateTime<chrono::Utc>,
 ) -> Result<Option<std::collections::BTreeMap<String, i64>>, String> {
     use crate::services::audit_service::AuditService;
 
-    let commits = AuditService::list_commits_for_file(repo_root, file_rel)?;
+    // A moved task's history includes its time under earlier IDs (DEV-183).
+    let commits = AuditService::list_commits_for_task(repo_root, tasks_root, file_rel)?;
     // Unparseable snapshots are kept as `None` so they still advance time.
     let mut snaps: Vec<StatusSnapshot> = commits
         .iter()

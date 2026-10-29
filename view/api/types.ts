@@ -144,6 +144,8 @@ export interface TaskDTO {
     deleted_at?: string | null
     /** DEV-4: the task is in its project's @archive folder and read-only. */
     archived?: boolean
+    /** DEV-183: earlier IDs of a task moved between projects, oldest first. */
+    moved_from?: string[]
     /** Optional runtime completion metadata; may be omitted in test fixtures. */
     task_state?: TaskRuntimeState
     due_date?: string | null
@@ -437,6 +439,35 @@ export interface TaskCreate {
  * `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, and
  * `sprints` replace the whole value when set.
  */
+/** DEV-183: move a task to another project. Unset values keep the current
+ * one when the target allows it, else the target's default. */
+export interface TaskMoveRequest {
+    id: string
+    project: string
+    status?: string
+    task_type?: string
+    priority?: string
+    reporter?: string
+    assignee?: string
+    /** `null` or an empty string drops a field. */
+    custom_fields?: Record<string, unknown>
+    dry_run?: boolean
+}
+
+export interface TaskMoveChange {
+    field: string
+    old?: string
+    new?: string
+}
+
+export interface TaskMoveResponse {
+    from: string
+    to: string
+    changes?: TaskMoveChange[]
+    dry_run?: boolean
+    task: TaskDTO
+}
+
 export interface TaskUpdate {
     title?: string
     status?: TaskStatus

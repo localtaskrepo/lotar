@@ -70,6 +70,21 @@ pub fn emit_task_deleted(id: &str, triggered_by: Option<&str>) {
     });
 }
 
+/// A task moved to another project (DEV-183): its old ID is gone from lists
+/// (`task_deleted` naming the new ID in `moved_to`, so open views can follow
+/// it) and the task appears under its new ID (`task_created`).
+pub fn emit_task_moved(from: &str, task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
+    let mut payload = serde_json::json!({"id": from, "moved_to": task.id});
+    if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
+        map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
+    }
+    emit(&ApiEvent {
+        kind: "task_deleted".into(),
+        data: payload,
+    });
+    emit_task_created(task, triggered_by);
+}
+
 pub fn emit_config_updated(triggered_by: Option<&str>) {
     let mut payload = serde_json::json!({});
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {

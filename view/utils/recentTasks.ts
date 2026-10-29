@@ -29,3 +29,11 @@ export function recordRecentTask(id: string, title: string) {
     const next = [{ id: trimmed, title }, ...readRecentTasks().filter((entry) => entry.id !== trimmed)]
     storageSetJson(RECENT_TASKS_KEY, next.slice(0, RECENT_TASKS_LIMIT))
 }
+
+/** Drop a task from the list, e.g. an old ID of a moved task (DEV-183). */
+export function forgetRecentTask(id: string) {
+    const trimmed = id.trim()
+    const current = readRecentTasks()
+    const next = current.filter((entry) => entry.id !== trimmed)
+    if (next.length !== current.length) storageSetJson(RECENT_TASKS_KEY, next)
+}

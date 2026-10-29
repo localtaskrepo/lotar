@@ -158,10 +158,18 @@ pub(super) fn perform_pull(
         deletion: crate::api_types::DeletionFilter::All,
         ..Default::default()
     };
-    let mut tasks = TaskService::list(&storage, &filter);
+    // Move stubs (DEV-183) count too: an issue whose task moved to another
+    // project matches the deleted stub here and is skipped, rather than being
+    // imported again or synced into the other project.
+    let mut tasks = TaskService::list_with_moved(&storage, &filter);
     for (id, task) in &mut tasks {
         task.id = canonical_sync_task_id(&resolver.path, project, &task.id)?;
-        *task = TaskService::get_including_deleted(&storage, &task.id, None)?;
+        if !matches!(
+            crate::storage::moves::follow(&resolver.path, &task.id),
+            Ok(Some(_))
+        ) {
+            *task = TaskService::get_including_deleted(&storage, &task.id, None)?;
+        }
         id.clone_from(&task.id);
     }
     let mut tasks_by_id: HashMap<String, TaskDTO> = HashMap::new();

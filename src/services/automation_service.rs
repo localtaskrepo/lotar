@@ -985,7 +985,12 @@ fn simulate_action(
             continue;
         };
         apply_tag_action(tag_action, add, &mut simulated.tags);
-        apply_relationship_action(tag_action, add, &mut simulated.relationships);
+        apply_relationship_action(
+            Some(storage.root_path.as_path()),
+            tag_action,
+            add,
+            &mut simulated.relationships,
+        );
         if tag_action.sprint.is_some() {
             preview.warn(
                 "Sprint membership changes are listed in actions but not reflected in task_after"
@@ -1628,6 +1633,7 @@ fn apply_action(
 
     let mut next_task = None;
     if has_relationship_delta {
+        let moves_root = storage.root_path.clone();
         next_task = Some(TaskService::update_with_relationship_delta(
             storage,
             &base.id,
@@ -1635,10 +1641,10 @@ fn apply_action(
             TaskUpdateContext::automation_disabled(),
             |relationships| {
                 if let Some(add) = &action.add {
-                    apply_relationship_action(add, true, relationships);
+                    apply_relationship_action(Some(&moves_root), add, true, relationships);
                 }
                 if let Some(remove) = &action.remove {
-                    apply_relationship_action(remove, false, relationships);
+                    apply_relationship_action(Some(&moves_root), remove, false, relationships);
                 }
             },
         )?);
@@ -1873,16 +1879,19 @@ fn apply_tag_action(action: &AutomationTagAction, add: bool, tags: &mut Vec<Stri
 }
 
 fn apply_relationship_action(
+    root: Option<&std::path::Path>,
     action: &AutomationTagAction,
     add: bool,
     relationships: &mut crate::types::TaskRelationships,
 ) {
-    fn modify_vec(vec: &mut Vec<String>, values: &[String], add: bool) {
-        fn identity(value: &str) -> String {
-            crate::storage::TaskId::parse(value)
-                .map(|id| id.canonical())
-                .unwrap_or_else(|_| value.to_string())
-        }
+    let moves = root.map(crate::storage::moves::MoveResolver::new);
+    // Old IDs of moved tasks name the task they became (DEV-183).
+    let identity = |value: &str| match (&moves, crate::storage::TaskId::parse(value)) {
+        (Some(moves), Ok(_)) => moves.current(value),
+        (None, Ok(id)) => id.canonical(),
+        (_, Err(_)) => value.to_string(),
+    };
+    let modify_vec = |vec: &mut Vec<String>, values: &[String], add: bool| {
         if add {
             for v in values {
                 let trimmed = v.trim();
@@ -1895,7 +1904,7 @@ fn apply_relationship_action(
             let remove: HashSet<String> = values.iter().map(|v| identity(v.trim())).collect();
             vec.retain(|e| !remove.contains(&identity(e)));
         }
-    }
+    };
 
     if let Some(vals) = action.depends_on.as_ref() {
         modify_vec(&mut relationships.depends_on, &vals.as_vec(), add);
@@ -2563,9 +2572,9 @@ mod dev21_cross_root_dependency_tests {
             depends_on: vec!["AA-1".into()],
             ..Default::default()
         };
-        apply_relationship_action(&action, true, &mut relationships);
+        apply_relationship_action(None, &action, true, &mut relationships);
         assert_eq!(relationships.depends_on, ["AA-1", "aa-1"]);
-        apply_relationship_action(&action, false, &mut relationships);
+        apply_relationship_action(None, &action, false, &mut relationships);
         assert_eq!(relationships.depends_on, ["AA-1"]);
     }
 
@@ -2596,6 +2605,7 @@ mod dev21_cross_root_dependency_tests {
             task_state: None,
             deleted_at: None,
             archived: false,
+            moved_from: Vec::new(),
             id: id.to_string(),
             title: "dependent".to_string(),
             status: crate::types::TaskStatus::from("Todo"),

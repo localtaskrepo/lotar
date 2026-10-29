@@ -929,6 +929,7 @@ mod tests {
             task_state: None,
             deleted_at: None,
             archived: false,
+            moved_from: Vec::new(),
             id: id.to_string(),
             title: format!("task {id}"),
             status: crate::types::TaskStatus::from("Todo"),

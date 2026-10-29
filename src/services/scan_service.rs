@@ -641,6 +641,9 @@ fn update_task_code_reference(
     code_ref: &str,
     live_refs: &[String],
 ) -> LoTaRResult<bool> {
+    // A comment naming an old ID anchors the task it became (DEV-183).
+    let current = crate::storage::moves::current_id(&storage.root_path, task_id);
+    let task_id = current.as_str();
     let derived = crate::storage::TaskId::parse(task_id)
         .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
         .project;

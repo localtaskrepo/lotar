@@ -12,6 +12,7 @@ pub mod identity;
 pub mod layout;
 pub mod locator;
 pub mod manager;
+pub mod moves;
 pub mod operations;
 pub mod safety;
 pub mod search;

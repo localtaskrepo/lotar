@@ -13,8 +13,9 @@ pub fn handle_history(
 ) -> Result<(), String> {
     let context = resolve_task_file(id, project, resolver)?;
 
-    let commits = crate::services::audit_service::AuditService::list_commits_for_file(
+    let commits = crate::services::audit_service::AuditService::list_commits_for_task(
         &context.repo_root,
+        &resolver.path,
         &context.file_repo_path,
     )?;
     let limited = commits.into_iter().take(limit).collect::<Vec<_>>();
@@ -74,8 +75,9 @@ pub fn handle_history_by_field(
 ) -> Result<(), String> {
     let context = resolve_task_file(id, project, resolver)?;
 
-    let commits = crate::services::audit_service::AuditService::list_commits_for_file(
+    let commits = crate::services::audit_service::AuditService::list_commits_for_task(
         &context.repo_root,
+        &resolver.path,
         &context.file_repo_path,
     )?;
 
@@ -198,7 +200,11 @@ pub fn handle_diff(
     let context = resolve_task_file(id, project, resolver)?;
 
     use crate::services::audit_service::AuditService;
-    let commits = AuditService::list_commits_for_file(&context.repo_root, &context.file_repo_path)?;
+    let commits = AuditService::list_commits_for_task(
+        &context.repo_root,
+        &resolver.path,
+        &context.file_repo_path,
+    )?;
     let commit_sha = if let Some(c) = commit {
         c
     } else {
@@ -418,8 +424,12 @@ pub fn handle_at(
     let context = resolve_task_file(id, project, resolver)?;
 
     use crate::services::audit_service::AuditService;
-    let commits = AuditService::list_commits_for_file(&context.repo_root, &context.file_repo_path)
-        .unwrap_or_default();
+    let commits = AuditService::list_commits_for_task(
+        &context.repo_root,
+        &resolver.path,
+        &context.file_repo_path,
+    )
+    .unwrap_or_default();
     let content = AuditService::show_file_at(
         &context.repo_root,
         commit,
@@ -453,6 +463,13 @@ fn resolve_task_file(
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
 ) -> Result<TaskFileContext, String> {
+    // An old ID of a moved task shows the task it became (DEV-183).
+    let current = crate::storage::moves::current_id(&resolver.path, id);
+    let id = if current.contains('-') {
+        current.as_str()
+    } else {
+        id
+    };
     let default_proj = project
         .map(|p| resolve_project_input(p, resolver.path.as_path()))
         .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));

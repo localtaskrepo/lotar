@@ -273,6 +273,17 @@ describe('TaskStore', () => {
             expect(store._map.value.get('P-42')?.title).toBe('Fetched')
         })
 
+        it('replaces an old ID of a moved task with the task under its new ID (DEV-183)', async () => {
+            store.upsert(makeTask('DEV-12', { title: 'Before the move' }))
+            mockClient.getTask.mockResolvedValue(makeTask('WEB-40', { title: 'Moved', moved_from: ['DEV-12'] }))
+
+            const result = await store.fetchOne('DEV-12')
+
+            expect(result?.id).toBe('WEB-40')
+            expect(store._map.value.get('WEB-40')?.title).toBe('Moved')
+            expect(store._map.value.has('DEV-12')).toBe(false)
+        })
+
         it('evicts + tombstones the task when the fetch fails with 404', async () => {
             store.upsert(makeTask('P-99'))
             const notFound = new Error('GET /api/tasks/get failed: Not found') as Error & { status?: number }

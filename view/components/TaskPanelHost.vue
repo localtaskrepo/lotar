@@ -12,6 +12,7 @@
     @created="handleCreated"
     @updated="handleUpdated"
     @restored="handleRestored"
+    @redirected="handleRedirected"
   />
 </template>
 
@@ -21,6 +22,7 @@ import { computed, inject, ref, watch } from 'vue'
 import { routerKey } from 'vue-router'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
+import { forgetRecentTask } from '../utils/recentTasks'
 import { isDeletedTask } from '../utils/text'
 import { showToast } from './toast'
 import TaskPanel from './TaskPanel.vue'
@@ -44,6 +46,22 @@ function handleClose() {
     const { taskPanel: _, ...query } = route.query
     void router.replace({ path: route.path, query, hash: route.hash })
   }
+}
+
+// DEV-183: an old ID of a moved task opened; show it under its current ID
+// without adding a history entry, so Back still leaves the panel.
+function handleRedirected(id: string) {
+  if (panelState.taskId && panelState.taskId !== id) forgetRecentTask(panelState.taskId)
+  const route = router?.currentRoute.value
+  if (router && route?.path.startsWith('/task/')) {
+    void router.replace(`/task/${encodeURIComponent(id)}`)
+    return
+  }
+  if (router && route && typeof route.query.taskPanel === 'string') {
+    void router.replace({ path: route.path, query: { ...route.query, taskPanel: id }, hash: route.hash })
+    return
+  }
+  setNavigatedTask(id)
 }
 
 function handleCreated(task: TaskDTO) {

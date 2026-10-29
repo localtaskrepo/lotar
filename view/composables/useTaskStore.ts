@@ -70,7 +70,7 @@ import type {
     TaskListResponse,
     TaskUpdate,
 } from '../api/types'
-import { isDeletedTask } from '../utils/text'
+import { isDeletedTask, projectOf } from '../utils/text'
 import { registerTaskQueryInvalidator } from './useCompletionPolicy'
 import { useSse } from './useSse'
 
@@ -801,6 +801,14 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         }
     }
 
+    // DEV-183: the server answers an old ID of a moved task with the task
+    // under its new ID. The old ID no longer names a task of its own, so its
+    // entry goes, unless a newer write decided otherwise meanwhile.
+    function forgetMovedId(requested: string, answered: string, requestClock: number) {
+        if (requested === answered || projectOf(requested) === projectOf(answered)) return
+        if (!hasNewerEntityWrite(requested, requestClock)) tombstoneEntity(requested)
+    }
+
     async function fetchOne(id: string, opts?: { includeDeleted?: boolean }): Promise<TaskDTO | null> {
         const requestClock = writeClock
         fetchOneError.value = null
@@ -809,6 +817,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
             const task = await client.getTask(id, undefined, { includeDeleted: opts?.includeDeleted })
             if (task && task.id) {
                 applyResponseEntity(task, requestClock)
+                forgetMovedId(id, task.id, requestClock)
                 return task
             }
             return null
@@ -822,6 +831,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                     const task = await client.getTask(id, undefined, { includeDeleted: true })
                     if (task && task.id) {
                         applyResponseEntity(task, requestClock)
+                        forgetMovedId(id, task.id, requestClock)
                         return task
                     }
                     return null

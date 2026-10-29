@@ -6,6 +6,7 @@ use crate::services::sprint_assignment::ensure_sprint_is_open;
 use crate::services::sprint_service::SprintRecord;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
+use crate::storage::moves::MoveResolver;
 use crate::storage::sprint::{BacklogOrder, Sprint, SprintHistoryEntry, SprintTaskEntry};
 use crate::storage::transaction::MultiFileTransaction;
 use crate::storage::{TaskFilter, TaskId};
@@ -17,17 +18,32 @@ fn canonical_id(raw: &str) -> LoTaRResult<String> {
         .map_err(|error| LoTaRError::ValidationError(format!("Invalid task ID '{raw}': {error}")))
 }
 
-fn canonical_sequence(ids: impl IntoIterator<Item = String>) -> LoTaRResult<Vec<String>> {
+/// The ID a stored or requested reference means today: canonical, and
+/// following a moved task to its current ID (DEV-183).
+fn current_id(moves: &MoveResolver, raw: &str) -> LoTaRResult<String> {
+    canonical_id(raw).map(|id| moves.current(&id))
+}
+
+fn canonical_sequence(
+    moves: &MoveResolver,
+    ids: impl IntoIterator<Item = String>,
+) -> LoTaRResult<Vec<String>> {
     let mut seen = HashSet::new();
+    let mut spelled = HashSet::new();
     let mut result = Vec::new();
     for raw in ids {
-        let id = canonical_id(&raw)?;
-        if !seen.insert(id.clone()) {
+        let stored = canonical_id(&raw)?;
+        if !spelled.insert(stored.clone()) {
             return Err(LoTaRError::ValidationError(format!(
-                "Duplicate task '{id}' in stored order"
+                "Duplicate task '{stored}' in stored order"
             )));
         }
-        result.push(id);
+        // An old and a new ID of one moved task can both be listed: the task
+        // keeps its first place.
+        let id = moves.current(&stored);
+        if seen.insert(id.clone()) {
+            result.push(id);
+        }
     }
     Ok(result)
 }
@@ -49,7 +65,8 @@ pub fn backlog_order_for_ids(
     ids: impl IntoIterator<Item = String>,
 ) -> LoTaRResult<Vec<String>> {
     let metadata = BacklogOrder::load(&storage.root_path)?;
-    let stored = canonical_sequence(metadata.tasks)?;
+    let moves = MoveResolver::new(&storage.root_path);
+    let stored = canonical_sequence(&moves, metadata.tasks)?;
     Ok(project_order(&stored, ids))
 }
 
@@ -71,7 +88,10 @@ fn eligible_backlog_ids(storage: &Storage) -> LoTaRResult<Vec<String>> {
                     .is_some_and(|value| value.parse::<u32>().is_ok())
             {
                 let sprint: Sprint = serde_yaml_ng::from_str(&std::fs::read_to_string(path)?)?;
-                canonical_sequence(sprint.tasks.into_iter().map(|entry| entry.id))?;
+                canonical_sequence(
+                    &MoveResolver::new(&storage.root_path),
+                    sprint.tasks.into_iter().map(|entry| entry.id),
+                )?;
             }
         }
     }
@@ -94,7 +114,10 @@ pub fn get_order(storage: &Storage, sprint_id: Option<u32>) -> LoTaRResult<TaskO
         Some(id) => {
             let contents = std::fs::read_to_string(Sprint::path_for_id(&storage.root_path, id))?;
             let sprint: Sprint = serde_yaml_ng::from_str(&contents)?;
-            canonical_sequence(sprint.tasks.into_iter().map(|entry| entry.id))?
+            canonical_sequence(
+                &MoveResolver::new(&storage.root_path),
+                sprint.tasks.into_iter().map(|entry| entry.id),
+            )?
         }
         None => backlog_order_for_ids(storage, eligible_backlog_ids(storage)?)?,
     };
@@ -104,6 +127,25 @@ pub fn get_order(storage: &Storage, sprint_id: Option<u32>) -> LoTaRResult<TaskO
         changed: false,
         sprint_id,
     })
+}
+
+/// A raw sprint entry (a bare ID or a mapping with `id`) naming `current`
+/// instead of `stored`; untouched when they are the same.
+fn with_entry_id(raw: serde_yaml_ng::Value, stored: &str, current: &str) -> serde_yaml_ng::Value {
+    if canonical_id(stored).is_ok_and(|id| id == current) {
+        return raw;
+    }
+    match raw {
+        serde_yaml_ng::Value::String(_) => serde_yaml_ng::Value::String(current.to_string()),
+        serde_yaml_ng::Value::Mapping(mut mapping) => {
+            mapping.insert(
+                serde_yaml_ng::Value::String("id".into()),
+                serde_yaml_ng::Value::String(current.to_string()),
+            );
+            serde_yaml_ng::Value::Mapping(mapping)
+        }
+        other => other,
+    }
 }
 
 fn ensure_local_active(storage: &Storage, id: &str) -> LoTaRResult<()> {
@@ -153,8 +195,10 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
             "Provide exactly one of before/after and a positive sprint ID when present".into(),
         ));
     }
-    let task = canonical_id(&request.task)?;
-    let anchor = canonical_id(
+    let moves = MoveResolver::new(&storage.root_path);
+    let task = current_id(&moves, &request.task)?;
+    let anchor = current_id(
+        &moves,
         request
             .before
             .as_deref()
@@ -191,8 +235,10 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
             if !request.allow_closed {
                 ensure_sprint_is_open(&record).map_err(LoTaRError::ValidationError)?;
             }
-            let order =
-                canonical_sequence(record.sprint.tasks.iter().map(|entry| entry.id.clone()))?;
+            let order = canonical_sequence(
+                &moves,
+                record.sprint.tasks.iter().map(|entry| entry.id.clone()),
+            )?;
             (
                 order,
                 Some(serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&contents)?),
@@ -201,7 +247,7 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
         }
         None => {
             let metadata = BacklogOrder::load(&storage.root_path)?;
-            let mut order = canonical_sequence(metadata.tasks.clone())?;
+            let mut order = canonical_sequence(&moves, metadata.tasks.clone())?;
             let eligible = eligible_backlog_ids(storage)?;
             let visible = project_order(&order, eligible);
             if !visible.contains(&task) || !visible.contains(&anchor) {
@@ -279,13 +325,16 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
                 ));
             }
         };
-        let mut entries: HashMap<_, _> = raw_entries
-            .into_iter()
-            .map(|raw| {
-                let entry: SprintTaskEntry = serde_yaml_ng::from_value(raw.clone())?;
-                Ok((canonical_id(&entry.id)?, raw))
-            })
-            .collect::<LoTaRResult<_>>()?;
+        // Rewritten entries store the current ID of a moved task (DEV-183);
+        // an entry superseded by another spelling of the same task is dropped.
+        let mut entries: HashMap<String, serde_yaml_ng::Value> = HashMap::new();
+        for raw in raw_entries {
+            let entry: SprintTaskEntry = serde_yaml_ng::from_value(raw.clone())?;
+            let id = current_id(&moves, &entry.id)?;
+            entries
+                .entry(id.clone())
+                .or_insert_with(|| with_entry_id(raw, &entry.id, &id));
+        }
         mapping.insert(
             tasks_key,
             serde_yaml_ng::Value::Sequence(

@@ -170,17 +170,29 @@ impl ProjectResolver {
     ) -> Result<String, String> {
         // If task ID already has a prefix, use as-is
         if self.extract_project_from_task_id(task_id).is_some() {
-            return Ok(task_id.to_string());
+            return Ok(self.follow_moves(task_id));
         }
 
         // If it's just a number, add the project prefix
         if task_id.chars().all(|c| c.is_ascii_digit()) {
             let project = self.resolve_project(task_id, explicit_project)?;
-            return Ok(format!("{}-{}", project, task_id));
+            return Ok(self.follow_moves(&format!("{}-{}", project, task_id)));
         }
 
         // Invalid format
         Err(format!("Cannot determine full task ID for: '{}'", task_id))
+    }
+}
+
+impl ProjectResolver {
+    /// An old ID of a moved task names the task it became (DEV-183). IDs that
+    /// were never moved, or whose move chain is broken, stay as typed so the
+    /// command's own lookup reports them.
+    fn follow_moves(&self, task_id: &str) -> String {
+        match crate::storage::moves::follow(&self.tasks_dir, task_id) {
+            Ok(Some(current)) => current,
+            _ => task_id.to_string(),
+        }
     }
 }
 

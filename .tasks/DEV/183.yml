@@ -1,18 +1,79 @@
 title: Allow tickets to be moved to different project
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-25T03:09:51.512208+00:00
-modified: 2026-10-28T02:08:54.209415+00:00
+modified: 2026-10-29T22:36:08.922153+00:00
 comments:
 - date: 2026-10-28T02:08:54.209415+00:00
   text: |-
     Take care to think about how this affect history, references, and IDs.
     However, do not introduce an index counter as we have managed to do it without so far.
+- date: 2026-10-29T21:18:48.347276+00:00
+  text: |-
+    Decisions (developer): (1) new ID in the target project plus a redirect stub at the old path: a soft-deleted task with moved_to (older clients just see a deleted task; the file keeps the number reserved, no counter). (2) resolve old IDs at run time through the stub everywhere instead of rewriting references; when LoTaR rewrites a list anyway it stores the current ID. (3) the move takes new status/type/priority/custom field values, with target defaults where a value is invalid there.
+
+    Plan in three checkpoints, each passing lint/test/smoke:
+    1. Move: Task.moved_to (stub) and Task.moved_from (history of old IDs); storage::moves resolver (follows chains, loop/length guard, broken-chain error); stub writes refused; TaskService::move_task in one MultiFileTransaction over both projects (target number = max+1 under lock, or reclaim the original number when moving back onto its own stub); value mapping + overrides; attachments copied when the attachment folder differs; agent context file moved; CLI lotar task move <ids|--select> --to P [--status --type --priority --field k=v|k=] [--dry-run]; REST POST /api/tasks/move; MCP task_move; UI: project picker in the panel opens a move dialog, then navigates to the new ID; ID lookups (get/update/delete/restore/archive/references/CLI) follow redirects and use the resolved ID's project; UI adopts the server's ID when it differs (URL, store eviction).
+    2. Lists: MoveResolver (lazy, cached per call) in sprint membership/lookup/backlog order/task_order (dedupe old+new), relationship Inventory (key/unique/state follow stubs; stubs not nodes), DTO relationship IDs shown current, agent job registry/queue/cooldown/jobs filter by aliases, sync journal canonicalization (stub keeps remote references so pulls skip it instead of re-importing), search id:/suggest match moved_from, UI recent tasks dedupe.
+    3. Old IDs: git history and stats union the old paths (moved_from), commit-message matching uses aliases, scanner exists check + anchor pass accept aliases, agent context fallback, hard-delete warnings include aliases, lotar task move --record OLD NEW for files moved by hand.
+
+    Scenarios to cover: same-project move refused; unknown target project refused; deleted task refused; archived task needs force and lands in target @archive; ambiguous/duplicate IDs refused; active or queued agent job refused; chain DEV-12->WEB-40->OPS-3 resolves; moving back reclaims the original number; broken chain (target hard-deleted) reports clearly; stub restore/edit refused; hard delete of moved task leaves stub; enum/custom field mismatches mapped or overridden; tags kept; history entries on both files; modified updated on the moved task; attachments; sprints/order/relationships referencing old ID; text references, URLs, bookmarks, recent tasks; commit messages and TODO comments with old ID; sync remote references; agent jobs/worktrees named by old ID; cross-root move refused; older clients (stub = deleted task).
+- date: 2026-10-29T22:34:22.491442+00:00
+  text: |-
+    Outcome: all three checkpoints implemented.
+    1. Move: lotar task move <ids|--select> --to P [--status --type --priority --reporter --assignee --field k=v|k=] [-n]; POST /api/tasks/move; MCP task_move; web UI: choosing another project in an existing task (or the palette action) opens a move dialog with the new ID and target-project values, then the panel follows the new ID. Stub = soft-deleted file with moved_to (+ remote refs, moved history entry); moved task gets moved_from, a moved history entry, modified; one MultiFileTransaction over both projects; number max+1, or the old number when moving back onto its own stub; attachments copied when attachment folders differ; agent context renamed. Refused: same project, unknown project, deleted, ambiguous, agent job running/queued, archived without --force-archived (then lands in target @archive), cross-root. Stub writes refused everywhere.
+    2. Lists resolve at run time (storage::moves, MoveResolver): every TaskService entry point and CLI ID resolution, sprint membership/lookup/assignment/reports, backlog and sprint order (dedupe old+new, rewritten to current ID when an order is saved), relationship inventory (old IDs are valid, not reported as issues), single-task DTO relationships shown with current IDs, agent job start and job filter, automation relationship actions, search/suggest via moved_from, UI store drops the old ID, panel/URL/recent tasks adopt the new ID, dependency graph root. Stubs hidden from all lists including trash; sync pull keeps them so a moved task's remote issue is skipped, not re-imported.
+    3. Old IDs: history/diff/at/history-field, REST history and stats merge commits of the old files; activity feed matches commit messages naming old IDs; scanner writes resolve, anchors accept old IDs in comments; hard delete warns that old IDs will stop resolving; lotar task move OLD --record NEW for hand moves.
+    Evidence: tests/dev183_move_test.rs (7 integration tests incl. git history), storage::moves unit tests, view TaskMoveDialog.spec + store test, smoke ui.task-move; full Rust 1853 passed, UI 1391 passed, smoke 365 passed (ui.global-actions hardened: it raced a reload right after page open; real cause filed as DEV-243), lint clean. Docs: task.md (move), task-model.md, api-quick-reference, mcp.md, mcp-tools.md, serve.md, openapi.json.
+    Known limits: pending sync journal links from an interrupted sync that name a task moved since fail closed with the 'moved to' message (rerun the sync); global activity feeds show the move twice (stub and task entries); single-task sync push with an old ID pushes the moved task through the remote you name.
+    Guidance: no durable finding.
+- date: 2026-10-29T22:35:34.982726+00:00
+  text: 'Not committed yet: the commit was blocked because signing (1Password) failed; retry pending.'
+references:
+- attachment: task-move-dialog-2x.5eba3ea322ce4ff81a4615deecf50c1b.webp
 description: Once a ticket is created, there's no way to move it to another project. We want to support this on all interfaces.
 history:
 - at: 2026-10-28T02:08:54.209415+00:00
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-29T21:18:48.283116+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-29T21:18:48.347276+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T22:34:03.610094+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:task-move-dialog-2x.5eba3ea322ce4ff81a4615deecf50c1b.webp
+- at: 2026-10-29T22:34:22.491442+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T22:34:22.525730+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-29T22:35:34.982726+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T22:36:08.922153+00:00
+  actor: mallox
+  changes:
+  - field: comment#4
+    old: Committed as d70d9a2 on main (not pushed).
+    new: 'Not committed yet: the commit was blocked because signing (1Password) failed; retry pending.'

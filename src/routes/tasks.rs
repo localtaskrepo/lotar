@@ -920,6 +920,36 @@ pub(super) fn register(api_server: &mut ApiServer) {
         });
     }
 
+    // POST /api/tasks/move {id, project, ...TaskMoveRequest} (DEV-183)
+    api_server.register_handler("POST", "/api/tasks/move", |req: &HttpRequest| {
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        let request: crate::api_types::TaskMoveRequest = match serde_json::from_slice(&req.body) {
+            Ok(request) => request,
+            Err(err) => return bad_request(format!("Invalid move request: {err}")),
+        };
+        if request.id.trim().is_empty() {
+            return bad_request("Missing id".into());
+        }
+        if request.project.trim().is_empty() {
+            return bad_request("Missing project".into());
+        }
+        match TaskService::move_task(&mut storage, &request) {
+            Ok(response) => {
+                if !response.dry_run {
+                    let actor = crate::utils::identity::resolve_current_user(None);
+                    crate::api_events::emit_task_moved(
+                        &response.from,
+                        &response.task,
+                        actor.as_deref(),
+                    );
+                }
+                ok_json(200, json!({"data": response}))
+            }
+            Err(err) => map_lotar_error(err),
+        }
+    });
+
     // GET /api/config/show
 
     api_server.register_handler("GET", "/api/tasks/history", |req: &HttpRequest| {
@@ -928,14 +958,17 @@ pub(super) fn register(api_server: &mut ApiServer) {
             _ => return bad_request("Missing id".into()),
         };
         let (repo_root, tasks_rel) = try_response!(resolve_repo_tasks_paths());
+        // An old ID of a moved task shows the task's whole history (DEV-183).
+        let tasks_abs = repo_root.join(&tasks_rel);
+        let id = crate::storage::moves::current_id(&tasks_abs, &id);
         // Derive project and numeric from the canonical ID parse
         let parsed = match crate::storage::TaskId::parse(&id) {
             Ok(parsed) => parsed,
             Err(_) => return bad_request("Invalid task id".into()),
         };
         let file_rel = task_file_rel(&repo_root, &tasks_rel, &parsed);
-        let mut commits = match crate::services::audit_service::AuditService::list_commits_for_file(
-            &repo_root, &file_rel,
+        let mut commits = match crate::services::audit_service::AuditService::list_commits_for_task(
+            &repo_root, &tasks_abs, &file_rel,
         ) {
             Ok(v) => v,
             Err(e) => return internal_error(e),
@@ -962,13 +995,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
             _ => return bad_request("Missing commit".into()),
         };
         let (repo_root, tasks_rel) = try_response!(resolve_repo_tasks_paths());
+        let tasks_abs = repo_root.join(&tasks_rel);
+        let id = crate::storage::moves::current_id(&tasks_abs, &id);
         let parsed = match crate::storage::TaskId::parse(&id) {
             Ok(parsed) => parsed,
             Err(_) => return bad_request("Invalid task id".into()),
         };
         let file_rel = task_file_rel(&repo_root, &tasks_rel, &parsed);
-        let commits = crate::services::audit_service::AuditService::list_commits_for_file(
-            &repo_root, &file_rel,
+        let commits = crate::services::audit_service::AuditService::list_commits_for_task(
+            &repo_root, &tasks_abs, &file_rel,
         )
         .unwrap_or_default();
         let at_commit = crate::services::audit_service::AuditService::path_at_commit(

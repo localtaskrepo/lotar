@@ -623,6 +623,7 @@ mod tests {
             task_state: None,
             deleted_at: None,
             archived: false,
+            moved_from: Vec::new(),
             id: "TEST-1".to_string(),
             title: "Example".to_string(),
             status: TaskStatus::from("Todo"),

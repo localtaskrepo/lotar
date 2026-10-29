@@ -87,6 +87,7 @@ The registry binds all 38 advertised tools to their handlers; `tools/list` retur
 | `task_delete` | Soft-delete by default; explicit `hard` removes the file and returns retained-attachment/incoming-relationship warnings. |
 | `task_restore` | Restore a soft-deleted task without changing its content-modification timestamp. |
 | `task_archive` / `task_unarchive` | Move a task into its project's `@archive` folder (read-only, left out of `task_list` unless `archived` is `yes` or `all`) or back. Tools that write tasks take `force_archived: true` to change an archived task. |
+| `task_move` | Move a task to another project under the next free number there; the old ID keeps working everywhere as a redirect. Unknown status/type/priority values fall back to the target's defaults unless set; `dry_run` previews. |
 | `task_list` | Filtered, paginated listing (limit default 50, max 200) with enum hints. |
 | `sprint_list` | List sprints with pagination + integrity hints. |
 | `sprint_get` | Fetch one sprint by id. |

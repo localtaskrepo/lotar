@@ -156,7 +156,7 @@
                   :statuses="statusOptions"
                   :priorities="priorityOptions"
                   @fieldBlur="handleFieldBlur"
-                  @projectChange="onProjectChange"
+                  @projectChange="handleProjectChange"
                   @updateStatus="updateStatus"
                 />
 
@@ -460,7 +460,7 @@
                     :statuses="statusOptions"
                     :priorities="priorityOptions"
                     @fieldBlur="handleFieldBlur"
-                    @projectChange="onProjectChange"
+                    @projectChange="handleProjectChange"
                     @updateStatus="updateStatus"
                   />
                   <TaskPanelOwnershipSection
@@ -679,6 +679,15 @@
       </div>
     </Transition>
   </Teleport>
+  <TaskMoveDialog
+    v-if="mode === 'edit' && task.id"
+    :open="moveDialogOpen"
+    :task-id="task.id"
+    :initial-target="moveTarget"
+    :projects="projects"
+    @close="moveDialogOpen = false"
+    @moved="onTaskMoved"
+  />
   <UiModal
     :open="sprintDialogOpen"
     :dismissible="!sprintDialogSubmitting"
@@ -856,6 +865,7 @@ import type {
   SyncRemoteConfig,
   SyncRequest,
   TaskDTO,
+  TaskMoveResponse,
 } from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
 import {
@@ -899,6 +909,7 @@ import TaskPanelReferencesTab from './task-panel/TaskPanelReferencesTab.vue'
 import TaskPanelRelationshipsTab from './task-panel/TaskPanelRelationshipsTab.vue'
 import TaskPanelSummarySection from './task-panel/TaskPanelSummarySection.vue'
 import TaskPanelTagEditor from './task-panel/TaskPanelTagEditor.vue'
+import TaskMoveDialog from './TaskMoveDialog.vue'
 import { showToast } from './toast'
 
 const props = defineProps<{
@@ -918,6 +929,7 @@ const emit = defineEmits<{
   (e: 'created', task: TaskDTO): void
   (e: 'updated', task: TaskDTO): void
   (e: 'restored', task: TaskDTO): void
+  (e: 'redirected', id: string): void
 }>()
 const taskStore = useTaskStore()
 
@@ -1059,6 +1071,7 @@ watch(
       toggleView: () => {
         largeView.value = !largeView.value
       },
+      moveTask: () => openMoveDialog(),
     })
   },
   { immediate: true },
@@ -1713,6 +1726,38 @@ watch(panelRef, (element) => {
 })
 onUnmounted(() => panelObserver?.disconnect())
 const splitLayout = computed(() => largeView.value && panelWidth.value >= SPLIT_MIN_WIDTH)
+
+// DEV-183: choosing another project for an existing task moves it there.
+const moveDialogOpen = ref(false)
+const moveTarget = ref('')
+
+function openMoveDialog(target = '') {
+  if (mode.value !== 'edit' || !task.id || isReadOnly.value) return
+  moveTarget.value = target
+  moveDialogOpen.value = true
+}
+
+function handleProjectChange() {
+  if (mode.value !== 'edit') {
+    void onProjectChange()
+    return
+  }
+  const current = projectPrefixOfTaskId(task.id || '') || ''
+  const chosen = form.project
+  // The select shows where the task is until the move happens. Reset it on
+  // the next tick, so the select element sees the value change back.
+  void nextTick(() => {
+    form.project = current
+  })
+  if (chosen && chosen !== current) openMoveDialog(chosen)
+}
+
+function onTaskMoved(response: TaskMoveResponse) {
+  moveDialogOpen.value = false
+  showToast(`Moved ${response.from} to ${response.to}`)
+  emit('updated', response.task)
+  emit('redirected', response.to)
+}
 
 const tagEditorRef = ref<{ openTagDialog: () => void } | null>(null)
 

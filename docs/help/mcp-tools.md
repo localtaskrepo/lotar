@@ -91,6 +91,12 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Behavior:** clears `deleted_at` and appends history without changing `modified`; restores the same ID and content under current project validation. Already-active tasks are unchanged.
 - **Response:** Updated `TaskDTO`.
 
+### `task_move`
+
+- **Params:** `id` (an old ID of an already moved task works too), `project` (target prefix), optional `status`, `task_type`, `priority`, `reporter`, `assignee` (empty clears), `custom_fields` (`null` or `""` drops a field), `dry_run`, `force_archived`.
+- **Behavior:** gives the task the next free number in the target project, or its old number when it returns to a project it came from, and leaves a stub at the old ID that redirects every later request. Values the target does not have fall back to its defaults unless set; a custom field the target does not allow fails the call until it is set or dropped. Refused for deleted tasks, tasks with a running or queued agent job, and archived tasks without `force_archived`.
+- **Response:** `{from, to, changes: [{field, old, new}], dry_run, task: TaskDTO}`; `task.moved_from` lists earlier IDs.
+
 ### `task_archive` / `task_unarchive`
 - **Params:** `id` (required) and optional `project`.
 - **Behavior:** moves the task file into its project's `@archive` folder, or back, and appends an `archived`/`unarchived` history entry; status, links and `modified` stay as they are. Archived tasks are left out of `task_list` unless `archived` is `yes` or `all`, are still returned by `task_get`, and are read-only: every tool that writes tasks refuses them unless called with `force_archived: true`. Unarchiving validates stored values against the current project config. Already in place: unchanged.

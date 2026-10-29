@@ -167,7 +167,9 @@ fn apply_assignment(
         .collect();
 
     let mut changed_sprints: HashSet<u32> = HashSet::new();
-    let mut membership = build_membership_index(&sprint_map);
+    let moves_root = storage.root_path.clone();
+    let moves = crate::storage::moves::MoveResolver::new(&moves_root);
+    let mut membership = build_membership_index(&moves, &sprint_map);
     let mut modified: Vec<String> = Vec::new();
     let mut unchanged: Vec<String> = Vec::new();
     let mut replaced: Vec<SprintReassignmentInfo> = Vec::new();
@@ -195,7 +197,7 @@ fn apply_assignment(
                             continue;
                         }
                         if let Some(sprint) = sprint_map.get_mut(&other_id)
-                            && remove_task_from_sprint(sprint, &task_id)
+                            && remove_task_from_sprint(&moves, sprint, &task_id)
                         {
                             changed_sprints.insert(other_id);
                         }
@@ -210,7 +212,7 @@ fn apply_assignment(
                     let sprint = sprint_map
                         .get_mut(&sprint_id)
                         .ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
-                    if add_task_to_sprint(sprint, &task_id) {
+                    if add_task_to_sprint(&moves, sprint, &task_id) {
                         changed_sprints.insert(sprint_id);
                         added_to_target = true;
                     }
@@ -263,7 +265,7 @@ fn apply_assignment(
                 let sprint = sprint_map
                     .get_mut(&sprint_id)
                     .ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
-                if remove_task_from_sprint(sprint, &task_id) {
+                if remove_task_from_sprint(&moves, sprint, &task_id) {
                     changed_sprints.insert(sprint_id);
                 }
 
@@ -306,7 +308,10 @@ fn apply_assignment(
     })
 }
 
-fn build_membership_index(sprint_map: &BTreeMap<u32, Sprint>) -> HashMap<String, BTreeSet<u32>> {
+fn build_membership_index(
+    moves: &crate::storage::moves::MoveResolver,
+    sprint_map: &BTreeMap<u32, Sprint>,
+) -> HashMap<String, BTreeSet<u32>> {
     let mut map: HashMap<String, BTreeSet<u32>> = HashMap::new();
     for (sprint_id, sprint) in sprint_map.iter() {
         for entry in &sprint.tasks {
@@ -314,18 +319,20 @@ fn build_membership_index(sprint_map: &BTreeMap<u32, Sprint>) -> HashMap<String,
             if task_id.is_empty() {
                 continue;
             }
-            // Canonical keys: legacy padded spellings and canonical ids
-            // index the same member.
-            let key = crate::storage::TaskId::parse(task_id)
-                .map(|parsed| parsed.canonical())
-                .unwrap_or_else(|_| task_id.to_string());
+            // Canonical keys: legacy padded spellings, canonical ids and old
+            // IDs of moved tasks (DEV-183) index the same member.
+            let key = moves.current(task_id);
             map.entry(key).or_default().insert(*sprint_id);
         }
     }
     map
 }
 
-fn add_task_to_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
+fn add_task_to_sprint(
+    moves: &crate::storage::moves::MoveResolver,
+    sprint: &mut Sprint,
+    task_id: &str,
+) -> bool {
     let normalized = task_id.trim();
     if normalized.is_empty() {
         return false;
@@ -338,7 +345,7 @@ fn add_task_to_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
             crate::storage::TaskId::parse(entry_id),
             crate::storage::TaskId::parse(normalized),
         ) {
-            (Ok(entry), Ok(task)) => entry == task,
+            (Ok(entry), Ok(task)) => entry == task || moves.same(entry_id, normalized),
             _ => entry_id == normalized,
         }
     });
@@ -352,7 +359,11 @@ fn add_task_to_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
     true
 }
 
-fn remove_task_from_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
+fn remove_task_from_sprint(
+    moves: &crate::storage::moves::MoveResolver,
+    sprint: &mut Sprint,
+    task_id: &str,
+) -> bool {
     let before = sprint.tasks.len();
     // Remove EVERY spelling of the member (TP-1 and TP-001 alike).
     sprint.tasks.retain(|entry| {
@@ -361,7 +372,7 @@ fn remove_task_from_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
             crate::storage::TaskId::parse(entry_id),
             crate::storage::TaskId::parse(task_id.trim()),
         ) {
-            (Ok(entry), Ok(task)) => entry != task,
+            (Ok(entry), Ok(task)) => entry != task && !moves.same(entry_id, task_id.trim()),
             _ => entry_id != task_id.trim(),
         }
     });
@@ -550,6 +561,9 @@ pub fn resolve_task_identifier(storage: &Storage, raw: &str) -> Result<String, S
     }
 
     if token.contains('-') {
+        // An old ID of a moved task assigns the task it became (DEV-183).
+        let current = crate::storage::moves::current_id(&storage.root_path, token);
+        let token = current.as_str();
         return match crate::storage::TaskId::parse(token) {
             // Canonicalize at this mutation boundary: padded spellings
             // (TP-001) enter assignment flows as TP-1 so memberships are

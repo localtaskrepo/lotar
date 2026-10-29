@@ -260,6 +260,26 @@ const { projectName, projectLabel } = useProjectNames()
 const route = useRoute(),
   router = useRouter()
 const pendingQuery = ref<LocationQueryRaw | null>(null)
+// DEV-183: a bookmarked graph may name a task by an old ID from before it
+// moved project. Ask the server which task that is now and show it under its
+// current ID, so the focal card is found.
+watch(
+  () => route.query.root,
+  async (root) => {
+    if (typeof root !== 'string' || !root.includes('-')) return
+    try {
+      const task = await api.getTask(root)
+      if (!task?.id || task.id === root || route.query.root !== root) return
+      const query: LocationQueryRaw = { ...route.query, root: task.id }
+      if (route.query.q === root) query.q = task.id
+      if (route.query.taskPanel === root) query.taskPanel = task.id
+      void router.replace({ path: route.path, query, hash: route.hash })
+    } catch {
+      // Unknown IDs keep the graph's own "could not be identified" message.
+    }
+  },
+  { immediate: true },
+)
 const connectionOptions: Array<{ kind: RelationshipKind; label: string }> = [
   { kind: 'dependency', label: 'Blocking dependencies' },
   { kind: 'hierarchy', label: 'Parent / child' },

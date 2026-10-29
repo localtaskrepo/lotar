@@ -69,6 +69,16 @@ pub struct Task {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub history: Vec<crate::types::TaskChangeLogEntry>,
 
+    /// Set on a move stub (DEV-183): the task now lives under this ID. A stub
+    /// is also soft-deleted, so tools that predate moves simply hide it; it
+    /// keeps the old number reserved and lets the old ID redirect.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub moved_to: Option<String>,
+    /// Earlier IDs of a moved task, oldest first (DEV-183). Used to find its
+    /// git history, commits and code comments that still name an old ID.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub moved_from: Vec<String>,
+
     /// User-owned YAML extensions, intentionally absent from API DTOs.
     #[serde(flatten, default, serialize_with = "serialize_extra_fields")]
     pub extra_fields: BTreeMap<String, serde_yaml_ng::Value>,
@@ -105,6 +115,8 @@ fn is_builtin_key(key: &str) -> bool {
             | "tags"
             | "custom_fields"
             | "history"
+            | "moved_to"
+            | "moved_from"
     )
 }
 

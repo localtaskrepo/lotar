@@ -31,6 +31,8 @@ struct Record {
 
 struct Inventory {
     records: BTreeMap<String, Vec<Record>>,
+    /// Move stubs (DEV-183): old ID -> the ID its task moved to.
+    moved: BTreeMap<String, String>,
     revision: String,
     local_root: PathBuf,
     sources: BTreeMap<PathBuf, Vec<String>>,
@@ -371,23 +373,48 @@ impl Inventory {
                 "Relationship inventory exceeds 50000 assertions; snapshot unavailable",
             ));
         }
+        let moved = records
+            .iter()
+            .filter_map(|(id, list)| {
+                let [record] = list.as_slice() else {
+                    return None;
+                };
+                let target = record.task.as_ref()?.moved_to.as_deref()?;
+                Some((id.clone(), TaskId::parse(target.trim()).ok()?.canonical()))
+            })
+            .collect();
         Ok(Self {
             records,
+            moved,
             revision: hash.finalize().to_hex().to_string(),
             local_root: canonical_root(&storage.root_path),
             sources,
         })
     }
 
+    /// The current ID of a canonical ID: old IDs of moved tasks follow their
+    /// stubs (DEV-183), so every relationship naming an old ID means the task
+    /// it became. Loops and overlong chains stop where they are.
+    fn current(&self, canonical: String) -> String {
+        let mut id = canonical;
+        for _ in 0..crate::storage::moves::MAX_MOVE_HOPS {
+            match self.moved.get(&id) {
+                Some(next) if next != &id => id = next.clone(),
+                _ => break,
+            }
+        }
+        id
+    }
+
     fn unique(&self, id: &str) -> Option<&Record> {
         let parsed = TaskId::parse(id).ok()?;
-        let records = self.records.get(&parsed.canonical())?;
+        let records = self.records.get(&self.current(parsed.canonical()))?;
         (records.len() == 1).then(|| &records[0])
     }
 
     fn key(&self, raw: &str) -> String {
         if self.unique(raw).is_some() {
-            TaskId::parse(raw).unwrap().canonical()
+            self.current(TaskId::parse(raw).unwrap().canonical())
         } else {
             raw.to_string()
         }
@@ -397,7 +424,7 @@ impl Inventory {
         let Ok(parsed) = TaskId::parse(id) else {
             return "missing";
         };
-        match self.records.get(&parsed.canonical()) {
+        match self.records.get(&self.current(parsed.canonical())) {
             None => "missing",
             Some(records) if records.len() != 1 => "ambiguous",
             Some(records) => match &records[0].task {
@@ -409,9 +436,11 @@ impl Inventory {
     }
 
     fn active_local(&self, root: &Path, raw: &str) -> LoTaRResult<String> {
-        let id = TaskId::parse(raw)
-            .map_err(|e| invalid(format!("Invalid relationship task '{raw}': {e}")))?
-            .canonical();
+        let id = self.current(
+            TaskId::parse(raw)
+                .map_err(|e| invalid(format!("Invalid relationship task '{raw}': {e}")))?
+                .canonical(),
+        );
         if self.state(&id) != "active" {
             return Err(invalid(format!(
                 "Relationship task '{raw}' is {}",
@@ -873,7 +902,10 @@ fn inspect_actions(
                 issues.push(diagnostic);
             }
             for p in found {
-                if p.value != target && inventory.unique(&p.value).is_some() {
+                // Only padded spellings: an old ID of a moved task is a valid
+                // reference that resolves at run time (DEV-183).
+                let padded = TaskId::parse(&p.value).is_ok_and(|id| id.canonical() == target);
+                if p.value != target && padded && inventory.unique(&p.value).is_some() {
                     let diagnostic = issue(
                         "padded_alias",
                         tasks.clone(),

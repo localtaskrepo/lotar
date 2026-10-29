@@ -229,6 +229,10 @@ pub struct TaskDTO {
     /// `@archive` folder and it is read-only. Serialized only when true.
     #[serde(skip_serializing_if = "std::ops::Not::not", default)]
     pub archived: bool,
+    /// Earlier IDs of a task moved between projects, oldest first (DEV-183).
+    /// Requests may still use them; they resolve to this task.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub moved_from: Vec<String>,
     /// Server-computed runtime projection (DEV-21): completion flag, due
     /// bucket, and the server-local calendar day at build time. Computed
     /// from the task's own project configuration and the shared due
@@ -432,6 +436,63 @@ pub struct TaskUpdate {
     /// Replace sprint memberships; empty list clears them.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub sprints: Option<Vec<u32>>,
+}
+
+/// Move a task to another project (DEV-183). The task gets the next free
+/// number there; its old ID keeps working through a redirect. Values that the
+/// target project does not allow fall back to its defaults unless set here.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskMoveRequest {
+    /// The task to move (an old ID of an already moved task works too).
+    pub id: String,
+    /// Prefix of the project to move it to.
+    pub project: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub priority: Option<String>,
+    /// Empty string clears.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reporter: Option<String>,
+    /// Empty string clears.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub assignee: Option<String>,
+    /// Custom field values to set; `null` or an empty string removes one.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub custom_fields: Option<crate::types::CustomFields>,
+    /// Report what would happen without changing anything.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub dry_run: bool,
+}
+
+/// One value the move changed to fit the target project.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskMoveChange {
+    pub field: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub old: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub new: Option<String>,
+}
+
+/// Result of a task move (DEV-183). For a dry run, `task` shows the task as
+/// it would look after the move and nothing was written.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskMoveResponse {
+    /// The ID the task had (after following earlier moves).
+    pub from: String,
+    /// Its new ID.
+    pub to: String,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub changes: Vec<TaskMoveChange>,
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub dry_run: bool,
+    pub task: TaskDTO,
 }
 
 /// What a job used, as far as its CLI reports it. Claude reports tokens,

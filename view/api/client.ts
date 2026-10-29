@@ -1,4 +1,6 @@
 import type {
+    TaskMoveRequest,
+    TaskMoveResponse,
     ActivityFeedItem,
     AgentJobCancelAllResponse,
     AgentJobCancelResponse,
@@ -229,6 +231,10 @@ export const api = {
     /** DEV-4: bring an archived task back. */
     unarchiveTask(id: string, project?: string): Promise<TaskDTO> {
         return post('/api/tasks/unarchive' + qs({ project }), { id })
+    },
+    /** DEV-183: move a task to another project (`dry_run` previews). */
+    moveTask(request: TaskMoveRequest): Promise<TaskMoveResponse> {
+        return post('/api/tasks/move', request)
     },
     /**
      * Upload an attachment. With `onProgress`, the request goes through

@@ -461,11 +461,19 @@ impl SprintService {
 
     pub fn load_tasks_for_record(storage: &Storage, record: &SprintRecord) -> Vec<(String, Task)> {
         let mut tasks = Vec::new();
+        let moves = crate::storage::moves::MoveResolver::new(&storage.root_path);
+        let mut seen = std::collections::HashSet::new();
         for entry in &record.sprint.tasks {
-            let task_id = entry.id.trim();
-            if task_id.is_empty() {
+            if entry.id.trim().is_empty() {
                 continue;
             }
+            // A sprint may still list a moved task under its old ID (DEV-183),
+            // possibly next to the new one: count the task once, as it is now.
+            let current = moves.current(&entry.id);
+            if !seen.insert(current.clone()) {
+                continue;
+            }
+            let task_id = current.as_str();
             let project = crate::storage::TaskId::parse(task_id)
                 .map(|parsed| parsed.project)
                 .unwrap_or_default();
