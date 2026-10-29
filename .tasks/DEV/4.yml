@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.705315+00:00
-modified: 2026-10-29T04:00:12.739235+00:00
+modified: 2026-10-29T04:01:07.577331+00:00
 comments:
 - date: 2026-09-06T11:21:52.619873+00:00
   text: 'Backlog reconciliation: Remains Todo for nested-folder ticket storage plus archive lifecycle/query behavior. DEV-56 owns canonical identity/multi-root lookup correctness, and DEV-53 storage safety is implemented; neither closes archive support.'
@@ -36,6 +36,8 @@ comments:
     Evidence: tests/dev4_archive_test.rs (6), layout unit tests, smoke/tests/ui.archive.smoke.spec.ts. lint:agent clean; nextest 1844 passed; UI 1372 passed (needed --maxWorkers=3 under load); release + hooks passed; smoke 362 (21 load timeouts passed on rerun with 2 workers). Also fixed tests/stats_snapshot_test.rs local-date bug and replaced TaskPanel's 9 explicit any (pruned its eslint suppression).
     Remaining: none in scope. Not done: built-in time trigger (DEV-240); relationship inventory still caps at 10000 files incl. archive; sprint-integrity scans skip archived tasks. Older clients (<0.11) cannot see nested/archived files and may reuse their numbers (documented).
     Guidance: no durable finding.
+- date: 2026-10-29T04:01:07.577331+00:00
+  text: Committed as de1b7e9 on main (not pushed).
 description: |-
   Migrated checklist requirements:
   Support transparent nested ticket discovery and mutation so manual grouping does not break scanning or lookup in large repositories. Retain archive support as a proposed extension requiring defined lifecycle/query semantics, not a silently assumed implementation. DEV-56 covers identity/multi-root correctness, not the complete nested/archive feature.
@@ -89,3 +91,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-29T04:01:07.577331+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

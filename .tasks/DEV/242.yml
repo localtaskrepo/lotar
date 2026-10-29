@@ -1,0 +1,50 @@
+title: Make the homepage findable for git-based task manager searches
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-29T17:35:06.657425+00:00
+modified: 2026-10-29T17:41:42.258517+00:00
+comments:
+- date: 2026-10-29T17:35:21.562571+00:00
+  text: 'Plan: keyword copy in site/index.html head and hero; JSON-LD SoftwareApplication; og:site_name/og:image:alt; site/sitemap.xml; site/compare.html (shared style.css) with facts checked against each tool''s own docs; footer/nav link to it. Check: npm run site:build, open target/site in the browser at phone and desktop widths, validate JSON-LD parses.'
+- date: 2026-10-29T17:41:42.087581+00:00
+  text: |-
+    Outcome: homepage title/description/H1/lead now say git-based task manager, local-first issue tracker; SoftwareApplication JSON-LD, og:site_name, og:image:alt, sitemap link; site/sitemap.xml; site/compare.html (LoTaR vs GitHub Issues, Jira, git-bug, Backlog.md; facts from each project's README/docs, dated Oct 2026) linked from nav and footer, with BreadcrumbList JSON-LD; compare styles in site/style.css.
+    Evidence: npm run site:build OK; JSON-LD and sitemap parse; Playwright screenshots at 390/1440 px in light and dark: no horizontal page overflow, no console errors; repo-relative links resolve. Prettier run on the site files.
+    Remaining: owner registers the site in Google Search Console and Bing Webmaster Tools and submits https://localtaskrepo.github.io/lotar/sitemap.xml; consider adding 'task manager' to the GitHub repo description. Uncommitted.
+    Guidance: no durable finding.
+description: |-
+  Search for the homepage in terms people use (git-based task manager, task tracker, local-first, Jira alternative).
+
+  Acceptance:
+  - Title, description and opening copy use those terms naturally.
+  - SoftwareApplication JSON-LD, og:site_name, og:image:alt.
+  - sitemap.xml published with the site.
+  - A comparison page (LoTaR vs GitHub Issues, Jira, git-bug, Backlog.md) linked from the homepage and listed in the sitemap.
+  - Site builds with npm run site:build.
+  - Search Console / Bing registration is out of scope here (needs the owner's accounts).
+history:
+- at: 2026-10-29T17:35:21.299218+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-29T17:35:21.562571+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T17:41:42.087581+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-29T17:41:42.258517+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -3,26 +3,52 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>LoTaR – the issue tracker that lives in your repo</title>
+        <title>LoTaR – git-based task manager and issue tracker</title>
         <meta
             name="description"
-            content="LoTaR is a git-native issue tracker: tasks are YAML files in your repository, with a CLI, a local web UI, a REST API and an MCP server, and it can run your coding agents on tasks in isolated git worktrees."
+            content="Free, open-source, git-based task manager and issue tracker. Tasks are YAML files in your repo, with a CLI, a local web UI, a REST API, an MCP server and coding agents."
         />
         <meta name="theme-color" content="#0b1622" />
         <link rel="icon" href="assets/branding/favicon.ico" sizes="any" />
         <link rel="icon" href="assets/branding/lotar-app-icon.svg" type="image/svg+xml" />
         <link rel="canonical" href="https://localtaskrepo.github.io/lotar/" />
+        <link rel="sitemap" type="application/xml" href="sitemap.xml" />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="LoTaR – the issue tracker that lives in your repo" />
+        <meta property="og:site_name" content="LoTaR" />
+        <meta property="og:title" content="LoTaR – the task manager that lives in your git repo" />
         <meta
             property="og:description"
-            content="Tasks as plain YAML next to your code, a local web UI, an MCP server, and coding agents that work your tasks in their own git worktrees."
+            content="A local-first issue tracker: tasks as plain YAML next to your code, a local web UI, an MCP server, and coding agents that work your tasks in their own git worktrees."
         />
         <meta property="og:url" content="https://localtaskrepo.github.io/lotar/" />
         <meta property="og:image" content="https://localtaskrepo.github.io/lotar/assets/social-preview.png" />
         <meta property="og:image:width" content="1280" />
         <meta property="og:image:height" content="640" />
+        <meta
+            property="og:image:alt"
+            content="LoTaR, a git-native issue tracker that lives in your repo and can run your coding agents, next to its kanban board"
+        />
         <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "SoftwareApplication",
+                "name": "LoTaR",
+                "description": "A git-based task manager and issue tracker that stores tasks as YAML files in your repository, with a CLI, a local web UI, a REST API, an MCP server and coding-agent runs in isolated git worktrees.",
+                "url": "https://localtaskrepo.github.io/lotar/",
+                "image": "https://localtaskrepo.github.io/lotar/assets/social-preview.png",
+                "applicationCategory": "DeveloperApplication",
+                "applicationSubCategory": "Issue tracker",
+                "operatingSystem": "macOS, Linux, Windows",
+                "license": "https://opensource.org/licenses/MIT",
+                "isAccessibleForFree": true,
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+                "downloadUrl": "https://github.com/localtaskrepo/lotar/releases/latest",
+                "codeRepository": "https://github.com/localtaskrepo/lotar",
+                "sameAs": ["https://github.com/localtaskrepo/lotar", "https://hub.docker.com/r/mallox/lotar"],
+                "keywords": "git-based task manager, git issue tracker, local-first, kanban, sprints, MCP server, coding agents, Jira alternative"
+            }
+        </script>
         <link rel="stylesheet" href="style.css" />
         <script src="main.js" defer></script>
     </head>
@@ -37,6 +63,7 @@
                 <nav class="site-nav" aria-label="Main">
                     <a href="#features">Features</a>
                     <a href="#install">Install</a>
+                    <a href="compare.html">Compare</a>
                     <a href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/index.md">Docs</a>
                     <a href="https://github.com/localtaskrepo/lotar/discussions">Community</a>
                     <a class="site-nav__github" href="https://github.com/localtaskrepo/lotar">
@@ -60,12 +87,12 @@
                             <span>Open source</span><span aria-hidden="true">·</span><span>MIT</span
                             ><span class="hero__version" data-latest-version hidden></span>
                         </p>
-                        <h1>The issue tracker that lives in your repo, and runs your coding agents.</h1>
+                        <h1>The task manager that lives in your git repo, and runs your coding agents.</h1>
                         <p class="hero__lead">
-                            LoTaR keeps tasks as plain YAML files in <code>.tasks/</code>, versioned and reviewed with
-                            your code. A CLI, a local web UI, a REST API and an MCP server all work on the same files.
-                            Assign a task to an agent and LoTaR runs it in its own git worktree, streams the log, and
-                            hands the work back for review.
+                            LoTaR is a local-first, git-based issue tracker. It keeps tasks as plain YAML files in
+                            <code>.tasks/</code>, versioned and reviewed with your code. A CLI, a local web UI, a REST
+                            API and an MCP server all work on the same files. Assign a task to an agent and LoTaR runs
+                            it in its own git worktree, streams the log, and hands the work back for review.
                         </p>
                         <div class="hero__actions">
                             <a class="button button--primary" href="#install">Get started</a>
@@ -583,6 +610,7 @@ lotar serve --open</code></pre>
                     <a href="https://github.com/localtaskrepo/lotar/blob/main/LICENSE">MIT license</a>.
                 </p>
                 <nav aria-label="Footer">
+                    <a href="compare.html">LoTaR vs Jira, GitHub Issues and git-bug</a>
                     <a href="https://github.com/localtaskrepo/lotar/blob/main/CODE_OF_CONDUCT.md">Code of conduct</a>
                     <a href="https://github.com/localtaskrepo/lotar/blob/main/SECURITY.md">Security</a>
                     <a href="https://github.com/localtaskrepo">GitHub organization</a>

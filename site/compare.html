@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>LoTaR vs Jira, GitHub Issues, git-bug and Backlog.md</title>
+        <meta
+            name="description"
+            content="How LoTaR, a git-based task manager, compares with Jira, GitHub Issues, git-bug and Backlog.md: where tasks are stored, offline use, MCP, coding agents, boards and sync."
+        />
+        <meta name="theme-color" content="#0b1622" />
+        <link rel="icon" href="assets/branding/favicon.ico" sizes="any" />
+        <link rel="icon" href="assets/branding/lotar-app-icon.svg" type="image/svg+xml" />
+        <link rel="canonical" href="https://localtaskrepo.github.io/lotar/compare.html" />
+        <meta property="og:type" content="article" />
+        <meta property="og:site_name" content="LoTaR" />
+        <meta property="og:title" content="LoTaR vs Jira, GitHub Issues, git-bug and Backlog.md" />
+        <meta
+            property="og:description"
+            content="A side-by-side look at git-based and hosted issue trackers, and when each one fits."
+        />
+        <meta property="og:url" content="https://localtaskrepo.github.io/lotar/compare.html" />
+        <meta property="og:image" content="https://localtaskrepo.github.io/lotar/assets/social-preview.png" />
+        <meta property="og:image:width" content="1280" />
+        <meta property="og:image:height" content="640" />
+        <meta
+            property="og:image:alt"
+            content="LoTaR, a git-native issue tracker that lives in your repo and can run your coding agents, next to its kanban board"
+        />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {
+                        "@type": "ListItem",
+                        "position": 1,
+                        "name": "LoTaR",
+                        "item": "https://localtaskrepo.github.io/lotar/"
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "name": "Compare",
+                        "item": "https://localtaskrepo.github.io/lotar/compare.html"
+                    }
+                ]
+            }
+        </script>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <a class="skip-link" href="#main">Skip to content</a>
+
+        <header class="site-header">
+            <div class="wrap site-header__inner">
+                <a class="brand" href="./" aria-label="LoTaR home">
+                    <img src="assets/branding/lotar-logo-dark.svg" alt="LoTaR" width="120" height="32" />
+                </a>
+                <nav class="site-nav" aria-label="Main">
+                    <a href="./#features">Features</a>
+                    <a href="./#install">Install</a>
+                    <a href="compare.html" aria-current="page">Compare</a>
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/docs/help/index.md">Docs</a>
+                    <a class="site-nav__github" href="https://github.com/localtaskrepo/lotar">
+                        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                            <path
+                                fill="currentColor"
+                                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                            />
+                        </svg>
+                        <span>GitHub</span>
+                    </a>
+                </nav>
+            </div>
+        </header>
+
+        <main id="main">
+            <section class="hero hero--compact">
+                <div class="wrap">
+                    <p class="hero__eyebrow">
+                        <a href="./">LoTaR</a><span aria-hidden="true">/</span><span>Compare</span>
+                    </p>
+                    <h1>LoTaR compared with Jira, GitHub Issues, git-bug and Backlog.md</h1>
+                    <p class="hero__lead">
+                        Hosted trackers keep your tasks on someone else's server. Git-based task managers keep them in
+                        your repository, next to the code they describe. Here is how LoTaR differs from the trackers
+                        people most often weigh it against, and when one of the others is the better fit.
+                    </p>
+                </div>
+            </section>
+
+            <section class="compare" aria-labelledby="compare-title">
+                <div class="wrap">
+                    <h2 id="compare-title">Side by side</h2>
+                    <div class="compare__scroll" tabindex="0" role="region" aria-labelledby="compare-title">
+                        <table class="compare__table">
+                            <thead>
+                                <tr>
+                                    <td></td>
+                                    <th scope="col" class="compare__us">LoTaR</th>
+                                    <th scope="col">GitHub Issues</th>
+                                    <th scope="col">Jira</th>
+                                    <th scope="col">git-bug</th>
+                                    <th scope="col">Backlog.md</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Where tasks live</th>
+                                    <td class="compare__us">
+                                        One YAML file per task in <code>.tasks/</code> in your repo
+                                    </td>
+                                    <td>GitHub's servers</td>
+                                    <td>Atlassian Cloud, or your own Data Center server</td>
+                                    <td>Inside git's own storage, with no files in your working tree</td>
+                                    <td>One Markdown file per task in a backlog folder in your repo</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Task changes show up in pull requests</th>
+                                    <td class="compare__us">Yes</td>
+                                    <td>No</td>
+                                    <td>No</td>
+                                    <td>No</td>
+                                    <td>Yes</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Works offline, without an account</th>
+                                    <td class="compare__us">Yes</td>
+                                    <td>No</td>
+                                    <td>No</td>
+                                    <td>Yes</td>
+                                    <td>Yes</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Ways to use it</th>
+                                    <td class="compare__us">CLI, local web UI, REST API, MCP server</td>
+                                    <td>Web, <code>gh</code> CLI, REST and GraphQL APIs</td>
+                                    <td>Web, mobile apps, REST API</td>
+                                    <td>CLI, terminal UI, local web UI, GraphQL API</td>
+                                    <td>CLI, terminal board, local web UI, MCP server</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">MCP server for AI agents</th>
+                                    <td class="compare__us">Built in (<code>lotar mcp</code>)</td>
+                                    <td>GitHub's separate MCP server</td>
+                                    <td>Atlassian's separate MCP server</td>
+                                    <td>No</td>
+                                    <td>Built in</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Runs coding agents on a task</th>
+                                    <td class="compare__us">
+                                        Yes, on your machine: ten agent CLIs, each job in its own git worktree
+                                    </td>
+                                    <td>Copilot coding agent, in GitHub's cloud</td>
+                                    <td>Through integrations</td>
+                                    <td>No</td>
+                                    <td>No; agents work on tasks through its CLI or MCP</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Planning</th>
+                                    <td class="compare__us">Boards, sprints, calendar, dependency graph</td>
+                                    <td>Projects boards, roadmaps and iterations</td>
+                                    <td>Boards, sprints, timelines</td>
+                                    <td>Labels and statuses</td>
+                                    <td>Kanban board</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Sync with other trackers</th>
+                                    <td class="compare__us">Jira and GitHub Issues (beta)</td>
+                                    <td>Marketplace apps</td>
+                                    <td>Marketplace apps</td>
+                                    <td>GitHub, GitLab, Jira and Launchpad bridges</td>
+                                    <td>No</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">License and cost</th>
+                                    <td class="compare__us">MIT, free</td>
+                                    <td>Proprietary, included with GitHub</td>
+                                    <td>Proprietary, free for up to 10 users, then priced per user</td>
+                                    <td>GPLv3, free</td>
+                                    <td>MIT, free</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="compare__note">
+                        Based on each project's own documentation in October 2026. Spotted something out of date?
+                        <a href="https://github.com/localtaskrepo/lotar/issues/new/choose">Open an issue</a>.
+                    </p>
+                </div>
+            </section>
+
+            <section class="compare-fit" aria-labelledby="fit-title">
+                <div class="wrap">
+                    <h2 id="fit-title">Which one fits</h2>
+                    <div class="feature-grid">
+                        <article>
+                            <h3>Choose LoTaR when</h3>
+                            <p>
+                                Your team works in one repository and wants tasks reviewed with the code, you want a
+                                full web UI without hosting anything, or you want coding agents to pick up tasks and
+                                hand back work for review.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>Choose GitHub Issues when</h3>
+                            <p>
+                                Users outside your team need to file bugs in public, or your planning spans many
+                                repositories and already lives on GitHub.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>Choose Jira when</h3>
+                            <p>
+                                Many teams, including people who never open a repository, plan work together and need
+                                fine-grained permissions, reporting and a large app marketplace.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>Choose git-bug when</h3>
+                            <p>
+                                You want issues to travel with the repository but never appear as files in your working
+                                tree, or you need a GitLab or Launchpad bridge.
+                            </p>
+                        </article>
+                        <article>
+                            <h3>Choose Backlog.md when</h3>
+                            <p>You would rather write tasks as Markdown and need a board, not sprints or sync.</p>
+                        </article>
+                        <article>
+                            <h3>Use LoTaR alongside them</h3>
+                            <p>
+                                LoTaR can pull Jira or GitHub issues into local tasks and push changes back, so a team
+                                can keep its tracker and still work from the repository.
+                                <a href="https://github.com/localtaskrepo/lotar/blob/main/docs/developers/sync.md"
+                                    >How sync works</a
+                                >.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="community" aria-labelledby="try-title">
+                <div class="wrap">
+                    <h2 id="try-title">Try it in your repository</h2>
+                    <p class="compare__cta">
+                        <code>brew tap localtaskrepo/lotar &amp;&amp; brew install lotar</code>, then
+                        <code>lotar serve --open</code>. Other platforms are on the
+                        <a href="./#install">install section</a> of the homepage.
+                    </p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <div class="wrap site-footer__inner">
+                <img src="assets/branding/lotar-symbol.svg" alt="" width="28" height="28" />
+                <p>
+                    LoTaR is open source under the
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/LICENSE">MIT license</a>.
+                </p>
+                <nav aria-label="Footer">
+                    <a href="./">Home</a>
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/CODE_OF_CONDUCT.md">Code of conduct</a>
+                    <a href="https://github.com/localtaskrepo/lotar/blob/main/SECURITY.md">Security</a>
+                    <a href="https://github.com/localtaskrepo">GitHub organization</a>
+                </nav>
+            </div>
+        </footer>
+    </body>
+</html>
