@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-29T17:35:06.657425+00:00
-modified: 2026-10-29T17:41:42.258517+00:00
+modified: 2026-10-29T17:41:55.786831+00:00
 comments:
 - date: 2026-10-29T17:35:21.562571+00:00
   text: 'Plan: keyword copy in site/index.html head and hero; JSON-LD SoftwareApplication; og:site_name/og:image:alt; site/sitemap.xml; site/compare.html (shared style.css) with facts checked against each tool''s own docs; footer/nav link to it. Check: npm run site:build, open target/site in the browser at phone and desktop widths, validate JSON-LD parses.'
@@ -15,6 +15,8 @@ comments:
     Evidence: npm run site:build OK; JSON-LD and sitemap parse; Playwright screenshots at 390/1440 px in light and dark: no horizontal page overflow, no console errors; repo-relative links resolve. Prettier run on the site files.
     Remaining: owner registers the site in Google Search Console and Bing Webmaster Tools and submits https://localtaskrepo.github.io/lotar/sitemap.xml; consider adding 'task manager' to the GitHub repo description. Uncommitted.
     Guidance: no durable finding.
+- date: 2026-10-29T17:41:55.786831+00:00
+  text: Committed as 3d803d2 on main (not pushed; pushing deploys the site).
 description: |-
   Search for the homepage in terms people use (git-based task manager, task tracker, local-first, Jira alternative).
 
@@ -48,3 +50,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-29T17:41:55.786831+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
