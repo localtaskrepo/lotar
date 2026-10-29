@@ -60,7 +60,11 @@ pub(crate) fn handle_backlog(
     };
     input
         .add_search(&crate::utils::search_syntax::parse(
-            &backlog_args.query.join(" "),
+            &[
+                backlog_args.query.join(" "),
+                backlog_args.query_terms.join(" "),
+            ]
+            .join(" "),
         ))
         .map_err(|e| e.cli_message())?;
     let manual_order = input.sort_by.is_none();

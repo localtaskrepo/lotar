@@ -1609,6 +1609,7 @@ pub(crate) fn task_list_input(
         effort_max: string(params, "effort_max")?,
         sort_by: string(params, "sort_by")?,
         order: string(params, "order")?,
+        exclude: Vec::new(),
     };
     // The web search syntax (DEV-235), added to the other params.
     if let Some(text) = string(params, "query")? {

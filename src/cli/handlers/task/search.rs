@@ -34,11 +34,25 @@ impl CommandHandler for SearchHandler {
         renderer.log_debug("list: executing search");
         let tasks = crate::services::task_list::run(&ctx.storage, &query, chrono::Utc::now());
         let total_matching = tasks.len();
+        // Totals over every matching task, not just this page (DEV-13).
+        let sums = args
+            .sum
+            .iter()
+            .map(|field| crate::services::task_list::sum_field(&tasks, field, &query.config))
+            .collect::<Result<Vec<_>, _>>()?;
         let (offset, limit) = Self::resolve_pagination(&args)?;
         let (start, end) = crate::utils::pagination::slice_bounds(total_matching, offset, limit);
         let page = tasks.into_iter().skip(start).take(end - start).collect();
 
-        Self::render_results(renderer, page, total_matching, offset, limit, args.details);
+        Self::render_results(
+            renderer,
+            page,
+            total_matching,
+            offset,
+            limit,
+            args.details,
+            &sums,
+        );
 
         Ok(())
     }
@@ -83,7 +97,13 @@ impl SearchHandler {
                 .transpose()?,
             ..TaskQueryInput::default()
         };
-        let search = crate::utils::search_syntax::parse(&args.query.join(" "));
+        let terms: Vec<&str> = args
+            .query
+            .iter()
+            .chain(&args.query_terms)
+            .map(String::as_str)
+            .collect();
+        let search = crate::utils::search_syntax::parse(&terms.join(" "));
         input.add_search(&search).map_err(|e| e.to_string())?;
         if input.order.is_none() {
             input.order = Some(Self::order(args.reverse).to_string());
@@ -143,7 +163,19 @@ impl SearchHandler {
         offset: usize,
         limit: usize,
         show_details: bool,
+        sums: &[crate::services::task_list::FieldSum],
     ) {
+        let with_sums = |mut value: serde_json::Value| {
+            if !sums.is_empty() {
+                value["sums"] = serde_json::json!(sums);
+            }
+            value.to_string()
+        };
+        let print_sums = || {
+            for sum in sums {
+                renderer.emit_raw_stdout(format_args!("  {}", sum.describe()));
+            }
+        };
         if tasks.is_empty() {
             renderer.log_info("list: no results");
             let current_page = offset.checked_div(limit).map(|q| q + 1).unwrap_or(1);
@@ -154,8 +186,7 @@ impl SearchHandler {
             };
             match renderer.format {
                 crate::output::OutputFormat::Json => {
-                    renderer.emit_raw_stdout(
-                        serde_json::json!({
+                    renderer.emit_raw_stdout(with_sums(serde_json::json!({
                             "status": "success",
                             "message": if total_matching == 0 {
                                 "No tasks found".to_string()
@@ -175,9 +206,7 @@ impl SearchHandler {
                             "has_previous": offset > 0,
                             "next_offset": serde_json::Value::Null,
                             "next_page": serde_json::Value::Null,
-                        })
-                        .to_string(),
-                    );
+                    })));
                 }
                 _ => {
                     if total_matching == 0 {
@@ -192,6 +221,7 @@ impl SearchHandler {
                                 .to_string(),
                         );
                     }
+                    print_sums();
                 }
             }
             return;
@@ -246,8 +276,7 @@ impl SearchHandler {
 
         match renderer.format {
             crate::output::OutputFormat::Json => {
-                renderer.emit_raw_stdout(
-                    serde_json::json!({
+                renderer.emit_raw_stdout(with_sums(serde_json::json!({
                         "status": "success",
                         "message": format!("Found {} task(s)", display_tasks.len()),
                         "tasks": display_tasks,
@@ -260,9 +289,7 @@ impl SearchHandler {
                         "has_previous": has_previous,
                         "next_offset": next_offset,
                         "next_page": next_page,
-                    })
-                    .to_string(),
-                );
+                })));
             }
             _ => {
                 renderer.emit_success(format_args!("Found {} task(s):", display_tasks.len()));
@@ -315,6 +342,7 @@ impl SearchHandler {
                             .to_string(),
                     );
                 }
+                print_sums();
             }
         }
     }

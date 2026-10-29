@@ -542,8 +542,12 @@ describe('suggestForFragment fixed value enums (backend-strict)', () => {
         ])
     })
 
-    it('suggests 7d as the only recent window', () => {
-        expect(suggestForFragment('recent:', source).map((s) => s.insert)).toEqual(['recent:7d'])
+    it('suggests common recent windows (any days or weeks work, DEV-3)', () => {
+        expect(suggestForFragment('recent:', source).map((s) => s.insert)).toEqual([
+            'recent:7d',
+            'recent:30d',
+            'recent:90d',
+        ])
     })
 
     it('suggests effort and due for needs', () => {
@@ -857,4 +861,15 @@ describe('shared search syntax cases (DEV-231)', () => {
             expect(parsed.errors ?? []).toEqual(testCase.errors ?? [])
         })
     }
+})
+
+describe('exclusions (DEV-5)', () => {
+    it('shows one Not chip per excluded value', () => {
+        const chips = chipsForFilterValue({ '-status': 'Done,Canceled', '-field:area': 'billing' }, {})
+        expect(chips.map((chip) => `${chip.label}=${chip.value}`)).toEqual([
+            'Not Status=Done',
+            'Not Status=Canceled',
+            'Not area=billing',
+        ])
+    })
 })

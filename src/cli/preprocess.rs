@@ -7,9 +7,51 @@ use std::borrow::Cow;
 ///    so they can appear after subcommands.
 /// 2. Normalize the `serve` subcommand so positional ports and `-p` map to
 ///    the canonical `--port` option Clap expects.
+/// 3. Route excluded filters in a `list`/`backlog` query (`-status:done`)
+///    to the query instead of letting Clap read them as short flags.
 pub fn normalize_args(raw_args: &[String]) -> Result<Vec<String>, String> {
     let hoisted = hoist_global_flags(raw_args)?;
-    normalize_serve_args(&hoisted)
+    let serve = normalize_serve_args(&hoisted)?;
+    Ok(route_query_exclusions(&serve))
+}
+
+/// `-status:done` after `lotar list` would reach Clap as `-s tatus:done`.
+/// Pass such excluded filters (DEV-5) to the query through the hidden
+/// `--query-term` option. Only terms that parse as an excluded filter with
+/// a key of two or more characters are moved, so short flags such as
+/// `-s Todo` or `-s=Todo` keep working.
+fn route_query_exclusions(args: &[String]) -> Vec<String> {
+    let takes_query = |idx: usize| {
+        args[..idx].iter().enumerate().any(|(i, arg)| {
+            matches!(arg.as_str(), "list" | "ls")
+                || (arg == "backlog" && i > 0 && args[i - 1] == "sprint")
+        })
+    };
+    let mut out = Vec::with_capacity(args.len());
+    let mut after_separator = false;
+    for (idx, arg) in args.iter().enumerate() {
+        if arg == "--" {
+            after_separator = true;
+        }
+        if !after_separator && is_excluded_filter(arg) && takes_query(idx) {
+            out.push("--query-term".to_string());
+        }
+        out.push(arg.clone());
+    }
+    out
+}
+
+fn is_excluded_filter(arg: &str) -> bool {
+    if !arg.starts_with('-') || arg.starts_with("--") {
+        return false;
+    }
+    let parsed = crate::utils::search_syntax::parse(arg);
+    parsed.text.is_empty()
+        && parsed.errors.is_empty()
+        && parsed.filters.keys().any(|key| {
+            key.strip_prefix('-')
+                .is_some_and(|k| k.chars().count() >= 2)
+        })
 }
 
 fn hoist_global_flags(raw_args: &[String]) -> Result<Vec<String>, String> {
@@ -108,6 +150,10 @@ fn try_hoist_global_flag(
         return Ok(Some((2, vec!["--format".to_string(), value])));
     }
 
+    // `-field:area=billing` is an excluded filter (DEV-5), not `-f ield...`.
+    if is_excluded_filter(token) {
+        return Ok(None);
+    }
     if token.starts_with("-f") && token.len() > 2 {
         return Ok(Some((1, vec![format!("--format={}", &token[2..])])));
     }
@@ -582,5 +628,34 @@ mod tests {
             ]))
             .is_none()
         );
+    }
+
+    #[test]
+    fn routes_excluded_filters_after_list_to_the_query() {
+        let args = to_vec(&[
+            "lotar",
+            "list",
+            "-status:done",
+            "-s",
+            "Todo",
+            "-s=Todo",
+            "-oauth",
+        ]);
+        assert_eq!(
+            crate::cli::preprocess::normalize_args(&args).unwrap(),
+            to_vec(&[
+                "lotar",
+                "list",
+                "--query-term",
+                "-status:done",
+                "-s",
+                "Todo",
+                "-s=Todo",
+                "-oauth"
+            ])
+        );
+        // Not a list command: left alone.
+        let args = to_vec(&["lotar", "add", "-status:done"]);
+        assert_eq!(crate::cli::preprocess::normalize_args(&args).unwrap(), args);
     }
 }

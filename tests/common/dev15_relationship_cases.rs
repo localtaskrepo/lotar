@@ -1055,7 +1055,7 @@ fn graph_filters_reject_invalid_explicit_values_including_empty_inventory() {
         ("sprints", "1,,2"),
         ("sprints", "0"),
         ("due", "yesterday"),
-        ("recent", "1d"),
+        ("recent", "1h"),
         ("needs", "nonsense"),
         ("deletion", "ALL"),
         ("sort_by", "garbage"),

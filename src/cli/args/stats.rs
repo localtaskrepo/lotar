@@ -26,7 +26,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -48,7 +48,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -99,7 +99,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -112,7 +112,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -128,7 +128,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -147,7 +147,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -163,7 +163,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -173,7 +173,7 @@ pub enum StatsAction {
         #[arg(long = "by", default_value = "assignee")]
         by: String,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui area=billing')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
         /// Output unit: hours|days|weeks|points|auto
         #[arg(long = "unit", value_enum, default_value_t = StatsEffortUnit::Hours)]
@@ -204,7 +204,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -217,7 +217,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -230,7 +230,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -246,7 +246,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 
@@ -265,7 +265,7 @@ pub enum StatsAction {
         #[arg(long)]
         global: bool,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         filter: Vec<String>,
     },
 

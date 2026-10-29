@@ -57,7 +57,7 @@ pub enum SprintAction {
 #[derive(Args, Debug, Default, Clone)]
 pub struct TaskSelectionArgs {
     /// Select tasks with the web search syntax, e.g. `--select 'status:todo tag:ui area=billing'`
-    #[arg(long = "select", value_name = "QUERY")]
+    #[arg(long = "select", value_name = "QUERY", allow_hyphen_values = true)]
     pub select: Vec<String>,
 
     /// Filter by status (repeatable)
@@ -430,6 +430,9 @@ pub struct SprintBacklogArgs {
     /// Filters and search text in the web search syntax, as for `lotar list`
     #[arg(num_args = 0..)]
     pub query: Vec<String>,
+    /// Excluded filters from the query, routed by the argument preprocessor.
+    #[arg(long = "query-term", hide = true, allow_hyphen_values = true)]
+    pub query_terms: Vec<String>,
     /// Restrict results to a specific project prefix (e.g. TEST)
     #[arg(long)]
     pub project: Option<String>,

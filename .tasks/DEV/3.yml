@@ -1,10 +1,11 @@
 title: 'CLI list/search: filter by age older than N days'
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.698804+00:00
-modified: 2026-10-28T19:10:45.170597+00:00
+modified: 2026-10-28T23:50:45.700650+00:00
 relationships:
   related:
   - DEV-13
@@ -16,6 +17,8 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 3: Allow CLI list/search to filter by age older than N days
+- date: 2026-10-28T23:50:45.678180+00:00
+  text: 'Outcome: recent takes any days or weeks (recent:14d, recent:2w, --recent 30d), measured from the task''s modified time (decided: not git); -recent:30d lists tasks not changed for 30 days. stats stale uses the same rule (no git needed; --threshold 0d lists all). UI suggests 7d/30d/90d. Contracts: openapi recent pattern, MCP schema, docs. Evidence: tests/dev3_dev13_recent_and_sum_test.rs; stale/audit tests updated. Committed with DEV-5 and DEV-13.'
 description: |-
   Migrated checklist requirements:
   Provide an older-than-N-days filter for CLI list/search, not only age/stale statistics. Specify created versus modified age and inclusive/exclusive boundaries; verify composition with other filters. Coordinate DEV-57/75.
@@ -59,3 +62,15 @@ history:
   - field: relationships
     old: '{"related":["DEV-13"]}'
     new: '{"related":["DEV-13","DEV-230"]}'
+- at: 2026-10-28T23:50:45.678180+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T23:50:45.700650+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

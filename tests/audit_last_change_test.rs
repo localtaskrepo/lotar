@@ -51,20 +51,13 @@ mod git_required {
         run_git(root, &["add", ".tasks/ABC/2.yml"], &[]);
         run_git(root, &["commit", "-m", "add 2"], &[]);
 
-        // Call via stats stale over 0d threshold to include all, asserting both IDs appear
+        // `stats changed` lists the last change per task from git history
+        // (`stats stale` uses each task's modified time since DEV-3).
         let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
             .args([
-                "--format",
-                "json",
-                "stats",
-                "stale",
-                "--threshold",
-                "0d",
-                "--global",
-                "--limit",
-                "10",
+                "--format", "json", "stats", "changed", "--global", "--limit", "10",
             ])
             .output()
             .unwrap();

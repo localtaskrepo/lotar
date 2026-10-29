@@ -1,10 +1,11 @@
 title: list group-by and sum flags
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.762443+00:00
-modified: 2026-10-28T19:10:45.490052+00:00
+modified: 2026-10-28T23:50:45.754100+00:00
 relationships:
   related:
   - DEV-3
@@ -18,6 +19,8 @@ comments:
     Former TODO.md line 14: --group-by <field> flag on lotar list that groups output by any top-level or custom field AND/OR --sum <field> flag that adds per-group and grand totals for numeric fields (effort being the obvious one)
 - date: 2026-10-28T02:09:47.191726+00:00
   text: Ideally works for any command output that produces lists
+- date: 2026-10-28T23:50:45.732962+00:00
+  text: 'Outcome (scope decided: sum only, no list group-by): lotar list --sum effort / --sum <numeric custom field> (repeatable) adds totals over every matching task, not just the page; effort keeps hours and points apart; missing and non-numeric values counted separately; JSON ''sums'' list, one text line per sum. Per-group totals stay with stats effort --by --filter. Evidence: tests/dev3_dev13_recent_and_sum_test.rs. Docs: list.md Totals, task.md. Committed with DEV-5 and DEV-3.'
 description: |-
   Migrated checklist requirements:
   Add list --group-by for top-level and custom fields and --sum for numeric fields, separately and together. Include per-group and grand totals; define effort-unit handling, missing/nonnumeric values and machine-readable output. Existing stats commands and DEV-57 query parity do not implement these list flags.
@@ -53,3 +56,15 @@ history:
   - field: relationships
     old: '{"related":["DEV-3"]}'
     new: '{"related":["DEV-3","DEV-230"]}'
+- at: 2026-10-28T23:50:45.732962+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T23:50:45.754100+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

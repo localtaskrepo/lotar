@@ -350,5 +350,103 @@
     "filters": {
       "field:due": "friday"
     }
+  },
+  {
+    "input": "-status:done",
+    "text": "",
+    "filters": {
+      "-status": "done"
+    }
+  },
+  {
+    "input": "-status:done -status:canceled",
+    "text": "",
+    "filters": {
+      "-status": "done,canceled"
+    }
+  },
+  {
+    "input": "status:todo,inprogress -tag:wip",
+    "text": "",
+    "filters": {
+      "status": "todo,inprogress",
+      "-tags": "wip"
+    }
+  },
+  {
+    "input": "-field:area=billing",
+    "text": "",
+    "filters": {
+      "-field:area": "billing"
+    }
+  },
+  {
+    "input": "-owner=ops",
+    "text": "",
+    "filters": {
+      "-owner": "ops"
+    }
+  },
+  {
+    "input": "-oauth login",
+    "text": "-oauth login",
+    "filters": {}
+  },
+  {
+    "input": "-title:draft",
+    "text": "-title:draft",
+    "filters": {}
+  },
+  {
+    "input": "-q=x",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "\"-q=x\" cannot be excluded"
+    ]
+  },
+  {
+    "input": "-has:tag",
+    "text": "",
+    "filters": {
+      "-has": "tag"
+    }
+  },
+  {
+    "input": "-mine:true",
+    "text": "",
+    "filters": {
+      "-mine": "true"
+    }
+  },
+  {
+    "input": "-\"login redirect\"",
+    "text": "-\"login redirect\"",
+    "filters": {}
+  },
+  {
+    "input": "--status:done",
+    "text": "--status:done",
+    "filters": {}
+  },
+  {
+    "input": "-status:",
+    "text": "-status:",
+    "filters": {}
+  },
+  {
+    "input": "-status:\"unclosed",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "Unmatched quote in \"status:\"unclosed\""
+    ]
+  },
+  {
+    "input": "-prio:low,medium bug",
+    "text": "bug",
+    "filters": {
+      "-priority": "low,medium"
+    }
   }
 ]

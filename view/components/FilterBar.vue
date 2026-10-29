@@ -541,7 +541,7 @@ const helpDescriptions: Record<string, string> = {
   assignee: 'Member name, @me for yourself, or __none__ for unassigned tasks.',
   tags: 'Existing tags, or a tag you type.',
   due: 'today, soon (the next 7 days), later, or overdue (before today and not done).',
-  recent: '7d: modified within the last seven days.',
+  recent: 'Days or weeks (7d, 30d, 2w): changed within that time. -recent:30d: not changed for 30 days.',
   needs: 'effort, due or both: tasks missing every listed field.',
   has: 'attachment, image, link or tag: tasks carrying every listed kind.',
   due_within: 'A number of days: due from today through that many days ahead.',
@@ -556,6 +556,13 @@ const filterHelp = computed(() => [
     description: helpDescriptions[meta.key] || '',
     aliases: meta.aliases.filter((alias) => alias !== meta.key).join(', '),
   })),
+  {
+    syntax: '-key:value',
+    label: 'Exclude',
+    description:
+      'A minus before any filter leaves out tasks that match it, e.g. -status:done, -tag:wip or -field:area=billing.',
+    aliases: '',
+  },
   {
     syntax: 'field:name=value',
     label: 'Custom field',
@@ -1428,7 +1435,10 @@ function removeChip(chip: FilterChip) {
       break
     default: {
       const next = { ...customFilters.value }
-      delete next[chip.key]
+      // An exclusion (`-status:done`, DEV-5) removes one value at a time.
+      const remaining = chip.key.startsWith('-') ? removeCsvValue(next[chip.key] ?? '', chip.value) : ''
+      if (remaining) next[chip.key] = remaining
+      else delete next[chip.key]
       customFilters.value = next
     }
   }

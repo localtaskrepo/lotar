@@ -4,7 +4,8 @@
 //! plain words become the search text, `key:value` tokens with a known key
 //! become filters, `key=value` and `field:name=value` set a filter outright.
 //! Unknown `key:value` tokens, URLs, `/regex/` terms and fully quoted
-//! literals stay search text. Both parsers are checked against the shared
+//! literals stay search text. A leading minus on a filter excludes it
+//! (`-status:done`). Both parsers are checked against the shared
 //! cases in `tests/fixtures/search_syntax_cases.json`, so keep them in step.
 
 use std::collections::BTreeMap;
@@ -61,6 +62,9 @@ const fn key(key: &'static str, aliases: &'static [&'static str]) -> SearchKey {
 pub const LIST_KEYS: &[&str] = &[
     "status", "priority", "type", "sprints", "tags", "needs", "has",
 ];
+
+/// Routing keys a leading minus cannot exclude.
+const UNNEGATABLE_KEYS: &[&str] = &["q", "order", "sort_by", "deletion"];
 
 /// The search key for an alias, ignoring case.
 pub fn find_key(token: &str) -> Option<&'static SearchKey> {
@@ -387,6 +391,38 @@ impl Parser {
         self.set(meta.key.to_string(), value, false);
     }
 
+    /// Parse `raw` (starting with `-`) as an excluded filter; false when the
+    /// rest is not a single filter, so the token stays search text.
+    fn negation(&mut self, raw: &str) -> bool {
+        let mut inner = Parser {
+            parsed: ParsedSearch::default(),
+            words: Vec::new(),
+            assigned: BTreeMap::new(),
+        };
+        inner.token(&raw[1..]);
+        if !inner.parsed.errors.is_empty() {
+            self.parsed.errors.append(&mut inner.parsed.errors);
+            return true;
+        }
+        if inner.parsed.filters.len() != 1 || !inner.words.is_empty() {
+            return false;
+        }
+        let (key, value) = inner.parsed.filters.into_iter().next().expect("one filter");
+        if UNNEGATABLE_KEYS.contains(&key.as_str()) {
+            self.parsed
+                .errors
+                .push(format!("\"{raw}\" cannot be excluded"));
+            return true;
+        }
+        let negated = format!("-{key}");
+        let value = match self.parsed.filters.get(&negated) {
+            Some(previous) => format!("{previous},{value}"),
+            None => value,
+        };
+        self.parsed.filters.insert(negated, value);
+        true
+    }
+
     fn set(&mut self, key: String, value: String, assigned: bool) {
         self.assigned.insert(key.clone(), assigned);
         self.parsed.filters.insert(key, value);
@@ -407,6 +443,12 @@ impl Parser {
         // URLs and `/regex/` terms are search text even with `=` or `:`.
         if is_url_like(raw) || raw.starts_with('/') || raw.starts_with("-/") {
             self.words.push(raw.to_string());
+            return;
+        }
+        // A leading minus on a filter excludes it (DEV-5): `-status:done`,
+        // `-field:area=billing`. Negations of one key add up. A minus on
+        // anything else (`-oauth`, `-title:draft`) stays search text.
+        if raw.len() > 1 && raw.starts_with('-') && !raw.starts_with("--") && self.negation(raw) {
             return;
         }
         let eq = find_top_level(raw, '=');

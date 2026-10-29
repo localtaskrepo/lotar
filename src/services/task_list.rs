@@ -76,6 +76,9 @@ pub struct TaskQueryInput {
     pub effort_max: Option<String>,
     pub sort_by: Option<String>,
     pub order: Option<String>,
+    /// Excluded filters (DEV-5): a task matching any of these is left out.
+    /// Each holds one filter, e.g. from `-status:done`.
+    pub exclude: Vec<TaskQueryInput>,
 }
 
 /// A validated query, ready for [`run`].
@@ -90,6 +93,8 @@ pub struct TaskQuery {
     /// The configuration enums and field names were resolved against: the
     /// requested project's, else the base configuration.
     pub config: ResolvedConfig,
+    /// Tasks matching any of these are left out (DEV-5).
+    pub exclude: Vec<TaskQuery>,
 }
 
 /// Why a query was rejected. Interfaces map these onto their own error
@@ -192,6 +197,7 @@ impl TaskQueryInput {
             effort_max: query.get("effort_max").cloned(),
             sort_by: query.get("sort_by").cloned(),
             order: query.get("order").cloned(),
+            exclude: Vec::new(),
         };
         if let Some(text) = query.get("query") {
             input.add_search(&crate::utils::search_syntax::parse(text))?;
@@ -224,6 +230,18 @@ impl TaskQueryInput {
         };
         let mut text = (!search.text.is_empty()).then(|| search.text.clone());
         for (key, value) in &search.filters {
+            // `-key:value` excludes (DEV-5): one exclusion per value, so a
+            // task matching any of them is left out.
+            if let Some(negated) = key.strip_prefix('-') {
+                for value in csv(value) {
+                    let mut exclusion = TaskQueryInput::default();
+                    let mut single = crate::utils::search_syntax::ParsedSearch::default();
+                    single.filters.insert(negated.to_string(), value);
+                    exclusion.add_search(&single)?;
+                    self.exclude.push(exclusion);
+                }
+                continue;
+            }
             match key.as_str() {
                 "status" => self.status.extend(csv(value)),
                 "priority" => self.priority.extend(csv(value)),
@@ -408,11 +426,23 @@ impl TaskQueryInput {
                 .collect(),
         };
 
+        // Exclusions look at every task, deleted ones included, so they can
+        // remove whatever the main query found.
+        let exclude = self
+            .exclude
+            .into_iter()
+            .map(|mut exclusion| {
+                exclusion.deletion = DeletionFilter::All;
+                exclusion.resolve(base, tasks_root)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         Ok(TaskQuery {
             filter,
             field_filters,
             options,
             config,
+            exclude,
         })
     }
 }
@@ -434,7 +464,26 @@ pub fn run(
     let mut tasks = crate::services::task_service::TaskService::list(storage, &query.filter);
     apply_field_filters(&mut tasks, &query.field_filters, &query.config);
     task_query::apply(&mut tasks, &query.options, now);
+    remove_excluded(storage, query, &mut tasks, now);
     tasks
+}
+
+/// Leave out tasks matching any of the query's exclusions (DEV-5).
+pub fn remove_excluded(
+    storage: &Storage,
+    query: &TaskQuery,
+    tasks: &mut Vec<(String, TaskDTO)>,
+    now: chrono::DateTime<chrono::Utc>,
+) {
+    if query.exclude.is_empty() {
+        return;
+    }
+    let excluded: std::collections::HashSet<String> = query
+        .exclude
+        .iter()
+        .flat_map(|exclusion| run(storage, exclusion, now).into_iter().map(|(id, _)| id))
+        .collect();
+    tasks.retain(|(id, _)| !excluded.contains(id));
 }
 
 /// IDs of the tasks a search in the web syntax selects, for commands that
@@ -518,4 +567,141 @@ pub fn parse_sprints_csv(raw: Option<&str>) -> Result<Vec<u32>, String> {
             }
         })
         .collect()
+}
+
+/// Totals of one field over a task list (DEV-13): effort (time and points
+/// kept apart) or a numeric custom field.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct FieldSum {
+    /// `effort` or `field:<name>`.
+    pub field: String,
+    /// Custom fields: the total of the numeric values.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<f64>,
+    /// Effort: total time in hours.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hours: Option<f64>,
+    /// Effort: total points.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub points: Option<f64>,
+    /// Tasks whose value was added.
+    pub counted: usize,
+    /// Tasks without a value.
+    pub missing: usize,
+    /// Tasks whose value is not a number (or not an effort).
+    pub invalid: usize,
+}
+
+/// Sum `field` (`effort`, or a custom field by name or `field:<name>`) over
+/// `tasks`. Other builtin fields are not numbers and are rejected.
+pub fn sum_field(
+    tasks: &[(String, TaskDTO)],
+    field: &str,
+    config: &ResolvedConfig,
+) -> Result<FieldSum, String> {
+    let field = field.trim();
+    if field.eq_ignore_ascii_case("effort") {
+        let mut sum = FieldSum {
+            field: "effort".to_string(),
+            total: None,
+            hours: Some(0.0),
+            points: Some(0.0),
+            counted: 0,
+            missing: 0,
+            invalid: 0,
+        };
+        for (_, task) in tasks {
+            match task
+                .effort
+                .as_deref()
+                .map(str::trim)
+                .filter(|e| !e.is_empty())
+            {
+                None => sum.missing += 1,
+                Some(raw) => match crate::utils::effort::parse_effort(raw).map(|e| e.kind) {
+                    Ok(crate::utils::effort::EffortKind::TimeHours(h)) => {
+                        sum.hours = sum.hours.map(|t| t + h);
+                        sum.counted += 1;
+                    }
+                    Ok(crate::utils::effort::EffortKind::Points(p)) => {
+                        sum.points = sum.points.map(|t| t + p);
+                        sum.counted += 1;
+                    }
+                    Err(_) => sum.invalid += 1,
+                },
+            }
+        }
+        return Ok(sum);
+    }
+    let name = if crate::utils::fields::is_reserved_field(field).is_some() {
+        None
+    } else {
+        crate::utils::custom_fields::resolve_filter_name(field, config)
+    }
+    .ok_or_else(|| {
+        format!("Cannot sum '{field}': use effort or a numeric custom field (field:<name>)")
+    })?;
+    let mut sum = FieldSum {
+        field: format!("field:{name}"),
+        total: Some(0.0),
+        hours: None,
+        points: None,
+        counted: 0,
+        missing: 0,
+        invalid: 0,
+    };
+    for (_, task) in tasks {
+        let value = crate::utils::custom_fields::extract_value_strings(&task.custom_fields, &name)
+            .and_then(|values| values.into_iter().next())
+            .filter(|v| !v.trim().is_empty());
+        match value.map(|v| v.trim().parse::<f64>()) {
+            None => sum.missing += 1,
+            Some(Ok(n)) if n.is_finite() => {
+                sum.total = sum.total.map(|t| t + n);
+                sum.counted += 1;
+            }
+            Some(_) => sum.invalid += 1,
+        }
+    }
+    Ok(sum)
+}
+
+impl FieldSum {
+    /// One line for text output, e.g. `effort: 34h + 13pt over 12 task(s) (3 without)`.
+    pub fn describe(&self) -> String {
+        let number = |n: f64| {
+            let rounded = (n * 100.0).round() / 100.0;
+            if rounded.fract() == 0.0 {
+                format!("{rounded:.0}")
+            } else {
+                format!("{rounded}")
+            }
+        };
+        let total = match (self.total, self.hours, self.points) {
+            (Some(total), _, _) => number(total),
+            (None, Some(h), Some(p)) if p > 0.0 && h > 0.0 => {
+                format!("{}h + {}pt", number(h), number(p))
+            }
+            (None, _, Some(p)) if p > 0.0 => format!("{}pt", number(p)),
+            (None, Some(h), _) => format!("{}h", number(h)),
+            _ => "0".to_string(),
+        };
+        let mut notes = Vec::new();
+        if self.missing > 0 {
+            notes.push(format!("{} without a value", self.missing));
+        }
+        if self.invalid > 0 {
+            notes.push(format!("{} not a number", self.invalid));
+        }
+        let field = self.field.strip_prefix("field:").unwrap_or(&self.field);
+        let notes = if notes.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", notes.join(", "))
+        };
+        format!(
+            "Sum of {field}: {total} over {} task(s){notes}",
+            self.counted
+        )
+    }
 }

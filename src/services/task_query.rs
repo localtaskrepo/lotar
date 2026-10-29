@@ -18,8 +18,8 @@
 //! - Stored due dates are parsed as RFC3339, naive local datetimes, or
 //!   date-only (local midnight) — the persisted formats. Human keywords
 //!   ("today", "+3d") are intentionally NOT re-evaluated at query time.
-//! - `recent=7d` compares parsed `modified` instants against `now - 7d`
-//!   (inclusive lower bound).
+//! - `recent=<N>d|<N>w` compares parsed `modified` instants against
+//!   `now - N days` (inclusive lower bound).
 
 use crate::api_types::TaskDTO;
 use crate::utils::text_search::{SearchQuery, Searchable};
@@ -76,9 +76,12 @@ pub enum DueFilter {
     Overdue,
 }
 
+/// `recent`: changed within the last N days (DEV-3), measured from the
+/// task's `modified` time. `-recent:30d` leaves those out: not changed for
+/// 30 days.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RecentFilter {
-    Last7Days,
+pub struct RecentFilter {
+    pub days: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -237,10 +240,24 @@ pub fn parse_due(raw: &str) -> Result<DueFilter, String> {
     }
 }
 
+/// `recent`: a positive number of days or weeks, `14d` or `2w`.
 pub fn parse_recent(raw: &str) -> Result<RecentFilter, String> {
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "7d" => Ok(RecentFilter::Last7Days),
-        other => Err(format!("Invalid recent: '{other}' (expected 7d)")),
+    let value = raw.trim().to_ascii_lowercase();
+    let invalid =
+        || format!("Invalid recent: '{value}' (expected days or weeks, e.g. 7d, 30d, 2w)");
+    let (number, unit_days) = if let Some(n) = value.strip_suffix('d') {
+        (n, 1)
+    } else if let Some(n) = value.strip_suffix('w') {
+        (n, 7)
+    } else {
+        return Err(invalid());
+    };
+    match number.parse::<u32>() {
+        Ok(n) if n > 0 => n
+            .checked_mul(unit_days)
+            .map(|days| RecentFilter { days })
+            .ok_or_else(invalid),
+        _ => Err(invalid()),
     }
 }
 
@@ -471,9 +488,9 @@ pub fn today_local(now: DateTime<Utc>) -> NaiveDate {
     local_date_of(now)
 }
 
-/// Inclusive lower bound for `recent=7d`.
-pub fn recent_cutoff(now: DateTime<Utc>) -> DateTime<Utc> {
-    now - Duration::days(7)
+/// Inclusive lower bound for `recent=<N>d`.
+pub fn recent_cutoff(now: DateTime<Utc>, filter: RecentFilter) -> DateTime<Utc> {
+    now - Duration::days(i64::from(filter.days))
 }
 
 /// Pure, DST-safe date-bucket test (calendar arithmetic only).
@@ -576,7 +593,7 @@ pub fn apply_smart_filters(
         return;
     }
     let today = today_local(now);
-    let cutoff = recent_cutoff(now);
+    let cutoff = options.recent.map(|filter| recent_cutoff(now, filter));
     tasks.retain(|(_, task)| {
         options
             .due
@@ -584,9 +601,7 @@ pub fn apply_smart_filters(
             && options.due_within_days.is_none_or(|days| {
                 due_raw_within_window(task.due_date.as_deref(), today, i64::from(days))
             })
-            && options
-                .recent
-                .is_none_or(|_| task_matches_recent(task, cutoff))
+            && cutoff.is_none_or(|cutoff| task_matches_recent(task, cutoff))
             && task_matches_needs(task, &options.needs)
             && task_matches_has(task, &options.has)
             && task_matches_effort(task, options)
@@ -814,8 +829,12 @@ mod tests {
         assert!(parse_order("descending").is_err());
         assert_eq!(parse_due("TODAY"), Ok(DueFilter::Today));
         assert!(parse_due("tomorrow").is_err());
-        assert_eq!(parse_recent("7d"), Ok(RecentFilter::Last7Days));
-        assert!(parse_recent("30d").is_err());
+        assert_eq!(parse_recent("7d"), Ok(RecentFilter { days: 7 }));
+        assert_eq!(parse_recent("30D"), Ok(RecentFilter { days: 30 }));
+        assert_eq!(parse_recent("2w"), Ok(RecentFilter { days: 14 }));
+        for bad in ["0d", "7", "7h", "-1d", "d"] {
+            assert!(parse_recent(bad).is_err(), "{bad}");
+        }
         let needs = parse_needs("effort,due").unwrap();
         assert!(needs.contains(&NeedsFlag::Effort) && needs.contains(&NeedsFlag::Due));
         assert!(parse_needs("effort,size").is_err());
@@ -1119,7 +1138,7 @@ mod tests {
         let now = DateTime::parse_from_rfc3339("2026-06-15T12:00:00Z")
             .unwrap()
             .with_timezone(&Utc);
-        let cutoff = recent_cutoff(now);
+        let cutoff = recent_cutoff(now, RecentFilter { days: 7 });
         let t_exact = dto("A-1", cutoff.to_rfc3339().as_str());
         let t_older = dto(
             "B-1",
@@ -1136,7 +1155,7 @@ mod tests {
             ("C-1".to_string(), needs_both),
         ];
         let options = TaskQueryOptions {
-            recent: Some(RecentFilter::Last7Days),
+            recent: Some(RecentFilter { days: 7 }),
             needs: [NeedsFlag::Effort, NeedsFlag::Due].into_iter().collect(),
             ..TaskQueryOptions::default()
         };

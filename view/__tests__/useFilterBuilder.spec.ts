@@ -175,3 +175,15 @@ describe('buildServerFilter shared-query filters (DEV-230)', () => {
         expect(extras).toEqual({})
     })
 })
+
+describe('exclusions (DEV-5)', () => {
+    it('sends -key filters to the server in the query syntax', () => {
+        const { serverFilter } = buildServerFilter(
+            { '-status': 'Done,Canceled', '-field:area': 'billing', owner: 'ops' },
+            '',
+        )
+        expect(serverFilter.query).toBe('-status="Done,Canceled" -field:area=billing')
+        expect(serverFilter.owner).toBe('ops')
+        expect(serverFilter['-status']).toBeUndefined()
+    })
+})

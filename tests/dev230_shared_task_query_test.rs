@@ -358,7 +358,7 @@ fn every_interface_rejects_the_same_invalid_values() {
         ("--has", "has", "photo", "Invalid has entry"),
         ("--due", "due", "someday", "Invalid due"),
         ("--effort-min", "effort_min", "lots", "Invalid effort_min"),
-        ("--recent", "recent", "30d", "Invalid recent"),
+        ("--recent", "recent", "30x", "Invalid recent"),
     ];
     for (flag, param, value, message) in cases {
         let rest = [(param, value)];

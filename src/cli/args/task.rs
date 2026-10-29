@@ -402,7 +402,7 @@ pub enum TaskRelationshipsAction {
         #[arg(long, action = clap::ArgAction::Set)]
         include_isolated: Option<bool>,
         /// Only tasks matching this query, in the web search syntax (e.g. 'status:todo tag:ui')
-        #[arg(long = "filter", value_name = "QUERY")]
+        #[arg(long = "filter", value_name = "QUERY", allow_hyphen_values = true)]
         #[serde(default)]
         filter: Vec<String>,
     },
@@ -585,6 +585,12 @@ pub struct TaskSearchArgs {
     )]
     pub query: Vec<String>,
 
+    /// Excluded filters from the query (`-status:done`), routed here by the
+    /// argument preprocessor so Clap does not read them as short flags.
+    #[arg(long = "query-term", hide = true, allow_hyphen_values = true)]
+    #[serde(default)]
+    pub query_terms: Vec<String>,
+
     /// Filter by assignee (@me for current user, __none__ for unassigned)
     #[arg(long, short = 'a')]
     pub assignee: Option<String>,
@@ -691,6 +697,11 @@ pub struct TaskSearchArgs {
     #[arg(long)]
     #[serde(default)]
     pub details: bool,
+
+    /// Add totals of a field over every matching task: effort or a numeric custom field (repeatable)
+    #[arg(long = "sum", value_name = "FIELD")]
+    #[serde(default)]
+    pub sum: Vec<String>,
 }
 
 #[derive(Args, Deserialize, Debug)]

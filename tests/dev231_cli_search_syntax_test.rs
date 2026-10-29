@@ -230,3 +230,67 @@ fn one_query_string_works_on_every_interface() {
     assert_eq!(status, 400);
     assert!(mcp(json!({"query": "owner="}))["error"]["code"] == -32602);
 }
+
+/// DEV-5: a leading minus excludes a filter, on every interface.
+#[test]
+fn excluded_filters_work_everywhere() {
+    use crate::common::env_mutex::EnvVarGuard;
+    use serde_json::json;
+
+    let ws = workspace();
+    // Bare exclusions work as CLI arguments, before or after flags.
+    assert_eq!(run(&ws, &["-status:done"]).unwrap(), ids(&[2, 1]));
+    assert_eq!(
+        run(
+            &ws,
+            &["--page-size", "5", "-prio:P0", "-field:area=billing"]
+        )
+        .unwrap(),
+        ids(&[3])
+    );
+    assert_eq!(
+        run(&ws, &["-status:done", "-status:todo"]).unwrap(),
+        ids(&[1])
+    );
+    // Short flags keep working; -word stays a search-text exclusion.
+    assert_eq!(run(&ws, &["-s", "Todo"]).unwrap(), ids(&[2]));
+    assert_eq!(run(&ws, &["billing -login"]).unwrap(), ids(&[2]));
+    let err = run(&ws, &["login -q=x"]).unwrap_err();
+    assert!(err.contains("cannot be excluded"), "{err}");
+
+    // The same text through REST and MCP `query`.
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", ws.tasks_dir.to_string_lossy().as_ref());
+    let mut api = lotar::api_server::ApiServer::new();
+    lotar::routes::initialize(&mut api);
+    let resp = api.handle_request(&lotar::api_server::HttpRequest {
+        method: "GET".into(),
+        path: "/api/tasks/list".into(),
+        query: [(
+            "query".to_string(),
+            "-prio:P0 -field:area=billing".to_string(),
+        )]
+        .into(),
+        headers: Default::default(),
+        body: Vec::new(),
+    });
+    let body: Value = serde_json::from_slice(&resp.body).unwrap();
+    let rest: Vec<String> = body["data"]["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(rest, ids(&[3]));
+    let line = json!({"jsonrpc": "2.0", "id": 1, "method": "task/list", "params": {"query": "-status:done"}});
+    let resp: Value =
+        serde_json::from_str(&lotar::mcp::server::handle_json_line(&line.to_string())).unwrap();
+    let payload: Value =
+        serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    let mcp: Vec<String> = payload["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(mcp, ids(&[2, 1]));
+}

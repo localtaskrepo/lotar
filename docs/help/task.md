@@ -51,7 +51,7 @@ lotar task add --title "Task title" [--type|-t] [--priority|-P] [--reporter|-R] 
 ### list
 
 ```bash
-lotar task list [QUERY...] [--assignee|-a <VALUE>] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--sprint ID...] [--due BUCKET] [--due-within DAYS] [--recent 7d] [--needs FIELDS] [--has KINDS] [--effort-min VALUE] [--effort-max VALUE] [--sort-by|-S FIELD] [--reverse|-R] [--page-size|-L N] [--offset N | --page N] [--deleted | --include-deleted] [--details]
+lotar task list [QUERY...] [--assignee|-a <VALUE>] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--sprint ID...] [--due BUCKET] [--due-within DAYS] [--recent 7d] [--needs FIELDS] [--has KINDS] [--effort-min VALUE] [--effort-max VALUE] [--sort-by|-S FIELD] [--reverse|-R] [--page-size|-L N] [--offset N | --page N] [--deleted | --include-deleted] [--details] [--sum FIELD...]
 ```
 
 - Same as `lotar list`: `QUERY` uses the web search syntax (`status:todo mine:true has:tag field:area=billing`), see `docs/help/list.md`; the query is the one REST and MCP run.

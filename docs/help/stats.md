@@ -78,10 +78,10 @@ lotar stats activity --since 90d --group-by project --global
 ```
 
 ### stale
-Tickets whose last change is older than a threshold.
+Tickets not changed for at least a threshold, measured from each task's `modified` time (not git history), oldest change first. It lists the same tasks as `lotar list -recent:<threshold>`; add `--filter` to narrow them, e.g. `--filter -status:done` for open work only.
 
 ```bash
-lotar stats stale [--threshold Nd|Nw] [--limit N] [--global]
+lotar stats stale [--threshold Nd|Nw] [--filter '<query>'] [--limit N] [--global]
 ```
 Defaults: `--threshold 21d`, `--limit 20`.
 

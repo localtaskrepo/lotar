@@ -1,3 +1,6 @@
+/// Tasks not changed for at least `threshold` (DEV-3): the shared task query
+/// with `-recent:<threshold>`, measured from each task's `modified` time
+/// (not git history), oldest change first.
 pub(crate) fn run(
     threshold: &str,
     limit: usize,
@@ -7,85 +10,57 @@ pub(crate) fn run(
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
-    // Determine scope
     let scope_project = super::common::scope_project(global, project, resolver);
-
     let mut header = super::common::header("stats.stale", global, scope_project.as_deref());
     header.insert("threshold".into(), serde_json::json!(threshold));
-    let Some(git) = super::common::git_window(resolver, renderer, header.clone())? else {
-        return Ok(());
+
+    // Same grammar as `recent:` (Nd or Nw), so `stats stale --threshold 30d`
+    // lists exactly what `lotar list -recent:30d` does.
+    // A zero threshold lists every task.
+    let exclude_recent = if matches!(threshold.trim(), "0" | "0d" | "0w") {
+        String::new()
+    } else {
+        let recent = crate::services::task_query::parse_recent(threshold)
+            .map_err(|_| format!("Invalid threshold '{threshold}'. Use Nd or Nw, e.g., 21d, 8w"))?;
+        format!("-recent:{}d", recent.days)
     };
-    let repo_root = &git.repo_root;
-    let tasks_rel = git.tasks_rel();
+    let query = format!("{filter} {exclude_recent} sort_by=modified order=asc");
+    let tasks = super::common::list_tasks(scope_project.as_deref(), resolver, &query)?;
 
-    // Parse threshold (Nd or Nw)
-    fn parse_threshold_to_duration(s: &str) -> Result<chrono::Duration, String> {
-        let t = s.trim().to_lowercase();
-        if let Some(num) = t.strip_suffix('d') {
-            let n: i64 = num
-                .parse()
-                .map_err(|_| format!("Invalid threshold: {}", s))?;
-            return Ok(chrono::Duration::days(n));
-        }
-        if let Some(num) = t.strip_suffix('w') {
-            let n: i64 = num
-                .parse()
-                .map_err(|_| format!("Invalid threshold: {}", s))?;
-            return Ok(chrono::Duration::weeks(n));
-        }
-        Err(format!(
-            "Invalid threshold '{}'. Use Nd or Nw, e.g., 21d, 8w",
-            s
-        ))
-    }
-
-    let thr = parse_threshold_to_duration(threshold)?;
     let now = chrono::Utc::now();
-
-    // Compute last change per task by scanning full history using existing aggregator
-    let since_epoch = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH);
-    let until_now = now;
-    let mut items = crate::services::audit_service::AuditService::list_changed_tasks(
-        repo_root,
-        &tasks_rel,
-        since_epoch,
-        until_now,
-        None,
-        scope_project.as_deref(),
-    )?;
-
-    // Filter by age
-    items.retain(|i| (now - i.last_date) >= thr);
-    // Sort by age descending (older first)
-    items.sort_by_key(|a| a.last_date);
-    // Only tickets matching `--filter` (DEV-238).
-    let keep = super::common::filter_ids(scope_project.as_deref(), resolver, filter)?;
-    let limited: Vec<_> = items
-        .into_iter()
-        .filter(|i| keep.as_ref().is_none_or(|ids| ids.contains(&i.id)))
-        .take(limit)
-        .collect();
+    let modified = |task: &crate::api_types::TaskDTO| {
+        chrono::DateTime::parse_from_rfc3339(&task.modified)
+            .map(|at| at.with_timezone(&chrono::Utc))
+            .ok()
+    };
+    let age_days = |task: &crate::api_types::TaskDTO| {
+        modified(task)
+            .map(|at| (now - at).num_days())
+            .unwrap_or_default()
+    };
+    let limited: Vec<_> = tasks.into_iter().take(limit).collect();
 
     super::common::emit_items(
         renderer,
         header,
         &limited,
-        |i| {
+        |(id, task)| {
             serde_json::json!({
-                "id": i.id,
-                "project": i.project,
-                "file": i.file,
-                "last_date": i.last_date.to_rfc3339(),
-                "age_days": ((now - i.last_date).num_days()),
+                "id": id,
+                "project": crate::storage::TaskId::parse(id).map(|parsed| parsed.project).ok(),
+                "title": task.title,
+                "status": task.status.to_string(),
+                "last_date": task.modified,
+                "age_days": age_days(task),
             })
         },
-        |i| {
+        |(id, task)| {
             format!(
                 "{:>6}d  {}  {}  {}",
-                (now - i.last_date).num_days(),
-                i.id,
-                i.project,
-                i.last_date.to_rfc3339()
+                age_days(task),
+                id,
+                task.modified,
+                task.title
             )
         },
         "No stale tickets over the threshold.",

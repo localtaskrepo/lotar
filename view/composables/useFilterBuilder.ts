@@ -2,6 +2,7 @@ import { computed, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { TaskListFilter } from '../api/types'
 import { normalizeSortBy } from '../utils/taskSort'
+import { serializeFilterToken } from './useFilterGrammar'
 
 const BUILTIN_QUERY_KEYS = new Set([
     'q',
@@ -101,7 +102,16 @@ export function buildServerFilter(
     // Forwarded verbatim — including invalid values — so explicit errors
     // surface server-side instead of silently defaulting.
     serverFilter.order = normalized.order as TaskListFilter['order']
-    return { serverFilter: { ...serverFilter, ...extras }, normalized, extras }
+    // Exclusions (`-status:done`, DEV-5) reach the server in the search
+    // syntax via `query`; every other extra is a field filter.
+    const fieldExtras: Record<string, string> = Object.create(null)
+    const exclusions: string[] = []
+    for (const [key, value] of Object.entries(extras)) {
+        if (key.startsWith('-')) exclusions.push(`-${serializeFilterToken(key.slice(1), value)}`)
+        else fieldExtras[key] = value
+    }
+    if (exclusions.length) serverFilter.query = exclusions.join(' ')
+    return { serverFilter: { ...serverFilter, ...fieldExtras }, normalized, extras }
 }
 
 export function useProjectFilterSync(

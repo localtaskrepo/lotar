@@ -330,9 +330,8 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                         await search.fill('recent:');
                         await suggestionList(page).waitFor({ state: 'visible' });
                         labels = await suggestionLabels(page);
-                        expect(labels).toEqual(['7d']);
-                        expect(labels).not.toContain('1d');
-                        expect(labels).not.toContain('30d');
+                        // Any days or weeks work (DEV-3); a few are suggested.
+                        expect(labels).toEqual(['7d', '30d', '90d']);
                         await search.press('Escape');
                         await suggestionList(page).waitFor({ state: 'detached' });
                         expect(await search.evaluate((el) => el === document.activeElement)).toBe(true);

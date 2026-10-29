@@ -71,7 +71,7 @@ mod git_required {
         write_file(
             root,
             ".tasks/TEST/1.yml",
-            "title: Old\nstatus: TODO\nmodified: 2000-01-01T00:00:00Z\n",
+            "title: Old\nstatus: TODO\ncreated: 2000-01-01T00:00:00Z\nmodified: 2000-01-01T00:00:00Z\n",
         );
         add_and_commit(
             root,
@@ -84,7 +84,7 @@ mod git_required {
         write_file(
             root,
             ".tasks/TEST/2.yml",
-            "title: New\nstatus: TODO\nmodified: 2025-08-18T00:00:00Z\n",
+            "title: New\nstatus: TODO\ncreated: 2025-08-18T00:00:00Z\nmodified: 2025-08-18T00:00:00Z\n",
         );
         add_and_commit(
             root,
@@ -94,7 +94,8 @@ mod git_required {
             "new",
         );
 
-        // Threshold 7000d should include the old task but not the new
+        // Threshold 7000d should include the old task but not the new; stale
+        // reads each task's `modified` time (DEV-3), which here matches git.
         let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)

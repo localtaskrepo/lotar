@@ -113,13 +113,14 @@ function normalizeReservedKey(input: string): string {
 
 /**
  * Fixed value lists matching the strict backend parsers (src/services/task_query.rs):
- * `due` accepts today/soon/later/overdue, `recent` only 7d, and `needs`
+ * `due` accepts today/soon/later/overdue, `recent` a number of days or weeks
+ * (suggested 7d/30d/90d), and `needs`
  * a CSV of effort/due. The former `week`/`month`/`1d`/`30d` entries were
  * server-rejected values and are gone.
  */
 export const GRAMMAR_FIXED_VALUES: Partial<Record<string, string[]>> = {
     due: ['today', 'soon', 'later', 'overdue'],
-    recent: ['7d'],
+    recent: ['7d', '30d', '90d'],
     needs: ['effort', 'due'],
     has: ['attachment', 'image', 'link', 'tag'],
 }
@@ -372,6 +373,9 @@ function parseColonToken(
     assignmentKeys[meta.key] = false
 }
 
+/** Routing keys a leading minus cannot exclude. */
+const UNNEGATABLE_KEYS = new Set(['q', 'order', 'sort_by', 'deletion'])
+
 function parseToken(
     raw: string,
     filters: Record<string, string>,
@@ -392,6 +396,31 @@ function parseToken(
     if (isUrlLike(raw) || /^-?\//.test(raw)) {
         words.push(raw)
         return
+    }
+    // A leading minus on a filter excludes it (DEV-5): `-status:done`,
+    // `-field:area=billing`. Negations of one key add up. A minus on
+    // anything else (`-oauth`, `-title:draft`) stays search text.
+    if (raw.length > 1 && raw.startsWith('-') && !raw.startsWith('--')) {
+        const inner: Record<string, string> = Object.create(null)
+        const innerWords: string[] = []
+        const innerErrors: string[] = []
+        parseToken(raw.slice(1), inner, innerWords, innerErrors, Object.create(null))
+        const keys = Object.keys(inner)
+        if (innerErrors.length) {
+            errors.push(...innerErrors)
+            return
+        }
+        if (keys.length === 1 && !innerWords.length) {
+            const key = keys[0]!
+            if (UNNEGATABLE_KEYS.has(key)) {
+                errors.push(`"${raw}" cannot be excluded`)
+                return
+            }
+            const negated = `-${key}`
+            const previous = filters[negated]
+            filters[negated] = previous ? `${previous},${inner[key]}` : inner[key]!
+            return
+        }
     }
     const eq = findTopLevel(raw, '=')
     const colon = findTopLevel(raw, ':')
@@ -869,6 +898,14 @@ export function chipsForFilterValue(value: Record<string, string>, source: Filte
             continue
         }
         if (key === 'q' || key === 'tags') {
+            continue
+        }
+        if (key.startsWith('-')) {
+            // Exclusions (DEV-5): one chip per value, "Not <label>".
+            const inner = key.slice(1)
+            const innerMeta = GRAMMAR_KEYS.find((m) => m.key === inner)
+            const name = innerMeta?.label ?? (inner.startsWith('field:') ? inner.slice('field:'.length) : inner)
+            for (const v of listFromCsv(raw)) chips.push({ key, label: `Not ${name}`, value: v, display: v })
             continue
         }
         if (!meta) {

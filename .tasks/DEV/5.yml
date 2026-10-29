@@ -1,10 +1,11 @@
 title: Complex custom field queries (AND/OR/NOT)
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.711139+00:00
-modified: 2026-10-28T19:10:45.334491+00:00
+modified: 2026-10-28T23:50:45.642998+00:00
 relationships:
   related:
   - DEV-230
@@ -17,6 +18,10 @@ comments:
     Former TODO.md line 5: Extend custom fields to support more complex queries (AND/OR logic, NOT operations, etc.)
 - date: 2026-10-28T02:06:17.858945+00:00
   text: Feature should probably be expanded to consider complex queries for any field and as an extension of the existing query language
+- date: 2026-10-28T21:29:49.554245+00:00
+  text: 'Scope decided 2026-10-28: no OR operator for now (add only if enough users ask). The query language stays: values of one key are ORed (status:todo,done or status:todo status:done), different keys are ANDed, plus negation: a leading minus excludes a filter, -key:value / -field:name=value (as -word already excludes search words). Works for any filter key, in the web search box, lotar list, and REST/MCP query, via the shared parser and task query (DEV-230/231/235).'
+- date: 2026-10-28T23:50:45.615151+00:00
+  text: 'Outcome: a leading minus excludes any filter (-status:done, -tag:wip,draft, -field:area=billing, -has:tag, -mine:true) in the web search box, lotar list (bare args, routed past clap by the preprocessor; short flags unaffected), REST/MCP query, sprint backlog, stats --filter, sprint --select. No OR operator (decided). Both parsers share 67 cases; the shared query removes tasks matching any exclusion (graph too); UI shows ''Not <label>'' chips and sends exclusions in query. q/order/sort_by/deletion cannot be excluded. Evidence: dev231 excluded_filters_work_everywhere, preprocess routing unit test, UI specs. Gates: lint, 1834 Rust, 1369 UI, release 33, hooks 5, smoke 361. Committed with DEV-3 and DEV-13. Guidance: no durable finding.'
 description: |-
   Migrated checklist requirements:
   Define custom-field AND/OR/NOT expressions, precedence and grouping, then implement consistent query semantics. Existing repeated key/value filters and automation conditions are not this general language. Coordinate DEV-57/75 without duplicating those narrower parity fixes.
@@ -58,3 +63,25 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-230"]}'
+- at: 2026-10-28T21:29:49.554245+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T21:29:49.579171+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-28T23:50:45.615151+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-28T23:50:45.642998+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

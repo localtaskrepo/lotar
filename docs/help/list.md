@@ -39,7 +39,7 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `mine:true` | assigned to you | `me:` | `assignee=@me` |
 | `due:today\|soon\|later\|overdue` | due bucket: soon is the next 7 days after today; overdue is before today and not done | `duedate:`, `dueon:` | `due` |
 | `due_within:3` | due today through 3 days ahead | `duewithin:` | `due_within` |
-| `recent:7d` | changed in the last 7 days | | `recent` |
+| `recent:7d`, `recent:2w` | changed in the last N days or weeks, by the task's `modified` time; `-recent:30d` is the opposite: not changed for 30 days | | `recent` |
 | `needs:effort,due` | missing every listed field | `need:` | `needs` |
 | `has:attachment,image,link,tag` | carries every listed kind | `with:` | `has` |
 | `effort_min:2h`, `effort_max:1d` | inclusive effort bounds; time and points never compare; tasks without an effort are left out | `effortmin:`, `effortmax:` | `effort_min`, `effort_max` |
@@ -47,12 +47,14 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `sort_by=due-date`, `order=asc` | sort key and direction | | `sort_by`, `order` |
 | `deletion=deleted\|all` | deleted tasks only, or both | | `deletion` |
 | `q="exact words"` | the search text, set explicitly | | `q`; MCP `search` |
+| `-status:done`, `-tag:wip,draft`, `-field:area=billing` | leaves out tasks matching that filter (any of the values) | | in `query` |
 
 REST and MCP also accept the whole query as one `query` parameter, written exactly as here, so a query works the same in the web UI, `lotar list`, REST and MCP.
 
 Rules, the same as in the web UI:
 
-- Values of one filter are ORed (`status:todo,done`, or `status:todo status:done`); different filters are ANDed.
+- Values of one filter are ORed (`status:todo,done`, or `status:todo status:done`); different filters are ANDed. There is no OR across different filters.
+- A minus in front of any filter leaves out the tasks that match it: `-status:done` (not done), `-tag:wip,draft` (neither tag), `-has:tag` (no tags), `-mine:true`. In `lotar list` they work as plain arguments (`lotar list -status:done --page-size 50`). A minus on a word (`-oauth`) excludes search text; quote it with other words (`lotar list 'login -oauth'`) so it is not read as a flag. `q=`, `order=`, `sort_by=` and `deletion=` cannot be excluded.
 - `key:value` adds to a list filter; `key=value` replaces it. Quote values with spaces: `status:"In Progress"`.
 - Keys are case-insensitive. A word with a colon whose key is not in the table, such as `title:login`, stays search text.
 - A custom field whose name is also a key above must be quoted: `field:"due"=friday`.
@@ -82,14 +84,26 @@ Flags set the same filters as the query and combine with it: list filters add up
 | --- | --- |
 | Project or workspace | `--project/-p`, `--tasks-dir` |
 | Values | `--status/-s`, `--priority/-P`, `--type/-t`, `--tag/-i`, `--sprint` (repeat a flag for several values), `--assignee/-a` (`@me`, `__none__`) |
-| Dates | `--due <bucket>`, `--due-within <days>`, `--recent 7d` |
+| Dates | `--due <bucket>`, `--due-within <days>`, `--recent 7d` (any days or weeks) |
 | Missing or present | `--needs effort,due`, `--has attachment,image,link,tag` |
 | Effort | `--effort-min 2h`, `--effort-max 1d` |
 | Deletion | Active tasks by default; `--deleted` for deleted tasks only, or `--include-deleted` for both (mutually exclusive) |
 | Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
+| Totals | `--sum effort`, `--sum <custom field>` (repeatable): totals over every matching task, not just the page |
 | Output | `--format text|json`, `--log-level info`, `--details`; `table`/`markdown`/`md` are text aliases |
 
 The former shortcuts are gone; write the filter instead: `--mine` is `mine:true`, `--unassigned` is `assignee:__none__`, `--high`/`--critical` are `priority:high`/`priority:critical`, `--overdue` is `due:overdue`, `--due-soon=N` is `due_within:N`, and `--where key=value` is `key=value` (or `field:name=value`).
+
+## Totals
+
+`--sum <field>` adds a total over every task the query matches (all pages): `effort`, or a numeric custom field (`--sum estimate` or `--sum field:estimate`). Repeat it for several totals.
+
+```bash
+lotar list status:todo sprint:4 --sum effort
+#   Sum of effort: 34h + 13pt over 12 task(s) (3 without a value)
+```
+
+Effort keeps time (in hours; a day is 8h, a week 40h) and points apart. Tasks without a value, and custom values that are not numbers, are counted separately rather than added. With `--format json` the response has a `sums` list with `field`, `hours`/`points` (effort) or `total` (custom field), `counted`, `missing` and `invalid`. For totals per group (assignee, status, tag, ...) use [`lotar stats effort --by <field> --filter '<query>'`](./stats.md#effort).
 
 ## Display styles
 
@@ -124,6 +138,9 @@ lotar list sprint:4 needs:effort
 
 # Tasks with screenshots, changed this week
 lotar list has:image recent:7d
+
+# Open work nobody has touched for a month
+lotar list -status:done -recent:30d
 
 # In-progress release work
 lotar list status:inprogress tag:release --sort-by due-date
