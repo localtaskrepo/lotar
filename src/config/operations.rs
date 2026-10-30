@@ -147,6 +147,23 @@ fn parse_optional_bool_flag(value: &str, field: &str) -> Result<Option<bool>, Co
     }
 }
 
+/// Agent job limit (DEV-153): a whole number; 0 pauses new jobs, empty (or
+/// `inherit` in a project) means no limit of its own.
+fn parse_max_parallel_jobs(value: &str, field: &str) -> Result<Option<usize>, ConfigError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("inherit")
+        || trimmed.eq_ignore_ascii_case("unlimited")
+    {
+        return Ok(None);
+    }
+    trimmed.parse::<usize>().map(Some).map_err(|_| {
+        ConfigError::ParseError(format!(
+            "{field} must be a whole number (0 pauses new jobs), or empty for no limit"
+        ))
+    })
+}
+
 fn parse_optional_string(value: &str) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
@@ -756,6 +773,24 @@ pub fn apply_field_to_global_config(
             }
             config.agent_worktree.branch_prefix = trimmed.to_string();
         }
+        "agent_worktree_max_parallel_jobs" => {
+            config.agent_worktree.max_parallel_jobs = parse_max_parallel_jobs(value, field)?;
+        }
+        "agent_worktree_cleanup_on_done" => {
+            config.agent_worktree.cleanup_on_done = parse_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_on_failure" => {
+            config.agent_worktree.cleanup_on_failure = parse_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_on_cancel" => {
+            config.agent_worktree.cleanup_on_cancel = parse_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_delete_branches" => {
+            config.agent_worktree.cleanup_delete_branches = parse_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_ignored_files" => {
+            config.agent_worktree.cleanup_ignored_files = parse_bool_flag(value, field)?;
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -1132,6 +1167,30 @@ pub fn apply_field_to_project_config(
             let worktree = config.agent_worktree.get_or_insert_with(Default::default);
             worktree.branch_prefix = parse_optional_string(value);
         }
+        "agent_worktree_max_parallel_jobs" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.max_parallel_jobs = parse_max_parallel_jobs(value, field)?;
+        }
+        "agent_worktree_cleanup_on_done" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.cleanup_on_done = parse_optional_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_on_failure" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.cleanup_on_failure = parse_optional_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_on_cancel" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.cleanup_on_cancel = parse_optional_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_delete_branches" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.cleanup_delete_branches = parse_optional_bool_flag(value, field)?;
+        }
+        "agent_worktree_cleanup_ignored_files" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.cleanup_ignored_files = parse_optional_bool_flag(value, field)?;
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -1426,6 +1485,16 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "agent_worktree_branch_prefix" => {
             let _ = parse_optional_string(value);
         }
+        "agent_worktree_max_parallel_jobs" => {
+            let _ = parse_max_parallel_jobs(value, field)?;
+        }
+        "agent_worktree_cleanup_on_done"
+        | "agent_worktree_cleanup_on_failure"
+        | "agent_worktree_cleanup_on_cancel"
+        | "agent_worktree_cleanup_delete_branches"
+        | "agent_worktree_cleanup_ignored_files" => {
+            let _ = parse_optional_bool_flag(value, field)?;
+        }
         "remotes" => {
             let _ = parse_sync_remotes(value)?;
         }
@@ -1585,6 +1654,24 @@ pub fn clear_project_override_field(
         "agent_worktree_branch_prefix" => {
             clear_agent_worktree_field(config, WorktreeSubfield::BranchPrefix);
         }
+        "agent_worktree_max_parallel_jobs" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::MaxParallelJobs);
+        }
+        "agent_worktree_cleanup_on_done" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::CleanupOnDone);
+        }
+        "agent_worktree_cleanup_on_failure" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::CleanupOnFailure);
+        }
+        "agent_worktree_cleanup_on_cancel" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::CleanupOnCancel);
+        }
+        "agent_worktree_cleanup_delete_branches" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::CleanupDeleteBranches);
+        }
+        "agent_worktree_cleanup_ignored_files" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::CleanupIgnoredFiles);
+        }
         "attachments_dir" => config.attachments_dir = None,
         "attachments_max_upload_mb" => config.attachments_max_upload_mb = None,
         "sync_reports_dir" => config.sync_reports_dir = None,
@@ -1606,6 +1693,12 @@ enum WorktreeSubfield {
     Enabled,
     Dir,
     BranchPrefix,
+    MaxParallelJobs,
+    CleanupOnDone,
+    CleanupOnFailure,
+    CleanupOnCancel,
+    CleanupDeleteBranches,
+    CleanupIgnoredFiles,
 }
 
 fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubfield) {
@@ -1616,6 +1709,12 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
         WorktreeSubfield::Enabled => worktree.enabled = None,
         WorktreeSubfield::Dir => worktree.dir = None,
         WorktreeSubfield::BranchPrefix => worktree.branch_prefix = None,
+        WorktreeSubfield::MaxParallelJobs => worktree.max_parallel_jobs = None,
+        WorktreeSubfield::CleanupOnDone => worktree.cleanup_on_done = None,
+        WorktreeSubfield::CleanupOnFailure => worktree.cleanup_on_failure = None,
+        WorktreeSubfield::CleanupOnCancel => worktree.cleanup_on_cancel = None,
+        WorktreeSubfield::CleanupDeleteBranches => worktree.cleanup_delete_branches = None,
+        WorktreeSubfield::CleanupIgnoredFiles => worktree.cleanup_ignored_files = None,
     }
     let worktree = config.agent_worktree.as_ref().unwrap();
     let empty = worktree.enabled.is_none()

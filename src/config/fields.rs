@@ -279,12 +279,24 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
     field("agent_worktree_branch_prefix")
         .both()
         .source("agent.worktree.branch_prefix"),
-    field("agent_worktree_cleanup_on_done").source("agent.worktree.cleanup_on_done"),
-    field("agent_worktree_cleanup_on_failure").source("agent.worktree.cleanup_on_failure"),
-    field("agent_worktree_cleanup_on_cancel").source("agent.worktree.cleanup_on_cancel"),
+    field("agent_worktree_max_parallel_jobs")
+        .both()
+        .source("agent.worktree.max_parallel_jobs"),
+    field("agent_worktree_cleanup_on_done")
+        .both()
+        .source("agent.worktree.cleanup_on_done"),
+    field("agent_worktree_cleanup_on_failure")
+        .both()
+        .source("agent.worktree.cleanup_on_failure"),
+    field("agent_worktree_cleanup_on_cancel")
+        .both()
+        .source("agent.worktree.cleanup_on_cancel"),
     field("agent_worktree_cleanup_delete_branches")
+        .both()
         .source("agent.worktree.cleanup_delete_branches"),
-    field("agent_worktree_cleanup_ignored_files").source("agent.worktree.cleanup_ignored_files"),
+    field("agent_worktree_cleanup_ignored_files")
+        .both()
+        .source("agent.worktree.cleanup_ignored_files"),
     field("agent_automation").aliases(&["agent.automation"]),
     field("agent_worktree").aliases(&["agent.worktree"]),
     field("remotes").both().aliases(&["sync.remotes"]),
@@ -419,6 +431,12 @@ mod tests {
         "agent_worktree_enabled",
         "agent_worktree_dir",
         "agent_worktree_branch_prefix",
+        "agent_worktree_max_parallel_jobs",
+        "agent_worktree_cleanup_on_done",
+        "agent_worktree_cleanup_on_failure",
+        "agent_worktree_cleanup_on_cancel",
+        "agent_worktree_cleanup_delete_branches",
+        "agent_worktree_cleanup_ignored_files",
         "remotes",
         "agents",
         "sprints_defaults_capacity_points",
@@ -482,6 +500,12 @@ mod tests {
         "agent_worktree_enabled",
         "agent_worktree_dir",
         "agent_worktree_branch_prefix",
+        "agent_worktree_max_parallel_jobs",
+        "agent_worktree_cleanup_on_done",
+        "agent_worktree_cleanup_on_failure",
+        "agent_worktree_cleanup_on_cancel",
+        "agent_worktree_cleanup_delete_branches",
+        "agent_worktree_cleanup_ignored_files",
         "remotes",
         "agents",
     ];
@@ -696,6 +720,11 @@ mod tests {
             "agent.worktree.branch_prefix",
             "agent_worktree_branch_prefix",
             "agent_worktree_branch_prefix",
+        ),
+        (
+            "agent.worktree.max_parallel_jobs",
+            "agent_worktree_max_parallel_jobs",
+            "agent_worktree_max_parallel_jobs",
         ),
         (
             "agent.worktree.cleanup_on_done",

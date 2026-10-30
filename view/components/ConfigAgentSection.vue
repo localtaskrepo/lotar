@@ -123,12 +123,87 @@
         />
         <p class="field-hint">Relative paths resolve from the repository's parent folder.</p>
       </div>
+
+      <h3 class="cfg-group-heading field--full">Running jobs</h3>
+      <div class="field">
+        <label class="field-label" :for="`${uid}-max-jobs`">
+          <span>Jobs at once</span>
+          <span
+            v-if="sourceFor('agent_worktree_max_parallel_jobs')"
+            :class="['provenance', provenanceClass(sourceFor('agent_worktree_max_parallel_jobs'))]"
+          >
+            {{ provenanceLabel(sourceFor('agent_worktree_max_parallel_jobs')) }}
+          </span>
+        </label>
+        <UiInput
+          :id="`${uid}-max-jobs`"
+          v-model="worktreeMaxParallelJobs"
+          inputmode="numeric"
+          maxlength="6"
+          data-testid="config-agent-max-jobs"
+          :placeholder="maxJobsPlaceholder"
+          @blur="emit('validate', 'agent_worktree_max_parallel_jobs')"
+        />
+        <p class="field-hint">Further jobs wait in the queue. 0 pauses new jobs; leave empty for no limit.</p>
+        <p v-if="errors.agent_worktree_max_parallel_jobs" class="field-error">
+          {{ errors.agent_worktree_max_parallel_jobs }}
+        </p>
+      </div>
+
+      <h3 class="cfg-group-heading field--full">Clean up worktrees</h3>
+      <div class="cfg-toggles" data-testid="config-agent-cleanup">
+        <ConfigToggleField
+          label="When the task is done"
+          v-model="worktreeCleanupOnDone"
+          :is-global="isGlobal"
+          description="Remove the worktree after a successful job once its task is in a done state."
+          :options="toggleSelectOptions('agentWorktreeCleanupOnDone')"
+          :source-label="provenanceLabel(sourceFor('agent_worktree_cleanup_on_done'))"
+          :source-class="provenanceClass(sourceFor('agent_worktree_cleanup_on_done'))"
+        />
+        <ConfigToggleField
+          label="After a failed job"
+          v-model="worktreeCleanupOnFailure"
+          :is-global="isGlobal"
+          description="Remove the worktree when a job fails."
+          :options="toggleSelectOptions('agentWorktreeCleanupOnFailure')"
+          :source-label="provenanceLabel(sourceFor('agent_worktree_cleanup_on_failure'))"
+          :source-class="provenanceClass(sourceFor('agent_worktree_cleanup_on_failure'))"
+        />
+        <ConfigToggleField
+          label="After a cancelled job"
+          v-model="worktreeCleanupOnCancel"
+          :is-global="isGlobal"
+          description="Remove the worktree when a job is cancelled."
+          :options="toggleSelectOptions('agentWorktreeCleanupOnCancel')"
+          :source-label="provenanceLabel(sourceFor('agent_worktree_cleanup_on_cancel'))"
+          :source-class="provenanceClass(sourceFor('agent_worktree_cleanup_on_cancel'))"
+        />
+        <ConfigToggleField
+          label="Delete the branch too"
+          v-model="worktreeCleanupDeleteBranches"
+          :is-global="isGlobal"
+          description="Also delete the job's branch when its worktree is removed."
+          :options="toggleSelectOptions('agentWorktreeCleanupDeleteBranches')"
+          :source-label="provenanceLabel(sourceFor('agent_worktree_cleanup_delete_branches'))"
+          :source-class="provenanceClass(sourceFor('agent_worktree_cleanup_delete_branches'))"
+        />
+        <ConfigToggleField
+          label="Ignore build output"
+          v-model="worktreeCleanupIgnoredFiles"
+          :is-global="isGlobal"
+          description="Git-ignored files (build and test output) don't keep a worktree. Untracked and changed files always do."
+          :options="toggleSelectOptions('agentWorktreeCleanupIgnoredFiles')"
+          :source-label="provenanceLabel(sourceFor('agent_worktree_cleanup_ignored_files'))"
+          :source-class="provenanceClass(sourceFor('agent_worktree_cleanup_ignored_files'))"
+        />
+      </div>
     </div>
   </ConfigGroup>
 </template>
 
 <script setup lang="ts">
-import { useId } from 'vue'
+import { computed, useId } from 'vue'
 import type { ConfigSource } from '../api/types'
 import type { AgentInstructionsMode, ToggleField, ToggleValue } from '../composables/useConfigForm'
 import ConfigGroup from './ConfigGroup.vue'
@@ -145,6 +220,14 @@ const instructionsFile = defineModel<string>('instructionsFile', { required: tru
 const worktreeEnabled = defineModel<ToggleValue>('worktreeEnabled', { required: true })
 const worktreeDir = defineModel<string>('worktreeDir', { required: true })
 const worktreeBranchPrefix = defineModel<string>('worktreeBranchPrefix', { required: true })
+const worktreeMaxParallelJobs = defineModel<string>('worktreeMaxParallelJobs', { default: '' })
+const worktreeCleanupOnDone = defineModel<ToggleValue>('worktreeCleanupOnDone', { default: 'false' })
+const worktreeCleanupOnFailure = defineModel<ToggleValue>('worktreeCleanupOnFailure', { default: 'false' })
+const worktreeCleanupOnCancel = defineModel<ToggleValue>('worktreeCleanupOnCancel', { default: 'false' })
+const worktreeCleanupDeleteBranches = defineModel<ToggleValue>('worktreeCleanupDeleteBranches', {
+  default: 'false',
+})
+const worktreeCleanupIgnoredFiles = defineModel<ToggleValue>('worktreeCleanupIgnoredFiles', { default: 'true' })
 
 const {
   description,
@@ -154,6 +237,7 @@ const {
   globalLogsDir = '',
   globalBranchPrefix = '',
   globalWorktreeDir = '',
+  globalMaxParallelJobs = null,
   sourceFor,
   toggleSelectOptions,
   provenanceLabel,
@@ -166,6 +250,7 @@ const {
   globalLogsDir?: string
   globalBranchPrefix?: string
   globalWorktreeDir?: string
+  globalMaxParallelJobs?: number | null
   sourceFor: (field: string) => ConfigSource | undefined
   toggleSelectOptions: (field: ToggleField) => Array<{ value: ToggleValue; label: string }>
   /** Unused since the inherit option states the global value; kept for callers. */
@@ -175,10 +260,24 @@ const {
 }>()
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'agent_context_extension' | 'agent_instructions' | 'agent_worktree_branch_prefix'): void
+  (
+    e: 'validate',
+    field:
+      | 'agent_context_extension'
+      | 'agent_instructions'
+      | 'agent_worktree_branch_prefix'
+      | 'agent_worktree_max_parallel_jobs',
+  ): void
 }>()
 
 const uid = useId()
+
+const maxJobsPlaceholder = computed(() => {
+  if (isGlobal) return 'No limit'
+  return globalMaxParallelJobs === null || globalMaxParallelJobs === undefined
+    ? 'Inherit global (no limit)'
+    : `Inherit global (${globalMaxParallelJobs})`
+})
 
 function inheritPlaceholder(value: string) {
   return value ? `Inherit global (${value})` : 'Inherit global'

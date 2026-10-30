@@ -34,9 +34,10 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - agent.worktree.enabled: boolean (default false) — when true, agent jobs run inside a git worktree.
 - agent.worktree.dir: string (default computed) — optional worktree root directory; relative paths resolve from the repo’s parent directory.
 - agent.worktree.branch_prefix: string (default "agent/") — prefix used when creating agent branches.
-- agent.worktree.max_parallel_jobs: optional positive integer (unset means unlimited)
+- agent.worktree.max_parallel_jobs: optional whole number (unset means unlimited). Further jobs wait in the queue; `0` pauses new jobs.
 - agent.worktree.cleanup_on_done / cleanup_on_failure / cleanup_on_cancel / cleanup_delete_branches: booleans (default false). Eligibility and clean/merged/active-job safeguards still apply; see [Agent Jobs](./agent.md).
 - agent.worktree.cleanup_ignored_files: boolean (default true). When true, git-ignored files (build output) don't keep a worktree from being cleaned up; untracked and modified files always do. Set false to keep any worktree that holds ignored files.
+- All `agent.worktree.*` settings can be changed with `config set` (global or per project) using their flat names: `agent_worktree_enabled`, `agent_worktree_dir`, `agent_worktree_branch_prefix`, `agent_worktree_max_parallel_jobs`, `agent_worktree_cleanup_on_done`, `agent_worktree_cleanup_on_failure`, `agent_worktree_cleanup_on_cancel`, `agent_worktree_cleanup_delete_branches` and `agent_worktree_cleanup_ignored_files`, or on the Config page under Agents. An empty value clears a project override; an empty job limit means no limit.
 - agent.automation: retired. Old files that still have this block load fine and keep it as written, but it does nothing and `lotar config validate` warns and prints the equivalent rule. Agent job status changes and reassignment are `job_started` / `job_completed` / `job_failed` / `job_cancelled` rules in the automation file; see [Automation Rules](./automation.md#agent-job-queueing). The `agent_on_*` keys of `config set` were removed.
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
   - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `cursor` | `amp` | `droid` | `opencode` | `kilo` | `antigravity` | `command`

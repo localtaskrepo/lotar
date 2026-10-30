@@ -87,6 +87,13 @@ export interface ConfigFormState {
     agentWorktreeEnabled: ToggleValue
     agentWorktreeDir: string
     agentWorktreeBranchPrefix: string
+    /** DEV-153: job limit and cleanup after jobs. */
+    agentWorktreeMaxParallelJobs: string
+    agentWorktreeCleanupOnDone: ToggleValue
+    agentWorktreeCleanupOnFailure: ToggleValue
+    agentWorktreeCleanupOnCancel: ToggleValue
+    agentWorktreeCleanupDeleteBranches: ToggleValue
+    agentWorktreeCleanupIgnoredFiles: ToggleValue
     /** Global-only sprint defaults. */
     sprintLength: string
     sprintOverdueAfter: string
@@ -122,6 +129,11 @@ export type ToggleField =
     | 'syncWriteReports'
     | 'agentContextEnabled'
     | 'agentWorktreeEnabled'
+    | 'agentWorktreeCleanupOnDone'
+    | 'agentWorktreeCleanupOnFailure'
+    | 'agentWorktreeCleanupOnCancel'
+    | 'agentWorktreeCleanupDeleteBranches'
+    | 'agentWorktreeCleanupIgnoredFiles'
     | 'sprintNotificationsEnabled'
 
 type AliasField = 'branchTypeAliases' | 'branchStatusAliases' | 'branchPriorityAliases'
@@ -245,6 +257,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         agentWorktreeEnabled: 'false',
         agentWorktreeDir: '',
         agentWorktreeBranchPrefix: '',
+        agentWorktreeMaxParallelJobs: '',
+        agentWorktreeCleanupOnDone: 'false',
+        agentWorktreeCleanupOnFailure: 'false',
+        agentWorktreeCleanupOnCancel: 'false',
+        agentWorktreeCleanupDeleteBranches: 'false',
+        agentWorktreeCleanupIgnoredFiles: 'true',
         sprintLength: '',
         sprintOverdueAfter: '',
         sprintCapacityPoints: '',
@@ -679,6 +697,16 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 return global.agent_context_enabled ?? null
             case 'agentWorktreeEnabled':
                 return global.agent_worktree?.enabled ?? null
+            case 'agentWorktreeCleanupOnDone':
+                return global.agent_worktree?.cleanup_on_done ?? null
+            case 'agentWorktreeCleanupOnFailure':
+                return global.agent_worktree?.cleanup_on_failure ?? null
+            case 'agentWorktreeCleanupOnCancel':
+                return global.agent_worktree?.cleanup_on_cancel ?? null
+            case 'agentWorktreeCleanupDeleteBranches':
+                return global.agent_worktree?.cleanup_delete_branches ?? null
+            case 'agentWorktreeCleanupIgnoredFiles':
+                return global.agent_worktree?.cleanup_ignored_files ?? null
             case 'sprintNotificationsEnabled':
                 return global.sprint_notifications?.enabled ?? null
             default:
@@ -903,6 +931,14 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 errors[field] = validateSprintDuration(isLength ? form.sprintLength : form.sprintOverdueAfter, isLength)
                 break
             }
+            case 'agent_worktree_max_parallel_jobs': {
+                const raw = form.agentWorktreeMaxParallelJobs.trim()
+                errors[field] =
+                    raw && !/^\d+$/.test(raw)
+                        ? 'Enter a whole number (0 pauses new jobs), or leave it empty for no limit.'
+                        : null
+                break
+            }
             case 'sprints_defaults_capacity_points':
             case 'sprints_defaults_capacity_hours': {
                 const raw = (
@@ -1113,6 +1149,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'sync_reports_dir',
             'agent_context_extension',
             'agent_worktree_branch_prefix',
+            'agent_worktree_max_parallel_jobs',
             'agent_instructions',
             'scan_signal_words',
             'scan_ticket_patterns',
@@ -1195,6 +1232,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.agentWorktreeEnabled = toToggle(!!effective.agent_worktree?.enabled)
         form.agentWorktreeDir = effective.agent_worktree?.dir ?? ''
         form.agentWorktreeBranchPrefix = effective.agent_worktree?.branch_prefix ?? ''
+        form.agentWorktreeMaxParallelJobs = effective.agent_worktree?.max_parallel_jobs?.toString() ?? ''
+        form.agentWorktreeCleanupOnDone = toToggle(!!effective.agent_worktree?.cleanup_on_done)
+        form.agentWorktreeCleanupOnFailure = toToggle(!!effective.agent_worktree?.cleanup_on_failure)
+        form.agentWorktreeCleanupOnCancel = toToggle(!!effective.agent_worktree?.cleanup_on_cancel)
+        form.agentWorktreeCleanupDeleteBranches = toToggle(!!effective.agent_worktree?.cleanup_delete_branches)
+        form.agentWorktreeCleanupIgnoredFiles = toToggle(effective.agent_worktree?.cleanup_ignored_files !== false)
         form.sprintLength = effective.sprint_defaults?.length ?? ''
         form.sprintOverdueAfter = effective.sprint_defaults?.overdue_after ?? ''
         form.sprintCapacityPoints = effective.sprint_defaults?.capacity_points?.toString() ?? ''
@@ -1279,6 +1322,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             form.agentWorktreeEnabled = toTriToggle(raw.agent_worktree?.enabled)
             form.agentWorktreeDir = raw.agent_worktree?.dir ?? ''
             form.agentWorktreeBranchPrefix = raw.agent_worktree?.branch_prefix ?? ''
+            form.agentWorktreeMaxParallelJobs = raw.agent_worktree?.max_parallel_jobs?.toString() ?? ''
+            form.agentWorktreeCleanupOnDone = toTriToggle(raw.agent_worktree?.cleanup_on_done)
+            form.agentWorktreeCleanupOnFailure = toTriToggle(raw.agent_worktree?.cleanup_on_failure)
+            form.agentWorktreeCleanupOnCancel = toTriToggle(raw.agent_worktree?.cleanup_on_cancel)
+            form.agentWorktreeCleanupDeleteBranches = toTriToggle(raw.agent_worktree?.cleanup_delete_branches)
+            form.agentWorktreeCleanupIgnoredFiles = toTriToggle(raw.agent_worktree?.cleanup_ignored_files)
             if (Array.isArray(raw.scan_signal_words)) {
                 form.scanSignalWords = [...raw.scan_signal_words]
             }
@@ -1483,6 +1532,16 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addToggleField('agentWorktreeEnabled', 'agent_worktree_enabled', { allowInherit: true })
         addValue('agentWorktreeDir', 'agent_worktree_dir')
         addValue('agentWorktreeBranchPrefix', 'agent_worktree_branch_prefix', { allowEmpty: !isGlobal.value })
+        addValue('agentWorktreeMaxParallelJobs', 'agent_worktree_max_parallel_jobs', { allowEmpty: true })
+        addToggleField('agentWorktreeCleanupOnDone', 'agent_worktree_cleanup_on_done', { allowInherit: true })
+        addToggleField('agentWorktreeCleanupOnFailure', 'agent_worktree_cleanup_on_failure', { allowInherit: true })
+        addToggleField('agentWorktreeCleanupOnCancel', 'agent_worktree_cleanup_on_cancel', { allowInherit: true })
+        addToggleField('agentWorktreeCleanupDeleteBranches', 'agent_worktree_cleanup_delete_branches', {
+            allowInherit: true,
+        })
+        addToggleField('agentWorktreeCleanupIgnoredFiles', 'agent_worktree_cleanup_ignored_files', {
+            allowInherit: true,
+        })
 
         if (isGlobal.value) {
             addValue('sprintLength', 'sprints_defaults_length')

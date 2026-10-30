@@ -275,6 +275,8 @@ agent:
     cleanup_ignored_files: true   # Git-ignored files (build output) don't block cleanup (default: true)
 ```
 
+Change these on the Config page (Agents) or with `config set`, globally or per project, for example `lotar config set agent_worktree_max_parallel_jobs 2 --global` or `lotar config set agent_worktree_cleanup_on_done true -p APP`. A job limit of `0` pauses new jobs; an empty value removes the limit.
+
 When enabled:
 - Each ticket gets a dedicated worktree at `<dir>/<repo>/<ticket-id>`
 - A branch is created at `<branch_prefix><ticket-id>` (e.g., `agent/TEST-1`)

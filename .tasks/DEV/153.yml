@@ -1,7 +1,43 @@
 title: Make agent worktree parallelism and cleanup settings editable
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-24T03:38:24.205770+00:00
+modified: 2026-10-30T01:51:28.658553+00:00
+comments:
+- date: 2026-10-30T00:59:29.025697+00:00
+  text: 'Plan: config set fields for agent.worktree.max_parallel_jobs (positive integer, empty clears) and cleanup_on_done/failure/cancel/delete_branches (+ cleanup_ignored_files) in global and project scope, validation, controls in ConfigAgentSection.vue, docs + tests.'
+- date: 2026-10-30T01:30:23.233115+00:00
+  text: 'Done: config set fields agent_worktree_max_parallel_jobs (whole number; 0 pauses new jobs, empty = no limit / inherit) and agent_worktree_cleanup_on_done/on_failure/on_cancel/delete_branches/ignored_files, global + project with precise clearing; inspect source labels; Config page Agents section gets ''Running jobs'' and ''Clean up worktrees'' controls. Kept 0 valid (existing behaviour/tests use it to pause). Dotted agent.worktree.* names stay unsupported by config set, like the existing worktree fields. Docs: config-reference, agent.md. Test: tests/dev153_worktree_settings_test.rs.'
+- date: 2026-10-30T01:51:28.630202+00:00
+  text: 'Verified: npm run lint:agent, nextest 1866/1866, UI vitest 1393/1393, smoke 367/367 (ui.config-coverage row count updated for the two new relationship switches). No guidance correction.'
 description: Found during DEV-146. agent.worktree.max_parallel_jobs and cleanup_on_done/cleanup_on_failure/cleanup_on_cancel/cleanup_delete_branches are documented and used at runtime but have no config set setter (fields.rs lists the cleanup flags as inspect-only and max_parallel_jobs not at all), so neither the CLI nor the Config UI can change them. Add setters (global + project override), validation (positive integer for max_parallel_jobs), and controls in view/components/ConfigAgentSection.vue.
+history:
+- at: 2026-10-30T00:54:19.902072+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:59:29.025697+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:30:23.233115+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.630202+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.658553+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
