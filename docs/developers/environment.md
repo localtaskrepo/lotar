@@ -54,6 +54,8 @@ All rows below are defined in `src/config/env_overrides.rs`. Each variable maps 
 | Config key | Env var(s) | Accepted values | Purpose |
 | --- | --- | --- | --- |
 | `auto_set_reporter` | `LOTAR_AUTO_SET_REPORTER` | `true`/`false` | Automatically set the reporter to the caller when missing. |
+| `auto_reciprocal_relationships` | `LOTAR_AUTO_RECIPROCAL_RELATIONSHIPS` | `true`/`false` | Write the other side of relationships. |
+| `auto_link_mentions` | `LOTAR_AUTO_LINK_MENTIONS` | `true`/`false` | Mentioned ticket IDs add related links. |
 | `auto_assign_on_status` | `LOTAR_AUTO_ASSIGN_ON_STATUS` | `true`/`false` | Toggles first-change auto-assignment. |
 | `auto_codeowners_assign` | `LOTAR_AUTO_CODEOWNERS_ASSIGN` | `true`/`false` | Assign tasks based on CODEOWNERS matches. |
 | `auto_tags_from_path` | `LOTAR_AUTO_TAGS_FROM_PATH` | `true`/`false` | Adds tags inferred from filesystem paths. |

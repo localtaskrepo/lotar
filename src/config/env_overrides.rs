@@ -109,6 +109,16 @@ pub const ENV_OVERRIDE_DEFINITIONS: &[EnvOverrideDefinition] = &[
         &["LOTAR_AUTO_SET_REPORTER"],
     ),
     def(
+        "auto_reciprocal_relationships",
+        "auto_reciprocal_relationships",
+        &["LOTAR_AUTO_RECIPROCAL_RELATIONSHIPS"],
+    ),
+    def(
+        "auto_link_mentions",
+        "auto_link_mentions",
+        &["LOTAR_AUTO_LINK_MENTIONS"],
+    ),
+    def(
         "auto_assign_on_status",
         "auto_assign_on_status",
         &["LOTAR_AUTO_ASSIGN_ON_STATUS"],

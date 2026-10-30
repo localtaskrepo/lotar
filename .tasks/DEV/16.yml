@@ -1,10 +1,14 @@
 title: Auto-create blocks reference when depends_on is set
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.777846+00:00
-modified: 2026-09-06T13:12:54.042174+00:00
+modified: 2026-10-30T01:51:28.730288+00:00
+relationships:
+  related:
+  - DEV-7
 comments:
 - date: 2026-09-06T11:21:52.685650+00:00
   text: 'Backlog reconciliation: Remains Todo: depends_on and blocks are independently stored/edited. Confirm A.depends_on=B then B.blocks and edge removal in an isolated scenario; decide persisted versus derived inverse behavior. DEV-55/60 are related mutation foundations, not completion of reciprocal edges.'
@@ -12,6 +16,14 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 17: Should a depends_on autimatically create blocks reference on the other ticket?
+- date: 2026-10-30T00:57:22.461136+00:00
+  text: Should have option to be disabled in config, and might already be handled from other recent relationship work
+- date: 2026-10-30T00:59:28.934468+00:00
+  text: 'Found: reciprocal links already exist (adding A depends_on B writes B.blocks A; removing removes both; verified in a scratch workspace). Plan: add a config switch (global + project) to turn reciprocal writing off; when off only the edited task changes and ''relationships check'' does not report one-sided links as missing mirrors. Docs + tests.'
+- date: 2026-10-30T01:30:25.280143+00:00
+  text: 'Done: auto.reciprocal_relationships (default true, global/project/env LOTAR_AUTO_RECIPROCAL_RELATIONSHIPS). Off: adding a link writes only the edited task (task edits, relationships add, REST/MCP mutate, mention links); removal still clears both sides because a link exists while either side lists it; check/repair don''t report or fill the missing side for projects with it off. Config page: Automatic behavior > Relationships. Committed together with DEV-7 (shared switch plumbing and relationship-service code). Test: tests/dev16_dev7_relationship_automation_test.rs.'
+- date: 2026-10-30T01:51:28.701327+00:00
+  text: 'Verified: npm run lint:agent, nextest 1866/1866, UI vitest 1393/1393, smoke 367/367 (ui.config-coverage row count updated for the two new relationship switches). No guidance correction.'
 description: |-
   Migrated checklist requirements:
   Preserve this as a design question: should setting A.depends_on=B automatically create or derive B.blocks=A? Decide persistence versus derivation and removal behavior, then cover reciprocal consistency and partial-write failures. Current manual reciprocal backlog links do not implement automatic application behavior.
@@ -31,3 +43,39 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-30T00:57:22.461136+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:57:27.440859+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:59:28.934468+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:30:25.280143+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:30:34.175925+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-7"]}'
+- at: 2026-10-30T01:51:28.701327+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.730288+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

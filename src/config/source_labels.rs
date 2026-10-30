@@ -299,6 +299,8 @@ fn source_label_for_global(
         "scan_enable_mentions" => scope_field!(scan_enable_mentions),
         "scan_strip_attributes" => scope_field!(scan_strip_attributes),
         "auto_set_reporter" => scope_field!(auto_set_reporter),
+        "auto_reciprocal_relationships" => scope_field!(auto_reciprocal_relationships),
+        "auto_link_mentions" => scope_field!(auto_link_mentions),
         "auto_assign_on_status" => scope_field!(auto_assign_on_status),
         "auto_codeowners_assign" => scope_field!(auto_codeowners_assign),
         "auto_tags_from_path" => scope_field!(auto_tags_from_path),
@@ -391,6 +393,8 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
         "scan_enable_mentions" => env_equal!(scan_enable_mentions),
         "scan_strip_attributes" => env_equal!(scan_strip_attributes),
         "auto_set_reporter" => env_equal!(auto_set_reporter),
+        "auto_reciprocal_relationships" => env_equal!(auto_reciprocal_relationships),
+        "auto_link_mentions" => env_equal!(auto_link_mentions),
         "auto_assign_on_status" => env_equal!(auto_assign_on_status),
         "auto_codeowners_assign" => env_equal!(auto_codeowners_assign),
         "auto_tags_from_path" => env_equal!(auto_tags_from_path),
@@ -588,6 +592,19 @@ fn source_label_for_project(
             let has_override = project_cfg.and_then(|pc| pc.auto_set_reporter).is_some();
             let diff = resolved_project.auto_set_reporter != base_config.auto_set_reporter;
             project_scope!("auto_set_reporter", has_override, diff)
+        }
+        "auto_reciprocal_relationships" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.auto_reciprocal_relationships)
+                .is_some();
+            let diff = resolved_project.auto_reciprocal_relationships
+                != base_config.auto_reciprocal_relationships;
+            project_scope!("auto_reciprocal_relationships", has_override, diff)
+        }
+        "auto_link_mentions" => {
+            let has_override = project_cfg.and_then(|pc| pc.auto_link_mentions).is_some();
+            let diff = resolved_project.auto_link_mentions != base_config.auto_link_mentions;
+            project_scope!("auto_link_mentions", has_override, diff)
         }
         "auto_assign_on_status" => {
             let has_override = project_cfg

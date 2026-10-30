@@ -41,6 +41,8 @@ fn cfg() -> ResolvedConfig {
         strict_members: false,
         auto_populate_members: true,
         auto_set_reporter: true,
+        auto_reciprocal_relationships: true,
+        auto_link_mentions: true,
         auto_assign_on_status: true,
         auto_codeowners_assign: true,
         default_priority: Priority::from("Medium"),

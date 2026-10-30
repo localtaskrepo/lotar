@@ -378,9 +378,13 @@ impl TaskService {
         if config_populated {
             Self::invalidate_config_caches(storage.root_path.as_path());
         }
+        let linked = Self::link_mentions(storage, &id, t.description.as_deref(), None);
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(&id, t, Some(&sprint_lookup), &config, chrono::Utc::now());
+        let mut dto = Self::to_dto(&id, t, Some(&sprint_lookup), &config, chrono::Utc::now());
+        if linked {
+            dto = Self::get(storage, &id, Some(&project)).unwrap_or(dto);
+        }
 
         let _ = AutomationService::apply_task_update(storage, None, &dto, &config);
 
@@ -542,6 +546,7 @@ impl TaskService {
         if config_staged {
             Self::invalidate_config_caches(storage.root_path.as_path());
         }
+        Self::link_mentions(storage, &id, task.description.as_deref(), None);
         Ok(id)
     }
 
@@ -798,13 +803,16 @@ impl TaskService {
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(
+        let mut dto = Self::to_dto(
             &canonical,
             outcome.after,
             Some(&sprint_lookup),
             &config,
             chrono::Utc::now(),
         );
+        if Self::link_mentions(storage, &canonical, Some(text), None) {
+            dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
+        }
         if context.fire_commented {
             let _ = AutomationService::apply_comment_event(storage, &dto, text, &config);
         }
@@ -877,15 +885,25 @@ impl TaskService {
             Ok(true)
         })?;
 
+        let previous_text = outcome
+            .before
+            .comments
+            .get(index)
+            .map(|comment| comment.text.clone());
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(
+        let mut dto = Self::to_dto(
             &canonical,
             outcome.after,
             Some(&sprint_lookup),
             &config,
             chrono::Utc::now(),
         );
+        if outcome.changed
+            && Self::link_mentions(storage, &canonical, Some(text), previous_text.as_deref())
+        {
+            dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
+        }
         Ok(TaskUpdateReceipt {
             dto,
             changed: outcome.changed,
@@ -910,6 +928,35 @@ impl TaskService {
             }
             Ok(_) => Ok(()),
             Err(_) => Err(LoTaRError::TaskNotFound(id.to_string())),
+        }
+    }
+
+    /// DEV-7: add `related` links for task IDs newly mentioned in `text`.
+    /// Best effort: the change it follows is already saved, so a failure here
+    /// is reported on stderr in debug runs and otherwise ignored.
+    fn link_mentions(
+        storage: &Storage,
+        id: &str,
+        text: Option<&str>,
+        previous: Option<&str>,
+    ) -> bool {
+        let text = text.unwrap_or_default();
+        if text.is_empty() {
+            return false;
+        }
+        match crate::services::relationships::link_mentions(
+            storage,
+            id,
+            text,
+            previous.unwrap_or_default(),
+        ) {
+            Ok(changed) => changed,
+            Err(error) => {
+                if std::env::var("LOTAR_DEBUG").is_ok() {
+                    eprintln!("[lotar] could not link tasks mentioned in {id}: {error}");
+                }
+                false
+            }
         }
     }
 
@@ -1442,10 +1489,19 @@ impl TaskService {
             Self::invalidate_config_caches(storage.root_path.as_path());
         }
 
+        let linked = Self::link_mentions(
+            storage,
+            &canonical,
+            t.description.as_deref(),
+            existing.description.as_deref(),
+        );
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let now = chrono::Utc::now();
         let previous_dto = Self::to_dto(&canonical, existing, Some(&sprint_lookup), &config, now);
-        let dto = Self::to_dto(&canonical, t, Some(&sprint_lookup), &config, now);
+        let mut dto = Self::to_dto(&canonical, t, Some(&sprint_lookup), &config, now);
+        if linked {
+            dto = Self::get(storage, &canonical, Some(&derived)).unwrap_or(dto);
+        }
 
         if context.emit_api_event {
             let actor =

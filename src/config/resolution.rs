@@ -544,6 +544,12 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.auto_set_reporter != defaults.auto_set_reporter {
         base.auto_set_reporter = override_config.auto_set_reporter;
     }
+    if override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships {
+        base.auto_reciprocal_relationships = override_config.auto_reciprocal_relationships;
+    }
+    if override_config.auto_link_mentions != defaults.auto_link_mentions {
+        base.auto_link_mentions = override_config.auto_link_mentions;
+    }
     if override_config.auto_assign_on_status != defaults.auto_assign_on_status {
         base.auto_assign_on_status = override_config.auto_assign_on_status;
     }
@@ -718,6 +724,12 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.auto_set_reporter != defaults.auto_set_reporter {
         resolved.auto_set_reporter = override_config.auto_set_reporter;
+    }
+    if override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships {
+        resolved.auto_reciprocal_relationships = override_config.auto_reciprocal_relationships;
+    }
+    if override_config.auto_link_mentions != defaults.auto_link_mentions {
+        resolved.auto_link_mentions = override_config.auto_link_mentions;
     }
     if override_config.auto_assign_on_status != defaults.auto_assign_on_status {
         resolved.auto_assign_on_status = override_config.auto_assign_on_status;
@@ -963,6 +975,12 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(auto) = project_config.auto_set_reporter {
         resolved.auto_set_reporter = auto;
     }
+    if let Some(auto) = project_config.auto_reciprocal_relationships {
+        resolved.auto_reciprocal_relationships = auto;
+    }
+    if let Some(auto) = project_config.auto_link_mentions {
+        resolved.auto_link_mentions = auto;
+    }
     if let Some(auto) = project_config.auto_assign_on_status {
         resolved.auto_assign_on_status = auto;
     }
@@ -1135,6 +1153,8 @@ impl ResolvedConfig {
             strict_members: global.strict_members,
             auto_populate_members: global.auto_populate_members,
             auto_set_reporter: global.auto_set_reporter,
+            auto_reciprocal_relationships: global.auto_reciprocal_relationships,
+            auto_link_mentions: global.auto_link_mentions,
             auto_assign_on_status: global.auto_assign_on_status,
             auto_codeowners_assign: global.auto_codeowners_assign,
             auto_tags_from_path: global.auto_tags_from_path,

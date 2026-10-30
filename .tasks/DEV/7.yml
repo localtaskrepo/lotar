@@ -1,10 +1,14 @@
 title: Auto-add ticket reference to relationships
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.727421+00:00
-modified: 2026-09-06T13:12:53.843574+00:00
+modified: 2026-10-30T01:51:28.799158+00:00
+relationships:
+  related:
+  - DEV-16
 comments:
 - date: 2026-09-06T11:21:52.652842+00:00
   text: 'Backlog reconciliation: Remains Todo for automatic relationship creation from ticket mentions. Explicit relationship editing exists, but does not implement automatic inference. Clarify eligible description/comment/reference surfaces, target relation category, deduplication and removal behavior; coordinate DEV-6/16 and mutation transactions DEV-55.'
@@ -12,6 +16,14 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 8: Option to automatically add ticket reference to relationships if they're not already in a more specific category.
+- date: 2026-10-30T00:56:16.612414+00:00
+  text: Should have a config flag that allows this to be disabled
+- date: 2026-10-30T00:59:28.975592+00:00
+  text: 'Decision (developer): mentions of other ticket IDs in the description and in comments add a ''related'' link (two-way) unless the pair is already linked in any category; on by default with a config switch (global + project) to turn it off; links are only added, never removed automatically. Plan: hook into task create/update and comment add/edit server-side so CLI, REST, MCP and UI all behave the same; skip unknown IDs, self, and moved stubs (resolve to current ID). Docs + tests.'
+- date: 2026-10-30T01:30:48.566818+00:00
+  text: 'Done: auto.link_mentions (default true). Ticket IDs newly written in a description (create/update, CLI/REST/MCP/UI) or comment (add/edit) add a two-way Related link; skipped: unknown/deleted IDs, self, code spans/blocks, pairs already linked in any category, archived targets when both sides are written; moved IDs follow to the current ID. Only new mentions count so hand-removed links stay removed; never removes links. Best effort after the main save. Docs: config-reference, config.md, task.md, environment. Test: tests/dev16_dev7_relationship_automation_test.rs.'
+- date: 2026-10-30T01:51:28.772329+00:00
+  text: 'Verified: npm run lint:agent, nextest 1866/1866, UI vitest 1393/1393, smoke 367/367 (ui.config-coverage row count updated for the two new relationship switches). No guidance correction.'
 description: |-
   Migrated checklist requirements:
   Make automatic relationship inference optional. Referenced tickets already in a more specific category must not be duplicated or have their explicit category overwritten. Define eligible text/reference surfaces, the general fallback category and removal behavior. Coordinate DEV-6/16 and transactional mutation work.
@@ -31,3 +43,39 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-30T00:56:16.612414+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:56:19.794344+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:59:28.975592+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:30:34.183608+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-16"]}'
+- at: 2026-10-30T01:30:48.566818+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.772329+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.799158+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

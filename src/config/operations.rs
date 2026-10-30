@@ -667,6 +667,12 @@ pub fn apply_field_to_global_config(
         "auto_set_reporter" => {
             config.auto_set_reporter = parse_bool_flag(value, field)?;
         }
+        "auto_reciprocal_relationships" => {
+            config.auto_reciprocal_relationships = parse_bool_flag(value, field)?;
+        }
+        "auto_link_mentions" => {
+            config.auto_link_mentions = parse_bool_flag(value, field)?;
+        }
         "auto_assign_on_status" => {
             config.auto_assign_on_status = parse_bool_flag(value, field)?;
         }
@@ -1031,6 +1037,12 @@ pub fn apply_field_to_project_config(
         }
         "auto_set_reporter" => {
             config.auto_set_reporter = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_reciprocal_relationships" => {
+            config.auto_reciprocal_relationships = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_link_mentions" => {
+            config.auto_link_mentions = parse_optional_bool_flag(value, field)?;
         }
         "auto_assign_on_status" => {
             config.auto_assign_on_status = parse_optional_bool_flag(value, field)?;
@@ -1506,6 +1518,8 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 parse_bool_flag(value, field)?;
             }
         "auto_set_reporter"
+        | "auto_reciprocal_relationships"
+        | "auto_link_mentions"
         | "auto_populate_members"
         | "auto_assign_on_status"
         | "auto_codeowners_assign"
@@ -1625,6 +1639,8 @@ pub fn clear_project_override_field(
         "tags" => config.tags = None,
         "custom_fields" => config.custom_fields = None,
         "auto_set_reporter" => config.auto_set_reporter = None,
+        "auto_reciprocal_relationships" => config.auto_reciprocal_relationships = None,
+        "auto_link_mentions" => config.auto_link_mentions = None,
         "auto_assign_on_status" => config.auto_assign_on_status = None,
         "auto_populate_members" => config.auto_populate_members = None,
         "auto_codeowners_assign" => config.auto_codeowners_assign = None,

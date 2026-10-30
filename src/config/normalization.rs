@@ -708,6 +708,18 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
             Y::Bool(cfg.auto_set_reporter),
         );
     }
+    if cfg.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships {
+        auto.insert(
+            Y::String("reciprocal_relationships".into()),
+            Y::Bool(cfg.auto_reciprocal_relationships),
+        );
+    }
+    if cfg.auto_link_mentions != defaults.auto_link_mentions {
+        auto.insert(
+            Y::String("link_mentions".into()),
+            Y::Bool(cfg.auto_link_mentions),
+        );
+    }
     if cfg.auto_assign_on_status != defaults.auto_assign_on_status {
         auto.insert(
             Y::String("assign_on_status".into()),
@@ -871,6 +883,12 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
     if let Some(v) = cfg.auto_set_reporter {
         auto.insert(Y::String("set_reporter".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_reciprocal_relationships {
+        auto.insert(Y::String("reciprocal_relationships".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_link_mentions {
+        auto.insert(Y::String("link_mentions".into()), Y::Bool(v));
     }
     if let Some(v) = cfg.auto_assign_on_status {
         auto.insert(Y::String("assign_on_status".into()), Y::Bool(v));

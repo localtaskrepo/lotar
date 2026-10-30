@@ -60,6 +60,8 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - auto.identity: boolean (default true)
 - auto.identity_git: boolean (default true)
 - auto.set_reporter: boolean (default true)
+- auto.reciprocal_relationships: boolean (default true). If true, adding a relationship also writes the matching side on the other task (Depends on ↔ Blocks, Parent ↔ Children, Related ↔ Related). When false, only the task you edit changes and `relationships check` does not report the missing side; removing a link still removes both sides.
+- auto.link_mentions: boolean (default true). If true, ticket IDs newly written in a description or comment add a `related` link (on both tasks, following `auto.reciprocal_relationships`). Tasks already linked in any way, unknown IDs, the task itself and IDs inside code are skipped; links are only added, never removed when the text changes.
 - auto.assign_on_status: boolean (default true)
 - auto.codeowners_assign: boolean (default true)
 - auto.tags_from_path: boolean (default true)
@@ -103,7 +105,7 @@ Home/global/project schemas are not identical. Project values override inherited
 
 Auth profiles are home-only: `auth_profiles` is ignored in project configs (secrets never live in the repo). Remotes can be configured globally or per-project; project remotes override/extend global remotes.
 
-Project configs can also override any automation toggle inherited from global defaults. Supported keys: `auto.populate_members`, `auto.set_reporter`, `auto.assign_on_status`, `auto.codeowners_assign`, `auto.tags_from_path`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`, `auto.identity`, and `auto.identity_git`.
+Project configs can also override any automation toggle inherited from global defaults. Supported keys: `auto.populate_members`, `auto.set_reporter`, `auto.reciprocal_relationships`, `auto.link_mentions`, `auto.assign_on_status`, `auto.codeowners_assign`, `auto.tags_from_path`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`, `auto.identity`, and `auto.identity_git`.
 
 > Legacy: older configs may include `issue.categories`. The key is normalized for compatibility but is not consumed by the runtime. Prefer modeling these labels with `custom_fields` (the dotted alias remains accepted for compatibility).
 

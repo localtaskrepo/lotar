@@ -58,6 +58,8 @@ export interface ConfigFormState {
     /** Project-only named reviewers. */
     reviewReviewers: string[]
     autoSetReporter: ToggleValue
+    autoReciprocalRelationships: ToggleValue
+    autoLinkMentions: ToggleValue
     autoAssignOnStatus: ToggleValue
     autoCodeownersAssign: ToggleValue
     autoTagsFromPath: ToggleValue
@@ -113,6 +115,8 @@ export interface ConfigFormState {
 
 export type ToggleField =
     | 'autoSetReporter'
+    | 'autoReciprocalRelationships'
+    | 'autoLinkMentions'
     | 'autoAssignOnStatus'
     | 'autoCodeownersAssign'
     | 'autoTagsFromPath'
@@ -229,6 +233,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         autoPopulateMembers: 'true',
         reviewReviewers: [],
         autoSetReporter: 'inherit',
+        autoReciprocalRelationships: 'inherit',
+        autoLinkMentions: 'inherit',
         autoAssignOnStatus: 'inherit',
         autoCodeownersAssign: 'true',
         autoTagsFromPath: 'true',
@@ -665,6 +671,10 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         switch (field) {
             case 'autoSetReporter':
                 return global.auto_set_reporter
+            case 'autoReciprocalRelationships':
+                return global.auto_reciprocal_relationships ?? null
+            case 'autoLinkMentions':
+                return global.auto_link_mentions ?? null
             case 'autoAssignOnStatus':
                 return global.auto_assign_on_status
             case 'autoCodeownersAssign':
@@ -1284,6 +1294,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                     raw.attachments_max_upload_mb === null ? '' : String(raw.attachments_max_upload_mb)
             }
             form.autoSetReporter = toTriToggle(raw.auto_set_reporter)
+            form.autoReciprocalRelationships = toTriToggle(raw.auto_reciprocal_relationships)
+            form.autoLinkMentions = toTriToggle(raw.auto_link_mentions)
             form.autoAssignOnStatus = toTriToggle(raw.auto_assign_on_status)
             form.scanEnableTicketWords = toTriToggle(raw.scan_enable_ticket_words)
             form.scanEnableMentions = toTriToggle(raw.scan_enable_mentions)
@@ -1350,6 +1362,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             form.projectName = ''
             form.issueDoneStates = normalizeDoneStatesRaw((data.global_raw as any)?.issue_done_states)
             form.autoSetReporter = toToggle(!!effective.auto_set_reporter)
+            form.autoReciprocalRelationships = toToggle(effective.auto_reciprocal_relationships !== false)
+            form.autoLinkMentions = toToggle(effective.auto_link_mentions !== false)
             form.autoAssignOnStatus = toToggle(!!effective.auto_assign_on_status)
             form.scanEnableTicketWords = toToggle(!!effective.scan_enable_ticket_words)
             form.scanEnableMentions = toToggle(!!effective.scan_enable_mentions)
@@ -1493,6 +1507,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addArray('scanTicketPatterns', 'scan_ticket_patterns')
 
         addToggleField('autoSetReporter', 'auto_set_reporter', { allowInherit: true })
+        addToggleField('autoReciprocalRelationships', 'auto_reciprocal_relationships', { allowInherit: true })
+        addToggleField('autoLinkMentions', 'auto_link_mentions', { allowInherit: true })
         addToggleField('autoAssignOnStatus', 'auto_assign_on_status', { allowInherit: true })
         addToggleField('scanEnableTicketWords', 'scan_enable_ticket_words', { allowInherit: true })
         addToggleField('scanEnableMentions', 'scan_enable_mentions', { allowInherit: true })

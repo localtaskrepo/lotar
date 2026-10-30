@@ -90,6 +90,8 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         summary: 'Automatic behaviors and automation rules.',
         fields: [
             'autoSetReporter',
+            'autoReciprocalRelationships',
+            'autoLinkMentions',
             'autoAssignOnStatus',
             'autoCodeownersAssign',
             'autoTagsFromPath',

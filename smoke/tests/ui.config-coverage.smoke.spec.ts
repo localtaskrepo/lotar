@@ -149,7 +149,7 @@ describe.concurrent('UI configuration coverage (DEV-146)', () => {
                         async (page) => {
                             await page.setViewportSize({ width: 1440, height: 1000 });
                             const rows = page.locator('[data-testid="config-automation"] .cfg-toggle');
-                            await expect.poll(() => rows.count()).toBe(9);
+                            await expect.poll(() => rows.count()).toBe(11);
                             const controls = await rows.evaluateAll((elements) =>
                                 elements.map((row) => {
                                     const control = row.querySelector('.cfg-switch, select')!.getBoundingClientRect();

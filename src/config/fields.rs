@@ -176,6 +176,14 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
         .both()
         .aliases(&["auto.set_reporter"])
         .source("auto.set-reporter"),
+    field("auto_reciprocal_relationships")
+        .both()
+        .aliases(&["auto.reciprocal_relationships"])
+        .source("auto.reciprocal-relationships"),
+    field("auto_link_mentions")
+        .both()
+        .aliases(&["auto.link_mentions"])
+        .source("auto.link-mentions"),
     field("auto_assign_on_status")
         .both()
         .aliases(&["auto.assign_on_status"])
@@ -403,6 +411,8 @@ mod tests {
         "issue_types",
         "issue_priorities",
         "auto_set_reporter",
+        "auto_reciprocal_relationships",
+        "auto_link_mentions",
         "auto_assign_on_status",
         "auto_codeowners_assign",
         "auto_tags_from_path",
@@ -472,6 +482,8 @@ mod tests {
         "tag_properties",
         "custom_fields",
         "auto_set_reporter",
+        "auto_reciprocal_relationships",
+        "auto_link_mentions",
         "auto_assign_on_status",
         "auto_codeowners_assign",
         "auto_tags_from_path",
@@ -541,6 +553,11 @@ mod tests {
         ("auto.identity_git", "auto_identity_git"),
         ("auto.populate_members", "auto_populate_members"),
         ("auto.set_reporter", "auto_set_reporter"),
+        (
+            "auto.reciprocal_relationships",
+            "auto_reciprocal_relationships",
+        ),
+        ("auto.link_mentions", "auto_link_mentions"),
         ("auto.assign_on_status", "auto_assign_on_status"),
         ("auto.codeowners_assign", "auto_codeowners_assign"),
         ("auto.tags_from_path", "auto_tags_from_path"),
@@ -628,6 +645,16 @@ mod tests {
             "auto.set-reporter",
             "auto_set_reporter",
             "auto_set_reporter",
+        ),
+        (
+            "auto.reciprocal-relationships",
+            "auto_reciprocal_relationships",
+            "auto_reciprocal_relationships",
+        ),
+        (
+            "auto.link-mentions",
+            "auto_link_mentions",
+            "auto_link_mentions",
         ),
         (
             "auto.assign-on-status",

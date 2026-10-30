@@ -467,6 +467,10 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auto_set_reporter: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_reciprocal_relationships: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_link_mentions: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auto_assign_on_status: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auto_codeowners_assign: Option<bool>,
@@ -559,6 +563,8 @@ impl ProjectConfig {
             default_status: None,
             custom_fields: None,
             auto_set_reporter: None,
+            auto_reciprocal_relationships: None,
+            auto_link_mentions: None,
             auto_assign_on_status: None,
             auto_codeowners_assign: None,
             auto_tags_from_path: None,
@@ -639,6 +645,10 @@ pub struct GlobalConfig {
     pub auto_populate_members: bool,
     #[serde(default = "default_true")]
     pub auto_set_reporter: bool,
+    #[serde(default = "default_true")]
+    pub auto_reciprocal_relationships: bool,
+    #[serde(default = "default_true")]
+    pub auto_link_mentions: bool,
     #[serde(default = "default_true")]
     pub auto_assign_on_status: bool,
     #[serde(default = "default_true")]
@@ -777,6 +787,8 @@ pub struct ResolvedConfig {
     pub strict_members: bool,
     pub auto_populate_members: bool,
     pub auto_set_reporter: bool,
+    pub auto_reciprocal_relationships: bool,
+    pub auto_link_mentions: bool,
     pub auto_assign_on_status: bool,
     pub auto_codeowners_assign: bool,
     pub default_priority: Priority,
@@ -1034,6 +1046,8 @@ impl Default for GlobalConfig {
             strict_members: false,
             auto_populate_members: true,
             auto_set_reporter: true,
+            auto_reciprocal_relationships: true,
+            auto_link_mentions: true,
             auto_assign_on_status: true,
             auto_codeowners_assign: true,
             auto_tags_from_path: true,

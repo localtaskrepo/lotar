@@ -671,6 +671,50 @@ fn conflicting_edges(edges: &BTreeSet<Edge>) -> BTreeSet<Edge> {
     bad
 }
 
+/// DEV-16: whether links added to this task are also written to the other
+/// task (`auto.reciprocal_relationships`, on by default).
+fn reciprocal_links(root: &Path, task_id: &str) -> bool {
+    let Ok(id) = TaskId::parse(task_id) else {
+        return true;
+    };
+    crate::config::resolution::config_for_project(root, Some(&id.project))
+        .map(|config| config.auto_reciprocal_relationships)
+        .unwrap_or(true)
+}
+
+/// Projects whose tasks do not get the other side of links written; their
+/// one-sided links are expected, not missing mirrors.
+fn one_sided_projects(inventory: &Inventory) -> BTreeSet<String> {
+    let mut seen = BTreeMap::<String, bool>::new();
+    for (id, records) in &inventory.records {
+        let Ok(parsed) = TaskId::parse(id) else {
+            continue;
+        };
+        if seen.contains_key(&parsed.project) {
+            continue;
+        }
+        let root = records
+            .first()
+            .map(|record| record.root.clone())
+            .unwrap_or_else(|| inventory.local_root.clone());
+        let on = crate::config::resolution::config_for_project(&root, Some(&parsed.project))
+            .map(|config| config.auto_reciprocal_relationships)
+            .unwrap_or(true);
+        seen.insert(parsed.project, on);
+    }
+    seen.into_iter()
+        .filter(|(_, on)| !on)
+        .map(|(project, _)| project)
+        .collect()
+}
+
+fn one_sided(projects: &BTreeSet<String>, e: &Edge) -> bool {
+    !projects.is_empty()
+        && [&e.0, &e.1]
+            .iter()
+            .any(|id| TaskId::parse(id).is_ok_and(|id| projects.contains(&id.project)))
+}
+
 fn mirrors(e: &Edge) -> Vec<(String, &'static str, String)> {
     let (source, target, kind) = e;
     match kind {
@@ -794,6 +838,7 @@ fn inspect_actions(
     inventory: &Inventory,
 ) -> (Vec<RelationshipIssue>, BTreeMap<String, RepairAction>) {
     let assertions = inventory.assertions();
+    let one_sided_projects = one_sided_projects(inventory);
     let edges: BTreeSet<Edge> = assertions.keys().cloned().collect();
     let conflicting = conflicting_edges(&edges);
     let conflicted_tasks: BTreeSet<_> = conflicting.iter().flat_map(|e| [&e.0, &e.1]).collect();
@@ -863,7 +908,7 @@ fn inspect_actions(
                 .iter()
                 .filter(|p| p.task_id == owner && p.field == field)
                 .collect();
-            if found.is_empty() {
+            if found.is_empty() && !one_sided(&one_sided_projects, e) {
                 let diagnostic = issue(
                     "missing_mirror",
                     tasks.clone(),
@@ -1543,8 +1588,19 @@ fn apply_edge(
     tasks: &mut BTreeMap<String, Task>,
     e: &Edge,
     add: bool,
+    only_owner: Option<&str>,
 ) -> LoTaRResult<()> {
-    for (owner, field, target) in mirrors(e) {
+    let mut sides = mirrors(e);
+    // DEV-16: with reciprocal links off, an added link is written only to the
+    // task being edited. Removing still clears both sides, because a link
+    // stays in place while either task lists it.
+    if add
+        && let Some(owner) = only_owner
+        && sides.iter().any(|(side, _, _)| side == owner)
+    {
+        sides.retain(|(side, _, _)| side == owner);
+    }
+    for (owner, field, target) in sides {
         // Missing/corrupt targets can be detached from the surviving task,
         // but are never guessed, rewritten, or resurrected.
         if !add {
@@ -1664,10 +1720,18 @@ pub(crate) fn stage_task_change(
     validate_additions(&inventory, &storage.root_path, &before, &after)?;
     let mut tasks = BTreeMap::new();
     for e in old.difference(&new) {
-        apply_edge(&inventory, &storage.root_path, &mut tasks, e, false)?;
+        apply_edge(&inventory, &storage.root_path, &mut tasks, e, false, None)?;
     }
+    let only_owner = (!reciprocal_links(&storage.root_path, id)).then_some(id);
     for e in new.difference(&old) {
-        apply_edge(&inventory, &storage.root_path, &mut tasks, e, true)?;
+        apply_edge(
+            &inventory,
+            &storage.root_path,
+            &mut tasks,
+            e,
+            true,
+            only_owner,
+        )?;
     }
     tasks.remove(id);
     stage_tasks(txn, storage, &inventory, tasks)
@@ -1779,6 +1843,7 @@ pub fn mutate(
     } else {
         inventory.active_local(&storage.root_path, &request.target)?
     };
+    let request_source = source.clone();
     let e = field_edge(source.clone(), target.clone(), request.kind);
     let before: BTreeSet<_> = inventory.assertions().keys().cloned().collect();
     let mut after = before.clone();
@@ -1855,10 +1920,26 @@ pub fn mutate(
     validate_additions(&inventory, &storage.root_path, &before, &after)?;
     let mut tasks = BTreeMap::new();
     for old in removals {
-        apply_edge(&inventory, &storage.root_path, &mut tasks, &old, false)?;
+        apply_edge(
+            &inventory,
+            &storage.root_path,
+            &mut tasks,
+            &old,
+            false,
+            None,
+        )?;
     }
     if request.operation != RelationshipOperation::Remove && !before.contains(&e) {
-        apply_edge(&inventory, &storage.root_path, &mut tasks, &e, true)?;
+        let focused = request_source.as_str();
+        let only_owner = (!reciprocal_links(&storage.root_path, focused)).then_some(focused);
+        apply_edge(
+            &inventory,
+            &storage.root_path,
+            &mut tasks,
+            &e,
+            true,
+            only_owner,
+        )?;
     }
     let changed_tasks = stage_tasks(&mut txn, storage, &inventory, tasks)?;
     let changed = !changed_tasks.is_empty();
@@ -1880,6 +1961,7 @@ fn repair_plan(
     project: Option<&str>,
 ) -> LoTaRResult<BTreeMap<String, Task>> {
     let assertions = inventory.assertions();
+    let one_sided_projects = one_sided_projects(inventory);
     let edges: BTreeSet<_> = assertions.keys().cloned().collect();
     let conflicting = conflicting_edges(&edges);
     let conflicted_tasks: BTreeSet<_> = conflicting.iter().flat_map(|e| [&e.0, &e.1]).collect();
@@ -1908,7 +1990,15 @@ fn repair_plan(
         {
             continue;
         }
+        let skip_missing = one_sided(&one_sided_projects, e);
         for (owner, field, target) in mirrors(e) {
+            if skip_missing
+                && !assertions[e]
+                    .iter()
+                    .any(|p| p.task_id == owner && p.field == field)
+            {
+                continue;
+            }
             let task = tasks
                 .entry(owner.clone())
                 .or_insert_with(|| inventory.unique(&owner).unwrap().task.clone().unwrap());
@@ -2103,3 +2193,142 @@ fn task_is_done(record: &Record, id: &str) -> LoTaRResult<bool> {
 #[cfg(test)]
 #[path = "../../tests/common/dev15_relationship_cases.rs"]
 mod dev15_relationship_cases;
+
+/// Task IDs written in `text` (DEV-7): `DEV-12`, `ABC-OPS-3`. Words glued to
+/// more ID characters (`DEV-12a`, `x-DEV-12`) and text inside inline code or
+/// fenced code blocks do not count.
+pub fn mentioned_ids(text: &str) -> BTreeSet<String> {
+    let mut found = BTreeSet::new();
+    let mut in_fence = false;
+    for line in text.lines() {
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        // Drop inline code spans (`...`).
+        let mut prose = String::with_capacity(line.len());
+        for (index, part) in line.split('`').enumerate() {
+            if index % 2 == 0 {
+                prose.push_str(part);
+            }
+            prose.push(' ');
+        }
+        let is_id_char = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+        for word in prose.split(|c: char| !is_id_char(c)) {
+            let word = word.trim_end_matches(['-', '_']);
+            let Some((prefix, number)) = word.rsplit_once('-') else {
+                continue;
+            };
+            if prefix.is_empty()
+                || number.is_empty()
+                || !number.chars().all(|c| c.is_ascii_digit())
+                || !prefix.chars().next().is_some_and(|c| c.is_alphanumeric())
+            {
+                continue;
+            }
+            if TaskId::parse(word).is_ok() {
+                found.insert(word.to_string());
+            }
+        }
+    }
+    found
+}
+
+/// DEV-7: link task `id` as `related` to tasks first mentioned in `text`
+/// (mentions already in `previous` were handled when they were written).
+/// Mentions of unknown, deleted or moved-away IDs, the task itself, and tasks
+/// already linked to it in any way are skipped. Links are only ever added.
+/// Respects `auto.link_mentions` and, for the other side,
+/// `auto.reciprocal_relationships`. Returns whether anything changed.
+pub(crate) fn link_mentions(
+    storage: &Storage,
+    id: &str,
+    text: &str,
+    previous: &str,
+) -> LoTaRResult<bool> {
+    let mut mentioned = mentioned_ids(text);
+    if mentioned.is_empty() {
+        return Ok(false);
+    }
+    for old in mentioned_ids(previous) {
+        mentioned.remove(&old);
+    }
+    if mentioned.is_empty() {
+        return Ok(false);
+    }
+    let Ok(parsed) = TaskId::parse(id) else {
+        return Ok(false);
+    };
+    let enabled =
+        crate::config::resolution::config_for_project(&storage.root_path, Some(&parsed.project))
+            .map(|config| config.auto_link_mentions)
+            .unwrap_or(true);
+    if !enabled {
+        return Ok(false);
+    }
+
+    let external = external_locks(storage)?;
+    let mut txn = MultiFileTransaction::begin_all(&storage.root_path, &[])?;
+    let inventory = external.load(storage)?;
+    let source = inventory.active_local(&storage.root_path, id)?;
+    let before: BTreeSet<_> = inventory.assertions().keys().cloned().collect();
+    let linked = |other: &str| {
+        before
+            .iter()
+            .any(|e| (e.0 == source && e.1 == other) || (e.1 == source && e.0 == other))
+    };
+    let only_owner = (!reciprocal_links(&storage.root_path, &source)).then_some(source.as_str());
+    let mut additions = Vec::new();
+    for raw in mentioned {
+        let Ok(target) = inventory.active_local(&storage.root_path, &raw) else {
+            continue;
+        };
+        if target == source || linked(&target) {
+            continue;
+        }
+        // An archived task is read-only; link it only when its side is not
+        // written.
+        if only_owner.is_none()
+            && let Some(record) = inventory.unique(&target)
+            && let Ok(target_id) = TaskId::parse(&target)
+            && crate::storage::operations::ensure_writable(
+                &record.root.join(&target_id.project),
+                &record.path,
+                &target,
+            )
+            .is_err()
+        {
+            continue;
+        }
+        let e = field_edge(source.clone(), target, RelationshipField::Related);
+        if !additions.contains(&e) {
+            additions.push(e);
+        }
+    }
+    if additions.is_empty() {
+        return Ok(false);
+    }
+    let mut after = before.clone();
+    after.extend(additions.iter().cloned());
+    validate_additions(&inventory, &storage.root_path, &before, &after)?;
+    let mut tasks = BTreeMap::new();
+    for e in &additions {
+        apply_edge(
+            &inventory,
+            &storage.root_path,
+            &mut tasks,
+            e,
+            true,
+            only_owner,
+        )?;
+    }
+    let changed = stage_tasks(&mut txn, storage, &inventory, tasks)?;
+    let locks = txn.commit_retaining_locks_checked(|| external.verify(storage))?;
+    drop(locks);
+    drop(external);
+    emit_counterparts(storage, &changed);
+    Ok(!changed.is_empty())
+}

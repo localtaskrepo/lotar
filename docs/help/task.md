@@ -180,6 +180,13 @@ lotar task relationships add APP-42 APP-8 --kind parent --expected-current APP-7
 Kinds are relative to the first, focused task. Adding Depends on maintains the
 target's Blocks assertion; changing Depends on to Blocks reverses dependency
 direction in one operation. Removing a relationship removes its reciprocal too.
+Set `auto.reciprocal_relationships: false` (globally or per project) to write
+only the focused task's side; removal still clears both sides.
+
+Mentioning another ticket's ID in a description or comment (`see APP-9`) adds a
+Related link to it, unless the two are already linked in any way. Only newly
+written mentions count, so removing such a link by hand sticks, and links are
+never removed when the text changes. Turn this off with `auto.link_mentions: false`.
 Other categories between the same pair remain intact. Parent/Duplicate of
 replacement requires the expected current target, preventing silent replacement
 after another edit. Cross-project edits within the same tasks root are supported;

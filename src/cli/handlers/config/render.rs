@@ -349,6 +349,22 @@ fn render_resolved_config_yaml(
     auto_written |= write_scalar_line(
         &mut auto_body,
         2,
+        "reciprocal-relationships",
+        &yaml_scalar(&resolved.auto_reciprocal_relationships),
+        sources.get("auto.reciprocal-relationships"),
+        options,
+    );
+    auto_written |= write_scalar_line(
+        &mut auto_body,
+        2,
+        "link-mentions",
+        &yaml_scalar(&resolved.auto_link_mentions),
+        sources.get("auto.link-mentions"),
+        options,
+    );
+    auto_written |= write_scalar_line(
+        &mut auto_body,
+        2,
         "assign-on-status",
         &yaml_scalar(&resolved.auto_assign_on_status),
         sources.get("auto.assign-on-status"),

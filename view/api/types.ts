@@ -1040,6 +1040,10 @@ export interface ResolvedConfigDTO {
     tags: string[]
     custom_fields: string[]
     auto_set_reporter: boolean
+    /** DEV-16: write the other side of relationships (default true). */
+    auto_reciprocal_relationships?: boolean
+    /** DEV-7: ticket IDs mentioned in descriptions and comments add related links (default true). */
+    auto_link_mentions?: boolean
     auto_assign_on_status: boolean
     auto_codeowners_assign: boolean
     auto_tags_from_path: boolean
@@ -1089,6 +1093,10 @@ export interface GlobalConfigRaw {
     default_reporter?: string | null
     default_tags: string[]
     auto_set_reporter: boolean
+    /** DEV-16: write the other side of relationships (default true). */
+    auto_reciprocal_relationships?: boolean
+    /** DEV-7: ticket IDs mentioned in descriptions and comments add related links (default true). */
+    auto_link_mentions?: boolean
     auto_assign_on_status: boolean
     auto_codeowners_assign: boolean
     auto_tags_from_path: boolean
@@ -1146,6 +1154,10 @@ export interface ProjectConfigRaw {
     strict_members?: boolean
     auto_populate_members?: boolean
     auto_set_reporter?: boolean
+    /** DEV-16: write the other side of relationships (default true). */
+    auto_reciprocal_relationships?: boolean
+    /** DEV-7: ticket IDs mentioned in descriptions and comments add related links (default true). */
+    auto_link_mentions?: boolean
     auto_assign_on_status?: boolean
     auto_codeowners_assign?: boolean
     auto_tags_from_path?: boolean

@@ -386,6 +386,8 @@ Automation (defaults inherited from global):
 - `scan.strip_attributes` - Remove inline attribute blocks after insertion (default: true)
 - Automation:
     - `auto.set_reporter` - Enable auto reporter when missing (default: true)
+    - `auto.reciprocal_relationships` - Write the other side of relationships (default: true)
+    - `auto.link_mentions` - Ticket IDs mentioned in descriptions and comments add related links (default: true)
     - `auto.assign_on_status` - Enable first-change auto-assign (default: true)
     - `auto.identity` - Enable smart identity detection beyond configured default (default: true)
     - `auto.identity_git` - Enable git-based identity detection (default: true)

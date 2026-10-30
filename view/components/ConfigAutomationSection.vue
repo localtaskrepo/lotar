@@ -40,6 +40,8 @@ type AutomationField =
   | 'autoBranchInferPriority'
   | 'autoIdentity'
   | 'autoIdentityGit'
+  | 'autoReciprocalRelationships'
+  | 'autoLinkMentions'
 
 const autoSetReporter = defineModel<ToggleValue>('autoSetReporter', { required: true })
 const autoAssignOnStatus = defineModel<ToggleValue>('autoAssignOnStatus', { required: true })
@@ -50,6 +52,8 @@ const autoBranchInferStatus = defineModel<ToggleValue>('autoBranchInferStatus', 
 const autoBranchInferPriority = defineModel<ToggleValue>('autoBranchInferPriority', { required: true })
 const autoIdentity = defineModel<ToggleValue>('autoIdentity', { required: true })
 const autoIdentityGit = defineModel<ToggleValue>('autoIdentityGit', { required: true })
+const autoReciprocalRelationships = defineModel<ToggleValue>('autoReciprocalRelationships', { default: 'true' })
+const autoLinkMentions = defineModel<ToggleValue>('autoLinkMentions', { default: 'true' })
 
 const values: Record<AutomationField, Ref<ToggleValue>> = {
   autoSetReporter,
@@ -61,6 +65,8 @@ const values: Record<AutomationField, Ref<ToggleValue>> = {
   autoBranchInferPriority,
   autoIdentity,
   autoIdentityGit,
+  autoReciprocalRelationships,
+  autoLinkMentions,
 }
 
 const props = defineProps<{
@@ -98,6 +104,25 @@ const groups: Array<{ title: string; toggles: ToggleDefinition[] }> = [
         key: 'auto_codeowners_assign',
         label: 'Prefer CODEOWNERS',
         description: 'When assigning on a status change, prefer the CODEOWNERS owner.',
+      },
+    ],
+  },
+  {
+    title: 'Relationships',
+    toggles: [
+      {
+        field: 'autoReciprocalRelationships',
+        key: 'auto_reciprocal_relationships',
+        label: 'Link both tasks',
+        description:
+          'Adding a link also adds the matching one on the other task, such as Blocks for Depends on. When off, only the task you edit changes.',
+      },
+      {
+        field: 'autoLinkMentions',
+        key: 'auto_link_mentions',
+        label: 'Link mentioned tasks',
+        description:
+          'A task ID written in a description or comment adds a Related link, unless the tasks are already linked.',
       },
     ],
   },

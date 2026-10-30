@@ -275,6 +275,8 @@
               v-model:auto-branch-infer-priority="form.autoBranchInferPriority"
               v-model:auto-identity="form.autoIdentity"
               v-model:auto-identity-git="form.autoIdentityGit"
+              v-model:auto-reciprocal-relationships="form.autoReciprocalRelationships"
+              v-model:auto-link-mentions="form.autoLinkMentions"
               :toggle-select-options="toggleSelectOptions"
               :global-toggle-summary="globalToggleSummary"
               :provenance-label="provenanceLabel"

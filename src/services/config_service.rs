@@ -588,6 +588,10 @@ impl ConfigService {
                 join(&local) == global_value
             }
             "auto_set_reporter" => parse_bool(value_trim) == Some(global.auto_set_reporter),
+            "auto_reciprocal_relationships" => {
+                parse_bool(value_trim) == Some(global.auto_reciprocal_relationships)
+            }
+            "auto_link_mentions" => parse_bool(value_trim) == Some(global.auto_link_mentions),
             "auto_assign_on_status" => parse_bool(value_trim) == Some(global.auto_assign_on_status),
             "scan_signal_words" => csv(value) == global.scan_signal_words,
             "scan_ticket_patterns" => {
