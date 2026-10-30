@@ -5,10 +5,11 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-30T19:14:22.883089+00:00
+modified: 2026-10-30T23:49:36.532826+00:00
 relationships:
   related:
   - DEV-251
+  - DEV-252
 comments:
 - date: 2026-10-30T01:06:55.820854+00:00
   text: "This may also be an opportunity to merge the scoop and homebrew repos into one, if possible, along with other repos that may be added. \nThere may even be a case for merging them back into the main repo if that provides any benefits."
@@ -21,6 +22,13 @@ comments:
     Not verified here (GitHub-only): package-linux job, cosign on packages, Windows execution of install.ps1 (real .exe run + user PATH), the verify workflows themselves, Pages serving the scripts.
     Remaining / next: commit; open a PR or run install-verify.yml + homebrew-verify.yml after merge (scripts work against v0.11.0 already); after the next release run install-verify with that tag to check deb/rpm and homebrew-verify for Linux. Phase 2 candidates: npm per-platform binary packages (user has an npm account), winget, AUR lotar-bin; crates.io/binstall low priority. Decision: separate repo per channel, nothing folded into main.
     Guidance: no durable finding.
+- date: 2026-10-30T23:39:52.553210+00:00
+  text: 'Phase 1 committed: dc3d047 (with DEV-251 658dd6a, DEV-252 ee1ae65); not pushed. Plan (Phase 2, npm): user chose main package ''lotar'' + platform packages @localtaskrepo/lotar-{darwin-arm64,darwin-x64,linux-x64,linux-arm64,win32-x64} (needs npm org localtaskrepo). Platform packages carry the release binary (musl for Linux; win32-x64 also allows arm64 via emulation) with os/cpu fields; main package has a small Node launcher (bin/lotar.js) and exact-version optionalDependencies, no postinstall. scripts/npm-packages.mjs assembles packages from the release archives (node:test coverage); release job publish-npm downloads + checks archives, publishes platform packages then main, skips versions already published, dist-tag next for prereleases, trusted publishing (OIDC, npm >= 11.5.1) with optional NPM_TOKEN secret only to bootstrap the first publish (classic tokens revoked Dec 2025, write tokens max 90 days). Root package.json gets private: true (it is named @localtaskrepo/lotar). Docs: install.md npm + MCP npx usage, release-guide bootstrap steps, README/homepage; install-verify gains an npm job. Checks: unit tests, local Verdaccio registry publish + install/npx in node containers (arm64/x64), actionlint.'
+- date: 2026-10-30T23:49:36.532826+00:00
+  text: |-
+    Outcome (npm, uncommitted at time of writing): packaging/npm/lotar (CommonJS launcher bin/lotar.js: maps platform-arch to @localtaskrepo/lotar-<platform>, win32-arm64 -> win32-x64, inherits stdio, forwards SIGTERM/SIGHUP, re-raises child signals, clear errors for unsupported platform or omitted optional dep; npm README with npx/MCP usage). scripts/npm-packages.mjs builds 5 platform packages (os/cpu, exec bit, preferUnplugged) + main lotar (exact-version optionalDependencies, no scripts) and publish-order.json; scripts/tests/npm-packages.test.mjs (7 cases, in test:release). release.yml publish-npm job: Node 24, npm >= 11.5.1 check, downloads + checks 5 archives, assembles, publishes platform packages then lotar with --provenance, skips published versions, dist-tag next for prereleases, NPM_TOKEN only for bootstrap; release page lists npm. install-verify gains an npm job (5 OSes, dispatch only). Root package.json private: true (named @localtaskrepo/lotar). ESLint override for the CommonJS launcher. Docs: install.md npm section, mcp.md client command, README, docs/README, homepage 'Script & npm' tab, release-guide one-time npm setup (org, temporary granular token, trusted publisher per package, revoke).
+    Evidence: local run of the real download step caught and fixed a CRLF bug in the Windows .sha256 (sha256sum --check failed); now passes with GNU tools. Assembled packages from v0.11.0 (pack contents and 755 modes checked), published all 6 to a throwaway Verdaccio registry with the real publish step (provenance flag removed), rerun skipped all 6. node:24 arm64 and x64: npm i -g installs only the matching platform package, lotar --version and npx -y lotar work, MCP initialize round-trips through the launcher, exit codes match the binary, SIGTERM to the launcher stops the binary; project install with --omit=optional shows the intended error (global installs ignore --omit=optional). actionlint clean except the pre-existing SC2193; npm run lint:agent clean; npm run test:release 40/40. Rust/UI tests and smoke not rerun (no app code changed).
+    Remaining: user creates npm org localtaskrepo and bootstraps the first publish (docs/release-guide.md One-Time npm Setup), then configures trusted publishing for the 6 packages and revokes the token. GitHub-only checks still pending: package-linux, publish-npm (OIDC + provenance), install-verify and homebrew-verify runs. Later candidates: winget, AUR lotar-bin.
 description: |-
   Right now we support homebrew and scoop as well as direct downloads from the release page.
   Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
@@ -51,3 +59,17 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-251"]}'
+- at: 2026-10-30T23:39:52.553210+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T23:39:52.673761+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-251"]}'
+    new: '{"related":["DEV-251","DEV-252"]}'
+- at: 2026-10-30T23:49:36.532826+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

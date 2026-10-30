@@ -5,10 +5,11 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T04:53:00.739435+00:00
-modified: 2026-10-30T18:04:28.816882+00:00
+modified: 2026-10-30T23:39:52.674+00:00
 relationships:
   related:
   - DEV-251
+  - DEV-250
 comments:
 - date: 2026-10-30T18:04:28.697045+00:00
   text: |-
@@ -42,3 +43,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-30T23:39:52.674+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-251"]}'
+    new: '{"related":["DEV-251","DEV-250"]}'

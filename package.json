@@ -1,6 +1,7 @@
 {
   "name": "@localtaskrepo/lotar",
   "version": "0.1.0",
+  "private": true,
   "description": "A task and project management tool that runs locally and can be synced via repo",
   "type": "module",
   "scripts": {
@@ -24,7 +25,7 @@
     "test:ui": "vitest run --config view/vitest.config.ts",
     "test:ui:only": "npm run test:ui",
     "test:agent": "bash -lc 'set -euo pipefail; npm run test:rust:agent; npm run test:ui:agent; npm run test:release; npm run test:hooks'",
-    "test:release": "node --test --test-reporter=spec scripts/tests/release-ticket-links.test.mjs scripts/tests/release-page.test.mjs",
+    "test:release": "node --test --test-reporter=spec scripts/tests/release-ticket-links.test.mjs scripts/tests/release-page.test.mjs scripts/tests/npm-packages.test.mjs",
     "test:rust:agent": "node scripts/rust-test-runner.mjs --agent",
     "test:rust:perf": "node scripts/perf-runner.mjs",
     "test:ui:agent": "bash -lc 'set -euo pipefail; export NO_COLOR=1 FORCE_COLOR=0; vitest run --config view/vitest.config.ts --reporter dot --no-color \"$@\"' --",

@@ -1,7 +1,7 @@
 # Release & Verification Guide
 
-LoTaR ships signed binaries, `.deb` and `.rpm` packages, a Docker image, a Homebrew tap
-(macOS and Linux), a Scoop bucket, and install scripts. This guide summarizes the release
+LoTaR ships signed binaries, `.deb` and `.rpm` packages, npm packages, a Docker image, a
+Homebrew tap (macOS and Linux), a Scoop bucket, and install scripts. This guide summarizes the release
 automation and the manual checks to run after every tag.
 
 ## Automation Overview
@@ -12,6 +12,8 @@ automation and the manual checks to run after every tag.
   - Signed tarballs/zips for every supported target, attached to the GitHub Release page.
   - Signed `.deb` and `.rpm` packages for x64 and arm64, built with nfpm from the static
     musl binaries (`packaging/nfpm.yaml`), attached to the same release.
+  - npm packages: `lotar` (a small Node launcher) and one `@localtaskrepo/lotar-<platform>`
+    package per binary, assembled by `scripts/npm-packages.mjs` from the release archives.
   - Docker image `mallox/lotar:<version>` built via Buildx.
   - Homebrew tap update pushed to `localtaskrepo/homebrew-lotar`. The formula installs the
     macOS builds on macOS and the static musl builds on Linux.
@@ -61,6 +63,30 @@ automation and the manual checks to run after every tag.
    ```
 4. Commit the changes on `main` and push.
 
+## One-Time npm Setup
+
+`publish-npm` uses npm trusted publishing: GitHub Actions proves its identity to npm, so no
+long-lived token is stored. npm can only enable that for packages that already exist, so the
+first version of each package is published with a temporary token:
+
+1. On npmjs.com, create the free organization `localtaskrepo` (it owns the
+   `@localtaskrepo/lotar-*` platform packages).
+2. Create a granular access token with read and write access to all packages, **Bypass
+   two-factor authentication** enabled, and the shortest expiry that covers the next release.
+   Store it as the repository secret `NPM_TOKEN`.
+3. Cut a release as usual, or re-run `publish-npm` for the latest one. It publishes all six
+   packages: `lotar`, `@localtaskrepo/lotar-darwin-arm64`, `-darwin-x64`, `-linux-arm64`,
+   `-linux-x64`, and `-win32-x64`.
+4. For each of those packages, open **Settings → Trusted publishing** on npmjs.com and add a
+   GitHub Actions publisher: organization `localtaskrepo`, repository `lotar`, workflow
+   `release.yml`, no environment. Then select **Require two-factor authentication and
+   disallow tokens** for that package.
+5. Delete the `NPM_TOKEN` secret and revoke the token. Later releases publish through OIDC.
+
+The job needs npm 11.5.1 or newer for trusted publishing and installs it if the runner's
+Node.js bundles an older npm. If a publish fails with `E404` after setup, the trusted
+publisher settings do not match the workflow (organization, repository, or file name).
+
 ## Cutting a Release
 
 1. Tag the commit on `main`:
@@ -72,6 +98,9 @@ automation and the manual checks to run after every tag.
    - `build-and-release`: compiles, signs, and uploads release assets.
    - `package-linux`: builds `.deb`/`.rpm` packages from the uploaded musl archives,
      signs them, and uploads them. Homebrew, Scoop, and Docker do not wait for it.
+   - `publish-npm`: publishes the platform packages, then `lotar`, with npm provenance.
+     Versions that are already on npm are skipped, so the job can be re-run. Prerelease
+     tags (`v1.0.0-rc.1`) publish under the `next` dist-tag instead of `latest`.
    - `update-release-page`: injects quick download links and snapshot-linked
      ticket references in the custom commit list.
    - `publish-docker-image`: builds/pushes the Docker image to Docker Hub.
@@ -127,9 +156,9 @@ What it does:
 Kick off this workflow once the release workflow finishes updating the tap so you have a
 smoke test for every platform the formula supports.
 
-### Install scripts and Linux packages
+### Install scripts and packages
 
-Workflow: **Verify Install Scripts and Linux Packages** (`.github/workflows/install-verify.yml`).
+Workflow: **Verify Install Scripts and Packages** (`.github/workflows/install-verify.yml`).
 
 Inputs:
 - `lotar_version` (optional) release tag to install and assert, e.g. `v0.12.0`. Defaults to
@@ -143,6 +172,9 @@ What it does:
    7 and Windows PowerShell 5.1, and checks the version and the user `PATH` entry.
 3. Downloads the `.deb` and `.rpm` packages for x64 and arm64, checks their SHA-256 files,
    and installs, runs, and removes them in Debian and Fedora containers.
+4. Installs the `lotar` npm package globally on Linux (x64, arm64), macOS (Apple Silicon,
+   Intel), and Windows, checks the version and that only the matching platform package was
+   installed, and runs it once with `npx`.
 
 Pull requests that change the install scripts run steps 1 and 2 against the latest release.
 
@@ -156,7 +188,7 @@ Pull requests that change the install scripts run steps 1 and 2 against the late
   re-run the manual Scoop workflow to confirm the package can still be installed.
 - **Release workflow failures**: Re-run the failed job from the Actions tab. Make sure the
   required secrets (`HOMEBREW_TAP_TOKEN`, Docker Hub creds) exist in the repository
-  settings before retrying.
+  settings before retrying. `publish-npm` needs no secret once trusted publishing is set up.
 
 With the release workflow and the three manual verification jobs, you can be confident the
 published artifacts install correctly on macOS, Linux, and Windows before announcing the

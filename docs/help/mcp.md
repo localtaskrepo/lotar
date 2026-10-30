@@ -9,6 +9,10 @@ Start the MCP (Model Context Protocol) JSON-RPC server. The process reads from s
 lotar mcp
 ```
 
+MCP clients start the server as a command over stdio. Use `lotar` with `args: ["mcp"]` when it is
+installed, or `npx` with `args: ["-y", "lotar", "mcp"]` to let npm fetch it (see
+[Installation](./install.md#any-os-with-nodejs-npm)).
+
 Environment:
 - `LOTAR_TASKS_DIR` — override the workspace search path.
 - `LOTAR_MCP_AUTORELOAD=0` — disable the default binary-change watcher that exits the process when the `lotar` executable is replaced (useful when running under a supervisor that already restarts the process).

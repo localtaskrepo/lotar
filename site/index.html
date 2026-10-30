@@ -482,7 +482,7 @@
                                         aria-selected="false"
                                         tabindex="-1"
                                     >
-                                        Install script
+                                        Script &amp; npm
                                     </button>
                                     <button
                                         type="button"
@@ -536,6 +536,11 @@
                                     <p class="tabs__label">Windows (PowerShell)</p>
                                     <div class="command">
                                         <pre><code>irm https://localtaskrepo.github.io/lotar/install.ps1 | iex</code></pre>
+                                        <button type="button" class="copy" data-copy>Copy</button>
+                                    </div>
+                                    <p class="tabs__label">Any OS with Node.js</p>
+                                    <div class="command">
+                                        <pre><code>npm install --global lotar</code></pre>
                                         <button type="button" class="copy" data-copy>Copy</button>
                                     </div>
                                 </div>

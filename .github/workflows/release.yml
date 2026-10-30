@@ -405,6 +405,88 @@ jobs:
           set -euo pipefail
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber packages/*
 
+  publish-npm:
+    name: Publish npm packages
+    # The lotar package plus one @localtaskrepo/lotar-<platform> package per
+    # binary, assembled from the uploaded archives (DEV-250). Publishes with npm
+    # trusted publishing (OIDC); NPM_TOKEN is only for bootstrapping packages
+    # that do not exist on npm yet (see docs/release-guide.md).
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Check npm supports trusted publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(npm --version)"
+          echo "npm ${version}"
+          # Trusted publishing needs npm 11.5.1 or newer.
+          if [ "$(printf '%s\n' 11.5.1 "$version" | sort -V | head -n1)" != 11.5.1 ]; then
+            npm install --global npm@11
+            npm --version
+          fi
+
+      - name: Download release archives
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          for platform in macos-arm64 macos-x64 linux-musl-arm64 linux-musl-x64 windows-x64; do
+            ext=tar.gz
+            [ "$platform" = windows-x64 ] && ext=zip
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir downloads \
+              --pattern "lotar-${TAG}-${platform}.${ext}" \
+              --pattern "lotar-${TAG}-${platform}.sha256"
+          done
+          # The Windows checksum file is uppercase with CRLF line endings; sha256sum
+          # accepts either case but not the trailing CR.
+          sed -i 's/\r$//' downloads/*.sha256
+          (cd downloads && sha256sum --check ./*.sha256)
+
+      - name: Assemble packages
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node scripts/npm-packages.mjs --tag "$TAG" --archives downloads --out npm-dist
+
+      - name: Publish packages
+        shell: bash
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NPM_TOKEN}" ]; then
+            echo "Using NPM_TOKEN; remove it once trusted publishing is configured for every package."
+            npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
+          fi
+          version="$(jq -r .version npm-dist/publish-order.json)"
+          dist_tag="$(jq -r .distTag npm-dist/publish-order.json)"
+          # Platform packages come first, so lotar never points at missing versions.
+          jq -r '.packages[] | "\(.name)\t\(.dir)"' npm-dist/publish-order.json |
+            while IFS=$'\t' read -r name dir; do
+              if npm view "${name}@${version}" version >/dev/null 2>&1; then
+                echo "${name}@${version} is already published; skipping"
+                continue
+              fi
+              (cd "$dir" && npm publish --access public --provenance --tag "$dist_tag")
+            done
+
   update-release-page:
     name: Update Release Page
     needs: build-and-release
@@ -483,6 +565,7 @@ jobs:
               '## Install Script',
               '- Linux and macOS: `curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh`',
               '- Windows: `irm https://localtaskrepo.github.io/lotar/install.ps1 | iex`',
+              `- npm: \`npm install --global lotar@${dockerTag}\` or \`npx -y lotar@${dockerTag}\``,
               '',
               '## Docker Image',
               `- \`mallox/lotar:${dockerTag}\` ([Docker Hub tag](${dockerUrl}))`,

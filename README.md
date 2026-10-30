@@ -32,6 +32,7 @@ LoTaR keeps tasks as plain YAML files in `.tasks/`, versioned and branched with 
 | Linux, macOS (script) | `curl -fsSL https://localtaskrepo.github.io/lotar/install.sh \| sh` |
 | Windows | `scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar; scoop install lotar` |
 | Windows (script) | `irm https://localtaskrepo.github.io/lotar/install.ps1 \| iex` |
+| Any OS with Node.js | `npm install --global lotar`, or `npx -y lotar` |
 | Linux, macOS, Windows | Signed binaries and `.deb`/`.rpm` packages on [GitHub Releases](https://github.com/localtaskrepo/lotar/releases/latest) |
 | Any OS with Docker | `docker run --rm -v "$PWD":/workspace -v "$PWD/.tasks":/tasks -w /workspace mallox/lotar list` |
 

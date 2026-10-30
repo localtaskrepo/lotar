@@ -41,6 +41,11 @@ irm https://localtaskrepo.github.io/lotar/install.ps1 | iex          # Windows P
 Both check the release's SHA-256 file before installing; see [Installation](help/install.md) for options
 and the `.deb`/`.rpm` packages.
 
+**npm (any OS with Node.js)**
+```bash
+npm install --global lotar          # or run it without installing: npx -y lotar list
+```
+
 **GitHub Releases (macOS • Linux • Windows)**
 ```bash
 # Download the asset for your platform from the Releases page

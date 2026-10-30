@@ -1,0 +1,6 @@
+{
+  "name": "lotar-npm-template",
+  "private": true,
+  "description": "Template for the lotar npm package. scripts/npm-packages.mjs replaces this file with the published manifest; it exists so bin/lotar.js runs as CommonJS inside this repository.",
+  "type": "commonjs"
+}

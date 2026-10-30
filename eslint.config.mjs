@@ -57,6 +57,13 @@ export default defineConfig(
         rules: { 'no-undef': 'off' },
     },
     {
+        // The npm launcher is CommonJS, so it runs on every supported Node.js
+        // without a package "type" (DEV-250).
+        files: ['packaging/npm/**/*.js'],
+        languageOptions: { sourceType: 'commonjs' },
+        rules: { '@typescript-eslint/no-require-imports': 'off' },
+    },
+    {
         // Tests mock freely and define throwaway components inline.
         files: ['view/__tests__/**', 'smoke/**'],
         rules: {

@@ -54,6 +54,28 @@ lotar --version
 Use `linux-arm64` for 64-bit ARM. The packages install `/usr/bin/lotar`; there is no package repository
 yet, so upgrade by installing the newer package.
 
+## Any OS with Node.js: npm
+
+```bash
+npm install --global lotar
+lotar --version
+```
+
+The `lotar` package installs the release binary for your platform (macOS, Linux, or Windows on x64 or
+arm64; Windows on ARM runs the x64 build under emulation). npm picks the matching
+`@localtaskrepo/lotar-<platform>` package from its optional dependencies; there is no install script,
+so `--ignore-scripts` works. Node.js only starts the binary. Upgrade with `npm update --global lotar`.
+
+To run it without installing, use `npx -y lotar <command>`. For an MCP client, that makes the server
+configuration independent of how LoTaR is installed:
+
+```json
+{ "command": "npx", "args": ["-y", "lotar", "mcp"] }
+```
+
+Packages are published with npm provenance from the same release workflow as the binaries, starting
+with the first release after v0.11.0.
+
 ## Windows: Scoop
 
 ```powershell

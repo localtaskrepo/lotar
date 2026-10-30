@@ -1,9 +1,9 @@
-name: Verify Install Scripts and Linux Packages
+name: Verify Install Scripts and Packages
 
-# DEV-250: checks site/install.sh, site/install.ps1 and the .deb/.rpm release
-# assets against a published release. Pull requests that touch the scripts run
-# the script jobs against the latest release; run it manually after a release to
-# check the packages too.
+# DEV-250: checks site/install.sh, site/install.ps1, the .deb/.rpm release
+# assets, and the npm packages against a published release. Pull requests that
+# touch the scripts run the script jobs against the latest release; run it
+# manually after a release to check the packages too.
 
 on:
   workflow_dispatch:
@@ -146,3 +146,38 @@ jobs:
             script='rpm -i "/pkg/$PACKAGE" && lotar --version | grep -q "${TAG#v}" && rpm -e lotar && ! test -e /usr/bin/lotar'
           fi
           docker run --rm -e PACKAGE -e TAG -v "$PWD:/pkg:ro" "$IMAGE" bash -c "$script"
+
+  npm-package:
+    name: npm package (${{ matrix.label }})
+    # Needs a release that publish-npm has published, so pull requests skip this.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, label: Linux x64 }
+          - { runner: ubuntu-24.04-arm, label: Linux arm64 }
+          - { runner: macos-15, label: macOS arm64 }
+          - { runner: macos-15-intel, label: macOS x64 }
+          - { runner: windows-latest, label: Windows x64 }
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Install globally and with npx
+        shell: bash
+        run: |
+          set -euo pipefail
+          spec="lotar@${LOTAR_VERSION:-latest}"
+          spec="${spec/@v/@}"
+          npm install --global "$spec"
+          lotar --version
+          if [ -n "${LOTAR_VERSION:-}" ]; then
+            lotar --version | grep -q "${LOTAR_VERSION#v}"
+          fi
+          # Only the package for this platform is installed.
+          ls "$(npm root --global)/lotar/node_modules/@localtaskrepo"
+          npx --yes "$spec" --version
