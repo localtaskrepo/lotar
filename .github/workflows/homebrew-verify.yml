@@ -26,12 +26,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13
-            label: Intel (macOS 13)
+          # macos-13 was retired in December 2025 (DEV-250).
+          - runner: macos-15-intel
+            label: Intel (macOS 15)
             arch: x86_64
-          - runner: macos-14
-            label: Apple Silicon (macOS 14)
+          - runner: macos-15
+            label: Apple Silicon (macOS 15)
             arch: arm64
+          # Homebrew on Linux installs the static musl build; `file` spells the arch x86-64.
+          - runner: ubuntu-latest
+            label: Linux x64
+            arch: x86-64
     steps:
       - name: Checkout tap (for reference)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,6 +76,9 @@ jobs:
             brew_bin="/opt/homebrew/bin/brew"
           elif [ -x "/usr/local/bin/brew" ]; then
             brew_bin="/usr/local/bin/brew"
+          elif [ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
+            # Ubuntu runners ship Homebrew without putting it on PATH.
+            brew_bin="/home/linuxbrew/.linuxbrew/bin/brew"
           else
             echo "Homebrew is not available on this runner" >&2
             exit 1
@@ -119,6 +127,8 @@ jobs:
           set -euo pipefail
           brew uninstall --ignore-dependencies --force lotar >/dev/null 2>&1 || true
           brew install lotar
+          # Runs the formula's own test block, which must reference the installed binary.
+          brew test lotar
 
       - name: Verify lotar version
         shell: bash
@@ -167,5 +177,6 @@ jobs:
           name: homebrew-logs-${{ matrix.runner }}
           path: |
             ~/Library/Logs/Homebrew
+            ~/.cache/Homebrew/Logs
             ${{ steps.brew_setup.outputs.prefix }}/Cellar/lotar
             ${{ steps.tap_clone.outputs.tap_path }}

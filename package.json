@@ -56,7 +56,7 @@
     "todo"
   ],
   "author": "Ravi Gairola <mallox@pyxzl.net>",
-  "license": "ISC",
+  "license": "MIT",
   "engines": {
     "node": "^24.15.0 || >=26.0.0"
   },

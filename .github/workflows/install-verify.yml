@@ -1,0 +1,148 @@
+name: Verify Install Scripts and Linux Packages
+
+# DEV-250: checks site/install.sh, site/install.ps1 and the .deb/.rpm release
+# assets against a published release. Pull requests that touch the scripts run
+# the script jobs against the latest release; run it manually after a release to
+# check the packages too.
+
+on:
+  workflow_dispatch:
+    inputs:
+      lotar_version:
+        description: "Release tag to install, e.g. v0.12.0 (defaults to the latest release)"
+        required: false
+  pull_request:
+    paths:
+      - site/install.sh
+      - site/install.ps1
+      - .github/workflows/install-verify.yml
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  LOTAR_VERSION: ${{ inputs.lotar_version }}
+
+jobs:
+  install-script-unix:
+    name: install.sh (${{ matrix.label }})
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, label: Ubuntu x64, arch: x86-64 }
+          - { runner: ubuntu-24.04-arm, label: Ubuntu arm64, arch: aarch64 }
+          # BusyBox sh and wget, no curl or bash.
+          - { runner: ubuntu-latest, label: Alpine x64, arch: x86-64, container: 'alpine:3' }
+          - { runner: macos-15, label: macOS arm64, arch: arm64 }
+          - { runner: macos-15-intel, label: macOS x64, arch: x86_64 }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install with install.sh
+        shell: sh
+        run: |
+          set -eu
+          dir="${RUNNER_TEMP:-/tmp}/lotar-bin"
+          sh site/install.sh --to "$dir"
+          "$dir/lotar" --version
+          if [ -n "${LOTAR_VERSION:-}" ]; then
+            "$dir/lotar" --version | grep -q "${LOTAR_VERSION#v}"
+          fi
+          # Reinstalling over an existing binary must work too.
+          sh site/install.sh --to "$dir" >/dev/null
+
+      - name: Check binary architecture
+        if: matrix.container == ''
+        shell: bash
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          output="$(file "${RUNNER_TEMP}/lotar-bin/lotar")"
+          echo "$output"
+          [[ "$output" == *"${EXPECTED_ARCH}"* ]]
+
+  install-script-windows:
+    name: install.ps1 (${{ matrix.shell }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # pwsh is PowerShell 7; powershell is the Windows PowerShell 5.1 that ships with Windows.
+        shell: [pwsh, powershell]
+    defaults:
+      run:
+        # A step's own shell cannot come from the matrix; the job default can.
+        shell: ${{ matrix.shell }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install with install.ps1 (piped, as documented)
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-Content -Raw site/install.ps1 | Invoke-Expression
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\lotar\lotar.exe'
+          $output = & $exe --version
+          Write-Host $output
+          if ($env:LOTAR_VERSION -and $output -notmatch [regex]::Escape($env:LOTAR_VERSION.TrimStart('v'))) {
+            throw "Expected $env:LOTAR_VERSION, got $output"
+          }
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (($userPath -split ';') -notcontains (Split-Path $exe)) { throw 'Install directory was not added to the user PATH' }
+          # Reinstalling over an existing binary must work too.
+          Get-Content -Raw site/install.ps1 | Invoke-Expression
+
+  linux-packages:
+    name: ${{ matrix.format }} package (${{ matrix.arch }})
+    # Packages exist only for releases newer than v0.11.0, so pull requests skip this.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, arch: x64, format: deb, image: 'debian:stable-slim' }
+          - { runner: ubuntu-24.04-arm, arch: arm64, format: deb, image: 'debian:stable-slim' }
+          - { runner: ubuntu-latest, arch: x64, format: rpm, image: 'fedora:latest' }
+          - { runner: ubuntu-24.04-arm, arch: arm64, format: rpm, image: 'fedora:latest' }
+    steps:
+      - name: Download and check the package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCH: ${{ matrix.arch }}
+          FORMAT: ${{ matrix.format }}
+        run: |
+          set -euo pipefail
+          tag="${LOTAR_VERSION:-$(gh release view --repo localtaskrepo/lotar --json tagName --jq .tagName)}"
+          file="lotar-${tag}-linux-${ARCH}.${FORMAT}"
+          gh release download "$tag" --repo localtaskrepo/lotar --pattern "$file" --pattern "$file.sha256"
+          sha256sum --check "$file.sha256"
+          echo "PACKAGE=$file" >> "$GITHUB_ENV"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Install, run, and remove in ${{ matrix.image }}
+        shell: bash
+        env:
+          IMAGE: ${{ matrix.image }}
+          FORMAT: ${{ matrix.format }}
+        run: |
+          set -euo pipefail
+          # The single-quoted scripts expand $PACKAGE and $TAG inside the container.
+          # shellcheck disable=SC2016
+          if [ "$FORMAT" = deb ]; then
+            script='apt-get install -y -qq "/pkg/$PACKAGE" && lotar --version | grep -q "${TAG#v}" && apt-get remove -y -qq lotar && ! test -e /usr/bin/lotar'
+          else
+            script='rpm -i "/pkg/$PACKAGE" && lotar --version | grep -q "${TAG#v}" && rpm -e lotar && ! test -e /usr/bin/lotar'
+          fi
+          docker run --rm -e PACKAGE -e TAG -v "$PWD:/pkg:ro" "$IMAGE" bash -c "$script"

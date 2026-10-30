@@ -1,7 +1,8 @@
 # Release & Verification Guide
 
-LoTaR ships signed binaries, a Docker image, a Homebrew tap, and a Scoop bucket. This
-guide summarizes the release automation and the manual checks to run after every tag.
+LoTaR ships signed binaries, `.deb` and `.rpm` packages, a Docker image, a Homebrew tap
+(macOS and Linux), a Scoop bucket, and install scripts. This guide summarizes the release
+automation and the manual checks to run after every tag.
 
 ## Automation Overview
 
@@ -9,11 +10,20 @@ guide summarizes the release automation and the manual checks to run after every
   `v` lands on `main` (for example `v0.6.3`).
 - **Artifacts produced**:
   - Signed tarballs/zips for every supported target, attached to the GitHub Release page.
+  - Signed `.deb` and `.rpm` packages for x64 and arm64, built with nfpm from the static
+    musl binaries (`packaging/nfpm.yaml`), attached to the same release.
   - Docker image `mallox/lotar:<version>` built via Buildx.
-  - Homebrew tap update pushed to `localtaskrepo/homebrew-lotar`.
+  - Homebrew tap update pushed to `localtaskrepo/homebrew-lotar`. The formula installs the
+    macOS builds on macOS and the static musl builds on Linux.
   - Scoop manifest update pushed to `localtaskrepo/scoop-lotar`.
+- **Install scripts**: `site/install.sh` (Linux, macOS) and `site/install.ps1` (Windows)
+  are published with the homepage at `https://localtaskrepo.github.io/lotar/` by the
+  Homepage workflow when they change on `main`, not by the release. They look up the
+  latest release when run, so a release needs no script change, but they depend on the
+  release asset names (`lotar-<tag>-<platform>.tar.gz|zip` plus `.sha256`).
 - **Quick-links**: The workflow edits the release notes to include clickable download
-  shortcuts for macOS, Linux, and Windows assets.
+  shortcuts for macOS, Linux, and Windows assets, the Linux packages, and the install
+  script commands.
 - **Commit list**: The custom `Changes:` list shows each commit's subject line,
   grouped by the type of the first ticket it names: Features, then Bug fixes,
   Chores, and Other changes (commits without a ticket, or with another type).
@@ -60,6 +70,8 @@ guide summarizes the release automation and the manual checks to run after every
    ```
 2. Monitor the **Release** workflow in GitHub Actions. The important jobs are:
    - `build-and-release`: compiles, signs, and uploads release assets.
+   - `package-linux`: builds `.deb`/`.rpm` packages from the uploaded musl archives,
+     signs them, and uploads them. Homebrew, Scoop, and Docker do not wait for it.
    - `update-release-page`: injects quick download links and snapshot-linked
      ticket references in the custom commit list.
    - `publish-docker-image`: builds/pushes the Docker image to Docker Hub.
@@ -71,7 +83,7 @@ guide summarizes the release automation and the manual checks to run after every
 
 ## Post-Release Verification
 
-While the release workflow performs automated updates, we keep two manual verification
+While the release workflow performs automated updates, we keep three manual verification
 workflows handy so we can validate installs on real runners before announcing the release.
 
 ### Windows: Verify Scoop Install
@@ -104,15 +116,35 @@ Inputs:
 - `lotar_version` (optional) to assert a specific version string.
 
 What it does:
-1. Runs on both `macos-13` (Intel) and `macos-14` (Apple Silicon) runners.
-2. Untaps and re-taps the requested repository/branch, installs LoTaR via Homebrew, then
-   runs `lotar --version` to confirm the installation.
+1. Runs on `macos-15-intel` (Intel), `macos-15` (Apple Silicon), and `ubuntu-latest`
+   (Homebrew on Linux) runners.
+2. Untaps and re-taps the requested repository/branch, installs LoTaR via Homebrew, runs
+   the formula's `brew test`, then runs `lotar --version` to confirm the installation.
 3. Uses `file` to ensure the binary architecture matches the runner.
 4. Uploads Homebrew logs, the tapped repo, and the installed Cellar contents for post-run
    inspection.
 
 Kick off this workflow once the release workflow finishes updating the tap so you have a
-smoke test for both architectures.
+smoke test for every platform the formula supports.
+
+### Install scripts and Linux packages
+
+Workflow: **Verify Install Scripts and Linux Packages** (`.github/workflows/install-verify.yml`).
+
+Inputs:
+- `lotar_version` (optional) release tag to install and assert, e.g. `v0.12.0`. Defaults to
+  the latest release.
+
+What it does:
+1. Runs `site/install.sh` from the checkout on Ubuntu (x64, arm64), Alpine (BusyBox `sh`
+   and `wget`), and macOS (Apple Silicon, Intel), checks the version and binary
+   architecture, and reinstalls over the existing binary.
+2. Runs `site/install.ps1` piped into `Invoke-Expression`, as documented, under PowerShell
+   7 and Windows PowerShell 5.1, and checks the version and the user `PATH` entry.
+3. Downloads the `.deb` and `.rpm` packages for x64 and arm64, checks their SHA-256 files,
+   and installs, runs, and removes them in Debian and Fedora containers.
+
+Pull requests that change the install scripts run steps 1 and 2 against the latest release.
 
 ## Troubleshooting Tips
 
@@ -126,6 +158,6 @@ smoke test for both architectures.
   required secrets (`HOMEBREW_TAP_TOKEN`, Docker Hub creds) exist in the repository
   settings before retrying.
 
-With the release workflow and the two manual verification jobs, you can be confident the
+With the release workflow and the three manual verification jobs, you can be confident the
 published artifacts install correctly on macOS, Linux, and Windows before announcing the
 release.

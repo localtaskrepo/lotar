@@ -472,7 +472,17 @@
                                         aria-controls="panel-brew"
                                         aria-selected="true"
                                     >
-                                        macOS
+                                        macOS &amp; Linux
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-script"
+                                        aria-controls="panel-script"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                    >
+                                        Install script
                                     </button>
                                     <button
                                         type="button"
@@ -514,6 +524,24 @@
                                 <div
                                     class="tabs__panel"
                                     role="tabpanel"
+                                    id="panel-script"
+                                    aria-labelledby="tab-script"
+                                    hidden
+                                >
+                                    <p class="tabs__label">Linux and macOS</p>
+                                    <div class="command">
+                                        <pre><code>curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh</code></pre>
+                                        <button type="button" class="copy" data-copy>Copy</button>
+                                    </div>
+                                    <p class="tabs__label">Windows (PowerShell)</p>
+                                    <div class="command">
+                                        <pre><code>irm https://localtaskrepo.github.io/lotar/install.ps1 | iex</code></pre>
+                                        <button type="button" class="copy" data-copy>Copy</button>
+                                    </div>
+                                </div>
+                                <div
+                                    class="tabs__panel"
+                                    role="tabpanel"
                                     id="panel-scoop"
                                     aria-labelledby="tab-scoop"
                                     hidden
@@ -543,7 +571,8 @@
                                     hidden
                                 >
                                     <p>
-                                        Signed binaries for Linux, macOS and Windows are on
+                                        Signed binaries for Linux, macOS and Windows, plus <code>.deb</code> and
+                                        <code>.rpm</code> packages, are on
                                         <a href="https://github.com/localtaskrepo/lotar/releases/latest"
                                             >GitHub Releases</a
                                         >. To build from source, see the

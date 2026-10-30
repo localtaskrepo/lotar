@@ -54,7 +54,7 @@ body:
     id: environment
     attributes:
       label: Operating system and install method
-      placeholder: macOS 15 via Homebrew, Windows 11 via Scoop, Docker, built from source, ...
+      placeholder: macOS 15 via Homebrew, Ubuntu 24.04 via .deb or install script, Windows 11 via Scoop, Docker, built from source, ...
     validations:
       required: true
   - type: textarea

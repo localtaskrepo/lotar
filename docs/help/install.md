@@ -3,7 +3,7 @@
 Every package below is produced by the same release workflow from the same tagged source.
 After installing, check the binary with `lotar --version`.
 
-## macOS: Homebrew
+## macOS and Linux: Homebrew
 
 LoTaR is not in Homebrew core. It ships as a formula in its own third-party tap,
 [localtaskrepo/homebrew-lotar](https://github.com/localtaskrepo/homebrew-lotar), so add the tap first:
@@ -14,9 +14,45 @@ brew install lotar
 lotar --version
 ```
 
-`brew install localtaskrepo/lotar/lotar` does both steps in one command. The formula is macOS-only and
-ships separate Apple Silicon and Intel builds; on Linux, use a [release archive](#linux-macos-windows-release-archives)
-or [Docker](#any-os-docker). Upgrade with `brew upgrade lotar`.
+`brew install localtaskrepo/lotar/lotar` does both steps in one command. On macOS the formula installs the
+Apple Silicon or Intel build; on Linux (x64 or arm64) it installs the static musl build. Upgrade with
+`brew upgrade lotar`.
+
+## Linux and macOS: install script
+
+```bash
+curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh
+```
+
+The script downloads the latest release for your system from GitHub, checks it against the release's
+SHA-256 file, and installs `lotar` to `~/.local/bin` without `sudo`. Linux gets the static musl build,
+which runs on any distribution. It needs `curl` or `wget`, `tar`, and a SHA-256 tool, and works with
+BusyBox. Options:
+
+```bash
+# A specific release and another directory (the directory must be writable)
+curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh -s -- --version v0.11.0 --to /usr/local/bin
+curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sudo sh -s -- --to /usr/local/bin
+```
+
+The same options can be set with `LOTAR_VERSION` and `LOTAR_INSTALL_DIR`. Run the script again to
+upgrade. To read the script before running it, download it first:
+`curl -fsSLO https://localtaskrepo.github.io/lotar/install.sh`.
+
+## Linux: .deb and .rpm packages
+
+Releases after v0.11.0 also attach Debian/Ubuntu and Fedora/RHEL packages for x64 and arm64, built from
+the static musl binaries, each with a SHA-256 file, a Sigstore signature, and a certificate:
+
+```bash
+VERSION=v0.12.0   # pick the release you want
+curl -LO https://github.com/localtaskrepo/lotar/releases/download/$VERSION/lotar-$VERSION-linux-x64.deb
+sudo apt install ./lotar-$VERSION-linux-x64.deb      # Fedora/RHEL: sudo dnf install ./lotar-$VERSION-linux-x64.rpm
+lotar --version
+```
+
+Use `linux-arm64` for 64-bit ARM. The packages install `/usr/bin/lotar`; there is no package repository
+yet, so upgrade by installing the newer package.
 
 ## Windows: Scoop
 
@@ -31,6 +67,18 @@ lotar --version
 ```
 
 The bucket is updated during every release. Upgrade with `scoop update lotar`.
+
+## Windows: install script
+
+```powershell
+irm https://localtaskrepo.github.io/lotar/install.ps1 | iex
+```
+
+The script downloads the latest x64 release, checks it against the release's SHA-256 file, installs
+`lotar.exe` to `%LOCALAPPDATA%\Programs\lotar`, and adds that folder to your user `PATH` (open a new
+terminal afterwards). Set `$env:LOTAR_VERSION` (for example `v0.11.0`) or `$env:LOTAR_INSTALL_DIR` before
+running it to pick a release or folder. On ARM64 Windows it installs the x64 build, which Windows 11 runs
+under emulation. Run it again to upgrade.
 
 ## Linux, macOS, Windows: release archives
 

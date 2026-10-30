@@ -635,6 +635,16 @@ section[id] {
     color: var(--muted);
 }
 
+/* A panel with several commands labels each one. */
+.tabs__panel .tabs__label {
+    margin: 0 0 6px;
+    font-size: 0.85rem;
+}
+
+.tabs__panel .command + .tabs__label {
+    margin-top: 14px;
+}
+
 .command {
     display: flex;
     align-items: flex-start;

@@ -1,0 +1,40 @@
+# .deb and .rpm packages for Linux, built by the release workflow from the
+# static musl binaries, so one package runs on any distribution (DEV-250).
+#
+# nfpm expands ${VAR} in fields such as version and arch, but not in file paths,
+# so the binary to package is always ./build/lotar (relative to the repo root):
+#   VERSION  release version without the leading v (0.12.0, 0.12.0-rc.1)
+#   ARCH     amd64 or arm64 (nfpm maps these to x86_64/aarch64 for rpm)
+#
+#   VERSION=0.12.0 ARCH=amd64 \
+#     nfpm package --config packaging/nfpm.yaml --packager deb --target lotar.deb
+name: lotar
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+version_schema: semver
+section: devel
+priority: optional
+maintainer: Ravi Gairola <mallox@pyxzl.net>
+vendor: LoTaR
+homepage: https://localtaskrepo.github.io/lotar/
+license: MIT
+description: |-
+  A git-native task management CLI that stores issues as YAML files in your repository.
+  Includes the web UI (lotar serve) and the MCP server (lotar mcp).
+contents:
+  - src: ./build/lotar
+    dst: /usr/bin/lotar
+    file_info:
+      mode: 0755
+  - src: ./LICENSE
+    dst: /usr/share/doc/lotar/copyright
+    packager: deb
+    file_info:
+      mode: 0644
+  - src: ./LICENSE
+    dst: /usr/share/licenses/lotar/LICENSE
+    packager: rpm
+    type: license
+    file_info:
+      mode: 0644

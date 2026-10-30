@@ -15,7 +15,7 @@ LoTaR is an actively developed task management tool with a CLI, web server, and 
 
 ### 1. Install the CLI
 
-**Homebrew ([brew.sh](https://brew.sh/), macOS)**
+**Homebrew ([brew.sh](https://brew.sh/), macOS and Linux)**
 ```bash
 brew tap localtaskrepo/lotar
 brew install lotar
@@ -33,12 +33,20 @@ lotar --version
 Run `scoop install lotar --version vX.Y.Z` if you need to pin a specific release from the
 bucket instead of installing the latest manifest.
 
+**Install script (Linux, macOS; Windows PowerShell)**
+```bash
+curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh     # installs to ~/.local/bin
+irm https://localtaskrepo.github.io/lotar/install.ps1 | iex          # Windows PowerShell
+```
+Both check the release's SHA-256 file before installing; see [Installation](help/install.md) for options
+and the `.deb`/`.rpm` packages.
+
 **GitHub Releases (macOS • Linux • Windows)**
 ```bash
 # Download the asset for your platform from the Releases page
 curl -LO https://github.com/localtaskrepo/lotar/releases/latest/download/lotar-vX.Y.Z-linux-musl-x64.tar.gz
-curl -LO https://github.com/localtaskrepo/lotar/releases/latest/download/lotar-vX.Y.Z-linux-musl-x64.tar.gz.sha256
-sha256sum --check lotar-vX.Y.Z-linux-musl-x64.tar.gz.sha256
+curl -LO https://github.com/localtaskrepo/lotar/releases/latest/download/lotar-vX.Y.Z-linux-musl-x64.sha256
+sha256sum --check lotar-vX.Y.Z-linux-musl-x64.sha256
 tar -xzf lotar-vX.Y.Z-linux-musl-x64.tar.gz
 sudo mv lotar /usr/local/bin/
 lotar --version

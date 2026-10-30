@@ -311,6 +311,100 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  package-linux:
+    name: Package .deb and .rpm
+    # Built from the static musl archives the build job uploaded, so a package
+    # runs on any distribution (DEV-250). The tap and bucket do not wait for it.
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      NFPM_VERSION: '2.48.0'
+      NFPM_SHA256: 6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install nfpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSfL -o nfpm.tar.gz \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "${NFPM_SHA256}  nfpm.tar.gz" | sha256sum --check
+          tar -xzf nfpm.tar.gz nfpm
+          sudo install -m 0755 nfpm /usr/local/bin/nfpm
+          rm nfpm nfpm.tar.gz
+          nfpm --version
+
+      - name: Download static Linux builds
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          for arch in x64 arm64; do
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir downloads \
+              --pattern "lotar-${TAG}-linux-musl-${arch}.tar.gz" \
+              --pattern "lotar-${TAG}-linux-musl-${arch}.sha256"
+          done
+          (cd downloads && sha256sum --check ./*.sha256)
+
+      - name: Build packages
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          export VERSION="${TAG#v}"
+          mkdir -p packages
+          for arch in x64 arm64; do
+            case "$arch" in
+              x64) export ARCH=amd64 ;;
+              arm64) export ARCH=arm64 ;;
+            esac
+            # packaging/nfpm.yaml always packages ./build/lotar.
+            rm -rf build && mkdir build
+            tar -xzf "downloads/lotar-${TAG}-linux-musl-${arch}.tar.gz" -C build
+            for format in deb rpm; do
+              file="packages/lotar-${TAG}-linux-${arch}.${format}"
+              nfpm package --config packaging/nfpm.yaml --packager "$format" --target "$file"
+              (cd packages && sha256sum "$(basename "$file")" > "$(basename "$file").sha256")
+            done
+          done
+          ls -l packages
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        # Same Cosign v2 line as the build job, so packages get .sig/.pem assets too.
+        with:
+          cosign-release: "v2.6.5"
+
+      - name: Sign packages
+        shell: bash
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          set -euo pipefail
+          for file in packages/*.deb packages/*.rpm; do
+            cosign sign-blob --yes --output-signature "${file}.sig" --output-certificate "${file}.pem" "$file"
+          done
+
+      - name: Upload packages to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber packages/*
+
   update-release-page:
     name: Update Release Page
     needs: build-and-release
@@ -378,10 +472,18 @@ jobs:
               { label: 'Linux (musl x64)', file: `lotar-${tag}-linux-musl-x64.tar.gz` },
               { label: 'Linux (musl arm64)', file: `lotar-${tag}-linux-musl-arm64.tar.gz` },
               { label: 'Windows (x64)', file: `lotar-${tag}-windows-x64.zip` },
+              { label: 'Debian/Ubuntu package (x64)', file: `lotar-${tag}-linux-x64.deb` },
+              { label: 'Debian/Ubuntu package (arm64)', file: `lotar-${tag}-linux-arm64.deb` },
+              { label: 'Fedora/RHEL package (x64)', file: `lotar-${tag}-linux-x64.rpm` },
+              { label: 'Fedora/RHEL package (arm64)', file: `lotar-${tag}-linux-arm64.rpm` },
             ];
 
             const lines = quickLinks.map((entry) => `- [${entry.label}](${assetBase}/${entry.file})`);
             const installLines = [
+              '## Install Script',
+              '- Linux and macOS: `curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh`',
+              '- Windows: `irm https://localtaskrepo.github.io/lotar/install.ps1 | iex`',
+              '',
               '## Docker Image',
               `- \`mallox/lotar:${dockerTag}\` ([Docker Hub tag](${dockerUrl}))`,
             ];
@@ -503,13 +605,18 @@ jobs:
             echo "asset_base=${asset_base}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Download macOS checksums
+      - name: Download macOS and Linux checksums
+        env:
+          ASSET_BASE: ${{ steps.release_meta.outputs.asset_base }}
+          TAG: ${{ steps.release_meta.outputs.tag }}
         run: |
+          set -euo pipefail
           cd tap
-          base="${{ steps.release_meta.outputs.asset_base }}"
-          tag="${{ steps.release_meta.outputs.tag }}"
-          curl -sSfL "${base}/lotar-${tag}-macos-arm64.sha256" -o arm64.sha
-          curl -sSfL "${base}/lotar-${tag}-macos-x64.sha256" -o x64.sha
+          curl -sSfL "${ASSET_BASE}/lotar-${TAG}-macos-arm64.sha256" -o arm64.sha
+          curl -sSfL "${ASSET_BASE}/lotar-${TAG}-macos-x64.sha256" -o x64.sha
+          # Homebrew on Linux gets the static musl builds, which run on any distro.
+          curl -sSfL "${ASSET_BASE}/lotar-${TAG}-linux-musl-arm64.sha256" -o linux-arm64.sha
+          curl -sSfL "${ASSET_BASE}/lotar-${TAG}-linux-musl-x64.sha256" -o linux-x64.sha
 
       - name: Update formula
         env:
@@ -517,10 +624,11 @@ jobs:
           BASE_URL: ${{ steps.release_meta.outputs.asset_base }}
         run: |
           cd tap
-          arm64_sha=$(cut -d ' ' -f1 arm64.sha)
-          x64_sha=$(cut -d ' ' -f1 x64.sha)
-          export ARM64_SHA="$arm64_sha"
-          export X64_SHA="$x64_sha"
+          ARM64_SHA=$(cut -d ' ' -f1 arm64.sha)
+          X64_SHA=$(cut -d ' ' -f1 x64.sha)
+          LINUX_ARM64_SHA=$(cut -d ' ' -f1 linux-arm64.sha)
+          LINUX_X64_SHA=$(cut -d ' ' -f1 linux-x64.sha)
+          export ARM64_SHA X64_SHA LINUX_ARM64_SHA LINUX_X64_SHA
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -529,12 +637,18 @@ jobs:
           base = os.environ['BASE_URL']
           arm_sha = os.environ['ARM64_SHA']
           x64_sha = os.environ['X64_SHA']
+          linux_arm_sha = os.environ['LINUX_ARM64_SHA']
+          linux_x64_sha = os.environ['LINUX_X64_SHA']
+          for name, value in [('macos-arm64', arm_sha), ('macos-x64', x64_sha),
+                              ('linux-musl-arm64', linux_arm_sha), ('linux-musl-x64', linux_x64_sha)]:
+              if len(value) != 64:
+                  raise SystemExit(f"Bad checksum for {name}: {value!r}")
 
           formula = f"""class Lotar < Formula
             desc "Local-first task and project management CLI"
             homepage "https://github.com/localtaskrepo/lotar"
             version "{version}"
-            license "ISC"
+            license "MIT"
 
             on_macos do
               if Hardware::CPU.arm?
@@ -546,16 +660,29 @@ jobs:
               end
             end
 
+            on_linux do
+              if Hardware::CPU.arm?
+                url "{base}/lotar-v{version}-linux-musl-arm64.tar.gz"
+                sha256 "{linux_arm_sha}"
+              else
+                url "{base}/lotar-v{version}-linux-musl-x64.tar.gz"
+                sha256 "{linux_x64_sha}"
+              end
+            end
+
             def install
               bin.install "lotar"
             end
 
             test do
-              assert_match "lotar", shell_output("#{bin}/lotar --version")
+              assert_match "lotar", shell_output("#{{bin}}/lotar --version")
             end
           end
           """
 
+          # Ruby's #{...} must be written #{{...}} in this f-string (DEV-250).
+          if "<built-in" in formula or "#{bin}" not in formula:
+              raise SystemExit("Formula template interpolation is broken")
           Path("Formula/lotar.rb").write_text(formula)
           PY
 
@@ -626,7 +753,7 @@ jobs:
               "version": version,
               "description": "Local-first task and project management CLI",
               "homepage": "https://github.com/localtaskrepo/lotar",
-              "license": "ISC",
+              "license": "MIT",
               "architecture": {
                   "64bit": {
                       "url": f"{base}/lotar-{tag}-windows-x64.zip",
