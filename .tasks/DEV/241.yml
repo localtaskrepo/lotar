@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-29T01:31:38.712922+00:00
-modified: 2026-10-29T23:47:08.490267+00:00
+modified: 2026-10-29T23:47:14.681625+00:00
 comments:
 - date: 2026-10-29T23:15:28.375730+00:00
   text: |-
@@ -20,6 +20,8 @@ comments:
     UI: one-screen When / If / Then editor (view/components/automation/AutomationRuleDialog.vue): trigger chips incl. Manually / cron, condition rows with operators per field kind and project value suggestions (statuses, priorities, types, tags, members, agent profiles, special @tokens), 'changes from/to' rows, actions per trigger from an Add menu, placeholder fields with Insert value menu, ${{ suggestions limited to the triggers' variables and a live preview on a chosen task, Try it (simulate the draft), starter recipes, generated YAML, plain-language footer. Rule list shows one sentence per trigger, on/off switch, Run now, icon reorder/duplicate/delete. Simulator tab offers every event.
     Evidence: tests/dev241_automation_test.rs (4), automation unit tests rewritten (13) + round-trip test, smoke ui.automation (2 new), ui.dialogs updated for the new title; full Rust 1857 passed, UI 1389 passed, smoke 365 passed after labelling the new dialogs by their heading; lint clean. Docs: automation.md (schedules via cron, time conditions, turning rules off, editor), api-quick-reference, serve.md, openapi.
     Limits: nested/NOT conditions remain YAML-only in the editor; Run now uses saved rules (disabled while there are unsaved changes).
+- date: 2026-10-29T23:47:14.681625+00:00
+  text: Committed as fb9c4e5 on main (not pushed).
 references:
 - attachment: automation-rule-list.ae6faeccfcf7764381e64ecd62f13c93.webp
 - attachment: automation-rule-editor.4052da7da47d543042a6dc90ef380127.webp
@@ -57,3 +59,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-29T23:47:14.681625+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

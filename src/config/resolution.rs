@@ -797,9 +797,6 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
                 .map(|(k, v)| (k, v.to_detail())),
         );
     }
-    if override_config.agent_automation != defaults.agent_automation {
-        resolved.agent_automation = override_config.agent_automation;
-    }
     if override_config.agent_worktree != defaults.agent_worktree {
         resolved.agent_worktree = override_config.agent_worktree;
     }
@@ -1050,9 +1047,6 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
             resolved.agent_profiles.insert(name, profile.to_detail());
         }
     }
-    if let Some(automation) = project_config.agent_automation {
-        apply_agent_automation_override(&mut resolved.agent_automation, automation);
-    }
     if let Some(worktree) = project_config.agent_worktree {
         apply_agent_worktree_override(&mut resolved.agent_worktree, worktree);
     }
@@ -1078,44 +1072,6 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
         resolved.remotes.extend(project_config.remotes);
     }
     // Smart toggles for branch/codeowners remain global/home/env scoped for now.
-}
-
-fn apply_agent_automation_override(
-    target: &mut crate::config::types::AgentAutomationConfig,
-    override_config: crate::config::types::AgentAutomationConfigOverride,
-) {
-    if let Some(action) = override_config.on_start {
-        if action.set_status.is_some() {
-            target.on_start.set_status = action.set_status;
-        }
-        if action.reassign_to.is_some() {
-            target.on_start.reassign_to = action.reassign_to;
-        }
-    }
-    if let Some(action) = override_config.on_success {
-        if action.set_status.is_some() {
-            target.on_success.set_status = action.set_status;
-        }
-        if action.reassign_to.is_some() {
-            target.on_success.reassign_to = action.reassign_to;
-        }
-    }
-    if let Some(action) = override_config.on_failure {
-        if action.set_status.is_some() {
-            target.on_failure.set_status = action.set_status;
-        }
-        if action.reassign_to.is_some() {
-            target.on_failure.reassign_to = action.reassign_to;
-        }
-    }
-    if let Some(action) = override_config.on_cancel {
-        if action.set_status.is_some() {
-            target.on_cancel.set_status = action.set_status;
-        }
-        if action.reassign_to.is_some() {
-            target.on_cancel.reassign_to = action.reassign_to;
-        }
-    }
 }
 
 fn apply_agent_worktree_override(
@@ -1213,7 +1169,6 @@ impl ResolvedConfig {
                 .into_iter()
                 .map(|(k, v)| (k, v.to_detail()))
                 .collect(),
-            agent_automation: global.agent_automation,
             agent_worktree: global.agent_worktree,
             remotes: global.remotes,
             ui: crate::config::types::UiSettings {

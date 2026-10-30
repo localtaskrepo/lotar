@@ -153,7 +153,6 @@ fn invalid_recognized_types_and_nonmapping_roots_are_errors() {
         "default: []",
         "default: {project: [DEV]}",
         "sprints: []",
-        "agent_automation: []",
         "agent: {worktree: []}",
         "default_project: [DEV]",
         "default_assignee: [alice]",

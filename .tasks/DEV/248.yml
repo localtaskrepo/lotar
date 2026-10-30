@@ -1,0 +1,9 @@
+title: Sprint backlog doesn't update after "create task"
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-30T00:12:31.359069+00:00
+description: |-
+  When adding a new task, it doesn't show up in the sprint backlog until a reload was hit, when it should show up.
+  Check if the same may happen in other pages.

@@ -73,7 +73,7 @@ Details:
 - `--dry-run` runs the exact validation pipeline of a real write — field/schema checks, resolved-configuration checks, and conflict detection against existing tasks — and exits nonzero without editing files when the change would be rejected. Only the write is skipped; no configuration files are created.
 - `--force` applies the change despite task-compatibility conflicts (an existing task whose status/type/priority would fall outside the new lists). Schema errors (wrong field name/value), malformed configuration or task files, and newly broken resolved-configuration invariants still abort, with or without `--force`.
 - Conflicts reference real task IDs; tasks that were already invalid before the change do not block unrelated updates.
-- An empty value in project scope clears that override precisely (e.g., `lotar config set agent_on_start_status '' --project=ENG` removes only that setting and preserves sibling agent automation).
+- An empty value in project scope clears that override precisely (e.g., `lotar config set agent_worktree_dir '' --project=ENG` removes only that setting and preserves the other worktree settings).
 - Fields that only make sense globally (`server.port`, `default_project`, sprint defaults) are automatically treated as global even if `--global` is not passed.
 - Writes are lockless and atomic per file: the candidate is validated first and the whole change lands in one atomic file replace. This is not a cross-writer transaction — a concurrent external editor can still race the final replace. Accepted writes rewrite the file in canonical form (comments and unknown keys are dropped); rejected changes leave the bytes untouched.
 

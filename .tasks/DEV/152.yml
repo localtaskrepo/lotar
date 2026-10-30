@@ -1,7 +1,43 @@
 title: agent.automation lifecycle settings have no runtime consumer
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-10-24T03:38:24.172542+00:00
+modified: 2026-10-30T00:21:35.041633+00:00
+comments:
+- date: 2026-10-30T00:01:01.949539+00:00
+  text: 'Decision (developer): retire. Plan: drop agent.automation from the resolved config and its merge/normalize/set code; config files that still contain the block load fine but warn (validate, load, Config page) with the equivalent job_* rule; the 8 ''config set agent_on_*'' keys are removed with a hint to automation rules; update docs and tests.'
+- date: 2026-10-30T00:10:19.017073+00:00
+  text: 'Implemented: agent.automation is now an ignored legacy value on GlobalConfig/ProjectConfig (kept as written on save), removed from ResolvedConfig with its merge code; config validate and config-set warnings (Config page save) print the equivalent job_* rule; the 8 agent_on_* config-set keys (and agent.automation.* dotted names) fail with a hint to automation rules. Docs: config-reference, config. Tests: tests/dev152_retired_agent_automation_test.rs; old dev71 field-clearing test removed. Next: full gates, then commit.'
+- date: 2026-10-30T00:21:34.989501+00:00
+  text: 'Verified: npm run lint:agent, nextest 1860/1860, UI vitest 1389/1389, smoke 365/365. Manually checked in a throwaway workspace: validate warns with the rule (global and --project), saving other settings keeps the old block, agent_on_* and agent.automation.* set keys fail with the hint, the suggested rule loads. No guidance correction.'
 description: 'Found during DEV-146. agent.automation.on_start/on_success/on_failure/on_cancel (set_status, reassign_to) are parsed, resolved, settable via config set (agent_on_*_status / agent_on_*_reassign_to) and documented in docs/help/config-reference.md, but nothing outside src/config reads ResolvedConfig.agent_automation; agent job lifecycle now runs through automation rules. The Config UI deliberately does not expose them. Decide: wire them into agent job lifecycle, or deprecate them (keep YAML backwards-compatible, warn on use, update docs). Acceptance: either behavior that honors the settings with tests, or a documented deprecation.'
+history:
+- at: 2026-10-30T00:01:01.881532+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:01:01.949539+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:10:19.017073+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:21:34.989501+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:21:35.041633+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

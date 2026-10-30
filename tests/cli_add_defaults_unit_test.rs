@@ -74,7 +74,6 @@ fn make_cfg(
         agent_logs_dir: None,
         agent_instructions: None,
         agent_profiles: Default::default(),
-        agent_automation: Default::default(),
         agent_worktree: Default::default(),
         remotes: Default::default(),
         ui: Default::default(),

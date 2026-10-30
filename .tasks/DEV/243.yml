@@ -4,7 +4,16 @@ priority: Low
 type: Bug
 reporter: mallox
 created: 2026-10-29T22:27:42.103246+00:00
+modified: 2026-10-30T00:09:52.199226+00:00
+references:
+- attachment: Screenshot-2026-10-29-at-17.09.05.c3d24328332907bdc686987c0042a788.png
 description: |-
   Found while fixing ui.global-actions smoke (DEV-183). The Tasks page loads its list twice right after opening (a second config/show + tasks/list about 150ms after the first). A row ticked in bulk mode during that reload is dropped from the selection (TasksList selected-ids setter filters by the tasks shown at that moment), but its checkbox stays ticked on screen because the component state never changed, so the counter says 0 while the row looks selected.
 
   Acceptance: a tick during a reload either sticks or visibly clears; the extra reload after opening the page is avoided if it is not needed. The smoke test currently re-ticks until the selection holds.
+history:
+- at: 2026-10-30T00:09:52.199226+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:Screenshot-2026-10-29-at-17.09.05.c3d24328332907bdc686987c0042a788.png

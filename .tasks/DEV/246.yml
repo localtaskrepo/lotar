@@ -1,0 +1,10 @@
+title: Task created notification doesn't say what the created ID is
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-30T00:08:26.575364+00:00
+description: |-
+  When creating a new task, a toast shows up saying that the task was created, but not what ID it is. If I want to look it up, I have to find it from metadata and not via ID, because I don't know the ID.
+  For this ticket we should do a review of all notifications and check if we show relevant and necessary information (without adding bloat to the message).
+  To keep this readable the toast can be styled more than just a simple notification bubble.

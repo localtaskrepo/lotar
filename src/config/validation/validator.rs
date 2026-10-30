@@ -27,6 +27,10 @@ impl ConfigValidator {
             self.validate_tag_properties(properties, config.tags.as_ref(), &mut result);
         }
 
+        if let Some(legacy) = &config.agent_automation {
+            result.add_error(retired_agent_automation_warning(legacy));
+        }
+
         // Validate project name
         self.validate_project_name(&config.project_name, &mut result);
         if let Some(reviewers) = &config.review_reviewers
@@ -198,6 +202,9 @@ impl ConfigValidator {
     pub fn validate_global_config(&self, config: &GlobalConfig) -> ValidationResult {
         let mut result = ValidationResult::new();
         self.validate_tag_properties(&config.tag_properties, Some(&config.tags), &mut result);
+        if let Some(legacy) = &config.agent_automation {
+            result.add_error(retired_agent_automation_warning(legacy));
+        }
 
         // Validate server port
         if config.server_port < 1024 {
@@ -1110,4 +1117,72 @@ impl ConfigValidator {
             );
         }
     }
+}
+
+/// `agent.automation` was retired (DEV-152): it never changed anything, and
+/// agent job lifecycle is handled by automation rules. Files that still have
+/// the block load fine; this warning shows the rule that does the same thing.
+fn retired_agent_automation_warning(legacy: &crate::types::CustomFieldValue) -> ValidationError {
+    ValidationError::warning(
+        Some("agent.automation".to_string()),
+        "agent.automation is no longer used and is ignored; agent job status changes \
+         and reassignment are automation rules now"
+            .to_string(),
+    )
+    .with_fix(format!(
+        "Remove agent.automation and add this rule to automation.yml if you want the behaviour:\n{}",
+        legacy_agent_automation_rule(legacy)
+    ))
+}
+
+/// The automation rule equivalent to a legacy `agent.automation` block.
+pub fn legacy_agent_automation_rule(legacy: &crate::types::CustomFieldValue) -> String {
+    const EVENTS: [(&str, &str); 4] = [
+        ("on_start", "job_started"),
+        ("on_success", "job_completed"),
+        ("on_failure", "job_failed"),
+        ("on_cancel", "job_cancelled"),
+    ];
+    let text = |value: Option<&crate::types::CustomFieldValue>| {
+        value
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    };
+    let mut events = String::new();
+    for (old, event) in EVENTS {
+        let Some(action) = legacy.get(old) else {
+            continue;
+        };
+        let status = text(action.get("set_status"));
+        let assignee = text(action.get("reassign_to")).map(|who| {
+            let keyword = matches!(
+                who.as_str(),
+                "assignee" | "reporter" | "assignee_or_reporter" | "me"
+            );
+            if keyword {
+                format!("\"@{who}\"")
+            } else {
+                format!("\"{who}\"")
+            }
+        });
+        if status.is_none() && assignee.is_none() {
+            continue;
+        }
+        events.push_str(&format!("        {event}:\n          set:\n"));
+        if let Some(status) = status {
+            events.push_str(&format!("            status: {status}\n"));
+        }
+        if let Some(assignee) = assignee {
+            events.push_str(&format!("            assignee: {assignee}\n"));
+        }
+    }
+    if events.is_empty() {
+        return "  (the block sets nothing, so no rule is needed)".to_string();
+    }
+    format!(
+        "automation:\n  rules:\n    - name: Agent lifecycle\n      when:\n        assignee: \"@agent\"\n      on:\n{}",
+        events.trim_end()
+    )
 }

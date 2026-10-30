@@ -147,18 +147,6 @@ fn parse_optional_bool_flag(value: &str, field: &str) -> Result<Option<bool>, Co
     }
 }
 
-fn parse_optional_status(value: &str, field: &str) -> Result<Option<TaskStatus>, ConfigError> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
-        Ok(None)
-    } else {
-        let status = trimmed.parse::<TaskStatus>().map_err(|err| {
-            ConfigError::ParseError(format!("{} must be a valid status: {}", field, err))
-        })?;
-        Ok(Some(status))
-    }
-}
-
 fn parse_optional_string(value: &str) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
@@ -748,30 +736,6 @@ pub fn apply_field_to_global_config(
                 })
             };
         }
-        "agent_on_start_status" => {
-            config.agent_automation.on_start.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_success_status" => {
-            config.agent_automation.on_success.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_failure_status" => {
-            config.agent_automation.on_failure.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_cancel_status" => {
-            config.agent_automation.on_cancel.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_start_reassign_to" => {
-            config.agent_automation.on_start.reassign_to = parse_optional_string(value);
-        }
-        "agent_on_success_reassign_to" => {
-            config.agent_automation.on_success.reassign_to = parse_optional_string(value);
-        }
-        "agent_on_failure_reassign_to" => {
-            config.agent_automation.on_failure.reassign_to = parse_optional_string(value);
-        }
-        "agent_on_cancel_reassign_to" => {
-            config.agent_automation.on_cancel.reassign_to = parse_optional_string(value);
-        }
         "agent_worktree_enabled" => {
             config.agent_worktree.enabled = parse_bool_flag(value, field)?;
         }
@@ -1156,46 +1120,6 @@ pub fn apply_field_to_project_config(
                     })
                 };
         }
-        "agent_on_start_status" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_start.get_or_insert_with(Default::default);
-            action.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_success_status" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_success.get_or_insert_with(Default::default);
-            action.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_failure_status" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_failure.get_or_insert_with(Default::default);
-            action.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_cancel_status" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_cancel.get_or_insert_with(Default::default);
-            action.set_status = parse_optional_status(value, field)?;
-        }
-        "agent_on_start_reassign_to" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_start.get_or_insert_with(Default::default);
-            action.reassign_to = parse_optional_string(value);
-        }
-        "agent_on_success_reassign_to" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_success.get_or_insert_with(Default::default);
-            action.reassign_to = parse_optional_string(value);
-        }
-        "agent_on_failure_reassign_to" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_failure.get_or_insert_with(Default::default);
-            action.reassign_to = parse_optional_string(value);
-        }
-        "agent_on_cancel_reassign_to" => {
-            let automation = config.agent_automation.get_or_insert_with(Default::default);
-            let action = automation.on_cancel.get_or_insert_with(Default::default);
-            action.reassign_to = parse_optional_string(value);
-        }
         "agent_worktree_enabled" => {
             let worktree = config.agent_worktree.get_or_insert_with(Default::default);
             worktree.enabled = parse_optional_bool_flag(value, field)?;
@@ -1305,6 +1229,9 @@ pub fn canonicalize_field_name(field: &str, is_global: bool) -> Result<String, C
             trimmed, flat, scope
         )));
     }
+    if let Some(hint) = retired_field_hint(trimmed) {
+        return Err(ConfigError::ParseError(hint));
+    }
     let scope = if is_global { "global" } else { "project" };
     Err(ConfigError::ParseError(format!(
         "Invalid {} config field: '{}'. Valid flat fields: {} (dotted canonical aliases such as 'default.priority' or 'issue.states' are also accepted)",
@@ -1312,6 +1239,19 @@ pub fn canonicalize_field_name(field: &str, is_global: bool) -> Result<String, C
         trimmed,
         valid_fields.join(", ")
     )))
+}
+
+/// Explain settings that were removed, instead of listing every valid field.
+fn retired_field_hint(field: &str) -> Option<String> {
+    let lower = field.to_ascii_lowercase();
+    if lower.starts_with("agent_on_") || lower.starts_with("agent.automation") {
+        return Some(format!(
+            "'{field}' was removed: agent job status changes and reassignment are automation rules now. \
+             Add a rule with on.job_started / job_completed / job_failed / job_cancelled to \
+             automation.yml (see `lotar help automation`)."
+        ));
+    }
+    None
 }
 
 /// If `field` (flat or dotted) canonicalizes to a global-only field, return
@@ -1477,18 +1417,6 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "agent_instructions" | "agent_instructions_file" => {
             // Accept any string; empty values clear the override.
         }
-        "agent_on_start_status"
-        | "agent_on_success_status"
-        | "agent_on_failure_status"
-        | "agent_on_cancel_status" => {
-            let _ = parse_optional_status(value, field)?;
-        }
-        "agent_on_start_reassign_to"
-        | "agent_on_success_reassign_to"
-        | "agent_on_failure_reassign_to"
-        | "agent_on_cancel_reassign_to" => {
-            let _ = parse_optional_string(value);
-        }
         "agent_worktree_enabled" => {
             let _ = parse_optional_bool_flag(value, field)?;
         }
@@ -1601,7 +1529,7 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
 /// Clear a specific field in a project configuration (remove the override).
 ///
 /// Field-precise: clearing a nested agent setting (for example
-/// `agent_on_start_status`) clears only that subfield and preserves sibling
+/// `agent_worktree_dir`) clears only that subfield and preserves sibling
 /// settings; emptied sections are pruned instead of leaving empty shells.
 /// Unknown fields are rejected.
 pub fn clear_project_override_field(
@@ -1652,34 +1580,6 @@ pub fn clear_project_override_field(
         "agent_instructions" | "agent_instructions_file" => {
             config.agent_instructions = None;
         }
-        "agent_on_start_status" => {
-            clear_agent_action_field(config, AgentActionField::Start, ActionSubfield::SetStatus)
-        }
-        "agent_on_success_status" => {
-            clear_agent_action_field(config, AgentActionField::Success, ActionSubfield::SetStatus)
-        }
-        "agent_on_failure_status" => {
-            clear_agent_action_field(config, AgentActionField::Failure, ActionSubfield::SetStatus)
-        }
-        "agent_on_cancel_status" => {
-            clear_agent_action_field(config, AgentActionField::Cancel, ActionSubfield::SetStatus)
-        }
-        "agent_on_start_reassign_to" => {
-            clear_agent_action_field(config, AgentActionField::Start, ActionSubfield::ReassignTo)
-        }
-        "agent_on_success_reassign_to" => clear_agent_action_field(
-            config,
-            AgentActionField::Success,
-            ActionSubfield::ReassignTo,
-        ),
-        "agent_on_failure_reassign_to" => clear_agent_action_field(
-            config,
-            AgentActionField::Failure,
-            ActionSubfield::ReassignTo,
-        ),
-        "agent_on_cancel_reassign_to" => {
-            clear_agent_action_field(config, AgentActionField::Cancel, ActionSubfield::ReassignTo)
-        }
         "agent_worktree_enabled" => clear_agent_worktree_field(config, WorktreeSubfield::Enabled),
         "agent_worktree_dir" => clear_agent_worktree_field(config, WorktreeSubfield::Dir),
         "agent_worktree_branch_prefix" => {
@@ -1702,95 +1602,10 @@ pub fn clear_project_override_field(
 }
 
 #[derive(Clone, Copy)]
-enum AgentActionField {
-    Start,
-    Success,
-    Failure,
-    Cancel,
-}
-
-#[derive(Clone, Copy)]
-enum ActionSubfield {
-    SetStatus,
-    ReassignTo,
-}
-
-#[derive(Clone, Copy)]
 enum WorktreeSubfield {
     Enabled,
     Dir,
     BranchPrefix,
-}
-
-fn action_override_is_empty(action: &crate::config::types::AgentAutomationActionOverride) -> bool {
-    action.set_status.is_none() && action.reassign_to.is_none()
-}
-
-fn clear_agent_action_field(
-    config: &mut ProjectConfig,
-    action_field: AgentActionField,
-    subfield: ActionSubfield,
-) {
-    let Some(automation) = config.agent_automation.as_mut() else {
-        return;
-    };
-    let action = match action_field {
-        AgentActionField::Start => automation.on_start.as_mut(),
-        AgentActionField::Success => automation.on_success.as_mut(),
-        AgentActionField::Failure => automation.on_failure.as_mut(),
-        AgentActionField::Cancel => automation.on_cancel.as_mut(),
-    };
-    let Some(action) = action else {
-        return;
-    };
-    match subfield {
-        ActionSubfield::SetStatus => action.set_status = None,
-        ActionSubfield::ReassignTo => action.reassign_to = None,
-    }
-    // Prune emptied action overrides and, when every action is gone, the
-    // whole section — sibling settings survive, empty shells do not.
-    let automation = config.agent_automation.as_ref().unwrap();
-    let all_empty = [
-        automation.on_start.as_ref(),
-        automation.on_success.as_ref(),
-        automation.on_failure.as_ref(),
-        automation.on_cancel.as_ref(),
-    ]
-    .iter()
-    .all(|action| action.is_none_or(action_override_is_empty));
-    if all_empty {
-        config.agent_automation = None;
-    } else {
-        let automation = config.agent_automation.as_mut().unwrap();
-        if automation
-            .on_start
-            .as_ref()
-            .is_some_and(action_override_is_empty)
-        {
-            automation.on_start = None;
-        }
-        if automation
-            .on_success
-            .as_ref()
-            .is_some_and(action_override_is_empty)
-        {
-            automation.on_success = None;
-        }
-        if automation
-            .on_failure
-            .as_ref()
-            .is_some_and(action_override_is_empty)
-        {
-            automation.on_failure = None;
-        }
-        if automation
-            .on_cancel
-            .as_ref()
-            .is_some_and(action_override_is_empty)
-        {
-            automation.on_cancel = None;
-        }
-    }
 }
 
 fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubfield) {

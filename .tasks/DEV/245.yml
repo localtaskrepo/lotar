@@ -1,0 +1,7 @@
+title: Sprint backlog table id column not aligned with row
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-30T00:06:23.356490+00:00
+description: The sprint backlog table has a gap in the row separator for some tickets, and the rows don't seem to align exactly in many cases.

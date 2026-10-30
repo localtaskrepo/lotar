@@ -1,0 +1,9 @@
+title: Can't attach images on create Task
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-30T00:04:55.001084+00:00
+description: |-
+  You currently can't attach an image to a task in the UI before the task is created.
+  When trying to drag and drop a screenshot of an error to a new ticket, a message shows up saying that we need to save the ticket first. This should already work during create and not only for already created tickets.

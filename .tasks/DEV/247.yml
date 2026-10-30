@@ -1,0 +1,7 @@
+title: UI search input doesn't support negative filter autocomplete
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-30T00:11:19.783317+00:00
+description: When starting a query with "-" there is not auto complete support in the search input box in the web ui. Something like "-status:done" still works when you type it in, but auto-complete is missing.
