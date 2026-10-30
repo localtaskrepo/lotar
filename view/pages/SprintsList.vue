@@ -210,7 +210,6 @@
         :statuses="statuses"
         :priorities="priorities"
         :types="types"
-        :custom-presets="customFilterPresets"
         :sprint-options="sprintFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
@@ -1004,13 +1003,6 @@ const filterPayload = computed(() => ({
 }))
 const { onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
   routePath: '/sprints',
-})
-const customFilterPresets = computed(() => {
-  const names = (availableCustomFields.value || []).filter((name) => name !== '*')
-  return names.slice(0, 6).map((name) => ({
-    label: name,
-    expression: `field:${name}=`,
-  }))
 })
 
 function parseDateLike(value?: string | null) {

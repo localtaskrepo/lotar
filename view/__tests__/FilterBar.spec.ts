@@ -656,7 +656,7 @@ describe('FilterBar unified search and panel cleanup (DEV-98)', () => {
         const wrapper = render(
             {
                 value: { q: 'roadmap' },
-                customPresets: [{ label: 'Release Stage', expression: 'field:Release Stage=' }],
+                customFieldOptions: ['Release Stage'],
             },
             true,
         )
@@ -882,7 +882,7 @@ describe('FilterBar unified search and panel cleanup (DEV-98)', () => {
     })
 
     it('queues a literal custom-field preset even when its name is a builtin alias', async () => {
-        const wrapper = render({ customPresets: [{ label: 'sprint', expression: 'field:sprint=' }] })
+        const wrapper = render({ customFieldOptions: ['sprint'] })
         ;(wrapper.vm as any).appendCustomFilter('field:sprint=')
         await nextTick()
         expect((wrapper.find('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(
@@ -891,6 +891,79 @@ describe('FilterBar unified search and panel cleanup (DEV-98)', () => {
         await submitSearch(wrapper, 'field:"sprint"=inc-2')
         expect(lastValue(wrapper)['field:sprint']).toBe('inc-2')
         expect(lastValue(wrapper).sprints).toBeUndefined()
+    })
+
+    it('lists every custom field in a labelled picker instead of quick-pick links', async () => {
+        const fields = ['component', 'story_points', 'release_stage', 'customer', 'region', 'severity', 'team']
+        const wrapper = render({ customFieldOptions: ['*', ...fields], customFieldValues: { Team: ['core'] } }, true)
+        await openPanel(wrapper)
+        const quickPicks = wrapper.findAll('section').find((section) => section.text().startsWith('Quick picks'))!
+        expect(quickPicks.text()).not.toContain('component')
+        const trigger = wrapper.get('[data-testid="filter-custom-field"]')
+        expect(wrapper.get(`[id="${trigger.attributes('aria-labelledby')}"]`).text()).toBe('Custom field')
+        expect(trigger.text()).toBe('Custom field')
+        await trigger.trigger('click')
+        const menu = wrapper.get('[aria-label="Custom field choices"]')
+        // Beyond the old six-preset cap, `*` skipped, and case-variant names from task values deduplicated.
+        expect(menu.findAll('.filter-bar__menu-option').map((option) => option.text())).toEqual(fields)
+        expect(menu.find('input[type="search"]').exists()).toBe(false)
+        await menu.findAll('.filter-bar__menu-option')[2]!.trigger('click')
+        expect(wrapper.find('[aria-label="Custom field choices"]').exists()).toBe(false)
+        const search = wrapper.get('[data-testid="filter-search"]')
+        expect((search.element as HTMLInputElement).value).toBe('field:release_stage=')
+        expect(document.activeElement).toBe(search.element)
+        expect(lastValue(wrapper)['field:release_stage']).toBeUndefined()
+    })
+
+    it('finds fields in a long list and marks the ones already filtered', async () => {
+        const fields = Array.from({ length: 12 }, (_, i) => `field_${String(i + 1).padStart(2, '0')}`)
+        const wrapper = render(
+            {
+                customFieldOptions: fields,
+                value: { 'field:field_03': 'beta', '-field_07': 'x', 'field:field_07': 'y' },
+            },
+            true,
+        )
+        await openPanel(wrapper)
+        const trigger = wrapper.get('[data-testid="filter-custom-field"]')
+        expect(trigger.text()).toBe('Custom field: field_03, field_07')
+        await trigger.trigger('click')
+        await nextTick()
+        const find = wrapper.get('input[aria-label="Find a custom field"]')
+        expect(document.activeElement).toBe(find.element)
+        const active = wrapper.findAll('.filter-bar__menu-option--active')
+        expect(active.map((option) => option.get('.filter-bar__menu-option-value').text())).toEqual([
+            'beta',
+            'not x, y',
+        ])
+        await find.setValue('1')
+        expect(wrapper.findAll('.filter-bar__menu-option').map((option) => option.text())).toEqual([
+            'field_01',
+            'field_10',
+            'field_11',
+            'field_12',
+        ])
+        await find.setValue('nothing')
+        expect(wrapper.get('[aria-label="Custom field choices"]').text()).toContain('No matching fields')
+        await find.setValue('_11')
+        await find.trigger('keydown', { key: 'Enter' })
+        expect((wrapper.get('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe('field:field_11=')
+    })
+
+    it('closes the custom field picker on Escape and hides it without custom fields', async () => {
+        const empty = render({ customFieldOptions: ['*'] })
+        await openPanel(empty)
+        expect(empty.find('[data-testid="filter-custom-field"]').exists()).toBe(false)
+        const wrapper = render({ customFieldOptions: ['component'] }, true)
+        await openPanel(wrapper)
+        const trigger = wrapper.get('[data-testid="filter-custom-field"]')
+        await trigger.trigger('click')
+        expect(trigger.attributes('aria-expanded')).toBe('true')
+        const option = wrapper.get('.filter-bar__menu-option')
+        ;(option.element as HTMLButtonElement).focus()
+        await option.trigger('keydown', { key: 'Escape' })
+        expect(wrapper.find('[aria-label="Custom field choices"]').exists()).toBe(false)
+        expect(document.activeElement).toBe(trigger.element)
     })
 
     it('round-trips prototype-named custom fields as ordinary own string properties', async () => {

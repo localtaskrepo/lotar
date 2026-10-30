@@ -13,19 +13,6 @@
       >Recent</UiButton
     >
     <UiButton :variant="isNoEstimate ? 'primary' : ''" type="button" @click="toggleNoEstimate">No estimate</UiButton>
-    <template v-if="customPresets?.length">
-      <span class="muted smart-list-chips__label">Custom fields</span>
-      <UiButton
-        v-for="preset in customPresets"
-        :key="preset.expression"
-        class="smart-list-chips__preset"
-        variant="ghost"
-        type="button"
-        @click="emitPreset(preset.expression)"
-      >
-        {{ preset.label }}
-      </UiButton>
-    </template>
   </div>
 </template>
 
@@ -34,20 +21,14 @@ import { computed } from 'vue'
 import { listFromCsv } from '../composables/useFilterBuilder'
 import UiButton from './UiButton.vue'
 
-interface CustomPreset {
-  label: string
-  expression: string
-}
-
 const props = defineProps<{
   statuses?: string[]
   priorities?: string[]
   value?: Record<string, string>
-  customPresets?: CustomPreset[]
   enableDueSoon?: boolean
   enableRecent?: boolean
 }>()
-const emit = defineEmits<{ (e: 'update:value', v: Record<string, string>): void; (e: 'preset', expr: string): void }>()
+const emit = defineEmits<{ (e: 'update:value', v: Record<string, string>): void }>()
 
 function normalize(s: string) {
   return (s || '').toLowerCase().replace(/\s|[_-]/g, '')
@@ -109,19 +90,4 @@ function toggleNoEstimate() {
   const csv = Array.from(set).join(',')
   patch({ needs: csv || '' })
 }
-
-function emitPreset(expression: string) {
-  emit('preset', expression)
-}
 </script>
-
-<style scoped>
-.smart-list-chips__label {
-  font-size: var(--text-xs, 0.75rem);
-}
-
-.smart-list-chips__preset {
-  font-size: var(--text-xs, 0.75rem);
-  padding-inline: var(--space-2);
-}
-</style>

@@ -126,7 +126,7 @@ vi.mock('../components/ReloadButton.vue', () => ({
 
 vi.mock('../components/SmartListChips.vue', () => ({
     default: {
-        props: ['statuses', 'priorities', 'value', 'customPresets'],
+        props: ['statuses', 'priorities', 'value'],
         emits: ['update:value', 'preset'],
         template: '<div class="chips" />',
     },

@@ -5,7 +5,10 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-06T02:15:15.915372+00:00
-modified: 2026-10-10T17:54:21.539534+00:00
+modified: 2026-10-30T04:46:20.039906+00:00
+relationships:
+  related:
+  - DEV-251
 comments:
 - date: 2026-10-09T19:01:10.325190+00:00
   text: 'Plan: remove duplicateCustom filtersUI onlyafterunifiedsearch supports explicitfield:key=value/key=value expressions and builtinaliases; preserveunknowncolon terms asfreetext, quotes and storedstructuredfilterobject/key/query shape. Replace extra string reparse/hinttextboxwithstructuredextra record/search errors and removableactivechips; routecustomfieldpresets to mainsearch with focus/no partialcommit, preserveprops/storage/project/querycache/sort-single-owner/deletion contracts. Clean existinginline filters panel (notnewmodal): labelledcompactresponsive controls, quickpicks/viewoptions sections, sharedsearchsyntax guidance+errors, clear/close affordances andkeyboard/autocomplete semantics. Scope sharedFilterBar Tasks/Board/Calendar/Sprints users, noRESTDTOchanges or mutationAPI. Regressionstestparser/UI legacycustomsnapshots/props/chipremoval/clear/preset/draftinvalid preservation; actualbackenddesktop/mobile visual+keyboard+crossview customfield filter membership. Requiredlint/Rust/UI/freshsmoke beforeDone, no repositoryGit/index/commit/push/worktrees; preserveearlierhighestfirstBoard logic.'
@@ -101,3 +104,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-30T04:46:20.039906+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-251"]}'

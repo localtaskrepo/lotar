@@ -55,7 +55,6 @@
         :statuses="statuses"
         :priorities="priorities"
         :types="types"
-        :custom-presets="customFilterPresets"
         :sprint-options="sprintFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
@@ -267,7 +266,7 @@ import UiModal from '../components/UiModal.vue'
 import { useConfig } from '../composables/useConfig'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { useColumns } from '../composables/useColumns'
-import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { buildServerFilter, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
@@ -467,7 +466,6 @@ const {
 } = useProjectFilterSync(project, filter, {
   onProjectChange: syncProjectRoute,
 })
-const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 

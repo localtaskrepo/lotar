@@ -86,7 +86,7 @@ vi.mock('../components/toast', () => ({ showToast: toast }))
 
 vi.mock('../components/FilterBar.vue', () => ({
     default: {
-        props: ['statuses', 'priorities', 'types', 'sprintOptions', 'customPresets', 'value', 'storageKey'],
+        props: ['statuses', 'priorities', 'types', 'sprintOptions', 'value', 'storageKey'],
         emits: ['update:value'],
         template: '<div class="filter-bar"><slot name="actions" /></div>',
     },

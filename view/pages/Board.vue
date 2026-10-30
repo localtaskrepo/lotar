@@ -57,7 +57,6 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
-        :custom-presets="customFilterPresets"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -530,7 +529,7 @@ import BoardColumnsDialog from '../components/BoardColumnsDialog.vue'
 import { useCompletionPolicy, completionStatusKey, normalizeStatusKey } from '../composables/useCompletionPolicy'
 import { useConfig } from '../composables/useConfig'
 import { useFilterOptions } from '../composables/useFilterOptions'
-import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { buildServerFilter, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { MS_PER_DAY } from '../utils/date'
 import {
   sessionGetJson,
@@ -616,7 +615,6 @@ const {
 } = useProjectFilterSync(project, filter, {
   routePath: '/boards',
 })
-const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
 

@@ -86,7 +86,7 @@ vi.mock('../components/toast', () => ({
 // aria, and disabled bindings reach the rendered DOM unchanged.
 vi.mock('../components/FilterBar.vue', () => ({
     default: {
-        props: ['statuses', 'priorities', 'types', 'sprintOptions', 'customPresets', 'value', 'storageKey'],
+        props: ['statuses', 'priorities', 'types', 'sprintOptions', 'value', 'storageKey'],
         emits: ['update:value'],
         template: '<div class="filter-bar"><slot name="actions" /></div>',
     },
@@ -121,7 +121,7 @@ vi.mock('../components/ReloadButton.vue', () => ({
 
 vi.mock('../components/SmartListChips.vue', () => ({
     default: {
-        props: ['statuses', 'priorities', 'value', 'customPresets'],
+        props: ['statuses', 'priorities', 'value'],
         emits: ['update:value', 'preset'],
         template: '<div class="chips" />',
     },

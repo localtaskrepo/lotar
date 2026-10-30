@@ -197,13 +197,3 @@ export function useProjectFilterSync(
 
     return { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters }
 }
-
-export function useCustomFilterPresets(customFieldNames: Ref<string[]>) {
-    return computed(() => {
-        const names = (customFieldNames.value || []).filter((name) => name !== '*')
-        return names.slice(0, 6).map((name) => ({
-            label: name,
-            expression: `field:${name}=`,
-        }))
-    })
-}

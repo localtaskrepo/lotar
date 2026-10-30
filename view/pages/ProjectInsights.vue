@@ -24,7 +24,6 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
-        :custom-presets="customFilterPresets"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -143,7 +142,7 @@ import PageHeader from '../components/PageHeader.vue'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
 import { useConfig } from '../composables/useConfig'
-import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { buildServerFilter, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
@@ -229,7 +228,6 @@ const {
   routePath: '/insights',
   keepQuery: VIEW_QUERY_KEYS,
 })
-const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 // One live task query (shared store, all pages, kept current over SSE).
 const query = shallowRef<TaskQueryHandle | null>(null)

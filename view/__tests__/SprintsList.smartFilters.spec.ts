@@ -82,7 +82,7 @@ vi.mock('../components/SmartListChips.vue', () => ({
 
 vi.mock('../components/FilterBar.vue', () => ({
     default: {
-        props: ['value', 'statuses', 'priorities', 'types', 'customPresets', 'emitProjectKey', 'storageKey'],
+        props: ['value', 'statuses', 'priorities', 'types', 'emitProjectKey', 'storageKey'],
         emits: ['update:value'],
         template: `
           <div class="filter-bar">

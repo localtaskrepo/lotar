@@ -48,7 +48,6 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
-        :custom-presets="customFilterPresets"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -430,7 +429,7 @@ import { useActivity } from '../composables/useActivity'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
 import { useFilterOptions } from '../composables/useFilterOptions'
-import { buildServerFilter, useCustomFilterPresets } from '../composables/useFilterBuilder'
+import { buildServerFilter } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
@@ -515,7 +514,6 @@ const {
   tags: configuredTags,
   members,
 } = useConfig()
-const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
 const { sprintLookup } = useSprintFormatting(sprints)

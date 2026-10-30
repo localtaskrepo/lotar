@@ -173,7 +173,7 @@ vi.mock('../components/ReloadButton.vue', () => ({
 
 vi.mock('../components/SmartListChips.vue', () => ({
     default: {
-        props: ['statuses', 'priorities', 'value', 'customPresets'],
+        props: ['statuses', 'priorities', 'value'],
         emits: ['update:value', 'preset'],
         template: '<div class="chips" />',
     },
@@ -190,7 +190,6 @@ vi.mock('../components/FilterBar.vue', () => ({
             'showStatus',
             'emitProjectKey',
             'storageKey',
-            'customPresets',
             'enableDueSoon',
             'enableRecent',
         ],

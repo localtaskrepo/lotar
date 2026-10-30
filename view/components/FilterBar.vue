@@ -200,11 +200,9 @@
               :statuses="statuses"
               :priorities="priorities"
               :value="smartChipsValue"
-              :custom-presets="customPresets"
               :enable-due-soon="enableDueSoon"
               :enable-recent="enableRecent"
               @update:value="onSmartChipsUpdate"
-              @preset="appendCustomFilter"
             />
           </section>
 
@@ -409,6 +407,61 @@
                 <option value="all">All tasks</option>
               </UiSelect>
             </div>
+
+            <div v-if="customFieldNames.length" class="filter-bar__field">
+              <span class="filter-bar__field-label" :id="controlId('custom-label')">Custom field</span>
+              <div ref="customDropdown" class="filter-bar__dropdown">
+                <button
+                  type="button"
+                  :id="controlId('custom')"
+                  class="input filter-bar__dropdown-trigger"
+                  :aria-labelledby="controlId('custom-label')"
+                  data-testid="filter-custom-field"
+                  :title="customTriggerLabel"
+                  :aria-expanded="customMenuOpen ? 'true' : 'false'"
+                  :aria-controls="customMenuOpen ? controlId('custom-options') : undefined"
+                  @click="toggleCustomMenu"
+                >
+                  <span class="filter-bar__dropdown-trigger-label">{{ customTriggerLabel }}</span>
+                </button>
+                <div
+                  v-if="customMenuOpen"
+                  :id="controlId('custom-options')"
+                  class="filter-bar__menu-popover filter-bar__menu-popover--fields"
+                  role="group"
+                  aria-label="Custom field choices"
+                  @click.stop
+                >
+                  <input
+                    v-if="customFieldNames.length > CUSTOM_FIELD_FIND_THRESHOLD"
+                    ref="customFind"
+                    v-model="customFieldQuery"
+                    type="search"
+                    class="input filter-bar__menu-find"
+                    placeholder="Find a field"
+                    aria-label="Find a custom field"
+                    autocomplete="off"
+                    @keydown.enter.prevent="pickFirstCustomField"
+                  />
+                  <div class="filter-bar__menu-list">
+                    <button
+                      v-for="field in visibleCustomFields"
+                      :key="field.name"
+                      type="button"
+                      class="filter-bar__menu-item filter-bar__menu-option"
+                      :class="{ 'filter-bar__menu-option--active': !!field.applied }"
+                      :title="field.applied ? `${field.name}: ${field.applied}` : `Filter by ${field.name}`"
+                      @click="pickCustomField(field.name)"
+                    >
+                      <span class="filter-bar__menu-option-name">{{ field.name }}</span>
+                      <span v-if="field.applied" class="filter-bar__menu-option-value">{{ field.applied }}</span>
+                    </button>
+                    <p v-if="!visibleCustomFields.length" class="filter-bar__menu-empty">No matching fields</p>
+                  </div>
+                  <p class="filter-bar__menu-hint">Pick a field, then type or choose its value in search.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -424,7 +477,6 @@ import { storageGetJson, storageRemove, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import {
   chipsForFilterValue,
-  canonicalCustomFilterKey,
   filterFragment,
   findGrammarKey,
   GRAMMAR_KEYS,
@@ -441,11 +493,6 @@ import UiButton from './UiButton.vue'
 import IconGlyph from './IconGlyph.vue'
 import UiSelect from './UiSelect.vue'
 
-interface CustomPreset {
-  label: string
-  expression: string
-}
-
 const props = withDefaults(
   defineProps<{
     statuses?: string[]
@@ -461,7 +508,6 @@ const props = withDefaults(
     showStatus?: boolean
     emitProjectKey?: boolean
     showOrder?: boolean
-    customPresets?: CustomPreset[]
     enableDueSoon?: boolean
     enableRecent?: boolean
     taskSuggestions?: (query: string, project?: string) => Promise<Array<{ id: string; title: string }>>
@@ -708,17 +754,20 @@ const statusMenuOpen = ref(false)
 const priorityMenuOpen = ref(false)
 const typeMenuOpen = ref(false)
 const sprintMenuOpen = ref(false)
+const customMenuOpen = ref(false)
 
 const statusDropdown = ref<HTMLElement | null>(null)
 const priorityDropdown = ref<HTMLElement | null>(null)
 const typeDropdown = ref<HTMLElement | null>(null)
 const sprintDropdown = ref<HTMLElement | null>(null)
+const customDropdown = ref<HTMLElement | null>(null)
 
 function closeAllMenus() {
   statusMenuOpen.value = false
   priorityMenuOpen.value = false
   typeMenuOpen.value = false
   sprintMenuOpen.value = false
+  customMenuOpen.value = false
 }
 
 function toggleStatusMenu() {
@@ -743,6 +792,65 @@ function toggleSprintMenu() {
   const next = !sprintMenuOpen.value
   closeAllMenus()
   sprintMenuOpen.value = next
+}
+
+// Projects can define many custom fields, so the picker lists all of them and
+// adds a find box past this many. Values are entered in the main search, which
+// already suggests known values (DEV-98, DEV-251).
+const CUSTOM_FIELD_FIND_THRESHOLD = 8
+const customFind = ref<HTMLInputElement | null>(null)
+const customFieldQuery = ref('')
+const customFieldNames = computed(() => {
+  const seen = new Set<string>()
+  return suggestionSource.value.customFields.filter((name) => {
+    const key = name.toLowerCase()
+    if (!name.trim() || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+})
+const appliedCustomValues = computed(() => {
+  const applied = new Map<string, string>()
+  for (const [key, value] of Object.entries(customFilters.value)) {
+    const excluded = key.startsWith('-')
+    const bare = excluded ? key.slice(1) : key
+    const name = (bare.toLowerCase().startsWith('field:') ? bare.slice(6) : bare).toLowerCase()
+    const shown = excluded ? `not ${value}` : value
+    applied.set(name, applied.has(name) ? `${applied.get(name)}, ${shown}` : shown)
+  }
+  return applied
+})
+const customFieldEntries = computed(() =>
+  customFieldNames.value.map((name) => ({ name, applied: appliedCustomValues.value.get(name.toLowerCase()) || '' })),
+)
+const visibleCustomFields = computed(() => {
+  const needle = customFieldQuery.value.trim().toLowerCase()
+  if (!needle) return customFieldEntries.value
+  return customFieldEntries.value.filter((field) => field.name.toLowerCase().includes(needle))
+})
+const customTriggerLabel = computed(() =>
+  formatMultiSelectTriggerLabel(
+    'Custom field',
+    customFieldEntries.value.filter((field) => field.applied).map((field) => field.name),
+  ),
+)
+
+function toggleCustomMenu() {
+  const next = !customMenuOpen.value
+  closeAllMenus()
+  customFieldQuery.value = ''
+  customMenuOpen.value = next
+  if (next) nextTick(() => customFind.value?.focus())
+}
+
+function pickCustomField(name: string) {
+  closeAllMenus()
+  appendCustomFilter(`field:${name}=`)
+}
+
+function pickFirstCustomField() {
+  const first = visibleCustomFields.value[0]
+  if (first) pickCustomField(first.name)
 }
 
 function toggleStatusValue(value: string) {
@@ -817,6 +925,9 @@ function onDocumentClick(event: MouseEvent) {
   if (typeMenuOpen.value && typeDropdown.value && !typeDropdown.value.contains(target)) {
     typeMenuOpen.value = false
   }
+  if (customMenuOpen.value && customDropdown.value && !customDropdown.value.contains(target)) {
+    customMenuOpen.value = false
+  }
 }
 
 function onDocumentKeydown(event: KeyboardEvent) {
@@ -831,7 +942,9 @@ function onDocumentKeydown(event: KeyboardEvent) {
           ? 'type'
           : sprintMenuOpen.value
             ? 'sprint'
-            : ''
+            : customMenuOpen.value
+              ? 'custom'
+              : ''
     if (openMenu) {
       closeAllMenus()
       document.getElementById(controlId(openMenu))?.focus()
@@ -1050,9 +1163,6 @@ const suggestionSource = computed(() => ({
   customFields: [
     ...new Set([
       ...(props.customFieldOptions ?? []).filter((name) => name && name !== '*'),
-      ...(props.customPresets ?? []).map((preset) =>
-        canonicalCustomFilterKey(preset.expression.replace(/=$/, '')).replace(/^field:/i, ''),
-      ),
       ...Object.keys(props.customFieldValues ?? {}),
     ]),
   ],
@@ -2067,6 +2177,84 @@ defineExpose({ appendCustomFilter, clear: onClear })
 .filter-bar__menu-item span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Custom field picker: the find box and hint stay put while a long field list
+   scrolls between them. */
+.filter-bar__menu-popover--fields {
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.filter-bar__menu-find {
+  flex-shrink: 0;
+  width: 100%;
+  min-height: 30px;
+  box-sizing: border-box;
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.filter-bar__menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.filter-bar__menu-option {
+  width: 100%;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.filter-bar__menu-option:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.filter-bar__menu-item .filter-bar__menu-option-name,
+.filter-bar__menu-item .filter-bar__menu-option-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.filter-bar__menu-option-name {
+  flex: 1 1 auto;
+}
+
+.filter-bar__menu-option-value {
+  flex: 0 1 auto;
+  max-width: 55%;
+  padding: 0 var(--space-2, 0.5rem);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent) 16%, transparent);
+  font-size: var(--text-xs, 0.75rem);
+  line-height: 1.6;
+}
+
+.filter-bar__menu-option--active .filter-bar__menu-option-name {
+  font-weight: 600;
+}
+
+.filter-bar__menu-empty,
+.filter-bar__menu-hint {
+  margin: 0;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-muted);
+}
+
+.filter-bar__menu-hint {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2, 0.5rem);
 }
 
 @container filter-controls (max-width: 40rem) {

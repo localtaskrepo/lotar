@@ -47,7 +47,6 @@
         :statuses="statuses"
         :priorities="priorities"
         :types="types"
-        :custom-presets="customFilterPresets"
         :sprint-options="sprintOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
@@ -251,7 +250,7 @@ import UiButton from '../components/UiButton.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useColumns, BUILTIN_COLUMNS } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
-import { useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
@@ -365,7 +364,6 @@ const filterOptions = useFilterOptions(
   () => project.value,
   { scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value },
 )
-const customFilterPresets = useCustomFilterPresets(customFields)
 // Retain the existing per-project field choices when moving details onto cards.
 const cardFields = useColumns({
   storagePrefix: 'lotar.dependencyHoverFields',

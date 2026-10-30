@@ -142,7 +142,24 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         await statusOptions.waitFor({ state: 'detached' });
                         expect(await status.evaluate((el) => el === document.activeElement)).toBe(true);
 
-                        await panel.getByRole('button', { name: 'iteration', exact: true }).click();
+                        // DEV-251: custom fields live in one picker in the field grid, not as quick picks.
+                        const customFieldPicker = panel.getByTestId('filter-custom-field');
+                        const customFieldChoices = page.getByRole('group', {
+                            name: 'Custom field choices',
+                            exact: true,
+                        });
+                        const pickCustomField = async (name: string) => {
+                            await customFieldPicker.click();
+                            const bounds = await customFieldChoices.boundingBox();
+                            expect(bounds!.x).toBeGreaterThanOrEqual(0);
+                            expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+                            await customFieldChoices.getByRole('button', { name, exact: true }).click();
+                            await customFieldChoices.waitFor({ state: 'detached' });
+                        };
+                        expect(await panel.locator('.filter-bar__picks-column').textContent()).not.toContain(
+                            'iteration',
+                        );
+                        await pickCustomField('iteration');
                         expect(await search.inputValue()).toBe('field:iteration=');
                         expect(await search.evaluate((el) => el === document.activeElement)).toBe(true);
                         await expect.poll(() => page.getByText('Alpha task', { exact: true }).count()).toBe(1);
@@ -175,7 +192,7 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                             .poll(() => listQueries.some((query) => new URLSearchParams(query).get('tags') === 'ui'))
                             .toBe(true);
                         await page.getByRole('button', { name: 'Remove filter Tag ui', exact: true }).click();
-                        await panel.getByRole('button', { name: 'sprint', exact: true }).click();
+                        await pickCustomField('sprint');
                         expect(await search.inputValue()).toBe('field:"sprint"=');
                         await search.fill('task field:"sprint"=inc-2 ');
                         await search.press('Enter');
@@ -192,9 +209,7 @@ describe.concurrent('Unified filter search and panel (DEV-98)', () => {
                         await expect.poll(() => new URL(page.url()).searchParams.has('field:sprint')).toBe(false);
                         await search.press('Escape');
                         if (!(await panel.isVisible())) await toggle.click();
-                        await expect
-                            .poll(() => panel.getByRole('button', { name: 'iteration', exact: true }).count())
-                            .toBe(1);
+                        await expect.poll(() => customFieldPicker.count()).toBe(1);
                         await page.screenshot({
                             path: path.join(artifacts, `tasks-${viewport.label}.png`),
                             animations: 'disabled',

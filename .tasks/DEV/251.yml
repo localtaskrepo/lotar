@@ -1,0 +1,83 @@
+title: Filter elements for custom fields looks unstyled
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-30T04:26:08.101458+00:00
+modified: 2026-10-30T19:14:22.883332+00:00
+relationships:
+  related:
+  - DEV-98
+  - DEV-252
+  - DEV-250
+comments:
+- date: 2026-10-30T04:46:19.925715+00:00
+  text: 'Plan: custom fields currently render as unstyled ghost text buttons appended to Quick picks, raw names, silently capped at the first 6 configured fields (useCustomFilterPresets / SprintsList slice). Replace with a ''Custom field'' dropdown in the Filter fields grid, styled like Status/Priority: lists every known field (config + task values), a find box when >8 fields, marks fields that already have a filter, picking one pre-fills field:name= in the main search with value suggestions (keeps DEV-98 single-entry search; no new text input). Remove the Quick picks custom section and the redundant customPresets prop/composable on Tasks/Board/Calendar/Sprints/Insights/Dependencies. Checks: FilterBar/SmartListChips unit tests, browser screenshots desktop/dark/390px with 12 fields, lint/test/smoke.'
+- date: 2026-10-30T04:55:27.907958+00:00
+  text: |-
+    Outcome: custom fields moved out of Quick picks into a 'Custom field' dropdown in the Filter fields grid (view/components/FilterBar.vue), styled like Status/Priority. Lists every known field (config custom_fields + names from task values, '*' skipped, case-deduplicated) instead of the old silent cap of 6; a find box appears past 8 fields (Enter picks the first match); fields with an applied filter are bold with a value pill (exclusions shown as 'not x'), and the trigger reads 'Custom field: a, b'. Picking a field still pre-fills field:name= in the main search with value suggestions (DEV-98 single-entry search kept, no new text input). Escape/outside click close it and return focus. Removed the redundant customPresets prop, SmartListChips custom section and useCustomFilterPresets from Tasks/Board/Calendar/Sprints/Insights/Dependencies; docs/help/serve.md updated.
+    Evidence: 3 new FilterBar unit cases + 2 migrated preset cases; ui.filter-panel smoke migrated to open the picker (desktop 1600 + mobile 390, popup within viewport). Browser check against a 12-field scratch workspace in light/dark/390px, no horizontal scroll; screenshots attached. npm run lint:agent clean; npm run test:agent 1866 Rust + 1395 UI passed; npm run test:smoke:agent (build-first) 98 files / 367 tests passed.
+    Remaining: none in scope. Changes uncommitted. Follow-up DEV-252 (seed script writes custom_fields in an ignored format). DEV-98 gained a 'related DEV-251' link from mention auto-linking in my plan comment.
+    Guidance: no durable finding.
+references:
+- attachment: custom-field-picker-panel.c1f172e46917d606cd33eecb480558c7.webp
+- attachment: custom-field-picker-menu-2x.3150199cd8671da316bf8cd67bb7dce7.webp
+- attachment: custom-field-picker-menu-dark.0e0b2d648af8888bda0723298e4e84cc.webp
+description: custom fields in the filter tab look quite basic and unstyled. Either they need to be removed or we need to think about a style that makes sense for custom fields. However, a project could have a lot of custom fields so that needs to be taken into account.
+history:
+- at: 2026-10-30T04:41:29.825924+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T04:46:19.925715+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T04:46:20.039716+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-98"]}'
+- at: 2026-10-30T04:52:13.265804+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:custom-field-picker-panel.c1f172e46917d606cd33eecb480558c7.webp
+- at: 2026-10-30T04:52:15.827463+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:custom-field-picker-menu-2x.3150199cd8671da316bf8cd67bb7dce7.webp
+- at: 2026-10-30T04:52:18.576256+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:custom-field-picker-menu-dark.0e0b2d648af8888bda0723298e4e84cc.webp
+- at: 2026-10-30T04:53:00.895759+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-98"]}'
+    new: '{"related":["DEV-98","DEV-252"]}'
+- at: 2026-10-30T04:55:27.907958+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T04:55:28.031895+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-30T19:14:22.883332+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-98","DEV-252"]}'
+    new: '{"related":["DEV-98","DEV-252","DEV-250"]}'
