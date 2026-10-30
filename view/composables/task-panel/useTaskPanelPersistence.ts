@@ -58,6 +58,13 @@ interface UseTaskPanelPersistenceOptions {
     refreshConfig: (project: string) => Promise<void>
     loadCommitHistory: (id: string, limit?: number) => Promise<void>
     emit: TaskPanelEmitter
+    /**
+     * DEV-244: runs once the task exists, before the panel closes; uploads
+     * files attached while creating it. Returns the task as it is now.
+     */
+    afterCreate?: (created: TaskDTO) => Promise<TaskDTO>
+    /** DEV-246: tell the user which task was created. */
+    announceCreated?: (created: TaskDTO) => void
 }
 
 export interface TaskPanelPersistenceApi {
@@ -508,11 +515,13 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 relationships: options.buildRelationships(),
                 custom_fields: options.buildCustomFields(),
             }
-            const created = await options.apiClient.addTask(payload)
+            let created = await options.apiClient.addTask(payload)
             if (!current()) return
-            options.showToast('Task created')
+            if (options.afterCreate) created = await options.afterCreate(created)
+            if (options.announceCreated) options.announceCreated(created)
+            else options.showToast(`Created ${created.id}`)
             options.emit('created', created)
-            options.closePanel()
+            if (current()) options.closePanel()
         } catch (error: any) {
             if (!current()) return
             options.showToast(error?.message || 'Failed to create task')

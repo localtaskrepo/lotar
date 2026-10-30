@@ -1,7 +1,44 @@
 title: Sprint backlog table id column not aligned with row
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-30T00:06:23.356490+00:00
+modified: 2026-10-30T00:51:09.356788+00:00
+comments:
+- date: 2026-10-30T00:39:27.287578+00:00
+  text: 'Cause: the ID cell was display:inline-flex, which takes a <td> out of table layout, so it stopped stretching to the row height when the title wrapped (gap in the row line). Moved the flex onto an inner span (SprintTaskCell.vue). Smoke ui.sprints-responsive now seeds a wrapping backlog title and asserts every cell of a row has the row''s height; injecting the old CSS gives 3 uneven rows at 1440px and 13 at 390px, 0 with the fix.'
+- date: 2026-10-30T00:51:09.329890+00:00
+  text: 'Verified: npm run lint:agent, nextest 1860/1860, UI vitest 1391/1391, smoke 365/365 (ui.members smoke updated for the new ''Created DEV-N'' toast). No guidance correction.'
+references:
+- attachment: Screenshot-2026-10-29-at-17.09.05.c3d24328332907bdc686987c0042a788.png
 description: The sprint backlog table has a gap in the row separator for some tickets, and the rows don't seem to align exactly in many cases.
+history:
+- at: 2026-10-30T00:27:12.081409+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:28:39.412459+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:Screenshot-2026-10-29-at-17.09.05.c3d24328332907bdc686987c0042a788.png
+- at: 2026-10-30T00:39:27.287578+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.329890+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.356788+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -1,7 +1,37 @@
 title: UI search input doesn't support negative filter autocomplete
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-30T00:11:19.783317+00:00
+modified: 2026-10-30T00:51:09.490475+00:00
+comments:
+- date: 2026-10-30T00:39:27.340846+00:00
+  text: 'Search suggestions now complete negated filters: ''-sta'' offers ''-status:'', ''-status:'' offers values with an ''Exclude status'' hint; keys that cannot be excluded (q, order, sort_by, deletion, archived) are left out, ''--x'' and ''-/regex/'' stay search text. The search box also treats ''-key:'' as filter typing (no task lookup). Unit test in useFilterGrammar.spec.ts; verified in a browser.'
+- date: 2026-10-30T00:51:09.464531+00:00
+  text: 'Verified: npm run lint:agent, nextest 1860/1860, UI vitest 1391/1391, smoke 365/365 (ui.members smoke updated for the new ''Created DEV-N'' toast). No guidance correction.'
 description: When starting a query with "-" there is not auto complete support in the search input box in the web ui. Something like "-status:done" still works when you type it in, but auto-complete is missing.
+history:
+- at: 2026-10-30T00:27:12.183319+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:39:27.340846+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.464531+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.490475+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

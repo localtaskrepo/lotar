@@ -86,6 +86,7 @@ const apiFixtures = vi.hoisted(() => {
     return {
         state,
         reset,
+        makeTask,
         getTaskMock,
         updateTaskMock,
         configRefreshMock,
@@ -285,14 +286,37 @@ describe('attaching files from the task panel', () => {
         expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
     })
 
-    it('asks to save a new task before attaching', async () => {
+    it('keeps files added while creating and uploads them once the task exists (DEV-244)', async () => {
+        const { api } = await import('../api/client')
+        ;(api.addTask as any).mockResolvedValue({ ...apiFixtures.makeTask('TP-9'), title: 'New one' })
         const wrapper = await mountPanel(null)
         wrappers.push(wrapper)
-        expect(wrapper.find('.task-panel__attach-button').exists()).toBe(false)
+        expect(wrapper.find('.task-panel__attach-button').exists()).toBe(true)
         paste(wrapper.find('.task-panel').element, [png()])
         await drains()
         expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
-        expect(showToastMock).toHaveBeenCalledWith('Save the task before attaching files')
+        expect(showToastMock).not.toHaveBeenCalledWith('Save the task before attaching files')
+        const staged = wrapper.find('[data-testid="staged-attachments"]')
+        expect(staged.text()).toMatch(/pasted-.*\.png/)
+        await staged.find('button').trigger('click')
+        expect(wrapper.find('[data-testid="staged-attachments"]').exists()).toBe(false)
+        paste(wrapper.find('.task-panel').element, [png()])
+        await drains()
+
+        const vm = wrapper.vm as any
+        vm.form.title = 'New one'
+        vm.form.project = 'TP'
+        await nextTick()
+        await vm.handleSubmit()
+        await drains()
+        expect(apiFixtures.uploadTaskAttachmentMock).toHaveBeenCalledTimes(1)
+        expect(apiFixtures.uploadTaskAttachmentMock.mock.calls[0]![0]).toMatchObject({ id: 'TP-9' })
+        expect(showToastMock).toHaveBeenCalledWith(
+            'Task TP-9',
+            'Created TP-9',
+            6000,
+            expect.objectContaining({ label: 'Open' }),
+        )
     })
 })
 

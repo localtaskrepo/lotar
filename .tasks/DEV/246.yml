@@ -1,10 +1,40 @@
 title: Task created notification doesn't say what the created ID is
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-30T00:08:26.575364+00:00
+modified: 2026-10-30T00:51:09.423991+00:00
+comments:
+- date: 2026-10-30T00:39:27.315337+00:00
+  text: 'Created toast now reads ''Created DEV-N'' with the task title and an Open button (6s). Reviewed all toasts: most already name what they act on; changed restore (''Restored DEV-N''), permanent delete (''Permanently deleted DEV-N''), attachment add (''Attached <file>'' / ''Attached N files'') and attachment removal (''Removed <file>…''). Panel field toasts (''Status updated'' etc.) stay short because the panel shows the task.'
+- date: 2026-10-30T00:51:09.396959+00:00
+  text: 'Verified: npm run lint:agent, nextest 1860/1860, UI vitest 1391/1391, smoke 365/365 (ui.members smoke updated for the new ''Created DEV-N'' toast). No guidance correction.'
 description: |-
   When creating a new task, a toast shows up saying that the task was created, but not what ID it is. If I want to look it up, I have to find it from metadata and not via ID, because I don't know the ID.
   For this ticket we should do a review of all notifications and check if we show relevant and necessary information (without adding bloat to the message).
   To keep this readable the toast can be styled more than just a simple notification bubble.
+history:
+- at: 2026-10-30T00:27:12.132596+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:39:27.315337+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.396959+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.423991+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

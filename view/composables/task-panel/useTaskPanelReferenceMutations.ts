@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { api } from '../../api/client'
 import type { TaskDTO } from '../../api/types'
 import { showToast } from '../../components/toast'
-import { fileToBase64, normalizeUrlCandidate } from '../../utils/taskAttachments'
+import { attachmentDisplayName, fileToBase64, normalizeUrlCandidate } from '../../utils/taskAttachments'
 
 interface UseTaskPanelReferenceMutationsOptions {
     task: TaskDTO
@@ -99,12 +99,13 @@ export function useTaskPanelReferenceMutations(
         try {
             const response = await api.removeTaskAttachment({ id: task.id, stored_path: path })
             applyResponseTask(response.task)
+            const name = attachmentDisplayName(path)
             if (response.deleted) {
-                showToast('Attachment removed')
+                showToast(`Removed ${name}`)
             } else if (response.still_referenced) {
-                showToast('Attachment removed (file kept: used by other tasks)')
+                showToast(`Removed ${name} (file kept: used by other tasks)`)
             } else {
-                showToast('Attachment removed (file may already be gone)')
+                showToast(`Removed ${name} (file may already be gone)`)
             }
         } catch (error: any) {
             console.warn('Failed to remove attachment', { path, error })
@@ -228,7 +229,7 @@ export function useTaskPanelReferenceMutations(
             }
 
             if (added > 0 && skipped === 0 && failed === 0) {
-                showToast(added === 1 ? 'Attachment added' : 'Attachments added')
+                showToast(added === 1 && files.length === 1 ? `Attached ${files[0]!.name}` : `Attached ${added} files`)
             } else {
                 const parts = []
                 if (added > 0) parts.push(`${added} added`)

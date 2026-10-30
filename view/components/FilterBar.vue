@@ -1065,7 +1065,8 @@ const grammarSuggestions = computed<SuggestionItem[]>(() => {
 })
 
 function isCompletingGrammar(fragment: string): boolean {
-  const lower = fragment.toLowerCase()
+  // `-status:` excludes a filter; it completes like `status:` (DEV-247).
+  const lower = fragment.toLowerCase().replace(/^-(?![-/])/, '')
   return (
     !!lower &&
     (lower.includes('=') ||

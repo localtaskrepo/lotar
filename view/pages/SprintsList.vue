@@ -1211,6 +1211,14 @@ function advanceOrderGeneration(sprint: number | null) {
 }
 let taskGeneration = 0
 let orderSse: ReturnType<typeof useSse> | null = null
+let taskEventTimer: number | null = null
+function scheduleTaskEventRefresh() {
+  if (taskEventTimer !== null) window.clearTimeout(taskEventTimer)
+  taskEventTimer = window.setTimeout(() => {
+    taskEventTimer = null
+    if (!disposed) void Promise.all([refreshTasks(), refreshBacklogOrder()])
+  }, 250)
+}
 const isSprintManual = (id: number) => manualSprints.value.includes(id)
 function toggleSprintManual(id: number) {
   manualSprints.value = isSprintManual(id)
@@ -2734,7 +2742,7 @@ onMounted(() => {
   window.addEventListener('keydown', onOrderHintKeydown)
   orderSse = useSse(
     '/api/events',
-    { kinds: 'task_order_changed' },
+    { kinds: 'task_order_changed,task_created,task_updated,task_deleted' },
     {
       onReconnect: () => {
         void refreshAll(true)
@@ -2756,6 +2764,14 @@ onMounted(() => {
       /* Ignore malformed events; reconnect reconciles from the server. */
     }
   })
+  // Tasks created, changed or deleted anywhere (the global New task button,
+  // another tab, the CLI) show up here without a reload (DEV-248). Bursts
+  // collapse into one refresh.
+  for (const kind of ['task_created', 'task_updated', 'task_deleted']) {
+    orderSse.on(kind, () => {
+      if (!disposed) scheduleTaskEventRefresh()
+    })
+  }
   stopPreferencesListener = onPreferencesChanged((key) => {
     if (key !== 'lotar.preferences.tasks.pageSize') return
     tasksPageSize.value = readTasksPageSizePreference()
@@ -2791,6 +2807,7 @@ onUnmounted(() => {
     if (filterTimer.value !== null) {
       window.clearTimeout(filterTimer.value)
     }
+    if (taskEventTimer !== null) window.clearTimeout(taskEventTimer)
   }
   stopPreferencesListener?.()
   stopPreferencesListener = null
@@ -3287,7 +3304,9 @@ onUnmounted(() => {
   white-space: normal;
 }
 
-.task-cell--id {
+/* Flex on an inner span: a flex <td> leaves table layout and stops
+   stretching to the row height (DEV-245). */
+.task-cell--id :deep(.task-cell__id) {
   display: inline-flex;
   gap: 6px;
   align-items: baseline;

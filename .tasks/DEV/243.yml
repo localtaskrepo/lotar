@@ -1,12 +1,16 @@
 title: Ticking a row while the task list reloads leaves it ticked but not selected
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-29T22:27:42.103246+00:00
-modified: 2026-10-30T00:09:52.199226+00:00
-references:
-- attachment: Screenshot-2026-10-29-at-17.09.05.c3d24328332907bdc686987c0042a788.png
+modified: 2026-10-30T00:51:09.218551+00:00
+comments:
+- date: 2026-10-30T00:39:27.216748+00:00
+  text: 'Cause: opening Tasks filled in the default project, which scheduled a debounced reload 150ms later even though the same filter had just been loaded; that reload reset the selection state mid-click. Fixed: the debounced reload re-checks the loaded filter (page now loads tasks once, verified in a browser), and a tick made while the list is loading now visibly clears instead of staying ticked (ticks on a loading list stay rejected so bulk actions never hit rows of the previous list). ui.global-actions smoke no longer re-ticks. Note: the screenshot that was attached here belonged to DEV-245 and was moved there.'
+- date: 2026-10-30T00:51:09.170139+00:00
+  text: 'Verified: npm run lint:agent, nextest 1860/1860, UI vitest 1391/1391, smoke 365/365 (ui.members smoke updated for the new ''Created DEV-N'' toast). No guidance correction.'
 description: |-
   Found while fixing ui.global-actions smoke (DEV-183). The Tasks page loads its list twice right after opening (a second config/show + tasks/list about 150ms after the first). A row ticked in bulk mode during that reload is dropped from the selection (TasksList selected-ids setter filters by the tasks shown at that moment), but its checkbox stays ticked on screen because the component state never changed, so the counter says 0 while the row looks selected.
 
@@ -17,3 +21,30 @@ history:
   changes:
   - field: reference_added
     new: attachment:Screenshot-2026-10-29-at-17.09.05.c3d24328332907bdc686987c0042a788.png
+- at: 2026-10-30T00:27:11.977809+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:28:39.446456+00:00
+  actor: mallox
+  changes:
+  - field: reference_removed
+    old: attachment:Screenshot-2026-10-29-at-17.09.05.c3d24328332907bdc686987c0042a788.png
+- at: 2026-10-30T00:39:27.216748+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.170139+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.218551+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

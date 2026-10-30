@@ -1,9 +1,39 @@
 title: Can't attach images on create Task
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-30T00:04:55.001084+00:00
+modified: 2026-10-30T00:51:09.288706+00:00
+comments:
+- date: 2026-10-30T00:39:27.258610+00:00
+  text: 'Files and links dropped, picked or pasted while creating a task are staged in the panel (thumbnails, removable, ''Attached when you create the task'') and uploaded right after the task is created; a screenshot pasted into the description links to a placeholder that is rewritten to the stored file. Failures are reported with the new ID. Code: view/composables/task-panel/useTaskPanelStagedAttachments.ts, TaskPanel.vue, useTaskPanelAttachmentDrop.ts; tests in TaskPanel.attachFiles/pendingDrops specs; verified end to end in a browser.'
+- date: 2026-10-30T00:51:09.261586+00:00
+  text: 'Verified: npm run lint:agent, nextest 1860/1860, UI vitest 1391/1391, smoke 365/365 (ui.members smoke updated for the new ''Created DEV-N'' toast). No guidance correction.'
 description: |-
   You currently can't attach an image to a task in the UI before the task is created.
   When trying to drag and drop a screenshot of an error to a new ticket, a message shows up saying that we need to save the ticket first. This should already work during create and not only for already created tickets.
+history:
+- at: 2026-10-30T00:27:12.033622+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:39:27.258610+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.261586+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.288706+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

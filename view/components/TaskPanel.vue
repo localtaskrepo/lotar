@@ -215,6 +215,7 @@
                     v-if="
                       showAttachmentsPreference &&
                       (canAttachFiles ||
+                        canStageFiles ||
                         attachments.length ||
                         attachmentsUploading ||
                         (showLinksInAttachmentsPreference && (linkReferences.length || addingLinkReferences)))
@@ -224,7 +225,7 @@
                     <div class="task-panel__attachments-header">
                       <span>Attachments</span>
                       <span v-if="attachmentsUploading" class="muted">Uploading…</span>
-                      <template v-else-if="canAttachFiles">
+                      <template v-else-if="canAttachFiles || canStageFiles">
                         <input
                           ref="attachmentPicker"
                           type="file"
@@ -263,13 +264,65 @@
                       </li>
                     </ul>
                     <button
-                      v-if="canAttachFiles && !visibleAttachments.length && !attachmentsUploading"
+                      v-if="
+                        (canAttachFiles && !visibleAttachments.length && !attachmentsUploading) ||
+                        (canStageFiles && !stagedFiles.length && !stagedLinks.length)
+                      "
                       type="button"
                       class="task-panel__attachments-empty"
                       @click="attachmentPicker?.click()"
                     >
                       Drop files here, paste a screenshot, or <span class="task-panel__attachments-browse">browse</span>
                     </button>
+                    <template v-if="canStageFiles && (stagedFiles.length || stagedLinks.length)">
+                      <ul class="task-panel__attachments-list" data-testid="staged-attachments">
+                        <li v-for="entry in stagedFiles" :key="entry.key" class="task-panel__attachment">
+                          <div class="task-panel__attachment-chip">
+                            <span class="task-panel__attachment-link" :title="entry.file.name">
+                              <img
+                                v-if="entry.previewUrl"
+                                class="task-panel__staged-thumb"
+                                :src="entry.previewUrl"
+                                alt=""
+                              />
+                              <IconGlyph v-else name="paperclip" />
+                              <span class="task-panel__attachment-name">{{ entry.file.name }}</span>
+                            </span>
+                            <UiButton
+                              variant="ghost"
+                              icon-only
+                              type="button"
+                              class="task-panel__attachment-remove"
+                              :aria-label="`Remove ${entry.file.name}`"
+                              :title="`Remove ${entry.file.name}`"
+                              @click.prevent.stop="unstageFile(entry.key)"
+                            >
+                              <IconGlyph name="close" />
+                            </UiButton>
+                          </div>
+                        </li>
+                        <li v-for="url in stagedLinks" :key="url" class="task-panel__attachment">
+                          <div class="task-panel__attachment-chip">
+                            <span class="task-panel__attachment-link" :title="url">
+                              <IconGlyph name="chevron-right" />
+                              <span class="task-panel__attachment-name">{{ linkDisplayName(url) }}</span>
+                            </span>
+                            <UiButton
+                              variant="ghost"
+                              icon-only
+                              type="button"
+                              class="task-panel__attachment-remove"
+                              :aria-label="`Remove ${url}`"
+                              :title="`Remove ${url}`"
+                              @click.prevent.stop="unstageLink(url)"
+                            >
+                              <IconGlyph name="close" />
+                            </UiButton>
+                          </div>
+                        </li>
+                      </ul>
+                      <p class="muted task-panel__staged-note">Attached when you create the task.</p>
+                    </template>
 
                     <ul v-if="galleryAttachments.length" class="task-panel__gallery">
                       <li
@@ -875,6 +928,7 @@ import {
 } from '../composables/task-panel/useTaskPanelAttachmentDrop'
 import { useDeferredAttachmentRemoval } from '../composables/task-panel/useDeferredAttachmentRemoval'
 import { useTaskPanelReferenceMutations } from '../composables/task-panel/useTaskPanelReferenceMutations'
+import { useTaskPanelStagedAttachments } from '../composables/task-panel/useTaskPanelStagedAttachments'
 import {
   attachmentDisplayName,
   attachmentUrl as buildAttachmentUrl,
@@ -1036,6 +1090,7 @@ const {
   whoami,
   refreshSprints,
   attachmentsDir,
+  setAfterCreate,
 } = useTaskPanelState(props, emit)
 
 // Named apart from the taskId prop, which it would otherwise shadow.
@@ -1135,7 +1190,7 @@ async function restoreDeletedTask() {
     // 'updated' snapshots can no longer clear a live tombstone (DEV-92).
     emit('restored', restored)
     emit('updated', restored)
-    showToast('Task restored')
+    showToast(`Restored ${id}`)
     await reloadTask()
   } catch (error) {
     showToast((error as Error | undefined)?.message || 'Failed to restore task')
@@ -1162,7 +1217,7 @@ async function submitHardDelete() {
     })
     const warnings = Array.isArray(response?.warnings) ? response.warnings : []
     warnings.forEach((warning) => showToast(warning))
-    showToast('Task permanently deleted')
+    showToast(`Permanently deleted ${task.id}`)
     hardDeleteDialogOpen.value = false
     closePanel()
   } catch (error) {
@@ -1289,6 +1344,33 @@ const {
   removeLinkReference,
 } = referenceMutations
 
+// DEV-244: files and links added while creating wait here until the task exists.
+const {
+  stagedFiles,
+  stagedLinks,
+  stageFiles,
+  stageLinks,
+  unstageFile,
+  unstageLink,
+  clearStaged,
+  stagedTarget,
+  uploadStaged,
+} = useTaskPanelStagedAttachments()
+watch(
+  () => [props.open, props.taskId],
+  () => clearStaged(),
+)
+setAfterCreate(async (created) => {
+  if (!stagedFiles.value.length && !stagedLinks.value.length) return created
+  const count = stagedFiles.value.length + stagedLinks.value.length
+  const { task: updated, failed, warnings } = await uploadStaged(created)
+  for (const warning of warnings) showToast(warning, 'Check this file', 6000)
+  if (failed.length) {
+    showToast(`${failed.length} of ${count} could not be attached: ${failed.join(', ')}`, `Created ${created.id}`, 8000)
+  }
+  return updated
+})
+
 const {
   attachmentsDragActive,
   attachmentsDropLabel,
@@ -1306,6 +1388,7 @@ const {
   targetTaskId: () => props.taskId,
   preferences: attachmentPreferences,
   mutations: referenceMutations,
+  staging: { files: (files) => void stageFiles(files), links: stageLinks },
 })
 
 function onReferencesUpdated(updated: TaskDTO) {
@@ -1316,6 +1399,8 @@ function onReferencesUpdated(updated: TaskDTO) {
 
 // Files can be attached once the task exists and is not deleted.
 const canAttachFiles = computed(() => mode.value === 'edit' && !isReadOnly.value && Boolean(task.id))
+// While creating, files are staged and uploaded once the task exists (DEV-244).
+const canStageFiles = computed(() => mode.value === 'create')
 const attachmentPicker = ref<HTMLInputElement | null>(null)
 function onAttachmentPicked(event: Event) {
   const input = event.target as HTMLInputElement
@@ -1489,13 +1574,27 @@ async function onDescriptionPaste(event: ClipboardEvent) {
   event.preventDefault()
   // The panel-wide paste handler would attach the same files again.
   event.stopPropagation()
+  const textarea = event.target as HTMLTextAreaElement
+  const start = textarea.selectionStart ?? (form.description || '').length
+  const end = textarea.selectionEnd ?? start
+  if (canStageFiles.value) {
+    // Linked to a placeholder that points at the stored file after create.
+    const staged = stageFiles(files)
+    const snippet = staged
+      .map(
+        (entry) =>
+          `${isImagePath(entry.file.name) ? '!' : ''}[${attachmentDisplayName(entry.file.name)}](attachment:${stagedTarget(entry.key)})`,
+      )
+      .join('\n')
+    const text = form.description || ''
+    form.description = text.slice(0, start) + snippet + text.slice(end)
+    onDescriptionInput()
+    return
+  }
   if (!canAttachFiles.value) {
     showToast('Save the task before attaching files')
     return
   }
-  const textarea = event.target as HTMLTextAreaElement
-  const start = textarea.selectionStart ?? (form.description || '').length
-  const end = textarea.selectionEnd ?? start
   const stored = await referenceMutations.uploadFiles(files)
   if (!stored.length) return
   const snippet = stored
@@ -3022,6 +3121,19 @@ textarea {
   height: 1em;
   object-fit: cover;
   border-radius: var(--radius-sm, 0.25rem);
+}
+
+.task-panel__staged-thumb {
+  width: 22px;
+  height: 22px;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 4px);
+  flex: 0 0 auto;
+}
+
+.task-panel__staged-note {
+  margin: 4px 0 0;
+  font-size: var(--text-xs, 0.75rem);
 }
 
 .task-panel__attachment-name {

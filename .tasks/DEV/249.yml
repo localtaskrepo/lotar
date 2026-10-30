@@ -1,0 +1,7 @@
+title: Show agent activity on tickets that are being worked on
+status: Todo
+priority: Low
+type: Feature
+reporter: mallox
+created: 2026-10-30T00:34:41.719509+00:00
+description: When an agent is working on a ticket, there should be an indicator on most pages that let's the user know that an agent is currently working on this. On hover over the indicator it could say what it is currently doing.

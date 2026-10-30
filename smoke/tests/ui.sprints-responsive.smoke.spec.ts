@@ -18,7 +18,11 @@ function seedFiles(): Record<string, string> {
         const id = `UX-${index}`;
         if (sprint) memberships[sprint - 1]!.push(id);
         files[`.tasks/UX/${index}.yml`] = stringify({
-            title: `Responsive task ${String(index).padStart(3, '0')}`,
+            // One long backlog title wraps, which once split the row lines (DEV-245).
+            title:
+                index === 131
+                    ? 'Responsive task 131 with a title long enough to wrap onto a second line in the backlog table'
+                    : `Responsive task ${String(index).padStart(3, '0')}`,
             status: 'Todo',
             priority: 'Medium',
             task_type: 'Feature',
@@ -119,6 +123,22 @@ describe.concurrent('Responsive sprint controls and standardized pagination (DEV
                                 }),
                             );
                         const pageWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+                        // Every cell of a row is as tall as the row (DEV-245).
+                        const unevenRows = await page
+                            .locator('tr.task-row')
+                            .evaluateAll((rows) =>
+                                rows
+                                    .filter(
+                                        (row) =>
+                                            new Set(
+                                                [...row.children].map((cell) =>
+                                                    Math.round(cell.getBoundingClientRect().height),
+                                                ),
+                                            ).size > 1,
+                                    )
+                                    .map((row) => row.getAttribute('data-task-id')),
+                            );
+                        expect(unevenRows).toEqual([]);
                         const rootFontSize = await page.evaluate(
                             () => getComputedStyle(document.documentElement).fontSize,
                         );

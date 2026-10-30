@@ -1,9 +1,39 @@
 title: Sprint backlog doesn't update after "create task"
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-10-30T00:12:31.359069+00:00
+modified: 2026-10-30T00:51:09.557129+00:00
+comments:
+- date: 2026-10-30T00:39:27.366722+00:00
+  text: 'Sprints page loaded its own task copy and only listened for order changes, so tasks created from the global New task button, another tab or the CLI only appeared after a reload. It now also listens for task created/updated/deleted events and refreshes once per burst. Checked other pages: Tasks, Boards, Calendar and Insights use the shared task store, which already refreshes on these events. Unit test in SprintsList.addTask.spec.ts; verified in a browser with a task added from the CLI.'
+- date: 2026-10-30T00:51:09.530559+00:00
+  text: 'Verified: npm run lint:agent, nextest 1860/1860, UI vitest 1391/1391, smoke 365/365 (ui.members smoke updated for the new ''Created DEV-N'' toast). No guidance correction.'
 description: |-
   When adding a new task, it doesn't show up in the sprint backlog until a reload was hit, when it should show up.
   Check if the same may happen in other pages.
+history:
+- at: 2026-10-30T00:27:12.231444+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:39:27.366722+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.530559+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T00:51:09.557129+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

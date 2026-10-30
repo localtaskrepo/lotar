@@ -845,11 +845,29 @@ function fieldAssignmentSuggestions(nameRaw: string, rawValue: string, source: F
  */
 export function suggestForFragment(fragment: string, source: FilterValueSource): SuggestionItem[] {
     const trimmed = fragment.trimStart()
+    // A leading minus excludes a filter (`-status:done`): suggest the same
+    // completions with the minus kept, minus the keys that cannot be
+    // excluded. `--x` and `-/regex/` are search text (DEV-247).
+    if (trimmed.startsWith('-') && !trimmed.startsWith('--') && !trimmed.startsWith('-/')) {
+        return suggestForFragment(trimmed.slice(1), source)
+            .filter((item) => !UNNEGATABLE_KEYS.has(suggestionKey(item.insert)))
+            .map((item) => ({
+                insert: `-${item.insert}`,
+                label: /[:=]$/.test(item.label) ? `-${item.label}` : item.label,
+                hint: item.hint ? `Exclude ${item.hint.toLowerCase()}` : 'Exclude',
+            }))
+    }
     const colon = findTopLevel(trimmed, ':')
     const eq = findTopLevel(trimmed, '=')
     if (colon === -1 && eq === -1) return keySuggestions(trimmed.toLowerCase(), source)
     if (eq !== -1 && (colon === -1 || eq < colon)) return assignmentValueSuggestions(trimmed, eq, source)
     return colonValueSuggestions(trimmed, colon, source)
+}
+
+/** The key a suggestion inserts (`status:Todo` -> `status`, `order=` -> `order`). */
+function suggestionKey(insert: string): string {
+    const end = insert.search(/[:=]/)
+    return (end === -1 ? insert : insert.slice(0, end)).toLowerCase()
 }
 
 /** A structured filter rendered as a dismissible chip. */

@@ -136,7 +136,7 @@ describe('UI strict member smoke scenarios', () => {
 
                     await page.getByRole('button', { name: 'Create task' }).click();
 
-                    await page.waitForSelector('.card:has-text("Task created")', { timeout: 10_000 });
+                    await page.waitForSelector('.toast-card:has-text("Created ")', { timeout: 10_000 });
                     await panel.waitFor({ state: 'hidden', timeout: 10_000 });
 
                     expect(new URL(page.url()).pathname).toBe('/');
@@ -210,7 +210,7 @@ describe('UI strict member smoke scenarios', () => {
                     await page.getByPlaceholder('Title').fill('UI Auto-Pop Members Smoke Task');
 
                     await page.getByRole('button', { name: 'Create task' }).click();
-                    await page.waitForSelector('.card:has-text("Task created")', { timeout: 15_000 });
+                    await page.waitForSelector('.toast-card:has-text("Created ")', { timeout: 15_000 });
                     await panel.waitFor({ state: 'hidden', timeout: 15_000 });
 
                     expect(new URL(page.url()).pathname).toBe('/');

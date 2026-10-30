@@ -1,8 +1,10 @@
 <template>
   <td :class="['task-cell', `task-cell--${col}`]">
     <template v-if="col === 'id'">
-      <span class="muted">{{ projectOf(task.id) }}</span>
-      <strong>{{ numericOf(task.id) }}</strong>
+      <span class="task-cell__id">
+        <span class="muted">{{ projectOf(task.id) }}</span>
+        <strong>{{ numericOf(task.id) }}</strong>
+      </span>
     </template>
     <template v-else-if="col === 'title'">
       <span class="task-title">

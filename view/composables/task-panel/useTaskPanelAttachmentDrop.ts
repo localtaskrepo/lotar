@@ -51,6 +51,8 @@ interface UseTaskPanelAttachmentDropOptions {
     targetTaskId: () => string | null | undefined
     preferences: TaskPanelAttachmentPreferences
     mutations: TaskPanelReferenceMutationsApi
+    /** DEV-244: keep files and links added while creating, upload on create. */
+    staging?: { files: (files: File[]) => void; links: (urls: string[]) => void }
 }
 
 export interface TaskPanelAttachmentDropApi {
@@ -136,6 +138,11 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
     const attachmentsDropLabel = computed(() => {
         if (attachmentsUploading.value) return 'Uploading attachments'
         if (addingLinkReferences.value) return 'Adding links'
+        if (mode.value !== 'edit' && options.staging) {
+            return preferences.showLinksInAttachments.value
+                ? 'Drop files or links to attach when the task is created'
+                : 'Drop files to attach when the task is created'
+        }
         if (mode.value !== 'edit' || !task.id) {
             return preferences.showLinksInAttachments.value
                 ? 'Save the task to attach files or links'
@@ -203,7 +210,7 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
             showToast('Restore the task before attaching files or links')
             return false
         }
-        if (mode.value !== 'edit') {
+        if (mode.value !== 'edit' && !options.staging) {
             showToast(
                 what === 'files' ? 'Save the task before attaching files' : 'Save the task before attaching links',
             )
@@ -215,6 +222,10 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
     /** Upload now, or buffer until the loading task is ready. */
     async function attachFiles(files: File[]) {
         if (!files.length) return
+        if (mode.value !== 'edit' && options.staging) {
+            options.staging.files(files)
+            return
+        }
         if (!task.id) {
             pendingDropFiles.value = [...pendingDropFiles.value, ...files]
             pendingDropTaskId = options.targetTaskId() ?? null
@@ -258,6 +269,15 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
         resetAttachmentsDragState()
 
         if (!canAttach(hasFiles ? 'files' : 'links')) return
+
+        if (mode.value !== 'edit' && options.staging) {
+            if (hasFiles) {
+                options.staging.files(Array.from(event.dataTransfer?.files ?? []))
+            } else {
+                options.staging.links(urls)
+            }
+            return
+        }
 
         if (!task.id) {
             // The panel is still initializing this task: `task.id` is assigned only

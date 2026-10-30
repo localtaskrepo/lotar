@@ -1,5 +1,6 @@
 import { formatProjectLabel } from '../utils/projectLabels'
-import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
+import { computed, hasInjectionContext, inject, onScopeDispose, reactive, ref, watch } from 'vue'
+import { routerKey } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import { showToast } from '../components/toast'
@@ -23,6 +24,7 @@ import { useProjects } from './useProjects'
 import { useReferencePreview } from './useReferencePreview'
 import { useSprints } from './useSprints'
 import { useTaskPanelOwnership } from './useTaskPanelOwnership'
+import { useTaskPanelController } from './useTaskPanelController'
 import { useTaskRelationships } from './useTaskRelationships'
 import { relationshipMutation } from '../utils/relationships'
 
@@ -48,6 +50,18 @@ type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'refer
 
 export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPanelEmit) {
     const mode = computed(() => (props.taskId && props.taskId !== 'new' ? 'edit' : 'create'))
+    const panelController = useTaskPanelController()
+    const hasRouter = hasInjectionContext() && inject(routerKey, null) !== null
+    /** Open a task from a toast: through the URL when there is a router. */
+    async function openCreatedTask(id: string) {
+        if (panelController.navigateTask && hasRouter) await panelController.navigateTask(id)
+        else panelController.openTaskPanel({ taskId: id })
+    }
+    // DEV-244: set by the panel to upload files staged while creating.
+    let afterCreateHook: ((created: TaskDTO) => Promise<TaskDTO>) | null = null
+    function setAfterCreate(hook: ((created: TaskDTO) => Promise<TaskDTO>) | null) {
+        afterCreateHook = hook
+    }
 
     const { projects, refresh: refreshProjects } = useProjects()
     const {
@@ -567,6 +581,12 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         refreshConfig,
         loadCommitHistory,
         emit,
+        afterCreate: (created) => (afterCreateHook ? afterCreateHook(created) : Promise.resolve(created)),
+        announceCreated: (created) =>
+            showToast(created.title || 'Untitled task', `Created ${created.id}`, 6000, {
+                label: 'Open',
+                run: () => void openCreatedTask(created.id),
+            }),
     })
 
     handleSubmitImpl = handleSubmitFromPersistence
@@ -605,6 +625,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
 
     return {
         mode,
+        setAfterCreate,
         applyPatch,
         projects,
         refreshProjects,

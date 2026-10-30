@@ -1003,7 +1003,13 @@ function handleBulkAction(action: BulkMenuAction) {
 }
 
 function setSelectedIds(value: string[]) {
-  if (!selectionReady.value) return
+  if (!selectionReady.value) {
+    // Rows of a list that is still loading cannot be selected. Hand the table
+    // a fresh copy so a box ticked meanwhile visibly clears instead of
+    // looking selected (DEV-243).
+    selectedIds.value = [...selectedIds.value]
+    return
+  }
   const allowed = new Set([...selectedIds.value, ...shownTasks.value.map((task) => task.id)])
   selectedIds.value = Array.isArray(value) ? [...new Set(value)].filter((id) => allowed.has(id)) : []
 }
@@ -1684,6 +1690,10 @@ watch(
     if (filterJson(q) === lastFilterJson) return
     const snapshot = { ...q }
     debounceTimer = setTimeout(() => {
+      // Opening the page applies the filter right away; the change that
+      // scheduled this (the default project filling in) is then already
+      // loaded. Loading it again reset the selection mid-click (DEV-243).
+      if (filterJson(snapshot) === lastFilterJson) return
       applyFilter(snapshot, 'push', { resetOffset: true }).catch((err) => {
         console.warn('Failed to apply filter', err)
       })

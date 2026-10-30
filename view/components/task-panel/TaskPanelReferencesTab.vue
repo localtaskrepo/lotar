@@ -1038,12 +1038,13 @@ async function removeReference(reference: ReferenceEntry) {
     if (attachment) {
       const response = await api.removeTaskAttachment({ id, stored_path: attachment })
       emit('updated', response.task)
+      const name = attachmentDisplayName(attachment)
       if (response.deleted) {
-        showToast('Attachment removed')
+        showToast(`Removed ${name}`)
       } else if (response.still_referenced) {
-        showToast('Attachment removed (file kept: used by other tasks)')
+        showToast(`Removed ${name} (file kept: used by other tasks)`)
       } else {
-        showToast('Attachment removed (file may already be gone)')
+        showToast(`Removed ${name} (file may already be gone)`)
       }
       return
     }

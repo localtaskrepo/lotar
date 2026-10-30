@@ -339,14 +339,15 @@ describe('TaskPanel pending drop lifecycle (DEV-93)', () => {
         }
     })
 
-    it('rejects queuing in create mode and never flushes the drop after switching to edit', async () => {
+    it('keeps a create-mode drop for the new task and drops it when switching to an existing task', async () => {
         const wrapper = await mountPanel('new')
         try {
             await dispatchFileDrop(wrapper, [
                 new File(['create payload'], 'create.bin', { type: 'application/octet-stream' }),
             ])
 
-            expect(toastTexts().some((text) => text.includes('Save the task before attaching files'))).toBe(true)
+            // DEV-244: held until the task is created, not refused.
+            expect(wrapper.find('[data-testid="staged-attachments"]').text()).toContain('create.bin')
             expect(toastTexts().some((text) => text.includes('still loading'))).toBe(false)
             expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
 

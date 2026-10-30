@@ -459,6 +459,21 @@ describe('filterFragment', () => {
 })
 
 describe('suggestForFragment', () => {
+    it('completes negated filters with the minus kept (DEV-247)', () => {
+        expect(suggestForFragment('-sta', source)[0]).toMatchObject({ insert: '-status:', label: '-status:' })
+        const values = suggestForFragment('-status:in', source)
+        expect(values.map((s) => s.insert)).toEqual(['-status:"In Progress"'])
+        expect(values[0]).toMatchObject({ label: 'In Progress', hint: 'Exclude status' })
+        expect(parseFilterQuery(values[0]!.insert).filters['-status']).toBe('In Progress')
+        // Keys that cannot be excluded are not offered; search text stays text.
+        const bare = suggestForFragment('-', source).map((s) => s.insert)
+        expect(bare).toContain('-status:')
+        expect(bare.some((insert) => /^-(order|sort_by|deletion|archived|q)\b/.test(insert))).toBe(false)
+        expect(suggestForFragment('-ord', source)).toEqual([])
+        expect(suggestForFragment('--sta', source)).toEqual([])
+        expect(suggestForFragment('-/sta', source)).toEqual([])
+    })
+
     it('suggests keys before a colon is typed', () => {
         const suggestions = suggestForFragment('sta', source)
         expect(suggestions.length).toBeGreaterThan(0)

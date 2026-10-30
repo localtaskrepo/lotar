@@ -31,8 +31,14 @@ const api = vi.hoisted(() => ({
 
 vi.mock('../api/client', () => ({ api }))
 
+const sseHandlers = vi.hoisted(() => new Map<string, Array<(event: MessageEvent) => void>>())
 vi.mock('../composables/useSse', () => ({
-    useSse: () => ({ on: vi.fn(), close: vi.fn() }),
+    useSse: () => ({
+        on: (kind: string, handler: (event: MessageEvent) => void) => {
+            sseHandlers.set(kind, [...(sseHandlers.get(kind) ?? []), handler])
+        },
+        close: vi.fn(),
+    }),
 }))
 
 vi.mock('../components/toast', () => ({
@@ -358,6 +364,22 @@ describe('SprintsList add-task controls (DEV-104)', () => {
         finishRefresh(tasksResponse([makeTask('PRJ-001', [1])]))
         await flushPromises()
         expect(wrapper.findAll('tr.task-row[data-task-id="PRJ-009"]')).toHaveLength(0)
+        wrapper.unmount()
+    })
+
+    it('shows tasks created elsewhere without a reload (DEV-248)', async () => {
+        sseHandlers.clear()
+        const wrapper = await mountSettled()
+        api.listTasks.mockResolvedValue(tasksResponse([makeTask('PRJ-001', [1]), makeTask('PRJ-010', [])]))
+        // A burst of events (created, then its follow-up update) is one refresh.
+        for (const kind of ['task_created', 'task_updated']) {
+            for (const handler of sseHandlers.get(kind) ?? [])
+                handler(new MessageEvent(kind, { data: '{"id":"PRJ-010"}' }))
+        }
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        await flushPromises()
+        expect(api.listTasks).toHaveBeenCalledTimes(1)
+        expect(wrapper.findAll('tr.task-row[data-task-id="PRJ-010"]')).toHaveLength(1)
         wrapper.unmount()
     })
 })
