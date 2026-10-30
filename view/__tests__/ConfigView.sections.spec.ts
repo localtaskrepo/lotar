@@ -170,6 +170,32 @@ describe('ConfigView sections (DEV-19)', () => {
         })
     })
 
+    it('finds settings by name or description and opens their section (DEV-166)', async () => {
+        const { wrapper, router } = await mountAt('/config')
+        const search = wrapper.get('[data-testid="config-search"]')
+        await search.setValue('jobs at once')
+        await search.trigger('focus')
+        const options = wrapper.findAll('.config-search__result')
+        expect(options.length).toBeGreaterThan(0)
+        expect(options[0]!.text()).toContain('Jobs at once')
+        expect(options[0]!.text()).toContain('Agents')
+
+        // Description words match too, and Enter picks the highlighted result.
+        await search.setValue('build output')
+        expect(wrapper.findAll('.config-search__result')[0]!.text()).toContain('Ignore build output')
+        await search.setValue('jobs at once')
+        await search.trigger('keydown', { key: 'Enter' })
+        await flushPromises()
+        expect(router.currentRoute.value.query.section).toBe('agents')
+        const field = wrapper.get('[data-testid="config-agent-max-jobs"]').element
+        expect(field.closest('.config-search-hit')).not.toBeNull()
+        expect(document.activeElement).toBe(field)
+
+        await search.setValue('nothing like this')
+        expect(wrapper.text()).toContain('No settings match.')
+        wrapper.unmount()
+    })
+
     it('routes the visible section through ?section= and keeps edits across sections', async () => {
         const { wrapper, router, vm: view } = await mountAt('/config')
         expect(visibleSection(wrapper)).toEqual(['general'])

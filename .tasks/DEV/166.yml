@@ -1,7 +1,43 @@
 title: Add search functionality to config UI
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-24T23:46:55.865283+00:00
+modified: 2026-10-30T01:51:28.869182+00:00
+comments:
+- date: 2026-10-30T00:59:29.050374+00:00
+  text: 'Plan: search box on the Config page that matches setting labels, keys and descriptions across all sections; picking a result switches to its section and scrolls to/highlights the field. Unit tests + smoke.'
+- date: 2026-10-30T01:30:49.733463+00:00
+  text: 'Done: search box in the Config page toolbar; matches setting labels, descriptions and section names read from the rendered page (no separate list to maintain), keyboard navigable; picking opens the section, scrolls, highlights and focuses the setting. Tests: ConfigView.sections.spec.ts, smoke ui.config-search.'
+- date: 2026-10-30T01:51:28.841186+00:00
+  text: 'Verified: npm run lint:agent, nextest 1866/1866, UI vitest 1393/1393, smoke 367/367 (ui.config-coverage row count updated for the two new relationship switches). No guidance correction.'
 description: We have quite a few config options. We should add a search field to allow finding the config page that the user is looking for faster.
+history:
+- at: 2026-10-30T00:54:09.341959+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:59:29.050374+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:30:49.733463+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.841186+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.869182+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

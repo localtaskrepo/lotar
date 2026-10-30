@@ -11,6 +11,12 @@
         </UiButton>
       </template>
       <template #toolbar>
+        <ConfigSearch
+          v-if="inspectData"
+          :root="configMainRef"
+          :sections="visibleSections.map((entry) => entry.id)"
+          :open-section="openSearchSection"
+        />
         <UiSelect
           :key="scopeSelectKey"
           :model-value="project"
@@ -76,7 +82,7 @@
         </ul>
       </nav>
 
-      <div class="config-main">
+      <div ref="configMainRef" class="config-main">
         <section
           v-show="activeSection === 'general'"
           :id="`config-section-general`"
@@ -728,6 +734,7 @@ import ConfigAutomationSection from '../components/ConfigAutomationSection.vue'
 import ConfigBranchAliasSection from '../components/ConfigBranchAliasSection.vue'
 import ConfigDefaultsSection from '../components/ConfigDefaultsSection.vue'
 import ConfigGroup from '../components/ConfigGroup.vue'
+import ConfigSearch from '../components/ConfigSearch.vue'
 import ConfigPeopleSection from '../components/ConfigPeopleSection.vue'
 import ConfigScanningSection from '../components/ConfigScanningSection.vue'
 import ConfigServerSection from '../components/ConfigServerSection.vue'
@@ -1106,6 +1113,15 @@ function sectionHref(id: ConfigSectionId) {
 function selectSection(id: ConfigSectionId) {
   if (id === activeSection.value && route.query.section === id) return
   void router.replace({ query: { ...route.query, section: id } })
+}
+
+// DEV-166: the settings search opens the section of the picked setting.
+const configMainRef = ref<HTMLElement | null>(null)
+async function openSearchSection(id: ConfigSectionId) {
+  if (id !== activeSection.value || route.query.section !== id) {
+    await router.replace({ query: { ...route.query, section: id } })
+  }
+  await nextTick()
 }
 
 // Keep the active entry visible in the scrolling tab strip at phone width.
