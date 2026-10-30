@@ -1,0 +1,44 @@
+title: Test-task seed script configures no custom fields
+status: Done
+priority: Low
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-30T04:53:00.739435+00:00
+modified: 2026-10-30T18:04:28.816882+00:00
+relationships:
+  related:
+  - DEV-251
+comments:
+- date: 2026-10-30T18:04:28.697045+00:00
+  text: |-
+    Outcome: scripts/generate-test-tasks.mjs now writes top-level custom_fields: [component, story_points] (matching scripts/demo/workspace.mjs and docs/help/config.md) instead of an ignored issue.custom_fields map.
+    Evidence: fresh seed (--count 6) resolves config show --project DEMO to [component, story_points]; task edit --field component=... still applies (4/6 tasks got values). ESLint + Prettier clean on the file. No tests use the script, so full lint/test/smoke from DEV-251 (same session) were not rerun for this one-line dev-script change.
+    Remaining: none. Uncommitted.
+    Guidance: no durable finding.
+description: 'scripts/generate-test-tasks.mjs writes custom_fields as a map under issue: (issue.custom_fields: {component: ''*'', story_points: ''*''}), but LoTaR reads a top-level custom_fields list. Seeded workspaces resolve to custom_fields [''*''], so the filter panel''s Custom field picker and custom columns show only names inferred from task values. Fix: emit top-level custom_fields: [component, story_points] (see docs/help/config.md). Found while verifying DEV-251.'
+history:
+- at: 2026-10-30T04:53:00.896134+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-251"]}'
+- at: 2026-10-30T18:03:50.264368+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T18:04:28.697045+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T18:04:28.816882+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

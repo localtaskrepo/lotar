@@ -91,9 +91,7 @@ issue:
   states: [Todo, InProgress, NeedsReview, Blocked, Done]
   types: [Feature, Bug, Chore, Epic, Spike]
   priorities: [Low, Medium, High, Critical]
-  custom_fields:
-    component: '*'
-    story_points: '*'
+custom_fields: [component, story_points]
 `;
 
 const VERBS = ['Add', 'Fix', 'Refactor', 'Improve', 'Support', 'Document', 'Wire up', 'Tune', 'Extend', 'Rework'];
