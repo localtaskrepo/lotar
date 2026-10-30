@@ -12,7 +12,8 @@ pub use args::{
     GitHooksInstallArgs, ScanArgs, ServeArgs, SortField, SprintAction, SprintArgs,
     SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs, SyncArgs, SyncCheckArgs,
     SyncCommandAction, SyncCommandArgs, TaskAction, TaskAddArgs, TaskArchiveArgs, TaskDeleteArgs,
-    TaskEditArgs, TaskMoveArgs, TaskRestoreArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
+    TaskEditArgs, TaskMoveArgs, TaskRestoreArgs, TaskSearchArgs, TaskShowArgs, TaskStatusArgs,
+    parse_key_value,
 };
 pub mod preprocess;
 
@@ -66,6 +67,14 @@ pub enum Commands {
     /// Quick list tasks  
     #[command(aliases = ["ls"])]
     List(TaskSearchArgs),
+
+    /// Show one task with all its details (same as `task show`)
+    #[command(alias = "view")]
+    Show(TaskShowArgs),
+
+    /// Edit a task (same as `task edit`)
+    #[command(alias = "update")]
+    Edit(TaskEditArgs),
 
     /// Change task status (validates against project config)
     Status {

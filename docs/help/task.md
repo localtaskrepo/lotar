@@ -20,7 +20,8 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 |--------|---------|---------------------|
 | `add` | Create a task with the core fields. | `lotar add`. |
 | `list` | Search/filter tasks with pagination helpers. | `lotar list`. |
-| `edit` | Modify an existing task, optionally previewing changes. | Same pipeline as `lotar add`. |
+| `show` (alias `view`) | Print one task with all its details. | `lotar show`. |
+| `edit` (alias `update`) | Modify an existing task, optionally previewing changes. | `lotar edit` / `lotar update`; same pipeline as `lotar add`. |
 | `status` | Change a task status (write-only in legacy mode). | `lotar status`. |
 | `priority` | Show or update priority. | `lotar priority`. |
 | `assignee` | Show or update assignee. | `lotar assignee`. |
@@ -61,12 +62,24 @@ lotar task list [QUERY...] [--assignee|-a <VALUE>] [--status|-s <VALUE>...] [--p
 - `--details` adds task descriptions to the text output.
 - Use `--page-size` (alias: `--limit`) with `--offset` or `--page` to paginate.
 
+### show
+
+```bash
+lotar show <TASK_ID>            # also: lotar view, lotar task show
+lotar --format json show <TASK_ID>
+```
+
+- Prints the task's fields, relationships, description, acceptance criteria, references and comments. Empty sections are left out.
+- Accepts the same IDs as other commands: `DEV-12`, `12` inside a project, an old ID of a moved task, or a soft-deleted task.
+- `--format json` prints the full task as the REST API returns it.
+
 ### edit
 
 ```bash
 lotar task edit <TASK_ID> [--title|-T] [--type|-t] [--priority|-P] [--reporter|-R] [--assignee|-a] [--effort|-E] [--due|-d] [--description|-D] [--tag|-i ...] [--field|-F key=value ...] [--dry-run|-n]
 ```
 
+- Also available as `lotar edit <TASK_ID> …` and `lotar update <TASK_ID> …`.
 - Validates and normalizes edits in the task's project context, including `@me` handling, before updating through the shared task service.
 - When `auto.populate_members` is enabled, new reporter/assignee members and the task edit are saved in one coordinated transaction. Validation or write failures do not leave member configuration changes behind; a pending transaction that cannot be safely recovered blocks the edit.
 - `--dry-run` works with both text and JSON output (`--format=json` emits the preview envelope described in `docs/help/effort.md`).

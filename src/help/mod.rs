@@ -27,8 +27,16 @@ static DEFAULT_DOCS_BASE_URL: LazyLock<String> = LazyLock::new(|| {
         env!("CARGO_PKG_VERSION")
     )
 });
-static HELP_ALIASES: LazyLock<HashMap<&'static str, &'static str>> =
-    LazyLock::new(|| HashMap::from([("sprint", "sprints"), ("init", "config")]));
+static HELP_ALIASES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    HashMap::from([
+        ("sprint", "sprints"),
+        ("init", "config"),
+        ("show", "task"),
+        ("view", "task"),
+        ("edit", "task"),
+        ("update", "task"),
+    ])
+});
 
 pub struct HelpSystem {
     renderer: OutputRenderer,

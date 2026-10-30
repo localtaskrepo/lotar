@@ -24,6 +24,7 @@ mod reference;
 pub(crate) mod render;
 mod restore;
 mod search;
+mod show;
 
 use delete::DeleteHandler;
 use edit::EditHandler;
@@ -91,6 +92,9 @@ impl CommandHandler for TaskHandler {
                 }
             }
             TaskAction::List(args) => SearchHandler::execute(args, project, resolver, renderer),
+            TaskAction::Show(show_args) => {
+                show::handle_show(&show_args.id, project, resolver, renderer)
+            }
             TaskAction::Edit(edit_args) => {
                 EditHandler::execute(edit_args, project, resolver, renderer)
             }

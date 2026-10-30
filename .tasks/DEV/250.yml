@@ -1,0 +1,18 @@
+title: Add additional distribution channels
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-30T01:02:52.755541+00:00
+modified: 2026-10-30T01:06:55.820854+00:00
+comments:
+- date: 2026-10-30T01:06:55.820854+00:00
+  text: "This may also be an opportunity to merge the scoop and homebrew repos into one, if possible, along with other repos that may be added. \nThere may even be a case for merging them back into the main repo if that provides any benefits."
+description: |-
+  Right now we support homebrew and scoop as well as direct downloads from the release page.
+  Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
+history:
+- at: 2026-10-30T01:06:55.820854+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

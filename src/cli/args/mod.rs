@@ -36,5 +36,5 @@ pub use task::{
     AddArgs, RelationshipKind, SortField, TaskAction, TaskAddArgs, TaskArchiveArgs, TaskDeleteArgs,
     TaskEditArgs, TaskMoveArgs, TaskReferenceAction, TaskReferenceAddArgs, TaskReferenceArgs,
     TaskReferenceKindAdd, TaskReferenceKindRemove, TaskReferenceRemoveArgs, TaskRelationshipsArgs,
-    TaskRestoreArgs, TaskSearchArgs, TaskStatusArgs,
+    TaskRestoreArgs, TaskSearchArgs, TaskShowArgs, TaskStatusArgs,
 };

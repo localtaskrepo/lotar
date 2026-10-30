@@ -35,6 +35,11 @@ fn is_valid_command(command: &str) -> bool {
         "add"
             | "list"
             | "ls"
+            | "show"
+            | "view"
+            | "edit"
+            | "update"
+            | "automation"
             | "status"
             | "priority"
             | "assignee"
@@ -234,6 +239,30 @@ fn main() {
                 }
             }
         }
+        Commands::Show(args) => match TaskHandler::execute(
+            Some(TaskAction::Show(args)),
+            cli.project.as_deref(),
+            &resolver,
+            &renderer,
+        ) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                renderer.emit_error(&e);
+                Err(e)
+            }
+        },
+        Commands::Edit(args) => match TaskHandler::execute(
+            Some(TaskAction::Edit(args)),
+            cli.project.as_deref(),
+            &resolver,
+            &renderer,
+        ) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                renderer.emit_error(&e);
+                Err(e)
+            }
+        },
         Commands::List(args) => {
             renderer.log_info("BEGIN LIST");
             let task_action = TaskAction::List(args);

@@ -29,6 +29,8 @@ lotar serve --open
 | --- | --- |
 | Capture new work | `lotar add` with title, type, priority, tags, and custom fields |
 | Find tasks | `lotar list` with the web search syntax, such as `status:todo priority:high mine:true tag:ui component=editor` |
+| Read one task | `lotar show <id>` (alias `view`): fields, relationships, description, references and comments; `--format json` gives the full task |
+| Change task fields | `lotar edit <id> --title … --description …` (alias `update`), same as `lotar task edit` |
 | Move tasks through states | `lotar status <id> <new_status>` (supports dry-run + explain) |
 | Update ownership | `lotar assignee <id> <name|@me>` |
 | Track deadlines and estimates | `lotar due-date`, `lotar effort` |

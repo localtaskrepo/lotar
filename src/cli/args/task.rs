@@ -203,7 +203,11 @@ pub enum TaskAction {
     Add(TaskAddArgs),
     /// List tasks (with optional filters)
     List(TaskSearchArgs),
+    /// Show one task with all its details
+    #[command(alias = "view")]
+    Show(TaskShowArgs),
     /// Edit an existing task
+    #[command(alias = "update")]
     Edit(TaskEditArgs),
     /// Change task status
     Status(TaskStatusArgs),
@@ -517,6 +521,12 @@ pub struct TaskAddArgs {
     #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskShowArgs {
+    /// Task ID (with or without project prefix)
+    pub id: String,
 }
 
 #[derive(Args, Deserialize, Debug)]

@@ -1,10 +1,11 @@
 title: Command aliases for common operations (show/update)
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.787987+00:00
-modified: 2026-09-06T13:12:54.089384+00:00
+modified: 2026-10-30T01:51:28.581430+00:00
 comments:
 - date: 2026-09-06T11:21:52.696878+00:00
   text: 'Backlog reconciliation: Remains Todo for the requested show/update aliases. Existing ls/c/task aliases do not implement those spellings. Define top-level versus task subcommand forms and add parser/help coverage; corrected DEV-53 injected instructions intentionally use currently supported commands instead.'
@@ -12,6 +13,12 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 19: Add aliases for command commands so that LLMs don't get tripped up (e.g. it's often trying "lotar show <id>", and "lotar update <id>")
+- date: 2026-10-30T00:59:29.000238+00:00
+  text: 'Plan: top-level ''lotar show <id>'' printing the full task (text, and JSON with --format json), and ''lotar update <id> ...'' / ''lotar edit <id> ...'' as aliases of ''task edit''; also ''task show'' / ''task update'' aliases. Parser + help tests.'
+- date: 2026-10-30T01:30:19.760856+00:00
+  text: 'Done: ''lotar show <id>'' (alias ''view'', also ''task show''; full task as text, --format json gives the REST DTO; numeric/moved/deleted IDs work) and ''lotar edit/update <id> …'' (also ''task update'') sharing task edit. Help aliases for show/view/edit/update. Docs: help/task.md, help/main.md. Test: tests/dev18_show_update_aliases_test.rs.'
+- date: 2026-10-30T01:51:28.530866+00:00
+  text: 'Verified: npm run lint:agent, nextest 1866/1866, UI vitest 1393/1393, smoke 367/367 (ui.config-coverage row count updated for the two new relationship switches). No guidance correction.'
 description: |-
   Migrated checklist requirements:
   Consider familiar aliases such as lotar show <id> and lotar update <id> so agent-generated commands are less error-prone. Agree top-level/subcommand semantics and preserve existing commands; test parser and help behavior. Existing ls/c aliases are not this request.
@@ -31,3 +38,29 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-30T00:54:31.907511+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:59:29.000238+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:30:19.760856+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.530866+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.581430+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
