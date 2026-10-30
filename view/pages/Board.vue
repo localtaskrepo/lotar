@@ -234,6 +234,7 @@
                           <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{
                             task.id
                           }}</span>
+                          <AgentActivityIndicator :task-id="task.id" />
                           <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{
                             task.title
                           }}</strong>
@@ -454,6 +455,7 @@
                       <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{
                         task.id
                       }}</span>
+                      <AgentActivityIndicator :task-id="task.id" />
                       <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{
                         task.title
                       }}</strong>
@@ -513,6 +515,7 @@ import FilterBar from '../components/FilterBar.vue'
 import AttachmentTile from '../components/AttachmentTile.vue'
 import { firstPreviewImage } from '../utils/taskAttachments'
 import BoardCardMeta from '../components/BoardCardMeta.vue'
+import AgentActivityIndicator from '../components/AgentActivityIndicator.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import { showToast } from '../components/toast'

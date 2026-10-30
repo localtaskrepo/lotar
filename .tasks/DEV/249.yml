@@ -1,7 +1,43 @@
 title: Show agent activity on tickets that are being worked on
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-10-30T00:34:41.719509+00:00
+modified: 2026-10-30T01:51:28.939046+00:00
+comments:
+- date: 2026-10-30T00:59:29.076250+00:00
+  text: 'Plan: an ''agent working'' indicator next to task IDs wherever tasks appear (task list, board cards, sprint rows, task panel header), driven by the running agent jobs and their live events; hovering shows the agent and its latest progress text. Unit tests + smoke.'
+- date: 2026-10-30T01:30:51.008750+00:00
+  text: 'Done: shared useAgentActivity store (job list + live agent_job_* events, one connection, reconciles on reconnect) and AgentActivityIndicator: pulsing agent icon (Working / Queued) next to titles in the task list and sprint tables, on board cards and by the status badge in the task panel; hover/aria label says which agent and its latest progress message. Tests: AgentActivityIndicator.spec.ts, smoke ui.agent-activity (gated mock agent).'
+- date: 2026-10-30T01:51:28.911352+00:00
+  text: 'Verified: npm run lint:agent, nextest 1866/1866, UI vitest 1393/1393, smoke 367/367 (ui.config-coverage row count updated for the two new relationship switches). No guidance correction.'
 description: When an agent is working on a ticket, there should be an indicator on most pages that let's the user know that an agent is currently working on this. On hover over the indicator it could say what it is currently doing.
+history:
+- at: 2026-10-30T00:54:14.110780+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-30T00:59:29.076250+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:30:51.008750+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.911352+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-30T01:51:28.939046+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

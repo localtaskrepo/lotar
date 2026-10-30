@@ -9,6 +9,7 @@
     <template v-else-if="col === 'title'">
       <span class="task-title">
         {{ task.title || 'Untitled task' }}
+        <AgentActivityIndicator :task-id="task.id" />
         <span
           v-if="multiSprint"
           class="task-title__badge badge badge--info"
@@ -89,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import AgentActivityIndicator from './AgentActivityIndicator.vue'
 import { tagAttrs } from '../composables/useTagColors'
 import type { TaskDTO } from '../api/types'
 import type { ColKey } from '../composables/useColumns'

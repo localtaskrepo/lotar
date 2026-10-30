@@ -60,6 +60,7 @@ type IconName =
   | 'play'
   | 'star'
   | 'external'
+  | 'agent'
 
 type IconDef = {
   paths: string[]
@@ -70,6 +71,18 @@ type IconDef = {
 }
 
 const ICONS: Record<IconName, IconDef> = {
+  agent: {
+    paths: [
+      'M6 9a2 2 0 012-2h8a2 2 0 012 2v7a2 2 0 01-2 2H8a2 2 0 01-2-2z',
+      'M12 7V4',
+      'M12 4h.01',
+      'M9.5 12h.01',
+      'M14.5 12h.01',
+      'M10 15h4',
+      'M4 12v2',
+      'M20 12v2',
+    ],
+  },
   play: {
     paths: ['M8 5.5v13a1 1 0 001.5.86l11-6.5a1 1 0 000-1.72l-11-6.5A1 1 0 008 5.5z'],
   },

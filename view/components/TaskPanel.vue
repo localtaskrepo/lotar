@@ -34,6 +34,7 @@
                 data-testid="task-panel-status-badge"
                 >{{ form.status }}</span
               >
+              <AgentActivityIndicator v-if="mode === 'edit'" :task-id="form.id" label />
               <span v-if="isDeleted" class="badge task-panel__deleted-badge" data-testid="task-panel-deleted-badge"
                 >Deleted</span
               >
@@ -920,6 +921,7 @@ import type {
   TaskDTO,
   TaskMoveResponse,
 } from '../api/types'
+import AgentActivityIndicator from './AgentActivityIndicator.vue'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
 import {
   pastedFiles,

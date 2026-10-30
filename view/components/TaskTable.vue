@@ -193,6 +193,7 @@
                         :class="{ 'task-table__title-text--deleted': t.deleted_at != null }"
                         >{{ t.title }}</span
                       >
+                      <AgentActivityIndicator :task-id="t.id" label class="task-table__agent" />
                       <span
                         v-if="t.deleted_at != null"
                         class="tag task-table__deleted-badge"
@@ -419,6 +420,7 @@
 
 <script setup lang="ts">
 import { tagAttrs } from '../composables/useTagColors'
+import AgentActivityIndicator from './AgentActivityIndicator.vue'
 import AttachmentTile from './AttachmentTile.vue'
 import { taskAttachments } from '../utils/taskAttachments'
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
@@ -750,6 +752,10 @@ th.active .header-button__sort {
     width: auto;
     max-width: none;
   }
+}
+
+.task-table__title-wrapper .task-table__agent {
+  margin-left: 0;
 }
 
 .task-table__title-wrapper {
