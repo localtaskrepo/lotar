@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-24T23:46:55.865283+00:00
-modified: 2026-10-30T01:51:28.869182+00:00
+modified: 2026-10-30T02:10:47.939364+00:00
 comments:
 - date: 2026-10-30T00:59:29.050374+00:00
   text: 'Plan: search box on the Config page that matches setting labels, keys and descriptions across all sections; picking a result switches to its section and scrolls to/highlights the field. Unit tests + smoke.'
@@ -13,6 +13,8 @@ comments:
   text: 'Done: search box in the Config page toolbar; matches setting labels, descriptions and section names read from the rendered page (no separate list to maintain), keyboard navigable; picking opens the section, scrolls, highlights and focuses the setting. Tests: ConfigView.sections.spec.ts, smoke ui.config-search.'
 - date: 2026-10-30T01:51:28.841186+00:00
   text: 'Verified: npm run lint:agent, nextest 1866/1866, UI vitest 1393/1393, smoke 367/367 (ui.config-coverage row count updated for the two new relationship switches). No guidance correction.'
+- date: 2026-10-30T02:10:47.939364+00:00
+  text: 'CI fix: smoke ui.config-search failed on CI (run 40988957614): the blur close timer from the previous pick fired after a fast refocus and closed the new results, so Enter did nothing. The pending close is now cancelled on focus/input (and on unmount). Regression unit test in ConfigView.sections.spec.ts fails without the fix. Verified: frontend lint/typecheck, UI vitest 1393/1393, ui.config-search smoke 3/3 on a fresh build.'
 description: We have quite a few config options. We should add a search field to allow finding the config page that the user is looking for faster.
 history:
 - at: 2026-10-30T00:54:09.341959+00:00
@@ -41,3 +43,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-30T02:10:47.939364+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -14,7 +14,7 @@
       :aria-controls="listId"
       :aria-activedescendant="open && results[active] ? `${listId}-${active}` : undefined"
       data-testid="config-search"
-      @focus="open = Boolean(query.trim())"
+      @focus="onFocus"
       @input="onInput"
       @blur="closeSoon"
     />
@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId } from 'vue'
 import { CONFIG_SECTIONS, type ConfigSectionId } from '../utils/configSections'
 import IconGlyph from './IconGlyph.vue'
 
@@ -151,16 +151,35 @@ const results = computed<SearchResult[]>(() => {
   return matches.sort((a, b) => a.rank - b.rank).slice(0, MAX_RESULTS)
 })
 
+// Closing waits a moment after blur so a click on a result still lands; a
+// return to the box cancels it, or a fast refocus would lose the new results.
+let closeTimer: ReturnType<typeof setTimeout> | null = null
+
+function cancelClose() {
+  if (closeTimer !== null) clearTimeout(closeTimer)
+  closeTimer = null
+}
+
+function onFocus() {
+  cancelClose()
+  open.value = Boolean(query.value.trim())
+}
+
 function onInput() {
+  cancelClose()
   open.value = Boolean(query.value.trim())
   active.value = 0
 }
 
 function closeSoon() {
-  setTimeout(() => {
+  cancelClose()
+  closeTimer = setTimeout(() => {
+    closeTimer = null
     open.value = false
   }, 120)
 }
+
+onBeforeUnmount(cancelClose)
 
 async function pick(result: SearchResult) {
   open.value = false

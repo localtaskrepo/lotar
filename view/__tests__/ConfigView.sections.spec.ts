@@ -191,6 +191,13 @@ describe('ConfigView sections (DEV-19)', () => {
         expect(field.closest('.config-search-hit')).not.toBeNull()
         expect(document.activeElement).toBe(field)
 
+        // Back in the box right after a pick (blur pending): new results stay open.
+        await search.trigger('blur')
+        await search.trigger('focus')
+        await search.setValue('build output')
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        expect(wrapper.findAll('.config-search__result').length).toBeGreaterThan(0)
+
         await search.setValue('nothing like this')
         expect(wrapper.text()).toContain('No settings match.')
         wrapper.unmount()
