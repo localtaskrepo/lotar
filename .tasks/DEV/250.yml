@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-31T01:35:54.643845+00:00
+modified: 2026-10-31T01:47:08.812046+00:00
 relationships:
   related:
   - DEV-251
@@ -43,6 +43,10 @@ comments:
   text: 'npm trusted publishing configured for all 6 packages (an earlier user run created them; the rerun hit E409 conflicts). npm trust list confirms each: type github, repository localtaskrepo/lotar, file release.yml, no environment, permissions createPackage + createStagedPackage. Unvalidated configs expire 48h after creation (created around 2026-10-31T01:00Z), so the next release should be tagged before about 2026-11-02T01:00Z, or the configs need recreating. Next: tag the release, confirm publish-npm succeeds via OIDC with provenance, run install-verify (npm, deb/rpm, scripts) and homebrew-verify with the tag, then close.'
 - date: 2026-10-31T01:35:54.643845+00:00
   text: 'v0.11.2 release fully green: publish-npm succeeded via OIDC (lotar and platform packages 0.11.2 with provenance attestations, so trust configs are validated), package-linux attached 4 .deb/.rpm assets, tap formula at 0.11.2 with on_linux and the fixed test block. Homebrew verify (run 41155236500) failed on all 3 runners: Homebrew 6+ refuses formulae from untrusted third-party taps (''Refusing to load formula ... from untrusted tap''). Reproduced locally with Homebrew 7.0.11 and an isolated empty trust store: short and full names both refused for brew info; brew trust --tap localtaskrepo/lotar unblocks it. Fix: homebrew-verify trusts the tap after tapping (guarded by brew help trust); install docs, README, docs/README, homepage and compare page add brew trust localtaskrepo/lotar. The tap repo''s own README (separate repo, also lists autospec) still lacks the trust step. Next: user pushes, reruns homebrew-verify and install-verify with v0.11.2.'
+- date: 2026-10-31T01:44:38.284640+00:00
+  text: 'Tap repo localtaskrepo/homebrew-lotar README updated and pushed (83adcda, with user permission): adds brew trust localtaskrepo/lotar to usage, lists platforms (lotar macOS + Linux, autospec macOS), and says formulae are rewritten by each project''s release workflow (edit release.yml, not Formula/). Formula files untouched.'
+- date: 2026-10-31T01:47:08.812046+00:00
+  text: 'Homebrew verify on 1570edb: macOS Intel and Apple Silicon pass (install, brew test, version, arch). Linux x64 installs, passes brew test and version, but the arch check failed: GNU file reports the Homebrew bin symlink itself (''symbolic link to ../Cellar/lotar/0.11.2/bin/lotar''), macOS file follows links. Fixed with file -L (checked GNU file in debian: x86-64 static-pie; macOS file -L still prints Mach-O arches). actionlint clean. Next: push, rerun homebrew-verify, run install-verify with v0.11.2.'
 description: |-
   Right now we support homebrew and scoop as well as direct downloads from the release page.
   Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
@@ -112,6 +116,14 @@ history:
   changes:
   - field: comment_added
 - at: 2026-10-31T01:35:54.643845+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T01:44:38.284640+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T01:47:08.812046+00:00
   actor: mallox
   changes:
   - field: comment_added

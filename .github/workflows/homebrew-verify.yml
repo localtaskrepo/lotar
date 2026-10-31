@@ -165,7 +165,8 @@ jobs:
             echo "lotar binary not found on PATH" >&2
             exit 1
           fi
-          file_output="$(file "$lotar_path")"
+          # -L follows the Homebrew bin symlink; GNU file describes the link itself without it.
+          file_output="$(file -L "$lotar_path")"
           uname_arch="$(uname -m)"
           echo "lotar binary: $lotar_path"
           echo "file output: $file_output"
