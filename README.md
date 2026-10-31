@@ -28,7 +28,7 @@ LoTaR keeps tasks as plain YAML files in `.tasks/`, versioned and branched with 
 
 | Platform | Install |
 | --- | --- |
-| macOS, Linux | `brew tap localtaskrepo/lotar && brew install lotar` |
+| macOS, Linux | `brew tap localtaskrepo/lotar && brew trust localtaskrepo/lotar && brew install lotar` |
 | Linux, macOS (script) | `curl -fsSL https://localtaskrepo.github.io/lotar/install.sh \| sh` |
 | Windows | `scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar; scoop install lotar` |
 | Windows (script) | `irm https://localtaskrepo.github.io/lotar/install.ps1 \| iex` |

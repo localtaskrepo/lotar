@@ -18,6 +18,7 @@ LoTaR is an actively developed task management tool with a CLI, web server, and 
 **Homebrew ([brew.sh](https://brew.sh/), macOS and Linux)**
 ```bash
 brew tap localtaskrepo/lotar
+brew trust localtaskrepo/lotar    # Homebrew 6+ only loads trusted third-party taps
 brew install lotar
 lotar --version
 ```

@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-31T01:00:46.787890+00:00
+modified: 2026-10-31T01:35:54.643845+00:00
 relationships:
   related:
   - DEV-251
@@ -39,6 +39,10 @@ comments:
   text: 'npm v0.11.1 published by hand: all 6 packages exist in the org (npm access list); public view lagged a few minutes each time. npm trust cannot run from the agent shell: without a TTY it fails with EOTP and a one-time browser link, so no trust config was created (3 attempts failed before the loop was stopped). User runs the loop interactively (script in the session scratchpad, same as release-guide step 3). NPM_TOKEN token revoked by user, but the repo secret still exists (unused by the workflow). Next: trust loop within 48h of the next tag, then install-verify.'
 - date: 2026-10-31T01:00:46.787890+00:00
   text: 'NPM_TOKEN repo secret deleted by user (confirmed via gh secret list). Remaining: user runs the npm trust loop within 48h of the next tag; after that release, run install-verify (npm, deb/rpm, scripts) and homebrew-verify with the tag, then close.'
+- date: 2026-10-31T01:10:43.435695+00:00
+  text: 'npm trusted publishing configured for all 6 packages (an earlier user run created them; the rerun hit E409 conflicts). npm trust list confirms each: type github, repository localtaskrepo/lotar, file release.yml, no environment, permissions createPackage + createStagedPackage. Unvalidated configs expire 48h after creation (created around 2026-10-31T01:00Z), so the next release should be tagged before about 2026-11-02T01:00Z, or the configs need recreating. Next: tag the release, confirm publish-npm succeeds via OIDC with provenance, run install-verify (npm, deb/rpm, scripts) and homebrew-verify with the tag, then close.'
+- date: 2026-10-31T01:35:54.643845+00:00
+  text: 'v0.11.2 release fully green: publish-npm succeeded via OIDC (lotar and platform packages 0.11.2 with provenance attestations, so trust configs are validated), package-linux attached 4 .deb/.rpm assets, tap formula at 0.11.2 with on_linux and the fixed test block. Homebrew verify (run 41155236500) failed on all 3 runners: Homebrew 6+ refuses formulae from untrusted third-party taps (''Refusing to load formula ... from untrusted tap''). Reproduced locally with Homebrew 7.0.11 and an isolated empty trust store: short and full names both refused for brew info; brew trust --tap localtaskrepo/lotar unblocks it. Fix: homebrew-verify trusts the tap after tapping (guarded by brew help trust); install docs, README, docs/README, homepage and compare page add brew trust localtaskrepo/lotar. The tap repo''s own README (separate repo, also lists autospec) still lacks the trust step. Next: user pushes, reruns homebrew-verify and install-verify with v0.11.2.'
 description: |-
   Right now we support homebrew and scoop as well as direct downloads from the release page.
   Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
@@ -100,6 +104,14 @@ history:
   changes:
   - field: comment_added
 - at: 2026-10-31T01:00:46.787890+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T01:10:43.435695+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T01:35:54.643845+00:00
   actor: mallox
   changes:
   - field: comment_added

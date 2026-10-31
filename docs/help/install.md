@@ -10,11 +10,13 @@ LoTaR is not in Homebrew core. It ships as a formula in its own third-party tap,
 
 ```bash
 brew tap localtaskrepo/lotar
+brew trust localtaskrepo/lotar
 brew install lotar
 lotar --version
 ```
 
-`brew install localtaskrepo/lotar/lotar` does both steps in one command. On macOS the formula installs the
+Homebrew 6 and newer refuse formulae from third-party taps until you trust them, so `brew trust` is
+needed once per machine (older Homebrew has no `brew trust` command; skip that line). On macOS the formula installs the
 Apple Silicon or Intel build; on Linux (x64 or arm64) it installs the static musl build. Upgrade with
 `brew upgrade lotar`.
 

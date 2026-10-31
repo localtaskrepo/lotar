@@ -111,6 +111,11 @@ jobs:
 
           brew untap "${tap_ref}" >/dev/null 2>&1 || true
           brew tap --custom-remote "${tap_ref}" "${remote}"
+          # Homebrew 6+ refuses formulae from untrusted third-party taps, which is
+          # what users hit too; the install docs include the same step (DEV-250).
+          if brew help trust >/dev/null 2>&1; then
+            brew trust --tap "${tap_ref}"
+          fi
 
           tap_path="$(brew --repo "${tap_ref}")"
           cd "$tap_path"
