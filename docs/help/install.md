@@ -57,20 +57,20 @@ yet, so upgrade by installing the newer package.
 ## Any OS with Node.js: npm
 
 ```bash
-npm install --global lotar
+npm install --global @localtaskrepo/lotar
 lotar --version
 ```
 
-The `lotar` package installs the release binary for your platform (macOS, Linux, or Windows on x64 or
+The `@localtaskrepo/lotar` package installs the `lotar` command, using the release binary for your platform (macOS, Linux, or Windows on x64 or
 arm64; Windows on ARM runs the x64 build under emulation). npm picks the matching
 `@localtaskrepo/lotar-<platform>` package from its optional dependencies; there is no install script,
-so `--ignore-scripts` works. Node.js only starts the binary. Upgrade with `npm update --global lotar`.
+so `--ignore-scripts` works. Node.js only starts the binary. Upgrade with `npm update --global @localtaskrepo/lotar`.
 
-To run it without installing, use `npx -y lotar <command>`. For an MCP client, that makes the server
+To run it without installing, use `npx -y @localtaskrepo/lotar <command>`. For an MCP client, that makes the server
 configuration independent of how LoTaR is installed:
 
 ```json
-{ "command": "npx", "args": ["-y", "lotar", "mcp"] }
+{ "command": "npx", "args": ["-y", "@localtaskrepo/lotar", "mcp"] }
 ```
 
 Packages are published with npm provenance from the same release workflow as the binaries, starting

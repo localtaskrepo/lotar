@@ -20,7 +20,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-export const MAIN_PACKAGE = 'lotar';
+// Scoped: npm rejected the unscoped name `lotar` as too similar to tar, lokap and jotai.
+export const MAIN_PACKAGE = '@localtaskrepo/lotar';
+// Output directory of the main package (the scope is not part of the path).
+const MAIN_DIR = 'lotar';
 export const SCOPE = '@localtaskrepo';
 
 // npm platform -> release archive. Linux uses the static musl builds, which run
@@ -100,7 +103,7 @@ export function platformManifest(platform, version) {
     return {
         name: platformPackageName(platform),
         version,
-        description: `The lotar binary for ${platform.label}. Install the lotar package instead.`,
+        description: `The lotar binary for ${platform.label}. Install the @localtaskrepo/lotar package instead.`,
         ...SHARED,
         os: [platform.os],
         cpu: platform.cpu,
@@ -167,13 +170,13 @@ export function buildPackages({ tag, archives, out }) {
             writeFileSync(
                 path.join(dir, 'README.md'),
                 `# ${platformPackageName(platform)}\n\nThe lotar binary for ${platform.label}. ` +
-                    'Install [`lotar`](https://www.npmjs.com/package/lotar) instead; it picks this package for you.\n',
+                    'Install [`@localtaskrepo/lotar`](https://www.npmjs.com/package/@localtaskrepo/lotar) instead; it picks this package for you.\n',
             );
             writeJson(path.join(dir, 'package.json'), platformManifest(platform, version));
             order.push({ name: platformPackageName(platform), dir });
         }
 
-        const dir = path.join(out, MAIN_PACKAGE);
+        const dir = path.join(out, MAIN_DIR);
         cpSync(path.join(ROOT, 'packaging', 'npm', 'lotar'), dir, { recursive: true });
         chmodSync(path.join(dir, 'bin', 'lotar.js'), 0o755);
         copyFileSync(path.join(ROOT, 'LICENSE'), path.join(dir, 'LICENSE'));

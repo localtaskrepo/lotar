@@ -171,13 +171,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          spec="lotar@${LOTAR_VERSION:-latest}"
-          spec="${spec/@v/@}"
+          version="${LOTAR_VERSION:-latest}"
+          spec="@localtaskrepo/lotar@${version#v}"
           npm install --global "$spec"
           lotar --version
           if [ -n "${LOTAR_VERSION:-}" ]; then
             lotar --version | grep -q "${LOTAR_VERSION#v}"
           fi
           # Only the package for this platform is installed.
-          ls "$(npm root --global)/lotar/node_modules/@localtaskrepo"
+          ls "$(npm root --global)/@localtaskrepo/lotar/node_modules/@localtaskrepo"
           npx --yes "$spec" --version

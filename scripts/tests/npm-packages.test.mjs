@@ -29,7 +29,7 @@ test('release tags become npm versions and dist-tags', () => {
 
 test('the main package depends on every platform package at its own exact version', () => {
     const manifest = mainManifest('0.12.0');
-    assert.equal(manifest.name, 'lotar');
+    assert.equal(manifest.name, '@localtaskrepo/lotar');
     assert.deepEqual(manifest.bin, { lotar: 'bin/lotar.js' });
     assert.equal(manifest.scripts, undefined, 'no install scripts');
     assert.deepEqual(
@@ -120,7 +120,7 @@ test('buildPackages assembles one directory per package from the release archive
     assert.equal(summary.distTag, 'latest');
     assert.deepEqual(
         summary.packages.map((entry) => entry.name),
-        [...PLATFORMS.map(platformPackageName), 'lotar'],
+        [...PLATFORMS.map(platformPackageName), '@localtaskrepo/lotar'],
         'platform packages publish before the package that depends on them',
     );
     assert.deepEqual(JSON.parse(readFileSync(path.join(out, 'publish-order.json'), 'utf8')), summary);
@@ -139,7 +139,7 @@ test('buildPackages assembles one directory per package from the release archive
     const main = path.join(out, 'lotar');
     assert.deepEqual(JSON.parse(readFileSync(path.join(main, 'package.json'), 'utf8')), mainManifest('0.12.0'));
     assert.equal(statSync(path.join(main, 'bin', 'lotar.js')).mode & 0o111, 0o111);
-    assert.match(readFileSync(path.join(main, 'README.md'), 'utf8'), /npx -y lotar/);
+    assert.match(readFileSync(path.join(main, 'README.md'), 'utf8'), /npx -y @localtaskrepo\/lotar/);
 });
 
 test('buildPackages refuses a release with a missing archive', (t) => {

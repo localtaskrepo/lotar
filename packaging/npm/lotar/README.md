@@ -1,14 +1,14 @@
-# lotar
+# @localtaskrepo/lotar
 
 LoTaR is a git-native task manager: tasks live as YAML files in your repository, next to the code.
 It ships as one binary with a CLI, a web UI (`lotar serve`), and an MCP server (`lotar mcp`) for
 coding agents.
 
-This package installs the prebuilt binary for your platform (macOS, Linux, and Windows on x64 or
+This package installs the `lotar` command: the prebuilt binary for your platform (macOS, Linux, and Windows on x64 or
 arm64). Node.js only starts it; nothing is compiled and no install script runs.
 
 ```bash
-npm install --global lotar
+npm install --global @localtaskrepo/lotar
 lotar add "Fix the login redirect loop" --type bug --priority high
 lotar list
 lotar serve          # web UI on http://localhost:8080
@@ -17,7 +17,7 @@ lotar serve          # web UI on http://localhost:8080
 Or run it without installing:
 
 ```bash
-npx -y lotar list
+npx -y @localtaskrepo/lotar list
 ```
 
 ## MCP clients
@@ -27,11 +27,11 @@ Point an MCP client at `npx` to run the server over stdio:
 ```json
 {
   "command": "npx",
-  "args": ["-y", "lotar", "mcp"]
+  "args": ["-y", "@localtaskrepo/lotar", "mcp"]
 }
 ```
 
-Pin a version (`lotar@<version>`) if you want every session to use the same release.
+Pin a version (`@localtaskrepo/lotar@<version>`) if you want every session to use the same release.
 
 ## More
 

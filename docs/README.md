@@ -43,7 +43,7 @@ and the `.deb`/`.rpm` packages.
 
 **npm (any OS with Node.js)**
 ```bash
-npm install --global lotar          # or run it without installing: npx -y lotar list
+npm install --global @localtaskrepo/lotar   # or without installing: npx -y @localtaskrepo/lotar list
 ```
 
 **GitHub Releases (macOS • Linux • Windows)**

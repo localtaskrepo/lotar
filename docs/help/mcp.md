@@ -10,7 +10,7 @@ lotar mcp
 ```
 
 MCP clients start the server as a command over stdio. Use `lotar` with `args: ["mcp"]` when it is
-installed, or `npx` with `args: ["-y", "lotar", "mcp"]` to let npm fetch it (see
+installed, or `npx` with `args: ["-y", "@localtaskrepo/lotar", "mcp"]` to let npm fetch it (see
 [Installation](./install.md#any-os-with-nodejs-npm)).
 
 Environment:

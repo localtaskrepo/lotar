@@ -28,7 +28,7 @@ function binaryPath(platform = process.platform, arch = process.arch, resolve = 
         return resolve(`${pkg}/bin/${file}`);
     } catch {
         throw new Error(
-            `${pkg} is not installed. It is an optional dependency of lotar, so reinstall without ` +
+            `${pkg} is not installed. It is an optional dependency of @localtaskrepo/lotar, so reinstall without ` +
                 `--omit=optional or --no-optional, or see ${INSTALL_DOCS}.`,
         );
     }

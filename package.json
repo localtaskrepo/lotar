@@ -1,5 +1,5 @@
 {
-  "name": "@localtaskrepo/lotar",
+  "name": "@localtaskrepo/lotar-workspace",
   "version": "0.1.0",
   "private": true,
   "description": "A task and project management tool that runs locally and can be synced via repo",

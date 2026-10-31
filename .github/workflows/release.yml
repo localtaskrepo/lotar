@@ -559,7 +559,7 @@ jobs:
               '## Install Script',
               '- Linux and macOS: `curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh`',
               '- Windows: `irm https://localtaskrepo.github.io/lotar/install.ps1 | iex`',
-              `- npm: \`npm install --global lotar@${dockerTag}\` or \`npx -y lotar@${dockerTag}\``,
+              `- npm: \`npm install --global @localtaskrepo/lotar@${dockerTag}\` or \`npx -y @localtaskrepo/lotar@${dockerTag}\``,
               '',
               '## Docker Image',
               `- \`mallox/lotar:${dockerTag}\` ([Docker Hub tag](${dockerUrl}))`,

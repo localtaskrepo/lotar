@@ -12,7 +12,7 @@ automation and the manual checks to run after every tag.
   - Signed tarballs/zips for every supported target, attached to the GitHub Release page.
   - Signed `.deb` and `.rpm` packages for x64 and arm64, built with nfpm from the static
     musl binaries (`packaging/nfpm.yaml`), attached to the same release.
-  - npm packages: `lotar` (a small Node launcher) and one `@localtaskrepo/lotar-<platform>`
+  - npm packages: `@localtaskrepo/lotar` (a small Node launcher that installs the `lotar` command) and one `@localtaskrepo/lotar-<platform>`
     package per binary, assembled by `scripts/npm-packages.mjs` from the release archives.
   - Docker image `mallox/lotar:<version>` built via Buildx.
   - Homebrew tap update pushed to `localtaskrepo/homebrew-lotar`. The formula installs the
@@ -100,7 +100,7 @@ So the first version of each package is published by hand from a maintainer's ma
    ```bash
    for p in @localtaskrepo/lotar-darwin-arm64 @localtaskrepo/lotar-darwin-x64 \
             @localtaskrepo/lotar-linux-arm64 @localtaskrepo/lotar-linux-x64 \
-            @localtaskrepo/lotar-win32-x64 lotar; do
+            @localtaskrepo/lotar-win32-x64 @localtaskrepo/lotar; do
      npm trust github "$p" --repo localtaskrepo/lotar --file release.yml --allow-publish --yes
      sleep 2
    done
@@ -127,7 +127,7 @@ publisher matching this repository and `release.yml`, or its configuration expir
    - `build-and-release`: compiles, signs, and uploads release assets.
    - `package-linux`: builds `.deb`/`.rpm` packages from the uploaded musl archives,
      signs them, and uploads them. Homebrew, Scoop, and Docker do not wait for it.
-   - `publish-npm`: publishes the platform packages, then `lotar`, with npm provenance.
+   - `publish-npm`: publishes the platform packages, then `@localtaskrepo/lotar`, with npm provenance.
      Versions that are already on npm are skipped, so the job can be re-run. Prerelease
      tags (`v1.0.0-rc.1`) publish under the `next` dist-tag instead of `latest`.
    - `update-release-page`: injects quick download links and snapshot-linked
