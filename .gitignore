@@ -16,3 +16,6 @@ node_modules/
 .tasks/**/.sprints.lock
 .tasks/**/.attachments-store.lock
 .tasks-demo/
+
+# npm first-publish workspace (docs/release-guide.md, DEV-250)
+/npm-bootstrap/

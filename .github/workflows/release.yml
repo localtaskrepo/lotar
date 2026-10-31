@@ -409,8 +409,8 @@ jobs:
     name: Publish npm packages
     # The lotar package plus one @localtaskrepo/lotar-<platform> package per
     # binary, assembled from the uploaded archives (DEV-250). Publishes with npm
-    # trusted publishing (OIDC); NPM_TOKEN is only for bootstrapping packages
-    # that do not exist on npm yet (see docs/release-guide.md).
+    # trusted publishing (OIDC), which each package must have configured; see
+    # "One-Time npm Setup" in docs/release-guide.md.
     needs: build-and-release
     runs-on: ubuntu-latest
     permissions:
@@ -467,14 +467,8 @@ jobs:
 
       - name: Publish packages
         shell: bash
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -n "${NPM_TOKEN}" ]; then
-            echo "Using NPM_TOKEN; remove it once trusted publishing is configured for every package."
-            npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
-          fi
           version="$(jq -r .version npm-dist/publish-order.json)"
           dist_tag="$(jq -r .distTag npm-dist/publish-order.json)"
           # Platform packages come first, so lotar never points at missing versions.

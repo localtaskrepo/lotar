@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-31T00:09:43.667370+00:00
+modified: 2026-10-31T00:32:45.274809+00:00
 relationships:
   related:
   - DEV-251
@@ -31,6 +31,8 @@ comments:
     Remaining: user creates npm org localtaskrepo and bootstraps the first publish (docs/release-guide.md One-Time npm Setup), then configures trusted publishing for the 6 packages and revokes the token. GitHub-only checks still pending: package-linux, publish-npm (OIDC + provenance), install-verify and homebrew-verify runs. Later candidates: winget, AUR lotar-bin.
 - date: 2026-10-31T00:09:43.667370+00:00
   text: 'CI: QA on f4b0d79 (and so 349b236) failed in Windows Binary Sanity: test:release runs on Windows, where the buildPackages test needs zip and Unix exec bits. That case now skips on win32 (packaging only runs on the Linux release runner); the other npm tests already passed on Windows. Release is blocked until a commit with this fix is QA-green.'
+- date: 2026-10-31T00:32:45.274809+00:00
+  text: 'v0.11.1 release: every job passed except publish-npm. The bootstrap token got E404 on PUT @localtaskrepo/lotar-darwin-arm64 (no publish rights in the new scope); nothing was published. npm 11.20 docs: npm trust needs the package to exist and an interactive 2FA login (bypass-2FA tokens unsupported); bypass-2FA tokens lose direct publishing in Jan 2027; trusted publishing configs expire after 48h until their first publish. Changed approach: removed the NPM_TOKEN path from publish-npm; release-guide One-Time npm Setup now = create org, build + publish the first version by hand (npm login, 6x npm publish --access public), then npm trust github <pkg> --repo localtaskrepo/lotar --file release.yml --allow-publish shortly before the next tag. Built the v0.11.1 packages from the release archives (checksums OK) for the user to publish. Next: user publishes, deletes the NPM_TOKEN secret and revokes the token; configure trust right before the next release, then run install-verify.'
 description: |-
   Right now we support homebrew and scoop as well as direct downloads from the release page.
   Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
@@ -76,6 +78,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-10-31T00:09:43.667370+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T00:32:45.274809+00:00
   actor: mallox
   changes:
   - field: comment_added

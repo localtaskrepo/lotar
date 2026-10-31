@@ -66,26 +66,55 @@ automation and the manual checks to run after every tag.
 ## One-Time npm Setup
 
 `publish-npm` uses npm trusted publishing: GitHub Actions proves its identity to npm, so no
-long-lived token is stored. npm can only enable that for packages that already exist, so the
-first version of each package is published with a temporary token:
+token is stored. npm only allows that for packages that already exist, and tokens that bypass
+two-factor authentication can neither configure it nor (from January 2027) publish directly.
+So the first version of each package is published by hand from a maintainer's machine:
 
 1. On npmjs.com, create the free organization `localtaskrepo` (it owns the
-   `@localtaskrepo/lotar-*` platform packages).
-2. Create a granular access token with read and write access to all packages, **Bypass
-   two-factor authentication** enabled, and the shortest expiry that covers the next release.
-   Store it as the repository secret `NPM_TOKEN`.
-3. Cut a release as usual, or re-run `publish-npm` for the latest one. It publishes all six
-   packages: `lotar`, `@localtaskrepo/lotar-darwin-arm64`, `-darwin-x64`, `-linux-arm64`,
-   `-linux-x64`, and `-win32-x64`.
-4. For each of those packages, open **Settings → Trusted publishing** on npmjs.com and add a
-   GitHub Actions publisher: organization `localtaskrepo`, repository `lotar`, workflow
-   `release.yml`, no environment. Then select **Require two-factor authentication and
-   disallow tokens** for that package.
-5. Delete the `NPM_TOKEN` secret and revoke the token. Later releases publish through OIDC.
+   `@localtaskrepo/lotar-*` platform packages). Two-factor authentication must be on for the
+   account.
+2. Build the packages from a published release and publish them, platform packages first:
+
+   ```bash
+   TAG=v0.11.1
+   mkdir -p npm-bootstrap/downloads && cd npm-bootstrap
+   for p in macos-arm64 macos-x64 linux-musl-arm64 linux-musl-x64 windows-x64; do
+     ext=tar.gz; [ "$p" = windows-x64 ] && ext=zip
+     gh release download "$TAG" --repo localtaskrepo/lotar --dir downloads \
+       --pattern "lotar-$TAG-$p.$ext" --pattern "lotar-$TAG-$p.sha256"
+   done
+   node ../scripts/npm-packages.mjs --tag "$TAG" --archives downloads --out dist
+   npm login
+   for d in lotar-darwin-arm64 lotar-darwin-x64 lotar-linux-arm64 lotar-linux-x64 lotar-win32-x64 lotar; do
+     (cd "dist/$d" && npm publish --access public) || break
+   done
+   ```
+
+   Each publish asks for two-factor authentication; the npm website offers to skip it for
+   the next five minutes. Versions published this way have no provenance statement; later
+   releases from the workflow do.
+3. Shortly before tagging the next release, connect every package to the release workflow.
+   npm expires a trusted publishing configuration that has not published within 48 hours,
+   so do not do this days ahead:
+
+   ```bash
+   for p in @localtaskrepo/lotar-darwin-arm64 @localtaskrepo/lotar-darwin-x64 \
+            @localtaskrepo/lotar-linux-arm64 @localtaskrepo/lotar-linux-x64 \
+            @localtaskrepo/lotar-win32-x64 lotar; do
+     npm trust github "$p" --repo localtaskrepo/lotar --file release.yml --allow-publish --yes
+     sleep 2
+   done
+   ```
+
+   This needs npm 11.15.0 or newer and an interactive login (not a token). The same settings
+   are under **Settings → Trusted publishing** for each package on npmjs.com.
+4. Optionally select **Require two-factor authentication and disallow tokens** for each
+   package once its first workflow publish succeeds.
 
 The job needs npm 11.5.1 or newer for trusted publishing and installs it if the runner's
-Node.js bundles an older npm. If a publish fails with `E404` after setup, the trusted
-publisher settings do not match the workflow (organization, repository, or file name).
+Node.js bundles an older npm. If a publish fails with `E404`, the package has no trusted
+publisher matching this repository and `release.yml`, or its configuration expired; check
+`npm trust list <package>`.
 
 ## Cutting a Release
 
