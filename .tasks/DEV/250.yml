@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-31T00:44:01.779312+00:00
+modified: 2026-10-31T01:00:46.787890+00:00
 relationships:
   related:
   - DEV-251
@@ -35,6 +35,10 @@ comments:
   text: 'v0.11.1 release: every job passed except publish-npm. The bootstrap token got E404 on PUT @localtaskrepo/lotar-darwin-arm64 (no publish rights in the new scope); nothing was published. npm 11.20 docs: npm trust needs the package to exist and an interactive 2FA login (bypass-2FA tokens unsupported); bypass-2FA tokens lose direct publishing in Jan 2027; trusted publishing configs expire after 48h until their first publish. Changed approach: removed the NPM_TOKEN path from publish-npm; release-guide One-Time npm Setup now = create org, build + publish the first version by hand (npm login, 6x npm publish --access public), then npm trust github <pkg> --repo localtaskrepo/lotar --file release.yml --allow-publish shortly before the next tag. Built the v0.11.1 packages from the release archives (checksums OK) for the user to publish. Next: user publishes, deletes the NPM_TOKEN secret and revokes the token; configure trust right before the next release, then run install-verify.'
 - date: 2026-10-31T00:44:01.779312+00:00
   text: 'First manual publish: npm rejected unscoped ''lotar'' (E403, too similar to tar, lokap, jotai); none of the platform packages are on npm either, so nothing to clean up. User chose @localtaskrepo/lotar as the main package (command stays lotar). Renamed in scripts/npm-packages.mjs (output dir stays dist/lotar), tests, launcher message, npm README, install.md, mcp.md, README, docs/README, homepage, release page npm line, release-guide trust loop, install-verify npm job (nested path @localtaskrepo/lotar/node_modules/@localtaskrepo). Root workspace package renamed to @localtaskrepo/lotar-workspace (private) to avoid two packages with one name. Rebuilt v0.11.1 packages; Verdaccio publish of all 6 + node:24 global install, npx, MCP initialize OK; test:release 40/40, lint and actionlint clean. Next: user publishes the 6 rebuilt packages, then npm trust before the next tag.'
+- date: 2026-10-31T00:51:06.450620+00:00
+  text: 'npm v0.11.1 published by hand: all 6 packages exist in the org (npm access list); public view lagged a few minutes each time. npm trust cannot run from the agent shell: without a TTY it fails with EOTP and a one-time browser link, so no trust config was created (3 attempts failed before the loop was stopped). User runs the loop interactively (script in the session scratchpad, same as release-guide step 3). NPM_TOKEN token revoked by user, but the repo secret still exists (unused by the workflow). Next: trust loop within 48h of the next tag, then install-verify.'
+- date: 2026-10-31T01:00:46.787890+00:00
+  text: 'NPM_TOKEN repo secret deleted by user (confirmed via gh secret list). Remaining: user runs the npm trust loop within 48h of the next tag; after that release, run install-verify (npm, deb/rpm, scripts) and homebrew-verify with the tag, then close.'
 description: |-
   Right now we support homebrew and scoop as well as direct downloads from the release page.
   Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
@@ -88,6 +92,14 @@ history:
   changes:
   - field: comment_added
 - at: 2026-10-31T00:44:01.779312+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T00:51:06.450620+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T01:00:46.787890+00:00
   actor: mallox
   changes:
   - field: comment_added
