@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-30T23:49:36.532826+00:00
+modified: 2026-10-31T00:09:43.667370+00:00
 relationships:
   related:
   - DEV-251
@@ -29,6 +29,8 @@ comments:
     Outcome (npm, uncommitted at time of writing): packaging/npm/lotar (CommonJS launcher bin/lotar.js: maps platform-arch to @localtaskrepo/lotar-<platform>, win32-arm64 -> win32-x64, inherits stdio, forwards SIGTERM/SIGHUP, re-raises child signals, clear errors for unsupported platform or omitted optional dep; npm README with npx/MCP usage). scripts/npm-packages.mjs builds 5 platform packages (os/cpu, exec bit, preferUnplugged) + main lotar (exact-version optionalDependencies, no scripts) and publish-order.json; scripts/tests/npm-packages.test.mjs (7 cases, in test:release). release.yml publish-npm job: Node 24, npm >= 11.5.1 check, downloads + checks 5 archives, assembles, publishes platform packages then lotar with --provenance, skips published versions, dist-tag next for prereleases, NPM_TOKEN only for bootstrap; release page lists npm. install-verify gains an npm job (5 OSes, dispatch only). Root package.json private: true (named @localtaskrepo/lotar). ESLint override for the CommonJS launcher. Docs: install.md npm section, mcp.md client command, README, docs/README, homepage 'Script & npm' tab, release-guide one-time npm setup (org, temporary granular token, trusted publisher per package, revoke).
     Evidence: local run of the real download step caught and fixed a CRLF bug in the Windows .sha256 (sha256sum --check failed); now passes with GNU tools. Assembled packages from v0.11.0 (pack contents and 755 modes checked), published all 6 to a throwaway Verdaccio registry with the real publish step (provenance flag removed), rerun skipped all 6. node:24 arm64 and x64: npm i -g installs only the matching platform package, lotar --version and npx -y lotar work, MCP initialize round-trips through the launcher, exit codes match the binary, SIGTERM to the launcher stops the binary; project install with --omit=optional shows the intended error (global installs ignore --omit=optional). actionlint clean except the pre-existing SC2193; npm run lint:agent clean; npm run test:release 40/40. Rust/UI tests and smoke not rerun (no app code changed).
     Remaining: user creates npm org localtaskrepo and bootstraps the first publish (docs/release-guide.md One-Time npm Setup), then configures trusted publishing for the 6 packages and revokes the token. GitHub-only checks still pending: package-linux, publish-npm (OIDC + provenance), install-verify and homebrew-verify runs. Later candidates: winget, AUR lotar-bin.
+- date: 2026-10-31T00:09:43.667370+00:00
+  text: 'CI: QA on f4b0d79 (and so 349b236) failed in Windows Binary Sanity: test:release runs on Windows, where the buildPackages test needs zip and Unix exec bits. That case now skips on win32 (packaging only runs on the Linux release runner); the other npm tests already passed on Windows. Release is blocked until a commit with this fix is QA-green.'
 description: |-
   Right now we support homebrew and scoop as well as direct downloads from the release page.
   Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
@@ -70,6 +72,10 @@ history:
     old: '{"related":["DEV-251"]}'
     new: '{"related":["DEV-251","DEV-252"]}'
 - at: 2026-10-30T23:49:36.532826+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T00:09:43.667370+00:00
   actor: mallox
   changes:
   - field: comment_added

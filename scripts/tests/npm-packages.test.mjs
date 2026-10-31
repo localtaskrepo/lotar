@@ -92,7 +92,12 @@ test('the launcher resolves the binary or explains why it cannot', () => {
     );
 });
 
-test('buildPackages assembles one directory per package from the release archives', (t) => {
+// buildPackages runs on the Linux release runner: it shells out to tar and
+// unzip and sets Unix executable bits, which Windows CI lanes do not have.
+const UNIX_ONLY =
+    process.platform === 'win32' && 'release packaging runs on Linux; needs zip, unzip and Unix file modes';
+
+test('buildPackages assembles one directory per package from the release archives', { skip: UNIX_ONLY }, (t) => {
     const work = mkdtempSync(path.join(os.tmpdir(), 'lotar-npm-test-'));
     t.after(() => rmSync(work, { recursive: true, force: true }));
     const tag = 'v0.12.0';
