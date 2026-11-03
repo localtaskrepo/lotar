@@ -243,11 +243,17 @@ impl EnvOverrideSnapshot {
     pub fn applied_keys(&self) -> &HashSet<&'static str> {
         &self.report.applied_keys
     }
+
+    /// Canonical flat config fields set by environment variables.
+    pub fn applied_fields(&self) -> &HashSet<&'static str> {
+        &self.report.applied_fields
+    }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct EnvOverrideReport {
     pub applied_keys: HashSet<&'static str>,
+    pub applied_fields: HashSet<&'static str>,
     pub errors: Vec<EnvOverrideError>,
 }
 
@@ -279,6 +285,7 @@ pub fn apply_env_overrides(config: &mut GlobalConfig) -> EnvOverrideReport {
                     match apply_field_to_global_config(config, definition.field, &raw_value) {
                         Ok(()) => {
                             report.applied_keys.insert(definition.key);
+                            report.applied_fields.insert(definition.field);
                         }
                         Err(err) => {
                             report.errors.push(EnvOverrideError {

@@ -55,6 +55,8 @@ fn config_fingerprint(tasks_dir: Option<&Path>, project: Option<&str>) -> String
 #[derive(Clone)]
 struct CliOverrideLayer {
     config: GlobalConfig,
+    /// Canonical fields named by `--config` (DEV-265 presence).
+    keys: LayerKeys,
     signature: String,
     /// Explicitly requested server port from the normalized `--config`
     /// pairs, independent of value: a request for the built-in default
@@ -194,6 +196,7 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
 
     set_cli_override_layer(Some(CliOverrideLayer {
         config: overlay,
+        keys: LayerKeys::from_fields(normalized.keys().cloned()),
         signature,
         port_override,
     }));
@@ -203,7 +206,7 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
 
 pub fn apply_cli_overrides(resolved: &mut ResolvedConfig) {
     if let Some(layer) = active_cli_override_layer() {
-        overlay_global_into_resolved(resolved, layer.config);
+        overlay_global_into_resolved_with(resolved, layer.config, &layer.keys);
         // server_port is applied by presence, not by differs-from-default:
         // the merge-by-value overlay would silently drop an explicit
         // `--config server.port=8080` over a lower layer's 9999.
@@ -312,10 +315,11 @@ pub fn preview_base_resolved(global_layer: &GlobalConfig) -> ResolvedConfig {
     let mut config = GlobalConfig::default();
     merge_global_config(&mut config, global_layer.clone());
     if let Ok(home_config) = crate::config::persistence::load_home_config() {
-        merge_global_config(&mut config, home_config);
+        merge_global_config_with(&mut config, home_config, &home_layer_keys());
     }
     let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    merge_global_config(&mut config, env_snapshot.global);
+    let env_keys = env_layer_keys(&env_snapshot);
+    merge_global_config_with(&mut config, env_snapshot.global, &env_keys);
     let mut resolved = ResolvedConfig::from_global(config);
     apply_cli_overrides(&mut resolved);
     // Presence-aware port precedence (env > home) without re-reading the
@@ -337,10 +341,11 @@ pub fn preview_project_resolved(
     merge_global_config(&mut base_global, global_layer.clone());
     let mut resolved = ResolvedConfig::from_global(base_global);
     if let Ok(home_config) = crate::config::persistence::load_home_config() {
-        overlay_global_into_resolved(&mut resolved, home_config);
+        overlay_global_into_resolved_with(&mut resolved, home_config, &home_layer_keys());
     }
     let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    overlay_global_into_resolved(&mut resolved, env_snapshot.global.clone());
+    let env_keys = env_layer_keys(&env_snapshot);
+    overlay_global_into_resolved_with(&mut resolved, env_snapshot.global.clone(), &env_keys);
     apply_project_config_overrides(&mut resolved, project_config.clone());
     apply_cli_overrides(&mut resolved);
     apply_server_port_presence(&mut resolved, None);
@@ -441,12 +446,13 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
 
     // 2. Home config (~/.lotar) - higher priority
     if let Ok(home_config) = crate::config::persistence::load_home_config() {
-        merge_global_config(&mut config, home_config);
+        merge_global_config_with(&mut config, home_config, &home_layer_keys());
     }
 
     // 1. Environment variables (highest priority)
     let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    merge_global_config(&mut config, env_snapshot.global);
+    let env_keys = env_layer_keys(&env_snapshot);
+    merge_global_config_with(&mut config, env_snapshot.global, &env_keys);
 
     let mut resolved = ResolvedConfig::from_global(config);
     apply_cli_overrides(&mut resolved);
@@ -489,20 +495,158 @@ pub fn config_for_project(
     }
 }
 
-/// Improved merging that only overrides non-default values
+/// [`config_for_project`] for writes: a config file that exists but does not
+/// parse is an error instead of being skipped (DEV-265: a typo used to turn
+/// off status/type/priority validation for REST and MCP writes).
+pub fn config_for_project_strict(
+    tasks_dir: &Path,
+    project: Option<&str>,
+) -> Result<ResolvedConfig, ConfigError> {
+    let check = |result: Result<_, ConfigError>, what: &str| match result {
+        Ok(_) | Err(ConfigError::FileNotFound(_)) => Ok(()),
+        Err(ConfigError::ParseError(detail)) => {
+            Err(ConfigError::ParseError(format!("{what}: {detail}")))
+        }
+        Err(err) => Err(ConfigError::ParseError(format!("{what}: {err}"))),
+    };
+    check(
+        crate::config::persistence::load_global_config(Some(tasks_dir)),
+        "Invalid global config (.tasks/config.yml)",
+    )?;
+    if crate::config::persistence::home_config_honored() {
+        check(
+            crate::config::persistence::load_home_config(),
+            "Invalid home config (~/.lotar)",
+        )?;
+    }
+    if let Some(prefix) = project.map(str::trim).filter(|p| !p.is_empty())
+        && crate::utils::paths::project_config_path(tasks_dir, prefix).exists()
+    {
+        crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir).map_err(
+            |err| {
+                let detail = match err {
+                    ConfigError::ParseError(detail) => detail,
+                    other => other.to_string(),
+                };
+                ConfigError::ParseError(format!("Invalid project config for {prefix}: {detail}"))
+            },
+        )?;
+    }
+    config_for_project(tasks_dir, project)
+}
+
+/// The canonical flat config fields a layer set explicitly (DEV-265).
+#[derive(Debug, Clone, Default)]
+pub struct LayerKeys(std::collections::HashSet<String>);
+
+impl LayerKeys {
+    pub fn from_fields<I, S>(fields: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self(fields.into_iter().map(Into::into).collect())
+    }
+
+    /// Keys a config file sets, from its nested, dotted or flat spellings.
+    pub fn from_file(path: &Path) -> Self {
+        let Ok(content) = std::fs::read_to_string(path) else {
+            return Self::default();
+        };
+        let Ok(value) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&content) else {
+            return Self::default();
+        };
+        let mut keys = std::collections::HashSet::new();
+        collect_layer_keys(&value, "", &mut keys);
+        Self(keys)
+    }
+
+    /// Whether the layer set this field. Struct-valued fields count as set
+    /// when any of their flat sub-fields is (`agent_worktree_enabled`).
+    pub fn has(&self, field: &str) -> bool {
+        if self.0.contains(field) {
+            return true;
+        }
+        matches!(field, "agent_worktree" | "sprints")
+            && self.0.iter().any(|key| {
+                key.strip_prefix(field)
+                    .is_some_and(|rest| rest.starts_with('_'))
+            })
+    }
+}
+
+fn collect_layer_keys(
+    value: &serde_yaml_ng::Value,
+    prefix: &str,
+    keys: &mut std::collections::HashSet<String>,
+) {
+    let Some(map) = value.as_mapping() else {
+        return;
+    };
+    for (key, child) in map {
+        let Some(key) = key.as_str() else {
+            continue;
+        };
+        let path = if prefix.is_empty() {
+            key.to_string()
+        } else {
+            format!("{prefix}.{key}")
+        };
+        if let Some(flat) = crate::config::fields::flat_for_alias(&path) {
+            keys.insert(flat.to_string());
+            continue;
+        }
+        let flat_candidate = path.replace('.', "_");
+        if crate::config::fields::settable_fields(true).contains(&flat_candidate.as_str())
+            || crate::config::fields::settable_fields(false).contains(&flat_candidate.as_str())
+        {
+            keys.insert(flat_candidate);
+            continue;
+        }
+        collect_layer_keys(child, &path, keys);
+    }
+}
+
+fn home_layer_keys() -> LayerKeys {
+    if !crate::config::persistence::home_config_honored() {
+        return LayerKeys::default();
+    }
+    dirs::home_dir()
+        .map(|home| LayerKeys::from_file(&home.join(".lotar")))
+        .unwrap_or_default()
+}
+
+fn env_layer_keys(snapshot: &crate::config::env_overrides::EnvOverrideSnapshot) -> LayerKeys {
+    LayerKeys::from_fields(snapshot.applied_fields().iter().copied())
+}
+
+/// Merge a lower-precedence-aware layer: a field is taken from
+/// `override_config` when it differs from the built-in default.
 pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfig) {
-    // Only override fields that are different from defaults
+    merge_global_config_with(base, override_config, &LayerKeys::default());
+}
+
+/// Like [`merge_global_config`], but a field the layer explicitly set
+/// (listed in `keys`) wins even when it equals the built-in default
+/// (DEV-265: `LOTAR_AUTO_SET_REPORTER=true` over a global `false`).
+pub fn merge_global_config_with(
+    base: &mut GlobalConfig,
+    override_config: GlobalConfig,
+    keys: &LayerKeys,
+) {
     let defaults = GlobalConfig::default();
 
-    if override_config.server_port != defaults.server_port {
+    if keys.has("server_port") || override_config.server_port != defaults.server_port {
         base.server_port = override_config.server_port;
     }
-    if override_config.default_project != defaults.default_project {
+    if keys.has("default_project") || override_config.default_project != defaults.default_project {
         base.default_project = override_config.default_project;
     }
 
     // For configurable fields, we do full replacement if they differ
-    if override_config.issue_states.values != defaults.issue_states.values {
+    if keys.has("issue_states")
+        || override_config.issue_states.values != defaults.issue_states.values
+    {
         base.issue_states = override_config.issue_states;
     }
     // issue.done_states is presence-based: an explicit override wins even
@@ -510,13 +654,16 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.issue_done_states.is_some() {
         base.issue_done_states = override_config.issue_done_states;
     }
-    if override_config.issue_types.values != defaults.issue_types.values {
+    if keys.has("issue_types") || override_config.issue_types.values != defaults.issue_types.values
+    {
         base.issue_types = override_config.issue_types;
     }
-    if override_config.issue_priorities.values != defaults.issue_priorities.values {
+    if keys.has("issue_priorities")
+        || override_config.issue_priorities.values != defaults.issue_priorities.values
+    {
         base.issue_priorities = override_config.issue_priorities;
     }
-    if override_config.tags.values != defaults.tags.values {
+    if keys.has("tags") || override_config.tags.values != defaults.tags.values {
         base.tags = override_config.tags;
     }
     // Tag properties merge per tag: a later layer wins for the tags it names.
@@ -535,65 +682,97 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if !override_config.members.is_empty() {
         base.members = override_config.members;
     }
-    if override_config.strict_members != defaults.strict_members {
+    if keys.has("strict_members") || override_config.strict_members != defaults.strict_members {
         base.strict_members = override_config.strict_members;
     }
-    if override_config.auto_populate_members != defaults.auto_populate_members {
+    if keys.has("auto_populate_members")
+        || override_config.auto_populate_members != defaults.auto_populate_members
+    {
         base.auto_populate_members = override_config.auto_populate_members;
     }
-    if override_config.auto_set_reporter != defaults.auto_set_reporter {
+    if keys.has("auto_set_reporter")
+        || override_config.auto_set_reporter != defaults.auto_set_reporter
+    {
         base.auto_set_reporter = override_config.auto_set_reporter;
     }
-    if override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships {
+    if keys.has("auto_reciprocal_relationships")
+        || override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships
+    {
         base.auto_reciprocal_relationships = override_config.auto_reciprocal_relationships;
     }
-    if override_config.auto_link_mentions != defaults.auto_link_mentions {
+    if keys.has("auto_link_mentions")
+        || override_config.auto_link_mentions != defaults.auto_link_mentions
+    {
         base.auto_link_mentions = override_config.auto_link_mentions;
     }
-    if override_config.auto_assign_on_status != defaults.auto_assign_on_status {
+    if keys.has("auto_assign_on_status")
+        || override_config.auto_assign_on_status != defaults.auto_assign_on_status
+    {
         base.auto_assign_on_status = override_config.auto_assign_on_status;
     }
-    if override_config.auto_codeowners_assign != defaults.auto_codeowners_assign {
+    if keys.has("auto_codeowners_assign")
+        || override_config.auto_codeowners_assign != defaults.auto_codeowners_assign
+    {
         base.auto_codeowners_assign = override_config.auto_codeowners_assign;
     }
-    if override_config.auto_tags_from_path != defaults.auto_tags_from_path {
+    if keys.has("auto_tags_from_path")
+        || override_config.auto_tags_from_path != defaults.auto_tags_from_path
+    {
         base.auto_tags_from_path = override_config.auto_tags_from_path;
     }
-    if override_config.auto_branch_infer_type != defaults.auto_branch_infer_type {
+    if keys.has("auto_branch_infer_type")
+        || override_config.auto_branch_infer_type != defaults.auto_branch_infer_type
+    {
         base.auto_branch_infer_type = override_config.auto_branch_infer_type;
     }
-    if override_config.auto_branch_infer_status != defaults.auto_branch_infer_status {
+    if keys.has("auto_branch_infer_status")
+        || override_config.auto_branch_infer_status != defaults.auto_branch_infer_status
+    {
         base.auto_branch_infer_status = override_config.auto_branch_infer_status;
     }
-    if override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority {
+    if keys.has("auto_branch_infer_priority")
+        || override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority
+    {
         base.auto_branch_infer_priority = override_config.auto_branch_infer_priority;
     }
-    if override_config.default_priority != defaults.default_priority {
+    if keys.has("default_priority") || override_config.default_priority != defaults.default_priority
+    {
         base.default_priority = override_config.default_priority;
     }
-    if override_config.default_status != defaults.default_status {
+    if keys.has("default_status") || override_config.default_status != defaults.default_status {
         base.default_status = override_config.default_status;
     }
-    if override_config.custom_fields.values != defaults.custom_fields.values {
+    if keys.has("custom_fields")
+        || override_config.custom_fields.values != defaults.custom_fields.values
+    {
         base.custom_fields = override_config.custom_fields;
     }
 
-    if override_config.attachments_dir != defaults.attachments_dir {
+    if keys.has("attachments_dir") || override_config.attachments_dir != defaults.attachments_dir {
         base.attachments_dir = override_config.attachments_dir;
     }
-    if override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
+    if keys.has("attachments_max_upload_mb")
+        || override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb
+    {
         base.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
     }
-    if override_config.sync_reports_dir != defaults.sync_reports_dir {
+    if keys.has("sync_reports_dir") || override_config.sync_reports_dir != defaults.sync_reports_dir
+    {
         base.sync_reports_dir = override_config.sync_reports_dir;
     }
-    if override_config.sync_write_reports != defaults.sync_write_reports {
+    if keys.has("sync_write_reports")
+        || override_config.sync_write_reports != defaults.sync_write_reports
+    {
         base.sync_write_reports = override_config.sync_write_reports;
     }
-    if override_config.agent_context_enabled != defaults.agent_context_enabled {
+    if keys.has("agent_context_enabled")
+        || override_config.agent_context_enabled != defaults.agent_context_enabled
+    {
         base.agent_context_enabled = override_config.agent_context_enabled;
     }
-    if override_config.agent_context_extension != defaults.agent_context_extension {
+    if keys.has("agent_context_extension")
+        || override_config.agent_context_extension != defaults.agent_context_extension
+    {
         base.agent_context_extension = override_config.agent_context_extension;
     }
     if override_config.agent_logs_dir.is_some() {
@@ -623,28 +802,37 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if !override_config.agents.is_empty() {
         base.agents.extend(override_config.agents);
     }
-    if override_config.agent_automation != defaults.agent_automation {
+    if keys.has("agent_automation") || override_config.agent_automation != defaults.agent_automation
+    {
         base.agent_automation = override_config.agent_automation;
     }
-    if override_config.agent_worktree != defaults.agent_worktree {
+    if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
         base.agent_worktree = override_config.agent_worktree;
     }
-    if override_config.scan_signal_words != defaults.scan_signal_words {
+    if keys.has("scan_signal_words")
+        || override_config.scan_signal_words != defaults.scan_signal_words
+    {
         base.scan_signal_words = override_config.scan_signal_words;
     }
-    if override_config.scan_strip_attributes != defaults.scan_strip_attributes {
+    if keys.has("scan_strip_attributes")
+        || override_config.scan_strip_attributes != defaults.scan_strip_attributes
+    {
         base.scan_strip_attributes = override_config.scan_strip_attributes;
     }
     if override_config.scan_ticket_patterns.is_some() {
         base.scan_ticket_patterns = override_config.scan_ticket_patterns;
     }
-    if override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
+    if keys.has("scan_enable_ticket_words")
+        || override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words
+    {
         base.scan_enable_ticket_words = override_config.scan_enable_ticket_words;
     }
-    if override_config.scan_enable_mentions != defaults.scan_enable_mentions {
+    if keys.has("scan_enable_mentions")
+        || override_config.scan_enable_mentions != defaults.scan_enable_mentions
+    {
         base.scan_enable_mentions = override_config.scan_enable_mentions;
     }
-    if override_config.sprints != defaults.sprints {
+    if keys.has("sprints") || override_config.sprints != defaults.sprints {
         base.sprints = override_config.sprints;
     }
     if !override_config.branch_type_aliases.is_empty() {
@@ -656,10 +844,12 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if !override_config.branch_priority_aliases.is_empty() {
         base.branch_priority_aliases = override_config.branch_priority_aliases;
     }
-    if override_config.auto_identity != defaults.auto_identity {
+    if keys.has("auto_identity") || override_config.auto_identity != defaults.auto_identity {
         base.auto_identity = override_config.auto_identity;
     }
-    if override_config.auto_identity_git != defaults.auto_identity_git {
+    if keys.has("auto_identity_git")
+        || override_config.auto_identity_git != defaults.auto_identity_git
+    {
         base.auto_identity_git = override_config.auto_identity_git;
     }
 
@@ -675,29 +865,44 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
 /// non-default override semantics as merge_global_config. This is used when
 /// applying higher-priority scopes (home, env) after project-specific values.
 pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_config: GlobalConfig) {
+    overlay_global_into_resolved_with(resolved, override_config, &LayerKeys::default());
+}
+
+/// [`overlay_global_into_resolved`] with explicitly set keys winning by
+/// presence (see [`merge_global_config_with`]).
+pub fn overlay_global_into_resolved_with(
+    resolved: &mut ResolvedConfig,
+    override_config: GlobalConfig,
+    keys: &LayerKeys,
+) {
     let defaults = GlobalConfig::default();
 
-    if override_config.server_port != defaults.server_port {
+    if keys.has("server_port") || override_config.server_port != defaults.server_port {
         resolved.server_port = override_config.server_port;
     }
-    if override_config.default_project != defaults.default_project {
+    if keys.has("default_project") || override_config.default_project != defaults.default_project {
         resolved.default_project = override_config.default_project;
     }
 
-    if override_config.issue_states.values != defaults.issue_states.values {
+    if keys.has("issue_states")
+        || override_config.issue_states.values != defaults.issue_states.values
+    {
         resolved.issue_states = override_config.issue_states;
     }
     // Presence-based optional override (see merge_global_config).
     if override_config.issue_done_states.is_some() {
         resolved.issue_done_states = override_config.issue_done_states;
     }
-    if override_config.issue_types.values != defaults.issue_types.values {
+    if keys.has("issue_types") || override_config.issue_types.values != defaults.issue_types.values
+    {
         resolved.issue_types = override_config.issue_types;
     }
-    if override_config.issue_priorities.values != defaults.issue_priorities.values {
+    if keys.has("issue_priorities")
+        || override_config.issue_priorities.values != defaults.issue_priorities.values
+    {
         resolved.issue_priorities = override_config.issue_priorities;
     }
-    if override_config.tags.values != defaults.tags.values {
+    if keys.has("tags") || override_config.tags.values != defaults.tags.values {
         resolved.tags = override_config.tags;
     }
     resolved
@@ -716,65 +921,97 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if !override_config.members.is_empty() {
         resolved.members = override_config.members;
     }
-    if override_config.strict_members != defaults.strict_members {
+    if keys.has("strict_members") || override_config.strict_members != defaults.strict_members {
         resolved.strict_members = override_config.strict_members;
     }
-    if override_config.auto_populate_members != defaults.auto_populate_members {
+    if keys.has("auto_populate_members")
+        || override_config.auto_populate_members != defaults.auto_populate_members
+    {
         resolved.auto_populate_members = override_config.auto_populate_members;
     }
-    if override_config.auto_set_reporter != defaults.auto_set_reporter {
+    if keys.has("auto_set_reporter")
+        || override_config.auto_set_reporter != defaults.auto_set_reporter
+    {
         resolved.auto_set_reporter = override_config.auto_set_reporter;
     }
-    if override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships {
+    if keys.has("auto_reciprocal_relationships")
+        || override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships
+    {
         resolved.auto_reciprocal_relationships = override_config.auto_reciprocal_relationships;
     }
-    if override_config.auto_link_mentions != defaults.auto_link_mentions {
+    if keys.has("auto_link_mentions")
+        || override_config.auto_link_mentions != defaults.auto_link_mentions
+    {
         resolved.auto_link_mentions = override_config.auto_link_mentions;
     }
-    if override_config.auto_assign_on_status != defaults.auto_assign_on_status {
+    if keys.has("auto_assign_on_status")
+        || override_config.auto_assign_on_status != defaults.auto_assign_on_status
+    {
         resolved.auto_assign_on_status = override_config.auto_assign_on_status;
     }
-    if override_config.auto_codeowners_assign != defaults.auto_codeowners_assign {
+    if keys.has("auto_codeowners_assign")
+        || override_config.auto_codeowners_assign != defaults.auto_codeowners_assign
+    {
         resolved.auto_codeowners_assign = override_config.auto_codeowners_assign;
     }
-    if override_config.auto_tags_from_path != defaults.auto_tags_from_path {
+    if keys.has("auto_tags_from_path")
+        || override_config.auto_tags_from_path != defaults.auto_tags_from_path
+    {
         resolved.auto_tags_from_path = override_config.auto_tags_from_path;
     }
-    if override_config.auto_branch_infer_type != defaults.auto_branch_infer_type {
+    if keys.has("auto_branch_infer_type")
+        || override_config.auto_branch_infer_type != defaults.auto_branch_infer_type
+    {
         resolved.auto_branch_infer_type = override_config.auto_branch_infer_type;
     }
-    if override_config.auto_branch_infer_status != defaults.auto_branch_infer_status {
+    if keys.has("auto_branch_infer_status")
+        || override_config.auto_branch_infer_status != defaults.auto_branch_infer_status
+    {
         resolved.auto_branch_infer_status = override_config.auto_branch_infer_status;
     }
-    if override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority {
+    if keys.has("auto_branch_infer_priority")
+        || override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority
+    {
         resolved.auto_branch_infer_priority = override_config.auto_branch_infer_priority;
     }
-    if override_config.default_priority != defaults.default_priority {
+    if keys.has("default_priority") || override_config.default_priority != defaults.default_priority
+    {
         resolved.default_priority = override_config.default_priority;
     }
-    if override_config.default_status != defaults.default_status {
+    if keys.has("default_status") || override_config.default_status != defaults.default_status {
         resolved.default_status = override_config.default_status;
     }
-    if override_config.custom_fields.values != defaults.custom_fields.values {
+    if keys.has("custom_fields")
+        || override_config.custom_fields.values != defaults.custom_fields.values
+    {
         resolved.custom_fields = override_config.custom_fields;
     }
 
-    if override_config.attachments_dir != defaults.attachments_dir {
+    if keys.has("attachments_dir") || override_config.attachments_dir != defaults.attachments_dir {
         resolved.attachments_dir = override_config.attachments_dir;
     }
-    if override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
+    if keys.has("attachments_max_upload_mb")
+        || override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb
+    {
         resolved.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
     }
-    if override_config.sync_reports_dir != defaults.sync_reports_dir {
+    if keys.has("sync_reports_dir") || override_config.sync_reports_dir != defaults.sync_reports_dir
+    {
         resolved.sync_reports_dir = override_config.sync_reports_dir;
     }
-    if override_config.sync_write_reports != defaults.sync_write_reports {
+    if keys.has("sync_write_reports")
+        || override_config.sync_write_reports != defaults.sync_write_reports
+    {
         resolved.sync_write_reports = override_config.sync_write_reports;
     }
-    if override_config.agent_context_enabled != defaults.agent_context_enabled {
+    if keys.has("agent_context_enabled")
+        || override_config.agent_context_enabled != defaults.agent_context_enabled
+    {
         resolved.agent_context_enabled = override_config.agent_context_enabled;
     }
-    if override_config.agent_context_extension != defaults.agent_context_extension {
+    if keys.has("agent_context_extension")
+        || override_config.agent_context_extension != defaults.agent_context_extension
+    {
         resolved.agent_context_extension = override_config.agent_context_extension;
     }
     if override_config.agent_logs_dir.is_some() {
@@ -809,25 +1046,33 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
                 .map(|(k, v)| (k, v.to_detail())),
         );
     }
-    if override_config.agent_worktree != defaults.agent_worktree {
+    if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
         resolved.agent_worktree = override_config.agent_worktree;
     }
-    if override_config.scan_signal_words != defaults.scan_signal_words {
+    if keys.has("scan_signal_words")
+        || override_config.scan_signal_words != defaults.scan_signal_words
+    {
         resolved.scan_signal_words = override_config.scan_signal_words;
     }
-    if override_config.scan_strip_attributes != defaults.scan_strip_attributes {
+    if keys.has("scan_strip_attributes")
+        || override_config.scan_strip_attributes != defaults.scan_strip_attributes
+    {
         resolved.scan_strip_attributes = override_config.scan_strip_attributes;
     }
     if override_config.scan_ticket_patterns.is_some() {
         resolved.scan_ticket_patterns = override_config.scan_ticket_patterns;
     }
-    if override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
+    if keys.has("scan_enable_ticket_words")
+        || override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words
+    {
         resolved.scan_enable_ticket_words = override_config.scan_enable_ticket_words;
     }
-    if override_config.scan_enable_mentions != defaults.scan_enable_mentions {
+    if keys.has("scan_enable_mentions")
+        || override_config.scan_enable_mentions != defaults.scan_enable_mentions
+    {
         resolved.scan_enable_mentions = override_config.scan_enable_mentions;
     }
-    if override_config.sprints != defaults.sprints {
+    if keys.has("sprints") || override_config.sprints != defaults.sprints {
         resolved.sprint_defaults = override_config.sprints.defaults;
         resolved.sprint_notifications = override_config.sprints.notifications;
     }
@@ -840,10 +1085,12 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if !override_config.branch_priority_aliases.is_empty() {
         resolved.branch_priority_aliases = override_config.branch_priority_aliases;
     }
-    if override_config.auto_identity != defaults.auto_identity {
+    if keys.has("auto_identity") || override_config.auto_identity != defaults.auto_identity {
         resolved.auto_identity = override_config.auto_identity;
     }
-    if override_config.auto_identity_git != defaults.auto_identity_git {
+    if keys.has("auto_identity_git")
+        || override_config.auto_identity_git != defaults.auto_identity_git
+    {
         resolved.auto_identity_git = override_config.auto_identity_git;
     }
 
@@ -892,12 +1139,13 @@ pub fn get_project_config(
 
     // 2) Overlay home config (higher priority than global)
     if let Ok(home_config) = crate::config::persistence::load_home_config() {
-        overlay_global_into_resolved(&mut resolved, home_config);
+        overlay_global_into_resolved_with(&mut resolved, home_config, &home_layer_keys());
     }
 
     // 3) Overlay environment variables (higher than home/global)
     let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    overlay_global_into_resolved(&mut resolved, env_snapshot.global.clone());
+    let env_keys = env_layer_keys(&env_snapshot);
+    overlay_global_into_resolved_with(&mut resolved, env_snapshot.global.clone(), &env_keys);
 
     // 4) Apply project-specific config last so it overrides env/home/global
     let project_config =

@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 fn write_global(tasks_dir: &std::path::Path, enable: bool) {
     let content = format!(
-        "default.project: TEST\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\nissue.tags: [*]\nauto.branch_infer_type: {}\n",
+        "default.project: TEST\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\nissue.tags: [\"*\"]\nauto.branch_infer_type: {}\n",
         if enable { "true" } else { "false" }
     );
     std::fs::write(tasks_dir.join("config.yml"), content).unwrap();

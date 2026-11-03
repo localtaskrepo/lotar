@@ -1123,7 +1123,11 @@ fn unlisted_review_actors_are_denied_with_recovery_help_and_no_writes() {
         )
         .expect_err("neither absent, empty, unrelated nor global reviewer settings grant access");
         let message = error.to_string();
-        assert!(message.contains("departed-user"), "{message}");
+        // An invalid reviewer list makes the project config itself invalid,
+        // so the write is refused with that config error (DEV-265).
+        if !reviewers.contains('*') {
+            assert!(message.contains("departed-user"), "{message}");
+        }
         assert!(message.contains("review.reviewers"), "{message}");
         assert!(message.contains("TEST"), "{message}");
         assert_eq!(std::fs::read(&task).unwrap(), before);

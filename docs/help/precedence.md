@@ -9,7 +9,7 @@ Configuration layers merge in a fixed order (highest wins):
 1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`) plus the global `--config KEY=VALUE` overrides. These are evaluated inside each command handler, apply only to the current process, and are never persisted.
 2. Project config (`.tasks/<PROJECT>/config.yml`) when a project context is resolved. These are the most local settings and override everything except explicit CLI flags.
 3. Environment overrides (see `docs/help/environment.md` for the full table). The first set variable wins per key and applies across every project on the machine.
-4. Home config (`~/.lotar` or `%APPDATA%/lotar/config.yml`). User-wide defaults that sit above global config but below env/project.
+4. Home config (`~/.lotar`, on Windows `%USERPROFILE%\.lotar`). User-wide defaults that sit above global config but below env/project.
 5. Global config (`.tasks/config.yml` in the resolved workspace). Provides the shared baseline for every project.
 6. Built-in defaults.
 

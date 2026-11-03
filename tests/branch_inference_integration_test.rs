@@ -8,7 +8,7 @@ fn write_global(tasks_dir: &std::path::Path) {
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature, Bug, Chore]
 issue.priorities: [Low, Medium, High]
-issue.tags: [*]
+issue.tags: ["*"]
 "#;
     std::fs::write(tasks_dir.join("config.yml"), content).unwrap();
 }
@@ -104,7 +104,7 @@ mod git_required {
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature]
 issue.priorities: [Low, Medium, High]
-issue.tags: [*]
+issue.tags: ["*"]
 "#;
         std::fs::write(tasks.join("config.yml"), content).unwrap();
         init_fake_git(root, "fix/should-fallback");

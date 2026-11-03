@@ -1,13 +1,23 @@
 title: Config resolution drops default-valued overrides, fails open on bad config, and docs misstate precedence
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:35.106934+00:00
-modified: 2026-10-31T22:06:35.166522+00:00
+modified: 2026-11-03T22:17:01.540718+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T22:17:01.490831+00:00
+  text: |-
+    Outcome: all five findings fixed.
+    1. Layers above global now win by presence: new LayerKeys (src/config/resolution.rs) records the canonical fields each layer set (home file keys via the field alias catalog, env via EnvOverrideReport.applied_fields, CLI via the normalized --config keys), and merge_global_config_with / overlay_global_into_resolved_with apply a field when the layer set it, even if it equals the built-in default. config show --explain then attributes it correctly (e.g. set-reporter: true # (env)).
+    2. Task create and update validate with TaskService::resolve_config_for_mutation -> config_for_project_strict, which fails when the global, home or project config exists but does not parse/validate; read-only projections keep the lenient fallback. Exposed and fixed 6 test fixtures whose 'issue.tags: [*]' was invalid YAML that had been silently ignored; one review test now expects the config error for an invalid reviewer list.
+    3. main.md (lotar --help) and scan.md state CLI -> project -> env -> home -> global -> defaults.
+    4./5. The home config is ~/.lotar on every platform: workspace.rs no longer prefers %APPDATA%\lotar\config.yml for tasks_folder, and tasks_folder is read with the YAML loader (no more splitting C:\work on ':' or keeping comments). Docs (precedence.md, cli-tour.md, developers/precedence.md) updated. Windows itself not run.
+    Evidence: tests/dev265_config_presence_test.rs (CLI/env/home back-to-default, explain label, REST writes fail closed on broken config), workspace tasks_folder_is_read_with_the_yaml_loader; full Rust suite 1894/1894; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -59,3 +69,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T22:17:01.490831+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:17:01.540718+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

@@ -78,7 +78,7 @@ LoTaR stores data in `.tasks/<PROJECT>` folders. Discovery order:
 4. Parent directory search
 5. Create `.tasks` beside the current directory
 
-Configuration precedence follows the same idea: CLI flag → environment → home → project → global → defaults. Learn the full chain in [Resolution & Precedence](./precedence.md).
+Configuration precedence follows the same idea: CLI flag → project → environment → home → global → defaults. Learn the full chain in [Resolution & Precedence](./precedence.md).
 
 ## Output Styles
 

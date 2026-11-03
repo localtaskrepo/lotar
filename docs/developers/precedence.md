@@ -8,7 +8,7 @@ This page explains how LoTaR resolves values for configuration, identity (for @m
 1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`) plus the global `--config KEY=VALUE` overrides. These are evaluated inside each command handler, scoped to the running process, and never persisted.
 2. Project config (`.tasks/<PROJECT>/config.yml`) when a project has been resolved. These files represent the most local settings and override everything except explicit CLI flags.
 3. Environment overrides defined in `src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key and applies globally across projects.
-4. Home config (`~/.lotar` or `%APPDATA%/lotar/config.yml`). Read via `ConfigManager::load_home_config*` and allowed to override the workspace-global config.
+4. Home config (`~/.lotar`, on Windows `%USERPROFILE%\.lotar`). Read via `ConfigManager::load_home_config*` and allowed to override the workspace-global config.
 5. Global config (`.tasks/config.yml` in the resolved workspace). Provides the shared baseline for every project.
 6. Built-in defaults from `src/config/types.rs`.
 

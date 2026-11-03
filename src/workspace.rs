@@ -195,42 +195,19 @@ impl TasksDirectoryResolver {
             return Ok(None);
         }
 
-        // Try to load the home config file
-        match fs::read_to_string(&home_config_path) {
-            Ok(content) => {
-                // Simple YAML parsing to extract tasks_folder setting (minimal parser)
-                for line in content.lines() {
-                    let line = line.trim();
-                    if line.starts_with("tasks_folder:")
-                        && let Some(value) = line.split(':').nth(1)
-                    {
-                        let value = value.trim().trim_matches('"').trim_matches('\'');
-                        if !value.is_empty() {
-                            return Ok(Some(value.to_string()));
-                        }
-                    }
-                }
-                Ok(None)
-            }
-            Err(_) => Ok(None), // Ignore read errors for home config
-        }
+        // Read it with the YAML loader: the old line parser cut `C:\\work`
+        // at the colon and kept trailing comments (DEV-265).
+        let Ok(content) = fs::read_to_string(&home_config_path) else {
+            return Ok(None); // Ignore read errors for home config
+        };
+        Ok(tasks_folder_from_yaml(&content))
     }
 
-    /// Get the default home configuration path (cross-platform)
+    /// The home configuration file: `~/.lotar` on every platform
+    /// (`%USERPROFILE%\\.lotar` on Windows), the same file every other
+    /// setting is read from (DEV-265).
     pub fn get_default_home_config_path() -> Result<PathBuf, String> {
-        // Use dirs crate for cross-platform home directory support
         let home_dir = dirs::home_dir().ok_or("Unable to determine home directory")?;
-
-        // On Windows, use %APPDATA%/lotar/config.yml when available
-        #[cfg(windows)]
-        {
-            // Try Windows-specific config location first
-            if let Some(config_dir) = dirs::config_dir() {
-                return Ok(config_dir.join("lotar").join("config.yml"));
-            }
-        }
-
-        // Default to ~/.lotar for Unix-like systems and fallback for Windows
         Ok(home_dir.join(".lotar"))
     }
 
@@ -306,3 +283,34 @@ impl TasksDirectoryResolver {
 }
 
 // inline tests moved to tests/workspace_unit_test.rs (subset; env/cwd heavy tests remain elsewhere)
+
+/// `tasks_folder` from a home config file's YAML.
+fn tasks_folder_from_yaml(content: &str) -> Option<String> {
+    let value = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(content).ok()?;
+    value
+        .get("tasks_folder")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+}
+
+#[cfg(test)]
+mod home_tasks_folder_tests {
+    use super::tasks_folder_from_yaml;
+
+    #[test]
+    fn tasks_folder_is_read_with_the_yaml_loader() {
+        // DEV-265: the line parser split on ':' and kept comments.
+        assert_eq!(
+            tasks_folder_from_yaml("tasks_folder: 'C:\\work\\tasks' # mine\n").as_deref(),
+            Some("C:\\work\\tasks")
+        );
+        assert_eq!(
+            tasks_folder_from_yaml("default:\n  project: A\ntasks_folder: .issues\n").as_deref(),
+            Some(".issues")
+        );
+        assert_eq!(tasks_folder_from_yaml("tasks_folder: ''\n"), None);
+        assert_eq!(tasks_folder_from_yaml("not: [valid"), None);
+    }
+}

@@ -113,7 +113,7 @@ From highest to lowest priority:
 1. Command-line flags for the current command
 2. Project config: `.tasks/<PROJECT>/config.yml`
 3. Environment variables such as `LOTAR_TASKS_DIR` and `LOTAR_DEFAULT_ASSIGNEE`
-4. Home config: `~/.lotar` (or `%APPDATA%/lotar/config.yml`)
+4. Home config: `~/.lotar` (on Windows `%USERPROFILE%\.lotar`)
 5. Global config: `.tasks/config.yml`
 6. Built-in defaults
 

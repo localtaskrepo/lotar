@@ -10,7 +10,7 @@ fn write_minimal_config(tasks_dir: &std::path::Path) {
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature, Bug, Chore]
 issue.priorities: [Low, Medium, High]
-issue.tags: [*]
+issue.tags: ["*"]
 "#;
     std::fs::write(paths::global_config_path(tasks_dir), content).unwrap();
 }

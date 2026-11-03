@@ -182,7 +182,7 @@ impl TaskService {
         // Prefer explicit project if provided; otherwise, derive from repo folder name
         let project = Self::resolve_create_project(&storage.root_path, project);
 
-        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
+        let config = Self::resolve_config_for_mutation(storage.root_path.as_path(), &project)?;
 
         let parsed_status = match status.as_deref() {
             Some(raw) => Some(validation::parse_status(raw, &config)?),
@@ -1071,7 +1071,7 @@ impl TaskService {
             patch.relationships = Some(relationships);
         }
 
-        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &derived);
+        let config = Self::resolve_config_for_mutation(storage.root_path.as_path(), &derived)?;
 
         // Shared project-aware enum validation: raw patch strings are checked
         // against this task's project configuration and canonicalized before
@@ -2683,6 +2683,17 @@ impl TaskService {
                 }
                 fallback
             })
+    }
+
+    /// Config for validating a write: unlike
+    /// [`Self::resolve_config_for_project`], a broken config file fails the
+    /// write instead of validating against built-in defaults (DEV-265).
+    pub(crate) fn resolve_config_for_mutation(
+        tasks_root: &Path,
+        project_prefix: &str,
+    ) -> LoTaRResult<ResolvedConfig> {
+        crate::config::resolution::config_for_project_strict(tasks_root, Some(project_prefix))
+            .map_err(|err| LoTaRError::ValidationError(err.to_string()))
     }
 
     pub(crate) fn ensure_task_defaults(
