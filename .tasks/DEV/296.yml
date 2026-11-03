@@ -1,0 +1,17 @@
+title: Required fields before a status (transition guards)
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-03T21:12:54.095410+00:00
+description: |-
+  Use case (home-network repo, change tickets): a ticket of type Change must not reach Done while its rollback and validation custom fields are empty, so the change-recording habit becomes a rule agents can't skip.
+
+  Proposal: per-project config, e.g.
+    issue.require:
+      - when: { type: Change, to: Done }
+        fields: [rollback, validation]
+        message: 'Fill rollback and validation before closing a change'
+  Enforced in the shared mutation service, so CLI, REST, MCP and the web UI refuse the transition the same way (clear error naming the missing fields; --force only for the reporter/reviewers, like the existing review guard).
+
+  Related: the NeedsReview review guard (enforce_review_owner_transition, review.reviewers) is the existing special case; this generalises it to field requirements. Automation 'set' actions should obey the same guard.

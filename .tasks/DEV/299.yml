@@ -1,0 +1,10 @@
+title: Record a command and its output on a ticket (lotar task exec)
+status: Todo
+priority: Low
+type: Feature
+reporter: claude
+created: 2026-11-03T21:12:55.085523+00:00
+description: |-
+  Use case: change tickets should show what was run during the change and what it returned (validation evidence), without agents pasting output by hand.
+
+  Proposal: 'lotar task exec <ID> [--attach] -- <command...>' runs the command, then adds a comment with the command line, exit code, duration and the last N lines of output (--attach stores the full output as an attachment). Output is passed through a redaction hook (configurable regexes, e.g. tokens) before it is written. Exit code of lotar = exit code of the command, so it can wrap steps in scripts. MCP equivalent optional (an agent can already comment).

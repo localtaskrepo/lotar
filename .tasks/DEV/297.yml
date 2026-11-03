@@ -1,0 +1,14 @@
+title: 'Commit references: link commits that mention a ticket ID'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-03T21:12:54.504832+00:00
+description: |-
+  Use case: in the home-network repo every change commit mentions its ticket (e.g. 'LOCA-59: ...'). lotar task history only lists commits that touched the ticket file, so the work done for a ticket is invisible from it.
+
+  Proposal:
+  - a 'commit' reference kind (sha + subject, repo-relative), shown in the task panel and in MCP task_get;
+  - 'lotar git link' (or a shipped post-commit hook) that adds a commit reference to every ticket ID found in the commit message, idempotent (no-op if already present, so no history entry or modified bump);
+  - 'lotar task commits <ID>' listing both kinds: commits touching the file and commits referencing the ID.
+  Workaround today: a post-commit hook calling 'lotar task reference add link <ID> <github commit URL>'.

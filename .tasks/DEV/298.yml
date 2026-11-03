@@ -1,0 +1,10 @@
+title: Automation conditions on the current value of a field
+status: Todo
+priority: Low
+type: Feature
+reporter: claude
+created: 2026-11-03T21:12:54.993705+00:00
+description: |-
+  Short-form conditions ('type: Change', 'status: InProgress') mean 'changed to'. A rule like 'when a Change ticket moves to InProgress' can't express 'type is Change' without type itself changing, so the run script has to check LOTAR_TICKET_TYPE itself (that's what the home-network repo does now).
+
+  Proposal: an explicit current-state form, e.g. 'type: { is: Change }' or 'current: { type: Change }', usable inside all/any/not next to change conditions, with 'lotar automation simulate' showing which part matched. Verified with lotar 0.11.2: 'when: { all: [ {type: Chore}, {status: InProgress} ] }' does not fire on a status change of an existing Chore.
