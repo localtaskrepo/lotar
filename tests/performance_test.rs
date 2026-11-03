@@ -358,6 +358,43 @@ mod large_datasets {
         perf_budget::check("many_small_tasks_list", &start, Duration::from_secs(3));
     }
 
+    /// DEV-255: listing used to locate every result again by walking the
+    /// project tree, so 2,000 tasks took about 6 s (quadratic). Files are
+    /// written directly so the setup cost stays out of the measurement.
+    #[test]
+    fn test_large_project_list_is_not_quadratic() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+        let project_dir = temp_dir.join(".tasks").join("BIG");
+        fs::create_dir_all(&project_dir).unwrap();
+        let task_count = 2_000;
+        for i in 1..=task_count {
+            fs::write(
+                project_dir.join(format!("{i}.yml")),
+                format!(
+                    "title: Task {i}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"
+                ),
+            )
+            .unwrap();
+        }
+
+        let start = Instant::now();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        let output = cmd
+            .current_dir(temp_dir)
+            .args(["--format", "json", "list", "--project=BIG", "--limit", "5"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains(&format!("\"total\":{task_count}")) || stdout.contains("BIG-1"),
+            "list should see the generated tasks: {stdout}"
+        );
+        println!("Listed {task_count} tasks in {:?}", start.elapsed());
+        perf_budget::check("large_project_list_x2000", &start, Duration::from_secs(3));
+    }
+
     #[test]
     fn test_complex_task_data_handling() {
         let test_fixtures = TestFixtures::new();

@@ -120,6 +120,11 @@ impl Storage {
     pub fn search(&self, filter: &TaskFilter) -> Vec<(String, Task)> {
         StorageSearch::search(&self.root_path, filter)
     }
+
+    /// [`Self::search`] plus the tasks root each match was read from.
+    pub fn search_located(&self, filter: &TaskFilter) -> Vec<(String, Task, std::path::PathBuf)> {
+        StorageSearch::search_located(&self.root_path, filter)
+    }
 }
 
 pub(crate) fn map_storage_error(err: Box<dyn std::error::Error>) -> LoTaRError {

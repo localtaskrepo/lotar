@@ -2300,10 +2300,10 @@ impl TaskService {
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let requested_sprints: HashSet<u32> = filter.sprints.iter().copied().collect();
         let mut results: Vec<(String, TaskDTO)> = storage
-            .search(&storage_filter)
+            .search_located(&storage_filter)
             .into_iter()
-            .filter(|(_, task)| include_moved || task.moved_to.is_none())
-            .filter(|(id, _)| {
+            .filter(|(_, task, _)| include_moved || task.moved_to.is_none())
+            .filter(|(id, _, _)| {
                 if requested_sprints.is_empty() {
                     return true;
                 }
@@ -2316,16 +2316,13 @@ impl TaskService {
                     })
                     .unwrap_or(false)
             })
-            .map(|(id, mut t)| {
+            .map(|(id, mut t, config_root)| {
                 let project_prefix = TaskId::parse(&id)
                     .map(|parsed| parsed.project)
                     .unwrap_or_default();
-                // Actual root per task ID (nested/sibling workspaces); the
-                // primary root is only the fallback for unresolvable ids.
-                let config_root = match storage.resolve_task_location(&id) {
-                    Ok(location) => location.root,
-                    Err(_) => storage.root_path.clone(),
-                };
+                // Config comes from the root the search read the task from
+                // (nested/sibling workspaces). Locating every result again
+                // walked the project tree per task (DEV-255).
                 let config = config_cache
                     .entry((config_root.clone(), project_prefix.clone()))
                     .or_insert_with(|| {

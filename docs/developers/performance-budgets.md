@@ -34,7 +34,7 @@ assertions fire.
 ## Baselines and thresholds
 
 The budget values are the pre-existing thresholds of the suite, carried over
-unchanged as the baseline (1–30s per label; 13 budgets across 9 tests, see
+unchanged as the baseline (1–30s per label; 14 budgets across 10 tests, see
 `EXPECTED_BUDGETS` in `scripts/perf-runner.mjs`). Treat any measurement —
 local or CI — as a baseline comparison, not a strict SLA: local machines are
 uncontrolled runners. Do **not** raise a threshold to make a run pass;

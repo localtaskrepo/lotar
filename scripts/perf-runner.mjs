@@ -41,6 +41,7 @@ const EXPECTED_BUDGETS = new Map([
     ['scan_medium_project', 5_000],
     ['many_small_tasks_create_x50', 20_000],
     ['many_small_tasks_list', 3_000],
+    ['large_project_list_x2000', 3_000],
     ['complex_tasks_create_x20', 15_000],
     ['complex_tasks_list', 3_000],
     ['large_file_scan', 8_000],

@@ -70,7 +70,17 @@ impl StorageSearch {
 
     /// Search for tasks based on filter criteria
     pub fn search(root_path: &Path, filter: &TaskFilter) -> Vec<(String, Task)> {
-        let mut results: Vec<(String, Task)> = Vec::new();
+        Self::search_located(root_path, filter)
+            .into_iter()
+            .map(|(id, task, _root)| (id, task))
+            .collect()
+    }
+
+    /// Like [`Self::search`], plus the tasks root each match was read from,
+    /// so callers need not locate every result again (DEV-255: re-locating
+    /// walked the whole project tree per task, making listings quadratic).
+    pub fn search_located(root_path: &Path, filter: &TaskFilter) -> Vec<(String, Task, PathBuf)> {
+        let mut results: Vec<(String, Task, PathBuf)> = Vec::new();
 
         // No longer use index for tag pre-filtering - do all filtering during file scan
 
@@ -87,14 +97,14 @@ impl StorageSearch {
                     );
 
                     #[cfg(feature = "parallel")]
-                    let mut partial: Vec<(String, Task)> = files
+                    let mut partial: Vec<(String, Task, PathBuf)> = files
                         .par_iter()
                         .filter_map(|file| {
                             let task_id = format!("{}-{}", project_folder, file.number);
                             let mut task = Self::load_task_file(&file.path)?;
                             task.archived = file.archived;
                             if Self::task_matches_filter(&task_id, &task, filter) {
-                                Some((task_id, task))
+                                Some((task_id, task, candidate_root.clone()))
                             } else {
                                 None
                             }
@@ -102,14 +112,14 @@ impl StorageSearch {
                         .collect();
 
                     #[cfg(not(feature = "parallel"))]
-                    let mut partial: Vec<(String, Task)> = files
+                    let mut partial: Vec<(String, Task, PathBuf)> = files
                         .iter()
                         .filter_map(|file| {
                             let task_id = format!("{}-{}", project_folder, file.number);
                             let mut task = Self::load_task_file(&file.path)?;
                             task.archived = file.archived;
                             if Self::task_matches_filter(&task_id, &task, filter) {
-                                Some((task_id, task))
+                                Some((task_id, task, candidate_root.clone()))
                             } else {
                                 None
                             }
@@ -132,16 +142,16 @@ impl StorageSearch {
                             (project_folder, dir_path, candidate_root.clone())
                         })
                 });
-            let all_files: Vec<(String, crate::storage::layout::TaskFile)> = subdirs
+            let all_files: Vec<(String, crate::storage::layout::TaskFile, PathBuf)> = subdirs
                 .into_iter()
-                .flat_map(|(project_folder, dir_path, _root)| {
+                .flat_map(|(project_folder, dir_path, root)| {
                     let files = crate::storage::layout::unique_numbers(
                         &project_folder,
                         crate::storage::layout::task_files(&dir_path, filter.archived),
                     );
                     files
                         .into_iter()
-                        .map(move |file| (project_folder.clone(), file))
+                        .map(move |file| (project_folder.clone(), file, root.clone()))
                 })
                 .collect();
 
@@ -149,12 +159,12 @@ impl StorageSearch {
             {
                 results = all_files
                     .par_iter()
-                    .filter_map(|(project_folder, file)| {
+                    .filter_map(|(project_folder, file, root)| {
                         let task_id = format!("{}-{}", project_folder, file.number);
                         let mut task = Self::load_task_file(&file.path)?;
                         task.archived = file.archived;
                         if Self::task_matches_filter(&task_id, &task, filter) {
-                            Some((task_id, task))
+                            Some((task_id, task, root.clone()))
                         } else {
                             None
                         }
@@ -165,12 +175,12 @@ impl StorageSearch {
             {
                 results = all_files
                     .iter()
-                    .filter_map(|(project_folder, file)| {
+                    .filter_map(|(project_folder, file, root)| {
                         let task_id = format!("{}-{}", project_folder, file.number);
                         let mut task = Self::load_task_file(&file.path)?;
                         task.archived = file.archived;
                         if Self::task_matches_filter(&task_id, &task, filter) {
-                            Some((task_id, task))
+                            Some((task_id, task, root.clone()))
                         } else {
                             None
                         }

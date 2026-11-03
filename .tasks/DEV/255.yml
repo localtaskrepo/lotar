@@ -1,13 +1,19 @@
 title: 'Task listing is quadratic: every result is located again by walking the project tree'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:33.720223+00:00
-modified: 2026-10-31T22:06:33.778834+00:00
+modified: 2026-11-03T18:01:12.076907+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T18:01:11.930074+00:00
+  text: |-
+    Outcome: fixed findings 1-3 (same hot path). StorageSearch::search_located returns the tasks root each match was read from; TaskService::list_matching uses it instead of resolve_task_location per result, so list/stats/REST/MCP listings no longer walk the project tree once per task. Other per-task callers audited: dto_from_task and get resolve a single task; attachment_service only resolves tasks that reference the blob being checked, so they are not hot. Declined: a direct <project>/<n>.yml fast path in layout::find, because find must still report duplicate files to detect ambiguous IDs.
+    Evidence: 3,000-task flat project, lotar list --limit 5: 12.3 s (installed 0.11.2) -> 0.9 s (debug build). New perf budget large_project_list_x2000 (3 s; measured 305 ms in the ci profile) in tests/performance_test.rs, registered in scripts/perf-runner.mjs and docs/developers/performance-budgets.md. 171 list/nested/sibling/root tests pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible. Three reviewers found and measured the same hot path independently (2,000 tasks ≈ 6 s, 5,000 ≈ 50 s per list). It affects CLI list/stats, every web view, REST and MCP.
 
@@ -40,3 +46,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T17:56:17.202096+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T18:01:11.930074+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T18:01:12.076907+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
