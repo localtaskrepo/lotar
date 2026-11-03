@@ -300,7 +300,20 @@ pub(super) fn filter_jira_payload_against_issue(
     let mut next = JsonMap::new();
     for (field, value) in &payload.fields {
         let desired = jira_payload_field_value(field, value);
-        let current = read_jira_field(issue, field);
+        // Users are sent as {accountId}, so compare with the issue's
+        // accountId, not the email/display name a pull stores (DEV-262).
+        let current = if matches!(field.to_ascii_lowercase().as_str(), "assignee" | "reporter")
+            && value.get("accountId").is_some()
+        {
+            issue
+                .get("fields")
+                .and_then(|fields| fields.get(field.as_str()))
+                .and_then(|user| user.get("accountId"))
+                .and_then(|v| v.as_str())
+                .map(|id| FieldValue::String(id.to_string()))
+        } else {
+            read_jira_field(issue, field)
+        };
         let matches = match (desired.as_ref(), current.as_ref()) {
             (Some(desired), Some(current)) => field_values_match(desired, current),
             _ => false,
@@ -402,4 +415,48 @@ pub(super) fn filter_github_payload_against_issue(
     }
 
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jira_users_compare_by_account_id() {
+        // DEV-262: a pull stores the display name, a push sends the
+        // accountId; comparing the two re-sent the assignee on every push.
+        let issue = json!({"fields": {
+            "assignee": {"accountId": "557058:ada", "displayName": "Ada"},
+            "description": {"type": "doc", "version": 1, "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Line one"}, {"type": "hardBreak"}, {"type": "text", "text": "line two"}]},
+                {"type": "bulletList", "content": [
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "alpha"}]}]},
+                ]},
+            ]},
+        }});
+        let mut payload = JiraIssuePayload {
+            fields: JsonMap::from_iter([
+                ("assignee".to_string(), json!({"accountId": "557058:ada"})),
+                (
+                    "description".to_string(),
+                    jira_text_to_adf(&jira_adf_to_text(&issue["fields"]["description"])),
+                ),
+            ]),
+            desired_status: None,
+        };
+        let changed = filter_jira_payload_against_issue(&issue, &mut payload);
+        assert!(changed.is_empty(), "nothing changed: {changed:?}");
+
+        let mut payload = JiraIssuePayload {
+            fields: JsonMap::from_iter([(
+                "assignee".to_string(),
+                json!({"accountId": "557058:bob"}),
+            )]),
+            desired_status: None,
+        };
+        assert_eq!(
+            filter_jira_payload_against_issue(&issue, &mut payload),
+            vec!["assignee".to_string()]
+        );
+    }
 }

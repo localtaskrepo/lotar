@@ -233,6 +233,40 @@ mod http {
     }
 
     #[test]
+    fn jira_search_follows_next_page_tokens_and_requests_mapped_fields() {
+        // DEV-262: the enhanced search has no `total` and ignores startAt;
+        // pulls stopped after the first page.
+        let api = MockApi::start(|request| {
+            let issues = |range: std::ops::RangeInclusive<u32>| -> Vec<JsonValue> {
+                range.map(|n| json!({"key": format!("ENG-{n}")})).collect()
+            };
+            ok(match query_param(request, "nextPageToken") {
+                None => json!({"issues": issues(1..=100), "nextPageToken": "p2", "isLast": false}),
+                Some("p2") => json!({"issues": issues(101..=120), "isLast": true}),
+                Some(_) => json!({"issues": []}),
+            })
+        });
+        let remote = SyncRemoteConfig {
+            provider: SyncProvider::Jira,
+            project: Some("ENG".into()),
+            repo: None,
+            filter: None,
+            auth_profile: None,
+            mapping: HashMap::from([(
+                "points".to_string(),
+                serde_yaml_ng::from_str("{field: customfield_10016}").unwrap(),
+            )]),
+        };
+        let issues = jira_search_issues(&api.client(SyncProvider::Jira), &remote).unwrap();
+        assert_eq!(issues.len(), 120);
+        let requests = api.requests();
+        assert_eq!(requests.len(), 2);
+        let fields = query_param(&requests[0], "fields").unwrap();
+        assert!(fields.contains("customfield_10016"), "{fields}");
+        assert!(query_param(&requests[0], "startAt").is_none());
+    }
+
+    #[test]
     fn jira_transition_posts_the_matching_transition_id() {
         let api = MockApi::start(|request| {
             if request.method == "GET" {
@@ -267,8 +301,17 @@ mod http {
     #[test]
     fn jira_user_lookup_resolves_once_and_reports_failures() {
         let api = MockApi::start(|request| match query_param(request, "query") {
-            Some("ada") => ok(json!([{"accountId": "557058:ada"}])),
-            Some("nobody") => ok(json!([])),
+            Some("ada") => ok(json!([
+                {"accountId": "557058:adam", "displayName": "Adam"},
+                {"accountId": "557058:ada", "displayName": "Ada"},
+            ])),
+            Some("jane") => ok(json!([
+                {"accountId": "557058:jane1", "displayName": "Jane"},
+                {"accountId": "557058:jane2", "displayName": "jane"},
+            ])),
+            Some("nobody") => {
+                ok(json!([{"accountId": "557058:nob", "displayName": "Nobody Else"}]))
+            }
             _ => (500, json!({"message": "down"})),
         });
         let client = api.client(SyncProvider::Jira);
@@ -290,11 +333,17 @@ mod http {
             Some(json!({"accountId": "5b10ac8d82e05b22cc7d4ef5"})),
             "account ids skip the lookup"
         );
-        assert_eq!(lookup("nobody", &mut warnings), None);
+        assert_eq!(
+            lookup("nobody", &mut warnings),
+            None,
+            "fuzzy hits don't count"
+        );
+        assert_eq!(lookup("jane", &mut warnings), None, "two exact matches");
         assert_eq!(lookup("broken", &mut warnings), None);
         assert_eq!(lookup("  ", &mut warnings), None);
 
-        assert_eq!(api.requests().len(), 3, "ada, nobody, broken");
+        assert_eq!(api.requests().len(), 4, "ada, nobody, jane, broken");
+        assert!(warnings.iter().any(|w| w.contains("'jane' is ambiguous")));
         assert!(
             warnings
                 .iter()
@@ -318,11 +367,11 @@ mod jira_values {
         assert_eq!(jira_text_to_adf("   "), JsonValue::Null);
 
         let nested = json!({"content": [
-            {"content": [{"text": "First "}, {"content": [{"text": "line"}]}]},
-            {"content": [{"text": "  "}]},
-            {"content": [{"text": "Second"}]},
+            {"type": "paragraph", "content": [{"type": "text", "text": "First "}, {"type": "text", "text": "line"}]},
+            {"type": "paragraph", "content": [{"type": "text", "text": "  "}]},
+            {"type": "paragraph", "content": [{"type": "text", "text": "Second"}]},
         ]});
-        assert_eq!(jira_adf_to_text(&nested), "First line\nSecond");
+        assert_eq!(jira_adf_to_text(&nested), "First line\n\nSecond");
     }
 
     #[test]

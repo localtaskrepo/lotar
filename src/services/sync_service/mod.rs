@@ -30,6 +30,7 @@ use crate::storage::manager::Storage;
 use crate::types::{CustomFieldValue, CustomFields, Priority, TaskStatus, TaskType};
 use crate::workspace::TasksDirectoryResolver;
 
+mod adf;
 mod client;
 mod fields;
 mod github;

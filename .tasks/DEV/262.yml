@@ -1,13 +1,23 @@
 title: 'Jira sync: pull stops after 50 issues, wipes custom fields, flattens descriptions, mis-assigns users'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:34.690843+00:00
-modified: 2026-10-31T22:06:34.750644+00:00
+modified: 2026-11-03T22:01:07.083573+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T22:01:07.048798+00:00
+  text: |-
+    Outcome: all four findings fixed.
+    1. jira_search_issues pages with nextPageToken until isLast (guarding against repeated tokens), maxResults 100, no startAt/total.
+    2. Bulk search requests jira_pull_field_names(remote), the same field list as single-task pulls, so mapped custom fields sync and when_empty: clear no longer wipes them. (Not done: treating a field missing from a response as unknown; with the fields requested it no longer happens in practice.)
+    3. New src/services/sync_service/adf.rs converts ADF to Markdown-style text (blank line between blocks, hardBreak newline, '- '/'1. ' lists incl. nesting, # headings, fenced code, > quotes, ---, [text](url)/bare URLs, mention/emoji/date/status text) and back on push; text->ADF->text is stable so unchanged descriptions are not re-pushed. Note: paragraphs are now separated by a blank line instead of a single newline, so multi-paragraph descriptions get one local update on the next pull. Bold/italic/colour marks are still not kept through a local edit + push (documented).
+    4. Push diff compares assignee/reporter by the issue's accountId; user lookup asks for 20 candidates and only accepts an exact display-name or email match, warning when several match.
+    Evidence: unit tests in adf.rs (structure on pull, round trips, lists/links on push), provider_tests jira_search_follows_next_page_tokens_and_requests_mapped_fields (mock, 120 issues over 2 pages, custom field requested), updated jira_user_lookup test (exact/fuzzy/ambiguous), payloads jira_users_compare_by_account_id; 65 sync tests pass; docs/developers/sync.md updated; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -65,3 +75,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:54:50.388610+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T22:01:07.048798+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:01:07.083573+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

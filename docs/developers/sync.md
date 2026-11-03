@@ -174,8 +174,9 @@ This guarantees pull→push and push→pull round-trips are no-ops unless a mapp
 
 - CLI auth can use email + API token (basic auth) via env variables.
 - OAuth flows are not supported; use manual tokens or basic auth.
-- Description updates should use Atlassian Document Format (ADF) when pushing.
-- Jira Cloud requires accountId values for reporter/assignee. Use account IDs in mappings if you want those fields set.
+- Pulls page through every matching issue (`nextPageToken`) and read the mapped custom fields, for bulk and single-task pulls alike.
+- Descriptions are converted between Atlassian Document Format (ADF) and Markdown-style text: paragraphs are separated by a blank line, line breaks stay line breaks, lists become `- ` / `1. ` items, headings `#`, code blocks fenced, quotes `> `, links `[text](url)` or the bare URL; mentions, emoji, dates and status lozenges become their text. A push turns the same text back into ADF. Formatting such as bold or colors, and mention links, are not kept when you edit a description locally and push it.
+- Jira Cloud requires accountId values for reporter/assignee. A pull stores the user's email or display name; a push looks that up and only uses an account whose display name or email matches exactly (an ambiguous name is skipped with a warning). Assignees are compared by accountId, so an unchanged assignee is not pushed again. Use account IDs in mappings to avoid the lookup.
 
 How to get Jira values:
 - `email_env`: use your Atlassian account email (direct) or set an env var name.

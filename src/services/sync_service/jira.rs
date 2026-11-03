@@ -42,7 +42,6 @@ pub(super) fn jira_validate_query(client: &SyncClient, jql: &str) -> LoTaRResult
         .agent
         .get(&url)
         .query("jql", jql)
-        .query("startAt", "0")
         .query("maxResults", "1")
         .query("fields", "summary")
         .force_send_body();
@@ -61,37 +60,46 @@ pub(super) fn jira_search_issues(
     remote: &SyncRemoteConfig,
 ) -> LoTaRResult<Vec<JsonValue>> {
     let jql = jira_query_for_remote(remote)?;
+    // Bulk pulls read the same fields as single-task pulls, mapped custom
+    // fields included (DEV-262).
+    let fields = jira_pull_field_names(remote).join(",");
 
+    // /rest/api/3/search/jql pages with nextPageToken/isLast; it has no
+    // `total` and ignores `startAt` (DEV-262: pulls stopped after 50).
     let mut issues = Vec::new();
-    let mut start_at = 0usize;
-    let max_results = 50usize;
+    let mut next_page: Option<String> = None;
+    let mut seen_tokens = HashSet::new();
     loop {
         let url = format!("{}/rest/api/3/search/jql", client.auth.api_base);
-        let req = client
+        let mut req = client
             .agent
             .get(&url)
             .query("jql", &jql)
-            .query("startAt", start_at.to_string())
-            .query("maxResults", max_results.to_string())
-            .query(
-                "fields",
-                "summary,description,status,issuetype,priority,assignee,reporter,labels",
-            )
-            .force_send_body();
-        let payload = send_json_request(client, req, None)?;
-        let total = payload.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            .query("maxResults", "100")
+            .query("fields", &fields);
+        if let Some(token) = next_page.as_deref() {
+            req = req.query("nextPageToken", token);
+        }
+        let payload = send_json_request(client, req.force_send_body(), None)?;
         let batch = payload
             .get("issues")
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
-        if batch.is_empty() {
-            break;
-        }
+        let batch_empty = batch.is_empty();
         issues.extend(batch);
-        start_at += max_results;
-        if issues.len() >= total {
-            break;
+        let is_last = payload
+            .get("isLast")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        next_page = payload
+            .get("nextPageToken")
+            .and_then(|v| v.as_str())
+            .filter(|token| !token.is_empty())
+            .map(str::to_string);
+        match next_page.as_ref() {
+            Some(token) if !is_last && !batch_empty && seen_tokens.insert(token.clone()) => {}
+            _ => break,
         }
     }
     Ok(issues)
@@ -189,58 +197,11 @@ pub(super) fn jira_transition_issue(
 }
 
 pub(super) fn jira_adf_to_text(value: &JsonValue) -> String {
-    let mut parts = Vec::new();
-    if let Some(content) = value.get("content").and_then(|v| v.as_array()) {
-        for node in content {
-            let mut buffer = String::new();
-            collect_adf_text(node, &mut buffer);
-            let trimmed = buffer.trim();
-            if !trimmed.is_empty() {
-                parts.push(trimmed.to_string());
-            }
-        }
-    }
-    parts.join("\n")
-}
-
-pub(super) fn collect_adf_text(value: &JsonValue, out: &mut String) {
-    match value {
-        JsonValue::Object(map) => {
-            if let Some(JsonValue::String(text)) = map.get("text") {
-                out.push_str(text);
-            }
-            if let Some(JsonValue::Array(content)) = map.get("content") {
-                for node in content {
-                    collect_adf_text(node, out);
-                }
-            }
-        }
-        JsonValue::Array(items) => {
-            for item in items {
-                collect_adf_text(item, out);
-            }
-        }
-        _ => {}
-    }
+    super::adf::adf_to_text(value)
 }
 
 pub(super) fn jira_text_to_adf(text: &str) -> JsonValue {
-    if text.trim().is_empty() {
-        JsonValue::Null
-    } else {
-        json!({
-            "type": "doc",
-            "version": 1,
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [
-                        {"type": "text", "text": text}
-                    ]
-                }
-            ]
-        })
-    }
+    super::adf::text_to_adf(text)
 }
 
 pub(super) fn jira_user_value(
@@ -287,12 +248,38 @@ pub(super) fn lookup_jira_account_id(
     }
 
     let client = client?;
-    match jira_search_account_id(client, trimmed) {
-        Ok(Some(account_id)) => {
-            lookup.user_cache.insert(key, account_id.clone());
-            Some(account_id)
+    match jira_search_users(client, trimmed) {
+        Ok(users) => {
+            // Exact display name or email only: Jira's user search is fuzzy,
+            // and taking its first hit could assign someone else (DEV-262).
+            let exact: Vec<&JiraUser> = users
+                .iter()
+                .filter(|user| {
+                    user.display_name
+                        .as_deref()
+                        .is_some_and(|name| name.trim().eq_ignore_ascii_case(trimmed))
+                        || user
+                            .email
+                            .as_deref()
+                            .is_some_and(|email| email.trim().eq_ignore_ascii_case(trimmed))
+                })
+                .collect();
+            match exact.as_slice() {
+                [only] => {
+                    lookup.user_cache.insert(key, only.account_id.clone());
+                    Some(only.account_id.clone())
+                }
+                [] => None,
+                _ => {
+                    warnings.push(format!(
+                        "Jira user '{}' is ambiguous ({} accounts match); use an accountId",
+                        trimmed,
+                        exact.len()
+                    ));
+                    None
+                }
+            }
         }
-        Ok(None) => None,
         Err(err) => {
             warnings.push(format!(
                 "Failed to resolve Jira user '{}': {}",
@@ -303,23 +290,36 @@ pub(super) fn lookup_jira_account_id(
     }
 }
 
-pub(super) fn jira_search_account_id(
-    client: &SyncClient,
-    query: &str,
-) -> LoTaRResult<Option<String>> {
+pub(super) struct JiraUser {
+    pub(super) account_id: String,
+    pub(super) display_name: Option<String>,
+    pub(super) email: Option<String>,
+}
+
+pub(super) fn jira_search_users(client: &SyncClient, query: &str) -> LoTaRResult<Vec<JiraUser>> {
     let url = format!("{}/rest/api/3/user/search", client.auth.api_base);
     let req = client
         .agent
         .get(&url)
         .query("query", query)
-        .query("maxResults", "1")
+        .query("maxResults", "20")
         .force_send_body();
     let payload = send_json_request(client, req, None)?;
-    let entries = payload.as_array().cloned().unwrap_or_default();
-    Ok(entries
+    let text =
+        |entry: &JsonValue, key: &str| entry.get(key).and_then(|v| v.as_str()).map(str::to_string);
+    Ok(payload
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
         .iter()
-        .find_map(|entry| entry.get("accountId").and_then(|v| v.as_str()))
-        .map(|value| value.to_string()))
+        .filter_map(|entry| {
+            Some(JiraUser {
+                account_id: text(entry, "accountId")?,
+                display_name: text(entry, "displayName"),
+                email: text(entry, "emailAddress"),
+            })
+        })
+        .collect())
 }
 
 pub(super) fn normalize_jira_account_id(value: &str) -> Option<String> {
