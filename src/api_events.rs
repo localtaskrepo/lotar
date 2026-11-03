@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, mpsc};
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ApiEvent {
@@ -31,7 +33,42 @@ pub fn emit(event: &ApiEvent) {
     }
 }
 
+/// Writes this process announced itself, so the file watcher can drop its
+/// own echo of them (DEV-273): task id -> (modified stamp, when).
+static OWN_TASK_WRITES: LazyLock<Mutex<HashMap<String, (String, Instant)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static OWN_CONFIG_WRITE: LazyLock<Mutex<Option<Instant>>> = LazyLock::new(|| Mutex::new(None));
+const ECHO_WINDOW: Duration = Duration::from_secs(10);
+const CONFIG_ECHO_WINDOW: Duration = Duration::from_secs(2);
+
+fn remember_task_write(task: &crate::api_types::TaskDTO) {
+    if let Ok(mut writes) = OWN_TASK_WRITES.lock() {
+        if writes.len() > 1024 {
+            writes.retain(|_, (_, at)| at.elapsed() < ECHO_WINDOW);
+        }
+        writes.insert(task.id.clone(), (task.modified.clone(), Instant::now()));
+    }
+}
+
+/// Whether a watcher change to task `id` with stamp `modified` is the echo
+/// of a write this process already announced with a full DTO.
+pub fn is_own_task_write(id: &str, modified: &str) -> bool {
+    OWN_TASK_WRITES.lock().is_ok_and(|writes| {
+        writes
+            .get(id)
+            .is_some_and(|(stamp, at)| stamp == modified && at.elapsed() < ECHO_WINDOW)
+    })
+}
+
+/// Whether this process announced a config change in the last moments.
+pub fn is_recent_own_config_write() -> bool {
+    OWN_CONFIG_WRITE
+        .lock()
+        .is_ok_and(|at| at.is_some_and(|at| at.elapsed() < CONFIG_ECHO_WINDOW))
+}
+
 pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
+    remember_task_write(task);
     let mut payload = match serde_json::to_value(task) {
         Ok(v) => v,
         Err(_) => JsonValue::Null,
@@ -46,6 +83,7 @@ pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<
 }
 
 pub fn emit_task_updated(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
+    remember_task_write(task);
     let mut payload = match serde_json::to_value(task) {
         Ok(v) => v,
         Err(_) => JsonValue::Null,
@@ -86,6 +124,9 @@ pub fn emit_task_moved(from: &str, task: &crate::api_types::TaskDTO, triggered_b
 }
 
 pub fn emit_config_updated(triggered_by: Option<&str>) {
+    if let Ok(mut at) = OWN_CONFIG_WRITE.lock() {
+        *at = Some(Instant::now());
+    }
     let mut payload = serde_json::json!({});
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));

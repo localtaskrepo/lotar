@@ -1754,6 +1754,156 @@ fn sse_project_changed_emitted_on_fs_change() {
     // Restored by guards
 }
 
+#[test]
+fn sse_delivers_during_a_steady_stream_of_events() {
+    // DEV-273: the debounce deadline moved with every event, so a steady
+    // stream delivered nothing until it stopped.
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
+    let mut server = start_server();
+    let port = server.port();
+    let (mut sse, leftover) = open_sse(port, "debounce_ms=150&kinds=task_updated&ready=1");
+    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+
+    let started = Instant::now();
+    let emitter = std::thread::spawn(|| {
+        for n in 0..40 {
+            lotar::api_events::emit(&lotar::api_events::ApiEvent {
+                kind: "task_updated".into(),
+                data: json!({"id": format!("STR-{n}")}),
+            });
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    });
+    let first = read_sse_events(&mut sse, 1, Duration::from_millis(1500), Vec::new());
+    let first_at = started.elapsed();
+    emitter.join().unwrap();
+    assert!(
+        !first.is_empty(),
+        "nothing delivered while events kept coming"
+    );
+    assert!(
+        first_at < Duration::from_millis(1500),
+        "first event took {first_at:?}; the stream lasts ~2 s"
+    );
+    server.stop();
+}
+
+#[test]
+fn watcher_reports_config_edits_and_ignores_internal_files() {
+    // DEV-273: root files and journals were reported as projects, and
+    // config edits from outside never produced config_updated.
+    let _guard = lock_var("LOTAR_CWD");
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().to_path_buf();
+    let tasks = root.join(".tasks");
+    std::fs::create_dir_all(tasks.join("DEMO")).unwrap();
+    std::fs::write(tasks.join("config.yml"), "default:\n  project: DEMO\n").unwrap();
+    let prev_cwd = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks.to_string_lossy());
+
+    let mut server = start_server();
+    let port = server.port();
+    let (mut sse, leftover) = open_sse(port, "debounce_ms=0&ready=1");
+    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+    // FSEvents and the poll watcher need a moment before they report.
+    std::thread::sleep(Duration::from_millis(600));
+
+    std::fs::write(tasks.join(".txn-pending.json"), "{}").unwrap();
+    std::fs::write(tasks.join("notes.txt"), "x").unwrap();
+    std::fs::write(
+        tasks.join("config.yml"),
+        "default:\n  project: DEMO\n  priority: High\n",
+    )
+    .unwrap();
+    std::fs::write(
+        tasks.join("DEMO").join("1.yml"),
+        "title: Watched\nstatus: Todo\npriority: Low\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n",
+    )
+    .unwrap();
+
+    let events = read_sse_events(&mut sse, 50, Duration::from_millis(2500), Vec::new());
+    server.stop();
+    std::env::set_current_dir(prev_cwd).unwrap();
+
+    let named: Vec<String> = events
+        .iter()
+        .filter(|(kind, _)| kind == "project_changed")
+        .map(|(_, data)| data.clone())
+        .collect();
+    assert!(
+        named.iter().all(|data| data.contains("\"DEMO\"")),
+        "only real projects: {named:?}"
+    );
+    assert!(
+        events.iter().any(|(kind, _)| kind == "config_updated"),
+        "external config edit must emit config_updated: {events:?}"
+    );
+    let task_events = events
+        .iter()
+        .filter(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1"))
+        .count();
+    assert_eq!(task_events, 1, "one event per changed task: {events:?}");
+}
+
+#[test]
+fn sprint_changes_announce_the_sprint_and_its_tasks() {
+    // DEV-273: sprint create/update and membership changes emitted nothing
+    // for other clients (only task_order_changed).
+    let _guard = lock_var("LOTAR_CWD");
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().to_path_buf();
+    let tasks = root.join(".tasks");
+    std::fs::create_dir_all(tasks.join("DEMO")).unwrap();
+    std::fs::write(tasks.join("config.yml"), "default:\n  project: DEMO\n").unwrap();
+    std::fs::write(
+        tasks.join("DEMO").join("1.yml"),
+        "title: Sprint member\nstatus: Todo\npriority: Low\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n",
+    )
+    .unwrap();
+    let prev_cwd = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks.to_string_lossy());
+
+    let mut server = start_server();
+    let port = server.port();
+    let (mut sse, leftover) = open_sse(
+        port,
+        "debounce_ms=0&kinds=sprint_changed,task_updated&ready=1",
+    );
+    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+    std::thread::sleep(Duration::from_millis(600));
+
+    let (status, body) = http_post_json(port, "/api/sprints/create", r#"{"label":"S1"}"#);
+    assert!(status < 300, "{}", String::from_utf8_lossy(&body));
+    let (status, body) = http_post_json(
+        port,
+        "/api/sprints/add",
+        r#"{"sprint":1,"tasks":["DEMO-1"]}"#,
+    );
+    assert!(status < 300, "{}", String::from_utf8_lossy(&body));
+
+    let events = read_sse_events(&mut sse, 20, Duration::from_millis(2500), Vec::new());
+    server.stop();
+    std::env::set_current_dir(prev_cwd).unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|(kind, data)| kind == "sprint_changed" && data.contains("\"id\":1")),
+        "{events:?}"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1")),
+        "membership change must announce the task: {events:?}"
+    );
+}
+
 // --- DEV-76: fixture lifecycle and readiness acceptance ---
 
 #[test]

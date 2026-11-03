@@ -1,13 +1,23 @@
 title: 'SSE and file watcher: delayed delivery, duplicate or bogus events, missing sprint/config events'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:36.265793+00:00
-modified: 2026-10-31T22:06:36.326251+00:00
+modified: 2026-11-03T23:16:41.249402+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T23:16:41.207776+00:00
+  text: |-
+    Outcome: all seven findings fixed.
+    1./2. SSE forwarder: the flush deadline is set when the buffer goes from empty to non-empty and no longer moves, so a steady stream is delivered every debounce window; repeated task_updated (by id) and project_changed (by name) events in one window are merged (an id-only echo never replaces a waiting full DTO); a 500-event buffer flushes at once.
+    3./4. File watcher rewritten as batches (40 ms quiet, 250 ms max): each changed path is handled once; dot-files (locks, temp files, .txn-pending.json), root files, @ folders and invalid prefixes never produce project_changed; config.yml/automation.yml at the root or in a project emit config_updated (with project when scoped; suppressed for 2 s after the server's own config write); task files are parsed directly instead of a full get/locate; echoes of the server's own full-DTO events (same id and modified stamp, api_events registry) are dropped; content fingerprints drop repeats from the native + poll watchers. Found and fixed: macOS FSEvents reports /private/var/... paths, so events under a non-canonical tasks dir were silently ignored (only the poll watcher saw new files).
+    5. Sprint file changes emit sprint_changed {id, deleted} and an id-only task_updated for every task that joined or left the sprint (diff of the membership snapshot), from any writer.
+    6./7. sse.md documents every kind and payload shape (full DTO vs id-only, task_error, task_order_changed, sprint_changed, moved_to), the project filter rules (agent jobs by ticket_id, config/order/sprint behavior), the fast-IO clamp, the batching and the default port.
+    Evidence: integration tests sse_delivers_during_a_steady_stream_of_events, watcher_reports_config_edits_and_ignores_internal_files (repeat runs stable), sprint_changes_announce_the_sprint_and_its_tasks; unit test sse_buffer_merges_repeated_task_and_project_events; full Rust suite 1908/1908; smoke sse-reactivity + 8 sprint specs pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -68,3 +78,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T23:02:44.922687+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T23:16:41.207776+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T23:16:41.249402+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

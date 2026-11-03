@@ -831,6 +831,22 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                                     .map(|name| name == pf)
                                     .unwrap_or(false)
                             }
+                            // Agent jobs carry the ticket they work on.
+                            kind if kind.starts_with("agent_job_") => evt
+                                .data
+                                .get("ticket_id")
+                                .and_then(|v| v.as_str())
+                                .and_then(|id| crate::storage::TaskId::parse(id).ok())
+                                .is_some_and(|parsed| parsed.project == *pf),
+                            // Config changes name their project, or none for
+                            // workspace-wide config, which concerns every
+                            // project. Order and sprint changes span projects.
+                            "config_updated" => evt
+                                .data
+                                .get("project")
+                                .and_then(|v| v.as_str())
+                                .is_none_or(|name| name == pf),
+                            "task_order_changed" | "sprint_changed" => true,
                             // Task events include { id: "PREFIX-N" }; compare
                             // against the canonical ID prefix (final numeric
                             // suffix split) so hyphenated prefixes match.
@@ -846,9 +862,16 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                             continue;
                         }
                     }
-                    buffer.push(evt);
-                    let now = Instant::now();
-                    deadline = Some(now + debounce);
+                    // The window opens with the first buffered event and is
+                    // not pushed back by later ones, so a steady stream is
+                    // still delivered every `debounce` (DEV-273).
+                    if buffer.is_empty() {
+                        deadline = Some(Instant::now() + debounce);
+                    }
+                    coalesce_into(&mut buffer, evt);
+                    if buffer.len() >= MAX_SSE_BUFFER {
+                        deadline = Some(Instant::now());
+                    }
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     if !buffer.is_empty() {
@@ -875,6 +898,37 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
             }
         }
     });
+}
+
+/// Flush early once a client has this many events waiting.
+const MAX_SSE_BUFFER: usize = 500;
+
+/// Add `evt` to an SSE buffer, merging repeated task_updated and
+/// project_changed events for the same task or project: an id-only echo
+/// never replaces a full DTO already waiting, and a newer full DTO
+/// replaces an older one in place.
+fn coalesce_into(buffer: &mut Vec<crate::api_events::ApiEvent>, evt: crate::api_events::ApiEvent) {
+    let key_field = match evt.kind.as_str() {
+        "task_updated" => "id",
+        "project_changed" => "name",
+        _ => {
+            buffer.push(evt);
+            return;
+        }
+    };
+    let key = evt.data.get(key_field).and_then(|v| v.as_str());
+    let Some(existing) = buffer.iter_mut().find(|queued| {
+        queued.kind == evt.kind
+            && queued.data.get(key_field).and_then(|v| v.as_str()) == key
+            && key.is_some()
+    }) else {
+        buffer.push(evt);
+        return;
+    };
+    let is_full = |data: &serde_json::Value| data.as_object().is_some_and(|map| map.len() > 1);
+    if is_full(&evt.data) || !is_full(&existing.data) {
+        *existing = evt;
+    }
 }
 
 fn is_mutating_method(method: &str) -> bool {
@@ -1109,155 +1163,277 @@ fn start_tasks_watcher() {
             }
         }
 
-        // Simple loop: for any modify/create/remove, emit project_changed events.
-        while let Ok(res) = rx.recv() {
-            let Ok(event) = res else {
-                continue;
-            };
-            match event.kind {
-                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
-                    // Derive project(s) from paths relative to the tasks directory root
-                    if let Some(paths) = (!event.paths.is_empty()).then_some(event.paths) {
-                        let mut emitted: HashSet<String> = HashSet::new();
-                        for p in paths {
-                            let mut proj: Option<String> = None;
-                            let mut task_id: Option<String> = None;
-
-                            // Strip the tasks directory prefix to get the relative path
-                            // e.g. /path/to/.tasks/PROJECT/NUM.yml → PROJECT/NUM.yml
-                            if let Ok(relative) = p.strip_prefix(&tasks_dir) {
-                                let mut components = relative.components();
-                                if let Some(std::path::Component::Normal(project_os)) =
-                                    components.next()
-                                    && let Some(project) = project_os.to_str()
-                                {
-                                    if project == "@sprints"
-                                        && p.extension().and_then(|value| value.to_str())
-                                            == Some("yml")
-                                    {
-                                        let stem = p
-                                            .file_stem()
-                                            .and_then(|value| value.to_str())
-                                            .unwrap_or_default();
-                                        let container = if stem == "backlog" {
-                                            Some(None)
-                                        } else {
-                                            stem.parse::<u32>().ok().filter(|id| *id > 0).map(Some)
-                                        };
-                                        if let Some(sprint_id) = container {
-                                            let storage = crate::storage::manager::Storage {
-                                                root_path: tasks_dir.clone(),
-                                            };
-                                            if let Ok(order) =
-                                                crate::services::task_order::get_order(
-                                                    &storage, sprint_id,
-                                                )
-                                            {
-                                                if order_snapshots.get(&sprint_id)
-                                                    == Some(&order.tasks)
-                                                {
-                                                    continue;
-                                                }
-                                                order_snapshots
-                                                    .insert(sprint_id, order.tasks.clone());
-                                                crate::api_events::emit(
-                                                    &crate::api_events::ApiEvent {
-                                                        kind: "task_order_changed".into(),
-                                                        data: serde_json::json!({"sprint_id": sprint_id, "tasks": order.tasks}),
-                                                    },
-                                                );
-                                            }
-                                        }
-                                    }
-                                    // Skip reserved internal directories (e.g. @sprints)
-                                    // to avoid treating sprint file changes as task events.
-                                    if !project.starts_with('@') {
-                                        proj = Some(project.to_string());
-                                        // Task files: <PROJECT>/[folders/]<NUM>.yml (DEV-4)
-                                        task_id = crate::storage::layout::parse_relative(relative)
-                                            .map(|task| task.id());
-                                    }
-                                }
-                            }
-                            if let Some(task_id) = task_id.clone() {
-                                // A file moved into or out of `@archive` (or another
-                                // folder) is removed in one place only: still stored
-                                // means updated, not deleted.
-                                let still_stored = matches!(event.kind, EventKind::Remove(_))
-                                    && crate::storage::TaskId::parse(&task_id)
-                                        .is_ok_and(|id| !id.locate(&tasks_dir).is_empty());
-                                match event.kind {
-                                    EventKind::Remove(_) if !still_stored => {
-                                        crate::api_events::emit(&crate::api_events::ApiEvent {
-                                            kind: "task_deleted".to_string(),
-                                            data: serde_json::json!({ "id": task_id }),
-                                        })
-                                    }
-                                    _ => {
-                                        // Try to load the task to check for parse errors.
-                                        // Tombstones are valid files (DEV-92): a
-                                        // soft-deleted task must surface as a normal
-                                        // task_updated, never as a task_error.
-                                        if let Ok(resolver) =
-                                            crate::workspace::TasksDirectoryResolver::resolve(
-                                                None, None,
-                                            )
-                                        {
-                                            let storage = crate::storage::manager::Storage::new(
-                                                &resolver.path,
-                                            );
-                                            match crate::services::task_service::TaskService::get_including_deleted(
-                                                &storage, &task_id, None,
-                                            ) {
-                                                Ok(_) => {
-                                                    crate::api_events::emit(
-                                                        &crate::api_events::ApiEvent {
-                                                            kind: "task_updated".to_string(),
-                                                            data: serde_json::json!({ "id": task_id }),
-                                                        },
-                                                    );
-                                                }
-                                                Err(e) => {
-                                                    // Emit both: task_error for the notification, task_updated so UIs can try to refresh
-                                                    crate::api_events::emit_task_error(
-                                                        &task_id,
-                                                        &e.to_string(),
-                                                    );
-                                                    crate::api_events::emit(
-                                                        &crate::api_events::ApiEvent {
-                                                            kind: "task_updated".to_string(),
-                                                            data: serde_json::json!({ "id": task_id }),
-                                                        },
-                                                    );
-                                                }
-                                            }
-                                        } else {
-                                            crate::api_events::emit(&crate::api_events::ApiEvent {
-                                                kind: "task_updated".to_string(),
-                                                data: serde_json::json!({ "id": task_id }),
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-
-                            if let Some(project) = proj
-                                && emitted.insert(project.clone())
-                            {
-                                crate::api_events::emit(&crate::api_events::ApiEvent {
-                                    kind: "project_changed".to_string(),
-                                    data: serde_json::json!({ "name": project }),
-                                });
-                            }
+        // Changes arrive in bursts (one write is a temp file, a rename and
+        // a lock); handle them in short batches so each task, project and
+        // sprint is announced once per burst (DEV-273).
+        let mut sprint_members: HashMap<Option<u32>, HashSet<String>> = order_snapshots
+            .iter()
+            .map(|(id, tasks)| (*id, tasks.iter().cloned().collect()))
+            .collect();
+        // Content last announced per file: the native and the poll watcher
+        // (and repeated notifications) report one change several times.
+        let mut announced: HashMap<PathBuf, u64> = HashMap::new();
+        while let Ok(first) = rx.recv() {
+            let mut paths: Vec<PathBuf> = Vec::new();
+            let mut collect = |res: notify::Result<notify::Event>| {
+                if let Ok(event) = res
+                    && matches!(
+                        event.kind,
+                        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+                    )
+                {
+                    for path in event.paths {
+                        if !paths.contains(&path) {
+                            paths.push(path);
                         }
                     }
                 }
-                _ => {}
+            };
+            collect(first);
+            let started = std::time::Instant::now();
+            while started.elapsed() < WATCH_BATCH_MAX {
+                match rx.recv_timeout(WATCH_BATCH_QUIET) {
+                    Ok(res) => collect(res),
+                    Err(_) => break,
+                }
             }
+            process_watch_batch(
+                &tasks_dir,
+                &paths,
+                &mut order_snapshots,
+                &mut sprint_members,
+                &mut announced,
+            );
         }
 
         drop(poll_watcher);
     });
+}
+
+/// A watcher batch ends after this much quiet, or after `WATCH_BATCH_MAX`.
+const WATCH_BATCH_QUIET: Duration = Duration::from_millis(40);
+const WATCH_BATCH_MAX: Duration = Duration::from_millis(250);
+
+/// Turn one batch of changed paths under the tasks directory into events.
+fn process_watch_batch(
+    tasks_dir: &Path,
+    paths: &[PathBuf],
+    order_snapshots: &mut HashMap<Option<u32>, Vec<String>>,
+    sprint_members: &mut HashMap<Option<u32>, HashSet<String>>,
+    announced: &mut HashMap<PathBuf, u64>,
+) {
+    let mut projects: Vec<String> = Vec::new();
+    let mut tasks: Vec<(String, PathBuf)> = Vec::new();
+    let mut sprints: Vec<Option<u32>> = Vec::new();
+    let mut config_projects: Vec<Option<String>> = Vec::new();
+
+    // FSEvents reports canonical paths (/private/var/... for /var/...), so
+    // match the canonical tasks directory as well.
+    let canonical = tasks_dir.canonicalize().ok();
+    for path in paths {
+        let Some(relative) = path.strip_prefix(tasks_dir).ok().or_else(|| {
+            canonical
+                .as_deref()
+                .and_then(|dir| path.strip_prefix(dir).ok())
+        }) else {
+            continue;
+        };
+        let parts: Vec<&str> = relative
+            .components()
+            .filter_map(|c| match c {
+                std::path::Component::Normal(part) => part.to_str(),
+                _ => None,
+            })
+            .collect();
+        // Lock files, temp files and transaction journals are dot-files.
+        if parts.is_empty() || parts.iter().any(|part| part.starts_with('.')) {
+            continue;
+        }
+        // Already announced with this exact content (or absence)?
+        let fingerprint = file_fingerprint(path);
+        if announced.get(relative) == Some(&fingerprint) {
+            continue;
+        }
+        announced.insert(relative.to_path_buf(), fingerprint);
+        let is_config = |name: &str| name == "config.yml" || name == "automation.yml";
+        match parts.as_slice() {
+            [file] if is_config(file) => {
+                if !config_projects.contains(&None) {
+                    config_projects.push(None);
+                }
+                continue;
+            }
+            [_] => continue, // other root files are not projects
+            ["@sprints", file] => {
+                if let Some(stem) = file.strip_suffix(".yml") {
+                    let container = if stem == "backlog" {
+                        Some(None)
+                    } else {
+                        stem.parse::<u32>().ok().filter(|id| *id > 0).map(Some)
+                    };
+                    if let Some(container) = container
+                        && !sprints.contains(&container)
+                    {
+                        sprints.push(container);
+                    }
+                }
+                continue;
+            }
+            _ => {}
+        }
+        let project = parts[0];
+        if project.starts_with('@') || !crate::storage::safety::is_valid_project_prefix(project) {
+            continue;
+        }
+        if !projects.iter().any(|known| known == project) {
+            projects.push(project.to_string());
+        }
+        if parts.len() == 2 && is_config(parts[1]) {
+            let scope = Some(project.to_string());
+            if !config_projects.contains(&scope) {
+                config_projects.push(scope);
+            }
+            continue;
+        }
+        if let Some(task) = crate::storage::layout::parse_relative(relative) {
+            let id = task.id();
+            if !tasks.iter().any(|(known, _)| *known == id) {
+                tasks.push((id, path.clone()));
+            }
+        }
+    }
+
+    for (id, path) in &tasks {
+        emit_watched_task(tasks_dir, id, path);
+    }
+    for container in sprints {
+        emit_watched_sprint(tasks_dir, container, order_snapshots, sprint_members);
+    }
+    if !config_projects.is_empty() && !crate::api_events::is_recent_own_config_write() {
+        for project in config_projects {
+            crate::api_events::emit(&crate::api_events::ApiEvent {
+                kind: "config_updated".to_string(),
+                data: match project {
+                    Some(project) => serde_json::json!({ "project": project }),
+                    None => serde_json::json!({}),
+                },
+            });
+        }
+    }
+    for project in projects {
+        crate::api_events::emit(&crate::api_events::ApiEvent {
+            kind: "project_changed".to_string(),
+            data: serde_json::json!({ "name": project }),
+        });
+    }
+}
+
+/// Content fingerprint of a watched file; directories and missing files
+/// get fixed markers.
+fn file_fingerprint(path: &Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    match fs::read(path) {
+        Ok(bytes) => {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            bytes.hash(&mut hasher);
+            hasher.finish()
+        }
+        Err(_) if path.is_dir() => 1,
+        Err(_) => 0,
+    }
+}
+
+/// Announce a changed task file: deleted, unreadable, or updated. The
+/// file is parsed directly (no full task lookup), and a change this server
+/// already announced with a full DTO is not repeated.
+fn emit_watched_task(tasks_dir: &Path, id: &str, path: &Path) {
+    let emit = |kind: &str| {
+        crate::api_events::emit(&crate::api_events::ApiEvent {
+            kind: kind.to_string(),
+            data: serde_json::json!({ "id": id }),
+        });
+    };
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => {
+            // Moved into or out of `@archive` (or another folder): still
+            // stored somewhere means updated, not deleted.
+            let still_stored = crate::storage::TaskId::parse(id)
+                .is_ok_and(|parsed| !parsed.locate(tasks_dir).is_empty());
+            emit(if still_stored {
+                "task_updated"
+            } else {
+                "task_deleted"
+            });
+            return;
+        }
+    };
+    match serde_yaml_ng::from_str::<crate::storage::task::Task>(&content) {
+        Ok(task) => {
+            if !crate::api_events::is_own_task_write(id, &task.modified) {
+                emit("task_updated");
+            }
+        }
+        Err(err) => {
+            // task_error for the notification, task_updated so UIs refresh.
+            crate::api_events::emit_task_error(id, &err.to_string());
+            emit("task_updated");
+        }
+    }
+}
+
+/// Announce a changed sprint or backlog file: `task_order_changed` when the
+/// order changed, `sprint_changed` for a numeric sprint, and `task_updated`
+/// for every task that joined or left it (their DTO `sprints` changed).
+fn emit_watched_sprint(
+    tasks_dir: &Path,
+    container: Option<u32>,
+    order_snapshots: &mut HashMap<Option<u32>, Vec<String>>,
+    sprint_members: &mut HashMap<Option<u32>, HashSet<String>>,
+) {
+    let storage = crate::storage::manager::Storage {
+        root_path: tasks_dir.to_path_buf(),
+    };
+    let order = crate::services::task_order::get_order(&storage, container)
+        .ok()
+        .map(|order| order.tasks);
+    if let Some(tasks) = order.as_ref()
+        && order_snapshots.get(&container) != Some(tasks)
+    {
+        crate::api_events::emit(&crate::api_events::ApiEvent {
+            kind: "task_order_changed".into(),
+            data: serde_json::json!({"sprint_id": container, "tasks": tasks}),
+        });
+    }
+    let Some(sprint_id) = container else {
+        if let Some(tasks) = order {
+            order_snapshots.insert(None, tasks);
+        }
+        return;
+    };
+    let now: HashSet<String> = order.iter().flatten().cloned().collect();
+    let before = sprint_members.remove(&container).unwrap_or_default();
+    crate::api_events::emit(&crate::api_events::ApiEvent {
+        kind: "sprint_changed".into(),
+        data: serde_json::json!({"id": sprint_id, "deleted": order.is_none()}),
+    });
+    let mut changed: Vec<&String> = before.symmetric_difference(&now).collect();
+    changed.sort();
+    for id in changed {
+        crate::api_events::emit(&crate::api_events::ApiEvent {
+            kind: "task_updated".into(),
+            data: serde_json::json!({ "id": id }),
+        });
+    }
+    match order {
+        Some(tasks) => {
+            order_snapshots.insert(container, tasks);
+            sprint_members.insert(container, now);
+        }
+        None => {
+            order_snapshots.remove(&container);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1280,6 +1456,60 @@ mod tests {
         let (_, query) = parse_path_and_query("/api/tasks/list?assignee=Jos%C3%A9&q=caf%C3%A9");
         assert_eq!(query.get("assignee").map(String::as_str), Some("José"));
         assert_eq!(query.get("q").map(String::as_str), Some("café"));
+    }
+
+    #[test]
+    fn sse_buffer_merges_repeated_task_and_project_events() {
+        use crate::api_events::ApiEvent;
+        let event = |kind: &str, data: serde_json::Value| ApiEvent {
+            kind: kind.into(),
+            data,
+        };
+        let mut buffer = Vec::new();
+        super::coalesce_into(
+            &mut buffer,
+            event(
+                "task_updated",
+                serde_json::json!({"id": "A-1", "title": "full"}),
+            ),
+        );
+        super::coalesce_into(
+            &mut buffer,
+            event("task_updated", serde_json::json!({"id": "A-1"})),
+        );
+        super::coalesce_into(
+            &mut buffer,
+            event("project_changed", serde_json::json!({"name": "A"})),
+        );
+        super::coalesce_into(
+            &mut buffer,
+            event("project_changed", serde_json::json!({"name": "A"})),
+        );
+        super::coalesce_into(
+            &mut buffer,
+            event("task_deleted", serde_json::json!({"id": "A-1"})),
+        );
+        super::coalesce_into(
+            &mut buffer,
+            event(
+                "task_updated",
+                serde_json::json!({"id": "A-2", "title": "x"}),
+            ),
+        );
+        let kinds: Vec<&str> = buffer.iter().map(|e| e.kind.as_str()).collect();
+        assert_eq!(
+            kinds,
+            [
+                "task_updated",
+                "project_changed",
+                "task_deleted",
+                "task_updated"
+            ]
+        );
+        assert_eq!(
+            buffer[0].data["title"], "full",
+            "id-only echo keeps the DTO"
+        );
     }
 
     #[test]
