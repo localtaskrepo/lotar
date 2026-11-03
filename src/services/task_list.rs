@@ -48,6 +48,17 @@ pub const KNOWN_QUERY_KEYS: &[&str] = &[
     "archived",
 ];
 
+/// Parameter names that are not filters, with what to use instead.
+const UNSUPPORTED_QUERY_KEYS: &[(&str, &str)] = &[
+    ("page", "use offset and limit"),
+    ("sort", "use sort_by and order"),
+    (
+        "format",
+        "only /api/tasks/export takes format, and only csv",
+    ),
+    ("cursor", "use offset and limit"),
+];
+
 /// Raw query terms, as the interface received them. Values are trimmed and
 /// validated by [`TaskQueryInput::resolve`]; multi-value lists are already
 /// split.
@@ -175,6 +186,17 @@ impl TaskQueryInput {
         for (key, value) in query {
             if KNOWN_QUERY_KEYS.contains(&key.as_str()) {
                 continue;
+            }
+            // Transport-style names a client may expect; never custom-field
+            // filters, which would silently match nothing (DEV-275).
+            if let Some(hint) = UNSUPPORTED_QUERY_KEYS
+                .iter()
+                .find(|(name, _)| *name == key.as_str())
+                .map(|(_, hint)| hint)
+            {
+                return Err(TaskQueryError::Invalid(format!(
+                    "Unknown parameter '{key}': {hint}"
+                )));
             }
             for part in value.split(',').map(str::trim).filter(|p| !p.is_empty()) {
                 fields.push((key.clone(), part.to_string()));
@@ -382,7 +404,11 @@ impl TaskQueryInput {
                     .or_default()
                     .push(value);
             } else {
-                field_filters.entry(key).or_default().insert(value);
+                // Not a builtin field and not a declared custom field: it
+                // can never match, so say so instead of returning nothing.
+                return Err(TaskQueryError::Invalid(format!(
+                    "Unknown filter '{key}': not a query parameter, a built-in field or a declared custom field"
+                )));
             }
         }
 

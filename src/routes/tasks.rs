@@ -68,21 +68,37 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let cfg = try_response!(load_merged_config(&resolver));
+        // `format` is this endpoint's own parameter, not a filter (DEV-275).
+        let mut params = req.query.clone();
+        if let Some(format) = params.remove("format")
+            && !format.trim().eq_ignore_ascii_case("csv")
+        {
+            return bad_request(format!(
+                "Unsupported export format '{}': only csv is available",
+                format.trim()
+            ));
+        }
         // Export shares the full list query (DEV-57): every filter, the
         // requested global order, and no pagination.
-        let query = match parse_list_query(&req.query, &cfg, &resolver) {
+        let query = match parse_list_query(&params, &cfg, &resolver) {
             Ok(query) => query,
             Err(response) => return response,
         };
         let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now());
 
-        // Build CSV (quoted where needed)
+        // RFC 4180 quoting; cells a spreadsheet would read as a formula get
+        // a leading apostrophe (DEV-275).
         fn esc(s: &str) -> String {
-            let mut v = s.replace('"', "\"\"");
-            if v.contains(',') || v.contains('\n') || v.contains('\r') {
-                v = format!("\"{}\"", v);
+            let guarded = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+                format!("'{s}")
+            } else {
+                s.to_string()
+            };
+            if guarded.contains(['"', ',', '\n', '\r']) {
+                format!("\"{}\"", guarded.replace('"', "\"\""))
+            } else {
+                guarded
             }
-            v
         }
         let mut wtr = String::from("id,title,status,priority,type,assignee,due_date,tags\n");
         for (id, t) in tasks {

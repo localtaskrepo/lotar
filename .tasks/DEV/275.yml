@@ -1,14 +1,23 @@
 title: 'CSV export: `format` treated as a filter, broken quoting, formula injection'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:36.547471+00:00
-modified: 2026-10-31T22:06:36.607737+00:00
+modified: 2026-11-03T23:23:25.669127+00:00
 relationships:
   related:
   - DEV-230
   - DEV-253
+comments:
+- date: 2026-11-03T23:23:25.642629+00:00
+  text: |-
+    Outcome: all three findings fixed.
+    1. /api/tasks/export takes format=csv (the default; any other value is a 400) and strips it before the shared query. The shared query now rejects page, sort, format and cursor with a hint (use offset/limit, sort_by/order), and a key that is neither a parameter, a built-in field nor a declared custom field is a 400 instead of silently matching nothing. With the default wildcard custom-field config any other key is still a custom-field filter (by design: cross-project field filters).
+    2./3. CSV cells are quoted per RFC 4180 whenever they contain a quote, comma, CR or LF, and cells starting with = + - @ tab or CR get a leading apostrophe so spreadsheets don't run them as formulas.
+    openapi.json descriptions updated.
+    Evidence: tests/dev275_export_and_query_keys_test.rs (format csv/xml, quoted quotes and commas, guarded formula, page/sort/bogus 400, declared custom field still filters); full Rust suite 1911/1911; smoke ui.advanced + ui.sort-export pass; openapi contract tests pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -45,3 +54,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-230","DEV-253"]}'
+- at: 2026-11-03T23:16:47.610510+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T23:23:25.642629+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T23:23:25.669127+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
