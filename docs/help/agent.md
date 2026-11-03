@@ -5,6 +5,7 @@ LoTaR can orchestrate supported agent CLIs (Copilot CLI, Claude Code, Codex CLI,
 ## CLI commands
 
 - `lotar agent run <TICKET> <PROMPT> [--runner <copilot|claude|codex|gemini>] [--agent <profile>] [--model <MODEL>] [--effort <LEVEL>] [--wait] [--follow] [--timeout-seconds <N>]`
+  - Without `--wait` or `--follow`, the job is checked (ticket, profile or runner, settings) and handed to the background queue worker, and the command returns at once with `Queued <TICKET> for <agent>`. Follow it with `lotar agent queue` and `lotar agent list-jobs`. With `--wait`, the job runs in this terminal and the command exits non-zero unless it completes; with `--format json` it prints the finished job.
 - `lotar agent status <JOB_ID>`
 - `lotar agent logs <JOB_ID>`
 - `lotar agent cancel <JOB_ID>`

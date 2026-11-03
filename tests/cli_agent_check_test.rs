@@ -122,6 +122,64 @@ fn agent_run_takes_model_and_effort() {
     );
 }
 
+/// Without --wait the command exits at once, so the job must run in the
+/// detached queue worker, not on a thread that dies with the CLI (DEV-257).
+#[cfg(unix)]
+#[test]
+fn agent_run_without_wait_still_runs_the_job() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _tasks = EnvVarGuard::set(
+        "LOTAR_TASKS_DIR",
+        fixtures.tasks_root.to_string_lossy().as_ref(),
+    );
+    let queue_dir = root.join("queue");
+    let _queue = EnvVarGuard::set(
+        "LOTAR_AGENT_QUEUE_DIR",
+        queue_dir.to_string_lossy().as_ref(),
+    );
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    let done = root.join("AGENT_DONE");
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: TEST\nagents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'sleep 1; echo finished > \"{}\"']\n",
+            done.display()
+        ),
+    );
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["add", "Background job"])
+        .assert()
+        .success();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["agent", "run", "TEST-1", "go", "--agent", "nope"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Unknown agent profile"));
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(root)
+        .args(["agent", "run", "TEST-1", "go", "--agent", "slow"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Queued TEST-1 for slow"));
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !done.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert!(
+        done.exists(),
+        "the queued job never ran after the CLI exited"
+    );
+}
+
 /// Agents call the CLI themselves; the job tells them which build started it
 /// so a different `lotar` on PATH can't answer instead (DEV-206).
 #[test]

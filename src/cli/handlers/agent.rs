@@ -80,30 +80,82 @@ impl AgentHandler {
             model: args.model,
             effort: args.effort,
         };
+        let json = matches!(renderer.format, OutputFormat::Json);
+        if !(args.wait || args.follow) {
+            return Self::queue_run(req, resolver, renderer);
+        }
+
         let job = AgentJobService::start_job(req, resolver).map_err(|e| e.to_string())?;
+        if !json {
+            renderer.emit_success(format!("Job {} started", job.id));
+            renderer.emit_info(format!("Ticket: {}", job.ticket_id));
+            renderer.emit_info(format!("Runner: {}", job.runner));
+            let settings: Vec<String> = [("model", &job.model), ("effort", &job.effort)]
+                .into_iter()
+                .filter_map(|(name, value)| value.as_ref().map(|value| format!("{name} {value}")))
+                .collect();
+            if !settings.is_empty() {
+                renderer.emit_info(format!("Settings: {}", settings.join(", ")));
+            }
+        }
+
+        let finished = wait_for_job_completion(
+            &job.id,
+            args.follow && !json,
+            args.timeout_seconds,
+            renderer,
+        )?;
+        if json {
+            renderer.emit_json(&serde_json::json!({ "job": finished }));
+        }
+        if finished.status.eq_ignore_ascii_case("completed") {
+            Ok(())
+        } else {
+            Err(format!(
+                "Job '{}' ended with status {}",
+                finished.id, finished.status
+            ))
+        }
+    }
+
+    /// Without `--wait`, the job cannot run on a thread of this process: the
+    /// command exits right away and takes the thread with it (DEV-257).
+    /// Validate it here, then hand it to the detached queue worker.
+    fn queue_run(
+        req: AgentJobCreateRequest,
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+    ) -> Result<(), String> {
+        AgentJobService::preflight(&req, &resolver.path).map_err(|e| e.to_string())?;
+        let ticket = crate::storage::TaskId::parse(req.ticket_id.trim())
+            .map(|id| id.canonical())
+            .unwrap_or_else(|_| req.ticket_id.trim().to_string());
+        let who = req
+            .agent
+            .clone()
+            .or_else(|| req.runner.clone())
+            .unwrap_or_default();
+        let queued = AgentQueueService::enqueue(&resolver.path, req).map_err(|e| e.to_string())?;
 
         if matches!(renderer.format, OutputFormat::Json) {
-            renderer.emit_json(&serde_json::json!({ "job": job }));
+            renderer.emit_json(&serde_json::json!({
+                "queued": queued,
+                "ticket": ticket,
+                "agent": who,
+            }));
             return Ok(());
         }
-
-        renderer.emit_success(format!("Job {} started", job.id));
-        renderer.emit_info(format!("Ticket: {}", job.ticket_id));
-        renderer.emit_info(format!("Runner: {}", job.runner));
-        let settings: Vec<String> = [("model", &job.model), ("effort", &job.effort)]
-            .into_iter()
-            .filter_map(|(name, value)| value.as_ref().map(|value| format!("{name} {value}")))
-            .collect();
-        if !settings.is_empty() {
-            renderer.emit_info(format!("Settings: {}", settings.join(", ")));
+        if queued {
+            renderer.emit_success(format!(
+                "Queued {ticket} for {who}; a background worker starts the job"
+            ));
+        } else {
+            renderer.emit_notice(format!("{ticket} is already queued for {who}"));
         }
-
-        let should_wait = args.wait || args.follow;
-        if !should_wait {
-            return Ok(());
-        }
-
-        wait_for_job_completion(&job.id, args.follow, args.timeout_seconds, renderer)
+        renderer.emit_info(
+            "Check progress with `lotar agent queue` and `lotar agent list-jobs`, or pass --wait to run it in this terminal.",
+        );
+        Ok(())
     }
 
     fn status(
@@ -920,12 +972,15 @@ fn list_running_jobs() -> Vec<RunningAgentJob> {
         .collect()
 }
 
+/// Poll until the job is terminal and return it. Text output (follow
+/// events and the final status lines) is skipped in JSON mode.
 fn wait_for_job_completion(
     job_id: &str,
     follow: bool,
     timeout_seconds: Option<u64>,
     renderer: &OutputRenderer,
-) -> Result<(), String> {
+) -> Result<crate::api_types::AgentJob, String> {
+    let text = !matches!(renderer.format, OutputFormat::Json);
     let start = Instant::now();
     let mut last_event_count = 0usize;
 
@@ -949,24 +1004,20 @@ fn wait_for_job_completion(
         };
 
         if job_is_terminal(job.status.as_str()) {
-            if job.status.eq_ignore_ascii_case("completed") {
-                renderer.emit_success(format!("Job {} completed", job.id));
-            } else {
-                renderer.emit_error(format!("Job {} {}", job.id, job.status));
+            if text {
+                if job.status.eq_ignore_ascii_case("completed") {
+                    renderer.emit_success(format!("Job {} completed", job.id));
+                } else {
+                    renderer.emit_error(format!("Job {} {}", job.id, job.status));
+                }
+                if let Some(usage) = job.usage.as_ref() {
+                    renderer.emit_info(format!("Usage: {}", usage.describe()));
+                }
+                if let Some(summary) = job.summary.as_ref() {
+                    renderer.emit_info(summary);
+                }
             }
-
-            if let Some(usage) = job.usage.as_ref() {
-                renderer.emit_info(format!("Usage: {}", usage.describe()));
-            }
-            if let Some(summary) = job.summary.as_ref() {
-                renderer.emit_info(summary);
-            }
-
-            return if job.status.eq_ignore_ascii_case("completed") {
-                Ok(())
-            } else {
-                Err(format!("Job '{}' ended with status {}", job.id, job.status))
-            };
+            return Ok(job);
         }
 
         if let Some(timeout) = timeout_seconds

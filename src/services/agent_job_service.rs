@@ -184,6 +184,45 @@ impl AgentJobService {
         Self::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::RespectLimits)
     }
 
+    /// Check what [`Self::start_job`] would reject (ticket id, profile or
+    /// runner, existing task) without starting anything. Used before a job
+    /// is handed to the detached queue worker, which cannot report errors
+    /// back to the command that queued it (DEV-257).
+    pub fn preflight(req: &AgentJobCreateRequest, tasks_dir: &std::path::Path) -> LoTaRResult<()> {
+        let ticket_id = req.ticket_id.trim().to_string();
+        if ticket_id.is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "Ticket id is required".to_string(),
+            ));
+        }
+        if req.prompt.trim().is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "Prompt cannot be empty".to_string(),
+            ));
+        }
+        let ticket_id = match crate::storage::moves::follow(tasks_dir, &ticket_id) {
+            Ok(Some(current)) => current,
+            _ => ticket_id,
+        };
+        let parsed_ticket = crate::storage::TaskId::parse(&ticket_id).map_err(|err| {
+            LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}"))
+        })?;
+        let config =
+            crate::config::resolution::config_for_project(tasks_dir, Some(&parsed_ticket.project))
+                .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let profile = resolve_profile(&config, req)?;
+        profile.runner.parse::<AgentRunnerKind>().map_err(|_| {
+            LoTaRError::ValidationError(format!(
+                "Unsupported runner '{}'. Expected {}",
+                profile.runner,
+                crate::config::operations::AGENT_RUNNERS.join(", ")
+            ))
+        })?;
+        let storage = Storage::new(tasks_dir);
+        TaskService::get(&storage, &parsed_ticket.canonical(), None)?;
+        Ok(())
+    }
+
     pub fn start_job_with_tasks_dir_mode(
         req: AgentJobCreateRequest,
         tasks_dir: &std::path::Path,

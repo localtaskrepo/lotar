@@ -26,7 +26,12 @@ struct AgentQueueState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentQueueEntry {
     pub ticket_id: String,
+    /// Agent profile name; empty when the entry names a bare runner.
+    #[serde(default)]
     pub agent: String,
+    /// Runner for entries queued without a profile (`agent run --runner`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runner: Option<String>,
     pub prompt: String,
     pub queued_at: String,
     pub attempts: u32,
@@ -44,10 +49,21 @@ impl AgentQueueService {
         reason = "the caller hands this value over and does not use it afterwards"
     )]
     pub fn enqueue(tasks_dir: &Path, req: AgentJobCreateRequest) -> LoTaRResult<bool> {
-        let agent = req
-            .agent
-            .clone()
-            .ok_or_else(|| LoTaRError::ValidationError("Agent profile required".to_string()))?;
+        let runner = req
+            .runner
+            .as_deref()
+            .map(str::trim)
+            .filter(|runner| !runner.is_empty())
+            .map(str::to_string);
+        let agent = match req.agent.clone() {
+            Some(agent) => agent,
+            None if runner.is_some() => String::new(),
+            None => {
+                return Err(LoTaRError::ValidationError(
+                    "Agent profile or runner required".to_string(),
+                ));
+            }
+        };
         let ticket_id = req.ticket_id.trim().to_string();
         if ticket_id.is_empty() {
             return Err(LoTaRError::ValidationError(
@@ -71,6 +87,7 @@ impl AgentQueueService {
         let entry = AgentQueueEntry {
             ticket_id: ticket_id.clone(),
             agent: agent.clone(),
+            runner: runner.clone(),
             prompt,
             queued_at: Utc::now().to_rfc3339(),
             attempts: 0,
@@ -85,6 +102,7 @@ impl AgentQueueService {
             if state.pending.iter().any(|item| {
                 crate::storage::identity::aliases_match(&item.ticket_id, &ticket_id)
                     && item.agent == agent
+                    && item.runner == runner
             }) {
                 return;
             }
@@ -246,8 +264,8 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
     let req = AgentJobCreateRequest {
         ticket_id: entry.ticket_id,
         prompt: entry.prompt,
-        runner: None,
-        agent: Some(entry.agent),
+        runner: entry.runner,
+        agent: (!entry.agent.is_empty()).then_some(entry.agent),
         model: entry.model,
         effort: entry.effort,
     };
@@ -263,11 +281,11 @@ fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<bo
     }
 
     with_locked_queue(tasks_dir, |state| {
-        if !state
-            .pending
-            .iter()
-            .any(|item| item.ticket_id == entry.ticket_id && item.agent == entry.agent)
-        {
+        if !state.pending.iter().any(|item| {
+            item.ticket_id == entry.ticket_id
+                && item.agent == entry.agent
+                && item.runner == entry.runner
+        }) {
             state.pending.push(entry.clone());
         }
     })?;

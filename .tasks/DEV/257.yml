@@ -1,13 +1,19 @@
 title: '`lotar agent run` without --wait reports "Job started" but the job never runs'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:33.997416+00:00
-modified: 2026-10-31T22:06:34.056640+00:00
+modified: 2026-11-03T21:28:45.603761+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T21:28:45.552492+00:00
+  text: |-
+    Outcome: fixed. agent run without --wait/--follow no longer starts the job on a thread of the exiting CLI. It runs AgentJobService::preflight (ticket, profile/runner, model/effort, task exists) so errors still reach the user, then hands the job to the detached queue worker (AgentQueueService::enqueue + ensure_worker) and prints 'Queued <ticket> for <agent>'. Queue entries gained an optional runner field (serde default, backwards-compatible) so --runner without a profile can be queued too. Also fixed: --format json with --wait used to return before the job ran; it now waits and prints the finished job, and a failed job exits non-zero.
+    Evidence: tests/cli_agent_check_test.rs agent_run_without_wait_still_runs_the_job (job writes a file after the CLI exits; unknown profile still fails fast); all 26 agent_run tests pass; docs/help/agent.md updated; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -28,3 +34,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:10:24.654099+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T21:28:45.552492+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T21:28:45.603761+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
