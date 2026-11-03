@@ -1,14 +1,26 @@
 title: 'Web UI: unsaved automation edits, timezone dates, keyboard and screen-reader gaps, preferences reset'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:38.530232+00:00
-modified: 2026-10-31T22:06:38.595800+00:00
+modified: 2026-11-03T22:28:00.641175+00:00
 relationships:
   related:
   - DEV-253
   - DEV-57
+comments:
+- date: 2026-11-03T22:28:00.599217+00:00
+  text: |-
+    Outcome: all six findings fixed in the frontend.
+    1. SprintTaskCell uses formatTaskDate; the CSV export filename uses toDateKey(new Date()).
+    2. Board column Enter handler is .self.prevent, so Enter on Add task / Show more / stacked-lane summary works. (A keyboard 'move to column' action is a separate feature, not done.)
+    3. AutomationView asks 'Discard unsaved rule changes?' before a scope switch or Reload, and guards route leave (onBeforeRouteLeave) and beforeunload; saving never prompts.
+    4. ActivityDrawer renders through UiModal (Escape, initial focus on close, focus trap, inert background, focus return).
+    5. Calendar 'N more' has role=button, tabindex=0 and Enter/Space handlers.
+    6. Preferences reset also clears lotar.tasks.sort and lotar.dependencyHoverFields and shows a toast.
+    Evidence: vitest SprintTaskCell.spec.ts, AutomationView.spec.ts, Preferences.reset.spec.ts (new) plus Board/Calendar/ActivityDrawer/frontendScopeSafety specs; full UI suite 1427 pass; new smoke spec ui.keyboard-access (LA timezone due date, Enter on board add, Activity modal, calendar overflow) passes on a rebuilt binary; existing ui.automation smoke test updated to confirm the new discard prompt. Full smoke: 371/372 before that update, all pass after.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -72,3 +84,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253","DEV-57"]}'
+- at: 2026-11-03T22:28:00.599217+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:28:00.641175+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

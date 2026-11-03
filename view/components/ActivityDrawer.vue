@@ -1,6 +1,13 @@
 <template>
-  <div v-if="open" class="backdrop" @click.self="$emit('close')">
-    <UiCard class="activity-drawer__card" role="dialog" aria-modal="true" aria-label="Recent activity">
+  <!-- UiModal owns Escape, initial focus, the focus trap and focus return. -->
+  <UiModal
+    :open="open"
+    size="xl"
+    aria-label="Recent activity"
+    initial-focus="[data-activity-close]"
+    @close="$emit('close')"
+  >
+    <div class="activity-drawer">
       <div class="card-head">
         <div>
           <h2>Recent activity</h2>
@@ -21,6 +28,7 @@
             type="button"
             aria-label="Close activity drawer"
             title="Close activity drawer"
+            data-activity-close
             @click="$emit('close')"
           >
             <IconGlyph name="close" />
@@ -76,8 +84,8 @@
         </li>
         <li v-if="!feed.length" class="muted">No recorded activity in the selected window.</li>
       </ul>
-    </UiCard>
-  </div>
+    </div>
+  </UiModal>
 </template>
 <script setup lang="ts">
 import { computed, onScopeDispose, watch } from 'vue'
@@ -87,7 +95,7 @@ import { formatDateTime } from '../utils/date'
 import IconGlyph from './IconGlyph.vue'
 import ReloadButton from './ReloadButton.vue'
 import UiButton from './UiButton.vue'
-import UiCard from './UiCard.vue'
+import UiModal from './UiModal.vue'
 import { titleCase } from '../utils/text'
 
 const props = defineProps<{ open: boolean }>()
@@ -155,26 +163,9 @@ watch(
 )
 </script>
 <style scoped>
-.backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--color-dialog-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 16px;
-  overflow-y: hidden;
-  z-index: var(--z-modal);
-}
-
-.activity-drawer__card {
-  width: 100%;
-  max-width: 880px;
-  max-height: min(90vh, calc(100vh - 64px));
-  margin: 0 auto;
+.activity-drawer {
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
 }
 
 .card-head {

@@ -94,7 +94,7 @@ import AgentActivityIndicator from './AgentActivityIndicator.vue'
 import { tagAttrs } from '../composables/useTagColors'
 import type { TaskDTO } from '../api/types'
 import type { ColKey } from '../composables/useColumns'
-import { formatRelativeTime } from '../utils/date'
+import { formatRelativeTime, formatTaskDate } from '../utils/date'
 import { formatMember } from '../utils/member'
 import { numericOf, projectOf } from '../utils/text'
 import { computed } from 'vue'
@@ -118,16 +118,10 @@ const props = defineProps<{
   sprintStateClass: (id: number) => string
 }>()
 
-function formatDue(value?: string | null) {
-  if (!value) return ''
-  try {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleDateString()
-  } catch {
-    return value
-  }
-}
+// Date-only due dates are local calendar days, like on every other page;
+// `new Date('2026-11-05')` would parse UTC midnight and show the day before
+// west of UTC.
+const formatDue = (value?: string | null) => formatTaskDate(value)
 
 const attachments = computed(() => (props.col === 'attachments' ? taskAttachments(props.task) : []))
 

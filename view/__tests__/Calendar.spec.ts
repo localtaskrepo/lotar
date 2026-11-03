@@ -378,6 +378,34 @@ describe('Calendar task hover cards', () => {
         expect(document.querySelector('.ui-modal__overlay')).toBeNull()
     })
 
+    it('opens the overflow day dialog from the keyboard (DEV-288)', async () => {
+        tasksStore.items.value = Array.from({ length: 7 }).map((_, idx) => ({
+            id: `ACME-${idx + 1}`,
+            title: `Task ${idx + 1}`,
+            status: 'Todo',
+            due_date: '2024-02-05',
+            modified: '2024-02-01T00:00:00Z',
+        }))
+
+        const wrapper = mount(Calendar)
+        await flushPromises()
+
+        const more = wrapper.get('[data-date="2024-02-05"] li.more')
+        expect(more.attributes('role')).toBe('button')
+        expect(more.attributes('tabindex')).toBe('0')
+
+        for (const key of ['Enter', ' ']) {
+            await more.trigger('keydown', { key })
+            await flushPromises()
+            const overlay = document.querySelector('.ui-modal__overlay')
+            expect(overlay?.querySelectorAll('.calendar-day-dialog__item').length).toBe(7)
+            overlay!.querySelector<HTMLElement>('.calendar-day-dialog__item')!.click()
+            await flushPromises()
+            expect(document.querySelector('.ui-modal__overlay')).toBeNull()
+        }
+        wrapper.unmount()
+    })
+
     it('opens the create panel with the due date prefilled when the cell add button is clicked', async () => {
         const wrapper = mount(Calendar)
         await flushPromises()

@@ -346,7 +346,7 @@
           :tabindex="lane.stacked ? undefined : 0"
           @dragover.prevent="onDragOver"
           @drop.prevent="onLaneDrop(lane, $event)"
-          @keydown.enter.prevent="!lane.stacked && onDrop(lane.columns[0]!)"
+          @keydown.enter.self.prevent="!lane.stacked && onDrop(lane.columns[0]!)"
         >
           <div
             class="col-header row lane-header"

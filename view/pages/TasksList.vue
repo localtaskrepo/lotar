@@ -442,6 +442,7 @@ import { colKeyToSortBy, normalizeSortBy, normalizeSortOrder, sortByToColKey } f
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { isDeletedTask, projectOf, titleCase } from '../utils/text'
 import { storageGet, storageGetJson, storageRemove, storageSet, storageSetJson } from '../utils/storage'
+import { toDateKey } from '../utils/date'
 
 const router = useRouter()
 const store = useTaskStore()
@@ -887,7 +888,7 @@ async function exportCsv() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `lotar-tasks-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `lotar-tasks-${toDateKey(new Date())}.csv`
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()

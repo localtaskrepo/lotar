@@ -710,6 +710,36 @@ describe('Board progressive disclosure', () => {
         expect(wrapper.find('.show-more-btn').exists()).toBe(false)
     })
 
+    it('leaves Enter to the column controls instead of cancelling it (DEV-288)', async () => {
+        // The previous test expanded the column for this session.
+        sessionStorage.clear()
+        const tasks: TaskDTO[] = []
+        for (let i = 1; i <= 35; i++) {
+            tasks.push(
+                baseTask({
+                    id: `ACME-${i}`,
+                    status: 'Todo',
+                    modified: `2026-01-02T${String(i).padStart(2, '0')}:00:00Z`,
+                }),
+            )
+        }
+        taskMap.value = new Map(tasks.map((t) => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const pressEnter = (element: Element) => {
+            const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+            element.dispatchEvent(event)
+            return event.defaultPrevented
+        }
+        // A cancelled Enter keydown suppresses the button's activation.
+        expect(pressEnter(wrapper.get('[data-status="Todo"] .board-col-add').element)).toBe(false)
+        expect(pressEnter(wrapper.get('.show-more-btn').element)).toBe(false)
+        wrapper.unmount()
+    })
+
     it('hides "show more" when all cards fit within page size', async () => {
         const tasks = [baseTask({ id: 'ACME-1', status: 'Todo' })]
         taskMap.value = new Map(tasks.map((t) => [t.id, t]))

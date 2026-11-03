@@ -14,7 +14,7 @@ const api = vi.hoisted(() => ({
     showConfig: vi.fn(),
 }))
 vi.mock('../api/client', () => ({ api }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }), onBeforeRouteLeave: vi.fn() }))
 
 function deferred<T = any>() {
     let resolve!: (value: T) => void

@@ -64,6 +64,8 @@ describe.concurrent('UI Automation page smoke tests', () => {
                         });
                     });
                     await page.selectOption('select[aria-label="Project scope"]', 'UIAUT');
+                    // Unsaved edits now ask before switching scope (DEV-288).
+                    await page.getByRole('button', { name: 'Discard changes', exact: true }).click();
                     await page.getByText('Loading configuration', { exact: false }).waitFor();
                     expect(await page.getByRole('button', { name: 'Save rules', exact: true }).count()).toBe(0);
                     release();

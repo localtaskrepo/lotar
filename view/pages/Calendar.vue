@@ -192,7 +192,16 @@
                     </div>
                   </TaskHoverCard>
                 </li>
-                <li v-if="hiddenCountFor(cell) > 0" key="__more__" class="muted more" @click="openDay(cell.date)">
+                <li
+                  v-if="hiddenCountFor(cell) > 0"
+                  key="__more__"
+                  class="muted more"
+                  role="button"
+                  tabindex="0"
+                  @click="openDay(cell.date)"
+                  @keydown.enter.prevent="openDay(cell.date)"
+                  @keydown.space.prevent="openDay(cell.date)"
+                >
                   {{ moreTicketsLabel(hiddenCountFor(cell)) }}
                 </li>
                 <li key="__add__" class="cell-add" :data-date="cell.dateKey">
@@ -886,6 +895,9 @@ watch(showSprints, (enabled, previous) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.tasks li.more:focus-visible {
+  box-shadow: var(--focus-ring);
 }
 .tasks li.more:hover {
   background: color-mix(in oklab, var(--surface) 82%, transparent);

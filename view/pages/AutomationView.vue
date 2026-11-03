@@ -4,12 +4,18 @@
       reload-label="Refresh automations"
       :reloading="loading"
       :reload-disabled="loading || savingRules"
-      @reload="refresh"
+      @reload="requestReload"
     >
       <template #title>Automations</template>
       <template #subtitle>Configure rules that trigger actions automatically.</template>
       <template #toolbar>
-        <UiSelect v-model="project" aria-label="Project scope" class="toolbar-select">
+        <UiSelect
+          :key="scopeSelectKey"
+          :model-value="project"
+          aria-label="Project scope"
+          class="toolbar-select"
+          @update:model-value="requestScope"
+        >
           <option value="">Global rules</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">
             {{ formatProjectLabel(p) }}
@@ -201,13 +207,29 @@
         </UiCard>
       </template>
     </template>
+
+    <UiModal
+      :open="discardPrompt !== null"
+      size="sm"
+      aria-label="Discard unsaved rule changes"
+      @close="resolveDiscard(false)"
+    >
+      <div class="dialog-card discard-card" data-testid="automation-discard-dialog">
+        <h2>Discard unsaved rule changes?</h2>
+        <p class="muted">{{ discardPrompt?.message }}</p>
+        <footer class="dialog-actions">
+          <UiButton variant="ghost" type="button" @click="resolveDiscard(false)">Keep editing</UiButton>
+          <UiButton variant="danger" type="button" @click="resolveDiscard(true)">Discard changes</UiButton>
+        </footer>
+      </div>
+    </UiModal>
   </section>
 </template>
 
 <script setup lang="ts">
 import PageHeader from '../components/PageHeader.vue'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { AutomationRunResponse, AutomationSimulateResponse, ConfigInspectResult, ProjectDTO } from '../api/types'
 import { showToast } from '../components/toast'
@@ -216,6 +238,7 @@ import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiInput from '../components/UiInput.vue'
+import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 
 const activeTab = ref<'rules' | 'simulator'>('rules')
@@ -345,6 +368,55 @@ function onRulesRan(result: AutomationRunResponse) {
   )
 }
 
+// ---- Unsaved-change guards (same pattern as ConfigView) ---------------------
+// Rule edits live only in scopeYaml until "Save rules"; switching scope,
+// reloading or leaving would otherwise replace them without a word.
+type DiscardPrompt = { message: string; resolve: (discard: boolean) => void }
+const discardPrompt = ref<DiscardPrompt | null>(null)
+const scopeSelectKey = ref(0)
+
+function confirmDiscard(message: string): Promise<boolean> {
+  if (!rulesDirty.value) return Promise.resolve(true)
+  discardPrompt.value?.resolve(false)
+  return new Promise((resolve) => {
+    discardPrompt.value = { message, resolve }
+  })
+}
+
+function resolveDiscard(discard: boolean) {
+  const prompt = discardPrompt.value
+  discardPrompt.value = null
+  prompt?.resolve(discard)
+}
+
+async function requestScope(next: string) {
+  if (next === project.value) return
+  const label = next ? projects.value.find((p) => p.prefix === next)?.name || next : 'Global rules'
+  if (await confirmDiscard(`Switching to ${label} discards the rule changes you have not saved.`)) {
+    project.value = next
+  } else {
+    // Re-render the select so it shows the scope that is still active.
+    scopeSelectKey.value += 1
+  }
+}
+
+async function requestReload() {
+  if (await confirmDiscard('Reloading discards the rule changes you have not saved.')) void refresh()
+}
+
+onBeforeRouteLeave(() => confirmDiscard('Leaving this page discards the rule changes you have not saved.'))
+
+function warnBeforeUnload(event: BeforeUnloadEvent) {
+  if (!rulesDirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', warnBeforeUnload)
+  discardPrompt.value?.resolve(false)
+})
+
 function resetRules() {
   scopeYaml.value = baselineYaml.value
   rulesSaveError.value = ''
@@ -396,6 +468,24 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Dialog shells are provided by UiModal; these are content layout only. */
+.discard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.discard-card h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .filter-tab {
   background: transparent;
   border: none;

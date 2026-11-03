@@ -142,7 +142,8 @@
           <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
             <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
             <span class="muted"
-              >Clears saved table columns, sorting, and board/calendar field visibility for all projects.</span
+              >Clears saved table columns, sorting, and board, calendar and dependency field visibility for all
+              projects.</span
             >
           </div>
         </UiCard>
@@ -280,6 +281,7 @@ import {
   type ThemePreference,
 } from '../utils/theme'
 import ThemeSelect from '../components/ThemeSelect.vue'
+import { showToast } from '../components/toast'
 import { useBranding } from '../composables/useBranding'
 
 const { isTabVisible, setTabHidden } = useNavTabs()
@@ -452,19 +454,27 @@ function resetAccent() {
 }
 
 function resetTables() {
+  // Each entry also covers its per-project `<prefix>::<PROJECT>` keys.
   const prefixes = [
     'lotar.taskTable.columns',
     'lotar.taskTable.sort',
     'lotar.taskTable.columnOrder',
+    // DEV-57: the Tasks page keeps its own sort.
+    'lotar.tasks.sort',
     'lotar.sprints.columns',
     'lotar.sprints.sort',
     'lotar.sprints.columnOrder',
     'lotar.boardFields',
     'lotar.boardSort',
     'lotar.calendarHoverFields',
+    'lotar.dependencyHoverFields',
   ]
   try {
-    const keys = Object.keys(localStorage)
+    const keys: string[] = []
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (key !== null) keys.push(key)
+    }
     for (const k of keys) {
       if (prefixes.some((p) => k.startsWith(p))) {
         localStorage.removeItem(k)
@@ -472,7 +482,10 @@ function resetTables() {
     }
   } catch {
     // Storage can be unavailable (private mode, blocked site data).
+    showToast('Could not reset saved columns and sorting: browser storage is unavailable')
+    return
   }
+  showToast('Saved columns and sorting were reset')
 }
 
 function clearSavedFilters() {
