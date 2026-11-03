@@ -9,7 +9,7 @@ Centralized documentation topics for quick navigation.
 	- Templates: [Templates Guide](./templates.md)
 - Tasks: [Add](./add.md) · [List](./list.md) · [Status](./status.md) · [Priority](./priority.md) · [Assignee](./assignee.md) · [Due Date](./due-date.md) · [Effort](./effort.md) · [Comment](./comment.md) · [History/Diff/At](./history.md) · [Changelog](./changelog.md)
 - Source & Git: [Scan](./scan.md) · [Stats](./stats.md) · [Git Hooks](./git.md)
-- Sync (beta): [Jira and GitHub Sync](../developers/sync.md)
+- Sync (beta): [Jira and GitHub Sync](./sync.md)
 - Sprints: [Sprint Workflows](./sprints.md)
 - MCP: [MCP Server](./mcp.md)
 - Agents: [Agent Jobs](./agent.md) · [Agent Skills and Template](./agent-skills.md)

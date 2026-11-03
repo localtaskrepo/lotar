@@ -94,11 +94,11 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - Note: mapped local values for `status`, `priority`, and `type` are validated against the target project's `issue.states`/`issue.priorities`/`issue.types`. A remote value that maps to a local value outside those sets fails for that issue (recorded as a sync warning/failed entry listing the valid values) instead of being persisted silently — configure the project enums or extend the mapping values accordingly.
 - auth_profiles: map (home config only; ignored in project configs)
 - auth_profiles.<name>.provider: enum (jira|github)
-- auth_profiles.<name>.method: string
+- auth_profiles.<name>.method: string (basic|token|bearer|pat; default basic for Jira, token for GitHub)
 - auth_profiles.<name>.token_env: string (env var name or literal token)
 - auth_profiles.<name>.email_env: string (env var name or literal email)
-- auth_profiles.<name>.base_url: string
-- auth_profiles.<name>.api_url: string
+- auth_profiles.<name>.base_url: string (Jira site URL)
+- auth_profiles.<name>.api_url: string (API address override, such as GitHub Enterprise; GitHub defaults to https://api.github.com)
 
 ## Home and Project keys
 Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `default.project`, sprint defaults, `web_ui_path` and `ui.*` are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
@@ -202,7 +202,7 @@ remotes:
           Done: done
 ```
 
-The remote example is configuration only. Before a real sync, configure its home auth profile as documented in [Sync](../developers/sync.md); validation of YAML is not a credential or connectivity check.
+The remote example is configuration only. Before a real sync, configure its home auth profile as documented in [Sync](./sync.md); validation of YAML is not a credential or connectivity check.
 
 ## Duration and JSON Recipes
 

@@ -143,7 +143,7 @@ lotar list 'redirct loop' --sort-by relevance # typo-tolerant, best match first
 
 ### Jira and GitHub sync (beta)
 
-Pull issues from Jira or GitHub into local tasks, or push local changes back, with field and value mappings per remote. Sync runs only when you ask: from the CLI, the Sync page, or MCP. Credentials stay in your home config or environment, never in the repo. See the [sync guide](docs/developers/sync.md).
+Pull issues from Jira or GitHub into local tasks, or push local changes back, with field and value mappings per remote. Sync runs only when you ask: from the CLI, the Sync page, or MCP. Credentials stay in your home config or environment, never in the repo. See the [sync guide](docs/help/sync.md).
 
 ```yaml
 # .tasks/<PROJECT>/config.yml

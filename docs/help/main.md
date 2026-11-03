@@ -36,6 +36,7 @@ lotar serve --open
 | Track deadlines and estimates | `lotar due-date`, `lotar effort` |
 | Capture discussion | `lotar comment` or use the web UI task panel |
 | Run agent jobs | `lotar agent run`, `lotar agent list-running` |
+| Sync with Jira or GitHub | `lotar pull <remote>`, `lotar push <remote>`, `lotar sync check <remote>` (see [Sync](./sync.md)) |
 | Watch metrics | `lotar stats`, `lotar sprint ...`, or the Insights tab in the browser |
 
 See [Agent Jobs](./agent.md) for the full CLI workflow and wrapper requirements.

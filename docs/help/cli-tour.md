@@ -187,7 +187,7 @@ lotar pull jira-home
 lotar push jira-home
 ```
 
-More: [Sync guide](../developers/sync.md), [Configuration reference](config-reference.md).
+More: [Sync guide](sync.md), [Configuration reference](config-reference.md).
 
 ## Where LoTaR fits
 

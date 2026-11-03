@@ -25,3 +25,15 @@ fn help_alias_resolution() {
             .contains("lotar sprint")
     );
 }
+
+#[test]
+fn sync_help_answers_for_pull_and_push() {
+    // DEV-294: `lotar help sync|pull|push` had no page.
+    let help = HelpSystem::new(OutputFormat::Text, false);
+    for topic in ["sync", "pull", "push"] {
+        let text = help
+            .show_command_help(topic)
+            .unwrap_or_else(|e| panic!("{topic}: {e}"));
+        assert!(text.contains("sync check"), "{topic}: {text}");
+    }
+}

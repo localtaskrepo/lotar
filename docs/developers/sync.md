@@ -1,6 +1,6 @@
 # Manual Sync (Push/Pull)
 
-This document defines the manual-only sync contract for Jira and GitHub integrations. The sync pipeline is invoked explicitly (CLI, UI button, or MCP tool). No polling or webhooks are used.
+User guide: [docs/help/sync.md](../help/sync.md) (`lotar help sync`). This document defines the manual-only sync contract for Jira and GitHub integrations. The sync pipeline is invoked explicitly (CLI, UI button, or MCP tool). No polling or webhooks are used.
 
 Sync integrations are still in beta. Use least-privilege credentials and verify the repositories or projects you target before running pull/push, since LoTaR can create and update issues.
 
@@ -82,7 +82,7 @@ remotes:
     provider: jira
     project: ENG
     auth_profile: jira.default
-    filter: "status != Done"
+    filter: "project = ENG AND status != Done" # the filter replaces the default `project = ENG` JQL
     mapping:
       title: summary
       description:
