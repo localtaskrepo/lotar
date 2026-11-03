@@ -916,42 +916,43 @@ fn parse_path_and_query(path_full: &str) -> (String, HashMap<String, String>) {
 }
 
 fn url_decode(s: &str) -> String {
-    // Minimal percent-decoder for application/x-www-form-urlencoded-like strings
-    let mut out = String::with_capacity(s.len());
+    // Minimal percent-decoder for application/x-www-form-urlencoded-like
+    // strings. Decoded bytes are collected first and read as UTF-8, so
+    // `%C3%A9` is "é", not two Latin-1 characters (DEV-256).
+    let hex = |c: u8| -> Option<u8> {
+        match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(10 + c - b'a'),
+            b'A'..=b'F' => Some(10 + c - b'A'),
+            _ => None,
+        }
+    };
     let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
             b'+' => {
-                out.push(' ');
+                out.push(b' ');
                 i += 1;
             }
             b'%' if i + 2 < bytes.len() => {
-                let hi = bytes[i + 1];
-                let lo = bytes[i + 2];
-                let hex = |c: u8| -> Option<u8> {
-                    match c {
-                        b'0'..=b'9' => Some(c - b'0'),
-                        b'a'..=b'f' => Some(10 + c - b'a'),
-                        b'A'..=b'F' => Some(10 + c - b'A'),
-                        _ => None,
-                    }
-                };
-                if let (Some(h), Some(l)) = (hex(hi), hex(lo)) {
-                    out.push((h << 4 | l) as char);
+                if let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
+                    out.push(h << 4 | l);
                     i += 3;
                 } else {
-                    out.push('%');
+                    out.push(b'%');
                     i += 1;
                 }
             }
             c => {
-                out.push(c as char);
+                out.push(c);
                 i += 1;
             }
         }
     }
-    out
+    String::from_utf8(out)
+        .unwrap_or_else(|err| String::from_utf8_lossy(err.as_bytes()).into_owned())
 }
 
 fn resolve_server_tasks_dir() -> Option<PathBuf> {
@@ -1192,7 +1193,25 @@ fn start_tasks_watcher() {
 
 #[cfg(test)]
 mod tests {
-    use super::{content_type_for, host_is_allowed, is_safe_rel_path, reason_phrase};
+    use super::{
+        content_type_for, host_is_allowed, is_safe_rel_path, parse_path_and_query, reason_phrase,
+        url_decode,
+    };
+
+    #[test]
+    fn query_values_decode_as_utf8() {
+        // DEV-256: multibyte values used to decode as Latin-1 ("CafÃ©").
+        assert_eq!(url_decode("Caf%C3%A9"), "Café");
+        assert_eq!(url_decode("%C3%BCber+alles"), "über alles");
+        assert_eq!(url_decode("%F0%9F%9A%80"), "🚀");
+        assert_eq!(url_decode("Jos\u{e9}"), "José", "raw UTF-8 stays intact");
+        assert_eq!(url_decode("100%"), "100%");
+        assert_eq!(url_decode("%zz"), "%zz");
+        assert_eq!(url_decode("%FF"), "\u{FFFD}", "invalid UTF-8 is replaced");
+        let (_, query) = parse_path_and_query("/api/tasks/list?assignee=Jos%C3%A9&q=caf%C3%A9");
+        assert_eq!(query.get("assignee").map(String::as_str), Some("José"));
+        assert_eq!(query.get("q").map(String::as_str), Some("café"));
+    }
 
     #[test]
     fn rebound_host_names_are_rejected() {

@@ -1,13 +1,19 @@
 title: 'Non-ASCII searches and filters return nothing: query strings are decoded as Latin-1'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:33.859449+00:00
-modified: 2026-10-31T22:06:33.919109+00:00
+modified: 2026-11-03T18:04:21.399921+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T18:04:21.255978+00:00
+  text: |-
+    Outcome: fixed findings 1 and 2 (same defect). web_server url_decode now collects decoded bytes (percent-escapes and raw bytes alike) and reads them as UTF-8, replacing invalid sequences with U+FFFD, like routes/attachments percent_decode.
+    Evidence: unit test query_values_decode_as_utf8 (src/web_server.rs); integration test non_ascii_query_values_match_over_http (q, assignee, tags and query= with é/ü through a real socket) in tests/web_api_integration_test.rs; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -37,3 +43,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T18:01:22.635612+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T18:04:21.255978+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T18:04:21.399921+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

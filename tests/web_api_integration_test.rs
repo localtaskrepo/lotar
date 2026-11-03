@@ -620,6 +620,37 @@ fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
 }
 
 #[test]
+fn non_ascii_query_values_match_over_http() {
+    // DEV-256: percent-encoded UTF-8 used to decode as Latin-1, so these
+    // searches and filters returned nothing.
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    let project_dir = tasks_dir.join("DEMO");
+    std::fs::create_dir_all(&project_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    std::fs::write(
+        project_dir.join("1.yml"),
+        "title: Café über\nstatus: Todo\npriority: Low\ntype: Feature\nassignee: José\ntags: [über]\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n",
+    )
+    .unwrap();
+
+    let mut server = start_server();
+    let port = server.port();
+    for query in [
+        "q=Caf%C3%A9",
+        "assignee=Jos%C3%A9",
+        "tags=%C3%BCber",
+        "query=assignee%3AJos%C3%A9",
+    ] {
+        let (status, _headers, body) = http_get_bytes(port, &format!("/api/tasks/list?{query}"));
+        assert_eq!(status, 200, "{query}");
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["data"]["total"], 1, "{query} should match: {json}");
+    }
+    server.stop();
+}
+
+#[test]
 fn api_list_reflects_external_file_edits_immediately() {
     let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
     let tmp = tempfile::tempdir().unwrap();
