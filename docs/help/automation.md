@@ -210,7 +210,13 @@ on:
     run: "sh -c 'echo $LOTAR_TICKET_ID'"
 ```
 
-When using the short-form shell syntax, template variable values are automatically shell-escaped (single-quoted) to prevent injection.
+In the short form, template values never become part of the script text. Each `${{...}}` placeholder is replaced with a reference to an environment variable (`LOTAR_TEMPLATE_1`, `LOTAR_TEMPLATE_2`, ...) that holds the value, so a title such as `$(rm -rf ~)` is printed, not run:
+
+- unquoted, `echo ${{ticket.title}}` becomes `echo "${LOTAR_TEMPLATE_1}"` (one argument)
+- inside double quotes, `echo "New: ${{ticket.title}}"` becomes `echo "New: ${LOTAR_TEMPLATE_1}"`
+- inside single quotes, `sh -c 'echo ${{ticket.title}}'` becomes `sh -c 'echo ${LOTAR_TEMPLATE_1}'`, which the nested shell expands. Without a nested shell, single quotes keep the reference literal, so put placeholders outside single quotes.
+
+The structured form passes `args` to the program directly, without a shell. If you start a shell there yourself (`command: sh`, `args: [-c, ...]`), read values from the `LOTAR_TICKET_*` variables (`"$LOTAR_TICKET_TITLE"`) rather than placing `${{...}}` in the script. On Windows the short form runs through `cmd`, which cannot keep values out of the command line, so a short-form command with placeholders is refused there; use the structured form or the environment variables.
 
 #### Synchronous vs asynchronous execution
 

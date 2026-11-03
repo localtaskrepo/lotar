@@ -1425,15 +1425,32 @@ fn execute_run_action(
 ) -> LoTaRResult<()> {
     let (command, args, env, cwd, ignore_failure, wait) = match run {
         AutomationRunAction::Shell(raw) => {
-            let expanded = tmpl.expand_shell_safe(raw);
-            let trimmed = expanded.trim().to_string();
+            let expanded = tmpl.expand_for_shell(raw);
+            let trimmed = expanded.script.trim().to_string();
             if trimmed.is_empty() {
                 return Err(LoTaRError::ValidationError(
                     "Automation run command cannot be empty".to_string(),
                 ));
             }
+            // cmd.exe expands %VARS% before parsing, so it cannot keep
+            // values out of the command line; refuse rather than inject.
+            if cfg!(windows) && !expanded.env.is_empty() {
+                return Err(LoTaRError::ValidationError(
+                    "Template values in a short-form run command are not supported on Windows; use the command/args form or the LOTAR_TICKET_* environment variables".to_string(),
+                ));
+            }
             let (program, args) = build_shell_command(&trimmed);
-            (program, args, HashMap::new(), None, false, true)
+            (
+                program,
+                args,
+                expanded
+                    .env
+                    .into_iter()
+                    .collect::<HashMap<String, String>>(),
+                None,
+                false,
+                true,
+            )
         }
         AutomationRunAction::Command(command) => {
             let expanded_cmd = tmpl.expand(&command.command);

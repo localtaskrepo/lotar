@@ -239,13 +239,80 @@ impl TemplateContext {
 
     /// Expand all `${{key}}` placeholders in `input`. Unknown keys expand to empty string.
     pub fn expand(&self, input: &str) -> String {
-        self.expand_inner(input, false)
+        self.expand_inner(input)
     }
 
-    /// Like `expand` but wraps substituted values in shell-safe single quotes.
-    /// Use this for strings that will be passed to `sh -c` to prevent injection.
-    pub fn expand_shell_safe(&self, input: &str) -> String {
-        self.expand_inner(input, true)
+    /// Expand a short-form `run` script without putting values into the
+    /// script text (DEV-258). Each placeholder becomes a reference to an
+    /// environment variable (`LOTAR_TEMPLATE_1`, ...) returned alongside the
+    /// script, so the shell only ever sees values as data, never as code.
+    ///
+    /// The reference depends on the quoting at the placeholder:
+    /// unquoted `"${V}"` (one word), inside double quotes `${V}`, and inside
+    /// single quotes `${V}` left literal for a nested shell (`sh -c '...'`)
+    /// to expand. Quoting values instead could not work: a value spliced
+    /// into a quoted or nested script is parsed again as code.
+    pub fn expand_for_shell(&self, input: &str) -> ShellExpansion {
+        #[derive(Clone, Copy, PartialEq)]
+        enum Quote {
+            None,
+            Single,
+            Double,
+        }
+        let mut script = String::with_capacity(input.len());
+        let mut env: Vec<(String, String)> = Vec::new();
+        let mut keys: Vec<String> = Vec::new();
+        let mut quote = Quote::None;
+        let mut rest = input;
+        while let Some(ch) = rest.chars().next() {
+            if rest.starts_with("${{")
+                && let Some(end) = rest[3..].find("}}")
+            {
+                let key = rest[3..3 + end].trim().to_string();
+                rest = &rest[3 + end + 2..];
+                let Some(value) = self.lookup(&key) else {
+                    continue; // Unknown key → empty string
+                };
+                let index = match keys.iter().position(|k| *k == key) {
+                    Some(index) => index,
+                    None => {
+                        keys.push(key);
+                        env.push((format!("LOTAR_TEMPLATE_{}", keys.len()), value));
+                        keys.len() - 1
+                    }
+                };
+                let name = &env[index].0;
+                match quote {
+                    Quote::None => {
+                        script.push_str("\"${");
+                        script.push_str(name);
+                        script.push_str("}\"");
+                    }
+                    Quote::Single | Quote::Double => {
+                        script.push_str("${");
+                        script.push_str(name);
+                        script.push('}');
+                    }
+                }
+                continue;
+            }
+            script.push(ch);
+            rest = &rest[ch.len_utf8()..];
+            match (quote, ch) {
+                (Quote::None, '\'') => quote = Quote::Single,
+                (Quote::None, '"') => quote = Quote::Double,
+                (Quote::Single, '\'') | (Quote::Double, '"') => quote = Quote::None,
+                (Quote::None | Quote::Double, '\\') => {
+                    // A backslash escapes the next character.
+                    if let Some(next) = rest.chars().next() {
+                        script.push(next);
+                        rest = &rest[next.len_utf8()..];
+                    }
+                }
+                _ => {}
+            }
+        }
+        ShellExpansion { script, env }
     }
 
     /// Preview expansion (DEV-118): like `expand`, but placeholders that only
@@ -278,7 +345,7 @@ impl TemplateContext {
         result
     }
 
-    fn expand_inner(&self, input: &str, shell_escape: bool) -> String {
+    fn expand_inner(&self, input: &str) -> String {
         let mut result = String::with_capacity(input.len());
         let mut rest = input;
         while let Some(start) = rest.find("${{") {
@@ -287,11 +354,7 @@ impl TemplateContext {
             if let Some(end) = after_open.find("}}") {
                 let key = after_open[..end].trim();
                 if let Some(value) = self.lookup(key) {
-                    if shell_escape {
-                        shell_quote_into(&mut result, &value);
-                    } else {
-                        result.push_str(&value);
-                    }
+                    result.push_str(&value);
                 }
                 // Unknown key → empty string (no output)
                 rest = &after_open[end + 2..];
@@ -306,18 +369,12 @@ impl TemplateContext {
     }
 }
 
-/// Write `value` into `out` as a POSIX single-quoted string.
-/// Single quotes inside the value are escaped as `'\''`.
-fn shell_quote_into(out: &mut String, value: &str) {
-    out.push('\'');
-    for ch in value.chars() {
-        if ch == '\'' {
-            out.push_str("'\\''");
-        } else {
-            out.push(ch);
-        }
-    }
-    out.push('\'');
+/// A short-form `run` script plus the environment variables its template
+/// placeholders refer to (see [`TemplateContext::expand_for_shell`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShellExpansion {
+    pub script: String,
+    pub env: Vec<(String, String)>,
 }
 
 #[cfg(not(feature = "schema"))]
@@ -421,10 +478,12 @@ mod tests {
         assert_eq!(ctx.expand("[${{ticket.comments[-9].text}}]"), "[]");
         assert_eq!(ctx.expand("[${{ticket.references[0].nope}}]"), "[]");
         assert_eq!(ctx.expand("[${{ticket.tags[x]}}]"), "[]");
-        // Shell-safe expansion quotes the joined value as one argument.
+        // Shell expansion passes the joined value as one variable.
+        let shell = ctx.expand_for_shell("echo ${{ticket.tags[*]}}");
+        assert_eq!(shell.script, "echo \"${LOTAR_TEMPLATE_1}\"");
         assert_eq!(
-            ctx.expand_shell_safe("echo ${{ticket.tags[*]}}"),
-            "echo 'ui, agents'"
+            shell.env,
+            vec![("LOTAR_TEMPLATE_1".to_string(), "ui, agents".to_string())]
         );
     }
 
@@ -502,37 +561,37 @@ mod tests {
     }
 
     #[test]
-    fn expand_shell_safe_quotes_values() {
+    fn shell_expansion_never_puts_values_in_the_script() {
         let mut ctx = TemplateContext::new();
-        ctx.set("ticket.title", "Fix the bug");
+        ctx.set("ticket.title", "Hello $(touch INJECTED) '; echo x #");
+        ctx.set("ticket.id", "X-1");
+        let unquoted =
+            ctx.expand_for_shell("echo ${{ticket.title}} ${{ticket.id}} ${{ticket.title}}");
         assert_eq!(
-            ctx.expand_shell_safe("echo ${{ticket.title}}"),
-            "echo 'Fix the bug'"
+            unquoted.script,
+            "echo \"${LOTAR_TEMPLATE_1}\" \"${LOTAR_TEMPLATE_2}\" \"${LOTAR_TEMPLATE_1}\""
         );
-    }
+        assert_eq!(unquoted.env.len(), 2, "one variable per distinct key");
+        assert!(!unquoted.script.contains("touch"));
 
-    #[test]
-    fn expand_shell_safe_escapes_single_quotes() {
-        let mut ctx = TemplateContext::new();
-        ctx.set("ticket.title", "it's broken");
+        let double = ctx.expand_for_shell("echo \"New: ${{ticket.title}}\"");
+        assert_eq!(double.script, "echo \"New: ${LOTAR_TEMPLATE_1}\"");
+
+        let nested = ctx.expand_for_shell("sh -c 'echo New task: ${{ticket.title}} >> log'");
         assert_eq!(
-            ctx.expand_shell_safe("echo ${{ticket.title}}"),
-            "echo 'it'\\''s broken'"
+            nested.script,
+            "sh -c 'echo New task: ${LOTAR_TEMPLATE_1} >> log'"
         );
+
+        let escaped = ctx.expand_for_shell("echo \\' ${{ticket.id}}");
+        assert_eq!(escaped.script, "echo \\' \"${LOTAR_TEMPLATE_1}\"");
     }
 
     #[test]
-    fn expand_shell_safe_prevents_injection() {
-        let mut ctx = TemplateContext::new();
-        ctx.set("ticket.title", "'; echo injected #");
-        let result = ctx.expand_shell_safe("echo ${{ticket.title}}");
-        assert_eq!(result, "echo ''\\''; echo injected #'");
-        // The value is safely wrapped — the shell interprets it as a literal string
-    }
-
-    #[test]
-    fn expand_shell_safe_unknown_stays_empty() {
+    fn shell_expansion_unknown_keys_stay_empty() {
         let ctx = TemplateContext::new();
-        assert_eq!(ctx.expand_shell_safe("echo ${{unknown}}"), "echo ");
+        let shell = ctx.expand_for_shell("echo ${{unknown}}");
+        assert_eq!(shell.script, "echo ");
+        assert!(shell.env.is_empty());
     }
 }

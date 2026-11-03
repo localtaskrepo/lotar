@@ -1,13 +1,19 @@
 title: Automation template values can inject shell commands despite the documented escaping
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:34.134989+00:00
-modified: 2026-10-31T22:06:34.194052+00:00
+modified: 2026-11-03T21:34:14.596949+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T21:34:14.548925+00:00
+  text: |-
+    Outcome: fixed (including the verifier's double-quote case). Short-form run no longer splices values into the script. TemplateContext::expand_for_shell lexes the script's quoting and replaces each placeholder with a reference to an env var LOTAR_TEMPLATE_<n> holding the value: unquoted -> "${V}", inside double quotes -> ${V}, inside single quotes -> ${V} for the nested shell to expand. Expansion results are never re-parsed as code, so titles with $(...), backticks, quotes or ; are printed verbatim. The old single-quote wrapper (expand_shell_safe) is removed. On Windows (cmd expands %VARS% before parsing) a short-form command with placeholders is refused with a pointer to the structured form. Structured command/args are unchanged (no shell); docs tell users who start a shell there to read $LOTAR_TICKET_*.
+    Evidence: unit tests shell_expansion_* in src/automation/template.rs; tests/dev258_automation_shell_injection_test.rs runs nested sh -c, double-quoted and unquoted rules with an injection title through lotar add and checks no marker file appears and the title is logged verbatim; 49 automation tests pass; docs/help/automation.md updated; clippy clean. Windows path not run locally.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -28,3 +34,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:28:50.260729+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T21:34:14.548925+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T21:34:14.596949+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
