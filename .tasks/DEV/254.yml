@@ -5,7 +5,7 @@ type: Bug
 reporter: mallox
 assignee: claude
 created: 2026-10-31T22:06:33.505823+00:00
-modified: 2026-11-03T17:56:12.606693+00:00
+modified: 2026-11-03T22:05:36.526426+00:00
 relationships:
   related:
   - DEV-253
@@ -21,6 +21,8 @@ comments:
     6. Fixed: all responses send X-Frame-Options: SAMEORIGIN, CSP frame-ancestors 'self' (the PDF attachment viewer frames same-origin) and X-Content-Type-Options: nosniff.
     Evidence: unit tests in src/web_server.rs (host_is_allowed, is_safe_rel_path) and serve_handler.rs; integration tests rebound_host_headers_are_rejected_for_every_route and responses_forbid_cross_site_framing in tests/web_api_integration_test.rs; clippy clean.
     Remaining: full lint/test/smoke gates run at the end of the bug batch.
+- date: 2026-11-03T22:05:36.526426+00:00
+  text: 'Follow-up: the full smoke run caught attachment downloads sending ''X-Content-Type-Options: nosniff'' twice (the attachments route already sets it). API responses now add only the security headers a route has not set. Evidence: smoke ui.attachment-previews passes again; web_api_integration framing test unchanged.'
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible. Any website can drive the local API (including automation commands) through DNS rebinding, because the Host header is never checked and GET/SSE skip the Origin check. Related browser-facing gaps are grouped here.
 
@@ -99,3 +101,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-03T22:05:36.526426+00:00
+  actor: claude
+  changes:
+  - field: comment_added

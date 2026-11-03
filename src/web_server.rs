@@ -416,12 +416,24 @@ fn handle_connection(
         } else {
             format!("Content-Length: {}\r\n", resp.body.len())
         };
+        // Routes may set some of these themselves (attachments send
+        // nosniff); never send a header twice.
+        let security_headers: String = SECURITY_HEADERS
+            .split_inclusive("\r\n")
+            .filter(|line| {
+                let name = line.split(':').next().unwrap_or_default();
+                !resp
+                    .headers
+                    .iter()
+                    .any(|(k, _)| k.eq_ignore_ascii_case(name))
+            })
+            .collect();
         let response = format!(
             "HTTP/1.1 {} {}\r\n{}{}{}\r\n",
             resp.status,
             reason_phrase(resp.status),
             headers_str,
-            SECURITY_HEADERS,
+            security_headers,
             content_length
         );
         let _ = stream.write_all(response.as_bytes());
