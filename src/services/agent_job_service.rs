@@ -211,6 +211,7 @@ impl AgentJobService {
             crate::config::resolution::config_for_project(tasks_dir, Some(&parsed_ticket.project))
                 .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
         let profile = resolve_profile(&config, req)?;
+        ensure_profile_trusted(tasks_dir, req)?;
         profile.runner.parse::<AgentRunnerKind>().map_err(|_| {
             LoTaRError::ValidationError(format!(
                 "Unsupported runner '{}'. Expected {}",
@@ -256,6 +257,7 @@ impl AgentJobService {
                 .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
 
         let profile = resolve_profile(&config, &req)?;
+        ensure_profile_trusted(tasks_dir, &req)?;
         let runner_kind = profile.runner.parse::<AgentRunnerKind>().map_err(|_| {
             LoTaRError::ValidationError(format!(
                 "Unsupported runner '{}'. Expected {}",
@@ -841,6 +843,27 @@ fn descendant_pids(root: u32) -> Vec<u32> {
         }
     }
     found
+}
+
+/// Agent profiles defined in repository config run programs the
+/// repository chose; they need a trusted workspace (DEV-259). Bare
+/// `--runner` jobs and home-config profiles are the user's own choice.
+fn ensure_profile_trusted(
+    tasks_dir: &std::path::Path,
+    req: &AgentJobCreateRequest,
+) -> LoTaRResult<()> {
+    use crate::services::trust_service::TrustService;
+    let Some(name) = req.agent.as_deref() else {
+        return Ok(());
+    };
+    if TrustService::profile_from_repository(tasks_dir, name)
+        && !TrustService::allows_commands(tasks_dir)
+    {
+        return Err(LoTaRError::ValidationError(
+            TrustService::untrusted_message(tasks_dir, &format!("agent profile '{name}'")),
+        ));
+    }
+    Ok(())
 }
 
 fn resolve_profile(

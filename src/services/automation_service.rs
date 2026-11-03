@@ -1407,6 +1407,35 @@ fn resolve_run_cwd(tasks_dir: &Path, raw: Option<&str>) -> LoTaRResult<std::path
     Ok(workspace_root.join(path))
 }
 
+/// Whether `run` actions may execute for this task: rules from the home
+/// automation file always may; repository rules need a trusted workspace.
+fn run_allowed(tasks_dir: &Path, task: &TaskDTO) -> bool {
+    let project = crate::storage::TaskId::parse(&task.id)
+        .map(|parsed| parsed.project)
+        .unwrap_or_default();
+    let project_file = !project.is_empty()
+        && crate::utils::paths::project_automation_path(tasks_dir, &project).exists();
+    if !project_file && matches!(automation_persistence::load_home_automation(), Ok(Some(_))) {
+        return true;
+    }
+    crate::services::trust_service::TrustService::allows_commands(tasks_dir)
+}
+
+/// Say once per process that repository run commands were held back.
+fn warn_untrusted_run_once(tasks_dir: &Path) {
+    static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    eprintln!(
+        "[lotar][warn] {}",
+        crate::services::trust_service::TrustService::untrusted_message(
+            tasks_dir,
+            "automation run commands"
+        )
+    );
+}
+
 fn build_shell_command(raw: &str) -> (String, Vec<String>) {
     if cfg!(windows) {
         ("cmd".to_string(), vec!["/C".to_string(), raw.to_string()])
@@ -1423,6 +1452,12 @@ fn execute_run_action(
     context: &AutomationActionContext,
     tmpl: &TemplateContext,
 ) -> LoTaRResult<()> {
+    // Repository rules run commands only in a trusted workspace (DEV-259).
+    if !run_allowed(tasks_dir, task) {
+        warn_untrusted_run_once(tasks_dir);
+        return Ok(());
+    }
+
     let (command, args, env, cwd, ignore_failure, wait) = match run {
         AutomationRunAction::Shell(raw) => {
             let expanded = tmpl.expand_for_shell(raw);

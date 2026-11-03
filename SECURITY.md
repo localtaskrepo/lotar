@@ -22,3 +22,5 @@ Things we especially want to hear about:
 - Paths that let task data, attachments or references read or write outside the repository
 
 `lotar serve` is designed for local use. Exposing it to a network without your own authentication in front of it is outside the supported setup. The server only answers requests whose `Host` header is a loopback name, an IP address or a name you allowed with `--allow-host`, which blocks DNS rebinding from web pages.
+
+Automation `run` commands and agent profiles that come from a repository's `.tasks` files only run after you trust that repository with `lotar trust`, and again after those files change (see [docs/help/trust.md](docs/help/trust.md)).

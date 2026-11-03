@@ -34,6 +34,7 @@ pub mod task_order;
 pub mod task_service;
 pub mod task_validation;
 pub mod theme_file;
+pub mod trust_service;
 
 pub mod task_list;
 pub mod task_move;

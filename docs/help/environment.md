@@ -131,6 +131,8 @@ All rows below are defined inside the same override table and map directly to th
 | `LOTAR_MCP_TOOLS` | comma-separated tool names | Limits which tools the MCP server lists and runs; unset means all. Agent jobs with `mcp.lotar` use it. |
 | `LOTAR_DOCS_BASE_URL` | URL | Overrides the base used when rendering hyperlinks inside `lotar help`. |
 | `LOTAR_HELP_STYLE` | `ansi`/`plain` | Forces colored (`ansi`) or plain-text help output regardless of TTY detection. |
+| `LOTAR_TRUST_ALL` | `1`/`true` | Trust every repository's automation `run` commands and agent profiles without `lotar trust` (CI, containers). See [Trust](trust.md). |
+| `LOTAR_TRUST_FILE` | Path | Where `lotar trust` records trusted repositories (default `~/.lotar.trust.yml`, or `~/.lotar/trust.yml` when `~/.lotar` is a directory). |
 
 ## Diagnostics & Test Helpers
 

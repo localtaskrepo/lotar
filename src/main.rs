@@ -54,6 +54,7 @@ fn is_valid_command(command: &str) -> bool {
             | "push"
             | "serve"
             | "whoami"
+            | "trust"
             | "stats"
             | "sprint"
             | "changelog"
@@ -1034,6 +1035,10 @@ fn main() {
                     Err(e)
                 }
             }
+        }
+        Commands::Trust { status, revoke } => {
+            lotar::cli::handlers::trust::TrustHandler::execute(status, revoke, &resolver, &renderer)
+                .inspect_err(|e| renderer.emit_error(e))
         }
         Commands::Completions(args) => {
             renderer.log_info("BEGIN COMPLETIONS");

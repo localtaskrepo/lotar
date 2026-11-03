@@ -226,6 +226,17 @@ pub enum Commands {
         explain: bool,
     },
 
+    /// Allow this repository's automation commands and agent profiles to run
+    /// (like `direnv allow`); needed again whenever they change
+    Trust {
+        /// Show whether this repository is trusted and what it would run
+        #[arg(long)]
+        status: bool,
+        /// Stop trusting this repository
+        #[arg(long, conflicts_with = "status")]
+        revoke: bool,
+    },
+
     /// Git integration helpers (hooks, status checks)
     Git {
         #[command(subcommand)]

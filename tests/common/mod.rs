@@ -202,6 +202,13 @@ pub fn reset_lotar_test_environment() {
     unsafe {
         std::env::set_var("LOTAR_IGNORE_HOME_CONFIG", "1");
     }
+    // Fixture workspaces are written by the tests themselves; trust their
+    // automation commands and agent profiles (DEV-259). Trust-gate tests
+    // clear this explicitly and point LOTAR_TRUST_FILE at a temp file.
+    let _guard = env_mutex::lock_var("LOTAR_TRUST_ALL");
+    unsafe {
+        std::env::set_var("LOTAR_TRUST_ALL", "1");
+    }
 }
 
 /// Create an isolated temp directory without mutating the process

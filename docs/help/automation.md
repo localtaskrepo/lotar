@@ -14,6 +14,8 @@ Rules are loaded from the first file found in this order:
 
 If a project automation file exists it fully replaces the global/home rules for that project.
 
+`run` actions from the repository files (project and global) only run after you trust the repository with [`lotar trust`](trust.md), and again after those files change outside LoTaR. Until then they are skipped with a warning; the rule's other actions still apply. Rules from the home file always run.
+
 ## Agent job queueing
 
 When you assign a ticket to an agent profile (e.g., `@claude-review`), LoTaR automatically starts an agent job. No explicit action is needed in your automation rules—assigning to an agent **is** the trigger.
@@ -186,7 +188,7 @@ When an action hands the ticket to an agent profile, `agent` sets how that job r
 
 ### Running commands
 
-Use `run` to execute a command when a rule action fires. Commands run on the server host.
+Use `run` to execute a command when a rule action fires. Commands run on the server host, and only once the repository is trusted ([`lotar trust`](trust.md)) when the rule comes from a repository file.
 
 ```yaml
 on:

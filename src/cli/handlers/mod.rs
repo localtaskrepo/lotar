@@ -30,6 +30,7 @@ pub mod stats;
 pub mod status;
 pub mod sync;
 pub mod task;
+pub mod trust;
 
 // Re-export handlers for easy access
 pub use agent::AgentHandler;

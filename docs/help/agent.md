@@ -15,6 +15,8 @@ LoTaR can orchestrate supported agent CLIs (Copilot CLI, Claude Code, Codex CLI,
 - `lotar agent worktree list` — list agent worktrees
 - `lotar agent worktree cleanup [--all] [--delete-branches] [--dry-run]` — remove stale worktrees
 
+Agent profiles defined in the repository's config files only start after you trust the repository with [`lotar trust`](trust.md), because they pick the program that runs. Profiles from your home config and `--runner` jobs without a profile always start.
+
 ## Runners
 
 Each agent profile names a runner. LoTaR starts the CLI headless, reads its JSON event stream, and shows tool calls as progress and the agent's replies as messages.

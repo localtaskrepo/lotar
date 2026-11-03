@@ -48,6 +48,8 @@ services:
 
 The API has no authentication, and automation rules run shell commands. Publishing the port as `"8080:8080"` makes it reachable from your whole network; keep the `127.0.0.1:` prefix unless the network is trusted or you put your own authentication in front. The server prints a warning when it binds to a non-loopback address, which inside a container is expected. If you reach it through a host name other than `localhost` or an IP address, add `--allow-host <name>` (see [serve](help/serve.md#host-checks)).
 
+Automation `run` commands and agent profiles from the repository need [`lotar trust`](help/trust.md). The container's home directory does not keep the trust record, so either mount one (and set `LOTAR_TRUST_FILE`) or set `LOTAR_TRUST_ALL=1` for a container that only sees your own checkout.
+
 The image sets `LOTAR_TASKS_DIR=/tasks`, so mapping any task directory to `/tasks` is the
 preferred workflow. Mounting the whole repository at `/workspace` keeps git metadata available
 for commands that need it.

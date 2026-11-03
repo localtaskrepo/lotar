@@ -13,7 +13,7 @@ Centralized documentation topics for quick navigation.
 - Sprints: [Sprint Workflows](./sprints.md)
 - MCP: [MCP Server](./mcp.md)
 - Agents: [Agent Jobs](./agent.md) · [Agent Skills and Template](./agent-skills.md)
-- Automation: [Automation Rules](./automation.md)
+- Automation: [Automation Rules](./automation.md) · [Trust](./trust.md)
 - Serve/API: [Serve](./serve.md) · [Docker](../docker.md)
 - Web UI Personalization: [Preferences](./preferences.md)
 

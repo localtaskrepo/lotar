@@ -1,13 +1,20 @@
 title: Require trust before running automation commands that come from repository files
-status: Todo
+status: Done
 priority: High
 type: Feature
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:34.272950+00:00
-modified: 2026-10-31T22:06:34.331086+00:00
+modified: 2026-11-03T21:44:20.678235+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T21:44:20.628376+00:00
+  text: |-
+    Outcome: implemented findings 1 and 2. New per-workspace trust (direnv-allow style), src/services/trust_service.rs: a blake3 fingerprint of .tasks/automation.yml, .tasks/<P>/automation.yml and the agents: blocks of .tasks/config.yml and project configs (unrelated config keys don't count), recorded per canonical tasks dir in ~/.lotar.trust.yml (or ~/.lotar/trust.yml; LOTAR_TRUST_FILE overrides). Until trusted, automation run actions from repository files are skipped with a one-time warning (other actions still apply; home automation rules always run), and agent jobs using a repository-defined profile are refused, including auto-starts on assignment (bare --runner jobs and home profiles are unaffected). Any outside change (pull/merge/edit) makes it untrusted again. New command lotar trust [--status|--revoke] lists every run command and repo agent profile. LoTaR's own config/automation writes (UI, REST, MCP, CLI) keep a trusted workspace trusted but never trust an untrusted one. LOTAR_TRUST_ALL=1 trusts everything (CI/containers); the Rust test harness (tests/common) and smoke harness (smoke/helpers/workspace.ts) set it.
+    Evidence: unit test fingerprint_covers_automation_and_agents_only; tests/dev259_workspace_trust_test.rs (run skipped -> trust -> runs -> outside change skips again -> revoke; LoTaR writes keep trust and don't launder; repo agent profile refused until trusted); full Rust suite 1881/1881 pass; docs: new docs/help/trust.md, automation.md, agent.md, environment.md, docker.md, SECURITY.md, help index; clippy clean.
+    Follow-up idea (not done): show trust state and a hint on the web UI Automations and Agents pages.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible. Rules in a tracked .tasks/automation.yml run shell commands on routine edits right after cloning or pulling, with no trust step (compare direnv allow / workspace trust).
 
@@ -37,3 +44,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:34:37.584846+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T21:44:20.628376+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T21:44:20.678235+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
