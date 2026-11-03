@@ -155,6 +155,37 @@ describe('Relationship category editor', () => {
             host.remove()
         }
     })
+    it('uses an Escape that closes the suggestion list without reaching the panel (DEV-263)', async () => {
+        vi.useFakeTimers()
+        apiMock.suggestTasks.mockResolvedValueOnce([{ id: 'DEV-3', title: 'Third' }])
+        const wrapper = editor()
+        const panelEscape = vi.fn()
+        wrapper.element.parentElement?.addEventListener('keydown', panelEscape)
+        try {
+            await openAdd(wrapper)
+            const input = wrapper.get('section[aria-label="Depends on"] input')
+            await input.setValue('dev')
+            await vi.advanceTimersByTimeAsync(160)
+            await flushPromises()
+            expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
+
+            const first = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+            input.element.dispatchEvent(first)
+            await nextTick()
+            expect(first.defaultPrevented).toBe(true)
+            expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
+            expect(wrapper.find('section[aria-label="Depends on"] input').exists()).toBe(true)
+
+            const second = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+            input.element.dispatchEvent(second)
+            await nextTick()
+            expect(second.defaultPrevented).toBe(true)
+            expect(wrapper.find('section[aria-label="Depends on"] input').exists()).toBe(false)
+            expect(panelEscape).not.toHaveBeenCalled()
+        } finally {
+            wrapper.unmount()
+        }
+    })
     it('does not request a same-category move and explicitly confirms direction reversal', async () => {
         const mutate = vi.fn(async () => {})
         const wrapper = editor({ mutate })

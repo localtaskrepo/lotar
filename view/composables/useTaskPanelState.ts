@@ -7,6 +7,7 @@ import { showToast } from '../components/toast'
 import { useTaskPanelActivity } from './task-panel/useTaskPanelActivity'
 import { useTaskPanelComments } from './task-panel/useTaskPanelComments'
 import { useTaskPanelCustomFields } from './task-panel/useTaskPanelCustomFields'
+import { useTaskPanelExternalSync } from './task-panel/useTaskPanelExternalSync'
 import { useTaskPanelFormLifecycle } from './task-panel/useTaskPanelFormLifecycle'
 import { useTaskPanelHotkeys } from './task-panel/useTaskPanelHotkeys'
 import { useTaskPanelPersistence, type TaskPanelFormState } from './task-panel/useTaskPanelPersistence'
@@ -26,6 +27,7 @@ import { useSprints } from './useSprints'
 import { useTaskPanelOwnership } from './useTaskPanelOwnership'
 import { useTaskPanelController } from './useTaskPanelController'
 import { useTaskRelationships } from './useTaskRelationships'
+import { useTaskStore } from './useTaskStore'
 import { relationshipMutation } from '../utils/relationships'
 
 export interface TaskPanelProps {
@@ -48,6 +50,9 @@ export interface TaskPanelEmit {
 
 type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'references'
 
+/** How the user asked to close the panel (DEV-263). */
+export type TaskPanelCloseSource = 'escape' | 'dismiss'
+
 export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPanelEmit) {
     const mode = computed(() => (props.taskId && props.taskId !== 'new' ? 'edit' : 'create'))
     const panelController = useTaskPanelController()
@@ -62,6 +67,13 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     function setAfterCreate(hook: ((created: TaskDTO) => Promise<TaskDTO>) | null) {
         afterCreateHook = hook
     }
+    // DEV-263: set by the panel to flush the focused field before a user
+    // close; returning false keeps the panel open (e.g. to confirm a draft).
+    let beforeCloseHook: ((source: TaskPanelCloseSource) => boolean) | null = null
+    function setBeforeClose(hook: ((source: TaskPanelCloseSource) => boolean) | null) {
+        beforeCloseHook = hook
+    }
+    const taskStore = useTaskStore()
 
     const { projects, refresh: refreshProjects } = useProjects()
     const {
@@ -245,6 +257,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         newField,
         buildCustomFields,
         commitCustomFields,
+        customFieldsDirty,
         addField,
         removeField,
         resetCustomFields,
@@ -370,7 +383,9 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
                     return
                 task.relationships = updated.relationships
                 task.history = updated.history
-                task.modified = updated.modified
+                // DEV-263: `modified` stays at the form's snapshot. This read
+                // runs on every outside task_updated; the store write below
+                // lets the external sync bring the other fields up to date.
                 if (updated.deleted_at) task.deleted_at = updated.deleted_at
                 emit('updated', updated)
                 return updated
@@ -455,7 +470,11 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         refreshConfig,
     })
 
+    let resetExternalSync = () => {
+        // Placeholder replaced once external sync initializes
+    }
     const cleanup = () => {
+        resetExternalSync()
         panelGeneration.value += 1
         configGeneration += 1
         loadedConfigScope.value = null
@@ -481,6 +500,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         ready.value = false
         submitting.value = false
         loading.value = mode.value === 'edit'
+        resetExternalSync()
         resetErrors()
         resetForm()
         try {
@@ -541,6 +561,14 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         emit('close')
     }
 
+    /** A user close (Escape, close button, backdrop); the panel may intervene. */
+    function requestClose(source: TaskPanelCloseSource = 'dismiss') {
+        if (beforeCloseHook && beforeCloseHook(source) === false) return
+        closePanel()
+    }
+
+    let isFieldHeldImpl: (field: string) => boolean = () => false
+
     const {
         handleSubmit: handleSubmitFromPersistence,
         onFieldBlur: onFieldBlurFromPersistence,
@@ -549,6 +577,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         updateStatus: updateStatusFromPersistence,
         reloadTask: reloadTaskFromPersistence,
         loadTask: loadTaskFromPersistence,
+        activeSaves,
     } = useTaskPanelPersistence({
         panelGeneration,
         getTaskId: () => props.taskId,
@@ -582,6 +611,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         loadCommitHistory,
         emit,
         afterCreate: (created) => (afterCreateHook ? afterCreateHook(created) : Promise.resolve(created)),
+        isFieldHeld: (field) => isFieldHeldImpl(field),
         announceCreated: (created) =>
             showToast(created.title || 'Untitled task', `Created ${created.id}`, 6000, {
                 label: 'Open',
@@ -597,9 +627,50 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     reloadTaskImpl = reloadTaskFromPersistence
     loadTaskImpl = loadTaskFromPersistence
 
+    const externalSync = useTaskPanelExternalSync({
+        active: () =>
+            props.open &&
+            mode.value === 'edit' &&
+            ready.value &&
+            !loading.value &&
+            !submitting.value &&
+            activeSaves.value === 0 &&
+            !!task.id &&
+            task.id === props.taskId &&
+            form.id === task.id,
+        entity: () => {
+            void taskStore.version.value
+            return task.id ? taskStore._map.value.get(task.id) : undefined
+        },
+        task,
+        form,
+        suppressWatch,
+        pendingOwner: (field) => {
+            const ownerMode = field === 'reporter' ? reporterMode : assigneeMode
+            const custom = field === 'reporter' ? reporterCustom : assigneeCustom
+            return ownerMode.value === 'custom' ? custom.value.trim() : undefined
+        },
+        customFieldsDirty,
+        applyCustomFields: applyTaskCustomFields,
+        applySprints: applyTaskSprints,
+        afterApply: (source) => {
+            mergeKnownTags(source.tags || [])
+            syncOwnershipControls()
+            syncFromTaskHistory(source)
+        },
+        save: async (field) => {
+            if (field === 'status') return updateStatus(form.status)
+            if (field === 'tags') return applyPatch({ tags: [...form.tags] })
+            if (field === 'custom_fields') return commitCustomFields()
+            return updateField(field)
+        },
+    })
+    isFieldHeldImpl = externalSync.isFieldHeld
+    resetExternalSync = externalSync.resetExternalSync
+
     useTaskPanelHotkeys({
         isOpen: () => props.open,
-        onClose: closePanel,
+        onClose: () => requestClose('escape'),
     })
 
     startTagWatchers()
@@ -701,6 +772,11 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         handleFieldBlur,
         onFieldBlur,
         closePanel,
+        requestClose,
+        setBeforeClose,
+        externalConflicts: externalSync.externalConflicts,
+        reloadConflicts: externalSync.reloadConflicts,
+        keepMineConflicts: externalSync.keepMineConflicts,
         handleSubmit,
         updateStatus,
         reloadTask,

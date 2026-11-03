@@ -57,7 +57,7 @@
         class="relationship-add"
         role="group"
         :aria-label="`Add ${category.label.toLowerCase()}`"
-        @keydown.esc.stop="closeAdd(category.key)"
+        @keydown.esc.stop.prevent="closeAdd(category.key)"
       >
         <input
           :id="`${editorId}-${category.key}`"
@@ -267,6 +267,11 @@ function search(kind: RelationshipCategory) {
 function onKey(event: KeyboardEvent, kind: RelationshipCategory) {
   const list = suggestions[kind] || []
   if (event.key === 'Escape') {
+    // DEV-263: with suggestions shown, Escape only closes the list; the
+    // next one closes the composer (handled by its group), never the panel.
+    if (!list.length) return
+    event.preventDefault()
+    event.stopPropagation()
     dismiss(kind)
     return
   }

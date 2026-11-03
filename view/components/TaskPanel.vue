@@ -5,7 +5,7 @@
         v-if="open"
         class="task-panel__overlay"
         :class="{ 'task-panel__overlay--large': largeView }"
-        @click.self="closePanel"
+        @click.self="requestClose()"
       >
         <aside
           ref="panelRef"
@@ -84,7 +84,7 @@
                 type="button"
                 aria-label="Close panel"
                 title="Close panel"
-                @click="closePanel"
+                @click="requestClose()"
               >
                 <IconGlyph name="close" />
               </UiButton>
@@ -92,6 +92,34 @@
           </header>
 
           <section class="task-panel__body" v-if="!loading">
+            <div
+              v-if="externalConflicts.length"
+              class="task-panel__conflict-banner"
+              role="alert"
+              data-testid="task-panel-conflict"
+            >
+              <div class="task-panel__conflict-text">
+                <strong>Changed elsewhere</strong>
+                <span class="muted">
+                  {{ externalConflicts.map((entry) => entry.label).join(', ') }}
+                  {{ externalConflicts.length === 1 ? 'was' : 'were' }} changed outside this panel while you were
+                  editing. Your text is not saved until you choose.
+                </span>
+              </div>
+              <div class="task-panel__conflict-actions">
+                <UiButton type="button" data-testid="task-panel-conflict-reload" @click="reloadConflicts">
+                  Reload theirs
+                </UiButton>
+                <UiButton
+                  variant="primary"
+                  type="button"
+                  data-testid="task-panel-conflict-keep"
+                  @click="() => void keepMineConflicts()"
+                >
+                  Keep mine
+                </UiButton>
+              </div>
+            </div>
             <div v-if="isDeleted" class="task-panel__deleted-banner" role="alert" data-testid="task-deleted-banner">
               <div class="task-panel__deleted-banner-text">
                 <strong>Deleted{{ deletedAtLabel }}</strong>
@@ -733,6 +761,28 @@
       </div>
     </Transition>
   </Teleport>
+  <UiModal :open="discardDraftOpen" size="sm" aria-label="Discard this draft?" @close="discardDraftOpen = false">
+    <div class="task-panel-dialog__form" data-testid="task-panel-discard-draft">
+      <header class="task-panel-dialog__header">
+        <h2>Discard this draft?</h2>
+      </header>
+      <p class="muted">The new task has not been created yet. Closing now throws away what you entered.</p>
+      <footer class="task-panel-dialog__footer">
+        <UiButton variant="danger" type="button" data-testid="task-panel-discard-confirm" @click="discardDraft">
+          Discard
+        </UiButton>
+        <UiButton
+          variant="ghost"
+          type="button"
+          data-autofocus
+          data-testid="task-panel-discard-cancel"
+          @click="discardDraftOpen = false"
+        >
+          Keep editing
+        </UiButton>
+      </footer>
+    </div>
+  </UiModal>
   <TaskMoveDialog
     v-if="mode === 'edit' && task.id"
     :open="moveDialogOpen"
@@ -1053,6 +1103,11 @@ const {
   handleFieldBlur: handleFieldBlurBase,
   onFieldBlur: onFieldBlurBase,
   closePanel,
+  requestClose,
+  setBeforeClose,
+  externalConflicts,
+  reloadConflicts,
+  keepMineConflicts,
   handleSubmit,
   updateStatus,
   reloadTask,
@@ -1828,6 +1883,58 @@ watch(panelRef, (element) => {
 onUnmounted(() => panelObserver?.disconnect())
 const splitLayout = computed(() => largeView.value && panelWidth.value >= SPLIT_MIN_WIDTH)
 
+// -- DEV-263: closing never drops typing silently ----------------------------
+
+const discardDraftOpen = ref(false)
+watch(
+  () => [props.open, props.taskId],
+  () => {
+    discardDraftOpen.value = false
+  },
+)
+
+/** A create draft holds something the user entered (defaults don't count). */
+function hasCreateDraft(): boolean {
+  if (mode.value !== 'create') return false
+  if ((form.title || '').trim() || (form.description || '').trim()) return true
+  if (stagedFiles.value.length || stagedLinks.value.length) return true
+  return Object.values(relationships).some((value) => (value || '').trim())
+}
+
+/**
+ * Save the field being edited before the panel goes away, as leaving it
+ * would. The close button gets this through the blur its press causes;
+ * Escape and the description editor (which saves after a delay) need it here.
+ */
+function flushFocusedField() {
+  if (mode.value !== 'edit') return
+  const active = document.activeElement
+  if (active instanceof HTMLElement && panelRef.value?.contains(active)) active.blur()
+  if (editingDescription.value) {
+    // Cancel the delayed focus-out save and save now, while the task is open.
+    descriptionFocusoutTick.value += 1
+    pendingDescriptionClose?.()
+    pendingDescriptionClose = null
+    editingDescription.value = false
+    descriptionPreview.value = false
+    void onFieldBlur('description')
+  }
+}
+
+setBeforeClose((source) => {
+  flushFocusedField()
+  if (source === 'escape' && hasCreateDraft()) {
+    discardDraftOpen.value = true
+    return false
+  }
+  return true
+})
+
+function discardDraft() {
+  discardDraftOpen.value = false
+  closePanel()
+}
+
 // DEV-183: choosing another project for an existing task moves it there.
 const moveDialogOpen = ref(false)
 const moveTarget = ref('')
@@ -2374,6 +2481,29 @@ async function removeSprintChip(sprintId: number) {
 }
 
 .task-panel__deleted-banner-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
+}
+.task-panel__conflict-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  flex-wrap: wrap;
+  padding: var(--space-3, 0.75rem);
+  margin-bottom: var(--space-3, 0.75rem);
+  border: 1px solid color-mix(in oklab, var(--color-warning) 45%, transparent);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md, 0.375rem);
+  background: color-mix(in oklab, var(--color-warning) 10%, transparent);
+}
+.task-panel__conflict-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.task-panel__conflict-actions {
   display: flex;
   gap: var(--space-2, 0.5rem);
   flex-wrap: wrap;

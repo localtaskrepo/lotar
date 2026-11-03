@@ -1,13 +1,22 @@
 title: Task panel overwrites newer edits and discards unsaved edits on Escape
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:34.831830+00:00
-modified: 2026-10-31T22:06:34.891852+00:00
+modified: 2026-11-03T21:49:56.174949+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T21:49:56.136573+00:00
+  text: |-
+    Outcome: both findings fixed in the frontend (no REST change).
+    1. New view/composables/task-panel/useTaskPanelExternalSync.ts watches the store entity for the open task; when a newer modified arrives, untouched fields (including focused-but-unchanged ones) take the new value; a field the user changed that also changed elsewhere becomes a conflict: their text stays, a 'Changed elsewhere' banner offers Reload theirs / Keep mine, and autosave holds that field back until they choose. Root cause also fixed: the relationships tab re-read the task on outside task_updated and bumped task.modified without updating the form, hiding the change (useTaskPanelState.ts).
+    2. Escape returns early on defaultPrevented; Escape, X and backdrop share one close path that saves the focused field and the open description first (also fixes a description loss on X, whose delayed save ran after unmount); create mode with a draft asks 'Discard this draft?'; tag and relationship suggestion lists preventDefault/stopPropagation the Escape they consume.
+    Evidence: vitest TaskPanel.externalSync.spec.ts (7), TaskPanel.escape.spec.ts (7), TaskRelationships.spec.ts (+1); full UI suite 1415 pass; smoke/tests/ui.panel-outside-edits.smoke.spec.ts (ticket repro + draft confirm) passes against a rebuilt smoke binary; lint:frontend, eslint, prettier pass.
+    Follow-ups (not done): a save already in flight can still overwrite a simultaneous outside change (needs a server-side modified precondition); pre-existing: save responses re-apply every form field, which can wipe text typed in another field; archive/attachment responses update the snapshot but not the form.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -50,3 +59,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:49:56.136573+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T21:49:56.174949+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

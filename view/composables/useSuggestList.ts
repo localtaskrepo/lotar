@@ -13,7 +13,11 @@ export interface SuggestEntry {
 export interface SuggestKeydownHandlers {
     /** Called on Enter; receives the highlighted entry, or undefined to commit raw input. */
     onCommit: (active: string | undefined) => void
-    /** Called on Escape after the active index is reset. */
+    /**
+     * Called on Escape after the active index is reset. Escape is consumed
+     * (default prevented, propagation stopped) when this is set or the list
+     * shows suggestions.
+     */
     onEscape?: () => void
 }
 
@@ -82,6 +86,11 @@ export function useSuggestList(options: UseSuggestListOptions) {
                 handlers.onCommit(active)
             }
         } else if (event.key === 'Escape') {
+            // DEV-263: an Escape that dismisses the list (or its composer) is
+            // used up here, so it cannot also close the surrounding panel.
+            if (!suggestions.length && !handlers.onEscape) return
+            event.preventDefault()
+            event.stopPropagation()
             activeIndex.value = -1
             handlers.onEscape?.()
         }

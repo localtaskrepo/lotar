@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import { nextTick, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import type { TaskDTO } from '../../api/types'
 import { completionStatusKey } from '../useCompletionPolicy'
 import { fromDateInputValue, toDateInputValue } from '../../utils/date'
@@ -65,6 +65,12 @@ interface UseTaskPanelPersistenceOptions {
     afterCreate?: (created: TaskDTO) => Promise<TaskDTO>
     /** DEV-246: tell the user which task was created. */
     announceCreated?: (created: TaskDTO) => void
+    /**
+     * DEV-263: fields whose local edit conflicts with a newer outside change.
+     * Autosaves leave them out until the user picks "reload" or "keep mine",
+     * so a blur never silently overwrites the newer value.
+     */
+    isFieldHeld?: (field: string) => boolean
 }
 
 export interface TaskPanelPersistenceApi {
@@ -75,6 +81,8 @@ export interface TaskPanelPersistenceApi {
     updateStatus: (status: string) => Promise<void>
     reloadTask: () => Promise<TaskDTO | undefined>
     loadTask: (id: string) => Promise<TaskDTO | undefined>
+    /** DEV-263: number of save requests running (any task); reactive. */
+    activeSaves: Readonly<Ref<number>>
 }
 
 /** Outcome of a queued autosave request, reported to enqueue callers. */
@@ -135,6 +143,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         options.form.id === options.task.id
 
     const saveQueues = new Map<string, SaveQueueState>()
+    const activeSaves = ref(0)
 
     function saveQueueFor(id: string): SaveQueueState {
         let state = saveQueues.get(id)
@@ -188,6 +197,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         const state = saveQueues.get(id)
         if (!state || state.running) return
         state.running = true
+        activeSaves.value += 1
         try {
             while (state.pending) {
                 const snapshot = state.pending
@@ -220,6 +230,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             }
         } finally {
             state.running = false
+            activeSaves.value -= 1
             if (state.pending && saveQueues.get(id) === state) void flushSaveQueue(id)
         }
     }
@@ -391,9 +402,13 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         }
     }
 
+    const isHeld = (field: string) => options.isFieldHeld?.(field) ?? false
+
     const applyPatch = async (patch: Record<string, unknown>) => {
         if (!canEdit()) return
-        await enqueuePatch(options.task.id, patch)
+        const allowed = Object.fromEntries(Object.entries(patch).filter(([field]) => !isHeld(field)))
+        if (!Object.keys(allowed).length) return
+        await enqueuePatch(options.task.id, allowed)
     }
 
     const updateField = async (field: string) => {
@@ -467,7 +482,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
 
     const updateStatus = async (status: string) => {
         if (!canEdit()) return
-        if (!status) return
+        if (!status || isHeld('status')) return
         // DEV-102: re-selecting the task's current effective status (e.g.
         // closing the dropdown on the already-selected option) is a no-op:
         // no request, no success toast. The comparison mirrors the server's
@@ -584,5 +599,6 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         updateStatus,
         reloadTask,
         loadTask,
+        activeSaves,
     }
 }

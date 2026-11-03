@@ -7,9 +7,11 @@ interface UseTaskPanelHotkeysOptions {
 
 export function useTaskPanelHotkeys(options: UseTaskPanelHotkeysOptions) {
     const closeListener = (event: KeyboardEvent) => {
-        if (event.key === 'Escape' && options.isOpen()) {
-            options.onClose()
-        }
+        if (event.key !== 'Escape' || !options.isOpen()) return
+        // DEV-263: an inner control (suggestion list, nested dialog) already
+        // used this Escape; it must not also close the panel.
+        if (event.defaultPrevented) return
+        options.onClose()
     }
 
     onMounted(() => {

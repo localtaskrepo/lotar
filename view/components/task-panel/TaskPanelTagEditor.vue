@@ -38,6 +38,7 @@
         aria-label="Manage tags"
         data-testid="tag-dialog"
         @click.self="closeTagDialog"
+        @keydown.esc.stop.prevent="closeTagDialog"
       >
         <UiCard class="task-panel-dialog__card">
           <form class="task-panel-dialog__form" @submit.prevent="handleTagDialogSubmit">

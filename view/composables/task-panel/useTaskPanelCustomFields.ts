@@ -28,6 +28,8 @@ export interface TaskPanelCustomFieldsApi {
     newField: NewFieldState
     buildCustomFields: () => Record<string, unknown>
     commitCustomFields: () => Promise<void>
+    /** DEV-263: the editor holds values that differ from the last applied task. */
+    customFieldsDirty: () => boolean
     addField: () => Promise<void>
     removeField: (key: string) => Promise<void>
     resetCustomFields: () => void
@@ -111,6 +113,18 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
             return
         }
         await options.applyPatch({ custom_fields: next })
+    }
+
+    const customFieldsDirty = () => {
+        if (!appliedTaskCustomFields) return false
+        const next = buildCustomFields()
+        const base = appliedTaskCustomFields
+        for (const key of new Set([...Object.keys(next), ...Object.keys(base)])) {
+            // Configured fields the task lacks show as empty inputs.
+            if (next[key] === '' && !Object.prototype.hasOwnProperty.call(base, key)) continue
+            if (!customFieldValuesEqual(next[key], base[key])) return true
+        }
+        return false
     }
 
     const addField = async () => {
@@ -224,6 +238,7 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
         newField,
         buildCustomFields,
         commitCustomFields,
+        customFieldsDirty,
         addField,
         removeField,
         resetCustomFields,
