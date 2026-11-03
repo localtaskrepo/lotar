@@ -110,6 +110,7 @@ impl ReferenceService {
             };
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now.clone(),
                 actor: crate::utils::identity::resolve_current_user(Some(root_path.as_path())),
                 changes: vec![TaskChange {

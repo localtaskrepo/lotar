@@ -144,6 +144,7 @@ fn handle_add_comment(
     renderer.log_debug("comment: preparing new comment entry");
     let timestamp = chrono::Utc::now().to_rfc3339();
     let entry = TaskComment {
+        extra: Default::default(),
         date: timestamp,
         text: inputs.text.clone(),
     };

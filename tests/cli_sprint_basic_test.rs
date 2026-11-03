@@ -20,6 +20,7 @@ fn append_sprint_tasks(storage: &mut Storage, sprint_id: u32, task_ids: &[String
             continue;
         }
         tasks.push(SprintTaskEntry {
+            extra: Default::default(),
             id: id.clone(),
             order: None,
         });
@@ -1396,6 +1397,7 @@ fn sprint_add_requires_force_for_existing_membership() {
         .expect("failed to add sprint-assigned task");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_one_record.sprint.tasks.push(SprintTaskEntry {
+        extra: Default::default(),
         id: task_id.clone(),
         order: None,
     });
@@ -1471,6 +1473,7 @@ fn sprint_move_reassigns_memberships() {
         .expect("failed to add task for sprint move");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_one_record.sprint.tasks.push(SprintTaskEntry {
+        extra: Default::default(),
         id: task_id.clone(),
         order: None,
     });
@@ -1528,6 +1531,7 @@ fn sprint_move_json_reports_reassignment_messages() {
         .expect("failed to add task for sprint move json");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_one_record.sprint.tasks.push(SprintTaskEntry {
+        extra: Default::default(),
         id: task_id.clone(),
         order: None,
     });
@@ -1649,6 +1653,7 @@ fn sprint_remove_detaches_tasks() {
         .expect("failed to add task for sprint remove");
     let mut sprint_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_record.sprint.tasks.push(SprintTaskEntry {
+        extra: Default::default(),
         id: task_id.clone(),
         order: None,
     });

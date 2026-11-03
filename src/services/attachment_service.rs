@@ -648,6 +648,7 @@ impl AttachmentService {
             }
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(crate::types::TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now.clone(),
                 actor: crate::utils::identity::resolve_current_user(Some(root_path.as_path())),
                 changes: vec![crate::types::TaskChange {

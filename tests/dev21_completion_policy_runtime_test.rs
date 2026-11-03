@@ -344,6 +344,7 @@ fn sprint_window(tasks: &[&str], start: &str, end: &str) -> Sprint {
             .iter()
             .enumerate()
             .map(|(idx, id)| SprintTaskEntry {
+                extra: Default::default(),
                 id: (*id).to_string(),
                 order: Some((idx + 1) as u32),
             })

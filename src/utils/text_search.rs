@@ -736,6 +736,7 @@ mod tests {
     #[test]
     fn searches_comments_criteria_and_references() {
         let comments = vec![TaskComment {
+            extra: Default::default(),
             date: "2026-01-01".into(),
             text: "Reproduced on Safari".into(),
         }];
@@ -820,6 +821,7 @@ mod tests {
     #[test]
     fn field_scopes_limit_terms_to_one_field() {
         let comments = vec![TaskComment {
+            extra: Default::default(),
             date: "2026-01-01".into(),
             text: "Needs repro on Safari".into(),
         }];

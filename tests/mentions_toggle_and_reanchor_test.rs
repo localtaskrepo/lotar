@@ -514,6 +514,7 @@ fn reanchor_never_moves_or_removes_user_attached_code_references() {
         code("gone.rs#7"),    // scan anchor into a deleted file: still cleaned up
     ];
     task.history.push(lotar::types::TaskChangeLogEntry {
+        extra: Default::default(),
         at: "2026-10-01T00:00:00Z".into(),
         actor: Some("someone".into()),
         changes: ["plain.rs#1", "notes.rs#5"]

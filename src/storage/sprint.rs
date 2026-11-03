@@ -1,4 +1,4 @@
-use serde::de::{self, Deserializer, IgnoredAny, MapAccess, Visitor};
+use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::ser::{SerializeMap, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
@@ -208,11 +208,14 @@ impl BacklogOrder {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SprintTaskEntry {
     pub id: String,
     pub order: Option<u32>,
+    /// Keys this version does not know, kept across edits (DEV-268).
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: BTreeMap<String, serde_yaml_ng::Value>,
 }
 
 impl Serialize for SprintTaskEntry {
@@ -220,7 +223,7 @@ impl Serialize for SprintTaskEntry {
     where
         S: Serializer,
     {
-        if self.order.is_none() {
+        if self.order.is_none() && self.extra.is_empty() {
             return serializer.serialize_str(self.id.as_str());
         }
 
@@ -228,6 +231,11 @@ impl Serialize for SprintTaskEntry {
         map.serialize_entry("id", &self.id)?;
         if let Some(order) = &self.order {
             map.serialize_entry("order", order)?;
+        }
+        for (key, value) in &self.extra {
+            if key != "id" && key != "order" {
+                map.serialize_entry(key, value)?;
+            }
         }
         map.end()
     }
@@ -253,7 +261,7 @@ impl<'de> Deserialize<'de> for SprintTaskEntry {
             {
                 Ok(SprintTaskEntry {
                     id: value.to_string(),
-                    order: None,
+                    ..SprintTaskEntry::default()
                 })
             }
 
@@ -263,7 +271,7 @@ impl<'de> Deserialize<'de> for SprintTaskEntry {
             {
                 Ok(SprintTaskEntry {
                     id: value,
-                    order: None,
+                    ..SprintTaskEntry::default()
                 })
             }
 
@@ -273,6 +281,7 @@ impl<'de> Deserialize<'de> for SprintTaskEntry {
             {
                 let mut id: Option<String> = None;
                 let mut order: Option<u32> = None;
+                let mut extra = BTreeMap::new();
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -289,13 +298,14 @@ impl<'de> Deserialize<'de> for SprintTaskEntry {
                             order = Some(map.next_value()?);
                         }
                         _ => {
-                            let _ = map.next_value::<IgnoredAny>()?;
+                            let value: serde_yaml_ng::Value = map.next_value()?;
+                            extra.insert(key, value);
                         }
                     }
                 }
 
                 let id = id.ok_or_else(|| de::Error::missing_field("id"))?;
-                Ok(SprintTaskEntry { id, order })
+                Ok(SprintTaskEntry { id, order, extra })
             }
         }
 
@@ -322,6 +332,10 @@ pub struct SprintPlan {
     pub overdue_after: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub notes: Option<String>,
+    /// Keys this version does not know, kept across edits (DEV-268).
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: BTreeMap<String, serde_yaml_ng::Value>,
 }
 
 impl SprintPlan {

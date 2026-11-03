@@ -353,6 +353,7 @@ fn add_task_to_sprint(
         return false;
     }
     sprint.tasks.push(SprintTaskEntry {
+        extra: Default::default(),
         id: normalized.to_string(),
         order: None,
     });

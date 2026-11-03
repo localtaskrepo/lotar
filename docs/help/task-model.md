@@ -81,9 +81,9 @@ Sprint files under `.tasks/@sprints/<ID>.yml` are authoritative for membership a
 
 ### YAML extensions
 
-Unknown top-level task YAML keys are retained as typed YAML values across task edits, including scalar, list, and nested mapping values. This is **semantic preservation**, not lossless text editing: comments, key order, quoting, whitespace, and anchor formatting are not preserved. Built-in fields and their aliases (such as `type`/`task_type`) remain authoritative and cannot be overridden by extension values.
+Unknown task YAML keys are retained as typed YAML values across task edits, including scalar, list, and nested mapping values. This covers top-level keys and unknown keys inside `relationships`, `comments`, `references` and `history` entries; sprint files keep unknown keys in `plan` and in `tasks` entries too. This is **semantic preservation**, not lossless text editing: comments, key order, quoting, whitespace, and anchor formatting are not preserved. Built-in fields and their aliases (such as `type`/`task_type`) remain authoritative and cannot be overridden by extension values.
 
-These extensions are separate from `custom_fields` and are not added to REST/MCP task DTOs. Tolerant legacy parsing retains valid structured fields and extensions; malformed structured data is rejected rather than silently emptied during an edit.
+These extensions are separate from `custom_fields`. Top-level ones are not added to REST/MCP task DTOs; unknown keys inside comments, references, relationships and history entries appear as extra keys on those objects. Tolerant legacy parsing retains valid structured fields and extensions; malformed structured data is rejected rather than silently emptied during an edit.
 
 ## Enumerations & config-driven values
 
@@ -112,6 +112,6 @@ These extensions are separate from `custom_fields` and are not added to REST/MCP
 - **Reference change events:** server surfaces emit exactly one `task_updated` SSE event per changed reference mutation (REST reference routes, upload, and remove), emitted only after every attachments-store lock has dropped. An upload that stores a blob without changing the task (`attached=false`) is a store-only change and emits no task event. Automation writes may follow with their own events. MCP watcher notifications are a separate id-based channel; LoTaR does not claim cross-channel exactly-once delivery.
 - Empty `tags`, `comments`, `references`, `history`, and relationship collections may be omitted. Relationship `parent` and `duplicate_of` are optional single values, not arrays.
 - Explicit `assignee` values persist across status transitions; automation must clear them deliberately if needed.
-- When exporting/importing YAML directly, use the storage field names: notably `type` in YAML corresponds to `task_type` in DTOs. Unknown top-level keys are preserved semantically as described above, not exposed as configured CLI fields.
+- When exporting/importing YAML directly, use the storage field names: notably `type` in YAML corresponds to `task_type` in DTOs. Unknown keys are preserved semantically as described above, not exposed as configured CLI fields.
 
 See also: [OpenAPI spec](../openapi.json) for the full REST contract and [Identity & Users](./identity.md) for `reporter`/`assignee` resolution rules.

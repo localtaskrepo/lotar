@@ -132,6 +132,7 @@ impl TaskService {
         task.moved_from.retain(|id| id != &to);
         task.modified = now.clone();
         task.history.push(TaskChangeLogEntry {
+            extra: Default::default(),
             at: now.clone(),
             actor: actor.clone(),
             changes: std::iter::once(moved.clone())
@@ -158,6 +159,7 @@ impl TaskService {
                 .cloned()
                 .collect(),
             history: vec![TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now,
                 actor,
                 changes: vec![moved],
@@ -286,6 +288,7 @@ impl TaskService {
             task.moved_from.push(from.clone());
         }
         task.history.push(TaskChangeLogEntry {
+            extra: Default::default(),
             at: now.clone(),
             actor: actor.clone(),
             changes: vec![moved.clone()],
@@ -296,6 +299,7 @@ impl TaskService {
             deleted_at: Some(now.clone()),
             moved_to: Some(to),
             history: vec![TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now,
                 actor,
                 changes: vec![moved],

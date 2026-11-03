@@ -625,6 +625,7 @@ mod reference_mutation_tests {
                 editor
                     .mutate_task("SAFE-1", |fresh| {
                         fresh.comments.push(TaskComment {
+                            extra: Default::default(),
                             date: "2026-10-20T00:00:00Z".into(),
                             text: "concurrent comment".into(),
                         });

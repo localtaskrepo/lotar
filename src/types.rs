@@ -379,6 +379,11 @@ pub struct TaskRelationships {
     pub fixes: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub duplicate_of: Option<String>,
+    /// Keys this version does not know, kept so a newer tool's or a
+    /// hand-written field survives edits (DEV-268).
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
 }
 
 impl TaskRelationships {
@@ -390,6 +395,7 @@ impl TaskRelationships {
             && self.children.is_empty()
             && self.fixes.is_empty()
             && self.duplicate_of.is_none()
+            && self.extra.is_empty()
     }
 }
 
@@ -398,6 +404,11 @@ impl TaskRelationships {
 pub struct TaskComment {
     pub date: String,
     pub text: String,
+    /// Keys this version does not know, kept so a newer tool's or a
+    /// hand-written field survives edits (DEV-268).
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
@@ -418,6 +429,11 @@ pub struct TaskChangeLogEntry {
     pub actor: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub changes: Vec<TaskChange>,
+    /// Keys this version does not know, kept so a newer tool's or a
+    /// hand-written field survives edits (DEV-268).
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
 }
 
 // Typed external references attached to a task/ticket.
@@ -442,6 +458,11 @@ pub struct ReferenceEntry {
     pub jira: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub github: Option<String>,
+    /// Keys this version does not know, kept so a newer tool's or a
+    /// hand-written field survives edits (DEV-268).
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
 }
 
 // Type alias for custom fields - can hold any YAML-serializable value

@@ -126,7 +126,7 @@ metadata bytes and timestamps. General task-list sorting is unchanged.
 - Change-log vocabulary: `comment_added` (comment append), `comment#N` (comment edit, old/new text), and `reference_added`/`reference_removed` (one entry per changed reference operation, old/new as `kind:value` displays). Changed reference operations bump `modified` once and dispatch post-commit automation (`updated` event, empty change set) plus one `task_updated` SSE event per server surface — strictly after any attachments-store lock drops. Automation comments are recorded under the `automation` actor and never re-dispatch `on.commented`.
 - `tags`, `comments`, `references`, `history`, and `relationships.*` are always arrays even when empty, simplifying client iteration.
 - Explicit `assignee` values persist across status transitions; automation must clear them deliberately if needed.
-- When exporting/importing YAML directly, keep field names lower_snake_case to match the DTOs. Unknown keys are preserved by serde but ignored by CLI readers.
+- When exporting/importing YAML directly, keep field names lower_snake_case to match the DTOs. Unknown keys are preserved (top level, and inside relationships, comments, references, history, sprint `plan` and sprint task entries through their `extra` maps) but ignored by CLI readers. Over REST and MCP these nested extras appear as additional JSON keys on the same objects.
 
 ## Atomic Temp Maintenance Design (DEV-84)
 

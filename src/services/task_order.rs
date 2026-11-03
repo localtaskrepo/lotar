@@ -302,6 +302,7 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
         "after"
     };
     let history = SprintHistoryEntry {
+        extra: Default::default(),
         at: now.clone(),
         actor,
         changes: vec![TaskChange {

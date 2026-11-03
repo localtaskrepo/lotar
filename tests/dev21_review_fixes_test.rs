@@ -222,10 +222,12 @@ fn f1_sprint_metrics_classify_cross_root_tasks_per_policy() {
         }),
         tasks: vec![
             SprintTaskEntry {
+                extra: Default::default(),
                 id: "PX-1".to_string(),
                 order: Some(1),
             },
             SprintTaskEntry {
+                extra: Default::default(),
                 id: "PX-2".to_string(),
                 order: Some(2),
             },
@@ -318,6 +320,7 @@ fn mixed_both_done_fixture(
             .iter()
             .enumerate()
             .map(|(idx, id)| SprintTaskEntry {
+                extra: Default::default(),
                 id: (*id).to_string(),
                 order: Some((idx + 1) as u32),
             })
@@ -393,10 +396,12 @@ fn f2_unanimous_status_rows_stay_done() {
         }),
         tasks: vec![
             SprintTaskEntry {
+                extra: Default::default(),
                 id: "B1-1".into(),
                 order: Some(1),
             },
             SprintTaskEntry {
+                extra: Default::default(),
                 id: "B2-1".into(),
                 order: Some(2),
             },
@@ -570,6 +575,7 @@ fn f3_burndown_utc_grid_uniform_across_23_25h_local_days() {
                 closed_at: Some(format!("{end}T00:00:00Z")),
             }),
             tasks: vec![SprintTaskEntry {
+                extra: Default::default(),
                 id: "DS-1".into(),
                 order: Some(1),
             }],

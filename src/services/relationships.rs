@@ -1764,6 +1764,7 @@ fn stage_tasks(
         let now = chrono::Utc::now().to_rfc3339();
         task.modified = now.clone();
         task.history.push(TaskChangeLogEntry {
+            extra: Default::default(),
             at: now,
             actor: crate::utils::identity::resolve_current_user_for_project(
                 Some(&storage.root_path),

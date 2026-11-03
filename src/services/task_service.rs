@@ -783,12 +783,14 @@ impl TaskService {
                 resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project))
             });
             task.comments.push(crate::types::TaskComment {
+                extra: Default::default(),
                 date: now.clone(),
                 text: text.to_string(),
             });
             // Record that a comment was added without copying the body into
             // the changelog (the comment itself is the audit trail).
             task.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now.clone(),
                 actor,
                 changes: vec![TaskChange {
@@ -870,6 +872,7 @@ impl TaskService {
             task.comments[index].text = text.to_string();
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now.clone(),
                 actor: resolve_current_user_for_project(
                     Some(root_path.as_path()),
@@ -1432,6 +1435,7 @@ impl TaskService {
             let history_actor =
                 resolve_current_user_for_project(Some(&storage.root_path), Some(&derived));
             t.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
                 at: modified,
                 actor: history_actor,
                 changes,
@@ -1887,6 +1891,7 @@ impl TaskService {
             }
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now.clone(),
                 actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
                 changes: vec![TaskChange {
@@ -2057,6 +2062,7 @@ impl TaskService {
 
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
                 at: now.clone(),
                 actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
                 changes: vec![TaskChange {
@@ -2110,6 +2116,7 @@ impl TaskService {
             storage
                 .mutate_task(&canonical, move |task| {
                     task.history.push(TaskChangeLogEntry {
+                        extra: Default::default(),
                         at: chrono::Utc::now().to_rfc3339(),
                         actor: resolve_current_user_for_project(
                             Some(root_path.as_path()),
@@ -2591,6 +2598,7 @@ impl TaskService {
                 found.insert(record.id);
                 if !contains {
                     record.sprint.tasks.push(SprintTaskEntry {
+                        extra: Default::default(),
                         id: task_id.to_string(),
                         order: None,
                     });

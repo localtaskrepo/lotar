@@ -1,15 +1,21 @@
 title: Unknown nested YAML keys in task and sprint files are dropped on write
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:35.526738+00:00
-modified: 2026-10-31T22:06:35.587391+00:00
+modified: 2026-11-03T22:47:12.310706+00:00
 relationships:
   related:
   - DEV-1
   - DEV-182
   - DEV-253
+comments:
+- date: 2026-11-03T22:47:12.284234+00:00
+  text: |-
+    Outcome: fixed. TaskRelationships, TaskComment, ReferenceEntry, TaskChangeLogEntry and SprintPlan gained a flattened 'extra' map (serde_yaml Value, skipped in JSON schemas), and SprintTaskEntry's custom serde keeps unknown keys too (it serializes as a map when it has extras). Hand-written or newer-tool keys in relationships, comments, references, history, sprint plan and sprint task entries now survive edits. Over REST/MCP these nested extras appear as additional JSON keys on the same objects (top-level task extensions stay out of DTOs). Not changed: sprint canonicalize still clears legacy per-entry 'order' (ordering lives in the order metadata by design). Docs: help/task-model.md and developers/task-model.md corrected.
+    Evidence: tests/dev268_nested_extra_keys_test.rs (task edit keeps relationships.implements, comment author, reference title, history source, top-level key; sprint update keeps plan.color and entry note); full Rust suite 1900/1900; clippy --all-features clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -30,3 +36,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-1","DEV-182","DEV-253"]}'
+- at: 2026-11-03T22:34:00.027723+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T22:47:12.284234+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:47:12.310706+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
