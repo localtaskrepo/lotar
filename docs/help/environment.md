@@ -68,6 +68,7 @@ All rows below are defined inside the same override table and map directly to th
 
 | Config key | Env var(s) | Accepted values | Purpose |
 | --- | --- | --- | --- |
+| `agent.context_enabled` | `LOTAR_AGENT_CONTEXT_ENABLED` | `true`/`false` | Stores a context file next to each ticket so agent jobs can resume (default `true`). |
 | `agent.context_extension` | `LOTAR_AGENT_CONTEXT_EXTENSION` | Extension string | File extension for context files stored next to tickets (default `.context`). |
 | `agent.logs_dir` | `LOTAR_AGENT_LOGS_DIR` | Path string or `off` | Folder for job logs (`<logs_dir>/<JOB_ID>.jsonl`); default `<tasks dir>/@agent-logs`. Relative paths resolve from the workspace root. `off` turns logging off. |
 
@@ -98,9 +99,9 @@ All rows below are defined inside the same override table and map directly to th
 | --- | --- | --- | --- |
 | `scan_signal_words` | `LOTAR_SCAN_SIGNAL_WORDS` | JSON/YAML list | Additional keywords that trigger TODO/scan detection. |
 | `scan_ticket_patterns` | `LOTAR_SCAN_TICKET_PATTERNS` | JSON/YAML list | Regex patterns for ticket detection. |
-| `scan_enable_ticket_words` | `LOTAR_SCAN_ENABLE_TICKET_WORDS` | `true`/`false` | Toggles recognition of words such as `ticket:` during scans. |
+| `scan_enable_ticket_words` | `LOTAR_SCAN_ENABLE_TICKET_WORDS` | `true`/`false` | Treats your task type words (such as `Feature:` or `Bug:`) as signal words, like `TODO:`. |
 | `scan_enable_mentions` | `LOTAR_SCAN_ENABLE_MENTIONS` | `true`/`false` | Enables mention parsing inside scanned files. |
-| `scan_strip_attributes` | `LOTAR_SCAN_STRIP_ATTRIBUTES` | `true`/`false` | Removes HTML attributes before scanning content. |
+| `scan_strip_attributes` | `LOTAR_SCAN_STRIP_ATTRIBUTES` | `true`/`false` | Removes inline `[key=value]` blocks from the comment after LoTaR inserts the task ID. |
 
 ### Sprint defaults
 
@@ -118,6 +119,8 @@ All rows below are defined inside the same override table and map directly to th
 | --- | --- | --- | --- |
 | `web_ui_path` | `LOTAR_WEB_UI_PATH` | Path string | Directory containing custom web UI assets. When set and the directory exists, files are served from here before falling back to embedded assets. |
 | _(CLI only)_ | `LOTAR_WEB_UI_EMBEDDED` | `1` | Forces serving only embedded UI assets, ignoring any `web_ui_path`. Useful for CI testing. |
+| _(CLI only)_ | `LOTAR_ENABLE_POLL_WATCH` | `1` (any value except `0`) | Also checks the tasks folder for changes on a timer. Turn it on when live updates in the browser miss file changes, for example in Docker or on a network drive. |
+| _(CLI only)_ | `LOTAR_POLL_WATCH_INTERVAL_MS` | Integer milliseconds (minimum 50, default 200) | How often the timer check runs when `LOTAR_ENABLE_POLL_WATCH` is on. |
 | _(CLI only)_ | `LOTAR_ALLOWED_HOSTS` | Comma-separated host names, or `*` | Extra names accepted in the `Host` header (same as `lotar serve --allow-host`). Loopback names and IP addresses are always accepted. |
 
 ## Runtime Toggles & Services
@@ -140,10 +143,9 @@ All rows below are defined inside the same override table and map directly to th
 | --- | --- | --- |
 | `LOTAR_TEST_SILENT` | `1` | Suppresses most warnings during automated tests. |
 | `LOTAR_VERBOSE` | `1` | Re-enables informational logs (such as config creation) even when tests are silenced. |
-| `LOTAR_DEBUG` | Any non-empty | Dumps search/transition internals to `/tmp/lotar_*_debug.log` for troubleshooting. |
+| `LOTAR_DEBUG` | Any non-empty | Writes `lotar stats effort --transitions` internals to `/tmp/lotar_transitions_debug.log`, and prints a message when mentioned task IDs could not be linked. |
 | `LOTAR_DEBUG_ADD` | `1` | Emits detailed payload logs for `lotar add` into `/tmp/lotar_add_debug.log`. |
 | `LOTAR_DEBUG_STATUS` | Any non-empty | Emits verbose `status` command and storage logs. |
 | `LOTAR_TEST_FAST_IO` | `1` | Shortens SSE debounce timers and heartbeats for local tests. |
-| `LOTAR_TEST_FAST_NET` | `1` | Integration-test helper that shrinks HTTP client timeouts. |
 
 Related docs: [Configuration Reference](./config-reference.md), [Precedence](./precedence.md), [serve](./serve.md), and [sse](./sse.md).

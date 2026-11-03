@@ -1,10 +1,11 @@
 title: 'Docs accuracy pass: stale pages, internal ticket notes, failing examples, missing flags and commands'
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:39.292878+00:00
-modified: 2026-10-31T22:06:39.357295+00:00
+modified: 2026-11-03T22:49:36.746570+00:00
 relationships:
   related:
   - DEV-110
@@ -15,6 +16,24 @@ relationships:
   - DEV-3
   - DEV-4
   - DEV-84
+comments:
+- date: 2026-11-03T22:49:36.720207+00:00
+  text: |-
+    Outcome: all 12 findings handled (docs pass by a delegated agent, reviewed and committed by the coordinator).
+    1. add.md/README/automation.md/serve.md/main.md/list.md examples use values the default config has (or say how to add them); every example was run in a fresh repo with the current build.
+    2. docs/README.md rewritten as a short, current index; docker.md links help/index.md.
+    3. Internal DEV notes removed from user help (list.md, task.md, task-model.md, serve.md).
+    4. config.md uses lotar config show --project instead of the nonexistent config inspect.
+    5. task.md synopsis/wording fixed; internal function names removed (task.md, git.md, status.md).
+    6. environment.md/precedence.md variables corrected (LOTAR_DEBUG scope, scan rows, poll watch vars added, test-only var removed).
+    7. agent-skills.md stale MCP warning reduced to general advice (fix confirmed via MCP).
+    8. Missing flags/endpoints documented (add --status, changelog --global, due-date/assignee --dry-run/--explain, review.reviewers, API quick reference 'More endpoints').
+    9. serve.md and api-quick-reference.md jargon moved to developer docs; plain summaries left.
+    10. templates.md sequence reordered so all commands pass.
+    11. Workspace tasks_folder and LOTAR_DEBUG workspace logging promises removed (declined implementing them in a docs ticket).
+    12. list.md stale note replaced with -recent:30d and --sum pointers.
+    Declined: a docs lint for DEV references (needs a script outside docs).
+    Follow-ups noticed: config show text output omits review.reviewers (JSON has it); lotar ls --help / lotar tasks --help say 'No help available'.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -107,3 +126,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-110","DEV-13","DEV-138","DEV-142","DEV-253","DEV-3","DEV-4","DEV-84"]}'
+- at: 2026-11-03T22:49:36.720207+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:49:36.746570+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

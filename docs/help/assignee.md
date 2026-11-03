@@ -9,8 +9,11 @@ Change or view a task's assignee with validation and project-aware ID resolution
 lotar assignee <TASK_ID>
 
 # Change assignee
-lotar assignee <TASK_ID> <NEW_ASSIGNEE>
+lotar assignee <TASK_ID> <NEW_ASSIGNEE> [--dry-run] [--explain]
 ```
+
+- `--dry-run`, `-n` - Show the change without saving it
+- `--explain`, `-e` - Explain how the value was validated and normalized
 
 ## Examples
 
@@ -23,6 +26,9 @@ lotar assignee 42 @me
 
 # Set using @username with explicit project for numeric IDs
 lotar assignee 42 @john_doe --project=AUTH
+
+# Preview a change
+lotar assignee 42 @me --dry-run
 
 # JSON output for automation
 lotar assignee 42 jane@example.com --format=json

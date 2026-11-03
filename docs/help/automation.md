@@ -38,8 +38,11 @@ automation:
             assignee: "@assignee_or_reporter"
         job_failed:
           set:
-            status: HelpNeeded
+            status: Todo
+            assignee: "@reporter"
 ```
+
+Statuses in rules must exist in your project. The default states are Todo, InProgress, NeedsReview and Done. Some examples below also use `Testing` and `HelpNeeded`; the agent templates add those states (`lotar init --template agent-pipeline` or `--template agent-reviewed`). `lotar automation simulate` warns about a status that does not exist.
 
 ## Triggers (`when`)
 

@@ -18,10 +18,13 @@ lotar add "Implement user authentication"
 lotar add "Add OAuth support" --type=feature -P high --reporter=lead@example.com --assignee=john.doe
 
 # Bug with due date
-lotar add "Fix login crash" --type=bug -P critical --due=tomorrow
+lotar add "Fix login crash" --type=bug -P high --due=tomorrow
 
-# Epic with custom fields
-lotar add "User Management System" --type=epic --field=story_points=13 --field=sprint=2
+# Start in a different status
+lotar add "Review the login copy" --status=NeedsReview
+
+# Feature with custom fields
+lotar add "User Management System" --type=feature --field=story_points=13 --field=sprint=2
 
 # Custom tasks directory
 lotar add "External task" --tasks-dir=/external/projects/tasks --project=external
@@ -34,10 +37,11 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 ## Options
 
 ### Core Properties
-- `--type <TYPE>` - Task type: feature, bug, epic, spike, chore
-- `--priority <PRIORITY>`, `-P <PRIORITY>` - Priority: low, medium, high, critical
+- `--type <TYPE>`, `-t <TYPE>` - Task type, one of the project's configured types (default config: Feature, Bug, Chore)
+- `--priority <PRIORITY>`, `-P <PRIORITY>` - Priority, one of the configured priorities (default config: Low, Medium, High)
+- `--status <STATUS>` - Initial status, one of the configured states (default config: Todo, InProgress, NeedsReview, Done). Without it the task starts in the default status.
 - `--reporter <REPORTER>`, `-R <REPORTER>` - Reporter identity (email or @username). Supports `@me` to resolve to your identity.
-- `--assignee <ASSIGNEE>` - Task assignee (email or @username). Supports `@me` to resolve to your identity.
+- `--assignee <ASSIGNEE>`, `-a <ASSIGNEE>` - Task assignee (email or @username). Supports `@me` to resolve to your identity.
 
 ### Scheduling
 - `--due <DATE>` - Due date (YYYY-MM-DD or relative like 'tomorrow')
@@ -59,7 +63,7 @@ Types and priorities are whatever your configuration defines, so there are no sh
 - `--field=sprint=N` stores a custom field named `sprint`; it does not assign the task to a sprint. Use `lotar sprint add --sprint N TASK_ID` for actual membership (see [Sprints](./sprints.md)).
 
 ### Global Options
-- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--format <FORMAT>` - Output format: text or json
 - `--verbose` - Enable verbose output
 - `--project <PROJECT>`, `-p <PROJECT>` - Target project (overrides auto-detection)
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
@@ -110,9 +114,11 @@ Task creation and any auto-populated project members are committed together thro
 
 Configure validation rules with:
 ```bash
-lotar config set issue.types feature,bug,chore
-lotar config set issue.priorities low,medium,high,critical
+lotar config set issue.types feature,bug,chore,epic --global
+lotar config set issue.priorities low,medium,high,critical --global
 ```
+
+`--global` changes `.tasks/config.yml` for every project; use `--project=<PREFIX>` to change one project.
 
 ## Project Resolution
 
@@ -155,9 +161,9 @@ Configuration toggle:
 - Set `auto.tags_from_path: false` in `.tasks/config.yml` (global) or in a project config to disable this behavior entirely.
 	- Default is `true`.
 
-### Branch-aware defaults (Phase 4)
+### Branch-aware defaults
 
-When no `--type`/shortcuts are provided, LoTaR will try to infer a task type from the current git branch name:
+When no `--type` is provided, LoTaR will try to infer a task type from the current git branch name:
 
 - `feat/*` or `feature/*` → type = Feature
 - `fix/*`, `bugfix/*`, `hotfix/*` → type = Bug
@@ -193,7 +199,7 @@ See `lotar config help` for how to configure alias maps.
 lotar add "Implement dark mode" --type=feature --assignee=alice@company.com --due=2025-08-15
 
 # Bug reporting
-lotar add "Login page crashes on mobile" --type=bug --priority=critical --tag=mobile --tag=urgent
+lotar add "Login page crashes on mobile" --type=bug --priority=high --tag=mobile --tag=urgent
 
 # Technical debt
 lotar add "Refactor authentication module" --type=chore --effort=3d
@@ -201,8 +207,8 @@ lotar add "Refactor authentication module" --type=chore --effort=3d
 
 ### Project Management
 ```bash
-# Epic planning
-lotar add "User Management System" --type=epic --field=story_points=21 --field=quarter=Q3
+# Larger planned work (add an Epic type first if you want one: lotar config set issue.types feature,bug,chore,epic --global)
+lotar add "User Management System" --type=feature --field=story_points=21 --field=quarter=Q3
 
 # Custom sprint label (not sprint membership)
 lotar add "Design user profile page" --field=sprint=15 --field=team=frontend

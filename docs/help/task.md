@@ -1,6 +1,6 @@
 # lotar task
 
-Legacy multi-action entry point that wraps the modern task commands for backward compatibility.
+The full task command group. Every task operation lives here. The most common ones also have top-level shortcuts (`lotar add`, `lotar list`, `lotar show`, `lotar edit`, `lotar status`, ...). Some operations exist only under `lotar task`: `relationships`, `delete`, `restore`, `archive`, `unarchive`, `move`, `history`, `history-by-field`, `diff`, `at` and `reference`.
 
 
 ## Invocation
@@ -11,7 +11,7 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 ```
 
 - All global flags (`--project/-p`, `--tasks-dir`, `--format`, `--log-level`, `--verbose`) behave exactly as they do for the top-level commands because this mode reuses the same workspace/project detection logic.
-- Running `lotar task` (or `lotar tasks`) with no action prints the available subcommands via `emit_subcommand_overview`.
+- Running `lotar task` (or `lotar tasks`) with no action lists the available actions.
 - Numeric task IDs are expanded to full IDs using the same project detection chain described in `docs/help/precedence.md`.
 
 ## Actions at a glance
@@ -22,7 +22,7 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `list` | Search/filter tasks with pagination helpers. | `lotar list`. |
 | `show` (alias `view`) | Print one task with all its details. | `lotar show`. |
 | `edit` (alias `update`) | Modify an existing task, optionally previewing changes. | `lotar edit` / `lotar update`; same pipeline as `lotar add`. |
-| `status` | Change a task status (write-only in legacy mode). | `lotar status`. |
+| `status` | Change a task status (the new status is required here). | `lotar status`. |
 | `priority` | Show or update priority. | `lotar priority`. |
 | `assignee` | Show or update assignee. | `lotar assignee`. |
 | `due-date` | Show or update due date. | `lotar due-date`. |
@@ -38,18 +38,18 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `comment` | Add or list comments for a task. | `lotar comment`. |
 | `reference` | Add or remove links, repository files, code ranges and attachments. | Reference and attachment services. |
 
-Each action below highlights the legacy-specific nuances; for behavior details see the dedicated help pages linked in the rightmost column.
+Each action below notes where it differs from the top-level shortcut; for behavior details see the dedicated help pages linked in the rightmost column.
 
 ## Action details
 
 ### add
 
 ```bash
-lotar task add --title "Task title" [--type|-t] [--priority|-P] [--reporter|-R] [--assignee|-a] [--due|-d] [--effort|-E] [--description|-D] [--tag|-i ...] [--field|-F key=value ...]
+lotar task add "Task title" [--type|-t] [--priority|-P] [--status] [--reporter|-R] [--assignee|-a] [--due|-d] [--effort|-E] [--description|-D] [--tag|-i ...] [--field|-F key=value ...]
 ```
 
 - Uses the same pipeline as `lotar add`, so status/priority/type defaults, auto-tags, branch inference, and validation all match the dedicated command.
-- Legacy mode only exposes the core fields. Flags such as `--dry-run` and `--explain` live exclusively on the top-level `lotar add` command.
+- `lotar task add` has the core fields only. `--dry-run` and `--explain` are available on `lotar add`.
 
 ### list
 
@@ -102,7 +102,7 @@ lotar task status <TASK_ID> <NEW_STATUS>
 lotar task priority <TASK_ID> [NEW_PRIORITY]
 ```
 
-- Without `NEW_PRIORITY` it prints the current value; otherwise it reuses `PriorityHandler` to validate and update the task.
+- Without `NEW_PRIORITY` it prints the current value; otherwise it validates and updates the task, like `lotar priority`.
 - Refer to `docs/help/priority.md` for supported values and renderer output.
 
 ### assignee
@@ -112,7 +112,7 @@ lotar task assignee <TASK_ID> [NEW_ASSIGNEE]
 ```
 
 - Accepts raw emails, usernames, or the `@me` token (resolved via the identity chain in `docs/help/precedence.md`).
-- Legacy mode does not expose `--dry-run` or `--explain`; use `lotar assignee` if you need a preview.
+- `lotar task assignee` has no `--dry-run` or `--explain`; use `lotar assignee` if you need a preview.
 
 ### due-date
 
@@ -295,13 +295,11 @@ that bounded view. **Validate project/workspace** checks the complete selected
 scope, regardless of graph focus, depth, relationship choices, or filters. The URL
 uses `relationships` for the comma-separated connection kinds (`none` for an
 empty selection) and `type` for task-type filters. Older `layers` and layer-only
-`type` links remain readable. Search synchronization between views is a separate
-feature tracked in DEV-142; it is not enabled by this dependency-view change.
+`type` links remain readable.
 
-Unified configuration/dependency/scanner verification and read-only pre-commit
-integration are tracked in DEV-138. `scan --dry-run` is a preview, not yet a
-fail-on-findings validation command; ordinary `scan` writes. Do not substitute
-the existing mutating formatting hook for read-only verification.
+There is no single read-only check for configuration, dependencies and scanner
+results yet. `scan --dry-run` previews what a scan would change but does not fail
+when it finds something; a normal `scan` writes files.
 
 ### effort
 
@@ -381,7 +379,7 @@ lotar task move <OLD_ID> --record <NEW_ID>
 lotar task comment <TASK_ID> [TEXT] [--message|-m TEXT] [--file|-F PATH] [--dry-run|-n] [--explain|-e]
 ```
 
-- Shares `CommentHandler` with `lotar comment`: TEXT can come from the positional argument, `--message`, `--file`, or stdin. Without comment content the command lists existing comments.
+- Works like `lotar comment`: TEXT can come from the positional argument, `--message`, `--file`, or stdin. Without comment content the command lists existing comments.
 - See `docs/help/comment.md` for JSON payloads and formatting rules.
 
 ### reference
@@ -402,12 +400,12 @@ lotar task reference remove <link|file|code|attachment> <TASK_ID> <VALUE>
 ## Tips and examples
 
 ```bash
-# Quick legacy flows
+# Quick flows
 lotar tasks list --project=backend mine:true due_within:5
 lotar task edit AUTH-42 --priority=High --tag backend --tag api --dry-run --format=json
 lotar task history AUTH-42 --limit=5
 lotar tasks comment AUTH-42 -m "Ready for review" --dry-run
 ```
 
-- Prefer the direct commands (`lotar add`, `lotar status`, etc.) when you need the newest flags or shorthands. `lotar task` remains supported for scripts that rely on the legacy shape.
+- The top-level shortcuts (`lotar add`, `lotar status`, etc.) are quicker to type and some have extra flags, such as `lotar add --dry-run`. Use `lotar task` for everything else.
 - All actions continue to respect identity resolution, workspace detection, and configuration precedence exactly as described in `docs/help/precedence.md`.

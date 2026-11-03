@@ -59,11 +59,42 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/jobs/message (AgentJobMessageRequest) -> { data: AgentJobMessageResponse }
 - GET  /api/events -> text/event-stream (see SSE Events)
 
+More endpoints (request and response shapes are in [OpenAPI](../openapi.json)):
+
+Tasks
+- POST /api/tasks/status ({ id, status }) -> { data: TaskDTO }; same validation as `lotar status`
+- POST /api/tasks/comment ({ id, text }) -> { data: TaskDTO }
+- POST /api/tasks/comment/update ({ id, index, text }) -> { data: TaskDTO }; `index` is the comment's position, starting at 0
+- GET  /api/tasks/history?id=ID[&limit=N] -> { data: commits }; recent git commits that changed the task file
+- GET  /api/tasks/commit_diff?id=ID&commit=SHA -> { data }; the task file's diff at that commit
+- GET  /api/tasks/suggest?q=TEXT[&project=PREFIX][&limit=N] -> { data: suggestions }; tasks whose ID or title match, for pickers
+- GET  /api/tasks/export -> the filtered task list as a file; takes the same filters as `/api/tasks/list`
+- POST /api/tasks/references/link/add | /link/remove and /code/add | /code/remove -> add or remove a link or code reference
+- GET  /api/tasks/stream -> alias of `/api/events`
+
+Projects, people and config
+- GET  /api/projects/list[?limit=N&offset=N] -> { data: projects }
+- GET  /api/projects/stats?project=PREFIX -> { data: stats }
+- POST /api/projects/create ({ name, prefix?, values? }) -> { data }; creates the project config
+- GET  /api/whoami -> { data: string }; the identity used for `@me`
+- GET  /api/config/inspect[?project=PREFIX] -> { data: ConfigInspectResult }; effective values with the source of each (there is no CLI `config inspect`; use `lotar config show --explain`)
+
+Sprints
+- GET  /api/sprints/list[?limit=N&offset=N] -> { data: sprints }
+- GET  /api/sprints/summary?sprint=ID, /api/sprints/burndown?sprint=ID -> { data }; sprint analytics
+- GET  /api/sprints/velocity[?limit=N&include_active=true&metric=...] -> { data }
+- POST /api/sprints/order ({ task, sprint?, before?, after?, allow_closed? }) -> { data: TaskOrderResponse }; moves a task before or after another in the backlog or a sprint
+- GET  /api/sprints/backlog/order -> { data: TaskOrderResponse }; the current backlog order
+
+Activity and references
+- GET  /api/activity/feed, /api/activity/series, /api/activity/authors, /api/activity/changed_tasks[?since&until&project...] -> { data }; activity for the Insights pages
+- GET  /api/references/files?q=TEXT[&limit=N] -> { data }; repository file paths for reference pickers
+- GET  /api/references/snippet?code=PATH#LINES[&context=N] -> { data }; the lines a code reference points to
+- GET  /api/openapi.json -> this API's OpenAPI document
+
 Notes
-- Graph exact typed-ID exceptions include full/padded `REL-2`/`REL-002`, compact `REL2`/`REL002`, and numeric `2`/`002` when unique in the project-scoped strict inventory. Project case is exact; ambiguous numeric/compact matches are not guessed. These identity matches survive `include_isolated=false` and rank before other query matches at the node cap, while still satisfying all non-text filters. Resolution does not use title matches or let other filters manufacture unique numeric identity.
-- Graph REST accepts `kinds=dependency,hierarchy` (comma-separated canonical kinds; `kinds=` selects none; omit for all) and strict `include_isolated=true|false`. The client/MCP request fields are `relationship_kinds` and `include_isolated`. Omitted options retain legacy projection. With `include_isolated=false`, isolated matching seeds are removed before budgeting, except an explicit focus, unique exact-ID search, or unresolved identity. Matching and sorting precede pair/component-aware allocation so recent isolates cannot displace linked clusters. Context endpoints may cross project/filter boundaries. `max_nodes` is never exceeded; `truncated` reports eligible omissions, and global integrity diagnostics remain independent of selected kinds. Focus `depth` is undirected BFS hops (0-8), not layout stages; project-wide graphs use all matching seeds with at least one boundary hop.
-- Fresh graph/check issues always include opaque `id`. For a per-issue fix, preview repair with `{ "issue_ids": ["<id>"], "apply": false }`, then apply with the same project/IDs and returned revision. The server recomputes diagnostics and refuses unknown, stale, unsafe or out-of-scope IDs; client `repairable` is not authority. Tokens bind full inventory bytes, project and sorted unique selected IDs. Selected repair responses scope `issues` before/after to those IDs and `changed_tasks` to necessary changes only. Alias-only repair substitutes the selected raw spelling without deduplicating; duplicate-only repair keeps the first stored spelling without canonicalizing; missing-mirror-only repair adds only that counterpart without normalizing existing entries. Multiple selected actions are independent of ID order, with selected aliases substituted before selected deduplication. Unselected diagnostic types are not opportunistically repaired. Omitted/empty `issue_ids` preserves batch combined normalization. Repair retains transactional history and post-commit events without starting jobs.
-- CLI parity: `task relationships graph --relationship-kind dependency --include-isolated false --filter 'status:todo tag:ui'` (`--filter` takes the web search syntax, the same as the `query` filter key) (repeat `--relationship-kind` to combine kinds; omitted options retain legacy behavior), and `task relationships repair --issue-id <id>` (repeatable; apply with the same IDs and `--apply --expected-revision <preview-token>`).
+- Graph and repair: `/api/relationships/graph` takes `kinds=dependency,hierarchy` (omit for all, empty for none), `include_isolated=true|false`, `depth` (0-8 steps from the focus task) and `max_nodes` (never exceeded; `truncated` says when tasks were left out). To fix one problem, call `/api/relationships/repair` with `{ "issue_ids": ["<id>"], "apply": false }` to preview, then again with `apply: true` and the returned `revision`. The server checks again and refuses stale or unsafe fixes. Details: [relationship graph internals](../developers/api-quick-reference.md#relationship-graph-and-repair).
+- CLI equivalents: `lotar task relationships graph --relationship-kind dependency --include-isolated false --filter 'status:todo tag:ui'` and `lotar task relationships repair --issue-id <id>` (then `--apply --expected-revision <token>`).
 - List and export accept `archived=no|yes|all` (default `no`: archived tasks are left out). Archived tasks are still returned by id and carry `archived: true`; any request that would change one returns 400 unless it adds `?force_archived=true`.
 - List and export accept `deletion=active|deleted|all` (default `active`). Blank or invalid values return 400. Delete/restore preserve `modified` and append lifecycle history; deleted tasks require restoration before ordinary mutations.
 - People fields accept `@me`.
@@ -76,7 +107,22 @@ Notes
 - Task/sprint domain failures share `{ error: { code, message } }`: invalid input, ambiguous/malformed IDs, and path/journal/cross-root safety refusals return `400 INVALID_ARGUMENT`; missing tasks/sprints/projects return `404 NOT_FOUND`; I/O, serialization, and index failures return `500 INTERNAL`. Unknown positive sprint IDs return 404 for update/delete/summary/burndown and task creation with sprint membership; zero/invalid IDs still return 400.
 - `assignee=@me` that cannot be resolved fails closed with a 400 error rather than returning an unfiltered list.
 - `/api/tasks/export` supports the exact `/api/tasks/list` query grammar, including the `due`/`due_within`/`recent`/`needs`/`has`/effort smart filters and `sort_by`/`order`: the export applies the complete filter set and the requested global order (default `modified` desc, canonical-ID ascending tiebreak); pagination params are ignored (no page slicing).
-- `/api/tasks/list` and `/api/tasks/export` share one strict query executor: `sort_by` accepts the builtin keys (`priority`, `status`, `effort`, `due-date`, `created`, `modified`, `assignee`, `reporter`, `title`, `type`, `project`, `id`, `tags`, `sprints`, `relevance`) plus `custom:<name>` (alias `field:<name>`); `relevance` orders by how well tasks match `q`, best first with the default `desc` (see [search text](list.md#search-text)); `tags` compares the tag array lexicographically and `sprints` the ascending sprint-id list numerically (empty first ascending); `order` is `asc|desc` (default `desc`); `priority` and `status` sort in their configured order (priorities lowest to highest, statuses in workflow order), other values after them by name; invalid explicit enum values, sprint entries, smart filters, sort/order params, or page params (`limit` must be 1-1000) return `400 INVALID_ARGUMENT` instead of being ignored or clamped. `has` keeps tasks carrying every listed kind: `attachment`, `image`, `link`, `tag` (at least one tag). `recent=Nd|Nw` keeps tasks modified within the last N days or weeks (in `query`, `-recent:30d` keeps the ones not changed for 30 days); `due_within=N` keeps tasks due from today through today + N days; `effort_min`/`effort_max` are inclusive effort bounds (`2h`, `1d`, `3pt`; time and points never compare, tasks without an effort are left out). `assignee=__none__` keeps unassigned tasks. `query` takes filters and search text in the web search-box syntax, exactly as `lotar list` does (e.g. `query=status:todo prio:high has:tag -tag:wip "login redirect"`; a leading minus excludes a filter), and adds to the other parameters; `q` stays plain search text, where `tag:x` limits a word to tags rather than filtering by tag. Explicitly blank `due`/`due_within`/`recent`/`needs`/`has`/`effort_min`/`effort_max` values are errors — omit the parameter instead. The CLI `lotar list` and MCP `task_list` run the same query (see [list](list.md#filters-in-the-query)).
+- `/api/tasks/list` and `/api/tasks/export` take the same parameters, the same as `lotar list` and MCP `task_list` (see [list](list.md#filters-in-the-query)). Invalid values return `400 INVALID_ARGUMENT`; they are never ignored or clamped. Leave a parameter out rather than sending it blank.
+
+  | Parameter | Values |
+  | --- | --- |
+  | `sort_by` | `priority`, `status`, `effort`, `due-date`, `created`, `modified`, `assignee`, `reporter`, `title`, `type`, `project`, `id`, `tags`, `sprints`, `relevance` (best match for `q`), or `custom:<name>` / `field:<name>`. Priority and status sort in configured order. |
+  | `order` | `asc` or `desc` (default `desc`) |
+  | `limit` | 1-1000 |
+  | `query` | Filters and search text in the web search-box syntax, e.g. `status:todo prio:high has:tag -tag:wip "login redirect"`; a leading minus excludes |
+  | `q` | Plain search text only (see [search text](list.md#search-text)) |
+  | `has` | `attachment`, `image`, `link`, `tag`; tasks must have every listed kind |
+  | `needs` | `effort`, `due`: tasks missing that value |
+  | `recent` | `Nd` or `Nw`: changed in the last N days or weeks |
+  | `due`, `due_within` | Due bucket, or due from today through today + N days |
+  | `effort_min`, `effort_max` | Inclusive bounds such as `2h`, `1d`, `3pt`; time and points never compare; tasks without effort are left out |
+  | `assignee` | A person, `@me`, or `__none__` for unassigned |
+
 - Enum filters (`status`, `priority`, `type`) validate against the explicit `project`'s resolved configuration when a project is requested, so project-only enum values are accepted; queries without `project` validate against the base config.
 
 See also: [Identity & Users](./identity.md), [Task Model](./task-model.md), and [SSE Events](./sse.md).

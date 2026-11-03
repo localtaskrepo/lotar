@@ -15,7 +15,7 @@ Configures your current repository so git executes the scripts in `.githooks`.
 
 #### What the command does
 
-1. Detects the repository root using `git rev-parse --show-toplevel` (via `find_repo_root`).
+1. Finds the root of the current git repository.
 2. Verifies `.githooks/` exists under that root and that it contains at least one non-hidden script (files starting with `.` or ending in `.md` are ignored).
 3. Reads the existing `core.hooksPath` value:
 	- If it already equals `.githooks`, the command simply ensures every script is executable (Unix only) and prints a summary.

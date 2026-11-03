@@ -174,10 +174,10 @@ JSON mode includes the same properties plus the explanation string.
 
 ## Validation and diagnostics
 
-- `CliValidator` normalizes case/whitespace and ensures the status exists in the config list.
-- `TaskCommandContext` reports detailed errors for missing workspaces, invalid IDs, or unresolved projects.
+- Status names are matched without regard to case, spaces or underscores (`in progress`, `in_progress` and `InProgress` are the same), and must exist in the project's configured states.
+- Clear errors are shown for a missing workspace, an invalid ID, or a project that cannot be found.
 - Combine `--dry-run` and `--explain` to see which config/identity source was used before committing.
-- Set `LOTAR_DEBUG=1` for extra resolver logs when troubleshooting precedence or identity issues.
+- Use `lotar whoami --explain` to see where your identity comes from.
 
 ## Error handling
 

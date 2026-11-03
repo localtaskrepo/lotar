@@ -9,8 +9,11 @@ Change or view a task's due date with validation and project-aware ID resolution
 lotar due-date <TASK_ID>
 
 # Change due date
-lotar due-date <TASK_ID> <NEW_DATE>
+lotar due-date <TASK_ID> <NEW_DATE> [--dry-run] [--explain]
 ```
+
+- `--dry-run`, `-n` - Show the change without saving it
+- `--explain`, `-e` - Explain how the date was read and validated
 
 ## Examples
 
@@ -26,13 +29,16 @@ lotar due-date 7 "next week"
 # Set an explicit date (YYYY-MM-DD)
 lotar due-date 7 2025-09-01 --project=AUTH
 
+# Preview a change
+lotar due-date 7 "next friday" --dry-run --explain
+
 # JSON output for automation
 lotar due-date 1 2025-09-01 --format=json
 ```
 
 ## Supported date formats
 
-- ISO Date: `YYYY-MM-DD` (interpreted as local midnight, stored in UTC)
+- ISO Date: `YYYY-MM-DD` (stored as that date, with no time)
 - RFC3339 DateTime: `2025-12-31T15:04:05Z`, `2025-12-31T15:04:05+02:00`
 - Local DateTime (assumed local tz): `YYYY-MM-DD HH:MM[:SS]`, `YYYY-MM-DDTHH:MM[:SS]`
 - Relative keywords: `today`, `tomorrow`, `next week`, `next <weekday>`
@@ -72,7 +78,7 @@ When no due date is set: `"due_date": null`.
 
 ## Notes
 
-- If a date is provided without a time or timezone, midnight local time is assumed and stored as an RFC3339 UTC timestamp.
+- A date without a time, and every relative date such as `tomorrow` or `+3d`, is stored as a plain date (`2025-09-01`). A date with a time is stored as an RFC3339 timestamp in UTC; a time without a timezone is read as local time.
 - Validation checks format and supports only the formats listed above. Error messages include hints with examples.
 - Works across multi-project workspaces; resolution is project-aware.
 

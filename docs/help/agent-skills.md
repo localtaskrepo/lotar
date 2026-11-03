@@ -71,11 +71,9 @@ the connection with `config_show` for your project or a filtered `task_list` bef
 mutating tasks. Use the advertised schemas, not assumed host-specific tool prefixes.
 See [MCP setup](./mcp.md) and [tool reference](./mcp-tools.md).
 
-If MCP rejects a project-specific status that the CLI accepts, inspect the
-project config and current task, use the validated CLI path for the intended
-transition, and report the mismatch. This was reproduced with LoTaR 0.8.0
-(`task_update` checked default states instead of project states). Do not change
-your workflow values to work around it; recheck this limitation after upgrading.
+If MCP and the CLI ever disagree about a value (for example MCP rejects a status
+the CLI accepts), check the project config and the task, and report the mismatch.
+Do not change your workflow values to work around it.
 
 ## Efficient sessions and caching
 

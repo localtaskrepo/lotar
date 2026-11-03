@@ -9,7 +9,7 @@ LoTaR keeps lightweight task trackers inside your repository so you can plan wor
 lotar add "Implement OAuth" --type feature --priority high
 
 # Review work
-lotar list status:todo mine:true
+lotar list status:todo
 
 # Move the work forward
 lotar status 1 in_progress
@@ -45,7 +45,7 @@ See [Agent Jobs](./agent.md) for the full CLI workflow and wrapper requirements.
 
 | Flag | What it does |
 | --- | --- |
-| `--format text|table|json|markdown` | Pick an output style once and reuse it everywhere. |
+| `--format text|json` | Pick an output style once and reuse it everywhere. `table` and `markdown` are accepted but print the same as `text`. |
 | `--log-level <level>` / `--verbose` | Control how chatty the command should be. |
 | `--force-archived` | Let this command change archived tasks, which are read-only otherwise (see [task archive](./task.md#archive--unarchive)). |
 | `--project, -p <PREFIX>` | Force a project context when auto-detection isn’t enough. Note: `lotar serve` ignores the project flag on purpose; use `--port`/`-p <PORT>` (after `serve`) to change the server port. |
@@ -75,9 +75,11 @@ LoTaR stores data in `.tasks/<PROJECT>` folders. Discovery order:
 
 1. `--tasks-dir` flag
 2. `LOTAR_TASKS_DIR`
-3. Home/global `tasks_folder` setting
-4. Parent directory search
-5. Create `.tasks` beside the current directory
+3. Home config `tasks_folder` setting (`~/.lotar`), which changes the folder name to look for
+4. Parent directory search, up to the root of the current git repository
+5. Create `.tasks` in the current directory (only commands that write create it)
+
+Run `lotar config show` to see which folder was picked.
 
 Configuration precedence follows the same idea: CLI flag → project → environment → home → global → defaults. Learn the full chain in [Resolution & Precedence](./precedence.md).
 

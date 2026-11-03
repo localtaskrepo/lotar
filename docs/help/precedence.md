@@ -18,7 +18,7 @@ Commands that do not operate on a specific project simply skip step 2, so they e
 Notes:
 - The same chain powers CLI, REST, and MCP. Project-aware commands always resolve the project context first, so they inherit project-level overrides while still respecting higher-level env and CLI tweaks. Use `--config KEY=VALUE` to temporarily override any field without editing YAML (existing per-command flags stay available as shorthands).
 - Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified and honor the same precedence chain.
-- When a field cannot be expressed per-project (for example `tasks_folder`), only the global/home/env layers are considered.
+- Fields that cannot be set per project skip the project layer. `tasks_folder` is a special case: only the home config can set it (see [Tasks directory resolution](#tasks-directory-resolution)).
 
 Automation rules (`automation.yml`) are resolved separately from config values:
 1. Project automation file (`.tasks/<PROJECT>/automation.yml`)
@@ -43,12 +43,11 @@ Identity lookups are cached per workspace and effective project, so CLI/REST/MCP
 Tasks directory discovery follows these steps:
 1. `--tasks-dir <PATH>` (highest priority). The directory is created automatically when missing so initialization commands can run in fresh folders.
 2. `LOTAR_TASKS_DIR` environment variable (skipped when `LOTAR_TEST_MODE=1`, `RUST_TEST_THREADS` is set, or `LOTAR_IGNORE_ENV_TASKS_DIR=1`). Relative single-segment values first try to match parent directories before falling back to creating the path.
-3. Home config `tasks_folder` setting (in `~/.lotar` unless overridden by `LOTAR_IGNORE_HOME_CONFIG=1`).
-4. Global config `tasks_folder` setting (allows repos to standardize on a folder such as `.work` instead of `.tasks`).
-5. Parent directory search for an initialized tasks folder (matching the configured name and containing `config.yml`). The resolver returns the parent path so status output can explain where it was found. The search stops at the root of the git repository the command runs in (a directory with `.git`), so a new or nested repository gets its own workspace, and a tasks folder directly in your home directory is only used when the command runs in the home directory itself.
-6. Current directory + configured folder name (created on demand). Commands that only read (`list`, `show`, `stats`, `config show`, ...) never create it.
+3. Home config `tasks_folder` setting (in `~/.lotar` unless overridden by `LOTAR_IGNORE_HOME_CONFIG=1`). This sets the folder name to look for, such as `.work` instead of `.tasks`. It is a personal setting; a repository cannot set it in `.tasks/config.yml`, because LoTaR reads that file only after it has found the folder.
+4. Parent directory search for an initialized tasks folder (matching the configured name and containing `config.yml`). The resolver returns the parent path so status output can explain where it was found. The search stops at the root of the git repository the command runs in (a directory with `.git`), so a new or nested repository gets its own workspace, and a tasks folder directly in your home directory is only used when the command runs in the home directory itself.
+5. Current directory + configured folder name (created on demand). Commands that only read (`list`, `show`, `stats`, `config show`, ...) never create it.
 
-These rules apply everywhere (CLI, REST server, MCP). Run commands with `LOTAR_DEBUG=1` to emit the resolved workspace path whenever you need to confirm which folder was selected.
+These rules apply everywhere (CLI, REST server, MCP). To see which folder was picked, run `lotar config show`: its first line is the tasks directory.
 
 ## Project resolution (short guide)
 
@@ -69,4 +68,4 @@ Both settings honor the configuration precedence chain, and they can be toggled 
 
 - Use `--explain` (where available) to see how values were chosen. Commands such as `lotar whoami --explain` and `lotar config show --explain` surface each layer in the order above.
 - Use `lotar whoami` to see your resolved identity and source chain.
-- Enable `LOTAR_DEBUG=1` temporarily to log the resolved tasks directory, config sources, and identity detector outcomes when diagnosing precedence issues.
+- Use `lotar config show` to see which tasks directory was picked.

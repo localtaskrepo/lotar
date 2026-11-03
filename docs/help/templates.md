@@ -154,11 +154,13 @@ issue:
 Continue customizing after initialization:
 
 ```bash
+lotar config set issue.tags '["frontend","backend","triage","sev"]' --project=DEMO
 lotar config set default.tags '["triage","sev"]' --project=DEMO
 lotar config set custom_fields '["product","squad"]' --project=DEMO
 lotar config set custom_fields product,squad --project=DEMO  # comma form
-lotar config set issue.tags '["frontend","backend"]' --project=DEMO
 ```
+
+Set `issue.tags` before `default.tags`: once the tag list is limited, every default tag must be in it.
 
 ## Migration notes
 

@@ -70,7 +70,7 @@ automation:
       on:
         job_started:   { set: { status: InProgress } }
         job_completed: { set: { status: NeedsReview, assignee: "@reporter" } }
-        job_failed:    { set: { status: Blocked } }
+        job_failed:    { set: { status: Todo, assignee: "@reporter" } }
 ```
 
 ### Web UI: board, sprints, calendar, insights

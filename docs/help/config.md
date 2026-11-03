@@ -329,7 +329,7 @@ project:
 ```bash
 lotar config set review.reviewers alice,bob --project AUTH --dry-run
 lotar config set review.reviewers alice,bob --project AUTH
-lotar config inspect --project AUTH
+lotar config show --project AUTH
 # Return to reporter-only review resolution
 lotar config set review.reviewers "" --project AUTH
 ```

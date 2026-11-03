@@ -7,8 +7,11 @@ Show recent changes to tasks from git history.
 ```bash
 lotar changelog            # compare working tree vs HEAD in .tasks
 lotar changelog HEAD~1     # compare HEAD vs HEAD~1 (range: HEAD~1..HEAD)
+lotar changelog --global   # include every project, not just the current one
 lotar --format json changelog
 ```
+
+- By default it shows only the current project (from `--project`, the folder you are in, or the default project). Add `--global` to include every project under `.tasks`.
 
 - Shows per-task field changes:
   - Default: working tree (incl. staged) vs HEAD.
