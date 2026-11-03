@@ -61,13 +61,18 @@ jobs:
             exit 1
           fi
 
+      # A tag with a suffix (v1.0.0-rc.1) is a prerelease: never the repository's
+      # latest release, which the install scripts install, and it skips the Docker
+      # `latest` tag, the Homebrew tap, and the Scoop bucket below. npm uses the
+      # same rule for its `next` dist-tag (scripts/npm-packages.mjs, DEV-290).
       - name: Create or update release (no assets yet)
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -290,6 +295,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz
             lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz.pem
@@ -303,6 +309,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip
             lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip.pem
@@ -555,10 +562,20 @@ jobs:
             ];
 
             const lines = quickLinks.map((entry) => `- [${entry.label}](${assetBase}/${entry.file})`);
+            // The install scripts default to the latest stable release, so a
+            // prerelease page names its own version (DEV-290).
+            const prerelease = dockerTag.includes('-');
             const installLines = [
               '## Install Script',
-              '- Linux and macOS: `curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh`',
-              '- Windows: `irm https://localtaskrepo.github.io/lotar/install.ps1 | iex`',
+              ...(prerelease
+                ? [
+                    `- Linux and macOS: \`curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh -s -- --version ${tag}\``,
+                    `- Windows: \`$env:LOTAR_VERSION = '${tag}'; irm https://localtaskrepo.github.io/lotar/install.ps1 | iex\``,
+                  ]
+                : [
+                    '- Linux and macOS: `curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh`',
+                    '- Windows: `irm https://localtaskrepo.github.io/lotar/install.ps1 | iex`',
+                  ]),
               `- npm: \`npm install --global @localtaskrepo/lotar@${dockerTag}\` or \`npx -y @localtaskrepo/lotar@${dockerTag}\``,
               '',
               '## Docker Image',
@@ -628,8 +645,14 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME}"
           version="${tag#v}"
+          # Prereleases move `next`, never `latest` (same rule as the npm dist-tag).
+          case "$version" in
+            *-*) channel=next ;;
+            *) channel=latest ;;
+          esac
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
@@ -653,12 +676,14 @@ jobs:
           build-args: |
             LOTAR_VERSION=${{ steps.release_meta.outputs.version }}
           tags: |
-            mallox/lotar:latest
+            mallox/lotar:${{ steps.release_meta.outputs.channel }}
             mallox/lotar:${{ steps.release_meta.outputs.version }}
 
   update-homebrew-tap:
     name: Update Homebrew Tap
     needs: update-release-page
+    # The tap and the bucket carry stable releases only (DEV-290).
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -775,6 +800,7 @@ jobs:
   update-scoop-bucket:
     name: Update Scoop Bucket
     needs: update-release-page
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

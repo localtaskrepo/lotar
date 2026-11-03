@@ -1,13 +1,20 @@
 title: Prerelease tags are published as the stable latest on GitHub, Docker Hub, Homebrew and Scoop
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:38.844895+00:00
-modified: 2026-10-31T22:06:38.909097+00:00
+modified: 2026-11-03T22:48:44.014282+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T22:48:43.991695+00:00
+  text: |-
+    Outcome: fixed in .github/workflows/release.yml (work by a delegated agent, reviewed and committed by the coordinator). A tag containing '-' (same rule as npm distTag) is a prerelease: the GitHub release is created with prerelease: true and make_latest: false (asset uploads keep prerelease and never set make_latest), Docker pushes <version> plus 'next' instead of 'latest', the Homebrew tap and Scoop bucket jobs are skipped, and the release page pins install-script commands to the tag. docs/release-guide.md gained a Prereleases section and matches the workflow.
+    Evidence: scripts/tests/release-page.test.mjs (prerelease/make_latest inputs, tap/bucket conditions, Docker tag list, release_meta run for stable and RC tags vs distTag, pinned install commands); the new tests fail against the old workflow; npm run test:release 47/47; workflows parse as YAML.
+    Not verified: a real prerelease tag on GitHub Actions (softprops make_latest behavior, job skipping, Buildx pushing 'next').
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -28,3 +35,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T22:48:43.991695+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:48:44.014282+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

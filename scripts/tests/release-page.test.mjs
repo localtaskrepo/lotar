@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
+import { distTag } from '../npm-packages.mjs';
 
 const workflow = parse(readFileSync(new URL('../../.github/workflows/release.yml', import.meta.url), 'utf8'));
 const steps = workflow.jobs['update-release-page'].steps;
@@ -24,6 +28,7 @@ function fixture({
     types = { 109: 'Feature', 62: 'Bug', 63: 'Chore' },
     attachments = {},
     images = {},
+    releaseTag = tag,
 } = {}) {
     const updates = [];
     const calls = [];
@@ -46,19 +51,24 @@ function fixture({
         rest: {
             repos: {
                 getReleaseByTag: async (params) => {
-                    assert.deepEqual(params, { owner: 'localtaskrepo', repo: 'lotar', tag });
+                    assert.deepEqual(params, { owner: 'localtaskrepo', repo: 'lotar', tag: releaseTag });
                     return { data: { id: 17, body } };
                 },
                 listTags: async () => {
                     throw new Error('listTags must be paginated');
                 },
                 compareCommits: async (params) => {
-                    assert.deepEqual(params, { owner: 'localtaskrepo', repo: 'lotar', base: 'v0.9.0', head: tag });
+                    assert.deepEqual(params, {
+                        owner: 'localtaskrepo',
+                        repo: 'lotar',
+                        base: 'v0.9.0',
+                        head: releaseTag,
+                    });
                     return { data: { commits: subjects.map((message) => ({ commit: { message } })) } };
                 },
                 getCommit: async (params) => {
                     calls.push({ method: 'getCommit', ...params });
-                    assert.equal(params.ref, tag);
+                    assert.equal(params.ref, releaseTag);
                     if (snapshotError) throw new Error('Snapshot API unavailable');
                     return { data: { sha: revision, commit: { tree: { sha: rootTree } } } };
                 },
@@ -106,7 +116,7 @@ function fixture({
         paginate: async (method, params) => {
             assert.equal(method, github.rest.repos.listTags);
             assert.deepEqual(params, { owner: 'localtaskrepo', repo: 'lotar', per_page: 100 });
-            return [{ name: tag }, ...(previous ? [{ name: 'v0.9.0' }] : [])];
+            return [{ name: releaseTag }, ...(previous ? [{ name: 'v0.9.0' }] : [])];
         },
     };
     return {
@@ -118,7 +128,7 @@ function fixture({
                 github,
                 { repo: { owner: 'localtaskrepo', repo: 'lotar' } },
                 { warning: (message) => warnings.push(message) },
-                { env: { GITHUB_REF_NAME: tag } },
+                { env: { GITHUB_REF_NAME: releaseTag } },
                 require,
             );
             assert.equal(updates.length, 1, 'exactly one release-body write through the mocked client');
@@ -318,3 +328,141 @@ test('screenshots are optional: an unreadable image is left out with a warning',
     assert.ok(body.includes('Add themes'));
     assert.ok(!body.includes('<img'));
 });
+
+// Prereleases (DEV-290): a tag with a suffix is a GitHub prerelease, never the
+// repository's latest release, and only npm `next` and Docker `next` carry it.
+const isPrerelease = "${{ contains(github.ref_name, '-') }}";
+
+test('prerelease tags are GitHub prereleases that never become the latest release', () => {
+    const create = workflow.jobs['create-release'].steps.find((step) => step.uses?.startsWith('softprops/'));
+    assert.equal(create.with.prerelease, isPrerelease);
+    assert.equal(create.with.make_latest, "${{ !contains(github.ref_name, '-') }}");
+    const uploads = workflow.jobs['build-and-release'].steps.filter((step) => step.uses?.startsWith('softprops/'));
+    assert.equal(uploads.length, 2);
+    for (const upload of uploads) {
+        assert.equal(upload.with.prerelease, isPrerelease, upload.name);
+        assert.equal(upload.with.make_latest, undefined, upload.name);
+    }
+});
+
+test('the Homebrew tap and the Scoop bucket only get stable releases', () => {
+    for (const job of ['update-homebrew-tap', 'update-scoop-bucket']) {
+        assert.equal(workflow.jobs[job].if, "${{ !contains(github.ref_name, '-') }}", job);
+    }
+    for (const job of ['publish-docker-image', 'publish-npm', 'package-linux', 'update-release-page']) {
+        assert.equal(workflow.jobs[job].if, undefined, job);
+    }
+});
+
+test('Docker pushes the version plus the channel npm uses for its dist-tag', () => {
+    const job = workflow.jobs['publish-docker-image'];
+    const push = job.steps.find((step) => step.uses?.startsWith('docker/build-push-action@'));
+    assert.deepEqual(push.with.tags.trim().split('\n'), [
+        'mallox/lotar:${{ steps.release_meta.outputs.channel }}',
+        'mallox/lotar:${{ steps.release_meta.outputs.version }}',
+    ]);
+});
+
+test(
+    'the Docker channel matches the npm dist-tag for stable and prerelease tags',
+    { skip: process.platform === 'win32' && 'runs the workflow step with a POSIX shell' },
+    () => {
+        const meta = workflow.jobs['publish-docker-image'].steps.find((step) => step.id === 'release_meta');
+        const dir = mkdtempSync(path.join(os.tmpdir(), 'lotar-release-meta-'));
+        try {
+            for (const tag of ['v1.2.0', 'v1.2.0-rc.1', 'v1.2.0-beta.2.x']) {
+                const output = path.join(dir, `${tag}.out`);
+                const run = spawnSync('sh', ['-c', meta.run], {
+                    env: { ...process.env, GITHUB_REF_NAME: tag, GITHUB_OUTPUT: output },
+                    encoding: 'utf8',
+                });
+                assert.equal(run.status, 0, run.stderr);
+                const values = Object.fromEntries(
+                    readFileSync(output, 'utf8')
+                        .trim()
+                        .split('\n')
+                        .map((line) => line.split('=')),
+                );
+                const version = tag.slice(1);
+                assert.deepEqual(values, { tag, version, channel: distTag(version) }, tag);
+            }
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    },
+);
+
+test('a prerelease page installs its own version with the install scripts', async () => {
+    const stable = await fixture().render();
+    assert.ok(stable.includes('`curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh`'));
+    assert.ok(stable.includes('`irm https://localtaskrepo.github.io/lotar/install.ps1 | iex`'));
+
+    const rc = 'v1.0.0-rc.1';
+    const body = await fixture({ releaseTag: rc }).render();
+    assert.ok(body.includes(`install.sh | sh -s -- --version ${rc}\``), body);
+    assert.ok(
+        body.includes(`\`$env:LOTAR_VERSION = '${rc}'; irm https://localtaskrepo.github.io/lotar/install.ps1 | iex\``),
+    );
+    assert.ok(!body.includes('install.sh | sh`'));
+    assert.ok(body.includes('@localtaskrepo/lotar@1.0.0-rc.1'));
+    assert.ok(body.includes('mallox/lotar:1.0.0-rc.1'));
+});
+
+// Docker image (DEV-289): git-backed commands need git, a mounted repository
+// owned by another UID must be trusted, and tasks must stay inside the repo.
+const dockerfile = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
+const entrypoint = readFileSync(new URL('../../packaging/docker-entrypoint.sh', import.meta.url), 'utf8');
+
+test('the Docker image ships git, trusts mounted repositories, and runs as any UID', () => {
+    const runtime = dockerfile.slice(dockerfile.indexOf(' AS runtime'));
+    assert.ok(!/^FROM scratch/m.test(dockerfile), 'a scratch image has no git and no /bin/sh');
+    assert.match(runtime, /apk add --no-cache git\b/);
+    assert.match(runtime, /git config --system --add safe\.directory '\*'/);
+    assert.match(runtime, /chmod 1777 \/home\/lotar/);
+    assert.match(runtime, /^ENV HOME=\/home\/lotar$/m);
+    assert.match(runtime, /COPY --chmod=0755 packaging\/docker-entrypoint\.sh \/usr\/local\/bin\/docker-entrypoint/);
+    assert.match(runtime, /^ENTRYPOINT \["\/usr\/local\/bin\/docker-entrypoint"\]$/m);
+    // An anonymous /tasks volume would always look mounted to the entrypoint.
+    assert.match(runtime, /^VOLUME \["\/workspace"\]$/m);
+    assert.ok(!/LOTAR_TASKS_DIR/.test(runtime), 'tasks are found in the mounted repository');
+    assert.match(entrypoint, /^exec \/usr\/local\/bin\/lotar "\$@"$/m);
+});
+
+test(
+    'the Docker entrypoint uses /tasks only when it is mounted and the repository has no tasks',
+    { skip: process.platform === 'win32' && 'runs the entrypoint with a POSIX shell' },
+    () => {
+        const dir = mkdtempSync(path.join(os.tmpdir(), 'lotar-entrypoint-'));
+        try {
+            const mounts = path.join(dir, 'mountinfo');
+            const mounted = '36 35 0:30 / /tasks rw,relatime - virtiofs tasks rw\n';
+            const unmounted = '36 35 0:30 / /workspace rw,relatime - virtiofs workspace rw\n';
+            // The script with its mount table and lotar swapped for test doubles.
+            const script = entrypoint
+                .replace('/proc/self/mountinfo', '"$MOUNTINFO"')
+                .replace('exec /usr/local/bin/lotar "$@"', 'printf "%s|%s" "${LOTAR_TASKS_DIR:-}" "$*"');
+            const repo = path.join(dir, 'repo');
+            const nested = path.join(repo, 'src');
+            const bare = path.join(dir, 'bare');
+            for (const folder of [path.join(repo, '.tasks'), nested, bare]) mkdirSync(folder, { recursive: true });
+            writeFileSync(path.join(repo, '.tasks', 'config.yml'), '');
+            const run = (cwd, table, env = {}) => {
+                writeFileSync(mounts, table);
+                const result = spawnSync('sh', ['-c', script, 'docker-entrypoint', 'list', '--format', 'json'], {
+                    cwd,
+                    env: { PATH: process.env.PATH, MOUNTINFO: mounts, ...env },
+                    encoding: 'utf8',
+                });
+                assert.equal(result.status, 0, result.stderr);
+                return result.stdout;
+            };
+            assert.equal(run(bare, mounted), '/tasks|list --format json');
+            assert.equal(run(bare, unmounted), '|list --format json');
+            assert.equal(run(repo, mounted), '|list --format json');
+            assert.equal(run(nested, mounted), '|list --format json', 'a parent .tasks counts');
+            assert.equal(run(bare, mounted, { LOTAR_TASKS_DIR: '/data' }), '/data|list --format json');
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    },
+);

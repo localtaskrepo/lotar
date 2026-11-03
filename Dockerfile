@@ -25,18 +25,34 @@ RUN set -euxo pipefail \
     && chmod +x /usr/local/bin/lotar \
     && rm -f /tmp/lotar.tar.gz /tmp/lotar.sha256
 
-FROM scratch AS runtime
+# Alpine rather than scratch: history, stats, changelog, scans and agent
+# worktrees run the git executable, and automation `run:` actions need /bin/sh
+# (DEV-289). The base image already ships the CA bundle.
+FROM alpine:3.21 AS runtime
 LABEL org.opencontainers.image.source="https://github.com/localtaskrepo/lotar" \
       org.opencontainers.image.description="LoTaR CLI packaged in a minimal image" \
       org.opencontainers.image.licenses="MIT"
 
-COPY --from=downloader /usr/local/bin/lotar /usr/local/bin/lotar
-COPY --from=downloader /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# A bind-mounted repository belongs to the host user, not to the container's
+# UID, so git would refuse it as a "dubious ownership" repository. The home
+# directory is writable for any UID, so `docker run --user "$(id -u):$(id -g)"`
+# works without a matching /etc/passwd entry.
+RUN set -eux \
+    && apk add --no-cache git \
+    && git config --system --add safe.directory '*' \
+    && mkdir -p /home/lotar /tasks \
+    && chmod 1777 /home/lotar
 
-ENV LOTAR_TASKS_DIR=/tasks
+COPY --from=downloader /usr/local/bin/lotar /usr/local/bin/lotar
+# Picks /tasks only when it is mounted and the repository has no .tasks, so
+# git-backed commands see tasks inside the repository. /tasks is therefore not
+# a VOLUME: an anonymous volume would always count as mounted.
+COPY --chmod=0755 packaging/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+
+ENV HOME=/home/lotar
 
 USER 1000:1000
 WORKDIR /workspace
-VOLUME ["/workspace", "/tasks"]
-ENTRYPOINT ["/usr/local/bin/lotar"]
+VOLUME ["/workspace"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint"]
 CMD ["--help"]

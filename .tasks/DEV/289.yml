@@ -1,13 +1,21 @@
 title: Docker image lacks git and runs as a fixed UID, so git-backed features fail
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:38.690848+00:00
-modified: 2026-10-31T22:06:38.753715+00:00
+modified: 2026-11-03T22:48:43.958527+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T22:48:43.820680+00:00
+  text: |-
+    Outcome: both findings fixed (work by a delegated agent, reviewed and committed by the coordinator).
+    1./2. Runtime image is alpine:3.21 with git (system gitconfig safe.directory=*), HOME=/home/lotar writable by any UID, USER 1000:1000 by default, /bin/sh available. Found while testing: LOTAR_TASKS_DIR=/tasks put tasks outside the mounted repo, so git refused them; the image no longer sets it, and a new packaging/docker-entrypoint.sh sets LOTAR_TASKS_DIR=/tasks only when /tasks is mounted, none was given, and no .tasks/config.yml is found from the working directory. .dockerignore keeps the build context tiny. docs/docker.md (tags, quick start with --user $(id -u):$(id -g), file ownership, compose user:, trust note, agent CLIs not included), install.md and the README Docker row updated. Behavior change: a separate shared /tasks next to a repo with its own .tasks now needs -e LOTAR_TASKS_DIR=/tasks (documented). Image ~29-30 MB (was ~8 MB scratch).
+    Not done: making changelog report git failures instead of 'No task changes' (needs src/main.rs; follow-up).
+    Evidence: docker build arm64 + amd64 OK; inside: git 2.47.3, history/stats authors/changelog/scan --modified-only work on a mounted temp repo, arbitrary --user works; scripts/tests/release-page.test.mjs gained Dockerfile layout and entrypoint decision tests (5 cases); npm run test:release 47/47.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -38,3 +46,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T22:48:43.820680+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:48:43.958527+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

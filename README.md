@@ -34,7 +34,7 @@ LoTaR keeps tasks as plain YAML files in `.tasks/`, versioned and branched with 
 | Windows (script) | `irm https://localtaskrepo.github.io/lotar/install.ps1 \| iex` |
 | Any OS with Node.js | `npm install --global @localtaskrepo/lotar`, or `npx -y @localtaskrepo/lotar` |
 | Linux, macOS, Windows | Signed binaries and `.deb`/`.rpm` packages on [GitHub Releases](https://github.com/localtaskrepo/lotar/releases/latest) |
-| Any OS with Docker | `docker run --rm -v "$PWD":/workspace -v "$PWD/.tasks":/tasks -w /workspace mallox/lotar list` |
+| Any OS with Docker | `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/workspace mallox/lotar list` ([details](docs/docker.md)) |
 
 LoTaR is not published on crates.io; to build it yourself, see [Installation](docs/help/install.md#build-from-source).
 

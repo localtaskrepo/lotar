@@ -1,0 +1,3 @@
+# The image downloads the release binary; the build context only needs the entrypoint.
+*
+!packaging/docker-entrypoint.sh

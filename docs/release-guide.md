@@ -14,10 +14,12 @@ automation and the manual checks to run after every tag.
     musl binaries (`packaging/nfpm.yaml`), attached to the same release.
   - npm packages: `@localtaskrepo/lotar` (a small Node launcher that installs the `lotar` command) and one `@localtaskrepo/lotar-<platform>`
     package per binary, assembled by `scripts/npm-packages.mjs` from the release archives.
-  - Docker image `mallox/lotar:<version>` built via Buildx.
+  - Docker image `mallox/lotar:<version>` built via Buildx, also tagged `latest` (or `next`
+    for a prerelease).
   - Homebrew tap update pushed to `localtaskrepo/homebrew-lotar`. The formula installs the
     macOS builds on macOS and the static musl builds on Linux.
   - Scoop manifest update pushed to `localtaskrepo/scoop-lotar`.
+  - Prereleases get less; see [Prereleases](#prereleases).
 - **Install scripts**: `site/install.sh` (Linux, macOS) and `site/install.ps1` (Windows)
   are published with the homepage at `https://localtaskrepo.github.io/lotar/` by the
   Homepage workflow when they change on `main`, not by the release. They look up the
@@ -132,12 +134,29 @@ publisher matching this repository and `release.yml`, or its configuration expir
      tags (`v1.0.0-rc.1`) publish under the `next` dist-tag instead of `latest`.
    - `update-release-page`: injects quick download links and snapshot-linked
      ticket references in the custom commit list.
-   - `publish-docker-image`: builds/pushes the Docker image to Docker Hub.
+   - `publish-docker-image`: builds/pushes the Docker image to Docker Hub as
+     `mallox/lotar:<version>` and `mallox/lotar:latest` (`next` for a prerelease).
    - `update-homebrew-tap`: refreshes the tap formula checksums and pushes to
      `homebrew-lotar` (uses `HOMEBREW_TAP_TOKEN`).
    - `update-scoop-bucket`: updates `scoop-lotar/bucket/lotar.json` with the new URLs and
      checksums (uses the same token).
-3. Make sure the release is marked as **latest** on GitHub once the workflow finishes.
+3. Once the workflow finishes, check that GitHub shows a stable release as **Latest** and a
+   prerelease as **Pre-release**.
+
+### Prereleases
+
+A tag with a suffix, such as `v1.0.0-rc.1` or `v1.0.0-beta.2`, is a prerelease. The tag
+without its suffix must still match the version in `Cargo.toml`. The workflow uses the same
+rule everywhere (a `-` in the tag), so prerelease users opt in and nobody else gets one:
+
+| Channel | Stable tag (`v1.0.0`) | Prerelease tag (`v1.0.0-rc.1`) |
+| --- | --- | --- |
+| GitHub release | Marked **Latest** | Marked **Pre-release**, never latest |
+| Install scripts | Install it by default | Only with `--version v1.0.0-rc.1` (`$env:LOTAR_VERSION` on Windows); the release page shows that command |
+| npm | `latest` dist-tag | `next` dist-tag |
+| Docker | `1.0.0` and `latest` | `1.0.0-rc.1` and `next` |
+| Homebrew tap, Scoop bucket | Updated | Not updated (`update-homebrew-tap` and `update-scoop-bucket` are skipped) |
+| `.deb`/`.rpm` packages | Attached to the release | Attached to the release |
 
 ## Post-Release Verification
 

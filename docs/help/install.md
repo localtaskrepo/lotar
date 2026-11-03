@@ -128,20 +128,21 @@ Release archives contain the `lotar` binary only. Agent jobs run without the opt
 ## Any OS: Docker
 
 The [`mallox/lotar`](https://hub.docker.com/r/mallox/lotar) image contains the static musl build
-for `linux/amd64` and `linux/arm64`. Its entrypoint is `lotar`, so pass subcommands directly.
-Mount your repository at `/workspace` and your tasks directory at `/tasks`:
+and `git` on Alpine Linux, for `linux/amd64` and `linux/arm64`. Its entrypoint is `lotar`, so
+pass subcommands directly. Mount your repository at `/workspace`, the working directory, and on
+Linux run as your own user so LoTaR can write to it:
 
 ```bash
 docker run --rm mallox/lotar --version
 docker run --rm \
+    --user "$(id -u):$(id -g)" \
     -v "$PWD":/workspace \
-    -v "$PWD/.tasks":/tasks \
-    -w /workspace \
     mallox/lotar list
 ```
 
-See [docs/docker.md](../docker.md) for Docker Compose, a long-running server, and shared task
-directories.
+`latest` is the newest stable release and `next` the newest prerelease. See
+[docs/docker.md](../docker.md) for file ownership, Docker Compose, a long-running server, and
+shared task directories.
 
 ## Build from source
 
