@@ -1,15 +1,28 @@
 title: 'REST contract consistency: bad JSON accepted, OpenAPI drift, status codes, upload cap, missing endpoint docs'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:36.702785+00:00
-modified: 2026-10-31T22:06:36.775415+00:00
+modified: 2026-11-03T23:37:33.048638+00:00
 relationships:
   related:
   - DEV-230
   - DEV-253
   - DEV-58
+  - DEV-293
+comments:
+- date: 2026-11-03T23:37:32.831561+00:00
+  text: |-
+    Outcome: all six findings handled.
+    1. TaskDTO always serializes tags, relationships, comments, references, sprints, history and custom_fields (the web types and developers/task-model.md already treat them as always present); ProjectListResponse always has projects; sprint summaries always have has_warnings; openapi.json documents queue_stats on AgentJobListResponse. Kept the spec's TaskDTO 'required' list as it was (the published examples omit those fields; always-present is compatible). Not done: a live response-schema conformance test for every GET endpoint; tests/dev276_rest_contract_test.rs checks the fields named in the finding.
+    2. Every route that parsed bodies leniently now uses parse_body_or_empty: malformed JSON is 400 'Invalid body'. Requests with Transfer-Encoding (chunked) get 411 Length Required.
+    3. The body cap for /api/tasks/attachments/upload follows attachments.max_upload_mb (x4/3 for base64 + 1 MiB, never below 16 MiB; -1 stops at 512 MiB, since bodies are held in memory). Documented in serve.md and config-reference.md.
+    4. Connections over the 64-connection limit get 503 with Retry-After: 1 instead of a reset.
+    5. projects/stats of an unknown project and history of a task that never existed are 404; commit_diff with an unknown revision is 400; activity group/since/until values that don't parse are 400; blank comments are refused; /api/tasks/update rejects unknown keys (e.g. tittle) with the list of fields; a known path with the wrong method is 405 with an Allow header.
+    6. Already covered by DEV-293 (API quick reference 'More endpoints').
+    Evidence: tests/dev276_rest_contract_test.rs (malformed bodies, unknown update field, blank comment, 404s, 405, activity 400s, always-present collections, projects: []); web_api_integration chunked_bodies_get_411_and_overload_gets_503; full Rust suite passes; full quick smoke 372/372; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -64,3 +77,27 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-230","DEV-253","DEV-58"]}'
+- at: 2026-11-03T23:23:31.876718+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T23:37:32.831561+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T23:37:32.955119+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-230","DEV-253","DEV-58"]}'
+    new: '{"related":["DEV-230","DEV-253","DEV-58","DEV-293"]}'
+- at: 2026-11-03T23:37:33.048638+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

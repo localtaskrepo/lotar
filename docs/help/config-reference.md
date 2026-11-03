@@ -25,7 +25,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - custom_fields: string[] (default wildcard ["*"])
   - For both lists, `["*"]` allows any value, a named list allows only those values, and `[]` allows none (for example, it turns custom fields off). In project scope a blank `config set` value clears the override, so set an explicit empty list with `lotar config set custom_fields '[]' --project=DEMO`.
 - attachments.dir: string (default "@attachments")
-- attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited; positive values are MiB
+- attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited (the server still stops at 512 MiB per upload); positive values are MiB
 - sync.reports_dir: string (default "@reports")
 - sync.write_reports: boolean (default true)
 - agent.context_enabled: boolean (default true) — when true, LoTaR stores per-ticket `.context` files to support agent resume/continue; disable for stateless runs. If you don’t want to share context files, add `.context` to `.gitignore`.

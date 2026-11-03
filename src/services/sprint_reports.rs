@@ -22,10 +22,6 @@ use crate::storage::manager::Storage;
 use crate::storage::task::Task as StoredTask;
 use crate::utils::effort::{self, EffortKind};
 
-fn is_false(value: &bool) -> bool {
-    !*value
-}
-
 #[derive(Debug, Serialize, Clone)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SprintReviewTask {
@@ -249,7 +245,7 @@ pub struct SprintCalendarEntryPayload {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub time_until_end_days: Option<f64>,
     pub window: String,
-    #[serde(skip_serializing_if = "is_false", default)]
+    #[serde(default)]
     pub has_warnings: bool,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub status_warnings: Vec<SprintStatusWarningPayload>,

@@ -159,7 +159,7 @@ Developers can find the details in [Write locking and transactions](../developer
 
 ## Development Notes
 
-- Request limits: HTTP bodies are capped at 16 MiB (`413` beyond) and idle sockets time out after 30 seconds; MCP stdio frames are capped at 10 MiB. Static file requests containing `.`/`..` path segments are rejected.
+- Request limits: HTTP bodies are capped at 16 MiB (`413` beyond), except attachment uploads, whose cap follows `attachments.max_upload_mb` (uploads are base64 inside JSON, so the request is about 4/3 of the file; `-1` stops at 512 MiB). Bodies must have a `Content-Length`; chunked bodies get `411`. At most 64 connections are served at once; more get `503` with `Retry-After: 1`. Idle sockets time out after 30 seconds; MCP stdio frames are capped at 10 MiB. Static file requests containing `.`/`..` path segments are rejected. A known path asked with the wrong method gets `405` with an `Allow` header.
 - The API is same-origin only: no `Access-Control-Allow-Origin` header is emitted, and mutating requests (`POST`/`PUT`/`PATCH`/`DELETE`) carrying an `Origin` that does not match the server's `Host` are rejected with `403 Forbidden`. Non-browser clients (CLI, scripts, MCP) send no `Origin` and are unaffected.
 - Preflight: `OPTIONS /api/*` returns `204 No Content` with headers:
 	- `Access-Control-Allow-Methods: GET,POST,OPTIONS`

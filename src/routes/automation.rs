@@ -25,7 +25,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
     api_server.register_handler("POST", "/api/automation/set", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let yaml = match body.get("yaml").and_then(|v| v.as_str()) {
             Some(value) => value,
             None => return bad_request("Missing yaml payload".to_string()),

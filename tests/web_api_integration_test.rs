@@ -1055,6 +1055,33 @@ fn responses_forbid_cross_site_framing() {
 }
 
 #[test]
+fn chunked_bodies_get_411_and_overload_gets_503() {
+    // DEV-276: chunked bodies were read as empty, and connections over
+    // the limit were reset without a response.
+    let mut server = start_server();
+    let port = server.port();
+    let (status, _) = raw_request(
+        port,
+        "POST /api/tasks/add HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\nContent-Type: application/json\r\n\r\n5\r\n{\"a\":\r\n0\r\n\r\n",
+    );
+    assert_eq!(status, 411);
+
+    // Hold the connection limit with idle sockets, then ask once more.
+    let idle: Vec<TcpStream> = (0..64)
+        .map(|_| TcpStream::connect(("127.0.0.1", port)).unwrap())
+        .collect();
+    std::thread::sleep(Duration::from_millis(200));
+    let (status, headers) = raw_request(
+        port,
+        "GET /api/openapi.json HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    );
+    assert_eq!(status, 503, "{headers}");
+    assert!(headers.contains("retry-after"), "{headers}");
+    drop(idle);
+    server.stop();
+}
+
+#[test]
 fn shutdown_endpoint_is_not_exposed() {
     let mut server = start_server();
     let port = server.port();

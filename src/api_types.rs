@@ -253,29 +253,28 @@ pub struct TaskDTO {
     pub subtitle: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub description: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    // Always serialized, even when empty: the API contract and the web
+    // types treat these collections as required (DEV-276).
+    #[serde(default)]
     pub tags: Vec<String>,
-    #[serde(
-        skip_serializing_if = "crate::types::TaskRelationships::is_empty",
-        default
-    )]
+    #[serde(default)]
     pub relationships: crate::types::TaskRelationships,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub comments: Vec<crate::types::TaskComment>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub references: Vec<crate::types::ReferenceEntry>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub acceptance_criteria: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub sprints: Vec<u32>,
     #[serde(
         skip_serializing_if = "crate::api_types::btreemap_u32_is_empty",
         default
     )]
     pub sprint_order: BTreeMap<u32, u32>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub history: Vec<crate::types::TaskChangeLogEntry>,
-    #[serde(skip_serializing_if = "crate::api_types::map_is_empty", default)]
+    #[serde(default)]
     pub custom_fields: crate::types::CustomFields,
 }
 
@@ -1535,7 +1534,7 @@ pub struct ProjectListResponse {
     pub total: usize,
     pub limit: usize,
     pub offset: usize,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub projects: Vec<ProjectDTO>,
 }
 

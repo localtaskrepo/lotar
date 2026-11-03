@@ -53,8 +53,11 @@ fn write_forbidden(mut stream: &TcpStream, body: &str) {
     let _ = stream.flush();
 }
 
-fn reject_oversized_body(mut stream: &TcpStream) {
-    let body = "{\"error\":{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds the 16 MiB limit\"}}";
+fn reject_oversized_body(mut stream: &TcpStream, limit: usize) {
+    let body = format!(
+        "{{\"error\":{{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds the {} MiB limit\"}}}}",
+        limit / (1024 * 1024)
+    );
     let response = format!(
         "HTTP/1.1 413 Content Too Large\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         body.len(),
@@ -62,6 +65,30 @@ fn reject_oversized_body(mut stream: &TcpStream) {
     );
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.flush();
+}
+
+/// Uploads with `attachments.max_upload_mb: -1` (unlimited) still stop here,
+/// since the whole body is held in memory.
+const MAX_UPLOAD_BODY_BYTES: usize = 512 * 1024 * 1024;
+
+/// Body size limit for a request. Attachment uploads are base64 inside JSON
+/// (4/3 larger), so their limit follows `attachments.max_upload_mb` instead
+/// of the general 16 MiB cap (DEV-276: uploads failed above ~12 MiB).
+fn request_body_limit(path: &str) -> usize {
+    if path != "/api/tasks/attachments/upload" {
+        return MAX_REQUEST_BODY_BYTES;
+    }
+    let configured = resolve_server_tasks_dir()
+        .and_then(|dir| crate::config::resolution::load_and_merge_configs(Some(&dir)).ok())
+        .map(|cfg| cfg.attachments_max_upload_mb);
+    match configured {
+        Some(-1) => MAX_UPLOAD_BODY_BYTES,
+        Some(mb) if mb > 0 => {
+            let file = (mb as usize).saturating_mul(1024 * 1024);
+            (file / 3 * 4 + 1024 * 1024).clamp(MAX_REQUEST_BODY_BYTES, MAX_UPLOAD_BODY_BYTES)
+        }
+        _ => MAX_REQUEST_BODY_BYTES,
+    }
 }
 
 /// Configuration for the web server's static file serving behavior.
@@ -235,8 +262,21 @@ fn accept_loop<'scope, 'env>(
                 // never leak into request handling.
                 let _ = stream.set_nonblocking(false);
                 if active.load(Ordering::Acquire) >= MAX_CONCURRENT_CONNECTIONS {
-                    // Fail closed: refuse the overload instead of
-                    // queuing it behind unbounded work.
+                    // Fail closed: refuse the overload instead of queuing
+                    // it, but with a retryable status rather than a reset
+                    // (DEV-276).
+                    let mut stream = stream;
+                    let _ = stream.set_write_timeout(Some(Duration::from_millis(200)));
+                    let body = "{\"error\":{\"code\":\"BUSY\",\"message\":\"Too many open connections; retry shortly\"}}";
+                    let _ = stream.write_all(
+                        format!(
+                            "HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            body.len(),
+                            body
+                        )
+                        .as_bytes(),
+                    );
+                    let _ = stream.shutdown(Shutdown::Both);
                     continue;
                 }
                 let stream = Arc::new(stream);
@@ -324,14 +364,30 @@ fn handle_connection(
                 headers.insert(k.trim().to_lowercase(), v.trim().to_string());
             }
         }
+        // Bodies are read by Content-Length only; a chunked body used to be
+        // treated as empty and fail with a misleading error (DEV-276).
+        if headers
+            .get("transfer-encoding")
+            .is_some_and(|value| !value.trim().eq_ignore_ascii_case("identity"))
+        {
+            let body = "{\"error\":{\"code\":\"LENGTH_REQUIRED\",\"message\":\"Chunked request bodies are not supported; send Content-Length\"}}";
+            let response = format!(
+                "HTTP/1.1 411 Length Required\r\nContent-Type: application/json\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+                SECURITY_HEADERS,
+                body.len(),
+                body
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+            return;
+        }
+        let body_limit = request_body_limit(&path);
         let mut body: Vec<u8> = body_bytes.to_vec();
         let declared_length: Option<usize> = headers
             .get("content-length")
             .and_then(|v| v.parse::<usize>().ok());
-        if declared_length.is_some_and(|cl| cl > MAX_REQUEST_BODY_BYTES)
-            || body.len() > MAX_REQUEST_BODY_BYTES
-        {
-            reject_oversized_body(stream);
+        if declared_length.is_some_and(|cl| cl > body_limit) || body.len() > body_limit {
+            reject_oversized_body(stream, body_limit);
             return;
         }
         if let Some(cl) = declared_length {
@@ -341,14 +397,14 @@ fn handle_connection(
                     break;
                 }
                 body.extend_from_slice(&buf[..n]);
-                if body.len() > MAX_REQUEST_BODY_BYTES {
+                if body.len() > body_limit {
                     break;
                 }
             }
-            body.truncate(cl.min(MAX_REQUEST_BODY_BYTES));
+            body.truncate(cl.min(body_limit));
         }
-        if body.len() > MAX_REQUEST_BODY_BYTES {
-            reject_oversized_body(stream);
+        if body.len() > body_limit {
+            reject_oversized_body(stream, body_limit);
             return;
         }
         (method, path, query, headers, body)
@@ -539,10 +595,13 @@ fn reason_phrase(status: u16) -> &'static str {
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
+        405 => "Method Not Allowed",
+        411 => "Length Required",
         409 => "Conflict",
         413 => "Content Too Large",
         416 => "Range Not Satisfiable",
         500 => "Internal Server Error",
+        503 => "Service Unavailable",
         _ => "",
     }
 }

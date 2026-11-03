@@ -108,6 +108,40 @@ impl ApiServer {
                     return (handler.callback)(req);
                 }
             }
+            // A known path asked with another method is a 405 naming the
+            // methods it takes, not a 404 (DEV-276).
+            let allowed: Vec<String> = self
+                .handlers
+                .keys()
+                .filter_map(|key| key.split_once(' '))
+                .filter(|(_, route)| *route == path)
+                .map(|(m, _)| m.to_string())
+                .chain(
+                    self.prefix_handlers
+                        .iter()
+                        .filter(|h| path == h.prefix || path.starts_with(&format!("{}/", h.prefix)))
+                        .map(|h| h.method.clone()),
+                )
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect();
+            if !allowed.is_empty() {
+                let allow = allowed.join(", ");
+                return HttpResponse {
+                    status: 405,
+                    headers: vec![
+                        ("Content-Type".into(), "application/json".into()),
+                        ("Allow".into(), allow.clone()),
+                    ],
+                    body: serde_json::to_vec(&serde_json::json!({
+                        "error": {
+                            "code": "METHOD_NOT_ALLOWED",
+                            "message": format!("{} is not allowed here; use {}", method, allow)
+                        }
+                    }))
+                    .unwrap_or_default(),
+                };
+            }
             HttpResponse {
                 status: 404,
                 headers: vec![("Content-Type".into(), "application/json".into())],

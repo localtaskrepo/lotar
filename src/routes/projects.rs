@@ -4,7 +4,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/projects/create", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
 
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let name = body
             .get("name")
             .and_then(|v| v.as_str())
@@ -82,6 +85,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
             _ => return bad_request("Missing project".into()),
         };
         let resolver = try_response!(resolve_tasks_dir());
+        let prefix = crate::utils::project::resolve_project_input(&name, &resolver.path);
+        if !resolver.path.join(&prefix).is_dir() {
+            return not_found(format!("Project '{name}' not found"));
+        }
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let stats = ProjectService::stats(&storage, &name);
         ok_json(200, json!({"data": stats}))

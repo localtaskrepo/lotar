@@ -8529,6 +8529,15 @@
       "AgentJobListResponse": {
         "type": "object",
         "properties": {
+          "queue_stats": {
+            "description": "Running and queued job counts when the job registry is in this process.",
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "running": {"type": "integer"},
+              "queued": {"type": "integer"}
+            }
+          },
           "jobs": {
             "type": "array",
             "items": {

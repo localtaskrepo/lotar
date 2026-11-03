@@ -8,7 +8,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/add", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let req_create = match parse_task_create_body(&body, req) {
             Ok(v) => v,
             Err(msg) => return bad_request(msg),
@@ -725,7 +728,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/update", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
             _ => return bad_request("Missing id".into()),
@@ -753,7 +759,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/status", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
             _ => return bad_request("Missing id".into()),
@@ -786,13 +795,17 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/comment", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => return bad_request("Missing id".into()),
         };
+        // Blank comments are refused, as comment/update does (DEV-276).
         let text = match body.get("text").and_then(|v| v.as_str()) {
-            Some(s) if !s.is_empty() => s.to_string(),
+            Some(s) if !s.trim().is_empty() => s.to_string(),
             _ => return bad_request("Missing text".into()),
         };
         let dto = match TaskService::add_comment(&mut storage, &id, &text) {
@@ -811,7 +824,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/comment/update", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => return bad_request("Missing id".into()),
@@ -884,7 +900,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/restore", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let body: serde_json::Value = match parse_body_or_empty(req) {
+            Ok(body) => body,
+            Err(response) => return response,
+        };
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
             _ => return bad_request("Missing id".into()),
@@ -913,7 +932,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
         api_server.register_handler("POST", path, move |req: &HttpRequest| {
             let resolver = try_response!(resolve_tasks_dir());
             let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let body: serde_json::Value = match parse_body_or_empty(req) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
             let id = match body.get("id").and_then(|v| v.as_str()) {
                 Some(s) if !s.trim().is_empty() => s.trim().to_string(),
                 _ => return bad_request("Missing id".into()),
@@ -989,6 +1011,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(e) => return internal_error(e),
         };
+        // A task that neither exists nor ever had history is unknown
+        // (DEV-276); a removed task keeps its git history.
+        if commits.is_empty() && parsed.locate(&tasks_abs).is_empty() {
+            return not_found(format!("Task '{id}' not found"));
+        }
         if let Some(limit_s) = req.query.get("limit")
             && let Ok(limit) = limit_s.parse::<usize>()
             && commits.len() > limit
@@ -1029,6 +1056,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
             &repo_root, &commit, at_commit,
         ) {
             Ok(diff) => ok_json(200, json!({"data": diff})),
+            // A commit git does not know is the caller's mistake (DEV-276).
+            Err(e)
+                if e.contains("bad revision")
+                    || e.contains("unknown revision")
+                    || e.contains("Invalid commit reference")
+                    || e.contains("bad object") =>
+            {
+                bad_request(e)
+            }
             Err(e) => internal_error(e),
         }
     });
@@ -1217,9 +1253,42 @@ fn parse_task_create_body(
     })
 }
 
+/// Keys `/api/tasks/update` understands; anything else (a typo such as
+/// `tittle`) is a 400 instead of a silent no-op (DEV-276).
+const TASK_UPDATE_KEYS: &[&str] = &[
+    "id",
+    "title",
+    "status",
+    "priority",
+    "task_type",
+    "type",
+    "reporter",
+    "assignee",
+    "due_date",
+    "due",
+    "effort",
+    "description",
+    "tags",
+    "acceptance_criteria",
+    "relationships",
+    "custom_fields",
+    "fields",
+    "sprints",
+];
+
 fn parse_task_update_body(
     body: &serde_json::Value,
 ) -> Result<crate::api_types::TaskUpdate, String> {
+    if let Some(map) = body.as_object()
+        && let Some(unknown) = map
+            .keys()
+            .find(|key| !TASK_UPDATE_KEYS.contains(&key.as_str()))
+    {
+        return Err(format!(
+            "Unknown field '{unknown}'. Fields: {}",
+            TASK_UPDATE_KEYS[1..].join(", ")
+        ));
+    }
     Ok(crate::api_types::TaskUpdate {
         title: parse_string_field(body, "title")?,
         status: parse_string_field(body, "status")?,
