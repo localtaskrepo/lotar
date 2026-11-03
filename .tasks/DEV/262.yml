@@ -1,0 +1,67 @@
+title: 'Jira sync: pull stops after 50 issues, wipes custom fields, flattens descriptions, mis-assigns users'
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:34.690843+00:00
+modified: 2026-10-31T22:06:34.750644+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] Jira pull silently stops after the first 50 issues: /rest/api/3/search/jql uses nextPageToken, but the code paginates with startAt/total (review ref sync-scan-git#1)
+     Where: src/services/sync_service/jira.rs:60-96
+     Evidence: `jira_search_issues` calls the enhanced-search endpoint `/rest/api/3/search/jql` with `startAt`/`maxResults=50`. It reads `total` (`unwrap_or(0)`) and stops when `issues.len() >= total`. The enhanced endpoint returns `{issues, nextPageToken, isLast}` with no `total`, and does not honour `startAt`. The code has no `nextPageToken`/`isLast` handling anywhere (grep finds none).
+
+  Repro against a local mock that follows that contract (120 issues, api_url via HOME=<scratch>/home): `lotar pull jira --project ENG` → `Created: 50, Updated: 0, Skipped: 0, Failed: 0`, with no warning. The request log shows a single `GET /rest/api/3/search/jql?...startAt=0&maxResults=50...`.
+     Impact: Any Jira project or filter with more than 50 matching issues is partly imported, with no warning. Later pulls never see issues past the first page, so they are neither created nor updated locally.
+     Suggested fix: Paginate with `nextPageToken` until `isLast` is true or no token comes back, and drop `startAt`/`total`. Add a mock-based provider test with more than one page.
+
+  2. [medium] Bulk Jira pull never requests mapped custom fields, so `when_empty: clear` wipes values that a `--task` pull just set (review ref sync-scan-git#4)
+     Where: src/services/sync_service/jira.rs:77-80, src/services/sync_service/remote_fields.rs:16-38, src/services/sync_service/mapping.rs:166-183
+     Evidence: `jira_search_issues` hard-codes `fields=summary,description,status,issuetype,priority,assignee,reporter,labels`. Single-task pull uses `jira_pull_field_names(remote)`, which adds mapped fields.
+
+  Repro against the mock with mapping `points: {field: customfield_10016, when_empty: clear}` (remote value 5):
+  - Bulk pull creates ENG-1 with `points: null`.
+  - `pull jira --task ENG-1` sets `points: '5'`.
+  - The next bulk pull reports `Updated: 50`, and history shows `points: '5'` → `{}`.
+     Impact: Custom-field mappings (story points, team, sprint and so on) never sync on a normal pull. With `when_empty: clear`, every bulk pull deletes local values and flips them against single-task pulls, filling task history with churn.
+     Suggested fix: Pass `jira_pull_field_names(remote)` to the bulk search as well. Optionally, treat a field missing from the response as 'unknown' rather than 'empty'.
+     Verifier note: With the default when_empty (skip), mapped custom fields simply never sync on a bulk pull. The data is wiped and flip-flops only with when_empty: clear.
+
+  3. [medium] Jira ADF-to-text conversion loses structure on pull, and a later push replaces the rich Jira description with flattened text (review ref sync-scan-git#11)
+     Where: src/services/sync_service/jira.rs:189-244, src/services/sync_service/payloads.rs:177-180
+     Evidence: `collect_adf_text` concatenates `text` nodes with no separators. It drops `hardBreak`, `inlineCard`/link URLs, `mention`, `emoji` and `date` nodes, and joins list items with no separator.
+
+  Repro against the mock: an ADF body of paragraph [`Line one`, hardBreak, `line two`], a bulletList [`alpha`, `beta`] and a paragraph [`see `, inlineCard https://example.com/spec] pulls as:
+  ```
+  Line oneline two
+  alphabeta
+  see
+  ```
+  `jira_text_to_adf` pushes the whole local text back as a single paragraph text node.
+     Impact: Pulled descriptions are corrupted locally: words glued together, links lost. Any later local edit followed by push overwrites the Jira description, which loses lists, links, mentions and formatting for everyone using Jira.
+     Suggested fix: Render ADF to Markdown-ish text, with newlines for hardBreak, `- ` for list items and URLs for cards/links. Convert paragraphs and newlines back to ADF on push. Consider skipping a description push when the remote ADF contains nodes the converter cannot round-trip.
+     Verifier note: Push side is from code reading. A description is pushed only when the diff against the remote differs, so the rich remote is overwritten only after a local description edit.
+
+  4. [medium] Jira assignee/reporter push is never idempotent, and fuzzy user search with maxResults=1 can assign the wrong person (review ref sync-scan-git#12)
+     Where: src/services/sync_service/remote_fields.rs:105-114, src/services/sync_service/remote_fields.rs:55-60, src/services/sync_service/jira.rs:245-320, src/services/sync_service/payloads.rs:318-345
+     Evidence: Pull stores a Jira user as emailAddress, then displayName, then accountId (`jira_user_to_string`); Jira Cloud usually hides email, so displayName wins. Push resolves a non-accountId value via `/rest/api/3/user/search?query=<value>&maxResults=1` and sends `{accountId}`. The diff then compares that accountId (`jira_payload_field_value` prefers accountId) against displayName/email (`read_jira_field`). They never match, so every push re-sends assignee/reporter.
+
+  Based on code reading; not reproduced against a mock.
+     Impact: The 'pull→push round-trips are no-ops' guarantee in docs/developers/sync.md breaks: every push reports updates and rewrites assignees. With an ambiguous display name ('Jane'), the first fuzzy match can reassign issues to the wrong account.
+     Suggested fix: Compare by accountId on both sides (read `accountId` from the issue for the diff), and store accountId locally or keep a mapping. Require an exact match on displayName or email in the user search, and warn when more than one user matches.
+     Verifier note: Not reproduced against a mock, but the mismatch is clear from the code.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:34.750644+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

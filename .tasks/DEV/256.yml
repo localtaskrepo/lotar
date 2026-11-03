@@ -1,0 +1,39 @@
+title: 'Non-ASCII searches and filters return nothing: query strings are decoded as Latin-1'
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:33.859449+00:00
+modified: 2026-10-31T22:06:33.919109+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] Percent-decoding of query strings breaks UTF-8: searches and filters with non-ASCII values return nothing (review ref api-sse-web#2)
+     Where: src/web_server.rs:434-471
+     Evidence: url_decode pushes each decoded byte as `(h << 4 | l) as char`, turning UTF-8 bytes into Latin-1 characters (%C3%A9 becomes "Ã©"). Repro: the task 'Café über' has assignee 'José'. `curl '/api/tasks/list?project=DEMO&q=Caf%C3%A9'` → `{"data":{"limit":50,"offset":0,"total":0}}`; `assignee=Jos%C3%A9` → total 0; `query=assignee%3AJos%C3%A9` → total 0; `/api/tasks/suggest?q=%C3%BCber` → []. `q=Caf` finds the task, and CLI `lotar list "Café"` finds DEMO-3.
+     Impact: In the web UI (which encodes parameters with URLSearchParams) and in any REST client, searching or filtering by non-ASCII text (titles, names with accents, tags, custom-field values) silently returns empty results.
+     Suggested fix: Collect decoded bytes into a Vec<u8> and convert with String::from_utf8 (lossy, or reject with 400), as percent_decode in routes/attachments.rs already does. Add a regression test with a multibyte query.
+     Verifier note: Additional note: raw non-percent-encoded UTF-8 bytes are also pushed as `c as char` (line 864), so they are mangled too.
+
+  2. [medium] Query-string decoding treats bytes as Latin-1, so non-ASCII searches and filters in the web UI and REST API match nothing (review ref security-release#5)
+     Where: src/web_server.rs:833-870, src/web_server.rs:856, view/api/client.ts:97
+     Evidence: url_decode() pushes each percent-decoded byte with `(h << 4 | l) as char`, so the UTF-8 sequence %C3%A9 becomes "Ã©" instead of "é". The UI builds queries with URLSearchParams, which always UTF-8 encodes. Repro: added the task "Café menu" with tag "über", then
+  curl 'http://127.0.0.1:19431/api/tasks/list?q=caf%C3%A9'  -> total 0
+  curl '…/api/tasks/list?tags=%C3%BCber'  -> total 0
+  curl '…/api/tasks/list?q=caf'  -> returns "Café menu".
+     Impact: Anyone using non-ASCII text (accents, umlauts, CJK, emoji) in titles, tags, assignees, custom fields or project filters gets empty results in the web UI and API (list, export, board filters, suggest).
+     Suggested fix: Collect the decoded bytes into a Vec<u8> and convert with String::from_utf8_lossy, as routes/attachments.rs percent_decode already does. Add a regression test with %C3%A9.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:33.919109+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

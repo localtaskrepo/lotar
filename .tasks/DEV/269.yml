@@ -1,0 +1,43 @@
+title: Project prefixes alias on case-insensitive filesystems and when generated prefixes match
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:35.691717+00:00
+modified: 2026-10-31T22:06:35.755873+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] On case-insensitive filesystems (macOS, Windows) a lowercase prefix aliases an existing project, giving tasks two IDs (review ref storage-core#7)
+     Where: src/utils/project.rs:225, src/storage/operations.rs:207, src/storage/identity.rs:149, docs/help/task-model.md:12
+     Evidence: The docs promise "Exact case, no folding: `abc` and `ABC` are different projects". The code uses `tasks_dir.join(input).exists()`, which matches any case on APFS and NTFS. Repro on macOS: in a workspace with only `.tasks/DEMO`, `lotar show demo-1` displays DEMO-1's content as `demo-1`. `lotar add "lowercase project" --project demo` → `Created task: demo-6`, written to `DEMO/6.yml`. `lotar list --project demo` relabels every DEMO task as `demo-N`, while `lotar list` shows `DEMO-6`. On Linux the same commands create a separate `demo/` project, so behavior differs by platform.
+     Impact: The same file gets IDs that differ by case. String-keyed data (relationships, sprint entries, history, events, automation matching) refers to `demo-6` and `DEMO-6` inconsistently. A repo created on macOS and cloned on Linux, or the reverse, can split or merge projects.
+     Suggested fix: Resolve project folders by an exact-case directory listing (compare against `read_dir` names) instead of `exists()`. Refuse to create a project that differs only in case from an existing one, and canonicalize IDs to the folder's real casing.
+
+  2. [medium] On case-insensitive filesystems `-p alph` keeps the user's casing as the prefix, which produces lowercase IDs and dangling sprint entries (review ref cli#9)
+     Where: src/utils/project.rs:219-228
+     Evidence: resolve_project_input returns `input` unchanged when `tasks_dir.join(input).is_dir()`. On macOS APFS and Windows that check is true for `alph` when the folder is `ALPH`. Repro (macOS): `lotar -p alph add lower` prints `Created task: alph-6`, and `lotar -p alph list` shows `alph-6`. `lotar -p alph task relationships add 1 2 --kind depends-on` fails with `Relationship task 'alph-1' is missing`. `lotar -p alph sprint add --sprint 1 3` (also hit by the -p/select bug) wrote `alph-1`, `alph-2`, `alph-3` next to `ALPH-*` into .tasks/@sprints/1.yml. A later `sprint remove` removed only the uppercase entries, and `lotar list sprint:1` then finds nothing while the file still lists alph-*. On Linux, generate_project_prefix uppercases, so behaviour depends on the platform.
+     Impact: Non-canonical IDs get persisted into shared YAML (sprint files) and are left dangling. Output is inconsistent across team members' operating systems.
+     Suggested fix: When the directory exists, return the actual on-disk directory name (match list_visible_subdirs case-insensitively), or require an exact-case match and otherwise fall back to the uppercase generated prefix.
+     Verifier note: This only happens on case-insensitive filesystems (the macOS default, Windows). The sprint-file pollution is amplified by #0.
+
+  3. [low] `--project <Name>` silently merges into another project whose generated prefix matches (review ref storage-core#9)
+     Where: src/utils/project.rs:244, src/utils/project.rs:247, src/utils/project.rs:27
+     Evidence: `resolve_project_input` falls back to `generate_project_prefix(input)`, and if that folder exists it returns it, without checking that the folder's configured `project.name` matches. Repro: `lotar add "alpha task" --project Alpha` → ALPH-1; `lotar add "alphabet task" --project Alphabet` → ALPH-2, stored in project Alpha (`ALPH/config.yml` has `name: Alpha`), and `lotar list --project Alphabet` lists both. `generate_unique_project_prefix` exists to detect this conflict but is only used by init and bootstrap.
+     Impact: Distinct projects with names that share a 4-letter prefix (Alpha/Alphabet, Platform/Plat-API, ...) get mixed together with no warning, which is hard to undo.
+     Suggested fix: In `resolve_project_input`, when the generated-prefix folder exists but its `project.name` differs from the input, refuse with a hint to pass the prefix or run `config init` with an explicit prefix. Reuse `generate_unique_project_prefix` when a project is created implicitly.
+     Verifier note: Only affects implicit project creation through `--project <Name>`. Projects initialized with an explicit prefix avoid it, and `task move` can split the tasks afterwards. Low.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:35.755873+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

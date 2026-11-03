@@ -1,0 +1,40 @@
+title: Docker image lacks git and runs as a fixed UID, so git-backed features fail
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:38.690848+00:00
+modified: 2026-10-31T22:06:38.753715+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Docker image has no git binary; docs say git metadata works, but history/stats fail and changelog silently reports no changes (review ref docs#1)
+     Where: Dockerfile:28-41, docs/docker.md:50-52, README.md:41, docs/help/install.md:136-152
+     Evidence: The runtime stage is `FROM scratch` and copies only `lotar` and CA certs. Git features shell out to `git` (src/utils/git.rs:46, src/services/audit_service.rs:246,293,322,1000). docker.md:51 says "Mounting the whole repository at /workspace keeps git metadata available for commands that need it." Ran the locally cached mallox/lotar image against a scratch repo with uncommitted task edits (the image is old, 0.6.2, but the current Dockerfile is still scratch with no git):
+  `docker run --rm -v "$PWD":/workspace -v "$PWD/.tasks":/tasks -w /workspace mallox/lotar task history AUTH-1` → `❌ Failed to run git: No such file or directory`
+  `... mallox/lotar stats authors --since 90d` → same error
+  `... mallox/lotar changelog` → `✅ No task changes.` even though the working tree had changed task files.
+     Impact: Docker users, an install path in the README quick-start table, get broken history and stats. Worse, changelog quietly gives a wrong empty answer. Agent worktrees and scan --modified-only also depend on git.
+     Suggested fix: Either ship git in the image (for example an alpine runtime with git) or document the limitation clearly in docker.md and install.md. Make changelog report an error, not 'No task changes', when the git executable is missing.
+     Verifier note: I simulated the missing git through PATH and did not run the Docker image. The silent empty result in main.rs also happens for any other git failure, not only in Docker.
+
+  2. [medium] The Docker image has no git and runs as a fixed UID, so git-backed features fail despite docs saying git metadata is available (review ref security-release#8)
+     Where: Dockerfile:27-42, docs/docker.md:49-51, src/services/audit_service.rs:246, src/services/audit_service.rs:1024, src/utils/git.rs:46
+     Evidence: The runtime stage is `FROM scratch` containing only /usr/local/bin/lotar and the CA bundle. LoTaR spawns the `git` executable (Command::new("git")) for history, the activity feed and series, commit diffs, changed-task detection and the scanner. docs/docker.md:50 says mounting the repository "keeps git metadata available for commands that need it". `USER 1000:1000` also means bind-mounted repos owned by another UID on a Linux host are read-only to lotar, and the docs give no `--user` guidance. Verified by reading the Dockerfile and code; I did not run Docker.
+     Impact: In the official image, the history and Activity/Insights views and the git-dependent CLI commands fail. Writes fail on Linux hosts where the user's UID is not 1000.
+     Suggested fix: Use a minimal base with git (e.g. alpine plus git, or distroless with git), or document the limitation. Document `--user "$(id -u):$(id -g)"` for bind mounts and fix the docker.md claim.
+     Verifier note: There is a further consequence: scratch has no /bin/sh, so shell-form automation `run:` actions and agent runners also cannot work in the image. The docs mention neither limitation.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:38.753715+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

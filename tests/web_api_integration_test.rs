@@ -947,6 +947,82 @@ fn mutating_requests_with_foreign_origin_are_rejected() {
     server.stop();
 }
 
+/// Send one raw request and return (status, lowercased header text).
+fn raw_request(port: u16, request: &str) -> (u16, String) {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream.set_read_timeout(Some(net_timeout())).unwrap();
+    stream.write_all(request.as_bytes()).unwrap();
+    stream.flush().unwrap();
+    let mut buf = Vec::new();
+    let mut tmp = [0u8; 1024];
+    loop {
+        let n = stream.read(&mut tmp).unwrap_or(0);
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&tmp[..n]);
+        if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+            break;
+        }
+    }
+    let text = String::from_utf8_lossy(&buf).to_string();
+    let status = text
+        .lines()
+        .next()
+        .and_then(|l| l.split_whitespace().nth(1))
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(0);
+    (status, text.to_ascii_lowercase())
+}
+
+#[test]
+fn rebound_host_headers_are_rejected_for_every_route() {
+    // DEV-254: a DNS-rebinding page sends matching Origin and Host values
+    // for its own domain; the Host allowlist must reject it everywhere.
+    let mut server = start_server();
+    let port = server.port();
+    let body = r#"{"title":"drive-by"}"#;
+    let requests = [
+        format!("GET /api/tasks/list HTTP/1.1\r\nHost: attacker.example:{port}\r\n\r\n"),
+        format!("GET /api/events HTTP/1.1\r\nHost: attacker.example:{port}\r\n\r\n"),
+        format!("GET / HTTP/1.1\r\nHost: attacker.example:{port}\r\n\r\n"),
+        format!(
+            "POST /api/tasks/add?project=DEMO HTTP/1.1\r\nHost: attacker.example:{port}\r\nOrigin: http://attacker.example:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        ),
+    ];
+    for request in &requests {
+        let (status, _) = raw_request(port, request);
+        assert_eq!(status, 403, "rebound request must be rejected: {request}");
+    }
+
+    for host in ["localhost", "127.0.0.1", "[::1]"] {
+        let (status, _) = raw_request(
+            port,
+            &format!("GET /api/openapi.json HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n"),
+        );
+        assert_eq!(status, 200, "loopback host {host} must be served");
+    }
+    server.stop();
+}
+
+#[test]
+fn responses_forbid_cross_site_framing() {
+    let mut server = start_server();
+    let port = server.port();
+    let (_, headers) = raw_request(
+        port,
+        "GET /api/tasks/list HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    );
+    assert!(headers.contains("x-frame-options: sameorigin"), "{headers}");
+    assert!(headers.contains("frame-ancestors 'self'"), "{headers}");
+    assert!(
+        headers.contains("x-content-type-options: nosniff"),
+        "{headers}"
+    );
+    server.stop();
+}
+
 #[test]
 fn shutdown_endpoint_is_not_exposed() {
     let mut server = start_server();

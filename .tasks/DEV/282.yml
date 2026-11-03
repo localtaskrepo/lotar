@@ -1,0 +1,63 @@
+title: 'CLI safety and validation: empty --select matches everything, edit skips validation, silent failures'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:37.612368+00:00
+modified: 2026-10-31T22:06:37.675840+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] `task archive|unarchive|move --select ""` (empty or whitespace query) selects every task in every project (review ref cli#3)
+     Where: src/cli/handlers/task/archive.rs:24-49, src/cli/handlers/task/move_task.rs
+     Evidence: The handler builds the query from `args.select` even when it is empty, and an empty query matches everything. Repro: `lotar task archive --select ""` prints `Archived ALPH-2/5/4/1/3`, exit 0. `lotar task archive --select "   " -n` lists every task. `lotar task move --select "" --to Beta -n` tries to move all 5 tasks. By contrast, sprint's `TaskSelectionArgs::is_active` ignores blank queries (src/cli/args/sprint.rs:102-110). Without -p the selection spans all projects.
+     Impact: A cron or CI script such as `lotar task archive --select "$QUERY"` with an unset variable archives, or with `move` re-homes, the entire tasks root. There is no confirmation.
+     Suggested fix: Treat a blank `--select` as not given (error out when no IDs are named either), matching sprint's is_active(). Optionally require --yes when a selection matches more than N tasks.
+     Verifier note: Archive can be undone with unarchive, so this is disruptive rather than destructive. move is refused when the target project does not exist.
+
+  2. [medium] `lotar edit` skips effort and tag validation that `add` and `effort` enforce (review ref cli#4)
+     Where: src/cli/handlers/task/edit.rs:120-150
+     Evidence: edit.rs:121-124: `match parse_effort(&effort) { Ok(p) => p.canonical, Err(_) => effort }` stores the raw value. Tags are appended with no allowlist check. Repro: `lotar edit 1 --effort banana` reports success and the YAML now has `effort: banana`, while `lotar effort 1 banana` and `lotar add E --effort banana` both fail validation. With `issue.tags: [ui, backend]`, `lotar add tagtest --tag notallowed` fails, but `lotar edit 3 --tag notallowed` succeeds and writes `tags: [notallowed]`. task.md:83 says edit 'Validates and normalizes edits'.
+     Impact: Invalid values reach user-owned YAML. Effort totals and filters then quietly skip the task (`effort_min` and `stats effort` ignore 'banana'), and project tag policy can be bypassed.
+     Suggested fix: Reuse the validators from AddHandler/EffortHandler in edit: reject unparsable effort and run validate_tag for each new tag. Also consider validating in TaskService::update so REST/MCP edits are covered too.
+
+  3. [medium] `comment -F <missing file>` exits 0 and lists existing comments instead of failing (the `task comment` form shows no error at all) (review ref cli#5)
+     Where: src/main.rs:412-419, src/cli/handlers/task/mod.rs:168-171
+     Evidence: Top-level: when the read fails it prints 'Failed to read --file', continues with an empty string, and so falls into list mode. Under `task comment` the error is swallowed by `unwrap_or_default()`. Repro: `lotar comment 1 -F /nonexistent` prints `❌ Failed to read --file`, then the existing comment, then exit=0. `lotar task comment 1 -F /nonexistent` prints only the existing comment list, exit=0. The message also omits the path and the OS error.
+     Impact: Scripts and agents that post comments from files believe the comment was added when it was not.
+     Suggested fix: Return Err with the path and the io error when --file cannot be read, in both code paths. Better, move the text-resolution logic into one shared helper.
+
+  4. [low] `task delete` prompts on stdout even in JSON mode, and a non-interactive or EOF stdin cancels with exit 0 (review ref cli#6)
+     Where: src/cli/handlers/task/delete.rs:44-62, src/cli/handlers/sprint/operations/maintenance.rs:34-39
+     Evidence: delete.rs prints the prompt with `print!` regardless of format, treats EOF as 'no', and returns Ok(()) both on cancellation and on read_line failure. Repro: `lotar task delete 3 -f json </dev/null` writes `Are you sure you want to soft delete task '3'? (y/N): {"message":"Deletion cancelled.","status":"warning"}` and exits 0. `sleep 3 | lotar task delete 2` blocks for 3s, then cancels with exit=0. `sprint delete` already handles this case and errors with 'requires --force with JSON output or non-interactive input'.
+     Impact: JSON stdout cannot be parsed, and automation sees success although nothing was deleted.
+     Suggested fix: Do what sprint delete does: in JSON mode or when stdin is not a TTY without --force, return an error. Return a non-zero exit on cancellation or read failure, and send the prompt to stderr.
+     Verifier note: It fails safe: nothing is deleted, and the JSON carries status 'warning'. The real defects are the unparseable JSON stdout and exit 0, so low-to-medium rather than medium.
+
+  5. [low] `list --sort-by <typo>` is accepted silently because the default `custom.fields: ['*']` wildcard turns any key into `field:<typo>` (review ref cli#12)
+     Where: src/cli/handlers/task/search.rs:114-133
+     Evidence: With the default config (`lotar config show --full` shows `custom: fields: ['*']`), sort_key() accepts any key when `has_wildcard()` is true. Repro: `lotar list --sort-by bogus` and `lotar list --sort-by prority` both print `Found 5 task(s)` with exit 0 and an unsorted order. `lotar list sort_by=bogus` errors with `Invalid sort_by: 'bogus' ...`. list.md says 'An unknown --sort-by key is an error unless it names a configured custom field'.
+     Impact: A typo in the sort key silently returns an unsorted list, and the flag and query forms behave differently.
+     Suggested fix: With only a wildcard, accept bare names only when some task actually carries that field, or require an explicit `field:` prefix for undeclared fields so the flag behaves like `sort_by=`.
+     Verifier note: The code comment ('bare declared (or wildcard) custom field name') shows the wildcard acceptance is intended. The defect is that the default wildcard config disables the typo error that list.md:121 promises, and the flag and query forms disagree. Low.
+
+  6. [low] `comment <id>` with no text reads stdin to EOF whenever stdin is not a TTY, so listing comments hangs in agents and CI (review ref cli#13)
+     Where: src/main.rs:425-436, src/cli/handlers/task/mod.rs:176-188
+     Evidence: When no text, -m or -F is given and stdin is not a terminal, the code calls read_to_string(stdin) before listing. Repro: `time (sleep 3 | lotar comment 1)` takes 3.0s before printing the list. With a stdin pipe that never closes (common in agent and CI harnesses, ssh -T, subprocess with stdin=PIPE) the listing never returns.
+     Impact: Tools that call `lotar comment ID` to read comments can hang forever.
+     Suggested fix: Read stdin only when explicitly asked (e.g. `-F -` or `--stdin`), or only when stdin is a FIFO or file that has data, and never block in list mode.
+     Verifier note: Reading stdin when it is piped is documented in comment.md:19, so this is designed behaviour. The block or hang with a never-closing pipe is an undocumented consequence and an ergonomics risk for agents, not a correctness bug.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:37.675840+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

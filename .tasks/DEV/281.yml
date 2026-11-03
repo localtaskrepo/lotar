@@ -1,0 +1,60 @@
+title: 'CLI argument preprocessing: help/version words and -f/-l values hijack commands'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:37.467469+00:00
+modified: 2026-10-31T22:06:37.529498+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Any argv token equal to `version`, `help`, `-h`, `--help`, `--version` or `-V` takes over the command, even when it is a value; with `version` nothing is written and the exit code is 0 (review ref cli#1)
+     Where: src/main.rs:82-90, src/main.rs:99-113
+     Evidence: main() scans `args[1..]` for those literals before clap parses anything. Repro: `lotar add "version"` prints `lotar 0.11.0` with exit 0 and creates no task. `lotar add "Bump" --tag version` prints `lotar 0.11.0`, exit 0, no task created (confirmed with `lotar list`). `lotar list help` prints the whole list help page instead of searching for the word 'help', and list.md says list with search text *is* the search. `lotar comment ALPH-1 -m help` prints the comment help, exit 0. `lotar -p ALPH list --help` shows the global help, because args[1] is `-p`.
+     Impact: Scripts and agents get exit 0 and no data written when a title, tag, message or search term is the word 'version' or 'help'. Searching for the word 'help' is impossible.
+     Suggested fix: Only treat these tokens as help/version when they come before the first positional or as the subcommand itself, or let clap handle `--help`/`--version` and render the markdown help from clap's DisplayHelp error. Never match tokens after `--` or tokens that are option values.
+     Verifier note: Only a token that equals one of these words exactly triggers it. A multi-word value such as "Update help text" is not affected, so the problem is real but narrow. Medium rather than high.
+
+  2. [medium] Any argument equal to help, -h or --help hijacks the command: edits and comments are silently skipped and the command exits 0 (review ref docs#0)
+     Where: src/main.rs:98-112, src/main.rs:32-66
+     Evidence: main() checks `args[1..].iter().any(|arg| arg == "help" || arg == "--help" || arg == "-h")` before clap parses anything, so a value that happens to be `help` is treated as a help request. Reproduced in a scratch repo with target/smoke/lotar:
+  `lotar comment WS-1 -m help; echo $?` → prints the comment help page, exit=0, no comment written (`lotar show WS-1` shows none).
+  `lotar edit WS-1 --description help` → exit 0, description unchanged.
+  `lotar add help` prints add help and creates no task. `lotar list help` prints list help instead of searching for the word.
+  The same router also fails for documented aliases: `lotar ls --help`, `lotar tasks --help`, `lotar pull|push|sync --help` all print `No help available for command ...` and exit 1. `lotar stats churn --help` and `lotar task add --help` show the whole page instead of that subcommand's usage.
+     Impact: Scripts, agents and MCP-adjacent wrappers that pass user text through the CLI can lose writes (comments, descriptions, titles) with a success exit code. errors.md says commands exit 1 on any error path, so callers cannot detect the skipped write.
+     Suggested fix: Only treat `help` as a help request when it is the first positional (`lotar help <topic>`), and only treat `-h`/`--help` as help before a `--` and outside option values (or let clap detect help through try_parse and render the docs on its DisplayHelp error). Add HELP_ALIASES for ls→list, tasks→task, pull/push/sync→a sync page. Add a regression test for `comment -m help`.
+     Verifier note: Real, but it only triggers when an argument is exactly help/-h/--help, so a write is rarely lost in practice. Medium, not high. I did not check the exit code of the alias error path (my pipe into head hid it).
+
+  3. [medium] The global-flag hoister rewrites option values and positionals that begin with `-f`/`-l` (and bare `--project`/`--format`/...) into global flags (review ref cli#2)
+     Where: src/cli/preprocess.rs:96-180
+     Evidence: try_hoist_global_flag hoists any token starting with `-f` or `-l` that is longer than 2 characters, wherever it appears, including as the value of another option. Repro: `lotar comment 1 "-fix: flaky test"` gives `error: invalid value 'ix: flaky test' for '--format <FORMAT>'` (exit 1). `lotar comment ALPH-1 -m "-lower the timeout"` gives `invalid value 'ower the timeout' for '--log-level'`. `lotar add Title --description "-f flag broken"` gives an invalid format error. Only the `--description=...` and `-- ...` forms work.
+     Impact: Titles, descriptions, comments and agent prompts that begin with a dash and f/l are rejected with confusing format/log-level errors. In some combinations the value is consumed and the original option is left with no value.
+     Suggested fix: Hoist only tokens in option position: skip the token after any option known to take a value, and stop hoisting short `-f`/`-l` clusters once a value-taking option is pending. Simpler: drop the custom hoisting and rely on clap `global = true`, which already accepts these flags after subcommands.
+     Verifier note: For a bare positional such as `comment 1 "-fix..."`, clap would also read `-f` as the format flag even without the hoister. The hoister-specific harm is to option values, including allow_hyphen_values query options such as --select/--filter and -m values.
+
+  4. [medium] Help is unreachable or empty for several commands: clap's help and usage features are off and every --help is intercepted (review ref cli#10)
+     Where: Cargo.toml:50, src/main.rs:99-113, src/help/mod.rs:29-38, src/help/mod.rs:70-96, docs/help/main.md
+     Evidence: clap is built with default-features=false and without the "help"/"usage" features, so clap's own help text is empty. Every `--help`/`-h`/`help` goes to the markdown docs. Repro: `lotar pull --help`, `lotar push --help`, `lotar ls --help` and `lotar tasks -h` all print `❌ Error showing help for 'pull': No help available...` with exit 1. `lotar stats`, `lotar agent`, `lotar automation` and `lotar sync` with no subcommand print just two blank lines (od -c shows `\n \n`) with exit 1, while sprint/task/config/git show an overview with exit 0. The global help (main.md) never mentions pull, push, sync, init, config, automation, changelog, whoami, git or completions. `HelpSystem::list_available_help` exists but nothing calls it.
+     Impact: Sync, the only way to talk to remotes, has no CLI help at all. Bare group commands give no guidance, and several commands cannot be found from `lotar help`.
+     Suggested fix: Add sync.md (pull/push/sync) and aliases ls→list, tasks→task, c→comment in HELP_ALIASES. Route empty-subcommand cases for stats/agent/automation/sync to emit_subcommand_overview. Add a command index to main.md, or expose list_available_help via `lotar help --all`.
+
+  5. [low] `lotar --config K=V serve <PORT>` rejects the positional port (review ref cli#18)
+     Where: src/cli/preprocess.rs:308-385
+     Evidence: find_serve_index knows which global options take a value (--format, --tasks-dir, --log-level, --project, -f, -l, -p) but not `--config`. The value `K=V` is then taken for the subcommand, so serve normalisation is skipped. Repro: `lotar --config auto.identity=true serve 19102` gives `error: unexpected argument '19102' found`. The same command with `-p 19103` starts normally (killed by timeout).
+     Impact: The documented positional port form fails when combined with inline config overrides.
+     Suggested fix: Add `--config` (and `--config=`) to the value-taking globals in find_serve_index and hoist_global_flags.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:37.529498+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

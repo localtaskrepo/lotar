@@ -1,0 +1,73 @@
+title: 'Git integration: identity parsing, branch inference from the server cwd, CODEOWNERS, hooks install'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:38.372134+00:00
+modified: 2026-10-31T22:06:38.436872+00:00
+relationships:
+  related:
+  - DEV-138
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Sync pull, REST/MCP create and REST scan infer type, priority, status and tags from the server process's cwd branch and path, not from the workspace or the remote data (review ref sync-scan-git#5)
+     Where: src/utils/task_intel.rs:12-15, src/services/task_service.rs:204-230, src/services/task_service.rs:308-314, src/services/sync_service/pull.rs:466-494
+     Evidence: `BranchContext::detect()` uses `std::env::current_dir()`, not the tasks root. `TaskService::create` calls `infer_priority/type/status_from_branch` and `auto_tag_from_path` (derived from cwd) whenever the caller leaves a field unset. Sync pull leaves unmapped fields unset.
+
+  Repro (scratch sy1): on branch `hotfix/urgent-login`, from `packages/api`, `lotar --tasks-dir <repo>/.tasks pull gh --project GH` imports every GitHub issue with `type: Bug` and `tags: [api]`.
+     Impact: Remote issues get local metadata based on whatever branch or folder the developer happens to be in. The same applies to tasks created through the web UI or MCP, which depend on where and when `lotar serve` was started, and to `--tasks-dir` pointing at another repo (that repo's branch is ignored).
+     Suggested fix: Resolve the repo from the tasks root, not cwd. Apply branch/path inference only for interactive CLI creation, or behind an explicit flag on TaskCreate. Skip inference for sync imports and scan-created tasks.
+     Verifier note: I did not reproduce against GitHub sync, but it uses the same create path. docs/help/add.md describes branch inference only for `add`, so applying it to sync imports is undocumented.
+
+  2. [medium] Git identity reads `name =` / `email =` from any section of .git/config, so a merge-driver name becomes the reporter (review ref sync-scan-git#8)
+     Where: src/utils/identity_detectors.rs:131-200
+     Evidence: `GitConfigDetector::detect` returns the first line starting with `name = ` regardless of section.
+
+  Repro (scratch id1): `git config merge.npm-merge-driver.name "automatically merge npm lockfiles"; git config user.name "Real Person"` → `lotar whoami --explain` prints `automatically merge npm lockfiles (source: git user.name)`, and `lotar add probe` writes `reporter: automatically merge npm lockfiles`. Values without spaces around `=`, quoted values and inline comments are also handled wrongly.
+     Impact: Wrong reporter, auto-assignee and @me resolution on every created or changed task in repos with custom merge or diff drivers. The wrong names also end up in the members list.
+     Suggested fix: Track the current section and accept only `[user]` keys, or shell out to `git config --get user.name` / `user.email` through `git_command`. That also picks up global and included config, which the docs currently list as a limitation.
+
+  3. [low] `lotar status` auto-assign picks the CODEOWNERS catch-all owner (often a team slug) by default, overwrites the user the service just assigned, and differs from REST (review ref sync-scan-git#9)
+     Where: src/cli/handlers/status.rs:322-336, src/utils/codeowners.rs:47-55, src/utils/codeowners.rs:81-125
+     Evidence: Repro (scratch co1): `.github/CODEOWNERS` = `* @acme/platform-team @bob`, user.name `Dev One`.
+  - `lotar status 1 InProgress` → `assignee: acme/platform-team`. History has two entries: `assignee new: Dev One`, then `old: Dev One new: acme/platform-team`. `members:` now contains `acme/platform-team`.
+  - REST `POST /api/tasks/update {status: InProgress}` on another task → `assignee: Dev One`.
+
+  `auto.codeowners_assign` defaults to true. `default_owner()` ignores which path a task relates to. The matcher also mishandles directory patterns: `/docs/` compiles to `^/docs/$` and unanchored patterns have no component boundary.
+     Impact: In most GitHub repos (a `*` CODEOWNERS rule is common), starting work from the CLI assigns a team or another person instead of the developer. History records an assignment nobody saw, and team slugs are added to project members. CLI and UI behave differently.
+     Suggested fix: Default `auto.codeowners_assign` to false, or use CODEOWNERS only when the task has a code reference and match that path. Skip `org/team` owners. Have the CLI decide before the service mutation rather than overwriting it. Fix directory-pattern semantics.
+     Verifier note: Preferring the CODEOWNERS default in the CLI, and not matching REST, is documented intended behavior (docs/help/status.md:72,162,171; identity.md:57; config.md:353). What remains are a phantom intermediate history entry, team slugs assigned as users and added to members, and the default of true. The directory-pattern matcher defects do not matter …
+
+  4. [low] `git hooks install` and the history/stats git calls skip the routing-env scrubbing; with GIT_DIR set, core.hooksPath is written into a different repository (review ref sync-scan-git#15)
+     Where: src/cli/handlers/git.rs:152-193, src/services/audit_service.rs:246, src/services/audit_service.rs:293, src/services/audit_service.rs:322, src/services/audit_service.rs:484, src/scanner.rs:538
+     Evidence: These use `Command::new("git").arg("-C")` instead of `utils::git::git_command`, which removes GIT_DIR, GIT_WORK_TREE and GIT_CONFIG*.
+
+  Repro (scratch gh1/gh2): `GIT_DIR=<gh2>/.git lotar git hooks install` run in gh1 prints `✅ Configured git core.hooksPath to '.githooks'`, but `git -C gh1 config --local --get core.hooksPath` is empty and gh2's config contains `.githooks`.
+     Impact: When lotar runs inside git hooks, `git rebase --exec` or tools that export GIT_DIR, hook installation reports success but changes another repo. History and stats can read the wrong repository, against the stated design in utils/git.rs.
+     Suggested fix: Route all git invocations through `git_command(root)`.
+
+  5. [low] `git hooks install` sets core.hooksPath without warning that existing .git/hooks scripts stop running (review ref cli#22)
+     Where: src/cli/handlers/git.rs:97-130, docs/help/git.md
+     Evidence: When core.hooksPath is unset, the handler writes `.githooks` without checking .git/hooks for active scripts (husky, pre-commit, etc.). Git then ignores .git/hooks entirely. git.md never mentions this. Verified from code only.
+     Impact: Existing local hooks (such as secret scanners) are disabled without notice.
+     Suggested fix: Detect non-sample executables in .git/hooks and warn, or require --force, and document it.
+     Verifier note: Verified from code and docs only. The command only works when the repo ships a .githooks/ directory (explicit opt-in). Husky-style setups that already set core.hooksPath are protected by the --force guard. Mainly affects users of the pre-commit framework or hand-written .git/hooks scripts. A docs/warning gap.
+
+  6. [low] `lotar git hooks install` is documented as a user feature but only works in repos that already ship a .githooks folder (LoTaR's own) (review ref docs#16)
+     Where: docs/help/git.md:1-46, docs/help/index.md:11, src/cli/handlers/git.rs
+     Evidence: git.md opens with "helpers for the git hooks shipped with LoTaR (`.githooks/`)", and index.md lists it under "Source & Git: Git Hooks". In a user repo, `lotar git hooks install --dry-run` → `❌ Hooks directory '.../.githooks' not found. Ensure the repository includes a .githooks folder.` LoTaR installs no hooks into user repos. The .githooks folder is part of this repository (SETUP.md, pre-commit, pre-push). This is related to DEV-138 (read-only verification and pre-commit integration), which is open.
+     Impact: Users expect LoTaR-provided hooks and get an error. It's a contributor tool exposed as a product feature.
+     Suggested fix: State at the top of git.md that the command activates hooks you keep in your own `.githooks/` (with an example hook), or hide it until DEV-138 ships real hooks.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:38.436872+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-138","DEV-253"]}'

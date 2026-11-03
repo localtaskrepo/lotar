@@ -1,0 +1,48 @@
+title: 'Storage robustness: lock files in git status, non-atomic attachments, hidden tasks, removed statuses'
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:35.985555+00:00
+modified: 2026-10-31T22:06:36.045030+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [low] Runtime lock files (`.task.lock`, `.sprints.lock`, `.attachments-store.lock`) show up as untracked files in user repos, with no ignore rule or guidance (review ref storage-core#10)
+     Where: src/storage/safety.rs:84, docs/help/serve.md:152, .gitignore:13
+     Evidence: Fresh repo: `lotar config init --project Web && lotar add t && git status --porcelain -uall` → `?? .tasks/@sprints/.sprints.lock`, `?? .tasks/WEB/.task.lock` next to the real task files. LoTaR's own repo hides them with explicit `.gitignore` entries (`.tasks/**/.task.lock`, etc.), but init writes no `.gitignore`, and the user docs only say lock files "must not be deleted". `.txn-pending.json` and `.*.tmp-*` leftovers have the same exposure.
+     Impact: Users following `git add .tasks` commit zero-byte lock files (and possibly a pending journal) into the shared history, which creates churn and confusion. `@sprints` exists only because of its lock file.
+     Suggested fix: Have init (or the first write) create `.tasks/.gitignore` with `**/.task.lock`, `**/.sprints.lock`, `**/.attachments-store.lock`, `.txn-pending.json` and `**/.*.tmp-*`, the same way `@agent-logs` gets one. Document it.
+
+  2. [low] Attachment blobs are written in place without atomic publish; a failed write leaves a truncated blob that later uploads deduplicate to (review ref storage-core#14)
+     Where: src/services/attachment_service.rs:145, src/services/attachment_service.rs:154, src/services/attachment_service.rs:113
+     Evidence: `store_bytes` opens the final content-hash name with `create_new` and calls `write_all` directly: no temp file, no fsync. If `write_all` fails (disk full, I/O error) the `?` returns an error before `(filename, true)`, so callers never learn they created the file and cannot clean it up. Any later upload of the same bytes finds the `.<hash>` name in the dedupe scan and reuses the truncated file without checking its content. Two concurrent processes are serialized by the store lock, but a crash mid-write has the same effect. Verified by code reading; disk-full not reproduced.
+     Impact: A rare I/O failure permanently corrupts that attachment for every task that uploads the same content later, and nothing reports it.
+     Suggested fix: Write to a temp file in the store directory, fsync it and rename it to the final name (the existing `atomic_write_bytes`). Optionally verify size or hash when deduplicating.
+
+  3. [low] A hand-written task without `created:` is hidden from every read command, although a tolerant parser exists (review ref storage-core#15)
+     Where: src/storage/search.rs:44, src/storage/task.rs:226
+     Evidence: `StorageSearch::load_task_file` (used by list, show and get) only tries strict `from_str::<Task>`. `parse_task_yaml_tolerant`, which defaults a missing `created` and normalizes enum casing, is only used by edit, stats and moves code, which a hidden task never reaches. Repro: `.tasks/DEMO/7.yml` = `title: Minimal hand-written\nstatus: Todo` → `list` warns "Skipping unreadable task file ... (missing field `created`)", and `show`, `status` and `comment` all fail with "Task 'DEMO-7' not found".
+     Impact: Tasks written by hand or by external tools or agents without a timestamp silently drop out of the board. The parser that docs describe as legacy-tolerant is never used on the read path.
+     Suggested fix: Use the tolerant parser in `load_task_file` (it still rejects malformed structured data), or at least make the warning say which field to add.
+     Verifier note: The task is not hidden silently. Every command prints '⚠️ Skipping unreadable task file ... (missing field `created`); fix or remove it to restore the item', which names the missing field and the file. `created` is also a documented field. The remaining problem is that the read and edit paths are inconsistent with the tolerant parser that exists.
+
+  4. [low] After a status is removed from config, tasks still holding it cannot be found with a status filter (review ref storage-core#17)
+     Where: src/types.rs:52
+     Evidence: Repro: task ALPH-1 has status InProgress; project config is then changed to `states: [Open, Closed]`. `lotar list` shows `[InProgress]`, but `lotar list status:InProgress` fails with "Status validation failed: Status 'InProgress' is not enabled for this project". There is no migration helper, and title edits succeed without flagging the invalid status.
+     Impact: Teams that rename workflow states cannot easily find and migrate the orphaned tasks.
+     Suggested fix: Accept unknown statuses in read filters (warn instead of error), or have `config validate` report tasks whose stored enums are no longer configured.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:36.045030+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

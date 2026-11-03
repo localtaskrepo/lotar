@@ -1,0 +1,52 @@
+title: Task panel overwrites newer edits and discards unsaved edits on Escape
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:34.831830+00:00
+modified: 2026-10-31T22:06:34.891852+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] Open task panel goes stale after outside edits, so its next autosave quietly overwrites them (lost update) (review ref frontend#0)
+     Where: view/components/TaskPanel.vue:1232, view/components/TaskPanelHost.vue:97, view/composables/task-panel/useTaskPanelPersistence.ts:150, view/composables/useTaskPanelState.ts:539
+     Evidence: The panel only reloads on outside lifecycle changes, meaning delete or restore (TaskPanel.vue:1232-1249 `lifecycleReload`). An ordinary outside task_updated never refreshes the panel form. Updates carry no concurrency precondition: TaskUpdate has no expected_modified field, and nothing in src/ or view/ checks If-Match.
+
+  Repro, run against a throwaway workspace with the server on :19473 and Playwright:
+  1. `lotar edit DEMO-1 --description "Original text"`
+  2. Open `/?project=DEMO&taskPanel=DEMO-1`.
+  3. While the panel is open, run `lotar edit DEMO-1 --description "Original text. Acceptance criteria added by agent."` and wait 2s.
+  4. Click the description. The editor still shows "Original text". Append " User note." and blur.
+
+  Result: DEMO-1.yml has `description: Original text User note.`, so the agent's text is gone. Separately, after a CLI `status DEMO-3 done` plus a title change, the list …
+     Impact: Anyone who keeps a panel open while an agent job, an automation, the CLI or another tab edits the task sees stale fields. Their next edit to that field silently overwrites the newer content. This is most likely for descriptions, which agents edit often. History keeps the old value, but nobody is told.
+     Suggested fix: While the panel is open, watch the shared store entity for the open task. Reapply fields that are not being edited (not dirty or focused) when a newer `modified` arrives. If the field being edited changed underneath, show a 'changed elsewhere — reload/overwrite' banner. Longer term, send the loaded `modified` with updates and let the server reject stale writes.
+     Verifier note: The main repro holds as described. I did not re-run the separate status/title staleness check, but the code path is the same. History keeps the old value, so the text can be recovered by hand, but nobody is warned.
+
+  2. [medium] Escape anywhere in the task panel closes it and throws away the unsaved field edit, even Escape meant to dismiss a suggestion list (review ref frontend#1)
+     Where: view/composables/task-panel/useTaskPanelHotkeys.ts:9, view/composables/useTaskPanelState.ts:539, view/composables/useTaskPanelState.ts:600, view/composables/useSuggestList.ts:84, view/components/task-panel/TaskPanelRelationshipsTab.vue:269
+     Evidence: useTaskPanelHotkeys puts a window keydown listener on Escape that calls closePanel() → cleanup(). It does not check defaultPrevented, focus, or an open dropdown. Fields autosave only on blur, and the panel unmounts before any blur-save runs.
+
+  Playwright repro:
+  (a) Open `?taskPanel=DEMO-3`, fill the Title input with 'Third task (edited title)', press Escape. Result: no POST is sent and title is unchanged in 3.yml.
+  (b) Click the description, fill 'Typed then Escape', press Escape. Result: the panel closes, no POST, the description is not saved.
+  (c) In create mode (press `c`), type a title, press Escape. Result: the panel closes with no confirmation and the draft is lost.
+
+  The tag and relationship suggestion handlers treat Escape as 'dismiss list' (useSuggestList.ts:84-86, RelationshipsTab:269-271) without stopPropagation, so the same keypress also closes the whole panel. UiModal stops pro…
+     Impact: Keyboard users lose typed edits and whole create-mode drafts with no warning. Closing with the X button blurs first and saves, so the two close paths behave differently.
+     Suggested fix: In the Escape handler, return early when event.defaultPrevented is set. Before closing, flush the focused field's blur-save (call onFieldBlur for the active field), or ask for confirmation when a create draft or a dirty field exists. Have suggestion lists call preventDefault/stopPropagation when they consume Escape.
+     Verifier note: I lowered severity to medium. Only unsaved typing is lost and the user sees the panel close; nothing already saved is overwritten. Escape-as-cancel can be argued as a design choice. The real defects are that the two close paths disagree (X saves, Escape discards), a suggestion-list Escape also closes the panel, and a create draft is dropped with n…
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:34.891852+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

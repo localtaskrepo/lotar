@@ -1,0 +1,39 @@
+title: Require trust before running automation commands that come from repository files
+status: Todo
+priority: High
+type: Feature
+reporter: mallox
+created: 2026-10-31T22:06:34.272950+00:00
+modified: 2026-10-31T22:06:34.331086+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible. Rules in a tracked .tasks/automation.yml run shell commands on routine edits right after cloning or pulling, with no trust step (compare direnv allow / workspace trust).
+
+  Findings:
+
+  1. [high] Automation rules in tracked repo files run shell commands on routine commands like `lotar add`, with no trust step (review ref security-release#1)
+     Where: src/services/automation_service.rs:1426-1464, docs/help/automation.md:7-15, docs/help/automation.md:196-212
+     Evidence: Rules load from `.tasks/<PROJECT>/automation.yml` or `.tasks/automation.yml`, both committed with the repository, and `run:` actions are executed through a shell (build_shell_command) on created/updated/commented events. Repro in a fresh temp git repo: wrote .tasks/automation.yml containing
+    automation: { rules: [ { name: innocuous, on: { created: { run: "touch <scratch>/PWNED_BY_CLONED_REPO" } } } ] }
+  then ran `target/smoke/lotar add "first task"`. Output was `Created task: DEMO-1` and the file PWNED_BY_CLONED_REPO was created. No prompt or warning, and no opt-in in the home config. By code reading (not run live), agent profiles in tracked config can also set an arbitrary `command`/`args` and are auto-started when a task is assigned to them. Neither SECURITY.md nor the automation docs mention this trust model.
+     Impact: Cloning, or pulling into, a repository whose .tasks/ was written by someone else runs their commands the first time you create, edit or comment on a task, whether from the CLI, the web UI, MCP (an AI agent creating a task) or sync pull. Unlike git hooks, these files travel with the repo. This is a supply-chain path through PRs and forks.
+     Suggested fix: Gate `run` actions (and custom agent `command`s) from repo-tracked files behind a per-repo trust record in the home config, along the lines of `direnv allow`: record a hash of the automation file, skip and warn when it changes until the user re-approves (e.g. `lotar automation trust`). At minimum, document the risk in SECURITY.md and automation.md, and print the commands a rule will run when the file first appears or changes.
+     Verifier note: This is the intended feature (shared team rules), so part of the finding is a missing trust and documentation step rather than a code defect. It is still a real execute-on-clone path through routine commands, with no direnv- or Workspace-Trust-style gate. I did not verify live that agent-profile `command` values auto-start on assignment.
+
+  2. [medium] Automation `run` commands from a repository's .tasks/automation.yml execute on ordinary edits, with no trust gate (review ref mcp-agents-automation#4)
+     Where: src/services/automation_service.rs:1418-1500, src/services/task_service.rs:389, src/cli/handlers/mod.rs:549
+     Evidence: Rules load from `.tasks/automation.yml`, which is checked into the repo, and fire on create/update from the CLI, MCP and REST. Repro (ws2): with an automation.yml whose `on.created.run` writes a file, a plain `lotar add "Hello"` runs it, and `lotar status TEST-1 InProgress` runs the `updated` command. No trust prompt, allow-list or opt-in exists (no matches for 'trust' in src apart from the cursor flag). Agent profiles in repo config (runner `command` with any program) are similar when a ticket is assigned to them.
+     Impact: Cloning an untrusted repository and running any mutating lotar command (or pointing an MCP-enabled AI client at it) runs arbitrary commands. Git deliberately does not ship hooks with clones for this reason.
+     Suggested fix: Require explicit per-workspace trust before running `run` actions or command-runner profiles from repo-tracked files: a trust record stored outside the repo, keyed by path and file hash, plus a CLI to grant it. Until trusted, skip those actions with a warning. Document the trust model.
+     Verifier note: This is a design gap, not a defect in the code as written. Severity stays medium for a local-first tool.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:34.331086+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

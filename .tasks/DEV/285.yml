@@ -1,0 +1,61 @@
+title: 'Scanner polish: renamed files, --modified-only, empty titles, NOTE default, --include docs'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:38.070211+00:00
+modified: 2026-10-31T22:06:38.136920+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] `scan --modified-only` misses new untracked directories and quoted paths, ignores --include/--exclude and .lotarignore, and skips the git env scrubbing (review ref sync-scan-git#10)
+     Where: src/scanner.rs:478-497, src/scanner.rs:534-570
+     Evidence: `git_modified_files` runs a raw `git -C root status --porcelain` (no `-uall`, no `-z`, no `git_command`).
+
+  Repro (scratch mo): untracked `feature/new.rs`, `gen/c.py` and `"my file.rs"` (each with a TODO) are all missed. Porcelain shows `?? feature/` and a quoted name. `lotar scan --dry-run --modified-only --include rs` still reports `b.py`, while the full scan with `--include rs` correctly reports only a.rs. The modified-only branch returns early, before the include/exclude/ignore filtering. When git fails inside a repo, the result is an empty list rather than the documented fallback to a full scan.
+     Impact: The documented 'limit to active work' mode skips brand-new modules, which are exactly what it should catch, and ignores the user's filters, so it may edit files in excluded or ignored locations.
+     Suggested fix: Use `git_command(repo_root).args(["status","--porcelain","-z","--untracked-files=all"])`. Parse NUL-separated entries, including rename pairs. Apply the same include/exclude and .lotarignore filtering as the walker. Fall back to a full walk when git fails.
+
+  2. [low] After a git rename, scan writes duplicate code anchors that even `--reanchor` never collapses (review ref sync-scan-git#7)
+     Where: src/cli/handlers/scan_handler.rs:383-402, src/utils/scan.rs:219-279, src/services/scan_anchor_service.rs:212-249, src/services/scan_anchor_service.rs:311-331
+     Evidence: When scan sees an existing key in the renamed file, the per-entry refresh appends `src/n.rs#2`, because no reference for that file exists yet. The anchor pass then maps the old `src/m.rs#2` through `git status` renames to the same `src/n.rs#2`. `apply_plan` does not check whether that value is already present.
+
+  Repro (scratch rb): scan → `code: src/m.rs#2`; `git mv src/m.rs src/n.rs; lotar scan src` → two `code: src/n.rs#2` entries; after commit, `lotar scan` and `lotar scan --reanchor` still show both.
+
+  Separately, `git_rename_map` reads plain porcelain output, so quoted paths (spaces or non-ASCII) never match.
+     Impact: Task files collect duplicate reference entries that show in the UI and API and are never cleaned up. Repeated renames compound the problem.
+     Suggested fix: Make `apply_plan` and `refresh_code_reference` dedupe: drop a moved entry whose new `code` already exists, unless it carries other data. Run the anchor pass before the per-entry refresh, or have the refresh consult the rename map. Use `git status --porcelain -z`.
+     Verifier note: Lowered to low: the result is duplicate reference clutter in task YAML, with no loss or misattribution. I did not verify the quoted-path git_rename_map sub-claim separately, though finding #10 shows the same parsing pattern.
+
+  3. [low] CLI scan creates tasks with empty titles for bare `// TODO:` (REST uses a fallback title); `lotar add ""` is also accepted (review ref sync-scan-git#13)
+     Where: src/cli/handlers/scan_handler.rs:247-262, src/services/scan_service.rs:667-675
+     Evidence: Repro (scratch r4): `printf '// TODO:\n' > a.rs; lotar scan` → `.tasks/R4/1.yml` contains `title: ''`. The REST path calls `coerce_entry_title`, giving 'TODO in a.rs:1'. `lotar add ""` and `lotar add "   "` both succeed (`Created task: R4-3`, empty title).
+     Impact: Blank-title tasks appear in lists and boards. The same source produces different results from CLI and UI.
+     Suggested fix: Use `coerce_entry_title` in the CLI scan, and reject blank titles in task creation validation.
+
+  4. [low] Default signal word NOTE, with the colon optional, turns ordinary prose comments into tasks and edits the source (review ref sync-scan-git#14)
+     Where: src/scanner.rs:248-256, src/scanner.rs:296-303
+     Evidence: The default words include `note`, and the simple form is `WORD[ \t]*:?\s*(.*)`. Repro (scratch fp): `// Note that the cache is cleared on reload.` → dry-run proposes `// Note (FP-NEW) that the cache is cleared on reload.` and a task titled 'that the cache is cleared on reload.'.
+     Impact: A first `lotar scan` on a real codebase creates many junk tasks and rewrites explanatory comments.
+     Suggested fix: Require a colon or parenthesised key for the default words (`NOTE:` / `NOTE(...)`), or drop NOTE from the defaults.
+     Verifier note: The docs list NOTE as a default trigger with the shape `WORD: message`. Matching without a colon is beyond what they document.
+
+  5. [low] Scan docs say unsupported extensions can be added with --include, but --include only filters built-in types (.mjs, .mts, .cjs, .zsh, Makefile and Dockerfile are never scanned) (review ref sync-scan-git#17)
+     Where: docs/help/scan.md, src/scanner.rs:465-476, src/scanner.rs:3-60
+     Evidence: Troubleshooting says: 'Confirm the extension is supported or add it via `--include`.' The walker discards any extension where `is_supported_ext` is false before it checks includes. Repro (scratch inc): `lotar scan --dry-run --include mk --include zsh --include mjs --include mts` with TODOs in build.mk, x.zsh, m.mjs, m.mts, Dockerfile and Gemfile → `No TODO comments found.`
+     Impact: Users following the docs get silent empty results. Modern JS/TS module extensions (.mjs, .mts, .cjs, .cts) are unsupported even though JS/TS coverage is advertised.
+     Suggested fix: Add .mjs, .cjs, .mts, .cts, .zsh, .fish and similar to FILE_TYPES. Support well-known extensionless files (Makefile, Dockerfile). Fix the troubleshooting text, or let `--include ext=token` register new extensions.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:38.136920+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

@@ -5,11 +5,12 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.762443+00:00
-modified: 2026-10-28T23:50:45.754100+00:00
+modified: 2026-10-31T22:06:39.356378+00:00
 relationships:
   related:
   - DEV-3
   - DEV-230
+  - DEV-293
 comments:
 - date: 2026-09-06T11:21:52.663730+00:00
   text: 'Backlog reconciliation: Remains Todo: stats commands expose related aggregation, but TaskSearchArgs has no list group-by/sum flags. Define supported grouping fields, sum/effort units and JSON output. DEV-57/75 should not silently treat this feature as implemented by query cleanup.'
@@ -68,3 +69,9 @@ history:
     new: Done
   - field: assignee
     new: mallox
+- at: 2026-10-31T22:06:39.356378+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-230"]}'
+    new: '{"related":["DEV-3","DEV-230","DEV-293"]}'

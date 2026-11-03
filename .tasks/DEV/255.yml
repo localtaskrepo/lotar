@@ -1,0 +1,42 @@
+title: 'Task listing is quadratic: every result is located again by walking the project tree'
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:33.720223+00:00
+modified: 2026-10-31T22:06:33.778834+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible. Three reviewers found and measured the same hot path independently (2,000 tasks ≈ 6 s, 5,000 ≈ 50 s per list). It affects CLI list/stats, every web view, REST and MCP.
+
+  Findings:
+
+  1. [high] `lotar list` / REST / MCP task listing takes quadratic time: every result is located again by walking the whole project directory (review ref storage-core#0)
+     Where: src/services/task_service.rs:2325, src/storage/identity.rs:149, src/storage/layout.rs:106, src/storage/layout.rs:191, src/storage/locator.rs:14
+     Evidence: `TaskService::list_matching` calls `storage.resolve_task_location(&id)` for every search result (task_service.rs:2325). That call goes through `identity::resolve` → `TaskId::locate` → `StorageLocator::candidate_task_roots`, which canonicalizes and reads the parent directory. It then calls `layout::find`, which walks the entire project tree with readdir plus an `is_file` stat on every .yml file. One list of N tasks therefore costs about N² filesystem operations. Repro with flat projects of generated task files (title/status/created only), timing `lotar list --limit 5`: 500 tasks 0.42s, 1000 tasks 1.61s, 2000 tasks 7.64s. With 5000 tasks (some in subfolders), `lotar list --limit 50` took real 56.3s, of which sys was 50.5s. `lotar show BIG-2500` on the same workspace takes 0.03s. The `--limit` does not help because DTOs are built for every match before paging. The web UI board and list vie…
+     Impact: Any long-lived repository with a few thousand tasks (archive included) gets multi-second to minute-long `lotar list`, web board loads and MCP list calls, mostly in kernel time. The cost grows quadratically, so it gets worse as the backlog grows.
+     Suggested fix: Have `StorageSearch::search` return the root (or the full `TaskLocation`) it found each file under, and use that in `list_matching` instead of calling `resolve_task_location` per task. Separately, cache `candidate_task_roots` per call and check the direct `<project>/<n>.yml` path before walking the tree. `moves::follow` already does this.
+
+  2. [high] Task listing is O(n²): every task triggers a full scan of its project directory (2,000 tasks ≈ 5.6 s, 5,000 ≈ 49 s per request) (review ref api-sse-web#1)
+     Where: src/services/task_service.rs:2318-2330, src/storage/identity.rs (TaskId::locate), src/storage/layout.rs (find/walk)
+     Evidence: Inside list_matching's per-task map, `storage.resolve_task_location(&id)` calls identity::resolve, then TaskId::locate, then layout::find, which walks the whole project directory (readdir + stat per file). macOS `sample` of `lotar list` shows 1375/1378 samples under identity::resolve → layout::walk → Path::is_file → stat. Measured GET /api/tasks/list?limit=1 (same for CLI `lotar list`) on synthetic projects: 500 tasks 0.35 s, 1000 tasks 1.4 s, 2000 tasks 5.6 s, 5000 tasks 49 s. Doubling the task count costs about 4x.
+     Impact: Every list/export/board/sprint view, MCP task_list and CLI list in a repository with a few thousand tasks takes seconds to a minute. The UI fetches pages repeatedly and refetches on every SSE invalidation, so the cost compounds.
+     Suggested fix: Resolve task locations from the data `storage.search` already collected (it already walked the files), or build one id→location map per request, instead of calling resolve_task_location per task.
+
+  3. [high] Every task listing is O(N²): list_matching re-resolves each result's location by walking the whole project tree (with a stat per file) for every task (review ref performance#0)
+     Where: src/services/task_service.rs:2319-2333, src/storage/identity.rs:96-110 (TaskId::locate), src/storage/identity.rs:190-193 (resolve), src/storage/layout.rs:107-118 (find walks project + @archive), src/storage/layout.rs:216-245 (walk: path.is_file() stat per .yml), src/storage/locator.rs:16-37 (candidate_task_roots: canonicalize + readdir of repo root per call), src/storage/search.rs:66-176 (search …
+     Evidence: Workspace: N task files copied from scripts/generate-test-tasks.mjs output into <scratch>/review-performance/sN/.tasks/DEMO, run with LOTAR_IGNORE_HOME_CONFIG=1 target/smoke/lotar list (warm cache). Results: N=250 0.11s, N=500 0.51s, N=1000 1.92s, N=2000 6.36s (sys 5.75s). Time roughly ×4 per doubling, so quadratic. `sample` of `lotar list` at N=2000: 1353 of 1355 samples in TaskService::list_matching → storage::identity::resolve → TaskId::locate → layout::find → walk → Path::is_file → stat. The same path makes these slow at N=2000: `lotar list -p DEMO --limit 5` 6.33s (pagination happens after the full DTO build); every `lotar stats` subcommand (tags 5.54s, distribution 5.33s, due 5.39s, age 5.42s, effort 5.35s, comments-top 5.49s, stale 10.66s); REST GET /api/tasks/list?limit=1000 5.67s, ?limit=50 6.30s; /api/projects/stats 5.56s; /api/tasks/export 5.26s; MCP tools/call task_list {lim…
+     Impact: Every user of the CLI list/stats commands, the web UI (Tasks, Board, Calendar and Insights all load the full list), REST clients and MCP agents. A 2000-task workspace takes 5–13 s per list. Cost grows with N², so 5000 tasks would take about 40 s per list, which makes the tool effectively unusable at scale.
+     Suggested fix: Carry the candidate root (and file path) from StorageSearch::search into its results, e.g. return (id, Task, root), and use it in list_matching instead of calling storage.resolve_task_location(&id) per task. Alternatively memoize resolution per (root, prefix), or use the direct `<root>/<project>/<n>.yml` fast path that storage::moves::follow already has. Audit the other per-task callers of resolve_task_location/locate (dto_from_task, attachment_service:362) for the same pattern.
+     Verifier note: None of substance. Most of the cost is the per-row walk; candidate_task_roots adds a canonicalize and readdir per row on top.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:33.778834+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

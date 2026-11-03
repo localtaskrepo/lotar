@@ -1,0 +1,29 @@
+title: Custom fields and config maps are written in random key order (git noise, merge conflicts)
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:35.245507+00:00
+modified: 2026-10-31T22:06:35.304550+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] `custom_fields` and config maps are serialized from a HashMap, so key order changes on every write and causes git noise and merge conflicts (review ref storage-core#2)
+     Where: src/types.rs:451, src/storage/task.rs:67, src/config/types.rs:504, src/config/types.rs:532, src/config/types.rs:541
+     Evidence: `pub type CustomFields = HashMap<String, serde_yaml_ng::Value>` serializes in RandomState iteration order, which differs per process. Repro: `lotar add CF --field=alpha=1 ... --field=zeta=6`, then `lotar edit 2 --title "CF $i"` five times. The order of `custom_fields:` changed on every write: `gamma epsilon zeta alpha beta delta` / `zeta beta gamma delta epsilon alpha` / ... Config writes behave the same way: four `lotar config set default_priority ... --project ALPH` runs reordered `branch.type_aliases` each time (`fix spike epic feat chore` → `chore fix feat spike epic` → ...). The same applies to `agents`, `remotes`, `auth_profiles` and the status/priority aliases.
+     Impact: For a git-native tracker, any unrelated edit (title, status, comment) rewrites the whole custom_fields block in a new order. Diffs get noisy, history becomes hard to read, and two people editing different fields of one task on separate branches get spurious merge conflicts. Config files churn the same way.
+     Suggested fix: Use `BTreeMap` (sorted) or `IndexMap` with insertion order preserved from parse for `CustomFields` and the persisted config maps. JSON and schema output are unaffected by the order.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:35.304550+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

@@ -4,7 +4,10 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-10-13T21:07:27.638816+00:00
-modified: 2026-10-13T21:13:16.886274+00:00
+modified: 2026-10-31T22:06:39.356232+00:00
+relationships:
+  related:
+  - DEV-293
 comments:
 - date: 2026-10-13T21:13:16.886274+00:00
   text: Unstarted implementation follow-up, not audit-pass-2 closure work. Design DEV-84 is Done and reviewed; scope/reference docs/developers/task-model.md#atomic-temp-maintenance-design-dev-84. No capsule protocol or collector exists today;46 baseline safety tests are not its acceptance coverage. Any apply implementation requires separately reviewed safety semantics and native handle/locking/reparse/race tests; tests must use isolated fixtures and owned children, never real workspace/system-temp cleanup. Legacy siblings remain report-only, even dead PID or old timestamps. Current root producer inventory is explicit tasks/project/sprint/config/init/journal paths plus separately scoped scanner staging, not home/log/queue/report/attachment/worktree deletion. No blanket force option or restored lock-time sweep. Native Linux/Windows plus full repository gates required before enabling deletion; fail toward inspection-only on unavailable filesystem proof.
@@ -14,3 +17,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-31T22:06:39.356232+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-293"]}'

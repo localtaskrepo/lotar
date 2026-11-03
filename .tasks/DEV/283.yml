@@ -1,0 +1,68 @@
+title: 'CLI output consistency and missing edits: IDs, JSON envelopes, changelog, clearing fields, completions'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:37.762164+00:00
+modified: 2026-10-31T22:06:37.835821+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] `task history`, `history-by-field`, `diff` and `at` reject bare numeric IDs with 'Task file not found' (review ref cli#7)
+     Where: src/cli/handlers/task/history.rs:461-482, src/storage/operations.rs:542-548
+     Evidence: resolve_task_file calls `get_file_path_for_id(project_dir, id)`, which does `TaskId::parse("1")`. That fails for a bare number, so the result is None. Repro (committed repo): `lotar task history ALPH-1` shows the commit, but `lotar task history 1`, `task history-by-field status 1`, `task diff 1` and `task at 1 HEAD` all print `❌ Task file not found` (exit 1, JSON {"message":"Task file not found"}). The arg docs say 'Task ID (with or without project prefix)', and every other command accepts `1`.
+     Impact: Users following the main.md tip ('Type the numeric ID (1) for day-to-day commands') get a misleading not-found error from the history commands.
+     Suggested fix: Resolve the ID with the same TaskCommandContext::resolve_full_task_id used by the other task handlers before looking up the file. Distinguish 'not tracked in git' from 'not found'.
+
+  2. [medium] `changelog` returns 'No task changes.' with exit 0 for an invalid ref, and misses tasks in untracked directories (review ref cli#8)
+     Where: src/main.rs:640-669, src/main.rs:673-710
+     Evidence: A failed `git diff` falls through to `_ => Vec::new()`. The working-tree mode runs `git status --porcelain` without `-uall`, so a new project folder shows up as one `?? .tasks/BETA/` entry, and parse_relative cannot turn that into a task. Repro: `lotar changelog no-such-ref` prints `✅ No task changes.` with exit=0, and in JSON {"count":0,"mode":"range","status":"ok"}. After `lotar -p BETA add 'beta one'` plus an ALPH add, git status shows `?? .tasks/ALPH/6.yml` and `?? .tasks/BETA/`, and `lotar changelog --global` lists only ALPH-6. `lotar -p BETA changelog` says 'No task changes.'
+     Impact: Commit-message or CI uses get wrong 'no changes' answers for a typo in a ref or for brand-new projects.
+     Suggested fix: Report the git error (non-zero exit) when diff or status fails. Use `git status --porcelain --untracked-files=all`, or `-z` parsing for robustness.
+
+  3. [low] Task lifecycle JSON reports the raw input ID instead of the canonical one, plus misleading 'deleted'/'restored' messages (review ref cli#15)
+     Where: src/cli/handlers/task/delete.rs:117-161, src/cli/handlers/task/edit.rs:181, src/cli/handlers/task/restore.rs
+     Evidence: Repro: `lotar task delete 3 -f json -y` returns {"task_id":"3",...}, `task restore 1 -f json` returns {"task_id":"1","message":"Task '1' restored"} for a task that was never deleted, and `edit 1 -T X -f json` returns only {"message":"Task '1' updated successfully"} with no task_id. Status/priority/effort return "task_id":"ALPH-1". A repeated soft delete prints 'Task '3' deleted (soft...)' again: the service returns deleted=true for no-ops (task_service.rs:1846), so the 'already deleted; no changes' branch in delete.rs:139-160 can never run. list.md says 'All formats show canonical IDs'.
+     Impact: Scripts cannot rely on task_id being canonical, and the no-op messages are wrong.
+     Suggested fix: Use full_id in all outputs. Use delete_with_receipt's `changed` flag to report no-ops. Make restore on a non-deleted task report 'not deleted; no changes'.
+     Verifier note: list.md:117 ('All formats show canonical IDs') is about list output, so the inconsistency is between commands rather than a broken documented contract.
+
+  4. [low] `automation run` (and git/sprint lifecycle handlers) ignore the global -p without telling the user (review ref cli#16)
+     Where: src/main.rs:228-241, src/cli/handlers/automation.rs:22-34
+     Evidence: AutomationHandler::execute is never passed cli.project, and run_manual is called with no project scope. `lotar -p ALPH automation run` therefore runs manual rules on matching tasks in every project, while `lotar -p ALPH task archive --select ...` honours -p (archive.rs:30-35). Verified from code only; no automation rules were configured to reproduce it.
+     Impact: A command the user scoped to one project changes tasks in other projects.
+     Suggested fix: Add `project=<prefix>` to the run query when -p is given (as archive does), or reject -p for commands that don't support it.
+     Verifier note: Now reproduced, not only read from code.
+
+  5. [low] Inconsistent JSON envelopes: dry-run `status` key clash, incomplete add payload, bare-array scan output (review ref cli#17)
+     Where: src/cli/handlers/status.rs, src/cli/handlers/mod.rs:604-622, src/cli/handlers/scan_handler.rs
+     Evidence: `lotar -f json status 1 inprogress -n` (unchanged) returns {"status":"InProgress","notice":...}, so `status` holds the task's state instead of the result status, while a changing dry-run returns "status":"preview". `add -f json` returns task fields without tags, effort, project or custom_fields, with "modified":"", while list returns modified=created. Its fallback shape uses top-level "task_id". `scan --dry-run -f json` returns a bare array with "uuid":"".
+     Impact: Script authors must special-case shapes per command, and an add with --tag cannot be verified from its JSON output.
+     Suggested fix: Always use `status` for the result and `task_status`/`status_value` for the field. Return the same task object as `show`/list from add, and wrap scan results in an envelope.
+
+  6. [low] No CLI way to clear a due date, remove a tag or unassign via `assignee`; `priority` lacks the --dry-run/--explain its sibling commands have (review ref cli#19)
+     Where: src/cli/mod.rs:91-98, src/cli/handlers/duedate.rs, src/cli/handlers/task/edit.rs:143-150
+     Evidence: `lotar due-date 1 ""` and `lotar due-date 1 none` fail with 'Invalid date format', `--clear` is not accepted, and `edit 1 --due ""` fails the same way. `edit --tag` only appends tags. `lotar assignee 1 ""` gives 'value cannot be empty' (only `edit --assignee ""` clears). `effort` has `--clear`, but there is no equivalent for due dates or tags. `Priority` is the only quick command without -n/-e.
+     Impact: Users must hand-edit YAML or use the web UI for routine edits.
+     Suggested fix: Add `--clear` to due-date and assignee, add `--untag`/`--remove-tag` to edit, and add --dry-run/--explain to priority for parity.
+
+  7. [low] Generated fish completions leave out third-level subcommands and their flags (review ref cli#21)
+     Where: src/cli/handlers/completions.rs:182-190
+     Evidence: `lotar completions generate --shell fish` has 0 entries for `issue-id`, `max-nodes` or `delete-branches`, so `task relationships repair/graph`, `agent worktree cleanup` and `task reference add <kind>` are missing. The bash and zsh outputs do include them (bash: 2 issue-id, 1 delete-branches). bash also completes the hidden `--query-term`. This is likely a clap_complete fish limitation.
+     Impact: Fish users get no completion for nested commands.
+     Suggested fix: Upgrade clap_complete or switch to clap_complete's dynamic (`CompleteEnv`) engine. At minimum, mention the limitation in completions.md.
+     Verifier note: The hidden --query-term also appears in the fish (3) and zsh (3) outputs, not only bash. Most likely a limitation of clap_complete's fish generator.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:37.835821+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

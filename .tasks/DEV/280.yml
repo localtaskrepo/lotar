@@ -1,0 +1,50 @@
+title: 'MCP protocol details and docs: error codes, logging capability, stale tool counts'
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:37.322793+00:00
+modified: 2026-10-31T22:06:37.385467+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [low] MCP docs/tool metadata are stale: tool count/table, error field name, and send_message runner support (review ref mcp-agents-automation#14)
+     Where: docs/help/mcp.md:75-118, docs/help/mcp.md:221, src/mcp/server/registry.rs:3, src/mcp/server/tools.rs:1655-1668, docs/help/agent.md:7
+     Evidence: mcp.md:75 says "The registry binds all 38 advertised tools", but registry tests assert 46, and the table omits `relationship_graph`, `relationship_check`, `relationship_mutate`, `relationship_repair` and `sprint_reorder`. The registry.rs header also says 38. mcp.md:221 tells users to inspect `error.data.details` for validation issues, while schema failures put them in `error.data.issues`. The `agent_send_message` tool description says "Only supported for runners that accept stdin input (Claude, Copilot)", but `supports_stdin` is Claude-only (agent_runner.rs:1497-1500, and mcp-tools.md:256 says Claude only). agent.md:7 lists `--runner <copilot|claude|codex|gemini>` although 11 runners exist.
+     Impact: Hosts and agents read tool descriptions, so a model may try to message Copilot jobs. Users following the docs miss five tools and look in the wrong error field.
+     Suggested fix: Update the count and table, the error field name, the tool description, and the runner list in the CLI synopsis.
+     Verifier note: Partial correction: error.data.details is correct for parse errors (-32700), but wrong for the validation issues the troubleshooting line describes.
+
+  2. [low] Project-enum validation failures in tool handlers return protocol error -32602 instead of `isError` results (review ref mcp-agents-automation#15)
+     Where: src/mcp/server/registry.rs:428-432, src/mcp/server/schema.rs:12-14, docs/help/mcp.md:186-188
+     Evidence: `tools/call task_create {title:"x", priority:"Bogus"}` → `{"error":{"code":-32602,"message":"Priority validation failed: Priority 'Bogus' is not enabled for this project…"}}`. schema.rs says project-aware enum validation is a domain concern, and mcp.md says domain failures are `isError` results while -32602 covers advertised-schema failures. Because the handler uses the reserved code, `invoke_tool` passes it through as a protocol error.
+     Impact: Many MCP hosts show protocol errors to the user rather than returning them to the model, so the model cannot see the valid-values suggestions and self-correct.
+     Suggested fix: Have domain validation in handlers use -32000 (domain_service_error) so it becomes an `isError` result with the suggestions in content, and keep -32602 for schema/envelope problems only.
+     Verifier note: Impact is modest: the valid values are in the error message, and several hosts do relay JSON-RPC tool errors to the model.
+
+  3. [low] `logging` capability is advertised but never used, and `logging/setLevel` accepts non-spec levels and silently maps invalid ones (review ref mcp-agents-automation#16)
+     Where: src/mcp/server.rs:157-171, src/mcp/server.rs:441-448, src/mcp/server.rs:505-511
+     Evidence: `initialize` advertises `capabilities.logging`, but no `notifications/message` is ever emitted (grep finds no such string in src), and LOG_LEVEL is written but never read. `set_log_level` accepts trace/warn/off and maps anything else (including the MCP levels `notice`, `warning`, `critical`, `alert`, `emergency`) to `info`, returning success instead of -32602.
+     Impact: Hosts that enable logging get nothing, and level negotiation is misleading. Low functional impact.
+     Suggested fix: Either drop the logging capability or emit `notifications/message` for warnings (e.g. automation failures) honoring the MCP level set. Validate levels against the spec enum.
+
+  4. [low] MCP docs say 'all 38 advertised tools'; the server advertises 46 (review ref docs#12)
+     Where: docs/help/mcp.md:76
+     Evidence: `grep -c 'name: "' src/mcp/server/registry.rs` → 46. A live `tools/list` against target/smoke/lotar mcp returned `.result.tools | length` = 46. mcp.md:76 says "The registry binds all 38 advertised tools".
+     Impact: A stale count makes readers doubt the table and hides newer tools.
+     Suggested fix: Drop the number or update it to 46. A test that compares the docs table with the registry would stop it drifting.
+     Verifier note: The line is mcp.md:75, not :76.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:37.385467+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

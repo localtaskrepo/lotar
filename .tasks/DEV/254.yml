@@ -1,0 +1,101 @@
+title: 'Critical: Block DNS rebinding and other browser attacks on the local server'
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: claude
+created: 2026-10-31T22:06:33.505823+00:00
+modified: 2026-11-03T17:56:12.606693+00:00
+relationships:
+  related:
+  - DEV-253
+comments:
+- date: 2026-11-03T17:56:12.571026+00:00
+  text: |-
+    Outcome:
+    1. Fixed: every request (API, SSE, static) is rejected with 403 unless Host is localhost/*.localhost, an IP literal, the --host name, or a name given with the new --allow-host / LOTAR_ALLOWED_HOSTS ('*' disables). IP literals cannot be rebound, so LAN access by IP keeps working. Origin check kept for mutations.
+    2. Same fix as 1.
+    3. Partly fixed: serve prints a warning when binding to a non-loopback address; serve.md, docker.md (Compose now publishes 127.0.0.1:8080:8080) and SECURITY.md document the risk. Declined for now: a generated access token for non-loopback binds (new auth feature; SECURITY.md keeps network exposure outside the supported setup).
+    4. Fixed: static paths with ':' , a leading slash/backslash or any non-Normal component are refused before Path::join, for the custom path and the target/web fallback.
+    5. Fixed: GET /api/sprints/backlog ignores cleanup_missing (no UI caller; POST sprint endpoints and MCP keep it).
+    6. Fixed: all responses send X-Frame-Options: SAMEORIGIN, CSP frame-ancestors 'self' (the PDF attachment viewer frames same-origin) and X-Content-Type-Options: nosniff.
+    Evidence: unit tests in src/web_server.rs (host_is_allowed, is_safe_rel_path) and serve_handler.rs; integration tests rebound_host_headers_are_rejected_for_every_route and responses_forbid_cross_site_framing in tests/web_api_integration_test.rs; clippy clean.
+    Remaining: full lint/test/smoke gates run at the end of the bug batch.
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible. Any website can drive the local API (including automation commands) through DNS rebinding, because the Host header is never checked and GET/SSE skip the Origin check. Related browser-facing gaps are grouped here.
+
+  Findings:
+
+  1. [critical] DNS rebinding: the server never checks the Host header, so any website can drive the whole API, including automation commands (remote code execution) (review ref api-sse-web#0)
+     Where: src/web_server.rs:394-416, src/web_server.rs:300-314, src/routes/automation.rs:26-38, src/services/automation_service.rs:1426-1470
+     Evidence: validate_request_origin only checks that Origin matches Host. It never compares Host with the bound address or with localhost/127.0.0.1. GET requests are not checked at all. In a DNS rebinding attack, attacker.example resolves to 127.0.0.1, so the browser sends matching Origin and Host values and the check passes. Repro against `lotar serve --host 127.0.0.1 --port 19137`:
+  `curl -X POST -H 'Host: attacker.example:19137' -H 'Origin: http://attacker.example:19137' -H 'Content-Type: application/json' --data @auto.json http://127.0.0.1:19137/api/automation/set` returned `{"data":{"errors":[],"info":[],"updated":true,...}}`. auto.json holds a DEMO rule `on: created: run: "touch <scratch>/rce-proof.txt"`. Then the same forged headers on POST /api/tasks/add returned 201, and `ls rce-proof.txt` showed the file had been created by the automation shell run. A GET /api/tasks/list with `Host: evil.e…
+     Impact: Anyone running `lotar serve` who visits a malicious page can lose all task data to the attacker. The page can also overwrite config, automation and agent profiles, and run arbitrary shell commands as the user through automation `run:` actions or agent jobs.
+     Suggested fix: Reject any request (API, SSE and static) whose Host is not the bound host:port or a loopback alias (localhost, 127.0.0.1, [::1]), unless the user explicitly binds to a public address or configures allowed hosts. Keep the Origin check. Consider requiring a per-session token for mutating and command-capable endpoints.
+     Verifier note: Location note: the origin gate is at src/web_server.rs:332-345, and validate_request_origin is at 793-815 (not 394-416). Default port 8080 and the localhost default make the target easy to guess. Fix as suggested: allowlist Host values (bound host:port plus loopback aliases unless a public bind or explicit allowed hosts is configured), and apply i…
+
+  2. [critical] DNS rebinding gives any website full read/write access to the local API, including running commands, because the Host header is never checked (review ref security-release#0)
+     Where: src/web_server.rs:333-345, src/web_server.rs:793-816, src/routes/automation.rs:26-38, src/routes/automation.rs:116-130, src/services/automation_service.rs:1426-1464, src/services/reference_service.rs:662-682
+     Evidence: validate_request_origin() only checks that the Origin authority equals the Host header. It never checks that Host is a loopback name. After a DNS rebind (attacker.example resolves to 127.0.0.1), the browser sends `Host: attacker.example:PORT` and `Origin: http://attacker.example:PORT`. Those match, so every GET and every mutating request is accepted as same-origin. Reproduced against target/smoke/lotar (0.11.0) serving a temp workspace on port 19431 by sending exactly the headers a rebound page would send:
+
+  curl -H 'Host: attacker.example:19431' http://127.0.0.1:19431/api/tasks/list  -> full task JSON
+  curl -H 'Origin: http://evil.example' -X POST .../api/automation/set  -> 403 (control)
+  curl -H 'Host: attacker.example:19431' -H 'Origin: http://attacker.example:19431' -X POST .../api/automation/set -d '{"project":"DEMO","yaml":"automation:\n  rules:\n    - name: pwn\n      on:\n        m…
+     Impact: Any developer running `lotar serve` (default localhost:8080) who visits a malicious page can have arbitrary commands run as their user, and have their task data and repository files (including credentials in .git/config) read or tampered with. DNS rebinding is a well-known attack on localhost dev servers. Chrome's Local Network Access prompt reduces the risk in some Chrome versions; Firefox and Safari have no equivalent.
+     Suggested fix: When bound to a loopback address, reject any request whose Host is not localhost, 127.0.0.1, [::1] or *.localhost (with the bound port), and apply this to GET and SSE too, not only mutating methods. For non-loopback binds, allow only the configured --host and an explicit allowlist. Consider also requiring Origin to be loopback for mutating requests, and refusing .git/ paths in references/snippet.
+     Verifier note: Default `lotar serve` binds to localhost, which resolved to [::1] only in my run. A rebinding attacker therefore needs an AAAA record pointing at ::1 (or 127.0.0.1 when localhost resolves to IPv4). Standard rebinding tools support both, so the finding still holds. The impact as stated (command execution by visiting a page) is accurate. The default…
+
+  3. [medium] `--host 0.0.0.0` (and the Docker Compose example) exposes the unauthenticated API, including command execution, to the network, with no warning (review ref security-release#2)
+     Where: src/cli/args/serve.rs:27-29, docs/help/serve.md:193, docs/docker.md:35-45, src/routes/automation.rs:26-38
+     Evidence: There is no authentication or token option. `lotar serve --host 0.0.0.0 --port 19433` printed only the normal banner (Host: 0.0.0.0 / URL: http://0.0.0.0:19433), with no warning. serve.md:193 says "Use `--host=0.0.0.0` to allow external connections". docs/docker.md:38-40 recommends `command: [serve, --host, 0.0.0.0]` with `ports: - "8080:8080"`, which publishes on every host interface. Anyone who can reach the port can call /api/automation/set plus /api/automation/run (the same as the finding above, with no rebinding needed), /api/config/set, /api/agents/profiles and /api/jobs, and can read repo files through /api/references/snippet.
+     Impact: Users following the docs on a shared network, or in a container whose port is published to the LAN, give every host on that network full read/write control of their repository and tasks, and command execution (in the container's case, as UID 1000 against the bind-mounted repo).
+     Suggested fix: Print a prominent warning when binding to a non-loopback address. Better, require an access token for non-loopback binds (generated, shown once in the banner, sent as a header or cookie). Change the Compose example to `"127.0.0.1:8080:8080"` and document the risk in serve.md and docker.md.
+     Verifier note: Downgraded from high. SECURITY.md already says 'lotar serve is designed for local use. Exposing it to a network without your own authentication in front of it is outside the supported setup.' The real defect is that the user-facing docs (serve.md, docker.md) and the CLI contradict that policy without any warning. The Compose example also publishes…
+
+  4. [medium] On Windows, static file serving from a custom web_ui_path can read arbitrary files via absolute drive paths (review ref security-release#10)
+     Where: src/web_server.rs:486-497, src/web_server.rs:570-574
+     Evidence: try_serve_static strips leading '/' and rejects only '.' and '..' segments, then calls `ext_dir.join(rel_path)`. On Windows, `Path::join` with an absolute or prefixed component such as `C:/Windows/win.ini` (request `GET /C:/Windows/win.ini`) or `C:foo` replaces the base, so fs::read reads outside web_ui_path. This applies only when web_ui_path is configured (CLI or global config), and reading the response needs same-origin access (LAN bind or the rebinding issue above). Not run on Windows; it follows from documented std::path semantics.
+     Impact: Arbitrary file disclosure on Windows hosts using a custom UI directory, made worse by the first and third findings.
+     Suggested fix: Reject rel_path containing ':' or any component that is not Component::Normal, or canonicalize and require the result to stay under the canonicalized ext_dir.
+     Verifier note: Broader than reported. It is not limited to a configured web_ui_path: step 4 of try_serve_static (web_server.rs:523-529) falls back to `Path::new("target/web").join(rel_path)` whenever no external path is set, which is the default. So on any Windows `lotar serve`, `GET /C:/Windows/win.ini` would read that file. UNC paths could also trigger outboun…
+
+  5. [low] GET /api/sprints/backlog?cleanup_missing=true writes task files, bypassing the Origin check (CSRF via a simple GET) (review ref api-sse-web#12)
+     Where: src/routes/sprints.rs:335-356, src/web_server.rs:300-302, src/web_server.rs:371-375
+     Evidence: The origin check applies only to non-GET methods. The backlog GET handler parses `cleanup_missing` (1/true/yes) and passes it to the sprint integrity cleanup, which rewrites task sprint references. A cross-site `<img src=http://localhost:8080/api/sprints/backlog?cleanup_missing=1>` would trigger it. Verified from code only, not reproduced.
+     Impact: Any website can make the server change tracked task YAML (removing dangling sprint references) without the user acting.
+     Suggested fix: Move cleanup to a POST endpoint, or ignore cleanup_missing on GET.
+     Verifier note: Now reproduced, not just code-derived. The impact is limited to removing dangling sprint references (a self-healing write). It still counts as a state-changing GET exposed to cross-site requests.
+
+  6. [low] The web UI can be framed by any site (no X-Frame-Options or frame-ancestors), enabling clickjacking of destructive actions (review ref security-release#7)
+     Where: src/web_server.rs:536-563
+     Evidence: serve_bytes() sends only Content-Type, Content-Length, Cache-Control and Connection. `curl -sI http://127.0.0.1:19431/` showed no X-Frame-Options, Content-Security-Policy or X-Content-Type-Options header, and index.html has no CSP meta tag. Origin checks do not help here because a framed UI makes genuine same-origin requests.
+     Impact: A malicious page can embed http://localhost:8080 in an invisible iframe and trick the user into clicking automation **Run now**, deleting or archiving tasks, or starting agent jobs.
+     Suggested fix: Send `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'` (ideally a full CSP) plus `X-Content-Type-Options: nosniff` on all static and API responses.
+     Verifier note: Downgraded to low. Clickjacking needs multi-step user interaction and can only trigger actions that already exist in the UI, such as running an existing manual rule or deleting tasks, which are git-tracked and recoverable. Getting command execution would require typing YAML into the editor through a frame. Finding #0 is strictly stronger in the sa…
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:33.639566+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T17:49:14.929147+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T17:56:12.571026+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T17:56:12.606693+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

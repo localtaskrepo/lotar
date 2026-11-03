@@ -1,0 +1,109 @@
+title: 'Docs accuracy pass: stale pages, internal ticket notes, failing examples, missing flags and commands'
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-31T22:06:39.292878+00:00
+modified: 2026-10-31T22:06:39.357295+00:00
+relationships:
+  related:
+  - DEV-110
+  - DEV-13
+  - DEV-138
+  - DEV-142
+  - DEV-253
+  - DEV-3
+  - DEV-4
+  - DEV-84
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Headline examples use values the default config doesn't have and fail or silently do nothing for new users (review ref docs#8)
+     Where: docs/help/add.md:20-24, docs/help/add.md:36-37, README.md:70-79, docs/help/automation.md:15-33, docs/help/serve.md:80, docs/help/main.md:10-11
+     Evidence: Fresh repo defaults: states Todo/InProgress/NeedsReview/Done, priorities Low/Medium/High, types Feature/Bug/Chore. add.md quick examples: `lotar add "Fix login crash" --type=bug -P critical` → `❌ Priority 'critical' is not enabled for this project`. `--type=epic` → `❌ Type 'epic' is not enabled`. The Options section lists "feature, bug, epic, spike, chore" and "low, medium, high, critical" as if they were built in. README automation example `job_failed: { set: { status: Blocked } }`: `lotar automation simulate --ticket T3-1 --event job_failed` on a default workspace prints `⚠️ Unknown status 'Blocked' would be skipped`. automation.md's lead example uses `HelpNeeded`/`Testing`, which exist only in the agent-pipeline templates. serve.md:80 says "the defaults display Critical, High, Medium, Low". main.md (lotar --help) Quick Start runs `lotar list status:todo mine:true` right after `lotar …
+     Impact: Copy-pasted first commands fail. The README automation rule quietly does nothing when a job fails.
+     Suggested fix: Use default values in the examples (High, Bug, NeedsReview/Todo), or say which template provides them (`lotar init --workflow agile` / `--template agent-pipeline`). Correct the add.md option descriptions to "configured types/priorities". Change the main.md quick start to `lotar list status:todo` or add `--assignee @me`.
+     Verifier note: I did not re-run automation simulate myself. The default states have no Blocked, so the warning the reviewer reported is consistent with that.
+
+  2. [low] docs/README.md, the docs landing page linked from docker.md, is badly stale and contradicts current defaults and behavior (review ref docs#5)
+     Where: docs/README.md:3, docs/README.md:118-122, docs/README.md:150-153, docs/README.md:165-169, docs/README.md:207-262, docs/docker.md:78
+     Evidence: Heading "Project Status - November 2025". "Status System: TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE", "Priority Levels: LOW, MEDIUM, HIGH, CRITICAL" and "Task Types: Feature, Bug, Epic, Spike, Chore": a fresh `lotar config show` gives states Todo/InProgress/NeedsReview/Done, priorities Low/Medium/High and types Feature/Bug/Chore. "the short -p flag is reserved for the global --project flag" (lines 151, 166): src/cli/args/serve.rs:13 makes `-p` the serve port, and serve.md says the same. "--host ... (default: 127.0.0.1)": the default is "localhost" (serve.rs:27). "Personalized chrome — system/light/dark themes" with "more shortcuts landing soon" is outdated next to the skins and palettes. "npm run test, which wraps the same command" (nextest): package.json test runs test:rust, test:ui, test:release and test:hooks. Marketing claims such as "Production-ready code quality", "Ready for produc…
+     Impact: GitHub shows this page when someone browses docs/. New users get wrong statuses, priorities and flags, and the claims hurt credibility.
+     Suggested fix: Cut docs/README.md down to a short index that points to docs/help/index.md, install.md and cli-tour.md, and remove the duplicated feature, CLI and testing sections. Point docker.md at docs/help/index.md.
+     Verifier note: The content is stale, but this is a secondary landing page and the embedded help is correct. Low rather than medium.
+
+  3. [low] User help contains internal DEV ticket notes that contradict shipped features (review ref docs#7)
+     Where: docs/help/list.md:123, docs/help/task.md:297-299, docs/help/serve.md:153, docs/help/task-model.md:9
+     Evidence: list.md:123: "Older-than-N-days filtering ([DEV-3](../../.tasks/DEV/3.yml)) and list grouping/sums ([DEV-13](../../.tasks/DEV/13.yml)) remain separate features." Both tickets are `status: Done`, and the same page documents `--sum` and `-recent:30d`. task.md:298-299: "Search synchronization between views is a separate feature tracked in DEV-142; it is not enabled". DEV-142 is Done, and preferences.md:33 documents "Use the same search and filters on every page". serve.md:153 links "DEV-84's ownership-safe maintenance design"; task-model.md:9 says "(DEV-4)". These pages are embedded in `lotar help`, so the links resolve to github.com/.../blob/vX/.tasks/DEV/3.yml in the LoTaR repo, which means nothing to users.
+     Impact: Users are told features are missing when they exist, and the help pages read like an internal backlog.
+     Suggested fix: Delete the sentence in list.md:123 and the DEV-142 sentence in task.md. Drop the DEV-xx references from docs/help (keep DEV-138/DEV-110 only in developer docs). Consider a docs lint that rejects `.tasks/DEV` links under docs/help.
+     Verifier note: This is a documentation-only problem, so low.
+
+  4. [low] Documented `lotar config inspect` subcommand does not exist (review ref docs#10)
+     Where: docs/help/config.md:332
+     Evidence: The review-recovery recipe includes `lotar config inspect --project AUTH`. Running it gives `error: unrecognized subcommand 'inspect'`. ConfigAction in src/cli/args/config.rs has Show/Set/Init/Templates/Validate/Normalize. Only REST has /api/config/inspect.
+     Impact: A documented recovery recipe fails partway through.
+     Suggested fix: Replace it with `lotar config show --project AUTH --explain`, or add the subcommand.
+
+  5. [low] task.md documents a wrong `task add --title` syntax, calls the full task command 'legacy', and leaks internal function names (review ref docs#11)
+     Where: docs/help/task.md:3, docs/help/task.md:15, docs/help/task.md:48, docs/help/task.md:412, docs/help/git.md:17
+     Evidence: task.md:48 `lotar task add --title "Task title" ...` → `error: unexpected argument '--title' found` (the title is positional). task.md:3 calls `lotar task` a "Legacy multi-action entry point ... for backward compatibility", and :412 says "Prefer the direct commands". But relationships, delete, restore, archive, move, history, diff, at and reference exist only under `lotar task`. task.md:15 mentions `emit_subcommand_overview` and git.md:17 mentions `find_repo_root`, which are source function names.
+     Impact: A broken example, and new users are steered away from the only command that offers many operations.
+     Suggested fix: Fix the synopsis to `lotar task add "Task title" [...]`. Describe `lotar task` as the full task command group, with the top-level shortcuts as conveniences. Remove the function names.
+
+  6. [low] environment.md and precedence.md misdescribe several variables; test-only and missing variables (review ref docs#14)
+     Where: docs/help/environment.md:96-100, docs/help/environment.md:132-144, docs/help/precedence.md:41, docs/help/precedence.md:71
+     Evidence: `scan_strip_attributes`: "Removes HTML attributes before scanning content". The real behavior (config-reference.md:58, scan.md:73) is removing inline `[key=value]` blocks after inserting the ID. `scan_enable_ticket_words`: "words such as `ticket:`". It actually promotes issue-type words such as `Feature:` (config.md:384). precedence.md:41/71 says `LOTAR_DEBUG=1` logs the resolved tasks dir, config sources and identity detector outcomes. The code reads LOTAR_DEBUG only in src/cli/handlers/stats/effort.rs and task_service.rs:955 (mention linking). `LOTAR_TEST_FAST_NET` is listed but only tests/web_api_integration_test.rs reads it, not the binary. Undocumented variables the binary reads: `LOTAR_AGENT_CONTEXT_ENABLED` (env_overrides.rs:180), `LOTAR_ENABLE_POLL_WATCH` and `LOTAR_POLL_WATCH_INTERVAL_MS` (web_server.rs:911-921; polling helps on Docker and network filesystems where inotify even…
+     Impact: Users switch the wrong knobs or expect diagnostics that never appear, and a useful option for Docker/NFS live updates goes undiscovered.
+     Suggested fix: Fix the two scan descriptions. Rewrite the LOTAR_DEBUG notes to match the code (or make it do what is documented). Move LOTAR_TEST_FAST_NET to developer docs. Document the agent context and poll-watch variables, and mention the poll watcher in docker.md.
+     Verifier note: The line references are environment.md:100/103, and the LOTAR_DEBUG claims are at precedence.md:51 and :72.
+
+  7. [low] agent-skills.md warns about an MCP project-status bug from 0.8.0 that is fixed (review ref docs#15)
+     Where: docs/help/agent-skills.md:73-77
+     Evidence: The doc says MCP may reject project-specific statuses ("reproduced with LoTaR 0.8.0 (task_update checked default states...)"). Verified fixed: in a project with `issue_states Todo,Testing,Done`, MCP `tools/call task_update {id: QA-1, patch: {status: Testing}}` succeeded and the file now has `status: Testing`. mcp-tools.md:41 also documents project-scoped validation.
+     Impact: Users are told to route around MCP for a problem that no longer exists.
+     Suggested fix: Remove the paragraph, or reduce it to general advice to report CLI/MCP mismatches.
+
+  8. [low] Help pages miss existing flags and endpoints; API quick reference leaves out common endpoints (review ref docs#17)
+     Where: docs/help/add.md:33-52, docs/help/changelog.md:7-16, docs/help/due-date.md:7-13, docs/help/assignee.md, docs/help/api-quick-reference.md:1-60, docs/help/config-reference.md:9-48, docs/help/due-date.md:35
+     Evidence: Checked against the clap tree (fish completions from `lotar completions generate --shell fish`). add.md never mentions `--status` (initial status). changelog.md doesn't document `--global` or that the default scope is the current or effective project (verified: `lotar changelog` showed only BACK, `--global` showed all projects). due-date.md doesn't document `--dry-run`/`--explain`, and assignee.md doesn't document `--dry-run`. api-quick-reference.md has no entry for /api/tasks/comment, /api/tasks/comment/update, /api/tasks/status, /api/tasks/history, /api/tasks/commit_diff, /api/tasks/suggest, /api/sprints/list|summary|burndown|velocity|order, /api/projects/create, /api/activity/*, /api/references/files|snippet, /api/config/inspect (all in src/routes and openapi.json). config-reference's canonical key list omits `review.reviewers` (documented in config.md:322). due-date.md:35 says YYYY-…
+     Impact: Users find features by reading the source or the OpenAPI file instead of the help.
+     Suggested fix: Add the missing flags to each page, add the endpoints to the quick reference (or link to openapi.json per area), add review.reviewers to config-reference, and correct the due-date storage note.
+     Verifier note: due-date.md:75 makes the same wrong UTC claim. I did not check the API quick-reference endpoint list.
+
+  9. [low] Long jargon passages in user help: serve.md Development Notes and the api-quick-reference graph notes (review ref docs#18)
+     Where: docs/help/serve.md:151-153, docs/help/api-quick-reference.md:62-66, docs/help/api-quick-reference.md:79, docs/help/serve.md:3, docs/help/serve.md:56-60
+     Evidence: serve.md:153 is one 398-word bullet about transaction journals, lock ordering, acknowledgement semantics and fsync durability ("a retained journal then matches the already-restored state, and recovery merely re-verifies and retries its removal"). api-quick-reference.md:62-66 uses phrases like "Tokens bind full inventory bytes, project and sorted unique selected IDs", "Omitted options retain legacy projection" and "pair/component-aware allocation". Line 79 is a 267-word sort/filter grammar bullet. serve.md:3 says the server "serves the SPA from `target/web` and exposes the REST + SSE APIs used by the CLI": the UI is embedded and the CLI does not use REST. serve.md:56-60 puts an asset-compression paragraph in the middle of the Options list, and `--format`/`--verbose` end up under it.
+     Impact: New users can't find the operational basics, and the density hides the few points that matter to them, such as 'no power-loss durability' and 'never delete .lock files'.
+     Suggested fix: Move the transaction and graph-repair internals to docs/developers/ and leave a 3-line user summary: writes are atomic, keep .lock and .txn-pending.json files, there is no temp-cleanup command (DEV-110). Split line 79 into a short table of sort keys and filters. Fix the serve.md intro, and move the compression paragraph after the options list.
+     Verifier note: Readability is partly subjective. The factual errors in the serve.md:3 intro are the concrete part.
+
+  10. [low] templates.md 'Continue customizing' sequence fails at its last command (review ref docs#19)
+     Where: docs/help/templates.md:154-161
+     Evidence: Ran the four commands in order on a fresh workspace: `config set default.tags '["triage","sev"]' --project=DEMO` ✅, then custom_fields ✅, then `config set issue.tags '["frontend","backend"]' --project=DEMO` → `❌ default_tags: default_tags contains values not present in issue.tags: triage, sev`.
+     Impact: A copy-paste example fails with a validation error.
+     Suggested fix: Use `issue.tags '["frontend","backend","triage","sev"]'` or reorder the commands, and note the dependency.
+
+  11. [low] Docs promise a workspace-level `tasks_folder` setting and `LOTAR_DEBUG=1` workspace logging; neither exists (review ref storage-core#12)
+     Where: docs/help/precedence.md:47, docs/help/precedence.md:51, docs/help/precedence.md:72, docs/help/main.md:77, src/main.rs:27, src/workspace.rs:137
+     Evidence: `resolve_tasks_directory_with_override` always passes `None` for the global `tasks_folder` (main.rs:27), and `tasks_folder` is not a field of `GlobalConfig` (grep finds it only in workspace.rs). It cannot work anyway, because the setting would live inside the folder being searched for. Repro: `.tasks/config.yml` with `tasks_folder: .work`, then `lotar add x` still writes to `.tasks/WRK/1.yml`. `LOTAR_DEBUG=1 lotar list` prints no workspace path; LOTAR_DEBUG is only read in stats/effort.rs.
+     Impact: Teams trying to standardize a custom folder per repo, or to debug which workspace was picked, follow documented steps that do nothing.
+     Suggested fix: Remove step 4 and the LOTAR_DEBUG claims from precedence.md and main.md (and the developers copy), or implement them, for example print the resolved workspace and source under `--verbose`/LOTAR_DEBUG.
+
+  12. [low] list.md says older-than-N-days filtering (DEV-3) and list sums (DEV-13) 'remain separate features', but both are Done and implemented (review ref cli#20)
+     Where: docs/help/list.md:123
+     Evidence: list.md:123 says '...Older-than-N-days filtering ([DEV-3]) and list grouping/sums ([DEV-13]) remain separate features.' Both .tasks/DEV/3.yml and .tasks/DEV/13.yml have `status: Done`. The same page documents `-recent:30d` and `--sum effort`, and the rendered help links to internal ticket YAML on GitHub.
+     Impact: The docs contradict themselves on what list can do.
+     Suggested fix: Delete the sentence, or point to the -recent/--sum sections.
+     Verifier note: Separate inconsistency nearby: list.md:123 says table and Markdown renderers are not implemented, but main.md's global-flags table advertises `--format text|table|json|markdown`, and the format error message lists only text and json.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:39.357295+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-110","DEV-13","DEV-138","DEV-142","DEV-253","DEV-3","DEV-4","DEV-84"]}'

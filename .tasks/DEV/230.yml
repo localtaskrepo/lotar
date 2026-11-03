@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-28T19:10:36.188977+00:00
-modified: 2026-10-28T19:50:01.672464+00:00
+modified: 2026-10-31T22:06:36.774890+00:00
 relationships:
   related:
   - DEV-3
@@ -13,6 +13,8 @@ relationships:
   - DEV-13
   - DEV-57
   - DEV-231
+  - DEV-275
+  - DEV-276
 comments:
 - date: 2026-10-28T19:12:39.798631+00:00
   text: |-
@@ -106,3 +108,15 @@ history:
   - field: relationships
     old: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57"]}'
     new: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57","DEV-231"]}'
+- at: 2026-10-31T22:06:36.607217+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57","DEV-231"]}'
+    new: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57","DEV-231","DEV-275"]}'
+- at: 2026-10-31T22:06:36.774890+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57","DEV-231","DEV-275"]}'
+    new: '{"related":["DEV-3","DEV-5","DEV-13","DEV-57","DEV-231","DEV-275","DEV-276"]}'

@@ -1,0 +1,37 @@
+title: Web UI refetches the whole task list on every event and ships one 1.4 MB bundle
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:36.406625+00:00
+modified: 2026-10-31T22:06:36.466800+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Web UI refetches the entire task list (every page re-running the full query) on every task SSE event and cancels in-flight refreshes, so with slow lists it may never settle (review ref performance#2)
+     Where: view/composables/useTaskStore.ts:942-990 (every task_* event → invalidateRetainedQueries), view/composables/useTaskStore.ts:583-593 (invalidateEntry bumps generation, superseding the in-flight refresh), view/composables/useTaskStore.ts:262-264,616-650 (fetch all pages of 1000; membership published only after every page completes), src/routes/tasks.rs:29-62 (each page re-runs task_list::run on all…
+     Evidence: Code: any task_created/task_updated/task_deleted calls invalidateRetainedQueries(), which after 250ms re-fetches /api/tasks/list for all pages of every retained query, and increments entry.generation if a refresh is in flight so its result is discarded. Measured at 2000 tasks: a 1000-task page takes 5.7s, and 4 concurrent page requests (PAGE_CONCURRENCY) take 8.7s wall. One API status change produces 3 task_updated events (1 full DTO from the route, 2 id-only from the watcher; see the watcher finding), and each id-only event also schedules a GET /api/tasks/get for that id. So every edit by anyone (CLI, agent, another tab) costs each open tab one full multi-page refresh. Under the default 100ms SSE debounce, any change arriving faster than the refresh time (6–9s at 2000 tasks) discards the in-flight refresh and the list stays 'loading'. That livelock follows from the code; I did not repr…
+     Impact: Server CPU per edit grows as tabs × pages × full-query cost. The task list can show a stale or perpetual loading state during agent activity. Most of the cost disappears once the O(N²) listing is fixed, but the design stays O(N) per event per tab.
+     Suggested fix: Apply SSE task DTOs incrementally: re-evaluate the filter client-side for the changed id, and do a full refresh only on reconnect or a periodic reconcile. Don't discard an in-flight refresh. Let it publish, then schedule one trailing refresh. Skip fetchOne when a full-DTO event for the same id was just applied.
+     Verifier note: The livelock is inferred from the code, not observed. Its practical severity comes mostly from finding #0's slow listing: once that is fixed, a 2000-task refresh would take well under a second, and the issue drops to low (O(N) per event per tab).
+
+  2. [low] Web UI ships as a single 1.44 MB JS chunk with every route eagerly imported (size warning raised to hide it) (review ref performance#8)
+     Where: view/main.ts:28-49, vite.config.ts:29 (chunkSizeWarningLimit: 1500)
+     Evidence: target/web/assets/index-*.js is 1,438,044 B (435,109 B gzipped). There is no other JS chunk. All 13 page components (Insights with chart.js, Sync, Automations, Config…) are static imports in the router. Serving is otherwise good: gzip Content-Encoding and `Cache-Control: immutable` were verified on the served asset.
+     Impact: Slower first load and parse on modest machines and remote/tunnelled sessions. Small impact for a local tool.
+     Suggested fix: Use `component: () => import('./pages/X.vue')` for the non-default routes so chart.js and the admin pages split out, then restore the default chunk-size warning.
+     Verifier note: The config file is vite.config.mts, not vite.config.ts. Impact is small for a localhost tool whose assets are served gzipped and cached as immutable.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:36.466800+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

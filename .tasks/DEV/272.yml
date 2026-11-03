@@ -1,0 +1,37 @@
+title: '`lotar serve` on localhost binds only ::1 and misses ports that are already taken'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:36.125649+00:00
+modified: 2026-10-31T22:06:36.184390+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Default host `localhost` binds only ::1 on macOS: 127.0.0.1 clients cannot connect, and a port already taken on 127.0.0.1 goes undetected (review ref api-sse-web#7)
+     Where: src/cli/args/serve.rs:28, src/cli/handlers/serve_handler.rs:200-222
+     Evidence: `TcpListener::bind(("localhost", port))` binds the first address that resolves. With a Python listener on 127.0.0.1:19140, `lotar serve --port 19140` printed its normal banner. lsof showed `Python ... 127.0.0.1:19140` and `lotar ... [::1]:19140`. `curl http://127.0.0.1:19140/api/whoami` → [000], while `curl http://[::1]:19140/...` → 200. The strict-port and default-port-fallback contract in serve.md therefore does not hold for IPv4.
+     Impact: Scripts, IDE plugins and tools that use 127.0.0.1 fail to connect or reach a different process. Port conflicts are not reported.
+     Suggested fix: Bind both loopback addresses for `localhost` (or default to 127.0.0.1), and check for conflicts on every resolved address.
+     Verifier note: Browsers using the printed localhost URL still work. The impact is on tools that hard-code 127.0.0.1 and on undetected IPv4 port conflicts. The severity could arguably be low.
+
+  2. [medium] `lotar serve` on a port already held on ::1 silently binds 127.0.0.1 instead of failing (outside my area, seen during repro) (review ref storage-core#11)
+     Where: src/web_server.rs:89, src/web_server.rs:90
+     Evidence: `TcpListener::bind(format!("{host}:{port}"))` with host `localhost` tries each resolved address. While another reviewer's `lotar serve --port=19431` (pid 14134) held `[::1]:19431`, my `lotar serve --port 19431` started without error on `127.0.0.1:19431` (`lsof` showed both listeners). `curl localhost:19431` then reached the other server and workspace. Docs: "a busy locked port fails instead of moving".
+     Impact: Two workspaces can be served on the same port number. Browsers and tools using `localhost` reach whichever address family they resolve first, so writes can go to the wrong repository. I actually created a task in another reviewer's workspace this way.
+     Suggested fix: Resolve `localhost` to all addresses and bind all of them (or fail if any is busy), or bind one explicit address and report it. Treat 'address in use' on any family as busy.
+     Verifier note: serve_handler.rs:206 has the same multi-address bind semantics for the implicit 8080 default-port fallback. If so, a second default `lotar serve` could silently share 8080 with the developer's server instead of falling back; I did not verify this, because 8080 is off-limits. Outside the storage area, but writes can reach the wrong workspace, so me…
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:36.184390+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

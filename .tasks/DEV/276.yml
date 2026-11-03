@@ -1,0 +1,66 @@
+title: 'REST contract consistency: bad JSON accepted, OpenAPI drift, status codes, upload cap, missing endpoint docs'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:36.702785+00:00
+modified: 2026-10-31T22:06:36.775415+00:00
+relationships:
+  related:
+  - DEV-230
+  - DEV-253
+  - DEV-58
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] OpenAPI response schemas disagree with real responses (queue_stats undocumented; fields marked required are omitted) (review ref api-sse-web#9)
+     Where: docs/openapi.json (AgentJobListResponse, SprintSummary, ProjectListResponse), src/routes/jobs.rs:32-36, src/services/sprint_reports.rs:252-253, src/api_types.rs:1536-1542, tests/openapi_contract_test.rs:65-81
+     Evidence: A script validating live responses against the spec found: GET /api/jobs returns `queue_stats`, which is absent from the AgentJobListResponse schema (TS has it). /api/sprints/summary and /api/sprints/burndown omit `sprint.has_warnings` when false, although the spec lists it as required (skip_serializing_if = is_false). /api/projects/list?offset=999 → `{"data":{"limit":200,"offset":999,"total":4}}` with no `projects`, which the spec and TS ProjectListResponse require. TaskDTO in view/api/types.ts declares tags/comments/references/sprints/history/custom_fields/relationships as required, but the server omits them when empty; the UI survives only through normalizeTaskRecord. openapi_contract_test only compares route sets, not schemas.
+     Impact: Generated or strict clients fail validation or crash on missing arrays. Drift is not caught by CI.
+     Suggested fix: Make the spec match (add queue_stats, drop has_warnings/projects from required or always serialize them), mark the TS TaskDTO collections optional, and add a response-schema conformance test for the main GET endpoints.
+
+  2. [low] Malformed or chunked JSON bodies are silently treated as `{}`, producing misleading errors or silent no-op successes (review ref api-sse-web#8)
+     Where: src/routes/tasks.rs:11, src/routes/tasks.rs:712, src/routes/tasks.rs:740, src/routes/tasks.rs:773, src/routes/tasks.rs:871, src/routes/tasks.rs:900, src/routes/config.rs:28, src/routes/automation.rs:28, src/routes/projects.rs:5, src/web_server.rs:244-271
+     Evidence: These handlers use `serde_json::from_slice(&req.body).unwrap_or(json!({}))`. The server only reads bodies with Content-Length; Transfer-Encoding: chunked is not supported. Repro: `curl -X POST -H 'Transfer-Encoding: chunked' --data '{"title":"chunked","project":"DEMO"}' /api/tasks/add` → 400 'Missing required field: title'; the same for /api/tasks/comment → 'Missing id'. Malformed JSON sent to /api/config/set returns 200 `updated:false`.
+     Impact: Clients that stream bodies (Node fetch with a stream, Python generators, Go with unknown length) fail with misleading errors. A malformed config write looks like success.
+     Suggested fix: Use parse_body everywhere ('Invalid body: …' 400). Return 411 or decode chunked bodies when Transfer-Encoding is present.
+     Verifier note: Downgraded to low: the bundled web UI and MCP send Content-Length JSON. The impact is limited to third-party clients and misleading error messages. No data is corrupted.
+
+  3. [low] Attachment uploads are capped near 12 MiB by the 16 MiB JSON body limit, contradicting documented max_upload_mb values (25, -1 = unlimited) (review ref api-sse-web#13)
+     Where: src/web_server.rs:20, src/routes/tasks.rs:157-200, docs/help/config-reference.md:27, docs/help/config-reference.md:181
+     Evidence: Uploads are base64 inside JSON (4/3 overhead) and MAX_REQUEST_BODY_BYTES = 16 MiB, so any file over about 12 MiB gets 413 PAYLOAD_TOO_LARGE regardless of attachments.max_upload_mb. config-reference shows `max_upload_mb: 25` and says `-1` is unlimited. Derived from code; no 13 MB upload was run.
+     Impact: Users who raise the limit as documented still cannot upload larger files from the web UI, and the error mentions a 16 MiB request limit they never configured.
+     Suggested fix: Accept raw or multipart uploads, or raise the body cap according to the configured upload limit. Document the effective ceiling.
+     Verifier note: serve.md:151 does document the 16 MiB body cap, but nothing ties it to max_upload_mb or states the effective ~12 MiB upload ceiling. The default max_upload_mb is 10, so only users who raise the limit are affected.
+
+  4. [low] Connections beyond the 64 concurrent limit are reset without a response (review ref api-sse-web#14)
+     Where: src/web_server.rs:155-160
+     Evidence: `if active >= MAX_CONCURRENT_CONNECTIONS { continue; }` drops the accepted socket. 100 parallel POST /api/tasks/add → 66 ok, 34 `[Errno 54] Connection reset by peer`. Idle browser preconnects count toward the limit for up to 30 s.
+     Impact: Bursty scripts, MCP bridges or parallel agents get opaque connection resets instead of a retryable status.
+     Suggested fix: Write a minimal `503 Service Unavailable` with Retry-After before closing, or queue briefly.
+     Verifier note: This is intentional design, so it is a hardening improvement (send 503 + Retry-After) rather than a bug.
+
+  5. [low] Inconsistent validation and status codes: unknown resources return 200, git errors return 500, unknown fields and blank comments are accepted (review ref api-sse-web#15)
+     Where: src/routes/projects.rs:79-90, src/routes/tasks.rs:955-1020, src/routes/activity.rs:28-40, src/routes/tasks.rs:770-792, src/routes/tasks.rs:709-733, src/api_server.rs:110-118
+     Evidence: `/api/projects/stats?project=NOPE` → 200 with zero stats. `/api/tasks/history?id=NOPE-99` → 200 []. `/api/tasks/commit_diff?...&commit=deadbeef` → 500 INTERNAL 'bad revision'. `/api/activity/series?group=bogus&since=garbage` → 200, falling back silently. `/api/tasks/comment {"text":"   "}` stores a whitespace-only comment, while comment/update trims and rejects. `/api/tasks/update {"id":..,"sprint":5,"tittle":"x"}` → 200 with nothing changed. `DELETE /api/tasks/get` → 404 'Route not found' instead of 405.
+     Impact: Clients cannot tell typos and missing resources from success. This contradicts the strict DEV-58/DEV-230 error contract used elsewhere.
+     Suggested fix: Return 404 for unknown projects/tasks, 400 for bad revisions and invalid group/since. Trim and reject blank comments. Reject unknown update keys. Return 405 for known paths with the wrong method.
+     Verifier note: The activity/series bogus group/since check returned [] in a repo with no commits, so I could not confirm the silent fallback either way. All of these are low-impact contract inconsistencies.
+
+  6. [low] docs/help/api-quick-reference.md omits about 30 registered endpoints (review ref api-sse-web#16)
+     Where: docs/help/api-quick-reference.md
+     Evidence: Missing from the quick reference but present in the spec and server: /api/tasks/status, /api/tasks/comment, /api/tasks/comment/update, /api/tasks/history, /api/tasks/commit_diff, /api/tasks/suggest, /api/tasks/references/{link,code}/{add,remove}, /api/projects/{create,list,stats}, /api/sprints/{list,summary,burndown,velocity,order,backlog/order}, /api/activity/{feed,series,authors,changed_tasks}, /api/config/inspect, /api/references/{files,snippet}, /api/whoami, /api/openapi.json, /api/tasks/stream.
+     Impact: Users relying on the help page miss core endpoints such as comments, status, sprint reports and projects.
+     Suggested fix: Add one line per missing endpoint, or state that the page is a partial selection and link to the spec.
+     Verifier note: The page header says 'Endpoints with quick examples. For full schema see OpenAPI', so it is implicitly partial. The gap is still real for core endpoints such as comments and status.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:36.775415+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-230","DEV-253","DEV-58"]}'

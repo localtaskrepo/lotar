@@ -1,0 +1,30 @@
+title: Prerelease tags are published as the stable latest on GitHub, Docker Hub, Homebrew and Scoop
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:38.844895+00:00
+modified: 2026-10-31T22:06:38.909097+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Prerelease tags are published as the stable 'latest' on GitHub, Docker Hub, Homebrew and Scoop, although the docs say prereleases go to `next` (review ref security-release#3)
+     Where: .github/workflows/release.yml:64-73, .github/workflows/release.yml:653-657, .github/workflows/release.yml:698-773, .github/workflows/release.yml:809-863, scripts/npm-packages.mjs:97-100, docs/release-guide.md:131-132, site/install.sh:53-66, site/install.ps1:41-47
+     Evidence: The release workflow triggers on 'v*.*.*', which matches v1.0.0-rc.1. create-release hard-codes `prerelease: false`, so an RC becomes the repo's /releases/latest. install.sh latest_tag() and install.ps1 resolve the default version from /releases/latest, so `curl … | sh` installs the RC. publish-docker-image always pushes `mallox/lotar:latest`. update-homebrew-tap and update-scoop-bucket always rewrite the formula and manifest to the new tag. Only npm distinguishes them (distTag() returns 'next' for versions containing '-'), and release-guide.md:131-132 describes only that npm behaviour. The verify-tag step deliberately allows `-suffix` tags, so prereleases are intended to work.
+     Impact: Cutting a release candidate pushes it to every Homebrew, Scoop, Docker `latest` and install-script user as if it were stable. npm users get the opposite behaviour.
+     Suggested fix: Compute `prerelease = contains(github.ref_name, '-')`. Pass it to action-gh-release (prerelease and make_latest), and skip the Docker `latest` tag, the Homebrew tap and the Scoop bucket updates for prereleases (or publish them to separate channels).
+     Verifier note: This only matters if the maintainer actually cuts an RC tag. The impact as stated is accurate.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:38.909097+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

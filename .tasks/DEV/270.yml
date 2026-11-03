@@ -1,0 +1,50 @@
+title: Task ID allocation can reuse or collide IDs, with no way to renumber
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:35.837230+00:00
+modified: 2026-10-31T22:08:15.245416+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [low] Hard delete frees the highest task number; the next task reuses the ID and silently inherits sprint memberships and incoming links (review ref storage-core#4)
+     Where: src/storage/operations.rs:466, src/storage/layout.rs:127, src/services/task_service.rs:420, src/services/sprint_service.rs:496
+     Evidence: IDs are `max_number(project) + 1`, computed from files on disk with no counter. Hard delete removes the file (operations.rs:466) and leaves sprint `tasks:` lists and relationships alone. Repro: add HD-1..HD-3, `lotar sprint add --sprint 1 HD-3`, `lotar task delete HD-3 --hard --yes`; `@sprints/1.yml` still lists `- HD-3`. Then `lotar add "brand new unrelated"` → `Created task: HD-3`, and `show HD-3 --format json` gives `sprints: [1]`. Earlier: DEMO-4 hard-deleted, then the next add gave DEMO-4 again. Sprints work the same way: `sprint delete 1` then `sprint create` → `Created sprint #1`, so history entries and reports that name sprint 1 now point at a different sprint. The hard-delete warnings do not mention sprint memberships.
+     Impact: Commit messages, code TODOs, links, relationships (`depends_on: [HD-3]`) and sprint plans that referred to the deleted task now resolve to an unrelated new task. Data is silently reattributed, and nothing warns at creation time.
+     Suggested fix: Keep a per-project high-water mark, for example a `next_id`/`last_id` in project config (or a stub/tombstone file like move stubs), so purged numbers are never reused. Do the same for sprints. Also remove or warn about sprint memberships during hard delete.
+     Verifier note: ID reuse after hard-deleting the highest number is a documented design decision: docs/developers/task-model.md:124 says reuse 'can bind older relationships, automation history, or worktree associations to a new task'. Soft delete is the default and reserves the ID. The undocumented gaps are smaller: hard delete keeps sprint memberships without a w…
+
+  2. [low] Task numbers are allocated per root without checking sibling roots, so IDs collide and both copies become permanently unreadable from the parent workspace (review ref storage-core#6)
+     Where: src/services/task_service.rs:420, src/services/task_service.rs:517, src/storage/operations.rs:153, src/storage/locator.rs:14
+     Evidence: Reads search the primary root plus `<parent>/*/.tasks`, but allocation only looks at `root/<project>`. Repro: `ws5/.tasks` and `ws5/pkg/.tasks`. `lotar add "root task" --project DEV` → DEV-1; `(cd pkg && lotar --tasks-dir .tasks add "pkg task" --project DEV)` → DEV-1. From ws5: `lotar show DEV-1` and `lotar edit DEV-1` both fail with "matches multiple storage locations ... refusing to pick one arbitrarily", and `lotar list` shows `DEV-1` twice with different titles.
+     Impact: In the monorepo layout the docs advertise, a shared or default project prefix produces IDs that can never be shown or edited from the root, and links or sprint entries to them are ambiguous. Nothing prevents the collision at creation time.
+     Suggested fix: When allocating, take the max over the same candidate roots that lookups use (under the primary lock), or refuse to create in a project that also exists in a sibling root. Have list views mark duplicates rather than show two identical IDs.
+     Verifier note: It requires two nested workspaces to deliberately share a project prefix; the default prefixes come from folder names. The duplicates can still be read from within each sub-workspace. Low.
+
+  3. [low] No way to renumber a duplicated or colliding task ID, although the warning tells users to renumber (review ref storage-core#16)
+     Where: src/storage/safety.rs:64, src/services/task_move.rs:51, docs/help/task.md:350
+     Evidence: The warning reads "Delete or renumber the extra copy", and the docs say changes are "refused until one copy is removed or renumbered". `task move` refuses same-project moves ("already in project") and duplicates ("stored in more than one file"), and there is no renumber command (grep `renumber` finds only the message). The typical case is a git add/add collision on `DEV/N.yml` when two branches each create the next number, and the docs give no guidance for it.
+     Impact: Resolving the most common multi-developer collision means renaming files by hand and finding every relationship, sprint entry and reference, which is error-prone.
+     Suggested fix: Add `lotar task renumber <ID> [--file <path>]`, or allow `task move` within the same project to take the next free number and leave a move stub. Document the add/add-merge recovery procedure.
+     Verifier note: Duplicates arise from two files in different subfolders or the archive. A git add/add on the same `DEV/N.yml` path produces a merge conflict, not a duplicate, so the 'typical case' named in the finding is inaccurate. This is a feature gap, and renaming the file by hand works.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:35.896372+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-1","DEV-253"]}'
+- at: 2026-10-31T22:08:15.245416+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-1","DEV-253"]}'
+    new: '{"related":["DEV-253"]}'

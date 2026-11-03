@@ -38,6 +38,21 @@ const MAX_TRACKED_PEERS: usize = 4 * MAX_CONCURRENT_CONNECTIONS;
 /// while the loop is sleeping, never an already-accepted request.
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
+/// Sent with every response: the UI may only be framed by itself (the
+/// attachment viewer embeds PDFs), and browsers must not sniff content types.
+const SECURITY_HEADERS: &str = "X-Frame-Options: SAMEORIGIN\r\nContent-Security-Policy: frame-ancestors 'self'\r\nX-Content-Type-Options: nosniff\r\n";
+
+fn write_forbidden(mut stream: &TcpStream, body: &str) {
+    let response = format!(
+        "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+        SECURITY_HEADERS,
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes());
+    let _ = stream.flush();
+}
+
 fn reject_oversized_body(mut stream: &TcpStream) {
     let body = "{\"error\":{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds the 16 MiB limit\"}}";
     let response = format!(
@@ -60,6 +75,10 @@ pub struct WebServerConfig {
     /// When true, only serve embedded assets (ignore web_ui_path).
     /// Useful for CI testing to ensure the bundled UI works correctly.
     pub embedded_only: bool,
+
+    /// Extra host names accepted in the `Host` header, besides loopback
+    /// names and IP literals (DEV-254). `*` accepts any host.
+    pub allowed_hosts: Vec<String>,
 }
 
 impl WebServerConfig {
@@ -278,6 +297,19 @@ fn handle_connection(
         (method, path, query, headers, body)
     };
 
+    // DNS rebinding guard (DEV-254): a page on attacker.example that
+    // rebinds its name to this machine sends `Host: attacker.example`, so
+    // every request (API, SSE and static) must name an expected host.
+    if let Some(host) = header_value(&headers, "Host")
+        && !host_is_allowed(host, &config.allowed_hosts)
+    {
+        write_forbidden(
+            stream,
+            "{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Host not allowed. Open the server through localhost or an IP address, or start it with --allow-host <name>.\"}}",
+        );
+        return;
+    }
+
     // SSE endpoints
     if path == "/api/events" || path == "/api/tasks/stream" {
         handle_sse_connection(stream, &query);
@@ -333,14 +365,7 @@ fn handle_connection(
         if is_mutating_method(&method)
             && let Err(rejection) = validate_request_origin(&headers)
         {
-            let body = rejection;
-            let response = format!(
-                "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            );
-            let _ = stream.write_all(response.as_bytes());
-            let _ = stream.flush();
+            write_forbidden(stream, &rejection);
             return;
         }
 
@@ -392,10 +417,11 @@ fn handle_connection(
             format!("Content-Length: {}\r\n", resp.body.len())
         };
         let response = format!(
-            "HTTP/1.1 {} {}\r\n{}{}\r\n",
+            "HTTP/1.1 {} {}\r\n{}{}{}\r\n",
             resp.status,
             reason_phrase(resp.status),
             headers_str,
+            SECURITY_HEADERS,
             content_length
         );
         let _ = stream.write_all(response.as_bytes());
@@ -422,7 +448,8 @@ fn handle_connection(
         if !served {
             let body = "404 - Page not found.";
             let response = format!(
-                "HTTP/1.1 404 NOT FOUND\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                "HTTP/1.1 404 NOT FOUND\r\nContent-Type: text/plain\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+                SECURITY_HEADERS,
                 body.len(),
                 body
             );
@@ -485,7 +512,7 @@ fn try_serve_static(
     external_path: Option<&Path>,
     accepts_gzip: bool,
 ) -> bool {
-    if has_dot_segments(rel_path) {
+    if !is_safe_rel_path(rel_path) {
         return false;
     }
 
@@ -546,10 +573,11 @@ fn serve_bytes(rel_path: &str, bytes: &[u8], mut stream: &TcpStream, gzipped: bo
     // lines are formatted with their own line endings. The socket closes
     // after this single response, so the connection is advertised as closed.
     let header = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: {}\r\nConnection: close\r\n{}\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: {}\r\nConnection: close\r\n{}{}\r\n",
         content_type,
         bytes.len(),
         cache_control,
+        SECURITY_HEADERS,
         if gzipped {
             "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n"
         } else {
@@ -567,10 +595,23 @@ fn should_fallback_to_index(path: &str) -> bool {
     trimmed.is_empty() || !trimmed.contains('.')
 }
 
-fn has_dot_segments(rel_path: &str) -> bool {
-    rel_path
+/// A static asset path must stay inside the asset root on every platform:
+/// no `.`/`..` segments, and nothing Windows would treat as a drive or UNC
+/// prefix (`C:/...`, `C:foo`, `\\\\server`), which `Path::join` would let
+/// replace the base directory (DEV-254).
+fn is_safe_rel_path(rel_path: &str) -> bool {
+    if rel_path.contains(':') || rel_path.starts_with(['/', '\\']) {
+        return false;
+    }
+    if rel_path
         .split(['/', '\\'])
         .any(|segment| segment == "." || segment == "..")
+    {
+        return false;
+    }
+    Path::new(rel_path)
+        .components()
+        .all(|component| matches!(component, std::path::Component::Normal(_)))
 }
 
 fn content_type_for(path: &str) -> &'static str {
@@ -788,6 +829,50 @@ fn origin_authority(origin: &str) -> Option<String> {
     } else {
         Some(authority.to_string())
     }
+}
+
+/// Whether a `Host` header names this server rather than a rebound domain.
+///
+/// IP literals cannot be rebound, and `localhost`/`*.localhost` always
+/// resolve to loopback, so those pass. Any other name must be listed in
+/// `allowed` (the `--host` name and `--allow-host` values; `*` allows all).
+fn host_is_allowed(host_header: &str, allowed: &[String]) -> bool {
+    let host_header = host_header.trim();
+    if allowed.iter().any(|entry| entry == "*") {
+        return true;
+    }
+    let name = if let Some(rest) = host_header.strip_prefix('[') {
+        // Bracketed IPv6 literal, with an optional port after `]`.
+        return match rest.split_once(']') {
+            Some((literal, tail)) => {
+                literal.parse::<std::net::Ipv6Addr>().is_ok()
+                    && (tail.is_empty() || tail.starts_with(':'))
+            }
+            None => false,
+        };
+    } else {
+        match host_header.rsplit_once(':') {
+            Some((name, port)) if port.chars().all(|c| c.is_ascii_digit()) => name,
+            Some(_) => return false,
+            None => host_header,
+        }
+    };
+    let name = name.trim_end_matches('.').to_ascii_lowercase();
+    if name.is_empty() {
+        return false;
+    }
+    if name.parse::<std::net::Ipv4Addr>().is_ok()
+        || name == "localhost"
+        || name.ends_with(".localhost")
+    {
+        return true;
+    }
+    allowed.iter().any(|entry| {
+        entry
+            .trim()
+            .trim_end_matches('.')
+            .eq_ignore_ascii_case(&name)
+    })
 }
 
 fn validate_request_origin(headers: &HashMap<String, String>) -> Result<(), String> {
@@ -1107,7 +1192,62 @@ fn start_tasks_watcher() {
 
 #[cfg(test)]
 mod tests {
-    use super::{content_type_for, reason_phrase};
+    use super::{content_type_for, host_is_allowed, is_safe_rel_path, reason_phrase};
+
+    #[test]
+    fn rebound_host_names_are_rejected() {
+        let none: Vec<String> = Vec::new();
+        assert!(!host_is_allowed("attacker.example:8080", &none));
+        assert!(!host_is_allowed("attacker.example", &none));
+        assert!(!host_is_allowed("localhost.attacker.example:8080", &none));
+        assert!(!host_is_allowed("", &none));
+        assert!(!host_is_allowed("[::1", &none));
+        assert!(!host_is_allowed("localhost:abc", &none));
+    }
+
+    #[test]
+    fn loopback_names_and_ip_literals_are_accepted() {
+        let none: Vec<String> = Vec::new();
+        for host in [
+            "localhost:8080",
+            "LOCALHOST",
+            "localhost.:8080",
+            "app.localhost:8080",
+            "127.0.0.1:8080",
+            "192.168.1.20:8080",
+            "[::1]:8080",
+            "[fe80::1]",
+        ] {
+            assert!(host_is_allowed(host, &none), "{host} should be allowed");
+        }
+    }
+
+    #[test]
+    fn configured_host_names_are_accepted() {
+        let allowed = vec!["devbox.lan".to_string()];
+        assert!(host_is_allowed("devbox.lan:8080", &allowed));
+        assert!(host_is_allowed("DevBox.LAN", &allowed));
+        assert!(!host_is_allowed("other.lan:8080", &allowed));
+        assert!(host_is_allowed("anything.example", &["*".to_string()]));
+    }
+
+    #[test]
+    fn static_paths_cannot_escape_the_asset_root() {
+        assert!(is_safe_rel_path("index.html"));
+        assert!(is_safe_rel_path("assets/index-abc.js"));
+        for path in [
+            "../secret",
+            "assets/../../secret",
+            "./index.html",
+            "C:/Windows/win.ini",
+            "C:foo",
+            "/etc/passwd",
+            "\\\\server\\share",
+            "assets\\..\\x",
+        ] {
+            assert!(!is_safe_rel_path(path), "{path} should be rejected");
+        }
+    }
 
     #[test]
     fn status_lines_keep_their_code() {

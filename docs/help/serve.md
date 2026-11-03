@@ -45,7 +45,8 @@ lotar serve --web-ui-embedded
 ## Options
 
 - `-p <PORT>`, `--port <PORT>` - Port to bind server to. When the flag (or a bare positional port) is omitted, the port is resolved in the documented order: `--config server.port=...`, then `LOTAR_PORT`/`LOTAR_SERVER_PORT`, then the config file's `server.port` (`~/.lotar`, then `.tasks/config.yml`), then the built-in default `8080`; `--port` beats everything. Each layer's request is honored exactly — including a request for `8080` itself — and config-set ports are validated to 1–65535 by the existing `--config` validation, so an OS-assigned port via config uses the file spelling (`server.port: 0`) or `--port 0`. Pass `0` to bind an OS-assigned ephemeral port; the startup banner then reports the actual bound port. `serve` is the deliberate exception where `-p` means the port; for every other command — and before the `serve` subcommand itself (`lotar -p web serve`) — `-p` remains the short form of the global `--project` option.
-- `--host <HOST>` - Host address to bind to (default: localhost)
+- `--host <HOST>` - Host address to bind to (default: localhost). Binding to anything other than a loopback address prints a warning: the API has no authentication.
+- `--allow-host <NAME>` - Extra host name the server answers to (repeatable; `LOTAR_ALLOWED_HOSTS` takes a comma-separated list). See [Host checks](#host-checks).
 - `--open` - Automatically open browser after starting server
 - `--web-ui-path <PATH>` - Path to a directory containing custom web UI assets. When set and the directory exists, files are served from here first, falling back to the bundled UI if not found.
 - `--web-ui-embedded` - Force serving only the embedded/bundled UI assets, ignoring any custom web UI path. Useful for CI testing to ensure the bundled UI works correctly.
@@ -190,4 +191,15 @@ After frontend changes, `npm run build` rebuilds the UI and release binary. Rest
 - Server runs until interrupted (Ctrl+C)
 - Web interface works with all modern browsers
 - API handlers expect JSON bodies and respond with JSON envelopes that mirror the CLI output (`{status,message,data}`).
-- Use `--host=0.0.0.0` to allow external connections
+- `--host=0.0.0.0` accepts connections from other machines. Only do this on a trusted network or behind your own authentication: anyone who can reach the port can change tasks, config and automation rules, and automation rules run shell commands.
+
+### Host checks
+
+To block DNS rebinding (a web page that points its own domain at your machine), the server rejects any request whose `Host` header is not one of these, with `403`:
+
+- `localhost` or a `*.localhost` name
+- an IP address, such as `127.0.0.1`, `[::1]` or `192.168.1.20`
+- the `--host` value, when it is a name
+- a name passed with `--allow-host` (for example a reverse proxy's public name); `--allow-host '*'` turns the check off
+
+Mutating requests must also send an `Origin` that matches `Host`, and responses carry `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, so other sites cannot frame the UI. `GET` requests never write files.

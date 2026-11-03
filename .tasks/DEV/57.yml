@@ -5,7 +5,7 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-09-06T11:10:31.479215+00:00
-modified: 2026-10-28T19:10:45.641295+00:00
+modified: 2026-10-31T22:06:38.595970+00:00
 relationships:
   depends_on:
   - DEV-56
@@ -20,6 +20,7 @@ relationships:
   - DEV-13
   - DEV-41
   - DEV-230
+  - DEV-288
   parent: DEV-53
 comments:
 - date: 2026-09-11T15:36:38.783680+00:00
@@ -156,3 +157,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-56"],"blocks":["DEV-64","DEV-65","DEV-68","DEV-75"],"related":["DEV-3","DEV-5","DEV-13","DEV-41"],"parent":"DEV-53"}'
     new: '{"depends_on":["DEV-56"],"blocks":["DEV-64","DEV-65","DEV-68","DEV-75"],"related":["DEV-3","DEV-5","DEV-13","DEV-41","DEV-230"],"parent":"DEV-53"}'
+- at: 2026-10-31T22:06:38.595970+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-56"],"blocks":["DEV-64","DEV-65","DEV-68","DEV-75"],"related":["DEV-3","DEV-5","DEV-13","DEV-41","DEV-230"],"parent":"DEV-53"}'
+    new: '{"depends_on":["DEV-56"],"blocks":["DEV-64","DEV-65","DEV-68","DEV-75"],"related":["DEV-3","DEV-5","DEV-13","DEV-41","DEV-230","DEV-288"],"parent":"DEV-53"}'

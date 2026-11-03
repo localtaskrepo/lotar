@@ -1,0 +1,30 @@
+title: Read-only commands create workspaces, and workspace search crosses repository boundaries
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:35.386508+00:00
+modified: 2026-10-31T22:06:35.445384+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] A read-only command run in any folder creates a workspace there; one stray `lotar list` in $HOME then catches every new repository under home (review ref storage-core#3)
+     Where: src/storage/manager.rs:17, src/storage/manager.rs:22, src/workspace.rs:137, src/workspace.rs:248, src/workspace.rs:296
+     Evidence: `Storage::new` always runs `create_dir_all` and `ensure_global_config`. Running `lotar list` in an empty folder created `.tasks/config.yml` (`default: project: WS6`). Workspace discovery adopts any parent `.tasks` that has a `config.yml`, walks up to and including $HOME, and ignores git repository boundaries. Repro (HOME pointed at a temp folder, LOTAR_IGNORE_HOME_CONFIG=1): `cd $HOME && lotar list` → `$HOME/.tasks/config.yml` is created. Then `mkdir -p code/newrepo && cd code/newrepo && git init && lotar add "my new repo task"` → `Created task: FAKE-1`, written to `$HOME/.tasks/FAKE/1.yml`, while the repo stays empty. In the same way, a nested git repo under another repo's tree writes into the outer repo's `.tasks` (checked: `inner/` git repo → DEMO-5 in the outer workspace).
+     Impact: Users can silently put tasks in the wrong repository, or in an untracked home folder, and lose track of them. The trigger is harmless-looking (list/show/stats in the wrong directory), and every later project under home is affected until someone notices `~/.tasks`.
+     Suggested fix: Make read paths use `resolve_read_only` plus `Storage::try_open`, without creating config or directories. Stop the parent search at the git repository root (`.git` directory or file), and do not adopt a `.tasks` in $HOME unless explicitly configured. Consider printing a one-line notice when a workspace is created.
+     Verifier note: The parent search itself is documented (precedence.md step 5), and it only adopts a folder that has config.yml. The defect is that read-only commands such as list and show create that config, which then captures every repository below that folder.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:35.445384+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

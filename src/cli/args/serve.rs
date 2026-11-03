@@ -28,6 +28,18 @@ pub struct ServeArgs {
     #[arg(long, default_value = "localhost")]
     pub host: String,
 
+    /// Extra host name the server answers to (repeatable, or comma-separated
+    /// in `LOTAR_ALLOWED_HOSTS`). Requests whose `Host` header is not
+    /// localhost, an IP address, the `--host` name or one of these are
+    /// rejected, which blocks DNS rebinding. `*` accepts any host.
+    #[arg(
+        long = "allow-host",
+        value_name = "NAME",
+        env = "LOTAR_ALLOWED_HOSTS",
+        value_delimiter = ','
+    )]
+    pub allow_host: Vec<String>,
+
     /// Open browser automatically
     #[arg(long)]
     pub open: bool,

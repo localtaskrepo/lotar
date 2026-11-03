@@ -1,0 +1,70 @@
+title: 'SSE and file watcher: delayed delivery, duplicate or bogus events, missing sprint/config events'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:36.265793+00:00
+modified: 2026-10-31T22:06:36.326251+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] SSE debounce restarts on every event, so a steady stream of events delays all delivery until there is a quiet gap (review ref api-sse-web#3)
+     Where: src/web_server.rs:288-343
+     Evidence: On every received event the forwarder sets `deadline = Some(now + debounce)`, so the flush deadline keeps moving forward. Repro: an SSE client with the default 100 ms debounce, then 60 POST /api/tasks/update calls about 85 ms apart. Output: `first send 0.35 last send 5.32 / events received: 180 / first arrival 5.42`. Nothing reached the client for 5 seconds, then all 180 events arrived within 10 ms. docs/help/sse.md says events flush 'after the configured debounce window'.
+     Impact: Live views (agent job progress streams, bulk edits, sync progress, other tabs) freeze while activity is ongoing and the buffer grows without limit.
+     Suggested fix: Set the deadline only when the buffer goes from empty to non-empty (or cap it at a maximum latency), so a flush happens at most `debounce` after the first buffered event.
+     Verifier note: Location: the forwarder loop is around src/web_server.rs:673-766. The per-update event amplification from finding #4 (about 20 events per update) makes it worse.
+
+  2. [medium] SSE trailing debounce has no max-wait: while events keep arriving <100ms apart, clients receive nothing (unbounded buffering) (review ref performance#1)
+     Where: src/web_server.rs:674-760 (deadline = now + debounce reset on every event at ~741), src/web_server.rs:597-605 (default 100ms), docs/help/sse.md:66
+     Evidence: Script <scratch>/review-performance/starve.py posted /api/tasks/status toggles for DEMO-11 every ~75ms for 8s while listening on /api/events?kinds=task_updated. Output: `updates=107 over 8.1s; first event at +8.16s (writes stopped at +8.07s); events=321`. Zero events arrived during the 8 s of activity, then all 321 at once. Bulk test (2000 task files rewritten with cp+mv in ~10s): the first SSE event reached the client 26s after the rewrite started, when the watcher went quiet. The forwarder pushes each event into `buffer` and moves `deadline` forward on every receive, so flushing waits for 100ms of silence, and the buffer holds full TaskDTO JSON. docs/help/sse.md:66 says events flush 'after the configured debounce window'.
+     Impact: Live views freeze during exactly the periods users want to watch: agent jobs updating tasks, bulk edits, automations, git pulls. Memory grows per connected client while it is starved.
+     Suggested fix: Use a fixed window: set the deadline only when the buffer goes from empty to non-empty, or add a max-wait (e.g. flush at least every 250–500ms). Cap or coalesce the buffer, e.g. keep only the latest event per (kind, id).
+     Verifier note: sse.md:66 is ambiguous rather than flatly contradicted. Still, the starvation and the unbounded per-client buffer during sustained activity are real. Watcher amplification (finding #3) makes sustained sub-100ms event streams likelier than the write rate alone would suggest.
+
+  3. [medium] Filesystem watcher sends bogus project_changed events for root files and duplicate task_updated events; external config edits never produce config_updated (review ref api-sse-web#4)
+     Where: src/web_server.rs:574-626, src/web_server.rs:690-697, docs/help/sse.md
+     Evidence: The watcher treats the first path component under .tasks as a project unless it starts with '@', even when it is a file. One REST update produced 16 SSE frames: 1 full task_updated, 2 watcher `task_updated {"id":"DEMO-1"}`, 9 `project_changed {"name":"DEMO"}`, plus `project_changed {"name":"..txn-pending.json.tmp-36755-130"}` x4 and `{"name":".txn-pending.json"}` x2. Rewriting .tasks/config.yml by hand produced `project_changed {"name":"config.yml"}` x2 and no config_updated. `lotar config set default.priority High` from the CLI while the server runs produced only project_changed events. sse.md says config_updated is emitted after `lotar config set`.
+     Impact: Clients get event names that are not projects. The UI receives 3 task events per mutation, each invalidating retained queries (full list refetches, see the O(n²) finding). Config/completion-policy caches in the UI (useCompletionPolicy listens to config_updated) go stale after CLI or hand edits until reload.
+     Suggested fix: Only treat directories with a valid project prefix as projects. Map changes to .tasks/config.yml, <PROJECT>/config.yml and automation.yml to config_updated. Skip journal/temp files. Drop watcher task events that match a just-emitted API event.
+     Verifier note: The docs claim that config_updated is 'emitted after `lotar config set`' cannot hold for a separate CLI process unless the watcher maps config files. Either the watcher should do that mapping or the docs should be corrected.
+
+  4. [medium] Filesystem watcher amplifies each change into many events, emits project_changed for non-project root files, and costs O(N) per file event, so bulk git operations are O(N²) (review ref performance#3)
+     Where: src/web_server.rs:960-1090 (per-path loop; `emitted` set is per notify event; root-level files treated as projects), src/web_server.rs:1028-1034 (TaskId::locate walk on Remove), src/web_server.rs:1043-1056 (TasksDirectoryResolver::resolve + Storage::new + get_including_deleted per task event), docs/help/sse.md:30,71
+     Evidence: Started `lotar serve --port 19474` on the 2000-task workspace and rewrote all 2000 task files (cp to tmp, then mv over) while capturing /api/events. Result: 26,091 events (22,091 project_changed, 4,000 task_updated), about 11 project_changed and 2 task_updated per file. Server CPU rose 25.8s (ps TIME 0:25.83 → 0:51.62). A single POST /api/tasks/status produced 13 project_changed and 3 task_updated events. Four of those project_changed events had data {"name":"..txn-pending.json.tmp-41258-0"} and two had {"name":".txn-pending.json"}: root-level transaction files reported as projects, contrary to sse.md ("for each project that has a file ... under .tasks/<PROJECT>/"). Each task event calls get_including_deleted, which runs follow_moves, storage.get (walk), resolve_task_location (walk) and load_sprint_lookup.
+     Impact: A `git pull`/`checkout`/rebase that touches many task files pins a server core for tens of seconds and floods every SSE client. Combined with the UI store, that means thousands of single-task GETs plus full-list refreshes. Third-party SSE consumers see bogus project names.
+     Suggested fix: Coalesce watcher events over a short window and dedupe by path. Emit project_changed once per project per batch, and only for real project directories (skip root files and names starting with '.' or '@'). Validate with a direct parse of the changed file instead of a full get/locate. Consider suppressing echo events for writes the server itself just made and announced.
+     Verifier note: The bogus project names (.txn-pending.json, temp files, and presumably config.yml) are also a contract bug against sse.md:71, not only a performance issue.
+
+  5. [low] Sprint mutations produce no SSE events for the tasks they affect; sprint metadata updates are invisible to other clients (review ref api-sse-web#10)
+     Where: src/routes/sprints.rs:86-306, src/routes/sprints.rs:486-520, src/web_server.rs:580-617
+     Evidence: Captured SSE: POST /api/sprints/create → only task_order_changed. POST /api/sprints/update (rename) → no events. POST /api/sprints/add {sprint, tasks:['DEMO-2']} → task_order_changed plus bogus project_changed events, but no task_updated for DEMO-2, even though its DTO `sprints` field changed. No sprint_* event kind exists.
+     Impact: Other tabs, the board and task lists show stale sprint membership and sprint labels/states until reload. External SSE consumers cannot track sprints.
+     Suggested fix: Emit task_updated (full DTO) for each task whose membership changed, plus a sprint_changed event for create/update/delete, and document both.
+     Verifier note: Downgraded to low: view/pages/SprintsList.vue:2744-2757 does listen to task_order_changed and refreshes tasks, so membership changes do reach the Sprints page. What remains is that sprint metadata changes (rename/state) emit nothing at all, and useTaskStore-based views ignore task_order_changed, so sprint labels and membership in other views go st…
+
+  6. [low] docs/help/sse.md does not match the stream: undocumented kinds, wrong payload claims, wrong clamp description, project filter drops job/config/order events (review ref api-sse-web#11)
+     Where: docs/help/sse.md, src/web_server.rs:278-282, src/web_server.rs:308-335, src/api_events.rs:73-85, src/api_events.rs:98-109
+     Evidence: Emitted but undocumented: `task_error`, `task_order_changed`, and `moved_to` in the task_deleted payload. The docs say task_created/task_updated are 'Full TaskDTO … always includes id, title', but watcher events are `{"id":"DEMO-1"}` only. The docs say 'Values below 20 ms are clamped' in fast-IO mode, but the code takes `debounce_ms.min(20)` (values above 20 are lowered). 'buffer drains on … disconnect' cannot happen. With `project=` set, agent_job_* (id `job-…`), config_updated and task_order_changed never match and are silently dropped. The curl example uses port 4183, but the default is 8080.
+     Impact: Integrators build the wrong client logic (assuming full DTOs, missing kinds, losing job events when filtering by project).
+     Suggested fix: Document every kind and payload variant (DTO vs id-only). Fix the clamp text and the example port. Match agent events on ticket_id under a project filter, and define how config/order events behave with one.
+
+  7. [low] SSE docs omit the task_order_changed and task_error events that the server emits and the UI consumes (review ref docs#13)
+     Where: docs/help/sse.md:19, docs/help/sse.md:27-44, src/services/task_order.rs:386, src/web_server.rs:1010, src/api_events.rs:99-105, view/composables/useTaskStore.ts:219
+     Evidence: The `kinds` list in sse.md and the 'Event kinds & payloads' section cover task_*, config_updated, project_changed, sync_* and agent_job_*. The code also emits `task_order_changed` (task_order.rs:386, web_server.rs:1010) and `task_error` for unparseable task files (api_events.rs:103), and the UI registers task_error listeners. openapi.json mentions task_order_changed only in a request description.
+     Impact: Integrators who filter with `kinds=` miss reorders and parse-failure notifications, and the payload shapes are undocumented.
+     Suggested fix: Add both kinds with their payload shapes to sse.md and to serve.md's event list.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:36.326251+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

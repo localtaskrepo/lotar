@@ -1,0 +1,42 @@
+title: 'Automation runner: commands corrupt MCP stdio, cooldowns reset per process, one failure stops later rules'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:37.030774+00:00
+modified: 2026-10-31T22:06:37.094220+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Synchronous automation `run` commands inherit stdio: they corrupt MCP stdout, steal MCP stdin, block without timeout and break `--format json` output (review ref mcp-agents-automation#2)
+     Where: src/services/automation_service.rs:1466-1473
+     Evidence: `cmd.status()` is called without setting stdin/stdout/stderr, so the child inherits the host process's stdio. Repro 1 (MCP): rule `on.updated.run: "echo automation-says-hi"`, then `tools/call task_update {id:TEST-1, patch:{priority:High}}`. The MCP stdout stream contains a bare `automation-says-hi` line between JSON-RPC responses. Repro 2: `run: "sh -c 'cat > STOLEN'"`, then a `ping` request 1 s later. The ping is never answered, `STOLEN` contains `{"jsonrpc":"2.0","id":3,"method":"ping"}`, and the task_update response arrives only after stdin closes. Repro 3 (CLI): `lotar --format json priority TEST-1 Medium` prints `automation-says-hi` before the JSON object. There is no timeout, so a hanging command blocks the MCP loop or the REST request thread forever.
+     Impact: A common rule (`run: notify-send …`, `echo`) breaks MCP clients with parse errors or swallowed requests, breaks scripts that parse CLI JSON output, and can hang the server.
+     Suggested fix: For wait:true, set stdin to null, capture stdout/stderr (log them to stderr or include them in the error), and add a configurable timeout that kills the process group. The async path already uses null/pipe and can serve as a model.
+     Verifier note: Medium rather than high. Many common commands (notify-send, curl -s to a file) produce no stdout, and the stdin theft needs a command that reads stdin. Still, any rule that prints breaks MCP framing and CLI JSON output, and a hanging command blocks the MCP loop or the request with no timeout.
+
+  2. [medium] Rule cooldowns are kept only in process memory, so cron/CLI `automation run` and CLI-triggered rules ignore them (review ref mcp-agents-automation#9)
+     Where: src/services/automation_service.rs:36-75, src/services/automation_service.rs:700-728, docs/help/automation.md:289
+     Evidence: COOLDOWN_STATE is a process-global HashMap. Every `lotar` CLI invocation, cron run included, starts with it empty. Repro (ws3): rule `Nag` with `cooldown: 1d`, `when: status: Todo`, `on.manual.comment: "Daily nag"`. Running `lotar automation run Nag` twice prints `✅ Ran 'Nag' on TEST-1` both times, and `grep -c 'Daily nag' .tasks/TEST/1.yml` → 2. The docs say: "Cooldowns apply as usual, so a rule with `cooldown: 1d` skips tasks it already handled within a day."
+     Impact: Scheduled rules that rely on cooldowns (the documented cron pattern) fire on every run, duplicating comments or other side effects. Loop protection for CLI-triggered updates is likewise per-process only.
+     Suggested fix: Persist last-fired timestamps per (rule, ticket), for example in a small state file under the tasks dir or the cache dir, keyed by a rule identity more stable than the index. Or correct the docs to say cooldowns apply only within one long-running process.
+
+  3. [medium] A failing automation action silently aborts all later rules, and every caller discards the error (review ref mcp-agents-automation#10)
+     Where: src/services/automation_service.rs:349-376, src/services/task_service.rs:389, src/services/task_service.rs:817, src/services/task_service.rs:1512-1515, src/services/reference_service.rs:62, src/services/automation_service.rs:2275-2283
+     Evidence: `apply_action(...)?` inside the rule loop returns on the first error, and callers do `let _ = AutomationService::apply_task_update(...)`. Repro (ws5): rule 1 `on.updated.run: "exit 3"`, rule 2 `on.updated.comment: "second rule ran"`. `lotar priority TEST-1 High` prints success with exit 0, and `grep -c 'second rule ran'` → 0, with nothing on stderr. Server-mode implicit job starts (`let _ = AgentJobService::start_job_with_tasks_dir`) also swallow failures such as "Merge agent jobs require agent.worktree.enabled".
+     Impact: One broken rule (missing binary, `ignore_failure` not set, archived task) quietly disables every rule after it, and an assignment to an agent can do nothing, with no signal to the user.
+     Suggested fix: Keep evaluating later rules after an action fails, collect the errors, and surface them: stderr warning in the CLI, a `task_error`/automation event over SSE, and the job/automation log. The docs should also say what happens on failure.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:37.094220+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

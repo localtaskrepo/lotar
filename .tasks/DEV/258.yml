@@ -1,0 +1,30 @@
+title: Automation template values can inject shell commands despite the documented escaping
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:34.134989+00:00
+modified: 2026-10-31T22:06:34.194052+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] Shell-escaping of template values is defeated by nested quotes: task titles can inject commands into short-form `run` (review ref mcp-agents-automation#3)
+     Where: src/automation/template.rs:247-249, src/automation/template.rs:311-321, src/services/automation_service.rs:1427-1437, docs/help/automation.md:196-208
+     Evidence: `expand_shell_safe` wraps each value in single quotes for the outer `sh -c`. When the user's template already sits inside single quotes, as in the doc's own `run: "sh -c '…'"` pattern, the escaping inverts and the value ends up unquoted. Repro (ws5): rule `on.created.run: "sh -c 'echo New task: ${{ticket.title}} >> notify.log'"`, then `lotar add 'Hello $(touch INJECTED)'` → the file `INJECTED` is created in the workspace.
+     Impact: The docs promise that values are "automatically shell-escaped … to prevent injection". Titles, comments and descriptions can come from collaborators, from sync pulls (Jira/GitHub) or from agents, so this gives arbitrary command execution on the machine running automation.
+     Suggested fix: Do not interpolate into shell strings. Pass values only as environment variables (already set as LOTAR_TICKET_*), or require the structured `command`+`args` form for templated values, or reject templates inside quotes at validation time. Fix the docs to recommend `"$LOTAR_TICKET_TITLE"`.
+     Verifier note: Wider than reported: a double-quoted context is also injectable. A rule `run: "echo \"New: ${{ticket.title}}\" >> notify2.log"` with title 'Bye $(touch INJECTED2)' created INJECTED2, because single quotes are literal inside double quotes while $() still expands. Only an unquoted placeholder is safe.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:34.194052+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

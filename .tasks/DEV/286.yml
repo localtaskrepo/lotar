@@ -1,0 +1,44 @@
+title: 'Sync robustness: Jira keys auto-linked as local tasks, no rate-limit handling, dropped GitHub fields'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:38.223672+00:00
+modified: 2026-10-31T22:06:38.286282+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Pull mention auto-linking treats Jira keys in remote descriptions as local task IDs and links unrelated tasks (review ref sync-scan-git#6)
+     Where: src/services/relationships.rs:2246-2330, src/services/task_service.rs:381, src/services/sync_service/pull.rs:456-470, src/services/sync_service/pull.rs:466-494
+     Evidence: Pull creates and updates tasks through `TaskService::create/update`, which run `link_mentions` (`auto.link_mentions`, default true). Local IDs are allocated sequentially and do not match Jira keys, but the prefixes often match. When no project is set, pull even falls back to the Jira project key as the local prefix.
+
+  Repro (scratch sy3): Jira issues ENG-101..105, each with the description 'See upstream ENG-2 for context'. After `lotar pull jira --project ENG`, local ENG-2 (which is Jira ENG-102) has `related: [ENG-3, ENG-4, ENG-5]`, and ENG-4 has `related: [ENG-2]`.
+     Impact: Pulls silently create wrong relationships, with matching history entries, between unrelated tasks. This corrupts the relationship graph users rely on.
+     Suggested fix: Skip mention linking for sync-originated writes, or translate remote keys to local IDs through the reference index before linking.
+
+  2. [low] Sync has no rate-limit or Retry-After handling, and the GitHub filter path makes up to 1000 extra issue fetches per pull (review ref sync-scan-git#16)
+     Where: src/services/sync_service/client.rs:180-206, src/services/sync_service/github.rs:104-162
+     Evidence: `send_json_request` turns every status of 400 or above into a hard error with no retry or backoff, and does not read `Retry-After` or `X-RateLimit-*`. `github_search_issues` pages the Search API (30 requests per minute) and then calls `github_fetch_issue` once per result (up to 1000 core calls). A 403/429 during pagination aborts the whole pull. Code reading only; not exercised against GitHub.
+     Impact: Large repos or filters hit primary or secondary rate limits. Runs fail midway with raw HTTP errors and have to be retried by hand.
+     Suggested fix: Retry 429 and secondary-limit 403 with bounded backoff, honouring Retry-After and X-RateLimit-Reset. Skip per-issue refetches unless a mapped field is missing from the search payload.
+     Verifier note: A failed per-issue fetch does not abort: it falls back to the search payload with a warning. Only search-page and other request failures abort. Search is capped at 10 pages, so the 30/min search limit is unlikely to be the trigger. Code reading only.
+
+  3. [low] Sync guide says GitHub `state_reason` can be set, but GitHub payloads drop it and any other unknown mapped field without a warning (review ref sync-scan-git#18)
+     Where: docs/developers/sync.md:188, src/services/sync_service/payloads.rs:266-283, src/services/sync_service/payloads.rs:6-14
+     Evidence: `GithubIssuePayload` has only title, body, state, labels and assignees. `apply_github_field` ends with `_ => {}`, so mappings such as `state_reason` or `milestone` are silently ignored on push. The developer sync guide says '`state_reason` can be set when closing'.
+     Impact: Users configure mappings that do nothing and get no feedback.
+     Suggested fix: Support state_reason (and milestone, if wanted), or warn when a GitHub mapping targets an unsupported field (also in `sync check`). Correct the doc.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:38.286282+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

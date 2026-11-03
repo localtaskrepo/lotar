@@ -1,0 +1,61 @@
+title: Config resolution drops default-valued overrides, fails open on bad config, and docs misstate precedence
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:35.106934+00:00
+modified: 2026-10-31T22:06:35.166522+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Config overrides that set a value back to its built-in default are silently dropped at the CLI `--config`, env and home layers (review ref storage-core#1)
+     Where: src/config/resolution.rs:493, src/config/resolution.rs:544, src/config/resolution.rs:571, src/config/resolution.rs:677, src/config/resolution.rs:204, docs/help/precedence.md:7
+     Evidence: `merge_global_config` and `overlay_global_into_resolved` only apply a field when `override != GlobalConfig::default()`. `apply_cli_overrides` (resolution.rs:204) uses the same overlay. Only `server_port` and `issue_done_states` were fixed to work by presence. Repro in a temp repo with global `.tasks/config.yml` = `default: {project: ENV, priority: High}` and `auto: {set_reporter: false}`:
+  `lotar --config auto.set_reporter=true --config default.priority=Medium add "cli override"` → `Priority: High` and no reporter written.
+  `LOTAR_DEFAULT_PRIORITY=Medium lotar add ...` → `Priority: High`.
+  `LOTAR_AUTO_SET_REPORTER=true lotar add ...` → no reporter, and `config show --explain` reports `set-reporter: false # (global)`.
+  The control works: with no global override, `LOTAR_AUTO_SET_REPORTER=false` is honored. This affects every boolean `auto.*` toggle, the default priority/status, `strict_member…
+     Impact: The documented precedence (CLI > project > env > home > global) is false whenever the higher layer asks for the default value. For example, a user cannot turn reporter auto-fill, identity detection or strict members back on from env or CLI once the workspace config turned it off. `--explain` hides this by attributing the value to the global layer.
+     Suggested fix: Apply overrides by presence, not by comparison with defaults: deserialize each layer into Option-wrapped fields (or track the set keys from the env snapshot, the `--config` pairs and the parsed YAML), then overlay present fields. Add tests that override a non-default global value back to the default for each layer.
+     Verifier note: Real precedence bug, but it only occurs when a higher layer sets a value back to the built-in default, and editing the lower config file works around it. Medium rather than high.
+
+  2. [medium] An unparseable global or project config makes REST and MCP writes validate against built-in defaults (fails open) (review ref storage-core#8)
+     Where: src/services/task_service.rs:2671, src/services/task_service.rs:2676, src/config/resolution.rs:433, src/config/resolution.rs:887, src/services/task_service.rs:1074
+     Evidence: `resolve_config_for_project` turns any config error other than PolicyError into `ResolvedConfig::from_global(GlobalConfig::default())`, which ignores even valid layers. `load_merged_global_chain` and `get_project_config` also skip a global config that fails to parse (`if let Ok(...)`). `update_composed` and `create` validate with that config. Repro via `lotar mcp`: global `.tasks/config.yml` with a YAML syntax error inside `issue: states: [Open, Closed` → `task_update {id: ENV-2, patch: {status: Done}}` succeeds and writes `status: Done`. Second repro: valid global with `auto.populate_members: false` and a broken project config that restricts states to Open/Closed → `task_update ENV-1 status InProgress` succeeds and writes `status: InProgress`. The CLI rejects the same edits with a parse error.
+     Impact: A typo in a config file silently turns off status/type/priority validation and project policy for agents and the web UI, and they write values the team's workflow does not allow. The CLI and REST/MCP surfaces behave differently.
+     Suggested fix: Return the config error from mutation paths: let `create` and `update_composed` fail closed, as the CLI and `restore_config` already do. Keep the lenient fallback only for read-only DTO projections, and surface the error there as a warning.
+     Verifier note: The finding says the CLI rejects these edits; that is only partly true. With a broken global config, the CLI also fails open (`lotar status ENV-1 Done` succeeded, while with the valid config it was rejected with 'not enabled'). With a broken project config, the CLI rejects the edit with a parse error. MCP also rejects it while auto.populate_member…
+
+  3. [medium] `lotar --help` (main.md) and scan.md state the wrong configuration precedence; environment variables do not beat project config (review ref docs#2)
+     Where: docs/help/main.md:81, docs/help/scan.md:107, docs/help/precedence.md:8-15, docs/help/config-reference.md:6
+     Evidence: main.md:81, which `lotar --help` prints, says: "CLI flag → environment → home → project → global → defaults". precedence.md, config-reference.md, environment.md and cli-tour.md all say CLI → project → env → home → global. Verified project beats env: with `.tasks/WS/config.yml` containing `default: {priority: High}`, `LOTAR_DEFAULT_PRIORITY=Low lotar add "prec test" --project WS` created a High task, and `config show --explain` printed `priority: High # (project)`. scan.md:107 says `LOTAR_SCAN_SIGNAL_WORDS` "beats any config file". With project `scan.signal_words: [FOO]` and `LOTAR_SCAN_SIGNAL_WORDS=BAR`, `lotar scan src --dry-run` matched only the FOO comment, and explain shows `signal-words: # (project)`.
+     Impact: The first help screen every user sees teaches the wrong override order. People who set env vars in CI expecting them to win over project config get silently different behavior.
+     Suggested fix: Change main.md:81 to "CLI flag → project → environment → home → global → defaults". Change scan.md:107 to say the env var overrides home/global config but not project config.
+     Verifier note: I did not reproduce the scan signal-words case myself. The precedence chain makes it consistent with the priority case.
+
+  4. [medium] Docs say the Windows home config can be %APPDATA%/lotar/config.yml, but config values are only read from ~/.lotar (review ref docs#4)
+     Where: src/config/persistence.rs:56-66, src/workspace.rs:219-235, docs/help/precedence.md:12, docs/help/cli-tour.md:116
+     Evidence: precedence.md:12 and cli-tour.md:116 describe the home layer as "`~/.lotar` (or `%APPDATA%/lotar/config.yml`)". persistence::load_home_config, which resolution.rs:314/339/443/894, identity detection and config show use, always reads `dirs::home_dir().join(".lotar")`. Only Workspace::get_default_home_config_path (workspace.rs:224-229, tasks_folder discovery) prefers `%APPDATA%\lotar\config.yml` on Windows. Not run on Windows; this is from reading the code.
+     Impact: A Windows user who follows the docs and puts default_reporter, ui.theme or auth_profiles (sync credentials) in %APPDATA%\lotar\config.yml finds them ignored for everything except tasks_folder. The two code paths disagree.
+     Suggested fix: Choose one home path per platform and use it in both persistence.rs and workspace.rs, or remove the %APPDATA% alternative from the docs and from workspace.rs.
+     Verifier note: Established from the code only; not run on Windows. Only Windows users are affected, so low-to-medium.
+
+  5. [low] Windows: config values are read from %USERPROFILE%\.lotar but `tasks_folder` from %APPDATA%\lotar\config.yml, while docs offer either file (review ref storage-core#13)
+     Where: src/workspace.rs:220, src/config/persistence.rs:64, src/config/resolution.rs:41, docs/help/precedence.md:12
+     Evidence: `get_default_home_config_path` returns `dirs::config_dir()/lotar/config.yml` on Windows, and that path is only used for the `tasks_folder` lookup. `persistence::load_home_config`, the config cache fingerprint and the server-port probe all hard-code `home_dir/.lotar`. Docs: "Home config (`~/.lotar` or `%APPDATA%/lotar/config.yml`)". The minimal `tasks_folder:` line parser also splits on ':', so `C:\work` becomes `C`, and it keeps trailing `# comments`. Verified by code reading only; no Windows host available.
+     Impact: Windows users who put their home config in %APPDATA% as documented get every setting except `tasks_folder` ignored, and the reverse with ~/.lotar.
+     Suggested fix: Pick one home-config path helper and use it everywhere (persistence, fingerprint, workspace). Parse `tasks_folder` with the real YAML loader.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:35.166522+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

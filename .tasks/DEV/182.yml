@@ -4,7 +4,10 @@ priority: Low
 type: Chore
 reporter: mallox
 created: 2026-10-25T02:35:38.565868+00:00
-modified: 2026-10-25T23:15:06.065529+00:00
+modified: 2026-10-31T22:06:35.587009+00:00
+relationships:
+  related:
+  - DEV-268
 comments:
 - date: 2026-10-25T18:40:49.423860+00:00
   text: |-
@@ -39,3 +42,9 @@ history:
   - field: priority
     old: Medium
     new: Low
+- at: 2026-10-31T22:06:35.587009+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-268"]}'

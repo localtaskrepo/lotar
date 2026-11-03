@@ -1,0 +1,38 @@
+title: MCP tool restrictions (LOTAR_MCP_TOOLS, job tool set) can be bypassed
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:36.874020+00:00
+modified: 2026-10-31T22:06:36.936817+00:00
+relationships:
+  related:
+  - DEV-253
+  - TEST-1
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] LOTAR_MCP_TOOLS allow-list is bypassed by direct method calls (e.g. `task/delete`, `agent/run`) and `schema/discover` (review ref mcp-agents-automation#1)
+     Where: src/mcp/server.rs:430-458, src/mcp/server.rs:520-529, src/mcp/server.rs:534-547
+     Evidence: Only `tools/list` and `handle_tools_call` check `tool_allowed()`. The fallback `_ => registry::find_tool_by_method(&method_key)` in `route_request` dispatches any registered tool by its slash or snake method name with no allow-list check, and `schema/discover` returns all 46 tools. Repro with `LOTAR_MCP_TOOLS=task_get,task_comment_add`, after the handshake: `tools/call {name:task_delete}` → `-32602 Tool 'task_delete' is not available in this session`, but `{"method":"task/delete","params":{"id":"TEST-1"}}` → `{"deleted":true,…}`, and TEST-1.yml gained `deleted_at`. `schema/discover` → `toolCount: 46`. Also inconsistent: `tools/call` with the slash alias `task/get` is refused even when `task_get` is allowed, because the raw name is compared.
+     Impact: docs/help/mcp.md:19 says "other calls are refused", and agent.md:169 says an agent "can't start other agents, delete tasks or sync through it". Any client or agent that can write raw JSON-RPC to the server can delete tasks, sync, change config or start agent jobs despite the restriction.
+     Suggested fix: Apply `tool_allowed(spec.name)` inside `registry::invoke_tool`, or in the direct-method branch, and normalize aliases to the canonical name first. Filter `schema/discover` output the same way as `tools/list`. Add a test that calls a disallowed tool through its direct method.
+     Verifier note: Severity lowered to medium. MCP hosts (Claude/Copilot/Codex) only let the model call listed tools through tools/call, so a model can't send raw methods. Agent jobs also have shell access with LOTAR_BIN on PATH and can run the lotar CLI directly. The allow-list is not a hard security boundary, but the env var's documented contract ('other calls are…
+
+  2. [low] The restricted job MCP tool set can still start agent jobs via `task_update` assignee, contradicting the docs (review ref mcp-agents-automation#11)
+     Where: src/services/agent_runner.rs:313-324, src/services/automation_service.rs:306-314, docs/help/agent.md:169
+     Evidence: `task_update` is in LOTAR_MCP_JOB_TOOLS, and assigning a ticket to an agent profile implicitly queues a job. Repro (ws4) with the exact job allow-list `LOTAR_MCP_TOOLS=task_get,task_list,task_update,task_comment_add,task_reference_add,relationship_graph,config_show,whoami`: `tools/call task_update {id:TEST-2, patch:{assignee:"@slow"}}` → `lotar … agent worker` and `lotar-agent-wrapper --ticket-id TEST-2` are spawned and the job runs. It also fires any automation `run` commands on that update.
+     Impact: docs/help/agent.md:169 states "An agent can't start other agents … through it". An agent can spawn further agents, possibly with broader `permissions: full` profiles, on any ticket.
+     Suggested fix: Mark updates made through the job MCP (e.g. LOTAR_JOB_ID present, or a dedicated flag) so they do not trigger implicit agent queueing, or restrict assignee changes to non-agent values there. Otherwise, correct the docs.
+     Verifier note: Lowered to low. Agent jobs get shell access with LOTAR_BIN on PATH, and the built-in instructions use `lotar assignee`, so the agent can start other agents through the CLI regardless. Agent-to-agent hand-off is also a designed workflow. The concrete defect is the inaccurate docs claim, plus no way to stop the restricted MCP from chaining jobs.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:36.936817+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253","TEST-1"]}'

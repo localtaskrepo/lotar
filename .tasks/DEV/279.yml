@@ -1,0 +1,77 @@
+title: 'Agent jobs across processes: detection, cancel/status, orphaned MCP jobs, queue drops, Windows cancel'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:37.172805+00:00
+modified: 2026-10-31T22:06:37.238522+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Running-job detection never reads process command lines, so the guards in `status`, `assignee` and `worktree cleanup` never fire (review ref mcp-agents-automation#5)
+     Where: src/cli/handlers/agent.rs:893-921, src/cli/handlers/status.rs:145, src/cli/handlers/assignee.rs:167, src/cli/handlers/agent.rs:650-655, src/services/agent_job_service.rs:782-805
+     Evidence: `list_running_jobs` calls `system.refresh_processes(ProcessesToUpdate::All, true)`. In sysinfo 0.39.6 that refreshes only memory/cpu/disk/exe/tasks (sysinfo src/common/system.rs:309-323), not `cmd`, so `process.cmd()` is empty and `parse_wrapper_metadata` gets nothing. Repro (job running via `lotar agent run … --wait &`): `lotar agent list-running --format json` → `{"jobs":[{"job_id":null,"pid":46380,"runner":null,"ticket_id":null}]}`. `lotar status TEST-1 InProgress` succeeds although the code means to refuse ("Ticket has an active agent job… Cancel it first").
+     Impact: `lotar agent worktree cleanup --all` can remove the worktree of a job running in the server or worker: a fresh worktree is clean and its branch is an ancestor of HEAD, so `check_worktree_cleanup` passes. Status/assignee changes can then disrupt a live job, and list-running shows only pids.
+     Suggested fix: Use `refresh_processes_specifics(..., ProcessRefreshKind::nothing().with_cmd(UpdateKind::Always).with_exe(...))` in `list_running_jobs`. Add a test that asserts the job_id/ticket parsed from a real spawned wrapper.
+
+  2. [medium] Agent jobs started via MCP `agent_run` are orphaned when the MCP session ends or autoreload fires: no final status, no automation, no cleanup (review ref mcp-agents-automation#6)
+     Where: src/mcp/server.rs:621-639, src/mcp/server.rs:655-662, src/services/agent_job_service.rs:398-412, src/services/agent_job_service.rs:1780-1792
+     Evidence: Jobs live in the MCP process's in-memory registry, and the runner runs in its own process group (`setpgid`). On stdin EOF the read loop breaks and the process exits. The autoreload thread also calls `process::exit(0)` when the binary changes. Repro (ws4): pipe initialize + `agent_run {ticket_id:TEST-1, agent:slow}` and close stdin. The MCP process exits, `ps` still shows `lotar-agent-wrapper … sh -c sleep 6`, the work finishes (AGENT_DONE written), and the job log holds only header + `agent_job_started`. `lotar agent list-jobs` shows `status unknown`, and no job_completed/job_failed automation ran.
+     Impact: MCP hosts restart servers routinely (window reload, `brew upgrade`, rebuilds). Agents keep editing files unsupervised, tickets stay InProgress or assigned to the agent, the lifecycle automation in docs/help/automation.md never fires, and worktrees are never cleaned.
+     Suggested fix: Delegate MCP `agent_run` to the persistent worker queue or a running server, the same way assignment-triggered jobs go in standalone mode. Or, on shutdown, cancel and finalize in-process jobs (terminate the group, write the cancelled status, fire job_cancelled) before exiting, including in the autoreload path.
+
+  3. [medium] `lotar agent cancel`/`status` only see jobs in the calling process; jobs run by `serve` or the queue worker cannot be cancelled from the CLI (review ref mcp-agents-automation#7)
+     Where: src/cli/handlers/agent.rs:238-250, src/services/agent_job_service.rs:469-511, src/services/agent_queue_service.rs:186-243
+     Evidence: `cancel_job` looks the id up in the process-local JOB_REGISTRY. Repro: start a job in another process (`lotar agent run TEST-1 go --agent slow --wait &`), then `lotar agent cancel job-20261031T213736.212Z-1` → `⚠️ Job not found`, and the job ran to completion. `lotar agent status` for the same id prints `unknown` (from the log file). `lotar agent queue` likewise reports `Running: 0` from the CLI's own empty registry while the worker runs jobs. docs/help/agent.md:9-10 list `agent cancel <JOB_ID>` without this limitation.
+     Impact: In standalone mode, where assignment-triggered jobs run in the detached worker, users have no CLI way to stop a runaway agent short of killing processes by hand.
+     Suggested fix: When the id is not in the local registry, find the wrapper process by `--job-id` (after fixing the cmd refresh) and terminate its process group, then record the cancelled status in the log. Or route cancel/status through the worker or server over IPC/REST. Document the limitation until then.
+     Verifier note: Jobs started by `lotar serve` can still be cancelled through REST/the web UI. The gap is the CLI path, and worker-queue or other-process jobs have no cancel path at all.
+
+  4. [medium] A queued agent job is dropped after three rapid retries when the ticket's previous job is still running (review ref mcp-agents-automation#8)
+     Where: src/services/agent_queue_service.rs:206-222, src/services/agent_queue_service.rs:259-275, src/services/automation_service.rs:2217-2220
+     Evidence: In a CLI process, `maybe_queue_agent_on_assignment` checks `has_active_job` against its own empty registry, so it always enqueues. The worker's `start_entry` then fails with "already has an active job" and `requeue_entry` puts the entry back with attempts+1. The next 300 ms poll retries, so after about 1 s (attempts > 3) the entry is discarded. The error goes to the worker's stdout/stderr, which are /dev/null. Repro (ws4): `lotar assignee TEST-3 @slow` (6 s job), then `lotar assignee TEST-3 @slowb` 1.5 s later; 2 s later `lotar agent queue` → `No pending entries in queue.` and slowb's output file is never created. Separately, `run_worker` decides to exit after `pending_count()==0` but holds the lock until the final drain, so an `enqueue` in that window sees the lock held, spawns no worker, and the entry is stranded until the next enqueue (code reading, not reproduced).
+     Impact: Agent hand-offs, such as reassigning to the next phase while a job is wrapping up, are silently lost and the ticket stays assigned to an agent that never runs.
+     Suggested fix: Do not count 'ticket busy' as a failed attempt: leave the entry pending until the active job ends, or back off by time rather than a few polls. Re-check the queue after releasing the worker lock (or loop once more after unlock) to close the lost-wakeup window.
+     Verifier note: The secondary lost-wakeup claim holds in code, but the window is tiny: the worker breaks only when running==0, so the final drain exits at once and the window lasts from the pending_count check until lock release. It is theoretical, not reproduced. docs/help/agent.md:319 documents the three-retry bound, but treating 'ticket busy' as a start failur…
+
+  5. [medium] On Windows, cancelling a job kills only the wrapper; the agent CLI keeps running (review ref mcp-agents-automation#12)
+     Where: src/services/agent_job_service.rs:760-780, src/bin/lotar_agent_wrapper.rs:262-290
+     Evidence: `terminate_child` signals the process group and descendants only under `#[cfg(unix)]`; elsewhere it calls `child.kill()` on the direct child, which is `lotar-agent-wrapper`. The wrapper spawns the real CLI (node/claude/codex) as a separate process without a Job Object, so TerminateProcess on the wrapper leaves the grandchild running. Its inherited stdout keeps the pipe open, so `read_job_output` would also hit the 5 s drain timeout. Windows is a release/CI target (.github/workflows/ci.yml:383 windows_checks). Not executed: no Windows host available.
+     Impact: Windows users who cancel a job, or hit cancel-all, get a 'cancelled' status while the agent keeps editing the worktree and spending tokens.
+     Suggested fix: Put the wrapper (or the runner directly) in a Windows Job Object with KILL_ON_JOB_CLOSE and terminate the job on cancel. Alternatively, have the wrapper join its child to a job object and forward termination.
+     Verifier note: Confirmed from code alone; the runtime behavior was not observed.
+
+  6. [medium] No distribution channel ships lotar-agent-wrapper, yet list-running and the cross-process active-job guards depend on it (review ref docs#9)
+     Where: src/services/agent_job_service.rs:721-746, src/cli/handlers/agent.rs:886-900, src/cli/handlers/status.rs:145, src/cli/handlers/assignee.rs:167, src/cli/handlers/agent.rs:653, src/cli/handlers/agent.rs:806, docs/help/agent.md:171-175, docs/help/main.md:40, .github/workflows/release.yml:217-235
+     Evidence: Cargo.toml defines the `lotar-agent-wrapper` bin, but release.yml packages only `${{ matrix.bin }}` (lotar / lotar.exe). The Dockerfile copies only lotar, and the npm, Homebrew, Scoop and install-script channels repackage those archives. running_job_for_ticket() finds jobs by scanning for the wrapper process, and AgentJobService::has_active_job only checks the in-process registry (agent_job_service.rs:458-462). So in any packaged install, these guards cannot see a job started by another process (for example `lotar serve`): the CLI status/assignee locks ("Ticket has an active agent job. Cancel it first"), worktree list's has_active_job, and `agent worktree cleanup`'s active-job skip. agent.md says only that list-running "will show no results". main.md lists `lotar agent list-running` as an everyday command. Not reproduced end to end; inferred from the code and packaging.
+     Impact: `list-running` never works in official installs. A CLI cleanup or status change can interfere with a job the server is running, despite the documented safeguards.
+     Suggested fix: Ship the wrapper in the archives and packages, or track active jobs in a file-backed registry (the queue dir or job logs) that every process can check. Until then, document that these guards need the wrapper and drop list-running from the main overview.
+     Verifier note: Inferred from code and packaging, not reproduced end to end. Worktree cleanup also requires the ticket to be Done, which reduces the risk on that path.
+
+  7. [low] `max_iterations` loop protection counts in-process terminal jobs forever, so it is ineffective across processes and permanent in a long-running server (review ref mcp-agents-automation#13)
+     Where: src/services/automation_service.rs:2224-2256, src/services/automation_service.rs:2287-2295, src/services/agent_job_service.rs:136-142
+     Evidence: `count_terminal_jobs_for_ticket` scans `AgentJobService::list_jobs()`, the process-local registry, which is never pruned (no `jobs.remove`/`retain` in services). In a CLI process the count is always 0. In the worker it resets whenever the worker exits. In `lotar serve` it only grows, so after 10 completed/failed jobs on a ticket over the server's lifetime, every later assignment, human ones included, is silently refused with an `automation-limit-reached` tag. The registry also keeps every job with up to 200 events in memory for the server's lifetime (code reading).
+     Impact: The protection the docs describe (docs/help/automation.md Cooldown) either never applies or blocks legitimate work indefinitely, and the server's memory grows with job history.
+     Suggested fix: Count iterations per automation chain, e.g. a counter carried through job_completed hand-offs that resets on a human edit, persisted alongside the job logs. Prune finished jobs from the in-memory registry after a retention window.
+     Verifier note: Low is right: blocking needs 10 terminal jobs on one ticket within a single server lifetime. Memory growth is bounded per job but unbounded in job count.
+
+  8. [low] `agent_logs_dir` pointing at an existing folder overwrites its .gitignore with `*` and deletes its oldest *.jsonl files (review ref mcp-agents-automation#17)
+     Where: src/services/agent_log_service.rs:93-118, src/services/agent_log_service.rs:122-145
+     Evidence: `prepare_logs_dir` runs on whatever folder `agent_logs_dir` names (relative to the workspace root or absolute). It writes `.gitignore` containing `*` when none exists and removes the oldest `*.jsonl` beyond 500 regardless of who wrote them. With `agent_logs_dir: .` and no root .gitignore, the whole repository becomes git-ignored. The setting can come from repo-tracked config. Code reading only, not executed.
+     Impact: An unusual but legal config can hide a repository's files from git or delete unrelated JSONL data.
+     Suggested fix: Always write logs into a LoTaR-owned subfolder (e.g. `<configured>/lotar-agent-logs`), or only prune files whose header line identifies them as LoTaR job logs, and refuse the workspace root.
+     Verifier note: The setting key is agent.logs_dir (env LOTAR_AGENT_LOGS_DIR). docs/help/agent.md:333 and config-reference.md:32 document that the folder gets a .gitignore, so the risk is an unguarded misconfiguration, not undocumented behavior. Already-tracked files stay tracked.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:37.238522+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

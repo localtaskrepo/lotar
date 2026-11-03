@@ -5,10 +5,12 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-09-06T11:10:31.496121+00:00
-modified: 2026-10-06T18:06:32.022909+00:00
+modified: 2026-10-31T22:06:36.775574+00:00
 relationships:
   blocks:
   - DEV-63
+  related:
+  - DEV-276
   parent: DEV-53
 comments:
 - date: 2026-10-06T16:47:31.480197+00:00
@@ -54,3 +56,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-31T22:06:36.775574+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-63"],"parent":"DEV-53"}'
+    new: '{"blocks":["DEV-63"],"related":["DEV-276"],"parent":"DEV-53"}'

@@ -1,11 +1,11 @@
 title: Add additional distribution channels
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-31T01:47:08.812046+00:00
+modified: 2026-10-31T02:12:28.720437+00:00
 relationships:
   related:
   - DEV-251
@@ -47,6 +47,12 @@ comments:
   text: 'Tap repo localtaskrepo/homebrew-lotar README updated and pushed (83adcda, with user permission): adds brew trust localtaskrepo/lotar to usage, lists platforms (lotar macOS + Linux, autospec macOS), and says formulae are rewritten by each project''s release workflow (edit release.yml, not Formula/). Formula files untouched.'
 - date: 2026-10-31T01:47:08.812046+00:00
   text: 'Homebrew verify on 1570edb: macOS Intel and Apple Silicon pass (install, brew test, version, arch). Linux x64 installs, passes brew test and version, but the arch check failed: GNU file reports the Homebrew bin symlink itself (''symbolic link to ../Cellar/lotar/0.11.2/bin/lotar''), macOS file follows links. Fixed with file -L (checked GNU file in debian: x86-64 static-pie; macOS file -L still prints Mach-O arches). actionlint clean. Next: push, rerun homebrew-verify, run install-verify with v0.11.2.'
+- date: 2026-10-31T02:12:28.533326+00:00
+  text: |-
+    Outcome: LoTaR now installs on Linux through Homebrew (static musl builds, x64/arm64), install scripts (site/install.sh for Linux/macOS, site/install.ps1 for Windows), signed .deb/.rpm release assets (x64/arm64), and npm (@localtaskrepo/lotar plus five @localtaskrepo/lotar-<platform> packages, trusted publishing with provenance). Homebrew and Scoop stay in their own repos; nothing merged into main. Fixed along the way: broken formula test block (Python f-string), ISC -> MIT license metadata, retired macos-13 runner, CRLF Windows checksum in publish-npm, Windows CI skip for the Unix-only packaging test, Homebrew 6+ tap trust (docs, verify workflow, tap README 83adcda), file -L in the arch check.
+    Evidence: v0.11.2 release run 41154362483 all jobs green (npm 0.11.2 published via OIDC with provenance attestations; 4 deb/rpm assets). Verify Install Scripts and Packages run 41155206177: 16/16 jobs passed (install.sh on Ubuntu x64/arm64, Alpine, macOS arm64/x64; install.ps1 under pwsh and PowerShell 5.1; deb/rpm in Debian/Fedora x64/arm64; npm on Linux x64/arm64, macOS x2, Windows). Verify Homebrew Install run 41158653063 on 1fa968b: macOS Intel, Apple Silicon and Linux x64 passed. Commits dc3d047, a0dae04, 6d74032, f85e18c, f453597, 1570edb, 1fa968b (all pushed).
+    Remaining: none in scope. Later candidates if wanted: winget, AUR lotar-bin, native Windows ARM64 build, crates.io/binstall (low priority). npm trust needs no rerun; a new platform package would need one manual publish plus npm trust.
+    Guidance: no durable instruction finding.
 description: |-
   Right now we support homebrew and scoop as well as direct downloads from the release page.
   Investigate what other platforms make sense to distribute the built binaries with, ideally, so that linux also is supported.
@@ -127,3 +133,13 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-31T02:12:28.533326+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T02:12:28.720437+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

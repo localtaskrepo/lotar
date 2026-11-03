@@ -5,10 +5,11 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-09-06T11:10:31.930814+00:00
-modified: 2026-10-13T21:11:10.110875+00:00
+modified: 2026-10-31T22:06:39.357865+00:00
 relationships:
   related:
   - DEV-32
+  - DEV-293
   parent: DEV-53
 comments:
 - date: 2026-10-13T20:03:19.759441+00:00
@@ -60,3 +61,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-10-31T22:06:39.357865+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-32"],"parent":"DEV-53"}'
+    new: '{"related":["DEV-32","DEV-293"],"parent":"DEV-53"}'

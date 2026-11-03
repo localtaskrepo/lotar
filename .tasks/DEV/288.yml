@@ -1,0 +1,74 @@
+title: 'Web UI: unsaved automation edits, timezone dates, keyboard and screen-reader gaps, preferences reset'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:38.530232+00:00
+modified: 2026-10-31T22:06:38.595800+00:00
+relationships:
+  related:
+  - DEV-253
+  - DEV-57
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Sprints table shows due dates one day early for users west of UTC (review ref frontend#4)
+     Where: view/components/SprintTaskCell.vue:121, view/components/SprintTaskCell.vue:68
+     Evidence: formatDue uses `new Date(value).toLocaleDateString()`. For a date-only `due_date` like '2026-11-05', that parses as UTC midnight. Every other surface uses parseTaskDate/formatTaskDate, which parse local midnight: TaskTable via useTaskTableState.fmtDate, TaskHoverCardBody, DependencyCardDetails and Calendar.
+
+  Repro: DEMO-1 has due 2026-11-05 and is in sprint #1. Loading /sprints in Playwright gave due cells `["11/5/2026"]` with timezoneId Europe/Berlin and `["11/4/2026"]` with America/Los_Angeles. `TZ=America/Los_Angeles node -e 'new Date("2026-11-05").toLocaleDateString("en-US")'` → 11/4/2026.
+
+  Related: the CSV export filename (TasksList.vue:890) also uses the UTC date via toISOString().slice(0,10).
+     Impact: Users in the Americas see every due date on the Sprints page one day earlier than on Tasks, Board and Calendar. That leads to wrong planning decisions.
+     Suggested fix: Use formatTaskDate(value) from utils/date in SprintTaskCell.formatDue. Use toDateKey(new Date()) for the export filename.
+     Verifier note: None.
+
+  2. [medium] Board columns block Enter on every control inside them (Add task, Show more, stacked-lane add menu) (review ref frontend#5)
+     Where: view/pages/Board.vue:349, view/pages/Board.vue:415, view/pages/Board.vue:1137
+     Evidence: The column `<div>` has `@keydown.enter.prevent="!lane.stacked && onDrop(lane.columns[0]!)"` without `.self`. Vue's `.prevent` runs before the expression, so every Enter that bubbles out of the column has its default cancelled, including Enter on buttons. That cancels the button's Enter activation. The handler itself does nothing from the keyboard: onDrop needs `draggingId`, which only a mouse dragstart sets.
+
+  Playwright repro on /boards?project=DEMO: focus the 'Add task in Todo' button and press Enter. Panel/dialog count stays 0. Press Space on the same button and the panel opens (count 1). The same applies to the 'Show N more…' button and the `<summary>` of stacked-lane add menus.
+     Impact: Keyboard users can't create tasks from a board column or expand truncated columns with Enter, the standard key for activating a button. The fake 'keyboard drop' doesn't give a keyboard way to move cards either.
+     Suggested fix: Remove the column-level Enter handler, or add `.self` to it. If keyboard moves are wanted, build an explicit 'move to column' action, for example on the card menu.
+     Verifier note: I only checked the Add-task button. 'Show more' and the stacked-lane summary are inferred from the same handler. Space still works, so there is a workaround.
+
+  3. [medium] Automations page silently discards unsaved rule edits on project switch, Reload, or leaving the page (review ref frontend#6)
+     Where: view/pages/AutomationView.vue:282, view/pages/AutomationView.vue:440, view/pages/AutomationView.vue:4, view/pages/ConfigView.vue:1176
+     Evidence: `watch(project, () => void refresh(), { flush: 'sync' })` and the header Reload button (enabled whenever not loading or saving) both call refresh(). refresh() overwrites scopeYaml and baselineYaml with the server copy, with no check of rulesDirty. The page has no onBeforeRouteLeave and no beforeunload guard. ConfigView does guard both: confirmDiscard at 1176 and warnBeforeUnload at 1183. Rule edits made through AutomationRuleDialog land in scopeYaml and need a separate 'Save rules' click, so pending work there is common. Verified from code only, not driven in a browser.
+     Impact: Users who build or edit several rules in the visual editor and then change the scope selector, press Reload, or click another tab lose everything with no prompt.
+     Suggested fix: Reuse ConfigView's confirmDiscard pattern: confirm before a project change or Reload when rulesDirty is true, and add onBeforeRouteLeave plus a beforeunload warning.
+     Verifier note: None.
+
+  4. [low] Activity drawer is marked aria-modal but has no Escape close, no initial focus and no focus trap (review ref frontend#7)
+     Where: view/components/ActivityDrawer.vue:2, view/components/ActivityDrawer.vue:3
+     Evidence: The drawer is a hand-rolled `<div class=backdrop>` holding `role=dialog aria-modal=true`, not UiModal, and has no keydown or focus handling.
+
+  Playwright: click 'Activity'. activeElement is still the nav 'Activity' button. Press Escape and the drawer stays open. Press Shift+Tab three times and focus lands on the nav link 'Scan' behind the backdrop.
+     Impact: Keyboard and screen-reader users are told it is a modal, but focus stays behind it and it can't be dismissed with Escape. Every other dialog (UiModal) supports both.
+     Suggested fix: Render the drawer through UiModal (or its focus and Escape stack). Otherwise add Escape-to-close, initial focus on the close button, Tab containment and focus return.
+     Verifier note: I lowered severity to low. It is a real accessibility gap, but there is a visible close button and a backdrop click, and no data is at risk.
+
+  5. [low] Calendar's 'N more tickets' overflow cannot be reached by keyboard (review ref frontend#8)
+     Where: view/pages/Calendar.vue:194
+     Evidence: `<li v-if="hiddenCountFor(cell) > 0" class="muted more" @click="openDay(cell.date)">` has no tabindex, no role and no key handler. The task chips next to it do have role=button, tabindex=0 and Enter/Space handlers (lines 167-174). openDay (the day dialog) is the only way to see the hidden tasks of a busy day. Verified from code only.
+     Impact: Keyboard and screen-reader users can't see tasks past a cell's capacity, which can be as few as 1-4 at small heights.
+     Suggested fix: Make it a `<button type="button">`, or add role=button, tabindex=0 and Enter/Space handlers like the chips.
+     Verifier note: Keyboard users can still open each visible task, and those tasks are reachable from other pages (Tasks list filtered by due date), so the impact is limited to the Calendar view.
+
+  6. [low] Preferences 'Reset saved columns and sorting' misses the Tasks page sort and some field and layout keys (review ref frontend#9)
+     Where: view/pages/Preferences.vue:454, view/pages/TasksList.vue:593, view/pages/Dependencies.vue:369
+     Evidence: The prefix list (Preferences.vue:455-465) covers `lotar.taskTable.sort`, but since DEV-57 the Tasks page stores its sort under `lotar.tasks.sort[::<project>]` (TasksList.vue:593-610). It also skips `lotar.dependencyHoverFields` (Dependencies.vue:369), even though the help text promises board/calendar/field visibility 'for all projects'. The action gives no confirmation toast either. Verified from code and a grep of storage keys.
+     Impact: After 'reset', the Tasks list keeps its remembered per-project sort and Dependencies keeps its hover-field choices, contrary to the button's description.
+     Suggested fix: Add `lotar.tasks.sort` and `lotar.dependencyHoverFields` to the prefixes. Consider deriving the list from each store's exported storage prefix so new stores aren't missed. Show a toast when done.
+     Verifier note: The help text names only 'board/calendar field visibility', so leaving out dependency hover fields is a minor mismatch. The missing Tasks-page sort is the clear miss.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:38.595800+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253","DEV-57"]}'

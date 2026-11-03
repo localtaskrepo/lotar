@@ -21,4 +21,4 @@ Things we especially want to hear about:
 - Sync leaking credentials, or writing to the wrong remote
 - Paths that let task data, attachments or references read or write outside the repository
 
-`lotar serve` is designed for local use. Exposing it to a network without your own authentication in front of it is outside the supported setup.
+`lotar serve` is designed for local use. Exposing it to a network without your own authentication in front of it is outside the supported setup. The server only answers requests whose `Host` header is a loopback name, an IP address or a name you allowed with `--allow-host`, which blocks DNS rebinding from web pages.

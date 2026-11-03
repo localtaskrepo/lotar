@@ -5,7 +5,10 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.705315+00:00
-modified: 2026-10-29T04:01:07.577331+00:00
+modified: 2026-10-31T22:06:39.357660+00:00
+relationships:
+  related:
+  - DEV-293
 comments:
 - date: 2026-09-06T11:21:52.619873+00:00
   text: 'Backlog reconciliation: Remains Todo for nested-folder ticket storage plus archive lifecycle/query behavior. DEV-56 owns canonical identity/multi-root lookup correctness, and DEV-53 storage safety is implemented; neither closes archive support.'
@@ -95,3 +98,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-31T22:06:39.357660+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-293"]}'

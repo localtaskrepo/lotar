@@ -1,0 +1,351 @@
+title: 'Comprehensive product review: bugs, gaps, performance, docs'
+status: Done
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-10-31T02:20:03.605242+00:00
+modified: 2026-10-31T22:08:33.346293+00:00
+relationships:
+  related:
+  - DEV-254
+  - DEV-255
+  - DEV-256
+  - DEV-257
+  - DEV-258
+  - DEV-259
+  - DEV-260
+  - DEV-261
+  - DEV-262
+  - DEV-263
+  - DEV-264
+  - DEV-265
+  - DEV-266
+  - DEV-267
+  - DEV-268
+  - DEV-269
+  - DEV-270
+  - DEV-271
+  - DEV-272
+  - DEV-273
+  - DEV-274
+  - DEV-275
+  - DEV-276
+  - DEV-277
+  - DEV-278
+  - DEV-279
+  - DEV-280
+  - DEV-281
+  - DEV-282
+  - DEV-283
+  - DEV-284
+  - DEV-285
+  - DEV-286
+  - DEV-287
+  - DEV-288
+  - DEV-289
+  - DEV-290
+  - DEV-291
+  - DEV-292
+  - DEV-293
+  - DEV-294
+  - DEV-1
+comments:
+- date: 2026-10-31T02:20:11.122870+00:00
+  text: 'Plan: multi-agent review (user opted in). 9 read-only reviewers in parallel: (1) storage/core/config/YAML compat, (2) REST+SSE+web server + contract parity (src/api_types.rs, view/api/types.ts, docs/openapi.json), (3) MCP + agent jobs + automation, (4) CLI + help, (5) sync/scanner/git/identity, (6) frontend, (7) docs accuracy/readability, (8) performance with large seeded workspaces, (9) security + release/install tooling. Each area''s findings go to an adversarial verifier that re-reads code and reproduces where feasible; only confirmed findings are reported. Reviewers make no file, ticket or git changes; repros use temp workspaces, never port 8080 or the DEV backlog. Then: dedupe, rank, report, one DEV ticket per confirmed actionable issue.'
+- date: 2026-10-31T21:31:13.938603+00:00
+  text: 'First run (wf_0571e3a5-15d) stopped at the account''s 5-hour usage limit: 10 of 16 agents done. Reviewed + verified: CLI 20 (18 confirmed), sync/scan/git 23 (20 confirmed), security/release 14 (14 confirmed). Reviewed, verification pending: storage/core 18, MCP/agents/automation 18, docs 25, performance 12. Not reviewed yet: REST/SSE/web server, frontend. Resumed the same run; finished agents replay from cache.'
+- date: 2026-10-31T22:08:33.180404+00:00
+  text: |-
+    Outcome: review complete. 149 findings from 9 areas; independent checkers confirmed 146 (2 critical, 12 high, 66 medium, 66 low; some found twice) and refuted 3. Grouped into 41 tickets DEV-254..DEV-294, one per fixable unit, each with evidence, repro, impact and suggested fix. Most urgent: DEV-254 DNS rebinding lets any website drive the local API incl. automation commands (filed High: DEV has no Critical priority); DEV-255 quadratic task listing (2,000 tasks about 6 s, 5,000 about 50 s); DEV-256 non-ASCII search returns nothing; DEV-257 agent run without --wait never runs; DEV-258/DEV-259 automation command injection and no trust gate for repo rules; DEV-260 -p makes sprint add change every task; DEV-261 scanner aborts; DEV-262 Jira pull stops at 50; DEV-263 task panel lost updates; DEV-264 scan page global save.
+    Evidence: workflow wf_0571e3a5-15d (first run hit the 5-hour usage limit, resumed). Spot-checked DEV-260 myself (reproduced). Full report with the per-area 'reviewed and sound' and 'not covered' lists, refuted findings and finding-to-ticket map attached here (lotar-review-DEV-253.md).
+    Limits: no Windows execution, no Docker run, no browser performance traces, limited GitHub push and Jira transition coverage; see 'not covered' in the report. Mention auto-linking added related links from the new tickets to tickets they cite (DEV-1, 3, 4, 13, 57, 58, 84, 110, 138, 142, 182, 230); removed one false link (DEV-270 to DEV-1, a test task ID). Six orphaned lotar serve processes from an Oct 28 smoke run (port 0, temp workspaces) were left running; not from this review.
+    Remaining: none for this ticket; fixes are tracked in DEV-254..DEV-294. Changes uncommitted.
+    Guidance: no durable instruction finding.
+references:
+- attachment: lotar-review-DEV-253.5d3871f7438355a4d819154946150ef7.md
+description: 'Whole-product bug and gap hunt before the next stage: correctness across storage, REST/SSE, MCP/agents/automation, CLI, sync/scan/git, frontend; docs accuracy and readability; performance; security and release tooling. Output: ranked, verified findings report plus one DEV ticket per confirmed issue worth fixing. No code changes in this ticket.'
+history:
+- at: 2026-10-31T02:20:11.078766+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-31T02:20:11.122870+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T21:31:13.938603+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T22:06:33.639367+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-254"]}'
+- at: 2026-10-31T22:06:33.778665+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254"]}'
+    new: '{"related":["DEV-254","DEV-255"]}'
+- at: 2026-10-31T22:06:33.918946+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256"]}'
+- at: 2026-10-31T22:06:34.056429+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257"]}'
+- at: 2026-10-31T22:06:34.193871+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258"]}'
+- at: 2026-10-31T22:06:34.330865+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259"]}'
+- at: 2026-10-31T22:06:34.465296+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260"]}'
+- at: 2026-10-31T22:06:34.605417+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261"]}'
+- at: 2026-10-31T22:06:34.750392+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262"]}'
+- at: 2026-10-31T22:06:34.891629+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263"]}'
+- at: 2026-10-31T22:06:35.027088+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264"]}'
+- at: 2026-10-31T22:06:35.166288+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265"]}'
+- at: 2026-10-31T22:06:35.304269+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266"]}'
+- at: 2026-10-31T22:06:35.445108+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267"]}'
+- at: 2026-10-31T22:06:35.587141+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268"]}'
+- at: 2026-10-31T22:06:35.755537+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269"]}'
+- at: 2026-10-31T22:06:35.896130+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270"]}'
+- at: 2026-10-31T22:06:36.044760+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271"]}'
+- at: 2026-10-31T22:06:36.184073+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272"]}'
+- at: 2026-10-31T22:06:36.325936+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273"]}'
+- at: 2026-10-31T22:06:36.466503+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274"]}'
+- at: 2026-10-31T22:06:36.607436+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275"]}'
+- at: 2026-10-31T22:06:36.775125+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276"]}'
+- at: 2026-10-31T22:06:36.936471+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277"]}'
+- at: 2026-10-31T22:06:37.093877+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278"]}'
+- at: 2026-10-31T22:06:37.238070+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279"]}'
+- at: 2026-10-31T22:06:37.385091+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280"]}'
+- at: 2026-10-31T22:06:37.529105+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281"]}'
+- at: 2026-10-31T22:06:37.675468+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282"]}'
+- at: 2026-10-31T22:06:37.835406+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283"]}'
+- at: 2026-10-31T22:06:37.981758+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284"]}'
+- at: 2026-10-31T22:06:38.136499+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285"]}'
+- at: 2026-10-31T22:06:38.285827+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286"]}'
+- at: 2026-10-31T22:06:38.436403+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287"]}'
+- at: 2026-10-31T22:06:38.595288+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288"]}'
+- at: 2026-10-31T22:06:38.753228+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289"]}'
+- at: 2026-10-31T22:06:38.908523+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290"]}'
+- at: 2026-10-31T22:06:39.057568+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291"]}'
+- at: 2026-10-31T22:06:39.208417+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292"]}'
+- at: 2026-10-31T22:06:39.356792+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292","DEV-293"]}'
+- at: 2026-10-31T22:06:39.568365+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292","DEV-293"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292","DEV-293","DEV-294"]}'
+- at: 2026-10-31T22:08:23.034709+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: attachment:lotar-review-DEV-253.5d3871f7438355a4d819154946150ef7.md
+- at: 2026-10-31T22:08:33.180404+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-31T22:08:33.243570+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292","DEV-293","DEV-294"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292","DEV-293","DEV-294","DEV-1"]}'
+- at: 2026-10-31T22:08:33.346293+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

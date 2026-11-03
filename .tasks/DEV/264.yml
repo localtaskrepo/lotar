@@ -1,0 +1,57 @@
+title: 'Scan page: "Global" save writes to the default project; pattern and apply bugs'
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:34.969087+00:00
+modified: 2026-10-31T22:06:35.027318+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] Scan page 'Save' with 'Global' selected writes to the default project's config, and copies inherited values into it (review ref frontend#2)
+     Where: view/pages/ScanView.vue:540, view/pages/ScanView.vue:551, view/pages/ConfigView.vue:1233
+     Evidence: saveAllSettings sends `{ values }` with `project` only when one is selected. It never sends `global: true`. ConfigView does send it (1233-1237).
+
+  Repro: the global config had `scan.ticket_patterns: ['[A-Z]+-\d+']`. On /scan with Project = Global, toggle 'Mentions detection' and click Save.
+  - Captured request: `{"values":{"scan_signal_words":"[...]","scan_ticket_patterns":"[\"[A-Z]+-\\\\d+\"]","scan_enable_mentions":"false","scan_strip_attributes":"true"}}` with no global and no project.
+  - Response: 200.
+  - Global .tasks/config.yml was unchanged. .tasks/DEMO/config.yml gained a whole `scan:` block (signal_words, ticket_patterns, enable_mentions), all copied from inherited/effective values.
+
+  The page also ignores `response.errors` / `warnings` from setConfig, where SyncHub and ConfigView surface them.
+     Impact: Users who think they changed the global scanner settings actually change the default project only. That project is then pinned to copies of the global values, so later global changes stop applying to it. This is quiet config drift in user-owned files.
+     Suggested fix: Send `global: true` when the project is ''. Only send the fields that actually changed versus what that scope holds, not every effective value. Surface the response's errors and warnings as ConfigView does.
+     Verifier note: None. Note that scan_strip_attributes was not written to the project file in my repro, so only three keys get pinned.
+
+  2. [medium] Scan settings split ticket-pattern regexes on commas, so any pattern with `{m,n}` makes every scanner-settings save fail (review ref frontend#3)
+     Where: view/pages/ScanView.vue:431, view/pages/ScanView.vue:514, view/pages/ScanView.vue:545
+     Evidence: syncEditableFields joins patterns with ', ', and saveAllSettings re-splits them with parseList (`split(/,|\n/)`).
+
+  Repro: set the global `scan_ticket_patterns` to `["[A-Z]{2,5}-\\d+"]` (valid, accepted by the API). On /scan, toggle only 'Mentions detection' and Save.
+  - Request: `"scan_ticket_patterns":"[\"[A-Z]{2\",\"5}-\\\\d+\"]"`
+  - Response: 400 `Invalid regex: regex parse error: [A-Z]{2 ... unclosed counted repetition`.
+
+  Save sends all four settings, so the user can't change signal words or mentions either until they rewrite the regex.
+     Impact: Anyone using a counted-repetition ticket regex (common, e.g. `[A-Z]{2,5}-\d+`) can't save any scanner setting from the UI. The error points at a pattern they never touched.
+     Suggested fix: Edit patterns one per line, or as a chip list, and split only on newlines. Better still, don't resend fields that didn't change.
+     Verifier note: A pattern containing a literal comma, for example a character class like [,;], breaks the same way.
+
+  3. [low] Applying one scan finding replaces the dry-run results, so the remaining 'Apply' buttons disappear (review ref frontend#10)
+     Where: view/pages/ScanView.vue:469, view/pages/ScanView.vue:451
+     Evidence: applyEntry calls runScan(false, [target]), which replaces scanResponse with the non-dry response. API repro: a dry run on src/ with two TODOs returns `True [(1,'create'),(3,'create')]`. Applying the target at line 1 returns `False [(1,'create','created')]`. The UI only shows Apply when `scanResponse.dry_run`, so the second finding and its Apply button vanish until the user runs a dry scan again.
+     Impact: The per-finding 'Apply' workflow breaks after the first click. To apply findings selectively, users must re-run the dry scan after every apply.
+     Suggested fix: After a targeted apply, merge the applied entry's result into the existing dry-run list and mark it applied. Alternatively, automatically re-run the dry scan with the same inputs.
+     Verifier note: None.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:35.027318+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

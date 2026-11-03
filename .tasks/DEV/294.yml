@@ -1,0 +1,29 @@
+title: Write user help for Jira/GitHub sync (pull, push, sync check)
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-10-31T22:06:39.506165+00:00
+modified: 2026-10-31T22:06:39.568931+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Jira/GitHub sync (pull, push, sync check) has no user help page; `lotar help sync|pull|push` fails (review ref docs#6)
+     Where: docs/help/index.md:12, src/help/mod.rs:29-38, docs/developers/sync.md:1, docs/developers/README.md:3
+     Evidence: There is no docs/help/sync.md. `lotar help sync`, `lotar help pull` and `lotar help push` each print `❌ ... No help available for command 'sync'`, and `lotar pull --help` errors the same way. README, index.md, cli-tour.md, config-reference.md and site/compare.html all send users to docs/developers/sync.md, which starts "This document defines the manual-only sync contract". It is not embedded in the binary. developers/README.md:3 says "End-user walkthroughs now live exclusively in docs/help/".
+     Impact: A beta feature advertised on the homepage has no offline, version-matched user help. Its flags (--auth-profile, --task, --dry-run) are documented only in a developer contract doc.
+     Suggested fix: Add docs/help/sync.md: user walkthrough, flags, auth profile setup, dry-run, reports. Map pull/push/sync to it in HELP_ALIASES, and keep the contract details in docs/developers/sync.md.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:39.568931+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

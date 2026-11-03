@@ -156,6 +156,30 @@ fn resolve_serve_port(
 /// bracketed (`http://[::1]:8080/`) so browsers and parsers resolve it;
 /// IPv4 and hostnames pass through unchanged. The `Host:` banner line and
 /// the bind itself keep the raw user-provided value.
+/// Whether the bind address only accepts connections from this machine.
+fn is_loopback_host(host: &str) -> bool {
+    let bare = host.trim().trim_start_matches('[').trim_end_matches(']');
+    bare.eq_ignore_ascii_case("localhost")
+        || bare
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
+/// Host names the server answers to besides loopback names and IP literals:
+/// the `--host` name itself (when it is a name) and every `--allow-host`.
+fn allowed_host_names(host: &str, extra: Vec<String>) -> Vec<String> {
+    let mut names: Vec<String> = extra
+        .into_iter()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect();
+    let bare = host.trim().trim_start_matches('[').trim_end_matches(']');
+    if bare.parse::<std::net::IpAddr>().is_err() && !bare.is_empty() {
+        names.push(bare.to_string());
+    }
+    names
+}
+
 fn url_host(host: &str) -> String {
     if host.contains(':') && !host.starts_with('[') {
         format!("[{}]", host)
@@ -240,6 +264,7 @@ impl CommandHandler for ServeHandler {
             open,
             web_ui_path,
             web_ui_embedded,
+            allow_host,
             ..
         } = args;
 
@@ -309,10 +334,18 @@ impl CommandHandler for ServeHandler {
             advertised_host, actual_port
         ));
 
+        if !is_loopback_host(&host) {
+            renderer.emit_warning(format_args!(
+                "Listening on {} makes the API reachable from other machines. It has no authentication and can change tasks, config and automation rules (which run shell commands). Only do this on a trusted network or behind your own authentication.",
+                host
+            ));
+        }
+
         // Build web server config from CLI args
         let web_config = WebServerConfig {
             web_ui_path: effective_web_ui_path.map(PathBuf::from),
             embedded_only: web_ui_embedded,
+            allowed_hosts: allowed_host_names(&host, allow_host),
         };
 
         if let Some(ref path) = web_config.web_ui_path {
@@ -473,6 +506,26 @@ mod tests {
         assert_eq!(implicit.source, PortSource::ImplicitDefault);
         assert_eq!(implicit.port, DEFAULT_SERVE_PORT);
         assert!(implicit.source.allows_fallback());
+    }
+
+    #[test]
+    fn loopback_binds_are_recognised() {
+        assert!(is_loopback_host("localhost"));
+        assert!(is_loopback_host("127.0.0.1"));
+        assert!(is_loopback_host("::1"));
+        assert!(is_loopback_host("[::1]"));
+        assert!(!is_loopback_host("0.0.0.0"));
+        assert!(!is_loopback_host("::"));
+        assert!(!is_loopback_host("devbox.lan"));
+    }
+
+    #[test]
+    fn bind_name_is_an_allowed_host() {
+        assert_eq!(
+            allowed_host_names("devbox.lan", vec!["proxy.example".into()]),
+            vec!["proxy.example".to_string(), "devbox.lan".to_string()]
+        );
+        assert!(allowed_host_names("0.0.0.0", Vec::new()).is_empty());
     }
 
     #[test]

@@ -1,0 +1,17 @@
+title: Add a repository/server switcher to the web UI
+status: Todo
+priority: Low
+type: Feature
+reporter: codex
+created: 2026-11-02T22:02:36.865665+00:00
+description: |-
+  Use case: several repositories each run their own LoTaR server. Make switching between them convenient from a phone without remembering URLs or ports. The immediate access solution is a private HTTPS domain and a project launcher page; this ticket tracks a future built-in switcher.
+
+  Acceptance criteria:
+  - Let users configure named repository/server destinations with their base URLs.
+  - Clearly show the current repository/server and provide a touch-friendly switcher on narrow screens.
+  - Switching opens the selected server and keeps reads and mutations scoped to that server; distinguish this from the existing project filter within one task store.
+  - Persist configured destinations and handle unavailable destinations clearly.
+  - Work with separate HTTPS hostnames behind a reverse proxy without requiring cross-origin API access for simple navigation.
+
+  Start with navigation between independent servers. A combined task view and automatic server discovery are optional future work, not required for this ticket.

@@ -1,0 +1,56 @@
+title: Scanner aborts on doc comments, stops at Rust lifetimes and rewrites CRLF line endings
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:34.542535+00:00
+modified: 2026-10-31T22:06:34.605706+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] CLI `lotar scan` aborts the whole run (after partially applying) on any comment where the signal word is not at the start, including Rust `///` and `//!` doc comments (review ref sync-scan-git#0)
+     Where: src/scanner.rs:617, src/scanner.rs:708-729, src/cli/handlers/scan_handler.rs:222-229, src/services/scan_service.rs:146-180
+     Evidence: Discovery (`process_comment_line`) accepts a comment when `signal_regex.is_match(line)` finds the word anywhere in it. The edit path (`matched_source_comment_range`) only accepts a match at offset 0, after trimming whitespace and `*` but not `/` or `!`. The CLI turns that `None` into a hard error with `?`.
+
+  Minimal repro (scratch repo r3): a.rs=`// TODO: real work item`, b.rs=`/// Filter syntax example: 'status:todo tag:ui'`. `lotar scan` prints `Found 2 TODO comment(s)`, creates R3-1, rewrites a.rs, then fails with `❌ Cannot establish a safe scan comment boundary` (rc=1). Every later run fails the same way.
+
+  Each of these single lines fails on its own: `/// TODO: doc todo`, `//! TODO: inner doc`, `// - TODO: bullet`, `// This is not a bug, it is intended.`, `/// Returns the todo list for the user.`, `// Workaround for the hack in libfoo; see upstream.`.
+
+  On a copy of this repo's src/ a…
+     Impact: Any repository with a Rust doc-comment TODO, or prose like 'bug', 'note' or 'todo' inside a comment, cannot use `lotar scan` from the CLI at all. Entries before the bad line are applied (tasks created, sources edited). Entries after it and the anchor-maintenance pass never run. REST/UI scans list these lines as 'failed' entries, which is noisy.
+     Suggested fix: Use one predicate for discovery and edit. Either require the signal word at the start of the comment segment in `process_comment_line` (after stripping `/`, `!`, `*`, `-` and whitespace), or let the edit path locate the signal word wherever discovery found it. In the CLI, report a per-entry skip or failure as REST does instead of aborting the run. Add regression tests for `///`, `//!` and mid-sentence words.
+     Verifier note: Even `--dry-run` aborts, so users cannot preview past the bad line either.
+
+  2. [medium] In Rust files, a single quote such as a lifetime (`<'a>`, `&'static`) silently stops TODO discovery for the rest of the file (review ref sync-scan-git#3)
+     Where: src/scanner.rs:194-216, docs/help/scan.md
+     Evidence: `CommentLexer::ranges` opens an ordinary quote on any `'` and marks the source ambiguous if it is still open at end of line. That stops all further discovery in the file. Rust lifetimes and `'static` produce exactly that.
+
+  Repro (scratch repo r1): src/lib.rs with `// TODO: first`, `pub struct Foo<'a> {`, `// TODO: second`, `// TODO: third` → `lotar scan --dry-run` reports only the first.
+
+  Probe on a copy of this repo (a `// TODO: probeend` appended to each of 400 .rs/.ts files): 205 found, 180 silently missed, 15 aborted. Missed files include src/web_server.rs and src/api_types.rs (`&'static`).
+     Impact: Rust is advertised as supported, but most real Rust files have a lifetime before most TODOs, so those TODOs are never turned into tasks or anchored, and nothing is reported. The docs list the JS regex/division limitation but not this one.
+     Suggested fix: For rs/rust, treat `'` as a char-literal opener only when it closes within a few characters (`'x'`, `'\n'`, `'\u{..}'`); otherwise treat it as a lifetime and do not open a quote. At least log the ambiguity at info level with file:line, and document it.
+     Verifier note: docs/help/scan.md:93 does say that 'unterminated ordinary quotes' stop further discovery. So the stop is documented in general terms, but lifetimes are not named, and they make this the normal case for Rust files. I did not re-run the 400-file probe.
+
+  3. [medium] Scan converts every CRLF line ending in an edited source file to LF (review ref sync-scan-git#2)
+     Where: src/utils/scan.rs:121-139, src/cli/handlers/scan_handler.rs:343, src/services/scan_service.rs:626
+     Evidence: `replace_line_contents` splits with `str::lines()`, which drops `\r`, and rejoins with `\n`.
+
+  Repro (scratch repo enc): `printf 'fn a() {}\r\n// TODO: crlf item\r\nfn b() {}\r\n' > crlf.rs; lotar scan` → `od -c crlf.rs` shows only `\n` on all three lines. A mixed file (`x = 1 # TODO: mixed\r\ny = 2\n`) also loses its `\r`. Files with a BOM or no trailing newline were preserved.
+     Impact: In Windows or CRLF repositories, inserting one task key rewrites every line of the file: whole-file diffs, broken .gitattributes expectations and possible merge conflicts. Docs promise a narrow, safe in-place edit.
+     Suggested fix: Replace only the target line's byte range, for example with `split_inclusive('\n')`, and keep each line's original terminator. Add CRLF and mixed-ending tests for the CLI and REST writers.
+     Verifier note: Severity lowered to medium: no content is lost. The damage is a whole-file line-ending rewrite and diff churn, and it is invisible in repos that normalize with autocrlf/.gitattributes.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:34.605706+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

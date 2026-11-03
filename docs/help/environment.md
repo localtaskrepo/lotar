@@ -118,6 +118,7 @@ All rows below are defined inside the same override table and map directly to th
 | --- | --- | --- | --- |
 | `web_ui_path` | `LOTAR_WEB_UI_PATH` | Path string | Directory containing custom web UI assets. When set and the directory exists, files are served from here before falling back to embedded assets. |
 | _(CLI only)_ | `LOTAR_WEB_UI_EMBEDDED` | `1` | Forces serving only embedded UI assets, ignoring any `web_ui_path`. Useful for CI testing. |
+| _(CLI only)_ | `LOTAR_ALLOWED_HOSTS` | Comma-separated host names, or `*` | Extra names accepted in the `Host` header (same as `lotar serve --allow-host`). Loopback names and IP addresses are always accepted. |
 
 ## Runtime Toggles & Services
 

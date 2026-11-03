@@ -1,0 +1,47 @@
+title: 'CSV export: `format` treated as a filter, broken quoting, formula injection'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:36.547471+00:00
+modified: 2026-10-31T22:06:36.607737+00:00
+relationships:
+  related:
+  - DEV-230
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] `format`, documented in the spec for /api/tasks/export, is treated as a custom-field filter: `format=csv` exports an empty file, and unknown keys silently return empty results (review ref api-sse-web#5)
+     Where: docs/openapi.json (/api/tasks/export parameter 'format'), src/services/task_list.rs:20-50, src/services/task_list.rs:175-181
+     Evidence: Every query key not in KNOWN_QUERY_KEYS becomes a field filter, and 'format' is not in the list. `curl '/api/tasks/export?project=DEMO&format=csv' | wc -l` → 1 (header only), while without format it returns 8 rows. `/api/tasks/list?project=DEMO&page=1&limit=2` → total 0, and `?bogus=1` → total 0. Filters on undeclared fields are never rejected, although DEV-230 promises 'invalid explicit values are 400s, never silently ignored'.
+     Impact: API consumers following the spec get empty exports. Typos or common pagination names (page, sort) silently return nothing instead of a 400.
+     Suggested fix: Either honour `format` (csv only, 400 for anything else) and add it to KNOWN_QUERY_KEYS, or remove it from the spec. Return 400 for filter keys that are not a declared custom field of the resolved project(s).
+     Verifier note: The `format` spec/implementation mismatch is clear-cut. Whether undeclared custom-field keys must be rejected with 400 is a design question (cross-project field filters), so that part is weaker than stated.
+
+  2. [medium] CSV export writes invalid CSV for values containing quotes, and leaves formula-injection payloads unescaped (review ref api-sse-web#6)
+     Where: src/routes/tasks.rs:79-86
+     Evidence: esc() doubles `"` but only wraps a field in quotes when it contains a comma or newline. The title `Quote "x" title` is exported as `DEMO-2,Quote ""x"" title,...`. Python's csv.reader reads it back as `'Quote ""x"" title'`, so the data is corrupted. A title `=HYPERLINK("http://x")` is exported starting with `=`.
+     Impact: Exports corrupt titles, assignees and tags that contain quotes. Opening an export in a spreadsheet can execute formulas taken from task content (synced or teammate-authored).
+     Suggested fix: Quote any field containing `"`, `,`, CR or LF (RFC 4180), or use the csv crate. Prefix values starting with = + - @ (or tab/CR) with a single quote, or document why not.
+     Verifier note: The corruption is the main defect. Formula injection is secondary and lower risk.
+
+  3. [medium] CSV export breaks values containing quotes and passes spreadsheet formulas through unescaped (review ref security-release#6)
+     Where: src/routes/tasks.rs:79-86
+     Evidence: esc() doubles quotes but wraps the value in quotes only when it contains a comma or newline, so `Say "hi" now` is written as the unquoted field `Say ""hi"" now`. Python's csv module reads that back as `Say ""hi"" now`. Values starting with = + - @ are emitted as-is. Repro output from GET /api/tasks/export:
+  DEMO-4,"=HYPERLINK(""http://x.example"",""click"")",Todo,...
+  DEMO-3,Say ""hi"" now,Todo,...
+     Impact: Exported data is corrupted for any title, assignee or tag containing a quote. Titles synced from public GitHub issues (pull sync) can carry formulas that run when a teammate opens the CSV in Excel or Sheets (CSV injection).
+     Suggested fix: Quote any field containing a quote, comma, CR or LF (RFC 4180). Prefix cells starting with = + - @, tab or CR with a single quote, or document why not. Consider the csv crate.
+     Verifier note: The quoting bug corrupts export output only; task YAML is unaffected. The CSV-injection part is low risk for a local tool. Overall medium is driven by the quoting correctness bug.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:36.607737+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-230","DEV-253"]}'

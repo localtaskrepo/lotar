@@ -1,0 +1,44 @@
+title: 'Release and install hardening: token scope, workflow expressions, install.ps1 PATH handling'
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-31T22:06:38.994897+00:00
+modified: 2026-10-31T22:06:39.058049+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [low] Release build job gives a contents:write token and OIDC signing to npm, vite, cargo build scripts and an unpinned cross container (review ref security-release#4)
+     Where: .github/workflows/release.yml:113-118, .github/workflows/release.yml:167-188, .github/workflows/release.yml:176-182
+     Evidence: The build-and-release job has `permissions: contents: write, id-token: write`. Its actions/checkout step does not set `persist-credentials: false`, unlike package-linux and publish-npm, so the write-scoped GITHUB_TOKEN sits in .git/config. The job then runs `npm ci && npm run build:web` (vite plus all its plugins), `cargo build` (every dependency's build.rs and proc-macros), and `cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5`, a mutable git tag. cross then pulls its default ghcr.io/cross-rs image by tag, not digest, and builds the shipped arm64 binary inside it. ACTIONS_ID_TOKEN_REQUEST_* is available to every step, so any of that code can mint Sigstore certificates for this workflow identity.
+     Impact: A compromised npm, crates or cross dependency on a release run could upload or overwrite release assets and sign them with the project's keyless identity. Install-script users verify only the SHA-256 from the same release, so that check would pass.
+     Suggested fix: Split into a build job (contents: read, persist-credentials: false, no id-token) that uploads workflow artifacts, and a separate sign-and-upload job with contents: write and id-token: write that runs no third-party build code. Pin cross by commit (or use cargo-zigbuild) and pin its image by digest.
+     Verifier note: Downgraded to low (defence in depth). npm ci and cargo --locked already verify lockfile integrity. A compromised locked dependency would backdoor the shipped binary whatever the job split, and a separate signing job would sign that artifact anyway. What the split would add is limiting the persisted contents:write token (pushing to the repo, overwr…
+
+  2. [low] Workflow hardening gaps: no explicit token permissions on several workflows, and `${{ }}` expressions interpolated directly into run scripts (review ref security-release#11)
+     Where: .github/workflows/ci.yml:1-20, .github/workflows/homebrew-verify.yml:1-20, .github/workflows/scoop-verify.yml:1-20, .github/workflows/performance.yml:102, .github/workflows/release.yml:165, .github/workflows/release.yml:232-235, .github/workflows/release.yml:285, .github/workflows/release.yml:772
+     Evidence: ci.yml (which runs on push and pull_request), homebrew-verify.yml and scoop-verify.yml declare no `permissions:` block, so they inherit the repository's default token scope. performance.yml:102 expands `${{ inputs.baseline_label }}` inside a run: string. release.yml expands `${{ github.ref_name }}` and `${{ matrix.* }}` directly into bash and pwsh bodies in several steps; git tag names may contain `$()`, backticks and `;`. Only users with push rights can set these values, so the risk is low.
+     Impact: Defence in depth only: a looser default token or a crafted tag or dispatch input could escalate to script injection in a privileged job.
+     Suggested fix: Add top-level `permissions: contents: read` to ci, homebrew-verify and scoop-verify. Pass inputs and ref names through `env:` and reference them as "$VAR", as the later release steps already do.
+     Verifier note: Low, as stated. Fork PRs already get a read-only token. Only users with push rights can create tags or dispatch workflows. Git ref rules allow $, () and backticks, so a crafted `-suffix` tag could pass create-release's base-version check, but only someone with push access could create it.
+
+  3. [low] install.ps1 rewrites the user PATH as an expanded REG_SZ string, permanently flattening %VAR% entries (review ref security-release#9)
+     Where: site/install.ps1:77-81
+     Evidence: `[Environment]::GetEnvironmentVariable('Path','User')` returns the expanded value of a REG_EXPAND_SZ user Path. `SetEnvironmentVariable('Path', …, 'User')` writes it back as REG_SZ. Entries such as `%JAVA_HOME%\bin` or `%USERPROFILE%\go\bin` are frozen to their current expansion, and later %VAR% entries added by other tools stop expanding. This is the same known pitfall other installers hit. Not verified on Windows here; it follows from .NET's registry semantics.
+     Impact: Windows users whose PATH entries depend on variables (Java, Go, SDK managers) can find tools resolving to stale paths after installing LoTaR, which is hard to diagnose and to undo.
+     Suggested fix: Read the raw value with `(Get-Item 'HKCU:\Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames')` and write it back with Set-ItemProperty using -Type ExpandString, then broadcast WM_SETTINGCHANGE (or set a dummy env var to trigger it).
+     Verifier note: It only triggers when the install dir is not already on PATH (the first install).
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:39.058049+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

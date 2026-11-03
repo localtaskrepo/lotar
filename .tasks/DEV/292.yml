@@ -1,0 +1,44 @@
+title: 'Performance: activity feed spawns git per commit and file, exclusion filters and @least_busy rerun full queries'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:39.143386+00:00
+modified: 2026-10-31T22:06:39.208899+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Activity feed spawns two `git show` processes per (commit, task file); one bulk commit makes the feed take tens of seconds (review ref performance#4)
+     Where: src/services/audit_service.rs:574-660 (build_tracked_activity_feed), src/services/audit_service.rs:907-912 (load_task_version), src/services/audit_service.rs:997-1010 (show_file_at → Command::new("git") show), src/routes/activity.rs:4-23
+     Evidence: Copied the 1000-task workspace to <scratch>/review-performance/g1000, `git init`, committed it, appended a history entry to all 1000 files and committed again. With `lotar serve --port 19475`: GET /api/activity/feed?since=2026-10-01T00:00:00Z → 200 in 34.11s (999,678 B). That is 2 commits × 1000 files × 2 serial `git show` spawns (sha and sha^). /api/activity/series, changed_tasks and authors took 0.011–0.018s. The limit caps commits (default 200) but not files per commit.
+     Impact: The Activity drawer on the Tasks page hangs for tens of seconds whenever the window contains a migration, bulk sprint/status change, `lotar scan` run or large merge, and ties up a server thread meanwhile.
+     Suggested fix: Read blobs through one `git cat-file --batch` process, or derive changes from a single `git log -p`/`git diff-tree -p` over the tasks path. Parallelize, and/or cap the files examined per commit and report truncation.
+     Verifier note: Measured 30.8s on this machine, against the reported 34s.
+
+  2. [medium] `@least_busy` automation runs a full TaskService::list per resolution (inside the mutation path, and per task in manual runs) (review ref performance#5)
+     Where: src/services/automation_service.rs:2433-2455 (resolve_least_busy), src/services/automation_service.rs:2380, src/services/automation_service.rs:634-660 (run_manual evaluates rules per task)
+     Evidence: Copied the 2000-task workspace to <scratch>/review-performance/a2000, set members, and added .tasks/automation.yml with rule `on: created: set: assignee: "@least_busy"`. `lotar add "least busy probe" -p DEMO`: real 5.07s (and 5.02s for a second add), against 0.04s for `lotar add` without the rule. resolve_least_busy builds full DTOs for every task just to count active tasks per assignee. With `lotar automation run` over many matching tasks this happens once per task, giving O(N³) with the current listing.
+     Impact: Teams using load-balanced assignment get multi-second latency on every create/update the rule matches, in the CLI, REST and MCP. Scheduled manual runs over large backlogs could take hours.
+     Suggested fix: Count assignees from StorageSearch::search results (Task, no DTO or config resolution), compute done-ness with the cached per-project config, and memoize the counts for the duration of one automation run, adjusting them as assignments are made.
+     Verifier note: The root cause is mostly finding #0's O(N²) listing. After that fix each resolution would be O(N), tolerable per mutation but still O(N²) for manual runs. Fixing #0 resolves most of it.
+
+  3. [low] Each exclusion term (`-field:value`) runs a separate full workspace query, including deleted tasks, instead of filtering the candidates in memory (review ref performance#6)
+     Where: src/services/task_list.rs:475-495 (remove_excluded → run() per exclusion), src/services/task_list.rs:441-450 (exclusions forced to DeletionFilter::All)
+     Evidence: 2000-task workspace: `lotar list status:Done` 0.53s; `lotar list status:Done -tag:ui` 0.55s; `lotar list status:Done -tag:ui -priority:low -type:bug` 3.89s. Each broad exclusion builds DTOs for every task it matches anywhere in the workspace, even those the main query already excluded. `lotar stats stale` (which adds -recent:Nd) takes 10.66s against ~5.4s for the other stats subcommands.
+     Impact: Negated filters, common in saved views and in stats stale, multiply query cost by up to (1 + number of exclusions). The effect stays proportional after the O(N²) fix.
+     Suggested fix: Evaluate exclusions as predicates on the main query's candidate set (the same task_matches_filter, field-filter and smart-filter checks) rather than as independent full runs.
+     Verifier note: None.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:39.208899+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

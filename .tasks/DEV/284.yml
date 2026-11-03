@@ -1,0 +1,42 @@
+title: Terminal help rendering and discoverability
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:37.919447+00:00
+modified: 2026-10-31T22:06:37.982194+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] The help markdown renderer drops `<placeholder>` text, mangles links whose text is a code span, and emits OSC-8 escapes into piped or NO_COLOR output (review ref cli#11)
+     Where: src/help/mod.rs:150-185, src/help/mod.rs:205-320
+     Evidence: Event::InlineHtml is not handled, so `<ref>`, `<PREFIX>` and similar are silently dropped. render_with_hyperlinks inserts `ESC]8;;url ESC\` before markdown parsing. The trailing backslash escapes the next backtick, so a link like [`lotar stats effort --by <field> --filter '<query>'`](./stats.md#effort) renders as "`lotar stats effort --by  --filter ''`". OSC-8 is also inserted regardless of HelpStyle. Repro: `LOTAR_HELP_STYLE=plain lotar help changelog` shows 'changes between ..HEAD' (source: '<ref>..HEAD'). Placeholder counts source→rendered: config-reference 39→4, api-quick-reference 11→8, config 12→10, list 10→8, install 2→0, changelog 1→0. `NO_COLOR=1 lotar help add | cat -v` still contains 2 `^[]8;;` sequences.
+     Impact: The rendered help (the only CLI help, since clap help is disabled) shows wrong syntax with missing arguments, and piped help or help saved to files contains terminal escape sequences.
+     Suggested fix: Handle Event::InlineHtml as literal text. Emit OSC-8 only in Ansi style, and apply it after markdown parsing (on Link events) rather than through a regex over raw markdown.
+     Verifier note: OSC-8 escapes also appear with LOTAR_HELP_STYLE=plain, not only when piped or with NO_COLOR.
+
+  2. [medium] Terminal help rendering breaks OSC 8 hyperlinks after punctuation, ignores NO_COLOR/piping for links, and drops list numbers that the text refers to (review ref docs#3)
+     Where: src/help/mod.rs:150-185, src/help/mod.rs:187-205, src/help/mod.rs:243-249
+     Evidence: render_with_hyperlinks puts `ESC]8;;URL ESC\ text ESC]8;; ESC\` into the Markdown before pulldown-cmark parses it. When a link is followed by ASCII punctuation, the closing `ESC \` plus that character becomes a Markdown backslash escape, so the backslash is lost. `lotar --help | od -c` shows `task archive 033 ] 8 ; ; 033 )` and `Precedence 033 ] 8 ; ; 033 .` with no closing `\`. The link stays open, and in xterm-like terminals `ESC )` swallows the next character. Counted broken terminators with `NO_COLOR=1 lotar help <topic> | grep -ao $'\x1b\\]8;;\x1b[^\\\\]'`: cli-tour 15, install 7, serve 7, config-reference 7, api-quick-reference 6, mcp-tools 6, and 23 topics in total. The links are inserted before the style choice, so they are still emitted with NO_COLOR=1 or when piped (`NO_COLOR=1 lotar help list | grep -c $'\x1b'` → 3). Ordered lists render as `•` bullets (Tag::Item always pushe…
+     Impact: Garbled terminal output for every help page with inline links, and escape sequences in captured or piped help. References to numbered steps make no sense in the terminal rendering.
+     Suggested fix: Turn links into OSC 8 while walking pulldown-cmark events (Tag::Link start/end), not by regex on the raw Markdown. Emit OSC 8 only in the Ansi style. Track ordered-list numbers (Tag::List(Some(start))) and print `1.`, `2.` and so on.
+
+  3. [low] Help topics are hard to discover from the CLI: index misses pages, `lotar help` never lists topics, and the topic-list code is unreachable (review ref docs#20)
+     Where: docs/help/index.md, src/help/mod.rs:71-95, src/main.rs:98-112, src/main.rs:1086-1088
+     Evidence: index.md doesn't link task.md, whoami.md, completions.md or agent-instructions.md. HelpSystem::list_available_help is never called (no references outside its definition), so `lotar help` always prints the overview. The error hint "Try 'lotar help' for available commands" leads to a page that doesn't list topics such as `environment`, `precedence`, `sse` or `task-model`. Those work (`lotar help environment`) but users can't find them from the CLI.
+     Impact: Most reference material is reachable only if the user already knows the topic file name.
+     Suggested fix: Wire `lotar help topics` (or the bare-help footer) to list_available_help, add the missing pages to index.md, and change the error hint to point at the topic list.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:37.982194+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

@@ -1,0 +1,32 @@
+title: Unknown nested YAML keys in task and sprint files are dropped on write
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:35.526738+00:00
+modified: 2026-10-31T22:06:35.587391+00:00
+relationships:
+  related:
+  - DEV-1
+  - DEV-182
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [medium] Unknown keys nested in relationships, comments, references, history and sprint plan or task entries are silently dropped on any write (review ref storage-core#5)
+     Where: src/types.rs:368, src/types.rs:399, src/types.rs:416, src/types.rs:433, src/storage/sprint.rs:177, src/storage/sprint.rs:308, docs/developers/task-model.md:129
+     Evidence: Only `Task` and `Sprint` have a flatten `extra_fields`. The nested structs (TaskRelationships, TaskComment, ReferenceEntry, TaskChangeLogEntry, SprintPlan, SprintTaskEntry) do not. Repro: a hand-written task with `relationships.implements: [DEMO-2]`, `comments[0].author: alice`, `references[0].title: Example site`, `history[0].source: import` and top-level `x_top: keep-me`. After `lotar edit 3 --title "Nested extras 2"` only `x_top` survived; `implements`, `author`, `title` and `source` were gone, and the history entry lost its empty `changes`. Sprint: `plan.color: red` and the task entry `{id: HD-1, order: 2, note: first}` became `- HD-1` after `lotar sprint update 1 --goal "Ship it"` (canonicalize also clears every `order`). docs/developers/task-model.md:129 says "Unknown keys are preserved by serde", which overstates this. The user docs scope preservation to top-level keys only.
+     Impact: Forward compatibility breaks. As soon as a newer LoTaR, the planned VSCode plugin (DEV-1), sync (DEV-182) or a teammate's tooling adds a field to comments, references or relationships, any older binary editing the task deletes it. Hand-written metadata such as a comment author or link title disappears without warning.
+     Suggested fix: Add `#[serde(flatten)] extra: BTreeMap<String, Value>` to the nested persisted structs, keeping the existing builtin-key shadow guard, or reject unknown nested keys loudly. Fix the developer doc either way.
+     Verifier note: I did not re-run the sprint-entry part. The forward-compatibility impact is prospective; the data loss that exists today is hand-written nested metadata.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:35.587391+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-1","DEV-182","DEV-253"]}'

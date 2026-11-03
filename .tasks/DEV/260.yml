@@ -1,0 +1,29 @@
+title: Global -p makes `sprint add|move|remove` change every task in the project
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:34.408336+00:00
+modified: 2026-10-31T22:06:34.465485+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] Global -p/--project is silently treated as `--select-project` by `sprint add|move|remove`, so the command changes every task in the project (review ref cli#0)
+     Where: src/cli/args/sprint.rs:79-81, src/cli/args/sprint.rs:356-357, src/cli/handlers/sprint/assignment/manage.rs:367-395, src/cli/mod.rs:24-27
+     Evidence: TaskSelectionArgs has a field `project` (long = "select-project"). Its clap arg id is "project", the same id as the global `Cli.project` (-p). Clap passes global values down to subcommand args that share the id, so `-p X` makes `is_active()` true and selects every task in X. Repro (fresh workspace, ALPH-1..3, sprint #1 empty): `lotar sprint add --sprint 1 2` attaches 1 task (correct). Then `lotar -p ALPH sprint add --sprint 1 1 -f json` gives {"modified":["ALPH-1"],"unchanged":["ALPH-2","ALPH-3"]}: all project tasks were selected. `lotar -l debug -p ALPH sprint remove --sprint 1 1 -f json` gives "modified":["ALPH-1","ALPH-2","ALPH-3"]: membership was removed from every task, not just ALPH-1. `--project ALPH` written after the subcommand is moved to the front by the preprocessor and has the same effect.
+     Impact: Anyone who adds the usual -p/--project to a sprint membership command, as the docs show for other commands, adds or removes sprint membership for the whole project. There is no prompt and no warning, so sprint plans are corrupted without notice.
+     Suggested fix: Give the selection field a distinct id (e.g. `#[arg(id = "select_project", long = "select-project")]`) or rename the field. Add a regression test that `-p X sprint add/remove <id>` touches only the named task.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:34.465485+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

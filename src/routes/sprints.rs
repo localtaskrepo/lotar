@@ -332,14 +332,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return bad_request("--limit must be greater than zero".to_string());
         }
 
-        let cleanup_missing = req
-            .query
-            .get("cleanup_missing")
-            .map(|value| {
-                let lowered = value.to_ascii_lowercase();
-                matches!(lowered.as_str(), "1" | "true" | "yes")
-            })
-            .unwrap_or(false);
+        // A GET never writes task files (DEV-254): any site can trigger a
+        // cross-origin GET, so `cleanup_missing` is ignored here. Cleanup
+        // stays available on the POST sprint endpoints and MCP.
+        let cleanup_missing = false;
 
         let mut records = match SprintService::list(&storage) {
             Ok(records) => records,

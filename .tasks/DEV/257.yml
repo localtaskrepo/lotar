@@ -1,0 +1,30 @@
+title: '`lotar agent run` without --wait reports "Job started" but the job never runs'
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-10-31T22:06:33.997416+00:00
+modified: 2026-10-31T22:06:34.056640+00:00
+relationships:
+  related:
+  - DEV-253
+description: |-
+  Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
+
+  Findings:
+
+  1. [high] `lotar agent run` without --wait reports "Job started" but the job never runs (review ref mcp-agents-automation#0)
+     Where: src/cli/handlers/agent.rs:70-107, src/services/agent_job_service.rs:398-412, src/services/agent_job_service.rs:1582-1640
+     Evidence: `run()` calls `AgentJobService::start_job`, which starts `run_job` on a detached `thread::spawn` inside the CLI process. When `--wait`/`--follow` is missing, `run()` returns at once and the process exits, killing the thread before or during spawn. Repro (ws4, profile `slow` = command runner `sh -c 'sleep 6; echo finished > AGENT_DONE'`): `lotar agent run TEST-1 go --agent slow` → `✅ Job job-…Z-1 started`; 7 s later `AGENT_DONE` does not exist and `.tasks/@agent-logs/job-…Z-1.jsonl` is 0 bytes (the header write was cut off). docs/help/agent.md:7 documents `[--wait]` as optional, with no caveat.
+     Impact: Every CLI user who starts a job without --wait gets a success message and no job at all. The ticket can stay assigned to an agent with nothing working on it.
+     Suggested fix: Without --wait, hand the job to the detached worker (AgentQueueService::enqueue + ensure_worker), or to a running server. Otherwise, block until the job is terminal (make --wait the default). Never print "started" for a thread the process is about to kill.
+     Verifier note: In my repro not even the log file was created (an empty @agent-logs dir), not a 0-byte file. Otherwise as described.
+
+  Acceptance: each finding above is fixed (with a regression test where behavior changes) or explicitly declined with a reason recorded here.
+history:
+- at: 2026-10-31T22:06:34.056640+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'

@@ -1,6 +1,8 @@
 project:
   name: Local Task Repo
 members:
+- claude
+- codex
 - mallox
 issue:
   states:
