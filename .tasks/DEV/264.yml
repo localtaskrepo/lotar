@@ -1,13 +1,22 @@
 title: 'Scan page: "Global" save writes to the default project; pattern and apply bugs'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:34.969087+00:00
-modified: 2026-10-31T22:06:35.027318+00:00
+modified: 2026-11-03T21:49:58.614542+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T21:49:58.590321+00:00
+  text: |-
+    Outcome: all three findings fixed in view/pages/ScanView.vue.
+    1. Global save sends global: true; only settings that differ from what the selected scope loaded are sent, so inherited values are no longer copied into a project file; response errors are shown inline (edits kept), warnings listed, success toast.
+    2. Ticket patterns are a one-per-line textarea split only on newlines, and unchanged fields are not resent, so a {m,n} pattern no longer blocks saving other settings.
+    3. A targeted apply merges its result into the existing dry-run list; the entry gets an Applied pill and the other Apply buttons stay.
+    Evidence: vitest ScanView.spec.ts (+5); full UI suite 1415 pass; smoke/tests/ui.scan-settings.smoke.spec.ts (Global save lands in .tasks/config.yml, {2,5} pattern survives, project config stays clean) passes against a rebuilt smoke binary; lint:frontend, eslint, prettier pass.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -55,3 +64,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:49:58.590321+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T21:49:58.614542+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

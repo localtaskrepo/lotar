@@ -787,6 +787,11 @@ main {
 	font-size: var(--text-xs);
 }
 
+.scan-field__patterns {
+	resize: vertical;
+	font-family: var(--font-mono, ui-monospace, monospace);
+}
+
 .scan-field--checkbox {
 	flex-direction: row;
 	align-items: center;
@@ -868,6 +873,12 @@ main {
 
 .scan-pill--action {
 	background: color-mix(in oklab, var(--color-surface) 90%, transparent);
+}
+
+.scan-pill--applied {
+	color: var(--color-success-strong);
+	border-color: color-mix(in oklab, var(--color-success) 55%, var(--color-border));
+	background: color-mix(in oklab, var(--color-success) 12%, transparent);
 }
 
 .scan-results {

@@ -10,6 +10,7 @@ vi.mock('../api/client', () => ({
         referenceSnippet: vi.fn(),
         listProjects: vi.fn(),
         inspectConfig: vi.fn(),
+        setConfig: vi.fn(),
     },
 }))
 
@@ -394,5 +395,191 @@ describe('ScanView run confirmation dialog', () => {
         } finally {
             wrapper.unmount()
         }
+    })
+})
+
+describe('ScanView scanner settings save (DEV-264)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        ;(api.listProjects as any).mockResolvedValue({
+            projects: [{ prefix: 'DEMO', name: 'Demo' }],
+            limit: 1,
+            offset: 0,
+            total: 1,
+        })
+        ;(api.setConfig as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
+    })
+
+    function inspectWith(patch: Partial<ResolvedConfigDTO>): ConfigInspectResult {
+        const base = baseConfigInspect()
+        return { ...base, effective: { ...base.effective, ...patch } }
+    }
+
+    async function mountScanView() {
+        const router = createRouter({
+            history: createMemoryHistory(),
+            routes: [{ path: '/scan', component: ScanView }],
+        })
+        await router.push('/scan')
+        await router.isReady()
+        const wrapper = mount(ScanView, { global: { plugins: [router], stubs } })
+        await flushPromises()
+        return wrapper
+    }
+
+    function saveButton(wrapper: ReturnType<typeof mount>) {
+        return wrapper.findAll('button').find((btn) => btn.text() === 'Save')!
+    }
+
+    it('saves only the changed setting to the global config when Global is selected', async () => {
+        ;(api.inspectConfig as any).mockResolvedValue(inspectWith({ scan_ticket_patterns: ['[A-Z]+-\\d+'] }))
+        const wrapper = await mountScanView()
+
+        await wrapper.get('#scan-mentions').setValue(false)
+        await saveButton(wrapper).trigger('click')
+        await flushPromises()
+
+        expect(api.setConfig).toHaveBeenCalledTimes(1)
+        expect((api.setConfig as any).mock.calls[0][0]).toEqual({
+            values: { scan_enable_mentions: 'false' },
+            project: undefined,
+            global: true,
+        })
+    })
+
+    it('saves to the selected project without the global flag', async () => {
+        ;(api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
+        const wrapper = await mountScanView()
+        await wrapper.findAll('select')[1]!.setValue('DEMO')
+        await flushPromises()
+
+        await wrapper.get('#scan-strip-config').setValue(false)
+        await saveButton(wrapper).trigger('click')
+        await flushPromises()
+
+        expect((api.setConfig as any).mock.calls[0][0]).toEqual({
+            values: { scan_strip_attributes: 'false' },
+            project: 'DEMO',
+            global: false,
+        })
+    })
+
+    it('keeps ticket patterns with commas intact, one per line', async () => {
+        ;(api.inspectConfig as any).mockResolvedValue(inspectWith({ scan_ticket_patterns: ['[A-Z]{2,5}-\\d+'] }))
+        const wrapper = await mountScanView()
+        const patterns = wrapper.get('[data-testid="scan-ticket-patterns"]')
+        expect((patterns.element as HTMLTextAreaElement).value).toBe('[A-Z]{2,5}-\\d+')
+
+        // Changing something else leaves the pattern alone.
+        await wrapper.get('#scan-mentions').setValue(false)
+        expect(saveButton(wrapper).exists()).toBe(true)
+        await patterns.setValue('[A-Z]{2,5}-\\d+\n[,;]ID-\\d+\n')
+        await saveButton(wrapper).trigger('click')
+        await flushPromises()
+
+        const values = (api.setConfig as any).mock.calls[0][0].values
+        expect(JSON.parse(values.scan_ticket_patterns)).toEqual(['[A-Z]{2,5}-\\d+', '[,;]ID-\\d+'])
+        expect(values.scan_enable_mentions).toBe('false')
+        expect(values.scan_signal_words).toBeUndefined()
+    })
+
+    it('shows errors and warnings from the save response', async () => {
+        ;(api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
+        ;(api.setConfig as any).mockResolvedValueOnce({
+            updated: false,
+            warnings: [],
+            info: [],
+            errors: ['Invalid regex'],
+        })
+        const wrapper = await mountScanView()
+        await wrapper.get('#scan-mentions').setValue(false)
+        await saveButton(wrapper).trigger('click')
+        await flushPromises()
+        expect(wrapper.get('[data-testid="scan-settings-error"]').text()).toContain('Invalid regex')
+        // The edit is kept so the user can fix it.
+        expect((wrapper.get('#scan-mentions').element as HTMLInputElement).checked).toBe(false)
+
+        ;(api.setConfig as any).mockResolvedValueOnce({
+            updated: true,
+            warnings: ['Pattern overlaps'],
+            info: [],
+            errors: [],
+        })
+        await saveButton(wrapper).trigger('click')
+        await flushPromises()
+        expect(wrapper.find('[data-testid="scan-settings-error"]').exists()).toBe(false)
+        expect(wrapper.get('[data-testid="scan-settings-warnings"]').text()).toContain('Pattern overlaps')
+    })
+})
+
+describe('ScanView targeted apply (DEV-264)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        ;(api.listProjects as any).mockResolvedValue({ projects: [], limit: 0, offset: 0, total: 0 })
+        ;(api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
+    })
+
+    function entry(line: number, extra: Record<string, unknown> = {}) {
+        return {
+            status: 'created',
+            action: 'create',
+            file: 'src/lib.rs',
+            line,
+            title: `Finding ${line}`,
+            annotation: `TODO: Finding ${line}`,
+            code_reference: `src/lib.rs#${line}`,
+            message: 'Dry run: would create a task',
+            ...extra,
+        }
+    }
+
+    it('keeps the other findings and their Apply buttons after applying one', async () => {
+        ;(api.scanRun as any).mockResolvedValueOnce({
+            status: 'ok',
+            dry_run: true,
+            summary: { created: 2, updated: 0, skipped: 0, failed: 0 },
+            warnings: [],
+            info: [],
+            entries: [entry(1), entry(3)],
+        })
+        const router = createRouter({
+            history: createMemoryHistory(),
+            routes: [{ path: '/scan', component: ScanView }],
+        })
+        await router.push('/scan')
+        await router.isReady()
+        const wrapper = mount(ScanView, { global: { plugins: [router], stubs } })
+        await flushPromises()
+        await wrapper
+            .findAll('button')
+            .find((btn) => btn.text() === 'Dry run')!
+            .trigger('click')
+        await flushPromises()
+        expect(wrapper.findAll('button').filter((btn) => btn.text() === 'Apply')).toHaveLength(2)
+
+        ;(api.scanRun as any).mockResolvedValueOnce({
+            status: 'ok',
+            dry_run: false,
+            summary: { created: 1, updated: 0, skipped: 0, failed: 0 },
+            warnings: [],
+            info: [],
+            entries: [entry(1, { task_id: 'TEST-9', message: null, updated_line: '// TODO TEST-9: Finding 1' })],
+        })
+        await wrapper
+            .findAll('button')
+            .find((btn) => btn.text() === 'Apply')!
+            .trigger('click')
+        await flushPromises()
+
+        expect((api.scanRun as any).mock.calls[1][0]).toMatchObject({
+            dry_run: false,
+            targets: [{ file: 'src/lib.rs', line: 1 }],
+        })
+        const entries = wrapper.findAll('.scan-entry')
+        expect(entries).toHaveLength(2)
+        expect(entries[0]!.text()).toContain('Applied')
+        expect(entries[0]!.text()).toContain('Created: TEST-9')
+        expect(entries[0]!.findAll('button').some((btn) => btn.text() === 'Apply')).toBe(false)
+        expect(entries[1]!.findAll('button').some((btn) => btn.text() === 'Apply')).toBe(true)
     })
 })

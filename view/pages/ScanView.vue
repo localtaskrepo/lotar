@@ -100,6 +100,14 @@
               </UiButton>
             </div>
           </div>
+          <p v-if="settingsError" class="scan-error" role="alert" data-testid="scan-settings-error">
+            {{ settingsError }}
+          </p>
+          <div v-if="settingsWarnings.length" class="scan-warnings" data-testid="scan-settings-warnings">
+            <ul>
+              <li v-for="warning in settingsWarnings" :key="warning">{{ warning }}</li>
+            </ul>
+          </div>
           <p v-if="configError" class="scan-error">{{ configError }}</p>
           <div v-else-if="configLoading" class="scan-loading">
             <UiLoader size="sm">Loading…</UiLoader>
@@ -119,8 +127,15 @@
               <UiInput v-model="editSignalWords" placeholder="TODO, FIXME, HACK" />
             </label>
             <label class="scan-field">
-              <span class="scan-field__label muted">Ticket patterns</span>
-              <UiInput v-model="editTicketPatterns" placeholder="[A-Z]+-\\d+" />
+              <span class="scan-field__label muted">Ticket patterns (one per line)</span>
+              <textarea
+                v-model="editTicketPatterns"
+                class="input scan-field__patterns"
+                rows="2"
+                spellcheck="false"
+                data-testid="scan-ticket-patterns"
+                placeholder="[A-Z]+-\\d+"
+              ></textarea>
             </label>
             <div class="scan-field scan-field--checkbox">
               <input id="scan-mentions" v-model="editEnableMentions" type="checkbox" />
@@ -185,13 +200,16 @@
                 <div class="scan-entry__header">
                   <div class="scan-entry__meta">
                     <span :class="['scan-pill', statusClass(entry.status)]">{{ formatStatus(entry.status) }}</span>
+                    <span v-if="isApplied(entry)" class="scan-pill scan-pill--applied" data-testid="scan-entry-applied">
+                      Applied
+                    </span>
                     <span class="scan-pill scan-pill--action">{{ formatAction(entry.action) }}</span>
                     <span class="scan-entry__file">{{ entry.file }}:{{ entry.line }}</span>
                     <span v-if="isDryRunMessage(entry)" class="scan-entry__warning">{{ entry.message }}</span>
                   </div>
                   <div class="scan-entry__actions">
                     <UiButton
-                      v-if="scanResponse.dry_run && isSelectable(entry)"
+                      v-if="scanResponse.dry_run && isSelectable(entry) && !isApplied(entry)"
                       type="button"
                       :disabled="loading"
                       @click="applyEntry(entry)"
@@ -306,6 +324,7 @@ import UiInput from '../components/UiInput.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
+import { showToast } from '../components/toast'
 import { useProjects } from '../composables/useProjects'
 import { storageGetFlag, storageSetFlag } from '../utils/storage'
 
@@ -344,6 +363,8 @@ const scanResponse = ref<ScanResponse | null>(null)
 const configLoading = ref(false)
 const configError = ref<string | null>(null)
 const configState = ref<ConfigInspectResult | null>(null)
+const settingsError = ref<string | null>(null)
+const settingsWarnings = ref<string[]>([])
 
 // Editable scanner settings
 const editSignalWords = ref('')
@@ -364,21 +385,37 @@ const scanSummary = computed(() => {
   return scanResponse.value?.summary ?? { created: 0, updated: 0, skipped: 0, failed: 0 }
 })
 
-// Check if scanner settings have changed from saved config
-const settingsChanged = computed(() => {
+function sameList(a: readonly string[], b: readonly string[]) {
+  return a.length === b.length && a.every((value, index) => value === b[index])
+}
+
+/**
+ * DEV-264: only the scanner settings the user changed, against what the
+ * selected scope resolves to. Untouched (often inherited) values are never
+ * resent, so saving one toggle cannot pin copies of the others into a file.
+ */
+const changedSettings = computed<Record<string, string>>(() => {
   const effective = configState.value?.effective
-  if (!effective) return false
-  const savedSignalWords = (effective.scan_signal_words ?? []).join(', ')
-  const savedTicketPatterns = (effective.scan_ticket_patterns ?? []).join(', ')
-  const savedMentions = effective.scan_enable_mentions ?? false
-  const savedStrip = effective.scan_strip_attributes ?? false
-  return (
-    editSignalWords.value !== savedSignalWords ||
-    editTicketPatterns.value !== savedTicketPatterns ||
-    editEnableMentions.value !== savedMentions ||
-    editStripConfig.value !== savedStrip
-  )
+  if (!effective) return {}
+  const values: Record<string, string> = {}
+  const signalWords = parseList(editSignalWords.value)
+  if (!sameList(signalWords, effective.scan_signal_words ?? [])) {
+    values.scan_signal_words = JSON.stringify(signalWords)
+  }
+  const ticketPatterns = parseLines(editTicketPatterns.value)
+  if (!sameList(ticketPatterns, effective.scan_ticket_patterns ?? [])) {
+    values.scan_ticket_patterns = JSON.stringify(ticketPatterns)
+  }
+  if (editEnableMentions.value !== (effective.scan_enable_mentions ?? false)) {
+    values.scan_enable_mentions = JSON.stringify(editEnableMentions.value)
+  }
+  if (editStripConfig.value !== (effective.scan_strip_attributes ?? false)) {
+    values.scan_strip_attributes = JSON.stringify(editStripConfig.value)
+  }
+  return values
 })
+
+const settingsChanged = computed(() => Object.keys(changedSettings.value).length > 0)
 
 const scanEntries = computed(() =>
   Array.isArray(scanResponse.value?.entries) ? (scanResponse.value?.entries ?? []) : [],
@@ -435,6 +472,14 @@ function parseList(raw: string) {
     .filter(Boolean)
 }
 
+/** Regexes may contain commas (`{2,5}`, `[,;]`): one per line, never split on commas. */
+function parseLines(raw: string) {
+  return raw
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+}
+
 function buildRequest(dryRun: boolean, targets?: ScanTarget[]): ScanRequest {
   const stripValue = stripAttributes.value === 'inherit' ? undefined : stripAttributes.value === 'true'
   return {
@@ -450,19 +495,31 @@ function buildRequest(dryRun: boolean, targets?: ScanTarget[]): ScanRequest {
   }
 }
 
+function normalizeResponse(response: ScanResponse): ScanResponse {
+  return {
+    ...response,
+    summary: response?.summary ?? { created: 0, updated: 0, skipped: 0, failed: 0 },
+    entries: Array.isArray(response?.entries) ? response.entries : [],
+    warnings: Array.isArray(response?.warnings) ? response.warnings : [],
+    info: Array.isArray(response?.info) ? response.info : [],
+  }
+}
+
+/** Entries of the current dry run already applied one by one (DEV-264). */
+const appliedKeys = reactive(new Set<string>())
+
+function isApplied(entry: ScanEntry) {
+  return appliedKeys.has(entryKey(entry))
+}
+
 async function runScan(dryRun: boolean, targets?: ScanTarget[]) {
   error.value = null
   loading.value = true
   try {
     const payload = buildRequest(dryRun, targets)
     const response = await api.scanRun(payload)
-    scanResponse.value = {
-      ...response,
-      summary: response?.summary ?? { created: 0, updated: 0, skipped: 0, failed: 0 },
-      entries: Array.isArray(response?.entries) ? response.entries : [],
-      warnings: Array.isArray(response?.warnings) ? response.warnings : [],
-      info: Array.isArray(response?.info) ? response.info : [],
-    }
+    scanResponse.value = normalizeResponse(response)
+    appliedKeys.clear()
   } catch (err: any) {
     error.value = err?.message || 'Failed to run scan'
   } finally {
@@ -470,13 +527,40 @@ async function runScan(dryRun: boolean, targets?: ScanTarget[]) {
   }
 }
 
+/**
+ * Apply one finding of the dry run, then show its result in place: the rest
+ * of the preview, and its Apply buttons, stay as they were (DEV-264).
+ */
 async function applyEntry(entry: ScanEntry) {
-  if (!scanResponse.value?.dry_run || !isSelectable(entry)) return
-  await runScan(false, [{ file: entry.file, line: entry.line }])
+  const preview = scanResponse.value
+  if (!preview?.dry_run || !isSelectable(entry) || isApplied(entry)) return
+  error.value = null
+  loading.value = true
+  try {
+    const response = normalizeResponse(await api.scanRun(buildRequest(false, [{ file: entry.file, line: entry.line }])))
+    if (scanResponse.value !== preview) return
+    const key = entryKey(entry)
+    const result =
+      response.entries.find((candidate) => entryKey(candidate) === key) ??
+      (response.entries.length === 1 ? response.entries[0] : undefined)
+    const merged = { ...entry, ...(result ?? {}), file: entry.file, line: entry.line }
+    scanResponse.value = {
+      ...preview,
+      entries: preview.entries.map((candidate) => (entryKey(candidate) === key ? merged : candidate)),
+      warnings: Array.from(new Set([...preview.warnings, ...response.warnings])),
+      info: Array.from(new Set([...(preview.info ?? []), ...(response.info ?? [])])),
+    }
+    if (merged.status !== 'failed') appliedKeys.add(key)
+  } catch (err: unknown) {
+    error.value = (err instanceof Error && err.message) || 'Failed to apply finding'
+  } finally {
+    loading.value = false
+  }
 }
 
 function clearResults() {
   scanResponse.value = null
+  appliedKeys.clear()
 }
 
 function snippetState(entry: ScanEntry) {
@@ -516,7 +600,7 @@ function isHighlighted(lineNumber: number, snippet?: ReferenceSnippet | null) {
 function syncEditableFields() {
   const effective = configState.value?.effective
   editSignalWords.value = (effective?.scan_signal_words ?? []).join(', ')
-  editTicketPatterns.value = (effective?.scan_ticket_patterns ?? []).join(', ')
+  editTicketPatterns.value = (effective?.scan_ticket_patterns ?? []).join('\n')
   editEnableMentions.value = effective?.scan_enable_mentions ?? false
   editStripConfig.value = effective?.scan_strip_attributes ?? false
 }
@@ -535,21 +619,22 @@ async function loadConfig() {
 }
 
 async function saveAllSettings() {
+  const values = { ...changedSettings.value }
+  if (!Object.keys(values).length) return
+  const scope = project.value
   configLoading.value = true
-  configError.value = null
+  settingsError.value = null
+  settingsWarnings.value = []
   try {
-    const values: Record<string, string> = {
-      scan_signal_words: JSON.stringify(parseList(editSignalWords.value)),
-      scan_ticket_patterns: JSON.stringify(parseList(editTicketPatterns.value)),
-      scan_enable_mentions: JSON.stringify(editEnableMentions.value),
-      scan_strip_attributes: JSON.stringify(editStripConfig.value),
-    }
-    const payload: { values: Record<string, string>; project?: string } = { values }
-    if (project.value) payload.project = project.value
-    await api.setConfig(payload)
+    // DEV-264: "Global" writes the global config, never the default project.
+    const result = await api.setConfig({ values, project: scope || undefined, global: !scope })
+    const warnings = Array.isArray(result?.warnings) ? result.warnings : []
+    if (Array.isArray(result?.errors) && result.errors.length) throw new Error(result.errors.join('\n'))
+    settingsWarnings.value = warnings
+    showToast(warnings.length ? 'Scanner settings saved with warnings' : 'Scanner settings saved')
     await loadConfig()
   } catch (err: any) {
-    configError.value = err?.message || 'Failed to save settings'
+    settingsError.value = err?.message || 'Failed to save settings'
   } finally {
     configLoading.value = false
   }
@@ -585,6 +670,8 @@ onMounted(async () => {
 })
 
 watch(project, async () => {
+  settingsError.value = null
+  settingsWarnings.value = []
   await loadConfig()
 })
 </script>
