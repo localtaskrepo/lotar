@@ -1,14 +1,22 @@
 title: MCP tool restrictions (LOTAR_MCP_TOOLS, job tool set) can be bypassed
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:36.874020+00:00
-modified: 2026-10-31T22:06:36.936817+00:00
+modified: 2026-11-03T23:42:51.862510+00:00
 relationships:
   related:
   - DEV-253
   - TEST-1
+comments:
+- date: 2026-11-03T23:42:51.818328+00:00
+  text: |-
+    Outcome: both findings fixed.
+    1. LOTAR_MCP_TOOLS now applies to every entry point: direct method calls (task/delete, agent/run) check the canonical tool name before dispatch; tools/call resolves aliases first, so task/get works when task_get is allowed; schema/discover lists only allowed tools.
+    2. In a restricted session (LOTAR_MCP_TOOLS set, as for agent jobs) task_update refuses to assign a ticket to an agent profile, since that queues an agent job. docs/help/agent.md now also says the restriction is not a security boundary (the agent has a shell and lotar on PATH); mcp.md describes the full rule.
+    Evidence: src/mcp/server/mcp_server_tests.rs tool_allowlist_covers_every_entry_point (direct task/delete refused and file untouched, alias allowed, discover toolCount 2, @helper assignment refused, person assignment allowed); 119 MCP tests pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -36,3 +44,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253","TEST-1"]}'
+- at: 2026-11-03T23:38:06.795528+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T23:42:51.818328+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T23:42:51.862510+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

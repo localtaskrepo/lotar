@@ -169,7 +169,7 @@ agents:
 | `copilot` | `--additional-mcp-config` | `--allow-tool=lotar` |
 | `codex` | `-c mcp_servers.lotar.*` | `default_tools_approval_mode = "approve"` |
 
-The server only offers the tools a job needs: `task_get`, `task_list`, `task_update`, `task_comment_add`, `task_reference_add`, `relationship_graph`, `config_show` and `whoami` (set through `LOTAR_MCP_TOOLS`, which `lotar mcp` honours in general). An agent can't start other agents, delete tasks or sync through it. Because the server is named `lotar`, it takes the place of a LoTaR server with that name in the CLI's own settings for the job, which would point at a different tasks directory or build. Other runners don't support the switch; their jobs log a note and use the CLI.
+The server only offers the tools a job needs: `task_get`, `task_list`, `task_update`, `task_comment_add`, `task_reference_add`, `relationship_graph`, `config_show` and `whoami` (set through `LOTAR_MCP_TOOLS`, which `lotar mcp` honours in general). An agent can't start other agents (including by assigning a ticket to an agent profile), delete tasks or sync through it. This limits the MCP tools only: the agent still has a shell and `lotar` on its PATH, so it is not a security boundary. Because the server is named `lotar`, it takes the place of a LoTaR server with that name in the CLI's own settings for the job, which would point at a different tasks directory or build. Other runners don't support the switch; their jobs log a note and use the CLI.
 
 ## list-running requirements
 

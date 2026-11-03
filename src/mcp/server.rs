@@ -453,6 +453,14 @@ fn route_request(
         }
         "schema/discover" => handle_schema_discover(id, &params),
         _ => match registry::find_tool_by_method(&method_key) {
+            // Direct method calls obey LOTAR_MCP_TOOLS like tools/call does
+            // (DEV-277: `task/delete` used to bypass the allow-list).
+            Some(spec) if !tool_allowed(spec.name) => err(
+                Some(id),
+                -32601,
+                &format!("Tool '{}' is not available in this session", spec.name),
+                None,
+            ),
             Some(spec) => {
                 let (response, _domain_error) = registry::invoke_tool(spec, Some(id), params);
                 response
@@ -517,10 +525,15 @@ fn initialize_response(id: Value) -> JsonRpcResponse {
     )
 }
 
+/// Whether `LOTAR_MCP_TOOLS` restricts this session at all.
+pub(crate) fn tools_restricted() -> bool {
+    std::env::var("LOTAR_MCP_TOOLS").is_ok_and(|list| !list.trim().is_empty())
+}
+
 /// `LOTAR_MCP_TOOLS` (comma-separated tool names) limits which tools this
 /// server lists and runs; agent jobs use it so an agent can update its
 /// ticket but not, say, start other agents. Unset means every tool.
-fn tool_allowed(name: &str) -> bool {
+pub(crate) fn tool_allowed(name: &str) -> bool {
     match std::env::var("LOTAR_MCP_TOOLS") {
         Ok(list) if !list.trim().is_empty() => list
             .split(',')
@@ -538,7 +551,12 @@ fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
             Some(json!({ "tool": null, "issues": ["params.name must be a string"] })),
         );
     };
-    if !tool_allowed(name) {
+    // Resolve aliases (`task/get`) first, then check the canonical name.
+    let spec = match registry::find_tool_for_call(name) {
+        Ok(spec) => spec,
+        Err(message) => return err(Some(id), -32602, &message, None),
+    };
+    if !tool_allowed(spec.name) {
         return err(
             Some(id),
             -32602,
@@ -546,10 +564,6 @@ fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
             None,
         );
     }
-    let spec = match registry::find_tool_for_call(name) {
-        Ok(spec) => spec,
-        Err(message) => return err(Some(id), -32602, &message, None),
-    };
     let arguments = match params.get("arguments") {
         None | Some(Value::Null) => json!({}),
         Some(value @ Value::Object(_)) => value.clone(),
@@ -572,6 +586,12 @@ fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
 fn handle_schema_discover(id: Value, params: &Value) -> JsonRpcResponse {
     let enum_hints = gather_enum_hints();
     let mut tools = build_tool_definitions(enum_hints.as_ref());
+    // Only the tools this session may run, like tools/list.
+    tools.retain(|tool| {
+        tool.get("name")
+            .and_then(|v| v.as_str())
+            .is_some_and(tool_allowed)
+    });
     if let Some(filter) = params
         .get("tool")
         .and_then(|v| v.as_str())

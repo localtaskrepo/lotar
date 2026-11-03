@@ -726,6 +726,23 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
         );
     }
 
+    // A restricted session (agent jobs) may not start agents, and assigning
+    // a ticket to an agent profile starts one (DEV-277).
+    if crate::mcp::server::tools_restricted()
+        && let Some(assignee) = patch.assignee.as_deref()
+        && let Some(profile) = assignee.trim().strip_prefix('@')
+        && project_cfg.agent_profiles.contains_key(profile)
+    {
+        return err(
+            req.id,
+            -32602,
+            &format!(
+                "Assigning tickets to agent profile '@{profile}' is not available in this session"
+            ),
+            None,
+        );
+    }
+
     let mut storage = Storage::new(&resolver.path.clone());
     match TaskService::update(&mut storage, id, patch) {
         Ok(task) => text_result(req.id, &task),

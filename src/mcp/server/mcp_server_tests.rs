@@ -2122,3 +2122,76 @@ fn tool_allowlist_limits_listing_and_calls() {
     let error = call.error.expect("agent_run refused");
     assert!(error.message.contains("not available"), "{}", error.message);
 }
+
+/// DEV-277: the allow-list also covers direct method calls, aliases and
+/// schema/discover, and a restricted session can't start agents by
+/// assigning a ticket to an agent profile.
+#[test]
+fn tool_allowlist_covers_every_entry_point() {
+    let _tasks_lock = lock_var("LOTAR_TASKS_DIR");
+    let _lock = lock_var("LOTAR_MCP_TOOLS");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    std::fs::write(
+        tasks_dir.join("config.yml"),
+        "default:\n  project: MCP\nagents:\n  helper:\n    runner: command\n    command: 'true'\n",
+    )
+    .unwrap();
+    // SAFETY: both variables are guarded by the test env locks above.
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
+    }
+    let call = |method: &str, params: Value| {
+        dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: method.into(),
+            params,
+        })
+    };
+    let created = call(
+        "tools/call",
+        json!({"name": "task_create", "arguments": {"title": "Guarded", "project": "MCP"}}),
+    );
+    assert!(created.error.is_none(), "{:?}", created.error);
+
+    unsafe { std::env::set_var("LOTAR_MCP_TOOLS", "task_get,task_update") };
+    let direct = call("task/delete", json!({"id": "MCP-1"}));
+    let alias = call(
+        "tools/call",
+        json!({"name": "task/get", "arguments": {"id": "MCP-1"}}),
+    );
+    let discover = call("schema/discover", json!({}));
+    let assign = call(
+        "tools/call",
+        json!({"name": "task_update", "arguments": {"id": "MCP-1", "patch": {"assignee": "@helper"}}}),
+    );
+    let assign_person = call(
+        "tools/call",
+        json!({"name": "task_update", "arguments": {"id": "MCP-1", "patch": {"assignee": "alice"}}}),
+    );
+    unsafe {
+        std::env::remove_var("LOTAR_MCP_TOOLS");
+        std::env::remove_var("LOTAR_TASKS_DIR");
+    }
+
+    let error = direct.error.expect("direct task/delete refused");
+    assert!(error.message.contains("not available"), "{}", error.message);
+    let stored = std::fs::read_to_string(tasks_dir.join("MCP").join("1.yml")).unwrap();
+    assert!(!stored.contains("deleted_at"), "task must not be deleted");
+    assert!(
+        alias.error.is_none(),
+        "alias of an allowed tool works: {:?}",
+        alias.error
+    );
+    let text = discover.result.as_ref().unwrap()["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let payload: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(payload["toolCount"], 2, "{payload}");
+    let error = assign.error.expect("agent assignment refused");
+    assert!(error.message.contains("@helper"), "{}", error.message);
+    assert!(assign_person.error.is_none(), "{:?}", assign_person.error);
+}
