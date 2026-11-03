@@ -511,6 +511,34 @@ describe('TaskStore', () => {
             await vi.waitFor(() => expect(mockClient.getTask).toHaveBeenCalledTimes(1))
         })
 
+        it('skips the single-task fetch for the watcher echo of a full DTO just applied (DEV-274)', async () => {
+            mockClient.getTask.mockResolvedValue(makeTask('P-1', { title: 'Fetched' }))
+            fireEvent('task_updated', makeTask('P-1', { title: 'Via API' }))
+            fireEvent('task_updated', { id: 'P-1' })
+            fireEvent('task_updated', { id: 'P-1' })
+            await vi.advanceTimersByTimeAsync(500)
+            expect(mockClient.getTask).not.toHaveBeenCalled()
+            expect(store._map.value.get('P-1')?.title).toBe('Via API')
+
+            // Other ids, and later id-only events, still fetch.
+            fireEvent('task_updated', { id: 'P-2' })
+            await vi.advanceTimersByTimeAsync(200)
+            expect(mockClient.getTask).toHaveBeenCalledWith('P-2', undefined, { includeDeleted: false })
+            await vi.advanceTimersByTimeAsync(2000)
+            fireEvent('task_updated', { id: 'P-1' })
+            await vi.advanceTimersByTimeAsync(200)
+            expect(mockClient.getTask).toHaveBeenCalledWith('P-1', undefined, { includeDeleted: false })
+        })
+
+        it('a full DTO cancels a strict fetch queued by an earlier id-only event (DEV-274)', async () => {
+            mockClient.getTask.mockResolvedValue(makeTask('P-1', { title: 'Fetched' }))
+            fireEvent('task_updated', { id: 'P-1' })
+            fireEvent('task_updated', makeTask('P-1', { title: 'Via API' }))
+            await vi.advanceTimersByTimeAsync(500)
+            expect(mockClient.getTask).not.toHaveBeenCalled()
+            expect(store._map.value.get('P-1')?.title).toBe('Via API')
+        })
+
         it('task_deleted optimistically tombstones in-place and reconciles via the trash endpoint', async () => {
             store.upsert(makeTask('P-1'))
             fireEvent('task_deleted', { id: 'P-1' })
@@ -921,7 +949,7 @@ describe('TaskStore', () => {
             query.release()
         })
 
-        it('invalidation immediately supersedes an in-flight refresh before the debounce fires', async () => {
+        it('lets an in-flight refresh publish, then runs one trailing refresh for events during it (DEV-274)', async () => {
             const query = store.getQuery({ project: 'A' })
             query.retain()
             mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('A-1')]))
@@ -932,20 +960,59 @@ describe('TaskStore', () => {
             mockClient.listTasks.mockImplementationOnce(() => inFlight.promise)
             const pending = query.refresh()
 
-            // An SSE event invalidates while the manual refresh is in flight: it
-            // must be superseded NOW, not after the 250ms debounce successor.
+            // A burst of events while the refresh runs: none of them may
+            // discard it, and together they owe exactly one trailing refresh.
             fireEvent('task_updated', makeTask('A-1', { title: 'moved' }))
+            await vi.advanceTimersByTimeAsync(100)
+            fireEvent('task_created', makeTask('A-2'))
+            await vi.advanceTimersByTimeAsync(300)
+            fireEvent('task_updated', { id: 'A-2' })
+            expect(mockClient.listTasks).toHaveBeenCalledTimes(2)
             expect(query.status.value).toBe('loading')
 
-            inFlight.resolve(listResponse([makeTask('STALE-1')]))
+            inFlight.resolve(listResponse([makeTask('IN-FLIGHT-1')]))
             await pending
-            expect(query.ids.value).toEqual(['A-1'])
-            expect(query.status.value).toBe('loading')
+            expect(query.ids.value).toEqual(['IN-FLIGHT-1'])
+            expect(query.status.value).toBe('ready')
 
-            mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('FRESH-1')]))
+            mockClient.listTasks.mockResolvedValue(listResponse([makeTask('FRESH-1')]))
             await vi.advanceTimersByTimeAsync(300)
             await vi.waitFor(() => expect(query.tasks.value.map((t) => t.id)).toEqual(['FRESH-1']))
             expect(query.status.value).toBe('ready')
+            await vi.advanceTimersByTimeAsync(1000)
+            expect(mockClient.listTasks).toHaveBeenCalledTimes(3)
+            query.release()
+        })
+
+        it('keeps publishing when events arrive faster than a refresh completes (DEV-274)', async () => {
+            const query = store.getQuery({ project: 'BUSY' })
+            query.retain()
+            const responses: Array<ReturnType<typeof deferred<{ total: number; tasks: TaskDTO[] }>>> = []
+            mockClient.listTasks.mockImplementation(() => {
+                const next = deferred<{ total: number; tasks: TaskDTO[] }>()
+                responses.push(next)
+                return next.promise
+            })
+            void query.refresh()
+
+            // Every refresh takes 1s; an event lands every 100ms throughout.
+            const published: string[][] = []
+            for (let tick = 1; tick <= 40; tick += 1) {
+                fireEvent('task_updated', makeTask('B-1', { title: `edit ${tick}` }))
+                await vi.advanceTimersByTimeAsync(100)
+                if (tick % 10 === 0) {
+                    responses[responses.length - 1]!.resolve(listResponse([makeTask(`B-${tick}`)]))
+                    await vi.advanceTimersByTimeAsync(0)
+                    published.push([...query.ids.value])
+                }
+            }
+            // Each slow refresh published its rows instead of being discarded.
+            expect(published).toEqual([['B-10'], ['B-20'], ['B-30'], ['B-40']])
+            // One refresh at a time: the initial run plus one trailing run after
+            // each publish (the last one starts after its debounce).
+            expect(responses.length).toBe(4)
+            await vi.advanceTimersByTimeAsync(300)
+            expect(responses.length).toBe(5)
             query.release()
         })
 

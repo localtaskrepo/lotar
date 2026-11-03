@@ -1,13 +1,22 @@
 title: Web UI refetches the whole task list on every event and ships one 1.4 MB bundle
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:36.406625+00:00
-modified: 2026-10-31T22:06:36.466800+00:00
+modified: 2026-11-03T22:28:03.298699+00:00
 relationships:
   related:
   - DEV-253
+  - DEV-255
+comments:
+- date: 2026-11-03T22:28:03.137350+00:00
+  text: |-
+    Outcome: both findings fixed.
+    1. useTaskStore: an SSE invalidation no longer discards a running refresh; it marks it dirty, the refresh publishes, and one debounced trailing refresh follows. An id-only task_updated within 2 s of a full-DTO event for the same id skips fetchOne, and a full DTO cancels a queued fetch for that id. Declined: client-side filter re-evaluation (the store has no engine for the full server filter grammar; the server stays the filter authority, and the refresh is now coalesced; with DEV-255 a refresh is fast).
+    2. Every route except / is lazy-loaded; a vite:preloadError handler reloads once after an upgrade. Entry chunk 1,446,715 B -> 512,928 B (initial JS incl. preloads 642,845 B / 208 kB gz); chart.js moved out of the entry. chunkSizeWarningLimit lowered from 1500 to 520 (the entry still holds TaskPanel, router, FilterBar and TasksList, so the 500 kB default isn't reachable without more splitting).
+    Evidence: useTaskStore.spec.ts rewritten/extended (in-flight publish + one trailing refresh, livelock test, echo skip, queued fetch cancel); full UI suite 1427 pass; new smoke spec ui.lazy-routes passes on a rebuilt binary; full smoke passes. Not measured: coalesced refresh under live agent load; stale-chunk reload after an upgrade.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -35,3 +44,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T22:28:03.137350+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:28:03.199696+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-253"]}'
+    new: '{"related":["DEV-253","DEV-255"]}'
+- at: 2026-11-03T22:28:03.298699+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

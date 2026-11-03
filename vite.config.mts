@@ -26,7 +26,10 @@ const baseConfig: UserConfig = {
     build: {
         outDir: resolve(__dirname, 'target/web'),
         emptyOutDir: true,
-        chunkSizeWarningLimit: 1500,
+        // DEV-274: pages load on demand; the entry chunk (~513 kB) still holds
+        // the global task panel (markdown + DOMPurify) and the default Tasks
+        // page. Keep the warning close above it so growth stays visible.
+        chunkSizeWarningLimit: 520,
     },
     define: {
         'import.meta.env.VITE_CARGO_VERSION': JSON.stringify(CARGO_VERSION),

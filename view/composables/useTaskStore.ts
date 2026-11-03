@@ -28,6 +28,13 @@
  * in or out of a filter converge without any client-side predicate engine
  * (the server stays the only filter authority).
  *
+ * DEV-274 coalescing: an invalidation never discards a refresh that is
+ * already running. The running refresh publishes, and every invalidation that
+ * arrived meanwhile collapses into ONE trailing refresh, so a steady stream of
+ * events cannot keep a slow list in `loading` forever. Full-DTO events are
+ * written to the entity map at once; the watcher's id-only echo of the same
+ * write skips its single-task fetch.
+ *
  * The legacy flat surface (`items`/`count`/`orderIndex`/`serverTotal`/
  * `status`/`error`/`lastSyncAt`/`hydrateAll`/`hydratePage`/`forceRefresh`)
  * remains a view over the *active* (most recently hydrated) query, falling
@@ -246,6 +253,10 @@ interface QueryEntry {
     liveHandles: number
     /** Currently running refreshes for this entry. */
     inFlight: number
+    /** Generation of the running authoritative refresh, if any (DEV-274). */
+    runningGeneration: number | null
+    /** Invalidated while a refresh was running: owes one trailing refresh. */
+    dirty: boolean
     /** True once a good server snapshot has been published. */
     hasSnapshot: ShallowRef<boolean>
     refreshTimer: ReturnType<typeof setTimeout> | null
@@ -266,6 +277,12 @@ const MAX_PAGES = 10_000
 const LIVE_REFRESH_DEBOUNCE_MS = 250
 /** Debounce for fswatcher task_updated (ID-only) single-task fetches. */
 const FETCH_ONE_DEBOUNCE_MS = 150
+/**
+ * DEV-274: an API write emits its full DTO and then the file watcher's
+ * id-only echo of the same write. Within this window after a full DTO for an
+ * id, the echo's single-task fetch is redundant and skipped.
+ */
+const FULL_DTO_ECHO_MS = 2000
 /** Paging params are per-request only; they must not fork the query key. */
 const PAGING_KEYS = new Set(['limit', 'offset', 'page'])
 
@@ -353,6 +370,28 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     // through the trash endpoint (the event is metadata-only for BOTH soft
     // and hard deletes, so only the server can distinguish them).
     const pendingFetches = new Map<string, { timer: ReturnType<typeof setTimeout>; includeDeleted: boolean }>()
+    // DEV-274: when a full-DTO SSE event last updated each id (Date.now()).
+    const fullDtoAppliedAt = new Map<string, number>()
+
+    function noteFullDto(id: string) {
+        const now = Date.now()
+        for (const [key, at] of fullDtoAppliedAt) {
+            if (now - at > FULL_DTO_ECHO_MS) fullDtoAppliedAt.delete(key)
+        }
+        fullDtoAppliedAt.set(id, now)
+        // A strict fetch queued by an earlier id-only event would only return
+        // this DTO (or an older one) now.
+        const pending = pendingFetches.get(id)
+        if (pending && !pending.includeDeleted) {
+            clearTimeout(pending.timer)
+            pendingFetches.delete(id)
+        }
+    }
+
+    function fullDtoJustApplied(id: string): boolean {
+        const at = fullDtoAppliedAt.get(id)
+        return at !== undefined && Date.now() - at <= FULL_DTO_ECHO_MS
+    }
 
     function scheduleFetchOne(id: string, includeDeleted: boolean) {
         const existing = pendingFetches.get(id)
@@ -547,6 +586,8 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 runs: 0,
                 liveHandles: 0,
                 inFlight: 0,
+                runningGeneration: null,
+                dirty: false,
                 hasSnapshot: shallowRef(false),
                 refreshTimer: null,
                 ids: shallowRef<readonly string[]>([]),
@@ -573,23 +614,39 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         }
     }
 
+    /** True while the entry's current-generation refresh is still running. */
+    function isRefreshRunning(entry: QueryEntry): boolean {
+        return entry.runningGeneration !== null && entry.runningGeneration === entry.generation
+    }
+
+    function scheduleEntryRefresh(entry: QueryEntry): void {
+        if (entry.refreshTimer !== null) return
+        entry.refreshTimer = setTimeout(() => {
+            entry.refreshTimer = null
+            if (entry.liveHandles <= 0) return
+            if (isRefreshRunning(entry)) {
+                entry.dirty = true
+                return
+            }
+            void runQueryRefresh(entry)
+        }, LIVE_REFRESH_DEBOUNCE_MS)
+    }
+
     /**
-     * Invalidate one retained query: schedule a debounced authoritative
-     * refresh AND immediately supersede any in-flight refresh so its stale
-     * membership cannot publish during the debounce window. The entry stays
-     * `loading` until the successor runs, so it can never get stuck `ready`
-     * with stale rows or starve (each timer fires 250ms after it is set).
+     * Invalidate one retained query (DEV-274). With no refresh running, a
+     * debounced authoritative refresh is scheduled; events inside the window
+     * share it. A running refresh is NOT superseded: it publishes, then the
+     * entry runs one trailing refresh covering every invalidation that arrived
+     * meanwhile. Superseding it instead would leave a list that takes longer
+     * to load than the gap between events in `loading` forever.
      */
     function invalidateEntry(entry: QueryEntry): void {
         if (entry.liveHandles <= 0) return
-        if (entry.refreshTimer === null) {
-            entry.refreshTimer = setTimeout(() => {
-                entry.refreshTimer = null
-                if (entry.liveHandles <= 0) return
-                void runQueryRefresh(entry)
-            }, LIVE_REFRESH_DEBOUNCE_MS)
+        if (isRefreshRunning(entry)) {
+            entry.dirty = true
+            return
         }
-        if (entry.inFlight > 0) entry.generation += 1
+        scheduleEntryRefresh(entry)
     }
 
     function invalidateRetainedQueries(): void {
@@ -607,6 +664,11 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         entry.status.value = 'loading'
         entry.error.value = null
         entry.inFlight += 1
+        // This request starts after every invalidation so far, so it answers
+        // them: a pending debounce or owed trailing refresh is redundant.
+        clearEntryTimer(entry)
+        entry.dirty = false
+        entry.runningGeneration = generation
 
         // Merge mode keeps the legacy union semantics: existing members (or, on
         // the very first run, the raw entity keys) stay, response tasks append.
@@ -673,6 +735,13 @@ function createTaskStore(client: ApiClient): TaskStoreState {
             entry.error.value = err instanceof Error ? err.message : String(err)
         } finally {
             entry.inFlight -= 1
+            if (entry.runningGeneration === generation) entry.runningGeneration = null
+            // Invalidations that arrived while this refresh ran get one
+            // trailing refresh (debounced, so a burst still costs one run).
+            if (entry.dirty && !isRefreshRunning(entry)) {
+                entry.dirty = false
+                if (entry.liveHandles > 0) scheduleEntryRefresh(entry)
+            }
         }
     }
 
@@ -708,6 +777,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 entry.liveHandles = Math.max(0, entry.liveHandles - 1)
                 if (entry.liveHandles === 0) {
                     clearEntryTimer(entry)
+                    entry.dirty = false
                     // Last owner left: an in-flight refresh must not publish either.
                     if (entry.inFlight > 0) entry.generation += 1
                 }
@@ -950,6 +1020,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 // decided by the authoritative refresh scheduled below.
                 if (id && payload.title) {
                     writeEntity(payload as TaskDTO)
+                    noteFullDto(id)
                 }
                 invalidateRetainedQueries()
                 break
@@ -960,16 +1031,20 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 // Filesystem-watcher events only include { id }.
                 if (payload.title) {
                     writeEntity(payload as TaskDTO)
-                    invalidateRetainedQueries()
-                } else {
+                    noteFullDto(id)
+                } else if (!fullDtoJustApplied(id)) {
                     // Debounce per-ID so rapid writes don't flood single-task fetches.
+                    // The watcher's echo of a write whose full DTO just arrived
+                    // has nothing newer to fetch (DEV-274).
                     scheduleFetchOne(id, false)
-                    invalidateRetainedQueries()
                 }
+                // Membership still converges through the (coalesced) refresh.
+                invalidateRetainedQueries()
                 break
             }
             case 'task_deleted': {
                 if (id) {
+                    fullDtoAppliedAt.delete(id)
                     // Cancel any pending fetch for this task.
                     const pending = pendingFetches.get(id)
                     if (pending) {
@@ -1052,6 +1127,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         // Clear pending debounced fetches
         for (const entry of pendingFetches.values()) clearTimeout(entry.timer)
         pendingFetches.clear()
+        fullDtoAppliedAt.clear()
     }
 
     return {
