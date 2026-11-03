@@ -105,17 +105,41 @@ pub fn serve_with_config(
     port: u16,
     config: &WebServerConfig,
 ) {
-    let addr = format!("{}:{}", host, port);
-    let listener = match TcpListener::bind(&addr) {
-        Ok(l) => l,
+    let listeners = match bind_host(host, port) {
+        Ok(listeners) => listeners,
         Err(e) => {
             OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
-                .log_error(format_args!("Failed to bind to {}: {}", addr, e));
+                .log_error(format_args!("Failed to bind to {}:{}: {}", host, port, e));
             return;
         }
     };
+    let refs: Vec<&TcpListener> = listeners.iter().collect();
+    serve_listeners(api_server, &refs, config);
+}
 
-    serve_listener(api_server, &listener, config);
+/// Bind `host:port`. `localhost` binds both loopback addresses (127.0.0.1
+/// and ::1) on the same port, so IPv4 and IPv6 clients reach this server and
+/// a port taken on either one is reported as busy (DEV-272: binding the
+/// first resolved address left 127.0.0.1 to whatever else held it). A
+/// missing IPv6 stack only skips ::1. Port 0 picks one free port for both.
+pub fn bind_host(host: &str, port: u16) -> std::io::Result<Vec<TcpListener>> {
+    if !host.trim().eq_ignore_ascii_case("localhost") {
+        return Ok(vec![TcpListener::bind((host, port))?]);
+    }
+    // With port 0 the free IPv4 port may be taken on ::1; pick again.
+    let attempts = if port == 0 { 8 } else { 1 };
+    let mut last_err = None;
+    for _ in 0..attempts {
+        let v4 = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))?;
+        let actual = v4.local_addr()?.port();
+        match TcpListener::bind((std::net::Ipv6Addr::LOCALHOST, actual)) {
+            Ok(v6) => return Ok(vec![v4, v6]),
+            Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => last_err = Some(err),
+            // No IPv6 loopback on this machine: IPv4 alone is complete.
+            Err(_) => return Ok(vec![v4]),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| std::io::Error::from(std::io::ErrorKind::AddrInUse)))
 }
 
 /// Serve on an already-bound listener.
@@ -129,7 +153,20 @@ pub fn serve_listener(
     listener: &TcpListener,
     config: &WebServerConfig,
 ) {
-    let port = listener
+    serve_listeners(api_server, &[listener], config);
+}
+
+/// Serve on several already-bound listeners that share one port (the IPv4
+/// and IPv6 loopback sockets of `localhost`), one accept loop each.
+pub fn serve_listeners(
+    api_server: &api_server::ApiServer,
+    listeners: &[&TcpListener],
+    config: &WebServerConfig,
+) {
+    let Some(first) = listeners.first() else {
+        return;
+    };
+    let port = first
         .local_addr()
         .map(|addr| addr.port())
         .unwrap_or_default();
@@ -152,64 +189,84 @@ pub fn serve_listener(
     let active = Arc::new(AtomicUsize::new(0));
     let peers: Arc<Mutex<Vec<Weak<TcpStream>>>> = Arc::new(Mutex::new(Vec::new()));
 
+    std::thread::scope(|scope| {
+        for listener in listeners {
+            let active = Arc::clone(&active);
+            let peers = Arc::clone(&peers);
+            scope.spawn(move || {
+                accept_loop(api_server, listener, config, port, &active, &peers, scope);
+            });
+        }
+    });
+    // Final sweep: a peer accepted in the last iteration before the stop
+    // flag was observed missed the stop handler's own sweep.
+    shutdown_peer_connections(&peers, None);
+
+    let _ = STOP_FLAGS.lock().map(|mut m| m.remove(&port));
+}
+
+fn accept_loop<'scope, 'env>(
+    api_server: &'env api_server::ApiServer,
+    listener: &'env TcpListener,
+    config: &'env WebServerConfig,
+    port: u16,
+    active: &Arc<AtomicUsize>,
+    peers: &Arc<Mutex<Vec<Weak<TcpStream>>>>,
+    scope: &'scope std::thread::Scope<'scope, 'env>,
+) {
     // Poll the listener instead of blocking in accept() so the stop flag is
     // observed promptly even when no further connection arrives.
     let _ = listener.set_nonblocking(true);
+    loop {
+        // Check for test-initiated shutdown before handling the next connection
+        if STOP_FLAGS
+            .lock()
+            .ok()
+            .and_then(|m| m.get(&port).copied())
+            .unwrap_or(false)
+        {
+            break;
+        }
 
-    std::thread::scope(|scope| {
-        loop {
-            // Check for test-initiated shutdown before handling the next connection
-            if STOP_FLAGS
-                .lock()
-                .ok()
-                .and_then(|m| m.get(&port).copied())
-                .unwrap_or(false)
-            {
-                break;
+        match listener.accept() {
+            Ok((stream, _addr)) => {
+                // Accepted sockets are blocking per POSIX, but reset the
+                // flag explicitly so the non-blocking listener state can
+                // never leak into request handling.
+                let _ = stream.set_nonblocking(false);
+                if active.load(Ordering::Acquire) >= MAX_CONCURRENT_CONNECTIONS {
+                    // Fail closed: refuse the overload instead of
+                    // queuing it behind unbounded work.
+                    continue;
+                }
+                let stream = Arc::new(stream);
+                if let Ok(mut tracked) = peers.lock() {
+                    if tracked.len() >= MAX_TRACKED_PEERS {
+                        tracked.retain(|weak| weak.strong_count() > 0);
+                    }
+                    tracked.push(Arc::downgrade(&stream));
+                }
+                active.fetch_add(1, Ordering::AcqRel);
+                let active = Arc::clone(active);
+                let peers = Arc::clone(peers);
+                scope.spawn(move || {
+                    handle_connection(api_server, &stream, config, port, &peers);
+                    active.fetch_sub(1, Ordering::Release);
+                });
             }
-
-            match listener.accept() {
-                Ok((stream, _addr)) => {
-                    // Accepted sockets are blocking per POSIX, but reset the
-                    // flag explicitly so the non-blocking listener state can
-                    // never leak into request handling.
-                    let _ = stream.set_nonblocking(false);
-                    if active.load(Ordering::Acquire) >= MAX_CONCURRENT_CONNECTIONS {
-                        // Fail closed: refuse the overload instead of
-                        // queuing it behind unbounded work.
-                        continue;
-                    }
-                    let stream = Arc::new(stream);
-                    if let Ok(mut tracked) = peers.lock() {
-                        if tracked.len() >= MAX_TRACKED_PEERS {
-                            tracked.retain(|weak| weak.strong_count() > 0);
-                        }
-                        tracked.push(Arc::downgrade(&stream));
-                    }
-                    active.fetch_add(1, Ordering::AcqRel);
-                    let active = Arc::clone(&active);
-                    let peers = Arc::clone(&peers);
-                    scope.spawn(move || {
-                        handle_connection(api_server, &stream, config, port, &peers);
-                        active.fetch_sub(1, Ordering::Release);
-                    });
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    std::thread::sleep(ACCEPT_POLL_INTERVAL);
-                }
-                Err(e) => {
-                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                        .log_warn(format_args!("Connection error: {}", e));
-                }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(ACCEPT_POLL_INTERVAL);
+            }
+            Err(e) => {
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                    .log_warn(format_args!("Connection error: {}", e));
             }
         }
-        // Final sweep: a peer accepted in the last iteration before the stop
-        // flag was observed missed the stop handler's own sweep and would
-        // otherwise delay the scoped-thread join until its socket timeout.
-        shutdown_peer_connections(&peers, None);
-    });
-
-    let _ = STOP_FLAGS.lock().map(|mut m| m.remove(&port));
+    }
+    // A peer accepted in the last iteration before the stop flag was
+    // observed missed the stop handler's own sweep and would otherwise delay
+    // the scoped-thread join until its socket timeout.
+    shutdown_peer_connections(peers, None);
 }
 
 /// Service exactly one HTTP request on an accepted connection, then return
@@ -1223,6 +1280,34 @@ mod tests {
         let (_, query) = parse_path_and_query("/api/tasks/list?assignee=Jos%C3%A9&q=caf%C3%A9");
         assert_eq!(query.get("assignee").map(String::as_str), Some("José"));
         assert_eq!(query.get("q").map(String::as_str), Some("café"));
+    }
+
+    #[test]
+    fn localhost_binds_both_loopbacks_and_reports_either_one_busy() {
+        // DEV-272: binding only the first resolved address (::1 on macOS)
+        // left 127.0.0.1 unreachable and missed a port taken there.
+        let listeners = super::bind_host("localhost", 0).expect("bind localhost");
+        let port = listeners[0].local_addr().unwrap().port();
+        assert!(listeners[0].local_addr().unwrap().is_ipv4());
+        if let Some(v6) = listeners.get(1) {
+            assert!(v6.local_addr().unwrap().is_ipv6());
+            assert_eq!(v6.local_addr().unwrap().port(), port);
+        }
+        drop(listeners);
+
+        let held_v4 = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let busy = held_v4.local_addr().unwrap().port();
+        let err = super::bind_host("localhost", busy).expect_err("v4 port is busy");
+        assert_eq!(err.kind(), std::io::ErrorKind::AddrInUse);
+
+        if let Ok(held_v6) = std::net::TcpListener::bind(("::1", 0)) {
+            let busy = held_v6.local_addr().unwrap().port();
+            let free_on_v4 = std::net::TcpListener::bind(("127.0.0.1", busy)).is_ok();
+            if free_on_v4 {
+                let err = super::bind_host("localhost", busy).expect_err("v6 port is busy");
+                assert_eq!(err.kind(), std::io::ErrorKind::AddrInUse);
+            }
+        }
     }
 
     #[test]

@@ -193,19 +193,31 @@ fn url_host(host: &str) -> String {
 #[derive(Debug)]
 pub(crate) struct BoundPort {
     pub(crate) listener: TcpListener,
+    /// Further listeners on the same port (the ::1 socket of `localhost`).
+    pub(crate) extra: Vec<TcpListener>,
     pub(crate) preferred_port: u16,
     pub(crate) actual_port: u16,
     pub(crate) fell_back: bool,
 }
 
 impl BoundPort {
-    fn new(listener: TcpListener, preferred_port: u16, fell_back: bool) -> Result<Self, String> {
+    fn new(
+        mut listeners: Vec<TcpListener>,
+        preferred_port: u16,
+        fell_back: bool,
+    ) -> Result<Self, String> {
+        if listeners.is_empty() {
+            return Err("No socket was bound".to_string());
+        }
+        let listener = listeners.remove(0);
+        let extra = listeners;
         let actual_port = listener
             .local_addr()
             .map(|addr| addr.port())
             .map_err(|err| format!("Failed to inspect the bound socket: {}", err))?;
         Ok(Self {
             listener,
+            extra,
             preferred_port,
             actual_port,
             fell_back,
@@ -227,10 +239,10 @@ fn bind_server_socket(
     allow_fallback: bool,
     source_note: &str,
 ) -> Result<BoundPort, String> {
-    match TcpListener::bind((host, preferred_port)) {
-        Ok(listener) => BoundPort::new(listener, preferred_port, false),
+    match web_server::bind_host(host, preferred_port) {
+        Ok(listeners) => BoundPort::new(listeners, preferred_port, false),
         Err(err) if allow_fallback && err.kind() == std::io::ErrorKind::AddrInUse => {
-            let listener = TcpListener::bind((host, 0)).map_err(|fallback_err| {
+            let listener = web_server::bind_host(host, 0).map_err(|fallback_err| {
                 format!(
                     "Failed to bind to {}:0 (fallback after port {} was in use): {}",
                     host, preferred_port, fallback_err
@@ -379,7 +391,9 @@ impl CommandHandler for ServeHandler {
         let mut api_server = api_server::ApiServer::new();
         routes::initialize(&mut api_server);
         // Serve on the pre-bound listener; API and UI served together
-        web_server::serve_listener(&api_server, &bound.listener, &web_config);
+        let mut listeners = vec![&bound.listener];
+        listeners.extend(bound.extra.iter());
+        web_server::serve_listeners(&api_server, &listeners, &web_config);
 
         Ok(())
     }

@@ -1,13 +1,19 @@
 title: '`lotar serve` on localhost binds only ::1 and misses ports that are already taken'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:36.125649+00:00
-modified: 2026-10-31T22:06:36.184390+00:00
+modified: 2026-11-03T23:02:34.525717+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T23:02:34.489845+00:00
+  text: |-
+    Outcome: both findings fixed. New web_server::bind_host: for localhost it binds 127.0.0.1 and ::1 on the same port (port 0 picks one free port for both, retrying if ::1 has it), fails with AddrInUse if either is taken, and skips ::1 only when the machine has no IPv6 loopback. serve (and the library serve_with_config) use it, and web_server::serve_listeners runs one accept loop per listener with the shared stop flag, connection cap and watcher. The implicit default-port fallback uses the same rule, so a second default serve can no longer share 8080 with another server on the other address family. Other hosts keep single-address binding.
+    Evidence: unit test localhost_binds_both_loopbacks_and_reports_either_one_busy; manual: a Python listener on 127.0.0.1:19140 now makes 'lotar serve --port 19140' fail with 'Address already in use', and a running serve answers on both http://127.0.0.1 and http://[::1]; existing serve/bind tests, full Rust suite 1905/1905, smoke webserver.socket + harness.server pass; serve.md documents it.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -35,3 +41,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T22:56:04.244090+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T23:02:34.489845+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T23:02:34.525717+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
