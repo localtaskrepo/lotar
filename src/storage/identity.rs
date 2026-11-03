@@ -136,6 +136,11 @@ impl TaskId {
     pub fn locate(&self, root: &Path) -> Vec<TaskLocation> {
         let mut out = Vec::new();
         for candidate in StorageLocator::candidate_task_roots(root) {
+            // Exact-case folder only: case-insensitive filesystems would
+            // otherwise find DEMO-1 as `demo-1` too (DEV-269).
+            if !has_exact_child_dir(&candidate, &self.project) {
+                continue;
+            }
             for file in crate::storage::layout::find(&candidate.join(&self.project), self.number) {
                 out.push(TaskLocation {
                     root: candidate.clone(),
@@ -146,6 +151,21 @@ impl TaskId {
             }
         }
         out
+    }
+}
+
+/// Whether `parent` holds a directory named exactly `name` (by listing, so
+/// a case-insensitive filesystem cannot match another spelling).
+fn has_exact_child_dir(parent: &Path, name: &str) -> bool {
+    let direct = parent.join(name);
+    if !direct.is_dir() {
+        return false;
+    }
+    match std::fs::read_dir(parent) {
+        Ok(entries) => entries
+            .flatten()
+            .any(|entry| entry.file_name().to_str() == Some(name)),
+        Err(_) => true,
     }
 }
 

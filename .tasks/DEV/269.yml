@@ -1,13 +1,22 @@
 title: Project prefixes alias on case-insensitive filesystems and when generated prefixes match
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:35.691717+00:00
-modified: 2026-10-31T22:06:35.755873+00:00
+modified: 2026-11-03T22:55:51.667206+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T22:55:51.598113+00:00
+  text: |-
+    Outcome: all three findings fixed.
+    1./2. resolve_project_input compares against a directory listing instead of exists(): an exact folder name wins, and a value differing only in case resolves to the existing folder's spelling on every platform (so -p alph is ALPH, IDs and sprint entries get the canonical prefix, and a case-variant project can't be created). TaskId::locate only searches a folder whose name matches the ID's prefix exactly, so demo-1 no longer aliases DEMO-1 on macOS/Windows.
+    3. When a name's generated prefix belongs to a project with a different configured name (Alpha vs Alphabet -> ALPH), resolution picks the next free prefix (ALPH2) instead of merging; folders without a configured name keep the old behavior.
+    Docs: help/task-model.md 'Exact case' rule rewritten.
+    Evidence: tests/dev269_project_case_test.rs (casing, Alpha/Alphabet, locate exact case, add -p demo -> DEMO-2); manual macOS repro; full Rust suite 1904/1904; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -41,3 +50,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T22:49:47.186630+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T22:55:51.598113+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:55:51.667206+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

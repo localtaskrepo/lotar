@@ -217,41 +217,66 @@ pub fn validate_explicit_prefix(
 /// Smart resolver that accepts either a project name or prefix and returns the appropriate prefix
 /// for storage operations. This allows users to use either format in --project parameters.
 pub fn resolve_project_input(input: &str, tasks_dir: &std::path::Path) -> String {
-    // First, check if input is already a valid prefix by looking for an exact directory match.
-    // Inputs containing path separators or traversal sequences are never treated as direct
-    // prefixes; they can only match via project-name resolution or prefix generation below.
-    let input_is_safe_prefix = crate::storage::safety::is_valid_project_prefix(input);
-    let input_as_prefix_dir = tasks_dir.join(input);
-    if input_is_safe_prefix && input_as_prefix_dir.exists() && input_as_prefix_dir.is_dir() {
-        // Input is a valid prefix (directory exists)
-        return input.to_string();
+    let folders: Vec<String> = crate::utils::filesystem::list_visible_subdirs(tasks_dir)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    // Folder names are compared by listing the directory, never with
+    // `exists()`: on macOS and Windows `DEMO` also "exists" as `demo`, which
+    // gave one task two IDs (DEV-269). A name that differs only in case
+    // resolves to the existing folder's spelling on every platform.
+    let existing = |candidate: &str| -> Option<String> {
+        folders
+            .iter()
+            .find(|name| name.as_str() == candidate)
+            .or_else(|| {
+                folders
+                    .iter()
+                    .find(|name| name.eq_ignore_ascii_case(candidate))
+            })
+            .cloned()
+    };
+
+    // Inputs containing path separators or traversal sequences are never
+    // treated as direct prefixes; they can only match via project-name
+    // resolution or prefix generation below.
+    if crate::storage::safety::is_valid_project_prefix(input)
+        && let Some(folder) = existing(input)
+    {
+        return folder;
     }
 
-    // If not found as prefix, look through all project directories to find one with matching project_name
-    for (dir_name, _dir_path) in crate::utils::filesystem::list_visible_subdirs(tasks_dir) {
-        // Check if this directory has a config file with matching project_name
-        let config_path = crate::utils::paths::project_config_path(tasks_dir, &dir_name);
+    // A configured project name.
+    for dir_name in &folders {
+        let config_path = crate::utils::paths::project_config_path(tasks_dir, dir_name);
         if let Some(project_name) =
             crate::utils::config::read_project_name_from_config(&config_path)
             && project_name == input
         {
-            return dir_name;
+            return dir_name.clone();
         }
     }
 
-    // If not found as prefix, treat input as a potential full project name
-    // Generate what the prefix would be for this project name
+    // Otherwise the prefix generated from the name. When that folder belongs
+    // to a project with a different configured name (Alpha vs Alphabet both
+    // give ALPH), pick the next free prefix instead of merging the two
+    // projects (DEV-269).
     let generated_prefix = generate_project_prefix(input);
-
-    // Check if a directory exists for the generated prefix
-    let generated_prefix_dir = tasks_dir.join(&generated_prefix);
-    if generated_prefix_dir.exists() && generated_prefix_dir.is_dir() {
-        // Full project name was provided, return its prefix
-        return generated_prefix;
+    let mut candidate = generated_prefix.clone();
+    for suffix in 2..100 {
+        let Some(folder) = existing(&candidate) else {
+            return candidate;
+        };
+        let config_path = crate::utils::paths::project_config_path(tasks_dir, &folder);
+        match crate::utils::config::read_project_name_from_config(&config_path) {
+            Some(name)
+                if !name.eq_ignore_ascii_case(input) && !name.eq_ignore_ascii_case(&folder) =>
+            {
+                candidate = format!("{generated_prefix}{suffix}");
+            }
+            _ => return folder,
+        }
     }
-
-    // Neither direct prefix nor full project name found
-    // This could be a new project being created, so return the generated prefix
     generated_prefix
 }
 
