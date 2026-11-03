@@ -12,7 +12,7 @@ pub fn handle_show(
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let mut ctx = TaskCommandContext::new(resolver, project, Some(id))?;
+    let mut ctx = TaskCommandContext::for_reading(resolver, project, Some(id))?;
     let loaded = load_task_including_deleted(&mut ctx, id, project)?;
     match renderer.format {
         OutputFormat::Json => renderer.emit_json(&loaded.task),

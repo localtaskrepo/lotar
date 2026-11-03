@@ -210,7 +210,7 @@ pub(crate) fn run(
             // Enumerate project folders directly under tasks_abs_real
             if let Ok(project_dirs) = fs::read_dir(&tasks_abs_real) {
                 let fallback_storage =
-                    crate::storage::manager::Storage::new(&tasks_abs_real.clone());
+                    crate::storage::manager::Storage::open_read_only(&tasks_abs_real);
                 let sprint_lookup = crate::services::task_service::TaskService::load_sprint_lookup(
                     &fallback_storage,
                 );

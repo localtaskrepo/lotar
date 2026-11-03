@@ -51,7 +51,7 @@ pub(crate) fn list_tasks(
     let query = input
         .resolve(&base, resolver.path.as_path())
         .map_err(|e| e.cli_message())?;
-    let storage = Storage::new(&resolver.path);
+    let storage = Storage::open_read_only(&resolver.path);
     Ok(crate::services::task_list::run(
         &storage,
         &query,

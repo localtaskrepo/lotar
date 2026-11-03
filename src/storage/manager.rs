@@ -33,6 +33,15 @@ impl Storage {
         Self { root_path }
     }
 
+    /// Open storage for reading only: nothing is created, and a missing
+    /// directory simply holds no tasks (DEV-267: `lotar list` in a stray
+    /// folder used to create a workspace there).
+    pub fn open_read_only(root_path: &Path) -> Self {
+        Self {
+            root_path: root_path.to_path_buf(),
+        }
+    }
+
     /// Try to open existing storage without creating directories
     /// Returns None if the storage directory doesn't exist
     pub fn try_open(root_path: &Path) -> Option<Self> {

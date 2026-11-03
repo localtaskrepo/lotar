@@ -251,10 +251,28 @@ impl TasksDirectoryResolver {
             None
         };
 
+        let start_dir = current_dir.clone();
+        let home_dir = dirs::home_dir().map(|home| home.canonicalize().unwrap_or(home));
         loop {
             let tasks_path = current_dir.join(folder_name);
-            if tasks_path.exists() && tasks_path.is_dir() {
+            // A `.tasks` directly in the home folder only counts when the
+            // command runs there; otherwise it would capture every new
+            // project below home (DEV-267).
+            let is_home_from_below = current_dir != start_dir
+                && home_dir.as_deref().is_some_and(|home| {
+                    current_dir
+                        .canonicalize()
+                        .unwrap_or_else(|_| current_dir.clone())
+                        == home
+                });
+            if tasks_path.exists() && tasks_path.is_dir() && !is_home_from_below {
                 return Ok(Some((tasks_path, current_dir)));
+            }
+
+            // Never leave the git repository the command runs in: a nested
+            // or new repository gets its own workspace (DEV-267).
+            if current_dir.join(".git").exists() {
+                break;
             }
 
             // Move up one directory

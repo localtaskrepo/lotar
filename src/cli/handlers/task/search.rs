@@ -22,7 +22,7 @@ impl CommandHandler for SearchHandler {
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
         renderer.log_info("list: begin");
-        let ctx = TaskCommandContext::new(resolver, project, None)?;
+        let ctx = TaskCommandContext::for_reading(resolver, project, None)?;
         let project_prefix = project.map(|p| ctx.project_prefix_for(Some(p)));
         let input = Self::query_input(&args, project_prefix, &ctx.config)?;
         // Enums and fields validate against the context's configuration (the

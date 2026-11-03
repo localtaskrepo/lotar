@@ -1,13 +1,19 @@
 title: Read-only commands create workspaces, and workspace search crosses repository boundaries
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:35.386508+00:00
-modified: 2026-10-31T22:06:35.445384+00:00
+modified: 2026-11-03T22:33:09.831991+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T22:33:09.808140+00:00
+  text: |-
+    Outcome: fixed. list, show and stats now open storage read-only (Storage::open_read_only / TaskCommandContext::for_reading): they never create .tasks or its config, and a missing workspace just has no tasks. Workspace discovery stops at the root of the git repository the command runs in (.git dir or file), so a new or nested repository gets its own workspace, and a .tasks directly in the home folder is only adopted when the command runs in the home folder itself. Not done: a notice when a workspace is created, and defaulting new workspaces to the git root instead of the current directory (behavior change, separate decision).
+    Evidence: tests/dev267_workspace_boundaries_test.rs (list/show/stats/json list create nothing; plain folder below home, nested repo and repo subfolder cases; home itself still uses ~/.tasks); manual repro incl. /var vs /private/var symlinked home; docs/help/precedence.md updated; full Rust suite 1898/1898; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -28,3 +34,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T22:25:49.562096+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T22:33:09.808140+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T22:33:09.831991+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

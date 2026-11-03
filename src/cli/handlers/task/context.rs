@@ -30,6 +30,21 @@ impl TaskCommandContext {
         Self::with_storage_mode(resolver, project, task_id_hint, false)
     }
 
+    /// For commands that only read (list, show): never creates the tasks
+    /// directory or its config, and a missing workspace has no tasks.
+    pub fn for_reading(
+        resolver: &TasksDirectoryResolver,
+        project: Option<&str>,
+        task_id_hint: Option<&str>,
+    ) -> Result<Self, String> {
+        Self::with_storage(
+            resolver,
+            project,
+            task_id_hint,
+            Storage::open_read_only(&resolver.path),
+        )
+    }
+
     pub fn storage_root(&self) -> &std::path::Path {
         self.storage.root_path.as_path()
     }
@@ -87,7 +102,15 @@ impl TaskCommandContext {
                 "No tasks found. Use 'lotar add' to create tasks first.".to_string()
             })?
         };
+        Self::with_storage(resolver, project, task_id_hint, storage)
+    }
 
+    fn with_storage(
+        resolver: &TasksDirectoryResolver,
+        project: Option<&str>,
+        task_id_hint: Option<&str>,
+        storage: Storage,
+    ) -> Result<Self, String> {
         let mut project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
         let hint = task_id_hint.unwrap_or("");
