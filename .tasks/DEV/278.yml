@@ -1,13 +1,22 @@
 title: 'Automation runner: commands corrupt MCP stdio, cooldowns reset per process, one failure stops later rules'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:37.030774+00:00
-modified: 2026-10-31T22:06:37.094220+00:00
+modified: 2026-11-03T23:54:40.289930+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T23:54:40.254739+00:00
+  text: |-
+    Outcome: all three findings fixed.
+    1. Waited-for run commands (run_and_wait) get an empty stdin and piped stdout/stderr, which are printed to LoTaR's stderr, so they can't swallow MCP requests, corrupt MCP frames or break --format json. They have a timeout (structured 'timeout: 30s|5m|1h', default 5 minutes); on timeout the whole process group is killed and the action fails. A failing command's stderr tail is in the error.
+    2. Cooldowns persist across processes in automation-cooldowns.json in the user cache dir (LOTAR_AUTOMATION_STATE_DIR overrides; unit tests never write it; the Rust and smoke harnesses point it at temp dirs), keyed by canonical tasks dir, rule name (or position) and ticket; entries older than 90 days are pruned; file access is locked.
+    3. A failing action no longer aborts later rules: every rule loop (update, comment, job events) collects failures, prints 'Automation rule <name> failed on <ID>: ...' to stderr and emits an automation_failed SSE event; implicit agent-job starts on assignment that fail now warn and emit too. automation.md and sse.md document all of this.
+    Evidence: tests/dev278_automation_runner_test.rs (JSON stdout stays valid and the echo goes to stderr, command can't read piped stdin, 1s timeout stops sleep 20, failing rule doesn't stop the next, cooldown 1d holds across two automation run processes); full Rust suite passes; smoke cli.automation, ui.automation, ui.agent-jobs, mcp.contracts pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -40,3 +49,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T23:42:57.305231+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T23:54:40.254739+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T23:54:40.289930+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

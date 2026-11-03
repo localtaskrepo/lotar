@@ -78,6 +78,8 @@ export class SmokeWorkspace {
             LOTAR_IGNORE_HOME_CONFIG: '1',
             // Fixture automation and agent profiles are the test's own (DEV-259).
             LOTAR_TRUST_ALL: '1',
+            // Automation cooldown state (DEV-278) stays inside the workspace.
+            LOTAR_AUTOMATION_STATE_DIR: path.join(this.root, '.automation-state'),
             LOTAR_IGNORE_ENV_TASKS_DIR: '0',
             LOTAR_TEST_MODE: '0',
             LOTAR_TASKS_DIR: this.tasksDir,

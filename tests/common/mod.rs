@@ -209,6 +209,16 @@ pub fn reset_lotar_test_environment() {
     unsafe {
         std::env::set_var("LOTAR_TRUST_ALL", "1");
     }
+    // Automation cooldowns persist in a state file (DEV-278); keep the
+    // tests' out of the user's cache directory. Entries are keyed by tasks
+    // directory, so tests sharing the file don't see each other's.
+    let _guard = env_mutex::lock_var("LOTAR_AUTOMATION_STATE_DIR");
+    unsafe {
+        std::env::set_var(
+            "LOTAR_AUTOMATION_STATE_DIR",
+            std::env::temp_dir().join("lotar-test-automation-state"),
+        );
+    }
 }
 
 /// Create an isolated temp directory without mutating the process

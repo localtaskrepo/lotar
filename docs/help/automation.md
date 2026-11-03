@@ -225,7 +225,7 @@ The structured form passes `args` to the program directly, without a shell. If y
 
 #### Synchronous vs asynchronous execution
 
-By default, `run` commands execute synchronously (`wait: true`). When `wait: false`, the command runs in the background. Async command failures are logged to stderr but do not block the automation.
+By default, `run` commands execute synchronously (`wait: true`): LoTaR waits for them, gives them an empty stdin, and prints their output to its own stderr, so a command can't break `--format json` output or an MCP connection. A synchronous command that runs longer than its `timeout` (structured form, e.g. `timeout: 30s`; default 5 minutes) is stopped together with the processes it started, and the action fails. When `wait: false`, the command runs in the background. Async command failures are logged to stderr but do not block the automation.
 
 #### Command environment
 
@@ -290,6 +290,7 @@ on:
 - Explicit replacement still wins: `set.tags`/`set.labels` replaces the whole tag list, and scalar `set` fields overwrite. When several rules set the same field, the last rule in file order wins. Within a single action, `set` applies before `add`, which applies before `remove`.
 - Conditions, template variables (`ticket.*`, `previous.*`, `comment.*`), and assignee alias tokens resolve against the task as it was when the event fired, not against values written by earlier actions in the same dispatch.
 - Actions in one dispatch run sequentially but are not atomic: another writer editing the task between two actions can still interleave with the sequence.
+- When a rule's action fails (a `run` command exits non-zero without `ignore_failure`, a timeout, a missing program), the rules after it still run. The failure is printed to stderr (`Automation rule '<name>' failed on <ID>: ...`) and sent as an `automation_failed` SSE event; the change that triggered the rules is kept.
 
 ## Running rules on a schedule
 
@@ -334,7 +335,7 @@ automation:
 
 ## Cooldown
 
-Actions that resolve to the same event can trigger further automation. To prevent infinite loops, rules support a cooldown window and a maximum iteration count (`max_iterations`, default 10). Set `cooldown` to a nonnegative integer followed by `s`, `m`, `h`, or `d`, such as `30s` or `5m`; `0s` permits immediate firing. Invalid or overflowing durations are rejected when saving through LoTaR. If malformed cooldowns are introduced by hand-editing YAML, those rules are skipped rather than disabling loop protection. If a rule has already fired for the same task within the cooldown period, subsequent matches are skipped.
+Actions that resolve to the same event can trigger further automation. To prevent infinite loops, rules support a cooldown window and a maximum iteration count (`max_iterations`, default 10). Set `cooldown` to a nonnegative integer followed by `s`, `m`, `h`, or `d`, such as `30s` or `5m`; `0s` permits immediate firing. Invalid or overflowing durations are rejected when saving through LoTaR. If malformed cooldowns are introduced by hand-editing YAML, those rules are skipped rather than disabling loop protection. If a rule has already fired for the same task within the cooldown period, subsequent matches are skipped. The last firing is remembered across processes (in `automation-cooldowns.json` in your user cache directory, or in `LOTAR_AUTOMATION_STATE_DIR`), so cron runs of `lotar automation run` and CLI edits honour cooldowns too. Rules are identified by name (or position when unnamed).
 
 ## Simulating rules
 

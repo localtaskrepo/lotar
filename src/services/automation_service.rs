@@ -46,7 +46,15 @@ fn rule_identity(rule: &AutomationRule, index: usize) -> String {
 
 /// Check whether the rule's cooldown allows firing on this ticket.
 /// Returns `true` if the rule is allowed to fire (no cooldown or cooldown expired).
-fn cooldown_allows(rule: &AutomationRule, rule_key: &str, ticket_id: &str) -> bool {
+/// The last firing is remembered in memory and in a small state file, so
+/// separate processes (cron `lotar automation run`, CLI edits) honour it
+/// too (DEV-278).
+fn cooldown_allows(
+    rule: &AutomationRule,
+    rule_key: &str,
+    ticket_id: &str,
+    tasks_dir: &Path,
+) -> bool {
     let cooldown_str = match rule.cooldown.as_deref() {
         Some(s) => s,
         None => return true,
@@ -57,19 +65,134 @@ fn cooldown_allows(rule: &AutomationRule, rule_key: &str, ticket_id: &str) -> bo
     };
     let key = (rule_key.to_string(), ticket_id.to_string());
     let map = COOLDOWN_STATE.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(last_fired) = map.get(&key) {
-        last_fired.elapsed() >= duration
-    } else {
-        true
+    if let Some(last_fired) = map.get(&key)
+        && last_fired.elapsed() < duration
+    {
+        return false;
+    }
+    drop(map);
+    match cooldown_store::last_fired(tasks_dir, rule_key, ticket_id) {
+        Some(at) => chrono::Utc::now()
+            .signed_duration_since(at)
+            .to_std()
+            .is_ok_and(|elapsed| elapsed >= duration),
+        None => true,
     }
 }
 
 /// Record the current instant as the last-fired time for this rule+ticket.
-fn cooldown_record(rule: &AutomationRule, rule_key: &str, ticket_id: &str) {
+fn cooldown_record(rule: &AutomationRule, rule_key: &str, ticket_id: &str, tasks_dir: &Path) {
     if rule.cooldown.is_some() {
         let key = (rule_key.to_string(), ticket_id.to_string());
         let mut map = COOLDOWN_STATE.lock().unwrap_or_else(|e| e.into_inner());
         map.insert(key, Instant::now());
+        drop(map);
+        cooldown_store::record(tasks_dir, rule_key, ticket_id);
+    }
+}
+
+/// Last-fired times of rules with a cooldown, shared by every process:
+/// `<cache dir>/lotar/automation-cooldowns.json` (or the directory in
+/// `LOTAR_AUTOMATION_STATE_DIR`), keyed by tasks directory, rule and ticket.
+mod cooldown_store {
+    use fs2::FileExt;
+    use std::collections::BTreeMap;
+    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::path::{Path, PathBuf};
+
+    const MAX_AGE_DAYS: i64 = 90;
+
+    fn state_file() -> Option<PathBuf> {
+        let dir = match std::env::var("LOTAR_AUTOMATION_STATE_DIR") {
+            Ok(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
+            // Unit tests never touch the user's cache directory.
+            _ if cfg!(test) => return None,
+            _ => dirs::cache_dir()?.join("lotar"),
+        };
+        Some(dir.join("automation-cooldowns.json"))
+    }
+
+    fn entry_key(tasks_dir: &Path, rule: &str, ticket: &str) -> String {
+        let dir = tasks_dir
+            .canonicalize()
+            .unwrap_or_else(|_| tasks_dir.to_path_buf());
+        format!("{}\u{1f}{rule}\u{1f}{ticket}", dir.display())
+    }
+
+    fn with_state<T>(apply: impl FnOnce(&mut BTreeMap<String, String>) -> T) -> Option<T> {
+        let path = state_file()?;
+        std::fs::create_dir_all(path.parent()?).ok()?;
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .ok()?;
+        file.lock_exclusive().ok()?;
+        let mut text = String::new();
+        let _ = file.read_to_string(&mut text);
+        let mut state: BTreeMap<String, String> = serde_json::from_str(&text).unwrap_or_default();
+        let before = state.clone();
+        let result = apply(&mut state);
+        if state != before {
+            let _ = file.set_len(0);
+            let _ = file.seek(SeekFrom::Start(0));
+            let _ = file.write_all(serde_json::to_string(&state).unwrap_or_default().as_bytes());
+        }
+        let _ = file.unlock();
+        Some(result)
+    }
+
+    pub(super) fn last_fired(
+        tasks_dir: &Path,
+        rule: &str,
+        ticket: &str,
+    ) -> Option<chrono::DateTime<chrono::Utc>> {
+        let key = entry_key(tasks_dir, rule, ticket);
+        with_state(|state| state.get(&key).cloned())
+            .flatten()
+            .and_then(|raw| chrono::DateTime::parse_from_rfc3339(&raw).ok())
+            .map(|at| at.with_timezone(&chrono::Utc))
+    }
+
+    pub(super) fn record(tasks_dir: &Path, rule: &str, ticket: &str) {
+        let key = entry_key(tasks_dir, rule, ticket);
+        let now = chrono::Utc::now();
+        let _ = with_state(|state| {
+            state.retain(|_, at| {
+                chrono::DateTime::parse_from_rfc3339(at).is_ok_and(|at| {
+                    now.signed_duration_since(at) < chrono::Duration::days(MAX_AGE_DAYS)
+                })
+            });
+            state.insert(key, now.to_rfc3339());
+        });
+    }
+}
+
+/// Report a failed rule action (DEV-278): later rules still run, and the
+/// failure is printed to stderr and sent as an `automation_failed` event.
+fn rule_failure(
+    rule: &AutomationRule,
+    rule_key: &str,
+    ticket_id: &str,
+    err: &LoTaRError,
+) -> String {
+    let name = rule.name.clone().unwrap_or_else(|| rule_key.to_string());
+    let message = format!("Automation rule '{name}' failed on {ticket_id}: {err}");
+    eprintln!("[lotar][warn] {message}");
+    crate::api_events::emit(&crate::api_events::ApiEvent {
+        kind: "automation_failed".into(),
+        data: serde_json::json!({"id": ticket_id, "rule": name, "message": err.to_string()}),
+    });
+    message
+}
+
+fn failures_result(failures: &[String]) -> LoTaRResult<()> {
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(LoTaRError::ValidationError(failures.join("; ")))
     }
 }
 
@@ -338,13 +461,14 @@ impl AutomationService {
 
         let match_mode = MatchMode::OnChange;
         let active_sprints = compute_active_sprint_ids(storage);
+        let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
             if !matches_rule(rule, current, &changes, match_mode, config, &active_sprints) {
                 continue;
             }
             let rk = rule_identity(rule, rule_idx);
-            if !cooldown_allows(rule, &rk, &current.id) {
+            if !cooldown_allows(rule, &rk, &current.id, &tasks_dir) {
                 continue;
             }
 
@@ -359,7 +483,11 @@ impl AutomationService {
                         previous: previous.cloned(),
                         comment_text: None,
                     };
-                    apply_action(storage, current, config, action, &action_context)?;
+                    if let Err(err) =
+                        apply_action(storage, current, config, action, &action_context)
+                    {
+                        failures.push(rule_failure(rule, &rk, &current.id, &err));
+                    }
                     fired = true;
                 }
             }
@@ -373,15 +501,17 @@ impl AutomationService {
                     previous: previous.cloned(),
                     comment_text: None,
                 };
-                apply_action(storage, current, config, action, &action_context)?;
+                if let Err(err) = apply_action(storage, current, config, action, &action_context) {
+                    failures.push(rule_failure(rule, &rk, &current.id, &err));
+                }
                 fired = true;
             }
 
             if fired {
-                cooldown_record(rule, &rk, &current.id);
+                cooldown_record(rule, &rk, &current.id, &tasks_dir);
             }
         }
-        Ok(())
+        failures_result(&failures)
     }
 
     /// Fire automation rules for a comment being added to a task.
@@ -407,6 +537,7 @@ impl AutomationService {
         let changes = ChangeSet::empty(task);
         let active_sprints = compute_active_sprint_ids(storage);
         let event = AutomationEvent::Commented;
+        let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
             if !matches_rule(
@@ -420,7 +551,7 @@ impl AutomationService {
                 continue;
             }
             let rk = rule_identity(rule, rule_idx);
-            if !cooldown_allows(rule, &rk, &task.id) {
+            if !cooldown_allows(rule, &rk, &task.id, &tasks_dir) {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
@@ -430,11 +561,13 @@ impl AutomationService {
                     previous: None,
                     comment_text: Some(comment_text.to_string()),
                 };
-                apply_action(storage, task, config, action, &action_context)?;
-                cooldown_record(rule, &rk, &task.id);
+                if let Err(err) = apply_action(storage, task, config, action, &action_context) {
+                    failures.push(rule_failure(rule, &rk, &task.id, &err));
+                }
+                cooldown_record(rule, &rk, &task.id, &tasks_dir);
             }
         }
-        Ok(())
+        failures_result(&failures)
     }
 
     pub fn apply_job_event(
@@ -458,6 +591,7 @@ impl AutomationService {
             previous: None,
             comment_text: None,
         };
+        let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
             if !matches_rule(
@@ -471,15 +605,19 @@ impl AutomationService {
                 continue;
             }
             let rk = rule_identity(rule, rule_idx);
-            if !cooldown_allows(rule, &rk, ticket_id) {
+            if !cooldown_allows(rule, &rk, ticket_id, tasks_dir) {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                apply_action(&mut storage, &task, &config, action, &action_context)?;
-                cooldown_record(rule, &rk, ticket_id);
+                if let Err(err) =
+                    apply_action(&mut storage, &task, &config, action, &action_context)
+                {
+                    failures.push(rule_failure(rule, &rk, ticket_id, &err));
+                }
+                cooldown_record(rule, &rk, ticket_id, tasks_dir);
             }
         }
-        Ok(())
+        failures_result(&failures)
     }
 
     /// Whether an automation rule moves this ticket when its agent job ends,
@@ -703,7 +841,7 @@ impl AutomationService {
                     continue;
                 }
                 let key = rule_identity(rule, index);
-                if !dry_run && !cooldown_allows(rule, &key, &task.id) {
+                if !dry_run && !cooldown_allows(rule, &key, &task.id, &tasks_dir) {
                     continue;
                 }
                 let mut preview = PreviewContext::new(&task);
@@ -727,7 +865,7 @@ impl AutomationService {
                         comment_text: None,
                     };
                     match apply_action(storage, &task, &config, action, &context) {
-                        Ok(()) => cooldown_record(rule, &key, &task.id),
+                        Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
                         Err(err) => entry.error = Some(err.to_string()),
                     }
                 }
@@ -1436,6 +1574,100 @@ fn warn_untrusted_run_once(tasks_dir: &Path) {
     );
 }
 
+/// Default time a waited-for `run` command may take.
+const DEFAULT_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Run a waited-for command without handing it this process's stdio
+/// (DEV-278): stdin is empty, so it can't swallow MCP requests, and its
+/// output goes to stderr, so it can't corrupt MCP frames or `--format json`
+/// output. A command that outlives `timeout` is stopped with its children.
+fn run_and_wait(
+    mut cmd: Command,
+    timeout: std::time::Duration,
+    ignore_failure: bool,
+) -> LoTaRResult<()> {
+    use std::io::Read;
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    let mut child = cmd.spawn()?;
+    let drain = |pipe: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut tail = BoundedTail {
+                limit: ASYNC_STDERR_LOG_LIMIT,
+                ..BoundedTail::default()
+            };
+            if let Some(mut pipe) = pipe {
+                let mut buf = [0u8; 4096];
+                while let Ok(n) = pipe.read(&mut buf) {
+                    if n == 0 {
+                        break;
+                    }
+                    tail.push(&buf[..n]);
+                }
+            }
+            tail.snapshot()
+        })
+    };
+    let stdout = drain(
+        child
+            .stdout
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let stderr = drain(
+        child
+            .stderr
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break Some(status);
+        }
+        if Instant::now() >= deadline {
+            #[cfg(unix)]
+            // SAFETY: plain kill(2) on the child's own process group.
+            unsafe {
+                libc::kill(-(child.id() as i32), libc::SIGKILL);
+            }
+            let _ = child.kill();
+            let _ = child.wait();
+            break None;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    };
+    let out = stdout.join().unwrap_or_default();
+    let err = stderr.join().unwrap_or_default();
+    for text in [&out, &err] {
+        let text = text.trim_end();
+        if !text.is_empty() {
+            eprintln!("{text}");
+        }
+    }
+    match status {
+        None => Err(LoTaRError::ValidationError(format!(
+            "Automation run command did not finish within {}s and was stopped",
+            timeout.as_secs()
+        ))),
+        Some(status) if !status.success() && !ignore_failure => {
+            let detail = err.trim();
+            Err(LoTaRError::ValidationError(if detail.is_empty() {
+                format!("Automation run command failed with status {status}")
+            } else {
+                format!("Automation run command failed with status {status}: {detail}")
+            }))
+        }
+        Some(_) => Ok(()),
+    }
+}
+
 fn build_shell_command(raw: &str) -> (String, Vec<String>) {
     if cfg!(windows) {
         ("cmd".to_string(), vec!["/C".to_string(), raw.to_string()])
@@ -1458,7 +1690,7 @@ fn execute_run_action(
         return Ok(());
     }
 
-    let (command, args, env, cwd, ignore_failure, wait) = match run {
+    let (command, args, env, cwd, ignore_failure, wait, timeout) = match run {
         AutomationRunAction::Shell(raw) => {
             let expanded = tmpl.expand_for_shell(raw);
             let trimmed = expanded.script.trim().to_string();
@@ -1485,6 +1717,7 @@ fn execute_run_action(
                 None,
                 false,
                 true,
+                DEFAULT_RUN_TIMEOUT,
             )
         }
         AutomationRunAction::Command(command) => {
@@ -1508,6 +1741,14 @@ fn execute_run_action(
                 command.cwd.as_ref().map(|c| tmpl.expand(c)),
                 command.ignore_failure,
                 command.wait,
+                match command.timeout.as_deref() {
+                    None => DEFAULT_RUN_TIMEOUT,
+                    Some(raw) => parse_cooldown(raw).ok_or_else(|| {
+                        LoTaRError::ValidationError(format!(
+                            "Invalid run timeout '{raw}': use a number followed by s, m, h or d"
+                        ))
+                    })?,
+                },
             )
         }
     };
@@ -1523,13 +1764,7 @@ fn execute_run_action(
     cmd.envs(merged_env);
 
     if wait {
-        let status = cmd.status()?;
-        if !status.success() && !ignore_failure {
-            return Err(LoTaRError::ValidationError(format!(
-                "Automation run command failed with status {}",
-                status
-            )));
-        }
+        run_and_wait(cmd, timeout, ignore_failure)?;
     } else {
         // Async: spawn, then monitor in background threads for logging.
         // Keep detached commands independent of the caller's stdio handles.
@@ -2325,13 +2560,22 @@ fn maybe_queue_agent_on_assignment(
         effort: run.effort,
     };
 
-    if matches!(
+    let ticket = req.ticket_id.clone();
+    let started = if matches!(
         AgentJobService::orchestrator_mode(),
         AgentOrchestratorMode::Server
     ) {
-        let _ = AgentJobService::start_job_with_tasks_dir(req, tasks_dir);
+        AgentJobService::start_job_with_tasks_dir(req, tasks_dir).map(|_| ())
     } else {
-        let _ = AgentQueueService::enqueue(tasks_dir, req);
+        AgentQueueService::enqueue(tasks_dir, req).map(|_| ())
+    };
+    // An assignment that can't start its job must say so (DEV-278).
+    if let Err(err) = started {
+        eprintln!("[lotar][warn] Could not start an agent job for {ticket}: {err}");
+        crate::api_events::emit(&crate::api_events::ApiEvent {
+            kind: "automation_failed".into(),
+            data: serde_json::json!({"id": ticket, "rule": "agent assignment", "message": err.to_string()}),
+        });
     }
 }
 
@@ -2568,12 +2812,13 @@ mod cooldown_tests {
                 cooldown: Some(input.into()),
                 ..Default::default()
             };
-            assert!(!cooldown_allows(&rule, "invalid", "TEST-1"));
+            assert!(!cooldown_allows(&rule, "invalid", "TEST-1", Path::new(".")));
         }
         assert!(cooldown_allows(
             &AutomationRule::default(),
             "absent",
-            "TEST-1"
+            "TEST-1",
+            Path::new(".")
         ));
     }
 

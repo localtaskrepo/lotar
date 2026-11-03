@@ -257,6 +257,10 @@ pub struct AutomationRunCommand {
     pub ignore_failure: bool,
     #[serde(default = "default_wait")]
     pub wait: bool,
+    /// How long a waited-for command may run (`30s`, `5m`, `1h`) before it
+    /// is stopped; default 5 minutes (DEV-278).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<String>,
 }
 
 fn default_wait() -> bool {
