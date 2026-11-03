@@ -1,13 +1,22 @@
 title: Scanner aborts on doc comments, stops at Rust lifetimes and rewrites CRLF line endings
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:34.542535+00:00
-modified: 2026-10-31T22:06:34.605706+00:00
+modified: 2026-11-03T21:54:45.794656+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T21:54:45.751384+00:00
+  text: |-
+    Outcome: all three findings fixed.
+    1. Discovery, the edit-range check and key insertion now share one predicate: the comment text must start with a signal word after stripping whitespace, '/', '!', '*' and '-' (scanner::comment_body). /// and //! doc comments and '- TODO' bullets are findings and get keys; prose mentioning bug/todo/note is no longer a finding. The CLI now warns and skips an entry it cannot edit safely (as REST does) instead of aborting after partial changes.
+    2. Rust/rs: a quote opens a char literal only when one closes right after ('x', '\n', '\'', '\u{..}'); lifetimes like <'a> and &'static no longer stop discovery.
+    3. replace_line_contents rewrites only the target line and keeps each line's own ending (CRLF, LF, missing final newline); used by both the CLI and REST writers.
+    Evidence: unit tests findings_start_with_the_signal_word_after_adornments, rust_lifetimes_do_not_stop_discovery, rust_char_literals_are_told_apart_from_lifetimes (src/scanner.rs), replacing_a_line_keeps_every_line_ending (src/utils/scan.rs); all 71 scan tests pass; manual repro in a scratch repo (doc comments keyed, lifetime file fully scanned, CRLF bytes preserved per od -c, rc 0); docs/help/scan.md updated; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -54,3 +63,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:48:53.980921+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T21:54:45.751384+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T21:54:45.794656+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

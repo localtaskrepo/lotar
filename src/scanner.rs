@@ -191,6 +191,13 @@ impl CommentLexer {
                 break;
             }
             let ch = tail.chars().next().unwrap();
+            // Rust: `'` opens a char literal only when one closes right
+            // after it ('x', '\n', '\u{1F600}'); otherwise it is a lifetime
+            // (`<'a>`, `&'static`) and must not open a quote (DEV-261).
+            if ch == '\'' && matches!(extension, "rs" | "rust") {
+                index += rust_char_literal_len(tail).unwrap_or(1);
+                continue;
+            }
             if matches!(ch, '\'' | '"' | '`') {
                 let triple = ch != '`' && tail.starts_with(&ch.to_string().repeat(3));
                 let terminator = ch.to_string().repeat(if triple { 3 } else { 1 });
@@ -217,6 +224,36 @@ impl CommentLexer {
         }
         ranges
     }
+}
+
+/// Length of a Rust char literal at the start of `tail` (which starts with
+/// `'`), or `None` when the quote is a lifetime.
+fn rust_char_literal_len(tail: &str) -> Option<usize> {
+    let mut chars = tail.char_indices().skip(1);
+    let (_, first) = chars.next()?;
+    if first == '\\' {
+        // Escapes are short: '\n', '\'', '\x7f', '\u{10FFFF}'.
+        // Offset 2 is the escaped character itself (it may be a quote).
+        return chars
+            .take(12)
+            .find(|(offset, ch)| *ch == '\'' && *offset >= 3)
+            .map(|(offset, _)| offset + 1);
+    }
+    if first == '\'' {
+        return None;
+    }
+    let (offset, close) = chars.next()?;
+    (close == '\'').then_some(offset + 1)
+}
+
+/// The text of a comment segment after its adornments: doc-comment markers
+/// (`///`, `//!`), block-comment stars, list dashes and whitespace. A finding
+/// must start with its signal word here, for discovery and editing alike
+/// (DEV-261), so prose that merely mentions "bug" or "todo" is not a finding.
+pub(crate) fn comment_body(segment: &str) -> &str {
+    segment
+        .trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '/' | '!' | '*' | '-'))
+        .trim_end()
 }
 
 #[derive(Debug, Clone)]
@@ -614,9 +651,14 @@ impl Scanner {
         // Signal-word findings require a signal word. Comment lines without one can
         // still carry a bare ticket key: when mention tracking is enabled they are
         // reported separately so the scan consumer can anchor the existing task.
-        if !self.signal_regex.is_match(line) {
+        let body = comment_body(line);
+        let starts_with_signal = self
+            .signal_regex
+            .find(body)
+            .is_some_and(|matched| matched.start() == 0);
+        if !starts_with_signal {
             if self.track_mentions {
-                let trimmed = line.trim().trim_start_matches('*').trim();
+                let trimmed = body;
                 if let Some(uuid) = self.extract_ticket_key_from_line(trimmed) {
                     mentions.push(Reference {
                         file_path: file_path.to_path_buf(),
@@ -632,8 +674,8 @@ impl Scanner {
             return;
         }
 
-        // Strip common leading block-comment adornments: *, /**, */ etc.
-        let trimmed = line.trim().trim_start_matches('*').trim();
+        // Adornments (`///`, `//!`, `*`, `-`) are already stripped.
+        let trimmed = body;
 
         // Prefer explicit UUID in parens after signal word, then [ticket=...], then generic DEMO-123 pattern
         let (mut uuid, title) = if let Some(c) = self.uuid_extract_regex.captures(trimmed) {
@@ -721,10 +763,8 @@ impl Scanner {
             let ranges = lexer.ranges(line, &extension);
             if index + 1 == line_number {
                 return ranges.into_iter().find(|range| {
-                    let comment = line[range.clone()]
-                        .trim_start_matches(|c: char| c.is_whitespace() || c == '*');
                     self.signal_regex
-                        .find(comment)
+                        .find(comment_body(&line[range.clone()]))
                         .is_some_and(|matched| matched.start() == 0)
                 });
             }
@@ -787,7 +827,9 @@ impl Scanner {
         if let Some(m) = self.signal_regex.find_at(line, range.start) {
             let comment = &line[range.clone()];
             // Compute the absolute index of the first non-decorative char in the comment
-            let trimmed = comment.trim_start_matches(|c: char| c.is_whitespace() || c == '*');
+            let trimmed = comment.trim_start_matches(|c: char| {
+                c.is_whitespace() || matches!(c, '/' | '!' | '*' | '-')
+            });
             let offset = comment.len() - trimmed.len();
             let first_token_abs = range.start + offset;
             // Only insert if the match begins exactly at the first token in the comment
@@ -935,6 +977,71 @@ mod tests {
                 .key_mention_lines(&file, &contents, "ABC-2")
                 .is_empty()
         );
+    }
+
+    fn scan_titles(name: &str, source: &str) -> Vec<(usize, String)> {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(name), source).unwrap();
+        let mut scanner = Scanner::new(dir.path().to_path_buf());
+        scanner
+            .scan()
+            .into_iter()
+            .map(|r| (r.line_number, r.title))
+            .collect()
+    }
+
+    #[test]
+    fn findings_start_with_the_signal_word_after_adornments() {
+        // DEV-261: discovery used to accept the word anywhere while editing
+        // required it first, so prose and doc comments aborted `lotar scan`.
+        let found = scan_titles(
+            "lib.rs",
+            "/// TODO: doc todo\n//! TODO: inner doc\n// - TODO: bullet\n\
+             // This is not a bug, it is intended.\n/// Returns the todo list.\n\
+             /// Filter syntax example: status:todo\n",
+        );
+        assert_eq!(
+            found,
+            vec![
+                (1, "doc todo".to_string()),
+                (2, "inner doc".to_string()),
+                (3, "bullet".to_string()),
+            ]
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("lib.rs");
+        let contents = "/// TODO: doc todo\n";
+        let scanner = Scanner::new(dir.path().to_path_buf());
+        assert_eq!(
+            scanner
+                .suggest_source_insertion(&file, contents, 1, "A-1", false)
+                .as_deref(),
+            Some("/// TODO (A-1): doc todo")
+        );
+    }
+
+    #[test]
+    fn rust_lifetimes_do_not_stop_discovery() {
+        let found = scan_titles(
+            "lib.rs",
+            "// TODO: first\npub struct Foo<'a> { s: &'static str, r: &'a u8 }\n\
+             fn c() -> [char; 3] { ['x', '\\n', '\\''] }\nfn u() -> char { '\\u{1F600}' }\n\
+             // TODO: second\nlet s = \"it's // TODO: not a comment\";\n// TODO: third\n",
+        );
+        let titles: Vec<_> = found.iter().map(|(_, t)| t.as_str()).collect();
+        assert_eq!(titles, vec!["first", "second", "third"]);
+    }
+
+    #[test]
+    fn rust_char_literals_are_told_apart_from_lifetimes() {
+        assert_eq!(rust_char_literal_len("'x'"), Some(3));
+        assert_eq!(rust_char_literal_len("'\\n' rest"), Some(4));
+        assert_eq!(rust_char_literal_len("'\\''"), Some(4));
+        assert_eq!(rust_char_literal_len("'\\u{1F600}'"), Some(11));
+        assert_eq!(rust_char_literal_len("'é'"), Some(4));
+        assert_eq!(rust_char_literal_len("'a>"), None);
+        assert_eq!(rust_char_literal_len("'static str"), None);
     }
 
     #[test]

@@ -220,13 +220,20 @@ impl CommandHandler for ScanHandler {
                                 )
                             })?;
                     {
-                        let range = line_scanner
-                            .matched_source_comment_range(
-                                &entry.file_path,
-                                &contents,
-                                entry.line_number,
-                            )
-                            .ok_or("Cannot establish a safe scan comment boundary")?;
+                        // One unsafe line skips that entry, as the REST scan
+                        // does; it must not abort the run halfway (DEV-261).
+                        let Some(range) = line_scanner.matched_source_comment_range(
+                            &entry.file_path,
+                            &contents,
+                            entry.line_number,
+                        ) else {
+                            renderer.emit_warning(format_args!(
+                                "Skipped {}:{}: cannot establish a safe scan comment boundary",
+                                entry.file_path.display(),
+                                entry.line_number
+                            ));
+                            continue;
+                        };
                         let existing_key =
                             line_scanner.extract_ticket_key_from_line(&orig_line[range.clone()]);
                         if existing_key.is_none() {
@@ -240,11 +247,12 @@ impl CommandHandler for ScanHandler {
                                 )
                                 .is_none()
                             {
-                                return Err(format!(
-                                    "Cannot safely insert a task key at {}:{}",
+                                renderer.emit_warning(format_args!(
+                                    "Skipped {}:{}: cannot safely insert a task key",
                                     entry.file_path.display(),
                                     entry.line_number
                                 ));
+                                continue;
                             }
                             if !args.dry_run {
                                 validate_source_write(&entry.file_path)?;

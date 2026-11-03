@@ -117,25 +117,35 @@ pub(crate) fn configured_line_scanner(
 }
 
 /// Replace a specific 1-based line in the file content and return the new
-/// content, preserving the trailing-newline shape of the input.
+/// content. Only that line's text changes: every line keeps its own ending
+/// (`\r\n` or `\n`), and a missing final newline stays missing (DEV-261).
 pub(crate) fn replace_line_contents(
     contents: &str,
     line_number_1based: usize,
     new_line: &str,
 ) -> Option<String> {
-    let mut lines: Vec<&str> = contents.lines().collect();
-    if line_number_1based == 0 || line_number_1based > lines.len() {
+    if line_number_1based == 0 {
         return None;
     }
-    lines[line_number_1based - 1] = new_line;
-    let mut out = String::new();
-    for (i, line) in lines.iter().enumerate() {
-        out.push_str(line);
-        if i + 1 < lines.len() || contents.ends_with('\n') {
-            out.push('\n');
+    let mut out = String::with_capacity(contents.len() + new_line.len());
+    let mut found = false;
+    for (index, line) in contents.split_inclusive('\n').enumerate() {
+        if index + 1 == line_number_1based {
+            let ending = if line.ends_with("\r\n") {
+                "\r\n"
+            } else if line.ends_with('\n') {
+                "\n"
+            } else {
+                ""
+            };
+            out.push_str(new_line);
+            out.push_str(ending);
+            found = true;
+        } else {
+            out.push_str(line);
         }
     }
-    Some(out)
+    found.then_some(out)
 }
 
 /// Strip parsed metadata from a comment segment, never from the surrounding source.
