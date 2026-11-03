@@ -1283,6 +1283,86 @@ fn sprint_add_assigns_tasks_to_sprint() {
 }
 
 #[test]
+fn global_project_flag_does_not_select_every_task() {
+    // DEV-260: `-p X` used to fill --select-project (same clap id), so
+    // `lotar -p X sprint add|remove <id>` changed every task in X.
+    let fixtures = common::TestFixtures::new();
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
+    let sprint = Sprint {
+        plan: Some(SprintPlan {
+            label: Some("Scoped".to_string()),
+            ..SprintPlan::default()
+        }),
+        ..Sprint::default()
+    };
+    SprintService::create(&mut storage, sprint, None).expect("create sprint");
+    let mut ids = Vec::new();
+    for title in ["One", "Two", "Three"] {
+        let mut task = Task::new(
+            fixtures.tasks_root.clone(),
+            title.to_string(),
+            Priority::from("Medium"),
+        );
+        task.status = TaskStatus::from("Todo");
+        ids.push(storage.add(&task, "TEST", Some("Test Project")).unwrap());
+    }
+    drop(storage);
+
+    for args in [
+        vec![
+            "-p",
+            "TEST",
+            "sprint",
+            "add",
+            "--sprint",
+            "1",
+            ids[0].as_str(),
+        ],
+        vec![
+            "sprint",
+            "add",
+            "--sprint",
+            "1",
+            ids[1].as_str(),
+            "--project",
+            "TEST",
+        ],
+    ] {
+        common::cargo_bin_in(&fixtures)
+            .args(&args)
+            .assert()
+            .success();
+    }
+    let members = sprint_task_ids(&Storage::new(&fixtures.tasks_root), 1);
+    assert_eq!(members, vec![ids[0].clone(), ids[1].clone()]);
+
+    common::cargo_bin_in(&fixtures)
+        .args([
+            "-p",
+            "TEST",
+            "sprint",
+            "remove",
+            "--sprint",
+            "1",
+            ids[0].as_str(),
+        ])
+        .assert()
+        .success();
+    let members = sprint_task_ids(&Storage::new(&fixtures.tasks_root), 1);
+    assert_eq!(members, vec![ids[1].clone()], "only the named task leaves");
+
+    // The explicit selector still selects the whole project.
+    common::cargo_bin_in(&fixtures)
+        .args(["sprint", "add", "--sprint", "1", "--select-project", "TEST"])
+        .assert()
+        .success();
+    assert_eq!(
+        sprint_task_ids(&Storage::new(&fixtures.tasks_root), 1).len(),
+        3
+    );
+}
+
+#[test]
 fn sprint_add_requires_force_for_existing_membership() {
     let fixtures = common::TestFixtures::new();
 

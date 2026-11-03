@@ -1,13 +1,19 @@
 title: Global -p makes `sprint add|move|remove` change every task in the project
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:34.408336+00:00
-modified: 2026-10-31T22:06:34.465485+00:00
+modified: 2026-11-03T21:48:49.354613+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-03T21:48:49.305556+00:00
+  text: |-
+    Outcome: fixed. TaskSelectionArgs.project now has the clap id select_project, so the global -p/--project (before or after the subcommand) no longer fills --select-project and sprint add/move/remove only touch the named tasks. Also fixed while testing: the TARGET positional was required, so the documented selector-only form (lotar sprint add --sprint 4 --select '...') failed with a clap error; it is now optional and the handler's existing 'Provide at least one task identifier via arguments or --select filters' check applies.
+    Evidence: tests/cli_sprint_basic_test.rs global_project_flag_does_not_select_every_task (-p before, --project after, remove, and --select-project still selecting the whole project); 102 sprint tests pass; manual check of the empty and selector-only cases; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -27,3 +33,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T21:44:29.233212+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-03T21:48:49.305556+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-03T21:48:49.354613+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

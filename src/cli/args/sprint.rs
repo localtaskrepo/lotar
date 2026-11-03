@@ -77,7 +77,11 @@ pub struct TaskSelectionArgs {
     pub tag: Vec<String>,
 
     /// Restrict selection to a specific project prefix
-    #[arg(long = "select-project")]
+    ///
+    /// The explicit id keeps this apart from the global `-p/--project`:
+    /// sharing the id `project` made clap copy `-p X` into this field, so
+    /// `lotar -p X sprint add 1` selected every task in X (DEV-260).
+    #[arg(id = "select_project", long = "select-project")]
     pub project: Option<String>,
 }
 
@@ -349,8 +353,9 @@ pub struct SprintAddArgs {
     /// Automatically remove dangling sprint references before assigning
     #[arg(long = "cleanup-missing")]
     pub cleanup_missing: bool,
-    /// Sprint reference (optional) followed by one or more task identifiers.
-    #[arg(value_name = "TARGET", required = true)]
+    /// Sprint reference (optional) followed by task identifiers; may be
+    /// omitted when `--select*` flags pick the tasks.
+    #[arg(value_name = "TARGET")]
     pub items: Vec<String>,
 
     #[command(flatten)]
@@ -368,8 +373,9 @@ pub struct SprintMoveArgs {
     /// Automatically remove dangling sprint references before moving
     #[arg(long = "cleanup-missing")]
     pub cleanup_missing: bool,
-    /// Sprint reference (optional) followed by one or more task identifiers.
-    #[arg(value_name = "TARGET", required = true)]
+    /// Sprint reference (optional) followed by task identifiers; may be
+    /// omitted when `--select*` flags pick the tasks.
+    #[arg(value_name = "TARGET")]
     pub items: Vec<String>,
 
     #[command(flatten)]
@@ -384,8 +390,9 @@ pub struct SprintRemoveArgs {
     /// Automatically remove dangling sprint references before removing memberships
     #[arg(long = "cleanup-missing")]
     pub cleanup_missing: bool,
-    /// Sprint reference (optional) followed by one or more task identifiers.
-    #[arg(value_name = "TARGET", required = true)]
+    /// Sprint reference (optional) followed by task identifiers; may be
+    /// omitted when `--select*` flags pick the tasks.
+    #[arg(value_name = "TARGET")]
     pub items: Vec<String>,
 
     #[command(flatten)]
