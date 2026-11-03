@@ -1,6 +1,5 @@
 use crate::config::types::ResolvedConfig;
 use crate::types::{Priority, TaskStatus, TaskType};
-use std::collections::HashMap;
 
 struct BranchContext {
     branch_lower: String,
@@ -32,7 +31,10 @@ impl BranchContext {
     }
 }
 
-fn alias_lookup<T: Clone>(map: &HashMap<String, T>, candidate: &str) -> Option<T> {
+fn alias_lookup<T: Clone>(
+    map: &std::collections::BTreeMap<String, T>,
+    candidate: &str,
+) -> Option<T> {
     if map.is_empty() {
         return None;
     }
@@ -54,7 +56,10 @@ fn alias_lookup<T: Clone>(map: &HashMap<String, T>, candidate: &str) -> Option<T
         })
 }
 
-fn alias_prefix_match<T: Clone>(map: &HashMap<String, T>, branch_lower: &str) -> Option<T> {
+fn alias_prefix_match<T: Clone>(
+    map: &std::collections::BTreeMap<String, T>,
+    branch_lower: &str,
+) -> Option<T> {
     if map.is_empty() {
         return None;
     }

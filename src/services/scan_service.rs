@@ -13,7 +13,7 @@ use crate::utils::scan::{
 };
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 const STATUS_CREATED: &str = "created";
@@ -609,7 +609,7 @@ fn build_custom_fields(fields: Vec<(String, String)>) -> Option<CustomFields> {
     if fields.is_empty() {
         return None;
     }
-    let mut custom: CustomFields = HashMap::new();
+    let mut custom: CustomFields = CustomFields::new();
     for (key, value) in fields {
         custom.insert(key, custom_value_string(value));
     }

@@ -1,6 +1,6 @@
 use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use crate::config::types::SyncRemoteConfig;
 
@@ -281,9 +281,7 @@ pub struct TaskDTO {
 
 // Helper to allow skipping empty maps for custom_fields
 pub fn map_is_empty(map: &crate::types::CustomFields) -> bool {
-    // CustomFields is a type alias for HashMap<String, Value>
-    let as_hash: &HashMap<String, crate::types::CustomFieldValue> = map;
-    as_hash.is_empty()
+    map.is_empty()
 }
 
 /// Due classification for [`TaskStateDTO`], matching the shared query

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
@@ -446,11 +445,12 @@ pub struct ReferenceEntry {
 }
 
 // Type alias for custom fields - can hold any YAML-serializable value
-// For schema generation, use serde_json::Value which has a JsonSchema implementation
+// For schema generation, use serde_json::Value which has a JsonSchema implementation.
+// Sorted, so task files list fields in the same order on every write (DEV-266).
 #[cfg(not(feature = "schema"))]
-pub type CustomFields = HashMap<String, serde_yaml_ng::Value>;
+pub type CustomFields = std::collections::BTreeMap<String, serde_yaml_ng::Value>;
 #[cfg(feature = "schema")]
-pub type CustomFields = HashMap<String, serde_json::Value>;
+pub type CustomFields = std::collections::BTreeMap<String, serde_json::Value>;
 
 // Value type alias and helpers for constructing custom field values in a feature-aware way
 #[cfg(not(feature = "schema"))]

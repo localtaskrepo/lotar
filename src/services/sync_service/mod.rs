@@ -725,13 +725,13 @@ mod tests {
             repo: Some("org/repo".to_string()),
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         remote.mapping.insert(
             "status".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("state".to_string()),
-                values: HashMap::from([
+                values: std::collections::BTreeMap::from([
                     (String::from("Todo"), String::from("open")),
                     (String::from("Done"), String::from("closed")),
                 ]),
@@ -756,7 +756,7 @@ mod tests {
             repo: None,
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         remote.mapping.insert(
             "status".to_string(),

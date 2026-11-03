@@ -70,7 +70,7 @@ fn fixture(
         filter: None,
         auth_profile: None,
         mapping: match provider {
-            SyncProvider::Jira => HashMap::from([
+            SyncProvider::Jira => std::collections::BTreeMap::from([
                 (
                     "title".to_string(),
                     SyncFieldMapping::Simple("summary".into()),
@@ -80,7 +80,7 @@ fn fixture(
                     SyncFieldMapping::Simple("status".into()),
                 ),
             ]),
-            SyncProvider::Github => HashMap::from([(
+            SyncProvider::Github => std::collections::BTreeMap::from([(
                 "title".to_string(),
                 SyncFieldMapping::Simple("title".into()),
             )]),

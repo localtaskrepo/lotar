@@ -61,7 +61,7 @@ mod git_required {
                 title: "Codeowners assign".to_string(),
                 project: Some("TEST".to_string()),
                 custom_fields: Some({
-                    let mut map = std::collections::HashMap::new();
+                    let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
                         map.insert(
@@ -127,7 +127,7 @@ mod git_required {
                 title: "Disabled codeowners".to_string(),
                 project: Some("TEST".to_string()),
                 custom_fields: Some({
-                    let mut map = std::collections::HashMap::new();
+                    let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
                         map.insert(
@@ -188,7 +188,7 @@ mod git_required {
                 title: "Multi owners".to_string(),
                 project: Some("TEST".to_string()),
                 custom_fields: Some({
-                    let mut map = std::collections::HashMap::new();
+                    let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
                         map.insert(
@@ -253,7 +253,7 @@ mod git_required {
                 title: "No match".to_string(),
                 project: Some("TEST".to_string()),
                 custom_fields: Some({
-                    let mut map = std::collections::HashMap::new();
+                    let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
                         map.insert(

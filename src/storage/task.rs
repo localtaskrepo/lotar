@@ -63,7 +63,7 @@ pub struct Task {
     pub tags: Vec<String>,
 
     // Team-specific custom fields (generic UI treatment based on type)
-    #[serde(skip_serializing_if = "std::collections::HashMap::is_empty", default)]
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty", default)]
     pub custom_fields: CustomFields,
 
     #[serde(skip_serializing_if = "Vec::is_empty", default)]

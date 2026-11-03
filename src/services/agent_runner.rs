@@ -1466,7 +1466,7 @@ fn parse_gemini_event(payload: &JsonValue) -> Vec<RunnerEvent> {
     }
 }
 
-fn expand_env_map(env: &HashMap<String, String>) -> HashMap<String, String> {
+fn expand_env_map(env: &std::collections::BTreeMap<String, String>) -> HashMap<String, String> {
     env.iter()
         .map(|(key, value)| (key.clone(), expand_env_value(value)))
         .collect()

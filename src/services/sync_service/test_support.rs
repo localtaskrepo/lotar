@@ -164,7 +164,7 @@ pub(super) fn workspace(
         repo: (provider == SyncProvider::Github).then(|| "org/repo".into()),
         filter: None,
         auth_profile: None,
-        mapping: HashMap::new(),
+        mapping: std::collections::BTreeMap::new(),
     };
     (temp, resolver, remote)
 }

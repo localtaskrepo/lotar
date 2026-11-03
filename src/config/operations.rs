@@ -6,7 +6,7 @@ use crate::utils::project::{
 };
 use serde::de::DeserializeOwned;
 use serde_yaml_ng;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 /// Parse an explicit `issue.done_states` list: non-empty, duplicate-free
@@ -64,13 +64,13 @@ where
         .collect()
 }
 
-fn parse_sync_remotes(value: &str) -> Result<HashMap<String, SyncRemoteConfig>, ConfigError> {
+fn parse_sync_remotes(value: &str) -> Result<BTreeMap<String, SyncRemoteConfig>, ConfigError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Ok(HashMap::new());
+        return Ok(BTreeMap::new());
     }
 
-    serde_yaml_ng::from_str::<HashMap<String, SyncRemoteConfig>>(trimmed)
+    serde_yaml_ng::from_str::<BTreeMap<String, SyncRemoteConfig>>(trimmed)
         .map_err(|err| ConfigError::ParseError(format!("Invalid remotes value: {}", err)))
 }
 
@@ -78,12 +78,12 @@ fn parse_sync_remotes(value: &str) -> Result<HashMap<String, SyncRemoteConfig>, 
 /// or a detailed profile). Names must work as `@name` assignees.
 fn parse_agent_profiles(
     value: &str,
-) -> Result<HashMap<String, crate::config::types::AgentProfileConfig>, ConfigError> {
+) -> Result<BTreeMap<String, crate::config::types::AgentProfileConfig>, ConfigError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Ok(HashMap::new());
+        return Ok(BTreeMap::new());
     }
-    let profiles: HashMap<String, crate::config::types::AgentProfileConfig> =
+    let profiles: BTreeMap<String, crate::config::types::AgentProfileConfig> =
         serde_yaml_ng::from_str(trimmed)
             .map_err(|err| ConfigError::ParseError(format!("Invalid agents value: {}", err)))?;
     for (name, profile) in &profiles {
@@ -282,18 +282,18 @@ pub fn parse_tag_properties(
     Ok(out)
 }
 
-fn parse_alias_map<T>(value: &str, label: &str) -> Result<HashMap<String, T>, ConfigError>
+fn parse_alias_map<T>(value: &str, label: &str) -> Result<BTreeMap<String, T>, ConfigError>
 where
     T: std::str::FromStr + DeserializeOwned,
     T::Err: std::fmt::Display,
 {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Ok(HashMap::new());
+        return Ok(BTreeMap::new());
     }
 
     fn insert_alias<T>(
-        target: &mut HashMap<String, T>,
+        target: &mut BTreeMap<String, T>,
         raw_key: &str,
         value: T,
         label: &str,
@@ -316,16 +316,16 @@ where
         Ok(())
     }
 
-    if let Ok(map) = serde_yaml_ng::from_str::<HashMap<String, T>>(trimmed) {
-        let mut out = HashMap::new();
+    if let Ok(map) = serde_yaml_ng::from_str::<BTreeMap<String, T>>(trimmed) {
+        let mut out = BTreeMap::new();
         for (key, value) in map.into_iter() {
             insert_alias(&mut out, &key, value, label)?;
         }
         return Ok(out);
     }
 
-    if let Ok(map) = serde_yaml_ng::from_str::<HashMap<String, String>>(trimmed) {
-        let mut out = HashMap::new();
+    if let Ok(map) = serde_yaml_ng::from_str::<BTreeMap<String, String>>(trimmed) {
+        let mut out = BTreeMap::new();
         for (k, raw) in map.into_iter() {
             let parsed = raw.parse::<T>().map_err(|err| {
                 ConfigError::ParseError(format!("Invalid {} '{}': {}", label, raw, err))
@@ -335,7 +335,7 @@ where
         return Ok(out);
     }
 
-    let mut out = HashMap::new();
+    let mut out = BTreeMap::new();
     for entry in trimmed.split([',', ';', '\n']) {
         let entry = entry.trim();
         if entry.is_empty() {

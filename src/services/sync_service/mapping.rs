@@ -329,7 +329,10 @@ pub(super) fn map_local_value(detail: &SyncFieldMappingDetail, value: FieldValue
     }
 }
 
-pub(super) fn lookup_mapping_value(map: &HashMap<String, String>, value: &str) -> Option<String> {
+pub(super) fn lookup_mapping_value(
+    map: &std::collections::BTreeMap<String, String>,
+    value: &str,
+) -> Option<String> {
     if let Some(found) = map.get(value) {
         return Some(found.clone());
     }
@@ -393,7 +396,6 @@ mod sync_mapping_tests {
     use super::*;
     use crate::types::ReferenceEntry;
     use serde_json::json;
-    use std::collections::HashMap;
 
     fn sample_task() -> TaskDTO {
         TaskDTO {
@@ -434,7 +436,7 @@ mod sync_mapping_tests {
             repo: None,
             filter: Some("project = HELLO".to_string()),
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         let jql = jira_query_for_remote(&remote).expect("jql should build");
         assert_eq!(jql, "project = HELLO");
@@ -448,7 +450,7 @@ mod sync_mapping_tests {
             repo: None,
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         let jql = jira_query_for_remote(&remote).expect("jql should build");
         assert_eq!(jql, "project = DEMO");
@@ -470,13 +472,13 @@ mod sync_mapping_tests {
             repo: Some("org/repo".to_string()),
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         remote.mapping.insert(
             "task_type".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("labels".to_string()),
-                values: HashMap::from([
+                values: std::collections::BTreeMap::from([
                     (String::from("Feature"), String::from("type:feature")),
                     (String::from("Bug"), String::from("type:bug")),
                 ]),
@@ -487,7 +489,10 @@ mod sync_mapping_tests {
             "priority".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("labels".to_string()),
-                values: HashMap::from([(String::from("Medium"), String::from("priority:medium"))]),
+                values: std::collections::BTreeMap::from([(
+                    String::from("Medium"),
+                    String::from("priority:medium"),
+                )]),
                 ..Default::default()
             }),
         );
@@ -512,13 +517,13 @@ mod sync_mapping_tests {
             repo: Some("org/repo".to_string()),
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         remote.mapping.insert(
             "status".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("state".to_string()),
-                values: HashMap::from([
+                values: std::collections::BTreeMap::from([
                     (String::from("Todo"), String::from("open")),
                     (String::from("InProgress"), String::from("open")),
                 ]),
@@ -552,13 +557,13 @@ mod sync_mapping_tests {
             repo: Some("org/repo".to_string()),
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         remote.mapping.insert(
             "status".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("state".to_string()),
-                values: HashMap::from([(
+                values: std::collections::BTreeMap::from([(
                     String::from("Bogus"), // not in SYNC's issue_states
                     String::from("open"),
                 )]),
@@ -611,7 +616,7 @@ mod sync_mapping_tests {
             repo: Some("org/repo".to_string()),
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         let mut task = sample_task();
         task.references.push(ReferenceEntry {

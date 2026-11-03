@@ -1,6 +1,5 @@
 mod common;
 use crate::common::env_mutex::EnvVarGuard;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 struct CwdGuard(PathBuf);
@@ -338,7 +337,7 @@ fn mcp_task_update_overwrites_custom_fields() {
 
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
     let mut storage = lotar::Storage::new(&resolver.path.clone());
-    let mut custom_fields: lotar::types::CustomFields = HashMap::new();
+    let mut custom_fields: lotar::types::CustomFields = Default::default();
     custom_fields.insert(
         "product".to_string(),
         lotar::types::custom_value_string("Initial"),
@@ -407,12 +406,12 @@ fn mcp_task_list_includes_custom_fields() {
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
     let mut storage = lotar::Storage::new(&resolver.path);
 
-    let mut product_a: lotar::types::CustomFields = HashMap::new();
+    let mut product_a: lotar::types::CustomFields = Default::default();
     product_a.insert(
         "product".to_string(),
         lotar::types::custom_value_string("Platform"),
     );
-    let mut product_b: lotar::types::CustomFields = HashMap::new();
+    let mut product_b: lotar::types::CustomFields = Default::default();
     product_b.insert(
         "product".to_string(),
         lotar::types::custom_value_string("Docs"),
@@ -504,7 +503,7 @@ fn mcp_task_list_filters_by_custom_fields() {
     let mut storage = lotar::Storage::new(&resolver.path);
 
     for (title, product) in [("Platform", "Platform"), ("Docs", "Docs")] {
-        let mut fields: lotar::types::CustomFields = HashMap::new();
+        let mut fields: lotar::types::CustomFields = Default::default();
         fields.insert(
             "product".to_string(),
             lotar::types::custom_value_string(product),

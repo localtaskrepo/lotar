@@ -250,9 +250,9 @@ fn parse_task_update_patch(
 
     if let Some(custom_fields_val) = patch_val.get("custom_fields") {
         match custom_fields_val {
-            Value::Null => patch.custom_fields = Some(std::collections::HashMap::new()),
+            Value::Null => patch.custom_fields = Some(crate::types::CustomFields::new()),
             Value::Object(obj) => {
-                let mut custom_fields_map = std::collections::HashMap::new();
+                let mut custom_fields_map = crate::types::CustomFields::new();
                 for (k, v) in obj.iter() {
                     custom_fields_map.insert(k.clone(), crate::types::custom_value_from_json(v));
                 }
@@ -456,7 +456,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         .get("custom_fields")
         .and_then(|v| v.as_object())
         .map(|o| {
-            let mut m = std::collections::HashMap::new();
+            let mut m = crate::types::CustomFields::new();
             for (k, v) in o.iter() {
                 m.insert(k.clone(), crate::types::custom_value_from_json(v));
             }

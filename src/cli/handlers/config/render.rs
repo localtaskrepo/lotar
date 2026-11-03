@@ -635,7 +635,7 @@ fn write_alias_map<T: Serialize>(
     buf: &mut String,
     indent: usize,
     key: &str,
-    aliases: &HashMap<String, T>,
+    aliases: &std::collections::BTreeMap<String, T>,
     source: Option<&String>,
     options: &YamlRenderOptions,
 ) -> bool {
@@ -681,11 +681,10 @@ fn scope_rank(label: &str) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     #[test]
     fn write_alias_map_renders_sorted_entries_and_respects_filters() {
-        let mut aliases = HashMap::new();
+        let mut aliases = std::collections::BTreeMap::new();
         aliases.insert("beta".to_string(), "second".to_string());
         aliases.insert("alpha".to_string(), "first".to_string());
 

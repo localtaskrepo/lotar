@@ -25,7 +25,7 @@ mod auth {
             repo: None,
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         }
     }
 
@@ -252,7 +252,7 @@ mod http {
             repo: None,
             filter: None,
             auth_profile: None,
-            mapping: HashMap::from([(
+            mapping: std::collections::BTreeMap::from([(
                 "points".to_string(),
                 serde_yaml_ng::from_str("{field: customfield_10016}").unwrap(),
             )]),
@@ -665,7 +665,7 @@ mod entry_points {
             repo: Some("org/repo".into()),
             filter: None,
             auth_profile: None,
-            mapping: HashMap::new(),
+            mapping: std::collections::BTreeMap::new(),
         };
         let response = SyncService::validate(&resolver, None, None, Some(override_config), None);
         assert!(err(response).contains("Auth profile is required for sync validation"));

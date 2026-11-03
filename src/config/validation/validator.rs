@@ -4,7 +4,7 @@ use crate::config::types::{
 };
 use crate::config::validation::conflicts::PrefixConflictDetector;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 
 pub struct ConfigValidator {
@@ -891,8 +891,8 @@ impl ConfigValidator {
 
     fn validate_remote_config(
         &self,
-        remotes: &std::collections::HashMap<String, SyncRemoteConfig>,
-        auth_profiles: &std::collections::HashMap<String, SyncAuthProfile>,
+        remotes: &std::collections::BTreeMap<String, SyncRemoteConfig>,
+        auth_profiles: &std::collections::BTreeMap<String, SyncAuthProfile>,
         scope: &str,
         result: &mut ValidationResult,
     ) {
@@ -1086,7 +1086,7 @@ impl ConfigValidator {
         &self,
         alias_field: &str,
         allowed_field: &str,
-        aliases: &HashMap<String, T>,
+        aliases: &std::collections::BTreeMap<String, T>,
         allowed: &[T],
         mut equals: F,
         result: &mut ValidationResult,

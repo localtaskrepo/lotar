@@ -2,7 +2,7 @@ use crate::types::{Priority, TaskStatus, TaskType};
 #[cfg(feature = "schema")]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTemplate {
@@ -65,8 +65,8 @@ pub enum SyncWhenEmpty {
 pub struct SyncFieldMappingDetail {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub field: Option<String>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub values: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub values: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub set: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -97,8 +97,8 @@ pub struct SyncRemoteConfig {
     pub filter: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auth_profile: Option<String>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub mapping: HashMap<String, SyncFieldMapping>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub mapping: BTreeMap<String, SyncFieldMapping>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -121,10 +121,10 @@ pub struct SyncAuthProfile {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SyncConfig {
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub remotes: HashMap<String, SyncRemoteConfig>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub auth_profiles: HashMap<String, SyncAuthProfile>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub remotes: BTreeMap<String, SyncRemoteConfig>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub auth_profiles: BTreeMap<String, SyncAuthProfile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -185,8 +185,8 @@ pub struct AgentProfileDetail {
     pub command: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub env: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tools: Option<AgentToolsConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -501,11 +501,11 @@ pub struct ProjectConfig {
 
     // Optional per-project branch alias maps
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub branch_type_aliases: Option<HashMap<String, TaskType>>, // token -> TaskType
+    pub branch_type_aliases: Option<BTreeMap<String, TaskType>>, // token -> TaskType
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub branch_status_aliases: Option<HashMap<String, TaskStatus>>, // token -> TaskStatus
+    pub branch_status_aliases: Option<BTreeMap<String, TaskStatus>>, // token -> TaskStatus
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub branch_priority_aliases: Option<HashMap<String, Priority>>, // token -> Priority
+    pub branch_priority_aliases: Option<BTreeMap<String, Priority>>, // token -> Priority
 
     // Attachments (project-level override)
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -529,7 +529,7 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_instructions: Option<AgentInstructionsConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub agents: Option<HashMap<String, AgentProfileConfig>>,
+    pub agents: Option<BTreeMap<String, AgentProfileConfig>>,
     /// Retired `agent.automation` block (DEV-152): still read and kept as
     /// written, but ignored; agent job lifecycle comes from automation rules.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -537,10 +537,10 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_worktree: Option<AgentWorktreeConfigOverride>,
 
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub remotes: HashMap<String, SyncRemoteConfig>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub auth_profiles: HashMap<String, SyncAuthProfile>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub remotes: BTreeMap<String, SyncRemoteConfig>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub auth_profiles: BTreeMap<String, SyncAuthProfile>,
 }
 
 impl ProjectConfig {
@@ -594,8 +594,8 @@ impl ProjectConfig {
             agents: None,
             agent_automation: None,
             agent_worktree: None,
-            remotes: HashMap::new(),
-            auth_profiles: HashMap::new(),
+            remotes: BTreeMap::new(),
+            auth_profiles: BTreeMap::new(),
         }
     }
 }
@@ -684,12 +684,12 @@ pub struct GlobalConfig {
     pub scan_strip_attributes: bool,
 
     // Branch alias maps (global-level)
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub branch_type_aliases: HashMap<String, TaskType>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub branch_status_aliases: HashMap<String, TaskStatus>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub branch_priority_aliases: HashMap<String, Priority>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub branch_type_aliases: BTreeMap<String, TaskType>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub branch_status_aliases: BTreeMap<String, TaskStatus>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub branch_priority_aliases: BTreeMap<String, Priority>,
 
     // Automation toggles
     #[serde(default = "default_true")]
@@ -727,8 +727,8 @@ pub struct GlobalConfig {
     pub agent_logs_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_instructions: Option<AgentInstructionsConfig>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub agents: HashMap<String, AgentProfileConfig>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub agents: BTreeMap<String, AgentProfileConfig>,
     /// Retired `agent.automation` block (DEV-152): still read and kept as
     /// written, but ignored; agent job lifecycle comes from automation rules.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -758,10 +758,10 @@ pub struct GlobalConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub web_ui_path: Option<String>,
 
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub remotes: HashMap<String, SyncRemoteConfig>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub auth_profiles: HashMap<String, SyncAuthProfile>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub remotes: BTreeMap<String, SyncRemoteConfig>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub auth_profiles: BTreeMap<String, SyncAuthProfile>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -813,9 +813,9 @@ pub struct ResolvedConfig {
     pub auto_branch_infer_priority: bool,
 
     // Effective alias maps
-    pub branch_type_aliases: HashMap<String, TaskType>,
-    pub branch_status_aliases: HashMap<String, TaskStatus>,
-    pub branch_priority_aliases: HashMap<String, Priority>,
+    pub branch_type_aliases: BTreeMap<String, TaskType>,
+    pub branch_status_aliases: BTreeMap<String, TaskStatus>,
+    pub branch_priority_aliases: BTreeMap<String, Priority>,
 
     // Attachments
     pub attachments_dir: String,
@@ -831,12 +831,12 @@ pub struct ResolvedConfig {
     pub agent_logs_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_instructions: Option<AgentInstructionsConfig>,
-    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
-    pub agent_profiles: HashMap<String, AgentProfileDetail>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
+    pub agent_profiles: BTreeMap<String, AgentProfileDetail>,
     pub agent_worktree: AgentWorktreeConfig,
 
-    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
-    pub remotes: HashMap<String, SyncRemoteConfig>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
+    pub remotes: BTreeMap<String, SyncRemoteConfig>,
 
     /// Web UI branding shared by everyone using the repository (DEV-218).
     #[serde(default)]
@@ -1064,9 +1064,9 @@ impl Default for GlobalConfig {
             sprints: SprintConfig::default(),
             // scan mutation policy
             scan_strip_attributes: true,
-            branch_type_aliases: HashMap::new(),
-            branch_status_aliases: HashMap::new(),
-            branch_priority_aliases: HashMap::new(),
+            branch_type_aliases: BTreeMap::new(),
+            branch_status_aliases: BTreeMap::new(),
+            branch_priority_aliases: BTreeMap::new(),
             auto_identity: true,
             auto_identity_git: true,
             attachments_dir: default_attachments_dir(),
@@ -1077,7 +1077,7 @@ impl Default for GlobalConfig {
             agent_context_extension: default_agent_context_extension(),
             agent_logs_dir: None,
             agent_instructions: None,
-            agents: HashMap::new(),
+            agents: BTreeMap::new(),
             agent_automation: None,
             agent_worktree: AgentWorktreeConfig::default(),
             ui_theme: None,
@@ -1087,8 +1087,8 @@ impl Default for GlobalConfig {
             ui_icon: None,
             ui_theme_file: None,
             web_ui_path: None,
-            remotes: HashMap::new(),
-            auth_profiles: HashMap::new(),
+            remotes: BTreeMap::new(),
+            auth_profiles: BTreeMap::new(),
         }
     }
 }
