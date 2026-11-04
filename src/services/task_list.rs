@@ -498,7 +498,9 @@ impl TaskQuery {
 }
 
 /// The spelling of `raw` as some stored task's status, when the status is
-/// no longer configured but tasks still hold it.
+/// no longer configured anywhere but tasks still hold it. A status another
+/// project still defines is not "removed": query that project instead
+/// (DEV-57 keeps project-only values out of the base scope).
 fn stored_status(
     tasks_root: &Path,
     project: Option<&str>,
@@ -514,6 +516,22 @@ fn stored_status(
         archived: crate::storage::layout::ArchiveFilter::All,
         ..Default::default()
     };
+    let configured_somewhere = crate::utils::filesystem::list_visible_subdirs(tasks_root)
+        .into_iter()
+        .any(|(prefix, _)| {
+            crate::config::resolution::config_for_project(tasks_root, Some(&prefix)).is_ok_and(
+                |config| {
+                    config
+                        .issue_states
+                        .values
+                        .iter()
+                        .any(|status| status.eq_ignore_case(wanted))
+                },
+            )
+        });
+    if configured_somewhere {
+        return None;
+    }
     crate::storage::search::StorageSearch::search(tasks_root, &filter)
         .into_iter()
         .map(|(_, task)| task.status)

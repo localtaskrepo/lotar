@@ -82,6 +82,14 @@ fn is_lock_contention(error: &std::io::Error, native_code: Option<i32>) -> bool 
 /// lock, so even an exclusive lock does not prove that their temp files are orphaned.
 pub fn acquire_storage_lock(target_dir: &Path, lock_name: &str) -> std::io::Result<File> {
     let lock_path = target_dir.join(format!(".{lock_name}.lock"));
+    // Task and sprint locks live one level below the tasks root (a project
+    // folder, `@sprints`); give the root its runtime .gitignore (DEV-271).
+    if (lock_name == "task" || lock_name == SPRINT_LOCK_NAME)
+        && let Some(root) = target_dir.parent()
+        && root.join("config.yml").is_file()
+    {
+        crate::storage::manager::ensure_runtime_gitignore(root);
+    }
     let file = File::options().write(true).create(true).truncate(false)
         .open(&lock_path).map_err(|e| std::io::Error::new(e.kind(), format!(
             "Cannot open storage lock {}: {e}; check the directory and permissions; mutation was not run",

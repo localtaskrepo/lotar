@@ -16,7 +16,9 @@ pub const RUNTIME_GITIGNORE: &str = "# Written by LoTaR: runtime files that are 
 .*.tmp-*\n";
 
 /// Create `<tasks>/.gitignore` for runtime files when it is missing. A
-/// workspace's own file is never changed.
+/// workspace's own file is never changed. Called when a task or sprint lock
+/// is taken, the first moment a runtime file appears, so read-only commands
+/// and dry runs write nothing.
 pub fn ensure_runtime_gitignore(root: &Path) {
     let path = root.join(".gitignore");
     if path.exists() || !root.is_dir() {
@@ -35,7 +37,6 @@ impl Storage {
     pub fn new(root_path: &Path) -> Self {
         let root_path = root_path.to_path_buf();
         let _ = fs::create_dir_all(&root_path);
-        ensure_runtime_gitignore(&root_path);
 
         // Ensure global config exists
         let _ = crate::config::bootstrap::ensure_global_config(&root_path, None);
@@ -46,7 +47,6 @@ impl Storage {
     pub fn new_with_context(root_path: &Path, project_context: Option<&str>) -> Self {
         let root_path = root_path.to_path_buf();
         let _ = fs::create_dir_all(&root_path);
-        ensure_runtime_gitignore(&root_path);
 
         // Ensure global config exists with smart default_project detection
         let _ = crate::config::bootstrap::ensure_global_config(&root_path, project_context);
