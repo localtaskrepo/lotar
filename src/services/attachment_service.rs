@@ -5,7 +5,6 @@ use crate::storage::manager::Storage;
 use crate::types::ReferenceEntry;
 use std::ffi::OsStr;
 use std::fs;
-use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 pub struct AttachmentService;
@@ -122,13 +121,16 @@ impl AttachmentService {
             }
         }
 
-        if let Some((_path, name)) = existing_dot {
+        // A blob with this hash is reused. One cut short by an earlier
+        // failed write is put right first: its name says what it must hold
+        // (DEV-271).
+        if let Some((path, name)) = existing_dot.or(existing_dash) {
+            let intact = fs::metadata(&path).is_ok_and(|meta| meta.len() == bytes.len() as u64);
+            if !intact {
+                crate::storage::safety::atomic_write_bytes(&path, bytes)?;
+                crate::services::attachment_previews::forget_index(root);
+            }
             return Ok((name, false));
-        }
-
-        if let Some((dash_path, dash_name)) = existing_dash {
-            let _ = dash_path;
-            return Ok((dash_name, false));
         }
 
         let base_stem = if stem.is_empty() {
@@ -145,19 +147,14 @@ impl AttachmentService {
         }
 
         let target = root.join(&filename);
-        match std::fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&target)
-        {
-            Ok(mut file) => {
-                file.write_all(bytes)?;
-                crate::services::attachment_previews::forget_index(root);
-                Ok((filename, true))
-            }
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok((filename, false)),
-            Err(err) => Err(LoTaRError::IoError(err)),
+        if target.exists() {
+            return Ok((filename, false));
         }
+        // Temp file, fsync, rename: a failed or interrupted write never
+        // leaves a partial blob under the final name (DEV-271).
+        crate::storage::safety::atomic_write_bytes(&target, bytes)?;
+        crate::services::attachment_previews::forget_index(root);
+        Ok((filename, true))
     }
 
     /// Remove a stored attachment file this process just created. Only safe

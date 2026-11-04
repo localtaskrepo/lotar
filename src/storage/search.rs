@@ -45,10 +45,16 @@ impl StorageSearch {
 
         let task = match serde_yaml_ng::from_str::<Task>(&content) {
             Ok(task) => task,
-            Err(e) => {
-                crate::storage::safety::warn_corrupt_once(path, &e.to_string());
-                return None;
-            }
+            // Hand-written files may leave out `created` or spell enums in
+            // another case; the tolerant parser fills those in and still
+            // rejects malformed data (DEV-271).
+            Err(e) => match crate::storage::task::parse_task_file_tolerant(path, &content) {
+                Some(task) => task,
+                None => {
+                    crate::storage::safety::warn_corrupt_once(path, &e.to_string());
+                    return None;
+                }
+            },
         };
         if let Ok(mut cache) = task_cache().write() {
             // Opportunistic size guard: drop the whole cache if it grew past

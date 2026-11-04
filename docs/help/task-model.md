@@ -27,7 +27,7 @@ Field | Type | Notes
 `task_type` | `TaskType` | Validated against `config.issue_types`.
 `reporter` | `string?` | Optional; resolved via identity helpers if omitted during creation.
 `assignee` | `string?` | Optional; never auto-cleared when statuses change.
-`created` | `RFC3339 string` | UTC timestamp recorded at creation.
+`created` | `RFC3339 string` | UTC timestamp recorded at creation. A hand-written file without it is still read, with the file's modification time; the next edit stores that value.
 `modified` | `RFC3339 string` | Last content-mutation timestamp; unchanged by soft delete and restore.
 `deleted_at` | `RFC3339 string?` | Soft-deletion timestamp. Omitted for active tasks; persisted in YAML and exposed when deleted tasks are explicitly requested.
 `archived` | `boolean?` | `true` while the task file is in the project's `@archive` folder (read-only). Omitted otherwise; never stored in YAML, since the location decides.

@@ -1,13 +1,23 @@
 title: 'Storage robustness: lock files in git status, non-atomic attachments, hidden tasks, removed statuses'
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:35.985555+00:00
-modified: 2026-10-31T22:06:36.045030+00:00
+modified: 2026-11-04T04:47:05.564058+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T04:47:05.542133+00:00
+  text: |-
+    Fixed all four findings.
+    1. Storage::new / new_with_context write <tasks>/.gitignore (lock files, .txn-pending.json, .*.tmp-*) when it is missing and never change an existing one. Documented in serve.md Data safety, including that an attachments folder outside .tasks needs its own rule.
+    2. AttachmentService::store_bytes publishes new blobs with atomic_write_bytes (temp file, fsync, rename). A deduplicated blob whose size doesn't match the upload is rewritten from the uploaded bytes, since its hash name says what it must hold.
+    3. Read and write paths use the tolerant parser (parse_task_file_tolerant): a hand-written task without created is listed, shown and editable, and gets the file mtime as created, which the next write stores. Malformed data is still rejected with the existing warning.
+    4. A status filter value no longer in the configuration is accepted when stored tasks still hold it (task_list stored_status), so orphaned tasks can be found and migrated. Unknown values nobody holds still error. Documented in list.md.
+    Tests: tests/dev271_storage_robustness_test.rs (4).
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -46,3 +56,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T04:47:05.502982+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T04:47:05.542133+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T04:47:05.564058+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

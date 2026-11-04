@@ -7,6 +7,24 @@ use crate::storage::task::Task;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// What the tasks folder's `.gitignore` keeps out of commits: lock files,
+/// a pending transaction journal and interrupted atomic writes (DEV-271).
+pub const RUNTIME_GITIGNORE: &str = "# Written by LoTaR: runtime files that are not task data.\n\
+# Edit this file rather than deleting it; LoTaR recreates it when missing.\n\
+.*.lock\n\
+.txn-pending.json\n\
+.*.tmp-*\n";
+
+/// Create `<tasks>/.gitignore` for runtime files when it is missing. A
+/// workspace's own file is never changed.
+pub fn ensure_runtime_gitignore(root: &Path) {
+    let path = root.join(".gitignore");
+    if path.exists() || !root.is_dir() {
+        return;
+    }
+    let _ = crate::storage::safety::atomic_write_file(&path, RUNTIME_GITIGNORE);
+}
+
 /// Main storage manager that orchestrates all storage operations
 pub struct Storage {
     pub root_path: PathBuf,
@@ -17,6 +35,7 @@ impl Storage {
     pub fn new(root_path: &Path) -> Self {
         let root_path = root_path.to_path_buf();
         let _ = fs::create_dir_all(&root_path);
+        ensure_runtime_gitignore(&root_path);
 
         // Ensure global config exists
         let _ = crate::config::bootstrap::ensure_global_config(&root_path, None);
@@ -27,6 +46,7 @@ impl Storage {
     pub fn new_with_context(root_path: &Path, project_context: Option<&str>) -> Self {
         let root_path = root_path.to_path_buf();
         let _ = fs::create_dir_all(&root_path);
+        ensure_runtime_gitignore(&root_path);
 
         // Ensure global config exists with smart default_project detection
         let _ = crate::config::bootstrap::ensure_global_config(&root_path, project_context);

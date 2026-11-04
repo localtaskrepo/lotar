@@ -286,7 +286,7 @@ impl StorageOperations {
                 return Err(message.into());
             }
             let content = fs::read_to_string(&file_path)?;
-            let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
+            let old_task = crate::storage::task::parse_task_file_tolerant(&file_path, &content)
                 .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
             if let Some(message) = stub_refusal(&old_task, id) {
                 return Err(message.into());
@@ -351,8 +351,8 @@ impl StorageOperations {
             };
             ensure_writable(&project_path, &file_path, id)?;
             let content = fs::read_to_string(&file_path)?;
-            let before =
-                crate::storage::task::parse_task_yaml_tolerant(&content).ok_or_else(|| {
+            let before = crate::storage::task::parse_task_file_tolerant(&file_path, &content)
+                .ok_or_else(|| {
                     LoTaRError::ValidationError(
                         "Cannot safely edit malformed task YAML; repair the task file first"
                             .to_string(),
@@ -397,7 +397,7 @@ impl StorageOperations {
         // Read fresh rather than using a potentially stale caller snapshot.
         // DTO-based replacements do not carry YAML extensions.
         let content = fs::read_to_string(&file_path)?;
-        let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
+        let old_task = crate::storage::task::parse_task_file_tolerant(&file_path, &content)
             .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
         if let Some(message) = stub_refusal(&old_task, id) {
             return Err(message.into());

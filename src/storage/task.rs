@@ -221,6 +221,25 @@ pub fn parse_status_from_yaml(content: &str) -> Option<TaskStatus> {
 /// with case-insensitive enum normalization and legacy missing-field defaults.
 /// All other values must deserialize intact; malformed structured data is not
 /// silently replaced with empty collections because callers may edit the task.
+/// The `created` value [`parse_task_yaml_tolerant`] fills in when the file
+/// has none.
+pub const MISSING_CREATED: &str = "1970-01-01T00:00:00Z";
+
+/// [`parse_task_yaml_tolerant`] for a file on disk: a missing `created`
+/// becomes the file's modification time, so a hand-written task shows a
+/// plausible date and the next write stores it (DEV-271).
+pub fn parse_task_file_tolerant(path: &std::path::Path, content: &str) -> Option<Task> {
+    let mut task = parse_task_yaml_tolerant(content)?;
+    if task.created == MISSING_CREATED
+        && let Some(modified) = std::fs::metadata(path)
+            .ok()
+            .and_then(|meta| meta.modified().ok())
+    {
+        task.created = chrono::DateTime::<chrono::Utc>::from(modified).to_rfc3339();
+    }
+    Some(task)
+}
+
 pub fn parse_task_yaml_tolerant(content: &str) -> Option<Task> {
     if let Ok(task) = serde_yaml_ng::from_str::<Task>(content) {
         return Some(task);
@@ -228,7 +247,7 @@ pub fn parse_task_yaml_tolerant(content: &str) -> Option<Task> {
 
     let mut v: serde_yaml_ng::Value = serde_yaml_ng::from_str(content).ok()?;
     let mapping = v.as_mapping_mut()?;
-    for (key, default) in [("title", ""), ("created", "1970-01-01T00:00:00Z")] {
+    for (key, default) in [("title", ""), ("created", MISSING_CREATED)] {
         mapping
             .entry(serde_yaml_ng::Value::String(key.into()))
             .or_insert_with(|| serde_yaml_ng::Value::String(default.into()));

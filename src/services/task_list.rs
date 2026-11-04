@@ -345,10 +345,14 @@ impl TaskQueryInput {
             ..TaskListFilter::default()
         };
         for raw in &self.status {
-            filter.status.push(
-                crate::types::TaskStatus::parse_with_config(raw, &config)
-                    .map_err(|message| invalid_enum("status", raw, message))?,
-            );
+            let status = match crate::types::TaskStatus::parse_with_config(raw, &config) {
+                Ok(status) => status,
+                // A status removed from the configuration still finds the
+                // tasks that hold it, so they can be migrated (DEV-271).
+                Err(message) => stored_status(tasks_root, filter.project.as_deref(), raw)
+                    .ok_or_else(|| invalid_enum("status", raw, message))?,
+            };
+            filter.status.push(status);
         }
         for raw in &self.priority {
             filter.priority.push(
@@ -491,6 +495,29 @@ impl TaskQuery {
     pub fn sorts_by_relevance(&self) -> bool {
         self.options.sort == SortSpec::Builtin(SortKey::Relevance)
     }
+}
+
+/// The spelling of `raw` as some stored task's status, when the status is
+/// no longer configured but tasks still hold it.
+fn stored_status(
+    tasks_root: &Path,
+    project: Option<&str>,
+    raw: &str,
+) -> Option<crate::types::TaskStatus> {
+    let wanted = raw.trim();
+    if wanted.is_empty() {
+        return None;
+    }
+    let filter = crate::storage::TaskFilter {
+        project: project.map(str::to_string),
+        deletion: DeletionFilter::All,
+        archived: crate::storage::layout::ArchiveFilter::All,
+        ..Default::default()
+    };
+    crate::storage::search::StorageSearch::search(tasks_root, &filter)
+        .into_iter()
+        .map(|(_, task)| task.status)
+        .find(|status| status.eq_ignore_case(wanted))
 }
 
 /// Load, filter and order the tasks a query selects. Pagination is left to
