@@ -118,11 +118,11 @@ impl CommandHandler for EditHandler {
             }
         }
 
+        // Same validation as `add` and `effort` (DEV-282).
         if let Some(effort) = effort {
-            let normalized = match crate::utils::effort::parse_effort(&effort) {
-                Ok(parsed) => parsed.canonical,
-                Err(_) => effort,
-            };
+            let normalized = crate::utils::effort::parse_effort(&effort)
+                .map(|parsed| parsed.canonical)
+                .map_err(|e| format!("Effort validation failed: {}", e))?;
             task.effort = Some(normalized.clone());
             patch.effort = Some(normalized);
         }
@@ -142,8 +142,11 @@ impl CommandHandler for EditHandler {
 
         if !tags.is_empty() {
             for tag in &tags {
-                if !task.tags.contains(tag) {
-                    task.tags.push(tag.clone());
+                let tag = validator
+                    .validate_tag(tag)
+                    .map_err(|e| format!("Tag validation failed: {}", e))?;
+                if !task.tags.contains(&tag) {
+                    task.tags.push(tag);
                 }
             }
             patch.tags = Some(task.tags.clone());

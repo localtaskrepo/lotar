@@ -165,27 +165,8 @@ impl CommandHandler for TaskHandler {
                 explain,
             } => {
                 // Resolve comment content from args: file > message > text > stdin
-                let resolved_text = if let Some(path) = file {
-                    std::fs::read_to_string(&path)
-                        .map(|s| s.trim_end_matches(['\n', '\r']).to_string())
-                        .unwrap_or_default()
-                } else if let Some(m) = message {
-                    m
-                } else if let Some(t) = text {
-                    t
-                } else {
-                    use std::io::{IsTerminal, Read};
-                    let mut buffer = String::new();
-                    if !std::io::stdin().is_terminal() {
-                        if std::io::stdin().read_to_string(&mut buffer).is_ok() {
-                            buffer.trim_end_matches(['\n', '\r']).to_string()
-                        } else {
-                            String::new()
-                        }
-                    } else {
-                        String::new()
-                    }
-                };
+                let resolved_text =
+                    crate::cli::handlers::comment::resolve_comment_text(file, message, text)?;
                 let text_value = if resolved_text.trim().is_empty() {
                     None
                 } else {

@@ -421,32 +421,14 @@ fn main() {
         } => {
             renderer.log_info("BEGIN COMMENT");
             // Resolve comment content from args: file > message > text > stdin
-            let resolved_text = if let Some(path) = file {
-                std::fs::read_to_string(&path)
-                    .map(|s| s.trim_end_matches(['\n', '\r']).to_string())
-                    .map_err(|e| e.to_string())
-                    .unwrap_or_else(|_| {
-                        renderer.emit_error("Failed to read --file");
-                        String::new()
-                    })
-            } else if let Some(m) = message {
-                m
-            } else if let Some(t) = text {
-                t
-            } else {
-                // Fallback: read from stdin if piped
-                use std::io::{IsTerminal, Read};
-                let mut buffer = String::new();
-                if !std::io::stdin().is_terminal() {
-                    if std::io::stdin().read_to_string(&mut buffer).is_ok() {
-                        buffer.trim_end_matches(['\n', '\r']).to_string()
-                    } else {
-                        String::new()
+            let resolved_text =
+                match lotar::cli::handlers::comment::resolve_comment_text(file, message, text) {
+                    Ok(text) => text,
+                    Err(e) => {
+                        renderer.emit_error(&e);
+                        std::process::exit(1);
                     }
-                } else {
-                    String::new()
-                }
-            };
+                };
             let text_value = if resolved_text.trim().is_empty() {
                 None
             } else {

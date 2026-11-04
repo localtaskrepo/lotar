@@ -1,13 +1,24 @@
 title: 'CLI safety and validation: empty --select matches everything, edit skips validation, silent failures'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:37.612368+00:00
-modified: 2026-10-31T22:06:37.675840+00:00
+modified: 2026-11-04T02:23:12.478955+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T02:23:12.451015+00:00
+  text: |-
+    Outcome: all six findings fixed.
+    1. task archive/unarchive/move refuse a blank --select ('--select is empty: give a query, or name the tasks by ID').
+    2. lotar edit validates --effort (parse_effort error) and each --tag (validate_tag) like add/effort do. Not done: moving those checks into TaskService::update for REST/MCP.
+    3./6. New cli::handlers::comment::resolve_comment_text shared by 'comment' and 'task comment': an unreadable -F file is an error with path and OS error (exit 1); '-F -' reads stdin; implicit stdin is only read when data arrives within 200 ms (then until EOF or 500 ms of quiet), so listing comments with a silent open pipe returns at once (0.24 s vs blocking).
+    4. task delete without --force fails in JSON mode or with non-interactive stdin (like sprint delete), prompts on stderr, and a 'no' or read failure exits 1.
+    5. --sort-by accepts a bare custom-field name only when declared (the default '*' wildcard no longer swallows typos); field:<name> reaches any custom field.
+    Evidence: tests/dev282_cli_safety_test.rs (blank select x3, edit effort/tag, -F missing in both forms, -F -, JSON delete without prompt, sort-by typo); manual repros; full Rust suite 1929/1929; comment.md/list.md/task.md updated; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -61,3 +72,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T02:16:13.495365+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T02:23:12.451015+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T02:23:12.478955+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

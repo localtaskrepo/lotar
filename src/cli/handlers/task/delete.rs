@@ -46,20 +46,28 @@ impl CommandHandler for DeleteHandler {
             } else {
                 "soft delete"
             };
-            print!("Are you sure you want to {action} task '{}'? (y/N): ", id);
-            use std::io::{self, Write};
-            let _ = io::stdout().flush();
+            use std::io::{self, IsTerminal, Write};
+            // Like sprint delete (DEV-282): no prompt that would corrupt JSON
+            // output or silently "cancel" with exit 0 in scripts.
+            if matches!(renderer.format, crate::output::OutputFormat::Json)
+                || !io::stdin().is_terminal()
+            {
+                return Err(
+                    "Task deletion requires --force with JSON output or non-interactive input."
+                        .to_string(),
+                );
+            }
+            eprint!("Are you sure you want to {action} task '{}'? (y/N): ", id);
+            let _ = io::stderr().flush();
 
             let mut input = String::new();
             if io::stdin().read_line(&mut input).is_err() {
-                renderer.emit_error("Failed to read input. Aborting.");
-                return Ok(());
+                return Err("Failed to read input. Deletion cancelled.".to_string());
             }
             let decision = input.trim().to_lowercase();
 
             if decision != "y" && decision != "yes" {
-                renderer.emit_warning("Deletion cancelled.");
-                return Ok(());
+                return Err("Deletion cancelled.".to_string());
             }
         }
 

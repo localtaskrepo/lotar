@@ -27,6 +27,11 @@ pub(crate) fn execute(
     for raw in &args.ids {
         ids.push(ctx.resolve_full_task_id(raw, project)?);
     }
+    // A blank query would select every task (DEV-282), e.g. an unset
+    // `--select "$QUERY"` in a script.
+    if args.select.as_deref().is_some_and(|q| q.trim().is_empty()) {
+        return Err("--select is empty: give a query, or name the tasks by ID".to_string());
+    }
     if let Some(select) = args.select.as_deref() {
         let mut search = String::new();
         if let Some(prefix) = project {

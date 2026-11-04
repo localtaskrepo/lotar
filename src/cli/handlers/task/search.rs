@@ -117,19 +117,21 @@ impl SearchHandler {
         if crate::services::task_query::parse_sort_by(sort_key).is_ok() {
             return Ok(sort_key.to_string());
         }
+        // A bare name must be a declared custom field; the default `*`
+        // wildcard alone would turn every typo into an unsorted list
+        // (DEV-282). `field:<name>` reaches any custom field.
         let key = sort_key.trim();
         if !key.is_empty()
-            && (config.custom_fields.has_wildcard()
-                || config
-                    .custom_fields
-                    .values
-                    .iter()
-                    .any(|v| v.eq_ignore_ascii_case(key)))
+            && config
+                .custom_fields
+                .values
+                .iter()
+                .any(|v| v != "*" && v.eq_ignore_ascii_case(key))
         {
             return Ok(format!("field:{key}"));
         }
         Err(format!(
-            "Invalid --sort-by '{key}': not a builtin key or configured custom field"
+            "Invalid --sort-by '{key}': not a builtin key or declared custom field (use field:{key} for any custom field)"
         ))
     }
 

@@ -301,3 +301,84 @@ fn insert_optional_string(payload: &mut Map<String, Value>, key: &str, value: Op
         payload.insert(key.to_string(), Value::String(content.to_string()));
     }
 }
+
+/// The comment text from `-F <file>` (`-F -` reads stdin), `-m`, the
+/// positional text, or piped stdin, in that order. An unreadable file is an
+/// error with its path (DEV-282: it used to fall back to listing comments
+/// with exit 0). Piped stdin is only read when data shows up promptly, so
+/// listing comments never hangs on a pipe that stays open with nothing in
+/// it (agents, CI, `ssh -T`).
+pub fn resolve_comment_text(
+    file: Option<String>,
+    message: Option<String>,
+    text: Option<String>,
+) -> Result<String, String> {
+    use std::io::Read;
+    let trim = |s: String| s.trim_end_matches(['\n', '\r']).to_string();
+    if let Some(path) = file {
+        if path == "-" {
+            let mut buffer = String::new();
+            std::io::stdin()
+                .read_to_string(&mut buffer)
+                .map_err(|e| format!("Failed to read the comment from stdin: {e}"))?;
+            return Ok(trim(buffer));
+        }
+        return std::fs::read_to_string(&path)
+            .map(trim)
+            .map_err(|e| format!("Failed to read --file '{path}': {e}"));
+    }
+    if let Some(message) = message {
+        return Ok(message);
+    }
+    if let Some(text) = text {
+        return Ok(text);
+    }
+    Ok(read_piped_stdin().map(trim).unwrap_or_default())
+}
+
+/// Stdin when it is a file or a pipe that delivers data within a moment;
+/// `None` for a terminal or a silent pipe.
+fn read_piped_stdin() -> Option<String> {
+    use std::io::{IsTerminal, Read};
+    let stdin = std::io::stdin();
+    if stdin.is_terminal() {
+        return None;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        let fd = stdin.as_raw_fd();
+        let ready = |timeout_ms: i32| {
+            let mut poll = libc::pollfd {
+                fd,
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            // SAFETY: poll on our own stdin descriptor.
+            unsafe { libc::poll(&mut poll, 1, timeout_ms) > 0 }
+        };
+        if !ready(200) {
+            return None;
+        }
+        let mut out = Vec::new();
+        let mut buf = [0u8; 8192];
+        let mut handle = stdin.lock();
+        loop {
+            match handle.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => out.extend_from_slice(&buf[..n]),
+            }
+            // Stop when the writer goes quiet without closing the pipe.
+            if !ready(500) {
+                break;
+            }
+        }
+        Some(String::from_utf8_lossy(&out).into_owned())
+    }
+    #[cfg(not(unix))]
+    {
+        let mut buffer = String::new();
+        stdin.lock().read_to_string(&mut buffer).ok()?;
+        Some(buffer)
+    }
+}
