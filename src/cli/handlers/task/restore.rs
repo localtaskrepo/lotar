@@ -56,7 +56,7 @@ impl CommandHandler for RestoreHandler {
                     let obj = serde_json::json!({
                         "status": "preview",
                         "action": "restore",
-                        "task_id": id,
+                        "task_id": full_id,
                         "project": project_prefix,
                         "deleted_at": task.deleted_at,
                     });
@@ -81,20 +81,28 @@ impl CommandHandler for RestoreHandler {
             return Ok(());
         }
 
+        // Canonical IDs in every output, and an honest no-op (DEV-283).
+        let was_deleted = task.deleted_at.is_some();
         match TaskService::restore(&mut ctx.storage, &full_id, Some(project_prefix.as_str())) {
             Ok(restored) => {
+                let message = if was_deleted {
+                    format!("Task '{}' restored", full_id)
+                } else {
+                    format!("Task '{}' is not deleted; no changes", full_id)
+                };
                 match renderer.format {
                     crate::output::OutputFormat::Json => {
                         let obj = serde_json::json!({
                             "status": "success",
-                            "message": format!("Task '{}' restored", id),
-                            "task_id": id,
+                            "message": message,
+                            "task_id": full_id,
+                            "changed": was_deleted,
                             "deleted_at": restored.deleted_at,
                         });
                         renderer.emit_json(&obj);
                     }
                     _ => {
-                        renderer.emit_success(format_args!("Task '{}' restored", id));
+                        renderer.emit_success(message);
                     }
                 }
                 Ok(())

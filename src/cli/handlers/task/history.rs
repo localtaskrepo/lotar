@@ -473,13 +473,22 @@ fn resolve_task_file(
     let default_proj = project
         .map(|p| resolve_project_input(p, resolver.path.as_path()))
         .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
+    // A bare number means a task of the current project, as everywhere
+    // else (DEV-283).
+    let qualified;
+    let id = if !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()) {
+        qualified = format!("{default_proj}-{id}");
+        qualified.as_str()
+    } else {
+        id
+    };
     let proj_prefix = crate::storage::operations::StorageOperations::get_project_for_task(id)
         .unwrap_or(default_proj.clone());
     let file_rel = crate::storage::operations::StorageOperations::get_file_path_for_id(
         &resolver.path.join(&proj_prefix),
         id,
     )
-    .ok_or_else(|| "Task file not found".to_string())?;
+    .ok_or_else(|| format!("Task '{id}' not found"))?;
 
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
     let repo_root = crate::utils::git::find_repo_root(&cwd)

@@ -15,6 +15,7 @@ use std::io::Write;
 pub mod agent;
 pub mod assignee;
 pub mod automation;
+pub mod clear_field;
 pub mod comment;
 pub mod completions;
 pub mod config;
@@ -604,10 +605,15 @@ impl AddHandler {
             if let Some(task) = storage.get(task_id, &project_prefix) {
                 match renderer.format {
                     OutputFormat::Json => {
-                        let response = serde_json::json!({
-                            "status": "success",
-                            "message": format!("Created task: {}", task_id),
-                            "task": {
+                        // The same task object `show` and `list` return, tags,
+                        // effort and custom fields included (DEV-283).
+                        let task_json = crate::services::task_service::TaskService::get(
+                            &storage, task_id, None,
+                        )
+                        .ok()
+                        .and_then(|dto| serde_json::to_value(dto).ok())
+                        .unwrap_or_else(|| {
+                            serde_json::json!({
                                 "id": task_id,
                                 "title": task.title,
                                 "status": task.status.to_string(),
@@ -619,7 +625,13 @@ impl AddHandler {
                                 "description": task.description,
                                 "created": task.created,
                                 "modified": task.modified
-                            }
+                            })
+                        });
+                        let response = serde_json::json!({
+                            "status": "success",
+                            "message": format!("Created task: {}", task_id),
+                            "task_id": task_id,
+                            "task": task_json,
                         });
                         renderer.emit_json(&response);
                     }

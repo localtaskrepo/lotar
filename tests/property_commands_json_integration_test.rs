@@ -210,8 +210,8 @@ fn test_task_delete_success_json() {
             .to_lowercase()
             .contains("deleted")
     );
-    // Task ID is the CLI-supplied ID for delete
-    assert_eq!(json["task_id"], "1");
+    // Canonical ID, like every other command (DEV-283).
+    assert_eq!(json["task_id"], "TP-1");
 
     // Optional: verify list is empty
     let mut cmd = crate::common::lotar_cmd().unwrap();

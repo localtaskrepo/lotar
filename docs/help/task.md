@@ -76,7 +76,7 @@ lotar --format json show <TASK_ID>
 ### edit
 
 ```bash
-lotar task edit <TASK_ID> [--title|-T] [--type|-t] [--priority|-P] [--reporter|-R] [--assignee|-a] [--effort|-E] [--due|-d] [--description|-D] [--tag|-i ...] [--field|-F key=value ...] [--dry-run|-n]
+lotar task edit <TASK_ID> [--title|-T] [--type|-t] [--priority|-P] [--reporter|-R] [--assignee|-a] [--effort|-E] [--due|-d] [--description|-D] [--tag|-i ...] [--untag TAG ...] [--field|-F key=value ...] [--dry-run|-n]
 ```
 
 - Also available as `lotar edit <TASK_ID> …` and `lotar update <TASK_ID> …`.

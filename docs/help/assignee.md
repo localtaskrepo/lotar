@@ -8,6 +8,9 @@ Change or view a task's assignee with validation and project-aware ID resolution
 # View current assignee
 lotar assignee <TASK_ID>
 
+# Unassign (-n previews)
+lotar assignee <TASK_ID> --clear
+
 # Change assignee
 lotar assignee <TASK_ID> <NEW_ASSIGNEE> [--dry-run] [--explain]
 ```

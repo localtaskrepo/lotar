@@ -1,13 +1,26 @@
 title: 'CLI output consistency and missing edits: IDs, JSON envelopes, changelog, clearing fields, completions'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:37.762164+00:00
-modified: 2026-10-31T22:06:37.835821+00:00
+modified: 2026-11-04T02:41:14.084989+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T02:41:14.041257+00:00
+  text: |-
+    Outcome: all seven findings handled.
+    1. task history/history-by-field/diff/at accept a bare number (qualified with the current project) and say 'Task <ID> not found' instead of a generic file error.
+    2. changelog reports git failures (bad ref: 'git diff X..HEAD failed: ...', exit 1) and uses 'git status --untracked-files=all', so new project folders' tasks appear.
+    3. delete/restore/edit outputs use the canonical ID; a repeated soft delete reports 'already deleted; no changes'; restore of a live task reports 'is not deleted; no changes' with changed=false; edit -f json returns task_id and the updated task.
+    4. lotar -p X automation run scopes the run to project X (project=X added to the query).
+    5. Property no-ops keep 'status' as the result and put a task status under 'task_status' (plus changed:false); add -f json returns the same task object as show (tags, effort, custom fields) plus task_id; scan -f json is an envelope {status, dry_run, count, findings[]} with 'key' (null when none) instead of an empty 'uuid'.
+    6. New: due-date --clear, assignee --clear (with the active-agent-job guard; -n previews), edit --untag TAG (case-insensitive), priority -n/--dry-run and -e/--explain.
+    7. completions.md documents the fish generator's two-level limit (not fixable here without changing clap_complete engines).
+    Evidence: tests/dev283_cli_output_test.rs (canonical IDs, honest no-ops, add JSON tags, task_status, clears/untag/priority dry run, changelog bad ref); 2 existing tests updated for the new shapes; full Rust suite 1932/1932; full quick smoke 372/372; docs (due-date, assignee, priority, task, completions, scan) updated; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -66,3 +79,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T02:23:17.796899+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T02:41:14.041257+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T02:41:14.084989+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

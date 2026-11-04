@@ -8,6 +8,9 @@ Change or view task priority with validation.
 # View current priority
 lotar priority <TASK_ID>
 
+# Preview a change and explain the validation (no write)
+lotar priority <TASK_ID> High --dry-run --explain
+
 # Change priority
 lotar priority <TASK_ID> <NEW_PRIORITY>
 ```

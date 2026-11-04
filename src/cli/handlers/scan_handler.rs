@@ -167,7 +167,7 @@ impl CommandHandler for ScanHandler {
                     "file": entry.file_path,
                     "line": entry.line_number,
                     "title": entry.title,
-                    "uuid": entry.uuid,
+                    "key": (!entry.uuid.is_empty()).then(|| entry.uuid.clone()),
                     "annotation": entry.annotation
                 })
             })
@@ -440,8 +440,14 @@ impl CommandHandler for ScanHandler {
             )?;
         }
 
+        // An envelope like the other commands (DEV-283).
         if json {
-            renderer.emit_json(&json_items);
+            renderer.emit_json(&serde_json::json!({
+                "status": "ok",
+                "dry_run": args.dry_run,
+                "count": json_items.len(),
+                "findings": json_items,
+            }));
         }
         Ok(())
     }

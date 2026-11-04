@@ -186,8 +186,10 @@ fn scan_formats_report_discovered_todo_comments() {
     );
 
     let json = stdout_of(&run(temp_dir, &["scan", ".", "--format=json"]));
-    let findings: Vec<serde_json::Value> =
+    let envelope: serde_json::Value =
         serde_json::from_str(&json).unwrap_or_else(|e| panic!("invalid JSON: {e}: {json}"));
+    assert_eq!(envelope["status"], "ok");
+    let findings = envelope["findings"].as_array().cloned().unwrap_or_default();
     assert_eq!(findings.len(), 1, "json scan must list the finding: {json}");
     assert_eq!(findings[0]["file"], "./sample.rs");
     assert_eq!(findings[0]["line"], 1);

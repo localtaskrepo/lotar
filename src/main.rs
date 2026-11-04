@@ -239,7 +239,12 @@ fn main() {
         }
         Commands::Automation(args) => {
             renderer.log_info("BEGIN AUTOMATION");
-            match AutomationHandler::execute(args.action, &resolver, &renderer) {
+            match AutomationHandler::execute(
+                args.action,
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
                 Ok(()) => {
                     renderer.log_info("END AUTOMATION status=ok");
                     Ok(())
@@ -318,9 +323,15 @@ fn main() {
                 }
             }
         }
-        Commands::Priority { id, priority } => {
+        Commands::Priority {
+            id,
+            priority,
+            dry_run,
+            explain,
+        } => {
             renderer.log_info("BEGIN PRIORITY");
-            let priority_args = PriorityArgs::new(id, priority, cli.project.clone());
+            let priority_args =
+                PriorityArgs::new(id, priority, cli.project.clone()).with_preview(dry_run, explain);
             match PriorityHandler::execute(
                 priority_args,
                 cli.project.as_deref(),
@@ -340,9 +351,24 @@ fn main() {
         }
         Commands::DueDate {
             id,
+            clear: true,
+            dry_run,
+            ..
+        } => lotar::cli::handlers::clear_field::clear_task_field(
+            &resolver,
+            cli.project.as_deref(),
+            &id,
+            lotar::cli::handlers::clear_field::ClearableField::DueDate,
+            dry_run,
+            &renderer,
+        )
+        .inspect_err(|e| renderer.emit_error(e)),
+        Commands::DueDate {
+            id,
             due_date,
             dry_run,
             explain,
+            ..
         } => {
             renderer.log_info("BEGIN DUEDATE");
             let args = DueDateArgs::new(id, due_date, cli.project.clone(), dry_run, explain);
@@ -393,9 +419,24 @@ fn main() {
         }
         Commands::Assignee {
             id,
+            clear: true,
+            dry_run,
+            ..
+        } => lotar::cli::handlers::clear_field::clear_task_field(
+            &resolver,
+            cli.project.as_deref(),
+            &id,
+            lotar::cli::handlers::clear_field::ClearableField::Assignee,
+            dry_run,
+            &renderer,
+        )
+        .inspect_err(|e| renderer.emit_error(e)),
+        Commands::Assignee {
+            id,
             assignee,
             dry_run,
             explain,
+            ..
         } => {
             renderer.log_info("BEGIN ASSIGNEE");
             let args = AssigneeArgs::new(id, assignee, cli.project.clone(), dry_run, explain);
@@ -659,7 +700,16 @@ fn main() {
                                 };
                                 iter.collect()
                             }
-                            _ => Vec::new(),
+                            // A ref git doesn't know is an error, not "no
+                            // changes" (DEV-283).
+                            Ok(o) => {
+                                return Err(format!(
+                                    "git diff {}..HEAD failed: {}",
+                                    ref_base,
+                                    String::from_utf8_lossy(&o.stderr).trim()
+                                ));
+                            }
+                            Err(e) => return Err(format!("Failed to run git: {e}")),
                         }
                     } else {
                         // Working + staged vs HEAD, use porcelain to detect .tasks changes
@@ -669,6 +719,9 @@ fn main() {
                             .arg(&repo_root)
                             .arg("status")
                             .arg("--porcelain")
+                            // New project folders list their files, not
+                            // just `?? .tasks/NEW/` (DEV-283).
+                            .arg("--untracked-files=all")
                             .output();
                         match out {
                             Ok(o) if o.status.success() => {
@@ -700,7 +753,13 @@ fn main() {
                                 };
                                 iter.collect()
                             }
-                            _ => Vec::new(),
+                            Ok(o) => {
+                                return Err(format!(
+                                    "git status failed: {}",
+                                    String::from_utf8_lossy(&o.stderr).trim()
+                                ));
+                            }
+                            Err(e) => return Err(format!("Failed to run git: {e}")),
                         }
                     };
 

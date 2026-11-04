@@ -34,6 +34,7 @@ impl CommandHandler for EditHandler {
             due,
             description,
             tags,
+            untag,
             fields,
             dry_run,
         } = args;
@@ -152,6 +153,16 @@ impl CommandHandler for EditHandler {
             patch.tags = Some(task.tags.clone());
         }
 
+        // `--untag` removes tags (DEV-283); matching ignores case.
+        if !untag.is_empty() {
+            task.tags.retain(|tag| {
+                !untag
+                    .iter()
+                    .any(|gone| gone.trim().eq_ignore_ascii_case(tag))
+            });
+            patch.tags = Some(task.tags.clone());
+        }
+
         if !fields.is_empty() {
             let mut merged = task.custom_fields.clone();
             for (key, value) in &fields {
@@ -179,9 +190,19 @@ impl CommandHandler for EditHandler {
         }
 
         renderer.log_debug("edit: persisting edits via TaskService");
-        crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
-            .map_err(|e| e.to_string())?;
-        renderer.emit_success(format_args!("Task '{}' updated successfully", id));
+        let updated =
+            crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
+                .map_err(|e| e.to_string())?;
+        if matches!(renderer.format, crate::output::OutputFormat::Json) {
+            renderer.emit_json(&serde_json::json!({
+                "status": "success",
+                "message": format!("Task '{}' updated successfully", full_id),
+                "task_id": full_id,
+                "task": updated,
+            }));
+        } else {
+            renderer.emit_success(format_args!("Task '{}' updated successfully", full_id));
+        }
         Ok(())
     }
 }

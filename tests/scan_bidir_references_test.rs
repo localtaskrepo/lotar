@@ -220,7 +220,7 @@ fn json_and_text_apply_equally_and_dry_run_never_writes() {
         if format == "json" {
             let entries: serde_json::Value =
                 serde_json::from_slice(&preview.get_output().stdout).unwrap();
-            assert_eq!(entries.as_array().unwrap().len(), 1);
+            assert_eq!(entries["findings"].as_array().unwrap().len(), 1);
         }
         assert_eq!(fs::read_to_string(&source).unwrap(), original);
         assert!(tf.create_storage().search(&Default::default()).is_empty());
@@ -229,7 +229,7 @@ fn json_and_text_apply_equally_and_dry_run_never_writes() {
         if format == "json" {
             let entries: serde_json::Value =
                 serde_json::from_slice(&applied.get_output().stdout).unwrap();
-            assert_eq!(entries.as_array().unwrap().len(), 1);
+            assert_eq!(entries["findings"].as_array().unwrap().len(), 1);
         }
         let tasks = tf.create_storage().search(&Default::default());
         assert_eq!(tasks.len(), 1);

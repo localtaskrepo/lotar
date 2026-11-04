@@ -33,7 +33,7 @@ modified-only, strip attributes, and re-anchor), but lets you pick individual fi
 | Turn TODO comments into LoTaR tasks | `lotar scan src` | Writes tasks, inserts IDs beside the comments, and adds code references to the task file. |
 | Clean up anchors after refactors | `lotar scan --reanchor` | Also removes dead anchors whose file is gone or no longer mentions the ID; preview with `--dry-run`. |
 | Limit noise to active work | `lotar scan --modified-only` | Uses `git status` to choose files; automatically falls back to full scan outside a repo. |
-| Feed results into tooling | `lotar --format json scan --include rs` | JSON entries provide `file`, `line`, `title`, `uuid`, and captured attributes. |
+| Feed results into tooling | `lotar --format json scan --include rs` | JSON is `{"status": "ok", "dry_run": ..., "count": N, "findings": [...]}`; each finding has `file`, `line`, `title`, `key` (the ticket key already on the line, or `null`) and `annotation`. |
 | Work in another workspace | `lotar scan --tasks-dir /path/to/.tasks ...` | Shares precedence with other commands plus `LOTAR_TASKS_DIR`. |
 
 ## Scope & filters

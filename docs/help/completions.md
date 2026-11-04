@@ -36,6 +36,8 @@ The following shells are supported via `--shell <name>`:
 - `powershell`
 - `elvish`
 
+Fish completions cover commands and their flags two levels deep; third-level subcommands such as `task relationships repair` or `agent worktree cleanup` and their flags are not completed (a limitation of the fish generator in `clap_complete`). Bash and zsh complete them.
+
 ## Default Install Locations
 
 `lotar completions install` writes scripts to the conventional directories below. Environment variables override the defaults when present.

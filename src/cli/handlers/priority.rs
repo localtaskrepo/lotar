@@ -28,6 +28,8 @@ impl CommandHandler for PriorityHandler {
             task_id,
             new_priority,
             explicit_project,
+            dry_run,
+            explain,
         } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
@@ -37,7 +39,7 @@ impl CommandHandler for PriorityHandler {
             task_id, project_hint
         ));
 
-        let mut ctx = if new_priority.is_some() {
+        let mut ctx = if new_priority.is_some() && !dry_run {
             TaskCommandContext::new(resolver, project_hint, Some(task_id.as_str()))?
         } else {
             TaskCommandContext::new_read_only(resolver, project_hint, Some(task_id.as_str()))?
@@ -46,7 +48,9 @@ impl CommandHandler for PriorityHandler {
         let LoadedTask { full_id, task, .. } = load_task(&mut ctx, &task_id, project_hint)?;
 
         match new_priority {
-            Some(candidate) => handle_set_priority(&candidate, &full_id, &task, &mut ctx, renderer),
+            Some(candidate) => handle_set_priority(
+                &candidate, &full_id, &task, &mut ctx, renderer, dry_run, explain,
+            ),
             None => {
                 render_current_priority(renderer, &full_id, &task.priority);
                 Ok(())
@@ -61,6 +65,8 @@ fn handle_set_priority(
     task: &Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
+    dry_run: bool,
+    explain: bool,
 ) -> Result<(), String> {
     let validator = CliValidator::new(&ctx.config);
     renderer.log_debug(format_args!(
@@ -73,8 +79,40 @@ fn handle_set_priority(
         .map_err(|e| format!("Priority validation failed: {}", e))?;
 
     let old_priority = task.priority.clone();
+    if explain && !matches!(renderer.format, crate::output::OutputFormat::Json) {
+        let allowed: Vec<String> = ctx
+            .config
+            .issue_priorities
+            .values
+            .iter()
+            .map(|p| p.to_string())
+            .collect();
+        renderer.emit_info(format_args!(
+            "Explanation: '{}' matched configured priority '{}' (allowed: {})",
+            candidate,
+            validated_priority,
+            allowed.join(", ")
+        ));
+    }
     if old_priority == validated_priority {
         render_noop_priority(renderer, full_id, &validated_priority);
+        return Ok(());
+    }
+    if dry_run {
+        if matches!(renderer.format, crate::output::OutputFormat::Json) {
+            renderer.emit_json(&serde_json::json!({
+                "status": "preview",
+                "action": "priority",
+                "task_id": full_id,
+                "old_priority": old_priority.to_string(),
+                "new_priority": validated_priority.to_string(),
+            }));
+        } else {
+            renderer.emit_info(format_args!(
+                "DRY RUN: would change priority of {} from {} to {}",
+                full_id, old_priority, validated_priority
+            ));
+        }
         return Ok(());
     }
 
@@ -144,6 +182,8 @@ pub struct PriorityArgs {
     pub task_id: String,
     pub new_priority: Option<String>,
     pub explicit_project: Option<String>,
+    pub dry_run: bool,
+    pub explain: bool,
 }
 
 impl PriorityArgs {
@@ -156,7 +196,16 @@ impl PriorityArgs {
             task_id,
             new_priority,
             explicit_project,
+            dry_run: false,
+            explain: false,
         }
+    }
+
+    /// `-n/--dry-run` and `-e/--explain`, as the sibling commands have.
+    pub fn with_preview(mut self, dry_run: bool, explain: bool) -> Self {
+        self.dry_run = dry_run;
+        self.explain = explain;
+        self
     }
 }
 

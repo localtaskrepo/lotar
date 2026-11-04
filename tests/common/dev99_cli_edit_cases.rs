@@ -29,6 +29,7 @@ fn edit_args(id: &str, title: Option<&str>, reporter: Option<&str>) -> TaskEditA
         due: None,
         description: None,
         tags: Vec::new(),
+        untag: Vec::new(),
         fields: Vec::new(),
         dry_run: false,
     }

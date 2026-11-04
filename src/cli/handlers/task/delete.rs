@@ -119,38 +119,7 @@ impl CommandHandler for DeleteHandler {
             hard,
         )
         .map_err(TaskStorageAction::Delete.map_err(&full_id))?;
-        if outcome.deleted {
-            match renderer.format {
-                crate::output::OutputFormat::Json => {
-                    let obj = serde_json::json!({
-                        "status": "success",
-                        "message": if outcome.hard {
-                            format!("Task '{}' permanently deleted", id)
-                        } else {
-                            format!("Task '{}' deleted (soft; restore with 'lotar task restore {}')", id, id)
-                        },
-                        "task_id": id,
-                        "hard": outcome.hard,
-                        "warnings": outcome.warnings,
-                    });
-                    renderer.emit_json(&obj);
-                }
-                _ => {
-                    if outcome.hard {
-                        renderer.emit_success(format_args!("Task '{}' permanently deleted", id));
-                    } else {
-                        renderer.emit_success(format_args!(
-                            "Task '{}' deleted (soft; restore with 'lotar task restore {}')",
-                            id, id
-                        ));
-                    }
-                    for warning in &outcome.warnings {
-                        renderer.emit_warning(format_args!("{}", warning));
-                    }
-                }
-            }
-            Ok(())
-        } else if !hard && loaded_task.deleted_at.is_some() {
+        if !hard && loaded_task.deleted_at.is_some() {
             // Already soft-deleted: a successful no-op. The service keeps
             // the tombstone untouched (no rewrite, no extra history entry)
             // and a repeated delete never escalates to a hard deletion.
@@ -160,9 +129,9 @@ impl CommandHandler for DeleteHandler {
                         "status": "success",
                         "message": format!(
                             "Task '{}' already deleted (soft); no changes",
-                            id
+                            full_id
                         ),
-                        "task_id": id,
+                        "task_id": full_id,
                         "hard": false,
                         "warnings": outcome.warnings,
                     });
@@ -171,8 +140,40 @@ impl CommandHandler for DeleteHandler {
                 _ => {
                     renderer.emit_success(format_args!(
                         "Task '{}' already deleted (soft); no changes",
-                        id
+                        full_id
                     ));
+                }
+            }
+            Ok(())
+        } else if outcome.deleted {
+            match renderer.format {
+                crate::output::OutputFormat::Json => {
+                    let obj = serde_json::json!({
+                        "status": "success",
+                        "message": if outcome.hard {
+                            format!("Task '{}' permanently deleted", full_id)
+                        } else {
+                            format!("Task '{}' deleted (soft; restore with 'lotar task restore {}')", full_id, full_id)
+                        },
+                        "task_id": full_id,
+                        "hard": outcome.hard,
+                        "warnings": outcome.warnings,
+                    });
+                    renderer.emit_json(&obj);
+                }
+                _ => {
+                    if outcome.hard {
+                        renderer
+                            .emit_success(format_args!("Task '{}' permanently deleted", full_id));
+                    } else {
+                        renderer.emit_success(format_args!(
+                            "Task '{}' deleted (soft; restore with 'lotar task restore {}')",
+                            full_id, full_id
+                        ));
+                    }
+                    for warning in &outcome.warnings {
+                        renderer.emit_warning(format_args!("{}", warning));
+                    }
                 }
             }
             Ok(())

@@ -234,7 +234,15 @@ pub fn render_property_current(renderer: &OutputRenderer, payload: PropertyCurre
             let mut root = Map::new();
             root.insert("status".to_string(), Value::String("success".to_string()));
             root.insert("task_id".to_string(), Value::String(task_id));
+            // `status` is the result of the command; a task's status value
+            // goes under `task_status` so the two never collide (DEV-283).
+            let field = if field == "status" {
+                "task_status".to_string()
+            } else {
+                field
+            };
             root.insert(field, option_to_value(value));
+            root.insert("changed".to_string(), Value::Bool(false));
             if let Some(explain_ref) = explain.as_ref() {
                 root.insert(
                     "explain".to_string(),
@@ -278,7 +286,15 @@ pub fn render_property_noop(renderer: &OutputRenderer, payload: PropertyNoop) {
             root.insert("status".to_string(), Value::String("success".to_string()));
             root.insert("message".to_string(), Value::String(json_message));
             root.insert("task_id".to_string(), Value::String(task_id));
+            // `status` is the result of the command; a task's status value
+            // goes under `task_status` so the two never collide (DEV-283).
+            let field = if field == "status" {
+                "task_status".to_string()
+            } else {
+                field
+            };
             root.insert(field, option_to_value(value));
+            root.insert("changed".to_string(), Value::Bool(false));
             for (key, value) in extra_json {
                 root.insert(key, value);
             }

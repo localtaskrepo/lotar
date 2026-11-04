@@ -8,6 +8,9 @@ Change or view a task's due date with validation and project-aware ID resolution
 # View current due date
 lotar due-date <TASK_ID>
 
+# Remove the due date (-n previews)
+lotar due-date <TASK_ID> --clear
+
 # Change due date
 lotar due-date <TASK_ID> <NEW_DATE> [--dry-run] [--explain]
 ```

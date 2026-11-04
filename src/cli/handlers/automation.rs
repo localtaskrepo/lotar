@@ -8,12 +8,13 @@ pub struct AutomationHandler;
 impl AutomationHandler {
     pub fn execute(
         action: AutomationAction,
+        project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
         match action {
             AutomationAction::Simulate(args) => Self::simulate(&args, resolver, renderer),
-            AutomationAction::Run(args) => Self::run(&args, resolver, renderer),
+            AutomationAction::Run(args) => Self::run(&args, project, resolver, renderer),
         }
     }
 
@@ -21,14 +22,29 @@ impl AutomationHandler {
     /// schedule is to call this from cron or CI.
     fn run(
         args: &AutomationRunArgs,
+        project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        // The global -p scopes the run to one project (DEV-283), as it does
+        // for `task archive --select`.
+        let scoped = project.map(|p| {
+            let prefix = crate::utils::project::resolve_project_input(p, &resolver.path);
+            match args
+                .select
+                .as_deref()
+                .map(str::trim)
+                .filter(|q| !q.is_empty())
+            {
+                Some(query) => format!("project={prefix} {query}"),
+                None => format!("project={prefix}"),
+            }
+        });
         let report = AutomationService::run_manual(
             &mut storage,
             &args.rules,
-            args.select.as_deref(),
+            scoped.as_deref().or(args.select.as_deref()),
             args.dry_run,
         )
         .map_err(|e| e.to_string())?;

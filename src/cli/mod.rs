@@ -96,6 +96,12 @@ pub enum Commands {
         id: String,
         /// New priority (must be valid for project). If omitted, shows current priority.
         priority: Option<String>,
+        /// Preview the change without saving
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+        /// Explain validation decisions
+        #[arg(long, short = 'e')]
+        explain: bool,
     },
 
     /// Change task assignee
@@ -104,6 +110,9 @@ pub enum Commands {
         id: String,
         /// New assignee. If omitted, shows current assignee.
         assignee: Option<String>,
+        /// Remove the assignee
+        #[arg(long, conflicts_with = "assignee")]
+        clear: bool,
         /// Preview the change without saving
         #[arg(long, short = 'n')]
         dry_run: bool,
@@ -118,6 +127,9 @@ pub enum Commands {
         id: String,
         /// New due date (YYYY-MM-DD or relative like 'tomorrow'). If omitted, shows current due date.
         due_date: Option<String>,
+        /// Remove the due date
+        #[arg(long, conflicts_with = "due_date")]
+        clear: bool,
         /// Preview the change without saving
         #[arg(long, short = 'n')]
         dry_run: bool,

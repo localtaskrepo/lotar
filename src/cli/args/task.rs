@@ -573,6 +573,11 @@ pub struct TaskEditArgs {
     #[serde(default, alias = "tags")]
     pub tags: Vec<String>,
 
+    /// Remove a tag (can be used multiple times)
+    #[arg(long = "untag", value_name = "TAG")]
+    #[serde(default)]
+    pub untag: Vec<String>,
+
     /// Set custom fields
     #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
