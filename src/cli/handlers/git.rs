@@ -6,7 +6,6 @@ use crate::workspace::TasksDirectoryResolver;
 use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Handler for `lotar git` subcommands.
 pub struct GitHandler;
@@ -108,6 +107,18 @@ impl GitHandler {
             }
         }
 
+        // Setting core.hooksPath silences .git/hooks; say which hooks would
+        // stop running instead of disabling them quietly (DEV-287).
+        let active = Self::active_default_hooks(&repo_root);
+        if !active.is_empty() && !args.force {
+            return Err(format!(
+                "These hooks in .git/hooks would stop running once core.hooksPath points at '{}': {}. Move them into '{}' or re-run with --force.",
+                desired_path,
+                active.join(", "),
+                desired_path
+            ));
+        }
+
         Self::ensure_executable(&scripts)?;
         Self::write_hooks_path(&repo_root, desired_path)?;
         Self::emit_summary(
@@ -118,6 +129,26 @@ impl GitHandler {
             InstallState::Updated,
         );
         Ok(())
+    }
+
+    /// Hook scripts in the repository's default hooks folder, sample files
+    /// excluded.
+    fn active_default_hooks(repo_root: &Path) -> Vec<String> {
+        let Some((_, common_dir)) = crate::utils::git::metadata_dirs(&repo_root.join(".git"))
+        else {
+            return Vec::new();
+        };
+        let Ok(entries) = fs::read_dir(common_dir.join("hooks")) else {
+            return Vec::new();
+        };
+        let mut hooks: Vec<String> = entries
+            .flatten()
+            .filter(|entry| entry.path().is_file())
+            .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+            .filter(|name| !name.ends_with(".sample") && !name.starts_with('.'))
+            .collect();
+        hooks.sort();
+        hooks
     }
 
     fn collect_hook_scripts(dir: &Path) -> Result<Vec<PathBuf>, String> {
@@ -149,9 +180,7 @@ impl GitHandler {
     }
 
     fn read_hooks_path(repo_root: &Path) -> Result<Option<String>, String> {
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
+        let output = crate::utils::git::git_command(repo_root)
             .args(["config", "--local", "--get", "core.hooksPath"])
             .output()
             .map_err(|err| format!("Failed to execute git: {err}"))?;
@@ -179,9 +208,7 @@ impl GitHandler {
     }
 
     fn write_hooks_path(repo_root: &Path, value: &str) -> Result<(), String> {
-        let status = Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
+        let status = crate::utils::git::git_command(repo_root)
             .args(["config", "--local", "core.hooksPath", value])
             .status()
             .map_err(|err| format!("Failed to execute git: {err}"))?;

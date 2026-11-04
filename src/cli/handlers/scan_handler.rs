@@ -53,6 +53,9 @@ impl CommandHandler for ScanHandler {
         renderer: &OutputRenderer,
     ) -> Self::Result {
         renderer.log_info("scan: begin");
+        // Tasks from comments don't take the developer's branch or folder
+        // as their type, priority, status or tags (DEV-287).
+        let _no_inference = crate::utils::task_intel::InferencePaused::new();
         let default_root = project::get_project_path().unwrap_or_else(|| PathBuf::from("."));
         let roots: Vec<PathBuf> = if args.paths.is_empty() {
             vec![default_root]

@@ -1,14 +1,26 @@
 title: 'Git integration: identity parsing, branch inference from the server cwd, CODEOWNERS, hooks install'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:38.372134+00:00
-modified: 2026-10-31T22:06:38.436872+00:00
+modified: 2026-11-04T03:22:39.888144+00:00
 relationships:
   related:
   - DEV-138
   - DEV-253
+comments:
+- date: 2026-11-04T03:22:39.850694+00:00
+  text: |-
+    Outcome: all six findings handled.
+    1. Branch inference reads the branch of the tasks directory's repository (task_intel::set_workspace_root, set by main from the resolved tasks dir; cwd only as a library fallback), path tags apply only when cwd is inside that repository, and a new InferencePaused guard turns branch/path inference off for sync pulls and scans (CLI and REST), so imported issues and comment tasks don't take type/priority/status/tags from the current branch or folder. Interactive lotar add still infers.
+    2. Git identity parses .git/config by section: only [user] name/email count, key=value with or without spaces, quoted values and #/; comments handled (git_config_user_section). Kept reading only the repository config (not global) as before.
+    3. CODEOWNERS default owner skips team slugs (org/team), and when the CLI already decided the assignee in the same patch, the service no longer records a phantom auto-assignment first. Declined: changing auto.codeowners_assign's default (documented behavior).
+    4. All remaining raw 'git -C' calls (changelog, hooks install, audit/history/stats) go through utils::git::git_command, which scrubs GIT_DIR/GIT_WORK_TREE/GIT_CONFIG*.
+    5. git hooks install refuses (without --force) when .git/hooks holds active hooks that core.hooksPath would silence, naming them.
+    6. git.md now says the command activates hooks your repository keeps in .githooks/, with an example.
+    Evidence: tests/dev287_git_integration_test.rs (whoami ignores a merge driver name; CODEOWNERS team skipped, one assignment in history; hooks install guard; scan on a hotfix branch doesn't set type Bug while add does); git_config_user_section unit test; codeowners unit test updated; full Rust suite 1942/1942; quick smoke 371/372 with ui.relationships failing once and passing 19/19 on rerun (flaky); clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -71,3 +83,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-138","DEV-253"]}'
+- at: 2026-11-04T03:10:35.486212+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T03:22:39.850694+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T03:22:39.888144+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

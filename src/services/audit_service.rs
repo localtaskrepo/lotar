@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::storage::task::Task;
 use crate::types::{TaskChange, TaskChangeLogEntry};
@@ -243,8 +242,7 @@ impl AuditService {
         max_commits: usize,
         pathspecs: &[PathBuf],
     ) -> Result<String, String> {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(repo_root);
+        let mut cmd = crate::utils::git::git_command(repo_root);
         cmd.arg("log");
         cmd.arg("--no-merges");
         if let Some(s) = since {
@@ -290,9 +288,7 @@ impl AuditService {
     /// Whether the repository's HEAD points at a commit. Asked of git
     /// directly rather than read from (possibly translated) error text.
     fn has_commits(repo_root: &Path) -> bool {
-        Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
+        crate::utils::git::git_command(repo_root)
             .args(["rev-parse", "--verify", "--quiet", "HEAD"])
             .output()
             .map(|output| output.status.success())
@@ -319,9 +315,7 @@ impl AuditService {
         repo_root: &Path,
         file_rel: &Path,
     ) -> Result<Vec<FileCommitEvent>, String> {
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
+        let output = crate::utils::git::git_command(repo_root)
             .args(["log", "--no-merges", "--follow", "--name-status"])
             .arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s")
             .arg("--")
@@ -481,8 +475,7 @@ impl AuditService {
     }
 
     fn tasks_are_tracked(repo_root: &Path, tasks_rel: &Path) -> bool {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(repo_root);
+        let mut cmd = crate::utils::git::git_command(repo_root);
         cmd.arg("ls-files");
         cmd.arg(Self::git_path_arg(tasks_rel));
         match cmd.output() {
@@ -961,8 +954,7 @@ impl AuditService {
             let last_date = header.date;
 
             let commits: usize = {
-                let mut rev = Command::new("git");
-                rev.arg("-C").arg(repo_root);
+                let mut rev = crate::utils::git::git_command(repo_root);
                 rev.arg("rev-list");
                 rev.arg("--count");
                 rev.arg("HEAD");
@@ -997,9 +989,7 @@ impl AuditService {
     pub fn show_file_at(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
         let spec = format!("{}:{}", commit, Self::git_path_str(file_rel));
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
+        let output = crate::utils::git::git_command(repo_root)
             .arg("show")
             .arg(spec)
             .output()
@@ -1021,9 +1011,7 @@ impl AuditService {
         file_rel: &Path,
     ) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
+        let output = crate::utils::git::git_command(repo_root)
             .arg("show")
             .arg(commit)
             .arg("--")

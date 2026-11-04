@@ -7,10 +7,59 @@ struct BranchContext {
     primary_token: String,
 }
 
+static WORKSPACE_ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+thread_local! {
+    static INFERENCE_PAUSED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The tasks directory this process works on. Branch inference reads the
+/// branch of that repository, not of whatever directory the process was
+/// started in (DEV-287: `--tasks-dir` and `lotar serve` used the cwd).
+pub fn set_workspace_root(tasks_dir: &std::path::Path) {
+    let _ = WORKSPACE_ROOT.set(tasks_dir.to_path_buf());
+}
+
+/// While alive, branch and path inference is off on this thread. Sync
+/// pulls and scans hold one: remote issues and source comments carry their
+/// own data, not the developer's current branch or folder (DEV-287).
+pub struct InferencePaused {
+    previous: bool,
+}
+
+impl InferencePaused {
+    pub fn new() -> Self {
+        Self {
+            previous: INFERENCE_PAUSED.with(|paused| paused.replace(true)),
+        }
+    }
+}
+
+impl Default for InferencePaused {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for InferencePaused {
+    fn drop(&mut self) {
+        INFERENCE_PAUSED.with(|paused| paused.set(self.previous));
+    }
+}
+
+fn inference_paused() -> bool {
+    INFERENCE_PAUSED.with(|paused| paused.get())
+}
+
 impl BranchContext {
     fn detect() -> Option<Self> {
-        let cwd = std::env::current_dir().ok()?;
-        let repo_root = crate::utils::git::find_repo_root(&cwd)?;
+        if inference_paused() {
+            return None;
+        }
+        let repo_root = match WORKSPACE_ROOT.get() {
+            Some(tasks_dir) => crate::utils::git::find_repo_root(tasks_dir)?,
+            None => crate::utils::git::find_repo_root(&std::env::current_dir().ok()?)?,
+        };
         let branch = crate::utils::git::read_current_branch(&repo_root)?;
         let branch_lower = branch.to_lowercase();
         let first_segment = branch_lower
@@ -152,7 +201,19 @@ pub fn infer_status_from_branch(config: &ResolvedConfig) -> Option<TaskStatus> {
 }
 
 pub fn auto_tag_from_path(config: &ResolvedConfig) -> Option<String> {
-    if !config.auto_tags_from_path {
+    if !config.auto_tags_from_path || inference_paused() {
+        return None;
+    }
+    // The folder only means something when it is inside the workspace's
+    // repository.
+    if let Some(tasks_dir) = WORKSPACE_ROOT.get()
+        && let Some(repo_root) = crate::utils::git::find_repo_root(tasks_dir)
+        && let Ok(cwd) = std::env::current_dir()
+        && !cwd
+            .canonicalize()
+            .unwrap_or(cwd)
+            .starts_with(repo_root.canonicalize().unwrap_or(repo_root))
+    {
         return None;
     }
     crate::utils::workspace_labels::derive_label_from_cwd()

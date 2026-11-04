@@ -1,6 +1,14 @@
 # git
 
-Repository-level helpers for the git hooks shipped with LoTaR (`.githooks/`).
+Activates git hooks that **your repository keeps in a `.githooks/` folder**. LoTaR does not ship hooks for your repository: create the folder and put your hook scripts in it (for example a `pre-commit` that runs your checks), then run `lotar git hooks install` so every clone can turn them on the same way.
+
+```sh
+mkdir -p .githooks
+printf '#!/bin/sh\nexec cargo fmt --check\n' > .githooks/pre-commit
+lotar git hooks install
+```
+
+Setting `core.hooksPath` makes git ignore `.git/hooks`. If that folder holds active hooks (anything but `*.sample`), the command lists them and stops; move them into `.githooks/` or re-run with `--force`.
 
 
 ## Hooks

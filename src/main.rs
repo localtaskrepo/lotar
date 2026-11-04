@@ -179,7 +179,10 @@ fn main() {
         resolve_tasks_directory_with_override(cli.tasks_dir.as_deref())
     };
     let resolver = match resolved {
-        Ok(resolver) => resolver,
+        Ok(resolver) => {
+            lotar::utils::task_intel::set_workspace_root(&resolver.path);
+            resolver
+        }
         Err(error) => {
             let renderer =
                 output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
@@ -674,10 +677,8 @@ fn main() {
                     // Gather changed task files
                     let changed_files: Vec<std::path::PathBuf> = if let Some(ref_base) = &since {
                         // Range: ref_base..HEAD
-                        let mut cmd = std::process::Command::new("git");
-                        cmd.arg("-C")
-                            .arg(&repo_root)
-                            .arg("diff")
+                        let mut cmd = lotar::utils::git::git_command(&repo_root);
+                        cmd.arg("diff")
                             .arg("--name-only")
                             .arg(format!("{}..HEAD", ref_base))
                             .arg("--")
@@ -713,10 +714,7 @@ fn main() {
                         }
                     } else {
                         // Working + staged vs HEAD, use porcelain to detect .tasks changes
-                        use std::process::Command;
-                        let out = Command::new("git")
-                            .arg("-C")
-                            .arg(&repo_root)
+                        let out = lotar::utils::git::git_command(&repo_root)
                             .arg("status")
                             .arg("--porcelain")
                             // New project folders list their files, not

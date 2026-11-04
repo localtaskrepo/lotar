@@ -1191,6 +1191,10 @@ impl TaskService {
             }
         }
         let explicit_reporter = patch.reporter.is_some();
+        // A caller that sets the assignee in the same patch decides it; the
+        // status auto-assign must not record a phantom intermediate
+        // assignment first (DEV-287).
+        let explicit_assignee = patch.assignee.is_some();
         let mut t = existing.clone();
         let mut changes: Vec<TaskChange> = Vec::new();
         let mut record_change = |field: &str, old: Option<String>, new: Option<String>| {
@@ -1244,6 +1248,7 @@ impl TaskService {
             let is_first_change = effective_transition && t.assignee.is_none();
             if auto
                 && is_first_change
+                && !explicit_assignee
                 && let Some(me) =
                     resolve_current_user_for_project(Some(&storage.root_path), Some(&derived))
             {

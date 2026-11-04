@@ -32,6 +32,9 @@ impl ScanService {
         resolver: &TasksDirectoryResolver,
         request: ScanRequest,
     ) -> LoTaRResult<ScanResponse> {
+        // Tasks from comments don't take the developer's branch or folder
+        // as their type, priority, status or tags (DEV-287).
+        let _no_inference = crate::utils::task_intel::InferencePaused::new();
         Self::run_with_source_writer(resolver, request, write_source)
     }
 

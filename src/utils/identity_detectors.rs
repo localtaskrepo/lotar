@@ -137,57 +137,215 @@ impl IdentityDetector for GitConfigDetector {
         let branch = crate::utils::git::read_current_branch(&repo_root);
         let remotes = crate::utils::git::read_remotes(&repo_root);
 
-        // user.name
-        for line in contents.lines() {
-            let line = line.trim();
-            if line.starts_with("name = ") {
-                let name = line.trim_start_matches("name = ").trim();
-                if !name.is_empty() {
-                    let mut details = format!("read from {}", config_path.to_string_lossy());
-                    if let Some(b) = &branch {
-                        details.push_str(", branch: ");
-                        details.push_str(b);
-                    }
-                    if !remotes.is_empty() {
-                        details.push_str(", remotes: ");
-                        details.push_str(&remotes.join(";"));
-                    }
-                    return Some(IdentityDetection {
-                        user: name.to_string(),
-                        source: IdentitySource::GitUserName,
-                        confidence: 85,
-                        details: Some(details),
-                    });
+        let details = || {
+            let mut details = format!("read from {}", config_path.to_string_lossy());
+            if let Some(b) = &branch {
+                details.push_str(", branch: ");
+                details.push_str(b);
+            }
+            if !remotes.is_empty() {
+                details.push_str(", remotes: ");
+                details.push_str(&remotes.join(";"));
+            }
+            details
+        };
+        let user = git_config_user_section(&contents);
+        if let Some(name) = user.name {
+            return Some(IdentityDetection {
+                user: name,
+                source: IdentitySource::GitUserName,
+                confidence: 85,
+                details: Some(details()),
+            });
+        }
+        if let Some(email) = user.email {
+            return Some(IdentityDetection {
+                user: email,
+                source: IdentitySource::GitUserEmail,
+                confidence: 80,
+                details: Some(details()),
+            });
+        }
+        None
+    }
+}
+
+#[derive(Default, Debug, PartialEq)]
+pub(crate) struct GitUserConfig {
+    pub(crate) name: Option<String>,
+    pub(crate) email: Option<String>,
+}
+
+/// `user.name` / `user.email` from git config text. Only the `[user]`
+/// section counts (DEV-287: a merge driver's `name =` became the reporter);
+/// `key=value` with or without spaces, quoted values and `#`/`;` comments
+/// are understood; a later value wins, as in git.
+pub(crate) fn git_config_user_section(contents: &str) -> GitUserConfig {
+    let mut out = GitUserConfig::default();
+    let mut in_user = false;
+    for raw in contents.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        if let Some(header) = line.strip_prefix('[') {
+            let section = header.split(']').next().unwrap_or_default().trim();
+            in_user = section.eq_ignore_ascii_case("user");
+            continue;
+        }
+        if !in_user {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = git_config_value(value);
+        if value.is_empty() {
+            continue;
+        }
+        match key.trim().to_ascii_lowercase().as_str() {
+            "name" => out.name = Some(value),
+            "email" => out.email = Some(value),
+            _ => {}
+        }
+    }
+    out
+}
+
+fn git_config_value(raw: &str) -> String {
+    let mut out = String::new();
+    let mut quoted = false;
+    let mut chars = raw.trim().chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => quoted = !quoted,
+            '\\' => {
+                if let Some(next) = chars.next() {
+                    out.push(next);
                 }
             }
+            '#' | ';' if !quoted => break,
+            _ => out.push(c),
         }
+    }
+    out.trim().to_string()
+}
 
-        // user.email
-        for line in contents.lines() {
-            let line = line.trim();
-            if line.starts_with("email = ") {
-                let email = line.trim_start_matches("email = ").trim();
-                if !email.is_empty() {
-                    let mut details = format!("read from {}", config_path.to_string_lossy());
-                    if let Some(b) = &branch {
-                        details.push_str(", branch: ");
-                        details.push_str(b);
+impl IdentityDetector for ProjectManifestDetector {
+    fn detect(&self, ctx: &DetectContext) -> Option<IdentityDetection> {
+        for root in Self::search_roots(ctx.tasks_root) {
+            // package.json
+            let pkg = root.join("package.json");
+            if pkg.exists()
+                && let Some(author) = Self::parse_package_json(&pkg)
+            {
+                return Some(IdentityDetection {
+                    user: author,
+                    source: IdentitySource::ProjectManifestAuthor,
+                    confidence: 90,
+                    details: Some(format!("package.json at {}", pkg.to_string_lossy())),
+                });
+            }
+            // Cargo.toml
+            let cargo = root.join("Cargo.toml");
+            if cargo.exists()
+                && let Some(author) = Self::parse_cargo_toml(&cargo)
+            {
+                return Some(IdentityDetection {
+                    user: author,
+                    source: IdentitySource::ProjectManifestAuthor,
+                    confidence: 88,
+                    details: Some(format!("Cargo.toml at {}", cargo.to_string_lossy())),
+                });
+            }
+            // .csproj (any in root)
+            if let Ok(entries) = std::fs::read_dir(&root) {
+                for ent in entries.flatten() {
+                    let p = ent.path();
+                    if let Some(ext) = p.extension().and_then(|e| e.to_str())
+                        && ext.eq_ignore_ascii_case("csproj")
+                        && let Some(author) = Self::parse_csproj(&p)
+                    {
+                        return Some(IdentityDetection {
+                            user: author,
+                            source: IdentitySource::ProjectManifestAuthor,
+                            confidence: 85,
+                            details: Some(format!(".csproj at {}", p.to_string_lossy())),
+                        });
                     }
-                    if !remotes.is_empty() {
-                        details.push_str(", remotes: ");
-                        details.push_str(&remotes.join(";"));
-                    }
-                    return Some(IdentityDetection {
-                        user: email.to_string(),
-                        source: IdentitySource::GitUserEmail,
-                        confidence: 80,
-                        details: Some(details),
-                    });
                 }
             }
         }
         None
     }
+}
+
+/// Detect from environment vars
+pub struct EnvUserDetector;
+
+impl IdentityDetector for EnvUserDetector {
+    fn detect(&self, _ctx: &DetectContext) -> Option<IdentityDetection> {
+        if let Ok(user) = std::env::var("USER") {
+            let t = user.trim();
+            if !t.is_empty() {
+                return Some(IdentityDetection {
+                    user: t.to_string(),
+                    source: IdentitySource::EnvUser,
+                    confidence: 60,
+                    details: Some("$USER".to_string()),
+                });
+            }
+        }
+        if let Ok(user) = std::env::var("USERNAME") {
+            let t = user.trim();
+            if !t.is_empty() {
+                return Some(IdentityDetection {
+                    user: t.to_string(),
+                    source: IdentitySource::EnvUsername,
+                    confidence: 55,
+                    details: Some("$USERNAME".to_string()),
+                });
+            }
+        }
+        None
+    }
+}
+
+/// Run detectors in priority order
+pub fn detect_identity(ctx: &DetectContext) -> Option<IdentityDetection> {
+    // Respect smart toggles
+    let cfg = ctx.config();
+
+    if let Some(cfg) = cfg.clone()
+        && !cfg.auto_identity
+    {
+        // Smart detection disabled: honor only the configured default_reporter
+        // and the OS username. Git/manifest probing stays off.
+        let d = ConfigDefaultReporterDetector;
+        if let Some(found) = d.detect(ctx) {
+            return Some(found);
+        }
+        return EnvUserDetector.detect(ctx);
+    }
+
+    // Precedence: configured default > git identity > OS user > manifest author.
+    // The manifest author is a static guess and must never outrank the actual
+    // git/system identity when stamping tasks as the current user.
+    let mut detectors: Vec<Box<dyn IdentityDetector>> =
+        vec![Box::new(ConfigDefaultReporterDetector)];
+    // Optionally include git based on toggle
+    if cfg.as_ref().map(|c| c.auto_identity_git).unwrap_or(true) {
+        detectors.push(Box::new(GitConfigDetector));
+    }
+    detectors.push(Box::new(EnvUserDetector));
+    detectors.push(Box::new(ProjectManifestDetector));
+
+    for d in detectors {
+        if let Some(found) = d.detect(ctx) {
+            return Some(found);
+        }
+    }
+    None
 }
 
 /// Detect from common project manifests (package.json, Cargo.toml, .csproj)
@@ -330,119 +488,23 @@ impl ProjectManifestDetector {
     }
 }
 
-impl IdentityDetector for ProjectManifestDetector {
-    fn detect(&self, ctx: &DetectContext) -> Option<IdentityDetection> {
-        for root in Self::search_roots(ctx.tasks_root) {
-            // package.json
-            let pkg = root.join("package.json");
-            if pkg.exists()
-                && let Some(author) = Self::parse_package_json(&pkg)
-            {
-                return Some(IdentityDetection {
-                    user: author,
-                    source: IdentitySource::ProjectManifestAuthor,
-                    confidence: 90,
-                    details: Some(format!("package.json at {}", pkg.to_string_lossy())),
-                });
+#[cfg(test)]
+mod git_config_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_user_section_counts() {
+        let config = "[merge \"npm-merge-driver\"]\n\tname = automatically merge npm lockfiles\n[user]\n\tname=\"Real Person\" # me\n\temail = real@example.com ; work\n";
+        assert_eq!(
+            git_config_user_section(config),
+            GitUserConfig {
+                name: Some("Real Person".into()),
+                email: Some("real@example.com".into()),
             }
-            // Cargo.toml
-            let cargo = root.join("Cargo.toml");
-            if cargo.exists()
-                && let Some(author) = Self::parse_cargo_toml(&cargo)
-            {
-                return Some(IdentityDetection {
-                    user: author,
-                    source: IdentitySource::ProjectManifestAuthor,
-                    confidence: 88,
-                    details: Some(format!("Cargo.toml at {}", cargo.to_string_lossy())),
-                });
-            }
-            // .csproj (any in root)
-            if let Ok(entries) = std::fs::read_dir(&root) {
-                for ent in entries.flatten() {
-                    let p = ent.path();
-                    if let Some(ext) = p.extension().and_then(|e| e.to_str())
-                        && ext.eq_ignore_ascii_case("csproj")
-                        && let Some(author) = Self::parse_csproj(&p)
-                    {
-                        return Some(IdentityDetection {
-                            user: author,
-                            source: IdentitySource::ProjectManifestAuthor,
-                            confidence: 85,
-                            details: Some(format!(".csproj at {}", p.to_string_lossy())),
-                        });
-                    }
-                }
-            }
-        }
-        None
+        );
+        assert_eq!(
+            git_config_user_section("[core]\n\tname = x\n"),
+            GitUserConfig::default()
+        );
     }
-}
-
-/// Detect from environment vars
-pub struct EnvUserDetector;
-
-impl IdentityDetector for EnvUserDetector {
-    fn detect(&self, _ctx: &DetectContext) -> Option<IdentityDetection> {
-        if let Ok(user) = std::env::var("USER") {
-            let t = user.trim();
-            if !t.is_empty() {
-                return Some(IdentityDetection {
-                    user: t.to_string(),
-                    source: IdentitySource::EnvUser,
-                    confidence: 60,
-                    details: Some("$USER".to_string()),
-                });
-            }
-        }
-        if let Ok(user) = std::env::var("USERNAME") {
-            let t = user.trim();
-            if !t.is_empty() {
-                return Some(IdentityDetection {
-                    user: t.to_string(),
-                    source: IdentitySource::EnvUsername,
-                    confidence: 55,
-                    details: Some("$USERNAME".to_string()),
-                });
-            }
-        }
-        None
-    }
-}
-
-/// Run detectors in priority order
-pub fn detect_identity(ctx: &DetectContext) -> Option<IdentityDetection> {
-    // Respect smart toggles
-    let cfg = ctx.config();
-
-    if let Some(cfg) = cfg.clone()
-        && !cfg.auto_identity
-    {
-        // Smart detection disabled: honor only the configured default_reporter
-        // and the OS username. Git/manifest probing stays off.
-        let d = ConfigDefaultReporterDetector;
-        if let Some(found) = d.detect(ctx) {
-            return Some(found);
-        }
-        return EnvUserDetector.detect(ctx);
-    }
-
-    // Precedence: configured default > git identity > OS user > manifest author.
-    // The manifest author is a static guess and must never outrank the actual
-    // git/system identity when stamping tasks as the current user.
-    let mut detectors: Vec<Box<dyn IdentityDetector>> =
-        vec![Box::new(ConfigDefaultReporterDetector)];
-    // Optionally include git based on toggle
-    if cfg.as_ref().map(|c| c.auto_identity_git).unwrap_or(true) {
-        detectors.push(Box::new(GitConfigDetector));
-    }
-    detectors.push(Box::new(EnvUserDetector));
-    detectors.push(Box::new(ProjectManifestDetector));
-
-    for d in detectors {
-        if let Some(found) = d.detect(ctx) {
-            return Some(found);
-        }
-    }
-    None
 }

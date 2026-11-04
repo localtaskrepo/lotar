@@ -22,6 +22,9 @@ pub(super) fn perform_pull(
     // Remote text mentions remote keys; never link them to local tasks that
     // happen to share the ID (DEV-286).
     let _no_mention_links = crate::services::task_service::MentionLinkingPaused::new();
+    // Imported issues don't take type, priority, status or tags from the
+    // local branch or folder (DEV-287).
+    let _no_inference = crate::utils::task_intel::InferencePaused::new();
     if remote.provider == SyncProvider::Github
         && remote.repo.as_deref().unwrap_or("").trim().is_empty()
     {

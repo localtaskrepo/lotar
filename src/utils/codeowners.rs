@@ -44,13 +44,11 @@ impl CodeOwners {
         }
     }
 
+    /// The first individual owner of the catch-all rule. Team slugs
+    /// (`org/team`) are skipped: a team is not an assignee (DEV-287).
     pub fn default_owner(&self) -> Option<String> {
-        let root_match = self.owners_for_path("/");
-        if let Some(first) = root_match.first() {
-            return Some(first.clone());
-        }
-        let star = self.owners_for_path("any/path.ext");
-        star.first().cloned()
+        let person = |owners: Vec<String>| owners.into_iter().find(|owner| !owner.contains('/'));
+        person(self.owners_for_path("/")).or_else(|| person(self.owners_for_path("any/path.ext")))
     }
 }
 
@@ -148,6 +146,11 @@ docs/**  @docs
         assert_eq!(cfg.owners_for_path("/src/lib.rs")[0], "alice");
         assert_eq!(cfg.owners_for_path("/README.md")[0], "team/default");
         assert_eq!(cfg.owners_for_path("docs/guide.md")[0], "docs");
-        assert_eq!(cfg.default_owner().unwrap(), "team/default");
+        // A team slug is not an assignee (DEV-287).
+        assert_eq!(cfg.default_owner(), None);
+        let mixed = CodeOwners {
+            rules: parse_rules("* @acme/platform @bob\n"),
+        };
+        assert_eq!(mixed.default_owner().as_deref(), Some("bob"));
     }
 }
