@@ -1142,7 +1142,7 @@ fn show_command_help(command: &str) {
             let renderer =
                 output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_error(format_args!("Error showing help for '{}': {}", command, e));
-            renderer.emit_info("Try 'lotar help' for available commands.");
+            renderer.emit_info("Run 'lotar help topics' to list every help page.");
             std::process::exit(1);
         }
     }

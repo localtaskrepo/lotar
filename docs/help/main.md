@@ -94,6 +94,7 @@ Switch formats with `--format text|json`. For machine-readable output, use `lota
 ## Launch Points
 
 - `lotar help <command>` – detailed usage for any subcommand
+- `lotar help topics` – every help page, including reference topics such as `environment`, `precedence`, `sse` and `task-model`
 - `lotar serve --open` – browser UI + REST API + SSE stream
 - `lotar mcp` – IDE or AI agent integrations (JSON-RPC)
 - `lotar scan <paths>` – turn TODO/FIXME comments into tasks

@@ -1,6 +1,5 @@
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
-use regex::Regex;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 use std::io::IsTerminal;
@@ -55,6 +54,10 @@ impl HelpSystem {
     }
 
     pub fn show_command_help(&self, command: &str) -> Result<String, String> {
+        // `lotar help topics` lists every page (DEV-284).
+        if command == "topics" {
+            return self.list_available_help();
+        }
         if let Some(file) = self.fetch_help_file(command) {
             return self.render_help_file(command, &file);
         }
@@ -77,6 +80,8 @@ impl HelpSystem {
         let mut help_files = Vec::new();
 
         self.collect_help_files(&mut help_files);
+        help_files.sort();
+        help_files.retain(|file| file != "main.md" && file != "index.md");
 
         if help_files.is_empty() {
             return Ok(self.renderer.render_warning("No help files found"));
@@ -121,8 +126,7 @@ impl HelpSystem {
             _ => {
                 // Render Markdown to ANSI/Plain text depending on TTY & NO_COLOR.
                 let base_dir = format!("{}/docs/help", ROOT_DIR);
-                let with_links = self.render_with_hyperlinks(content, &base_dir);
-                Ok(self.render_markdown(&with_links))
+                Ok(self.render_markdown(content, &base_dir))
             }
         }
     }
@@ -152,45 +156,11 @@ impl HelpSystem {
         None
     }
 
-    fn render_with_hyperlinks(&self, markdown: &str, base_dir: &str) -> String {
-        // Convert Markdown links [text](target) into OSC 8 clickable hyperlinks.
-        // Preserve original link text and do not change JSON output.
-        let re = match Regex::new(r"\[([^\]]+)\]\(([^)]+)\)") {
-            Ok(r) => r,
-            Err(_) => return markdown.to_string(),
-        };
-        let mut out = String::with_capacity(markdown.len() + 64);
-        let mut last = 0usize;
-        for caps in re.captures_iter(markdown) {
-            if let (Some(m), Some(text), Some(target)) = (
-                caps.get(0),
-                caps.get(1).map(|m| m.as_str()),
-                caps.get(2).map(|m| m.as_str()),
-            ) {
-                // Push preceding text
-                out.push_str(&markdown[last..m.start()]);
-                // Skip OSC-8 for in-page anchors (e.g., #section)
-                if target.starts_with('#') {
-                    out.push_str(text);
-                    last = m.end();
-                    continue;
-                }
-
-                let url = self.resolve_link_target(target, base_dir);
-                // OSC 8: ESC ] 8 ;; URL ST, text, ESC ] 8 ;; ST
-                out.push_str("\x1b]8;;");
-                out.push_str(&url);
-                out.push_str("\x1b\\");
-                out.push_str(text);
-                out.push_str("\x1b]8;;\x1b\\");
-                last = m.end();
-            }
-        }
-        out.push_str(&markdown[last..]);
-        out
-    }
-
-    fn render_markdown(&self, markdown: &str) -> String {
+    /// Render help Markdown for the terminal. Links become OSC 8 hyperlinks
+    /// only in the ANSI style, while walking the parsed events (DEV-284:
+    /// inserting them into the raw Markdown broke on punctuation and code
+    /// spans, and leaked escapes into plain or piped output).
+    fn render_markdown(&self, markdown: &str, base_dir: &str) -> String {
         // Choose style based on TTY/NO_COLOR: ANSI when TTY and NO_COLOR not set, else plain
         let style = match std::env::var("LOTAR_HELP_STYLE").ok().as_deref() {
             Some("ansi") => HelpStyle::Ansi,
@@ -208,6 +178,9 @@ impl HelpSystem {
 
         let mut out = String::with_capacity(markdown.len() + 64);
         let mut list_level: usize = 0;
+        // Next number per open list; None for bullet lists.
+        let mut list_numbers: Vec<Option<u64>> = Vec::new();
+        let mut open_links: Vec<bool> = Vec::new();
         let parser = Parser::new_ext(markdown, pulldown_cmark::Options::empty());
         let mut in_code_block = false;
 
@@ -243,19 +216,44 @@ impl HelpSystem {
                         out.push('\n');
                     }
                 }
-                Event::Start(Tag::List(_)) => {
+                Event::Start(Tag::List(start)) => {
                     list_level += 1;
+                    list_numbers.push(start);
                 }
                 Event::End(TagEnd::List(_)) => {
                     list_level = list_level.saturating_sub(1);
+                    list_numbers.pop();
                 }
                 Event::Start(Tag::Item) => {
                     if !out.ends_with('\n') {
                         out.push('\n');
                     }
                     out.push_str(&"  ".repeat(list_level.saturating_sub(1)));
-                    out.push_str("• ");
+                    // Numbered lists keep their numbers; the text refers
+                    // to steps by number.
+                    match list_numbers.last_mut() {
+                        Some(Some(number)) => {
+                            let _ = write!(out, "{}. ", number);
+                            *number += 1;
+                        }
+                        _ => out.push_str("• "),
+                    }
                 }
+                Event::Start(Tag::Link { dest_url, .. }) => {
+                    let link = style == HelpStyle::Ansi && !dest_url.starts_with('#');
+                    if link {
+                        let url = self.resolve_link_target(&dest_url, base_dir);
+                        let _ = write!(out, "\x1b]8;;{}\x1b\\", url);
+                    }
+                    open_links.push(link);
+                }
+                Event::End(TagEnd::Link) => {
+                    if open_links.pop().unwrap_or(false) {
+                        out.push_str("\x1b]8;;\x1b\\");
+                    }
+                }
+                // `<PREFIX>`, `<ref>` and similar placeholders are text.
+                Event::InlineHtml(html) => out.push_str(&html),
                 Event::End(TagEnd::Item) => {}
                 Event::Start(Tag::CodeBlock(_)) => {
                     in_code_block = true;

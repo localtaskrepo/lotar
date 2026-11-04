@@ -29,3 +29,9 @@ Reference Guides
 - [SSE Events](./sse.md)
 - [MCP Tools](./mcp-tools.md)
 - [API Quick Reference](./api-quick-reference.md)
+- [Task Command Group](./task.md)
+- [Who Am I](./whoami.md)
+- [Shell Completions](./completions.md)
+- [Agent Instructions Template](./agent-instructions.md)
+
+In the terminal, `lotar help topics` lists every page and `lotar help <topic>` shows one.

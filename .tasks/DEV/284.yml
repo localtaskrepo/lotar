@@ -1,13 +1,21 @@
 title: Terminal help rendering and discoverability
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:37.919447+00:00
-modified: 2026-10-31T22:06:37.982194+00:00
+modified: 2026-11-04T02:48:06.579703+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T02:48:06.553345+00:00
+  text: |-
+    Outcome: all three findings fixed.
+    1./2. src/help/mod.rs no longer rewrites links into the raw Markdown with a regex: links become OSC 8 hyperlinks while walking pulldown-cmark events, only in the ANSI style, so punctuation or code spans after a link no longer break the escape and plain/NO_COLOR/piped help has no escapes. Inline HTML (placeholders such as <ref>, <PREFIX>) is printed as text. Ordered lists keep their numbers.
+    3. 'lotar help topics' lists every help page with its first line (list_available_help was unreachable); the unknown-topic hint points to it; main.md mentions it; index.md now links task, whoami, completions and agent-instructions.
+    Evidence: tests/help_module_unit_test.rs rendering_keeps_placeholders_numbers_and_plain_text; ANSI output of main/cli-tour/stats has balanced OSC 8 opens/closes and no broken terminators; NO_COLOR output has no escape bytes; full Rust suite passes; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -40,3 +48,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T02:41:40.283769+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T02:48:06.553345+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T02:48:06.579703+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

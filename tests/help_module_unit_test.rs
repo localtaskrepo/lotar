@@ -37,3 +37,27 @@ fn sync_help_answers_for_pull_and_push() {
         assert!(text.contains("sync check"), "{topic}: {text}");
     }
 }
+
+/// DEV-284: placeholders survive rendering, plain output carries no
+/// escapes, numbered lists keep numbers, and topics are listable.
+#[test]
+fn rendering_keeps_placeholders_numbers_and_plain_text() {
+    // SAFETY: test-local style override.
+    unsafe { std::env::set_var("LOTAR_HELP_STYLE", "plain") };
+    let help = HelpSystem::new(OutputFormat::Text, false);
+    let changelog = help.show_command_help("changelog").unwrap();
+    assert!(changelog.contains("<ref>"), "{changelog}");
+    let main = help.show_command_help("main").unwrap();
+    assert!(
+        !main.contains('\u{1b}'),
+        "plain help must not carry escapes"
+    );
+    let precedence = help.show_command_help("precedence").unwrap();
+    assert!(precedence.contains("1. "), "{precedence}");
+    let topics = help.show_command_help("topics").unwrap();
+    assert!(
+        topics.contains("environment") && topics.contains("sse"),
+        "{topics}"
+    );
+    unsafe { std::env::remove_var("LOTAR_HELP_STYLE") };
+}
