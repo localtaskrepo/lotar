@@ -12,8 +12,8 @@ pub use args::{
     GitHooksInstallArgs, ScanArgs, ServeArgs, SortField, SprintAction, SprintArgs,
     SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs, SyncArgs, SyncCheckArgs,
     SyncCommandAction, SyncCommandArgs, TaskAction, TaskAddArgs, TaskArchiveArgs, TaskDeleteArgs,
-    TaskEditArgs, TaskMoveArgs, TaskRestoreArgs, TaskSearchArgs, TaskShowArgs, TaskStatusArgs,
-    parse_key_value,
+    TaskEditArgs, TaskMoveArgs, TaskRenumberArgs, TaskRestoreArgs, TaskSearchArgs, TaskShowArgs,
+    TaskStatusArgs, parse_key_value,
 };
 pub mod preprocess;
 

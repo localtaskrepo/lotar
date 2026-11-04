@@ -443,6 +443,45 @@ impl SprintService {
         txn.stage(&path, serialized)
     }
 
+    /// Drop a task from every sprint that lists it, returning those sprint
+    /// IDs. Used by hard delete: a later task that reuses the number must not
+    /// inherit the memberships (DEV-270).
+    pub fn remove_task_memberships(storage: &mut Storage, task_id: &str) -> LoTaRResult<Vec<u32>> {
+        let dir = Sprint::dir(&storage.root_path);
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+        crate::storage::safety::with_storage_lock(
+            &dir,
+            crate::storage::safety::sprint_lock_name(),
+            || -> LoTaRResult<Vec<u32>> {
+                let mut changed = Vec::new();
+                for entry in fs::read_dir(&dir)? {
+                    let path = entry?.path();
+                    if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("yml") {
+                        continue;
+                    }
+                    let Ok((id, mut sprint)) = Self::load_entry(&path) else {
+                        continue;
+                    };
+                    let before = sprint.tasks.len();
+                    sprint.tasks.retain(|item| {
+                        !crate::storage::identity::aliases_match(item.id.trim(), task_id)
+                    });
+                    if sprint.tasks.len() == before {
+                        continue;
+                    }
+                    let (_, serialized) = Self::stamp_for_write(sprint)?;
+                    crate::storage::safety::atomic_write_file(&path, &serialized)
+                        .map_err(LoTaRError::from)?;
+                    changed.push(id);
+                }
+                changed.sort_unstable();
+                Ok(changed)
+            },
+        )
+    }
+
     pub fn delete(storage: &mut Storage, id: u32) -> LoTaRResult<bool> {
         let dir = Sprint::dir(&storage.root_path);
         crate::storage::safety::with_storage_lock(

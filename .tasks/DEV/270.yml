@@ -1,13 +1,21 @@
 title: Task ID allocation can reuse or collide IDs, with no way to renumber
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:35.837230+00:00
-modified: 2026-10-31T22:08:15.245416+00:00
+modified: 2026-11-04T04:46:55.403709+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T04:46:55.363951+00:00
+  text: |-
+    1. Hard delete now drops the task from every sprint (SprintService::remove_task_memberships) and warns when the deleted number was the highest, so the next new task gets the ID again. Declined: a stored high-water mark for tasks and sprints. ID reuse after a hard delete is a documented design choice (docs/developers/task-model.md); soft delete, the default, keeps the number reserved, and the new warning plus the docs now say so.
+    2. StorageOperations::get_current_id takes the max over every related tasks root (own, sibling roots, and the parent workspace that lists this root), so nested workspaces sharing a prefix get distinct IDs from either side. task move uses the same allocation.
+    3. New `lotar task renumber <ID> --file <path> [-n]` (TaskService::renumber_duplicate) moves the chosen copy of a duplicated number to the next free number in the same folder with a 'renumbered' history entry. It refuses single copies and stubs. The duplicate warning and the docs point to it, including the add/add merge-conflict recovery.
+    Tests: tests/dev270_task_numbers_test.rs (3); 152 related delete/move/duplicate/nested tests pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -48,3 +56,21 @@ history:
   - field: relationships
     old: '{"related":["DEV-1","DEV-253"]}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T03:59:26.635787+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T04:46:55.363951+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T04:46:55.403709+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

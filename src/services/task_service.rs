@@ -1900,10 +1900,38 @@ impl TaskService {
             let task = storage
                 .get(&canonical, &derived)
                 .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
-            let warnings = Self::hard_delete_warnings(storage, &canonical, &task);
+            let mut warnings = Self::hard_delete_warnings(storage, &canonical, &task);
             let removed = storage.delete(&canonical, &derived)?;
             if !removed {
                 return Err(LoTaRError::TaskNotFound(canonical.clone()));
+            }
+            // DEV-270: a later task can take this number again; it must not
+            // inherit the deleted task's sprint plans.
+            match crate::services::sprint_service::SprintService::remove_task_memberships(
+                storage, &canonical,
+            ) {
+                Ok(sprints) if !sprints.is_empty() => {
+                    let list = sprints
+                        .iter()
+                        .map(|id| format!("#{id}"))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    warnings.push(format!("removed from sprint(s) {list}"));
+                }
+                Ok(_) => {}
+                Err(err) => warnings.push(format!(
+                    "could not remove the task from its sprints ({err}); edit the sprint files by hand"
+                )),
+            }
+            if let Ok(parsed) = TaskId::parse(&canonical)
+                && crate::storage::operations::StorageOperations::get_current_id(
+                    &storage.root_path.join(&parsed.project),
+                ) < parsed.number
+            {
+                warnings.push(format!(
+                    "{canonical} was the highest number in {}; the next new task there gets this ID again (soft delete keeps it reserved)",
+                    parsed.project
+                ));
             }
             return Ok((
                 TaskDeleteResponse {

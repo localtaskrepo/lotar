@@ -1,6 +1,6 @@
 use crate::api_types::{TaskMoveRequest, TaskMoveResponse};
-use crate::cli::TaskMoveArgs;
 use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::{TaskMoveArgs, TaskRenumberArgs};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::task_service::TaskService;
 use crate::workspace::TasksDirectoryResolver;
@@ -170,6 +170,62 @@ fn record(
             renderer.emit_success(format_args!("Recorded the move of {old} to {new_id}"))
         }
         _ => renderer.emit_info(format_args!("{old} already redirects to {new_id}")),
+    }
+    Ok(())
+}
+
+/// `lotar task renumber ID --file PATH` (DEV-270): resolve a number stored
+/// twice by giving the chosen copy the next free number.
+pub(crate) fn renumber(
+    args: &TaskRenumberArgs,
+    project: Option<&str>,
+    resolver: &TasksDirectoryResolver,
+    renderer: &OutputRenderer,
+) -> Result<(), String> {
+    let mut ctx = TaskCommandContext::new(resolver, project, Some(args.id.as_str()))?;
+    let id = ctx.resolve_full_task_id(&args.id, project)?;
+    let outcome =
+        TaskService::renumber_duplicate(&mut ctx.storage, &id, args.file.as_deref(), args.dry_run)
+            .map_err(|e| e.to_string())?;
+    match renderer.format {
+        OutputFormat::Json => renderer.emit_json(&serde_json::json!({
+            "status": "ok",
+            "action": "task.renumber",
+            "dry_run": args.dry_run,
+            "from": outcome.from,
+            "to": outcome.to,
+            "old_file": outcome.old_file.display().to_string(),
+            "new_file": outcome.new_file.display().to_string(),
+            "kept": outcome.kept.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+        })),
+        _ => {
+            let verb = if args.dry_run {
+                "DRY RUN: Would renumber"
+            } else {
+                "Renumbered"
+            };
+            let line = format!(
+                "{verb} {} to {} ({} -> {})",
+                outcome.from,
+                outcome.to,
+                outcome.old_file.display(),
+                outcome.new_file.display()
+            );
+            if args.dry_run {
+                renderer.emit_info(format_args!("{line}"));
+            } else {
+                renderer.emit_success(format_args!("{line}"));
+            }
+            for kept in &outcome.kept {
+                renderer.emit_info(format_args!("  {} keeps {}", kept.display(), outcome.from));
+            }
+            if !args.dry_run {
+                renderer.emit_info(format_args!(
+                    "  Links, sprint entries and commits that meant this copy still say {}; update them to {}",
+                    outcome.from, outcome.to
+                ));
+            }
+        }
     }
     Ok(())
 }

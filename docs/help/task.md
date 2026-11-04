@@ -32,6 +32,7 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `restore` | Restore a soft-deleted task. | Restore helper. |
 | `archive` / `unarchive` | Move tasks into the project's `@archive` folder (read-only) or back. | Archive helper. |
 | `move` | Move tasks to another project; old IDs keep working. | Move helper. |
+| `renumber` | Give one copy of a number stored twice the next free number. | Move helper. |
 | `history` / `history-field` | Git history utilities. | See `docs/help/history.md`. |
 | `diff` | Show the latest (or specific) git diff for a task. | History/diff helper. |
 | `at` | Print the file at a specific commit. | History helper. |
@@ -317,7 +318,8 @@ lotar task delete <TASK_ID> [--hard] [--dry-run] [--force | --yes | -y]
 
 - Default deletion keeps the YAML file, sets `deleted_at`, and hides the task from normal views. It preserves the task's content, ID, attachment references, and sprint memberships.
 - Soft delete and restore leave `modified` unchanged. Lifecycle operations append timestamped history entries; repeating an operation that is already applied does not change history.
-- `--hard` permanently removes the task file. Attachment blobs are **not** deleted: warnings list retained attachments and detectable incoming task relationships. Related task files are not rewritten.
+- `--hard` permanently removes the task file and drops it from every sprint that lists it. Attachment blobs are **not** deleted: warnings list retained attachments, detectable incoming task relationships and the sprints it was removed from. Related task files are not rewritten.
+- A hard-deleted number can be handed out again: when it was the highest in its project, the next new task gets the same ID (a warning says so) and inherits whatever still points at it, such as links in other tasks, commit messages and TODO comments. Soft delete keeps the number reserved.
 - `--force`, `--yes`, and `-y` only skip confirmation; they never select hard deletion. Without one of them, deletion asks on the terminal (on stderr); with `--format json` or when stdin is not a terminal it fails with an error instead of prompting, and answering anything but `y` exits 1. `--dry-run` previews the selected deletion mode without writing.
 - Use `lotar list --deleted` to list deleted tasks, or `--include-deleted` to list active and deleted tasks together. These flags are mutually exclusive.
 - Physical file removal remains supported. Missing IDs do not prevent other tasks from loading. ID allocation uses the highest numeric filename anywhere in the project folder (subfolders and `@archive` included) plus one: tombstones reserve IDs, while removing the highest file permits its number to be reused. Reuse can associate old relationships, Git history, and agent records with a different task; increment the filename manually when retaining that distinction matters.
@@ -345,7 +347,7 @@ lotar task unarchive [TASK_ID...] [--select '<query>'] [--dry-run|-n]
 - Archived tasks are read-only everywhere (web UI, CLI, REST, MCP, automations). To change one anyway, add the global `--force-archived` flag (`lotar --force-archived comment DEV-12 -m "..."`); REST takes `?force_archived=true` and MCP `force_archived: true`.
 - `--select` takes the same query as `lotar list` and adds every match: `lotar task archive --select 'status:done -recent:30d'` archives finished tasks nobody changed for 30 days. For `unarchive` the query looks inside the archive. Run it from cron or CI to archive on a schedule, or use the automation action `archive: true` to archive right when something happens.
 - Soft-deleted tasks can be archived too. Unarchiving requires the stored status, priority and type to be valid under the current configuration, like `restore`.
-- Tasks can also be grouped in any subfolder of their project folder by hand (`DEV/backend/12.yml` is still `DEV-12`). Folders starting with `.` or `@` are not scanned, except `@archive`. Moving a file with `git mv` archives it just like the command does. A number stored twice in one project (for example after a merge) is listed once with a warning, and changes to that ID are refused until one copy is removed or renumbered.
+- Tasks can also be grouped in any subfolder of their project folder by hand (`DEV/backend/12.yml` is still `DEV-12`). Folders starting with `.` or `@` are not scanned, except `@archive`. Moving a file with `git mv` archives it just like the command does. A number stored twice in one project (for example after a merge that brought in a file in another folder) is listed once with a warning, and changes to that ID are refused until one copy is removed or given a new number with [`task renumber`](#renumber).
 - LoTaR versions before 0.11 only read the top level of a project folder: they do not see nested or archived tasks and can hand out their numbers again. Upgrade every client before archiving or nesting tasks.
 
 ### move
@@ -365,6 +367,17 @@ lotar task move <OLD_ID> --record <NEW_ID>
 - Moved a file by hand (`git mv DEV/12.yml WEB/40.yml`)? Run `lotar task move DEV-12 --record WEB-40` to add the redirect and the `moved_from` entry afterwards.
 - A sync pull of the old project keeps matching the remote issue to the stub (it carries the remote reference) and skips it, rather than importing it again; sync the moved task from its new project.
 - LoTaR versions before 0.11 show the stub as a deleted task and do not follow the redirect.
+
+### renumber
+
+```bash
+lotar task renumber <TASK_ID> --file <PATH> [--dry-run|-n]
+```
+
+- Resolves a number stored in more than one file. `lotar show <TASK_ID>` lists the files; `--file` picks the copy that gets the next free number in the project. It stays in its folder (`DEV/web/12.yml` becomes `DEV/web/41.yml`) and its history gains a `renumbered` entry. The other copy keeps the old ID.
+- No redirect is left, since the old ID still belongs to the other copy. Links, sprint entries and commits that meant the renumbered copy still say the old ID; the command reminds you to update them.
+- Refused for an ID stored in one file (use [`task move`](#move) to change project) and for a move stub.
+- Two branches that each create `DEV/12.yml` give a merge conflict rather than a duplicate: keep one side as `DEV/12.yml`, save the other side in a subfolder such as `DEV/merged/12.yml`, and run `lotar task renumber DEV-12 --file .tasks/DEV/merged/12.yml`.
 
 ### Git history helpers (`history`, `history-field`, `diff`, `at`)
 

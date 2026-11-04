@@ -156,6 +156,7 @@ impl CommandHandler for TaskHandler {
                 archive::execute(&args, false, project, resolver, renderer)
             }
             TaskAction::Move(args) => move_task::execute(&args, project, resolver, renderer),
+            TaskAction::Renumber(args) => move_task::renumber(&args, project, resolver, renderer),
             TaskAction::Comment {
                 id,
                 text,

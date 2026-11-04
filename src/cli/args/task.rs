@@ -249,6 +249,9 @@ pub enum TaskAction {
     /// Move tasks to another project; old IDs keep working as redirects
     Move(TaskMoveArgs),
 
+    /// Give one copy of a task number stored twice the next free number
+    Renumber(TaskRenumberArgs),
+
     /// Show git history for a task file (read-only)
     History {
         /// Task ID (with or without project prefix)
@@ -759,6 +762,22 @@ pub struct TaskArchiveArgs {
     #[arg(long, value_name = "QUERY", allow_hyphen_values = true)]
     #[serde(default)]
     pub select: Option<String>,
+
+    /// Preview without moving any file
+    #[arg(long, short = 'n')]
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskRenumberArgs {
+    /// The duplicated task ID (with or without project prefix)
+    pub id: String,
+
+    /// The copy to renumber; `lotar show <ID>` lists the files
+    #[arg(long, value_name = "PATH")]
+    #[serde(default)]
+    pub file: Option<std::path::PathBuf>,
 
     /// Preview without moving any file
     #[arg(long, short = 'n')]

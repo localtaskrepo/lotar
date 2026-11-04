@@ -61,7 +61,7 @@ pub fn warn_duplicate_once(id: &str) {
         .unwrap_or(false);
     if should_report {
         OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(format_args!(
-            "Task {id} is stored in more than one file; listing one of them. Delete or renumber the extra copy; `lotar show {id}` names the files, and changes to {id} are refused until then"
+            "Task {id} is stored in more than one file; listing one of them. `lotar show {id}` names the files; delete the extra copy or give it a new number with `lotar task renumber {id} --file <path>`. Changes to {id} are refused until then"
         ));
     }
 }

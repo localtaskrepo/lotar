@@ -40,3 +40,4 @@ pub mod trust_service;
 pub mod task_list;
 pub mod task_move;
 pub mod task_query;
+pub mod task_renumber;

@@ -548,9 +548,44 @@ impl StorageOperations {
     }
 
     /// Highest task number stored in the project, nested folders and the
-    /// archive included, so new tasks never reuse a number.
+    /// archive included, so new tasks never reuse a number. Every workspace
+    /// root that can read the project counts: this root, its sibling roots,
+    /// and the parent workspace that lists this root as a sibling, so nested
+    /// workspaces sharing a prefix never create one ID twice (DEV-270).
     pub fn get_current_id(project_path: &Path) -> u64 {
-        crate::storage::layout::max_number(project_path)
+        let local = crate::storage::layout::max_number(project_path);
+        let (Some(root), Some(project)) = (project_path.parent(), project_path.file_name()) else {
+            return local;
+        };
+        Self::related_task_roots(root)
+            .into_iter()
+            .map(|other| crate::storage::layout::max_number(&other.join(project)))
+            .fold(local, u64::max)
+    }
+
+    /// Every tasks root whose reads can include `root`'s tasks, or whose
+    /// tasks `root`'s reads include.
+    fn related_task_roots(root: &Path) -> Vec<std::path::PathBuf> {
+        let mut roots = crate::storage::locator::StorageLocator::candidate_task_roots(root);
+        // `<parent>/<workspace>/.tasks` is a sibling root of `<parent>/.tasks`.
+        let absolute = root
+            .canonicalize()
+            .or_else(|_| std::path::absolute(root))
+            .unwrap_or_else(|_| root.to_path_buf());
+        if let Some(parent_root) = absolute
+            .parent()
+            .and_then(Path::parent)
+            .map(|dir| dir.join(".tasks"))
+            .filter(|dir| dir.is_dir())
+        {
+            for other in crate::storage::locator::StorageLocator::candidate_task_roots(&parent_root)
+            {
+                if !roots.contains(&other) {
+                    roots.push(other);
+                }
+            }
+        }
+        roots
     }
 
     /// Get the actual project folder name for a given task ID, from the

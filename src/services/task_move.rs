@@ -103,7 +103,8 @@ impl TaskService {
             // Moving back onto its own stub: take the original number again.
             Some((number, path)) if !file.archived => (number, path),
             _ => {
-                let number = layout::max_number(&target_dir) + 1;
+                let number =
+                    crate::storage::operations::StorageOperations::get_current_id(&target_dir) + 1;
                 let folder = if file.archived {
                     target_dir.join(layout::ARCHIVE_DIR)
                 } else {
