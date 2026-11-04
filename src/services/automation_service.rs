@@ -777,6 +777,7 @@ impl AutomationService {
     ) -> LoTaRResult<ManualRunReport> {
         let tasks_dir = storage.root_path.clone();
         let base = resolve_config_for_project(&tasks_dir, None)?;
+        let _least_busy = LeastBusyMemo::new();
         let ids: Vec<String> = match query.map(str::trim).filter(|q| !q.is_empty()) {
             Some(search) => {
                 crate::services::task_list::select_ids(storage, &base, &tasks_dir, search)
@@ -2681,7 +2682,7 @@ fn resolve_assignee_value(
         }
         "@round_robin" => resolve_round_robin(config, storage),
         "@random" => resolve_random(config),
-        "@least_busy" => resolve_least_busy(config, storage),
+        "@least_busy" => resolve_least_busy(config, storage, task),
         _ => resolve_me_alias(normalized, Some(storage.root_path.as_path())),
     }
 }
@@ -2734,30 +2735,104 @@ fn resolve_random(config: &ResolvedConfig) -> Option<String> {
     Some(members[idx].clone())
 }
 
-fn resolve_least_busy(config: &ResolvedConfig, storage: &Storage) -> Option<String> {
+thread_local! {
+    /// Active-task counts per member, kept for one manual automation run so
+    /// each `@least_busy` resolution does not rescan the workspace (DEV-292).
+    /// `None`: no run active; `Some(None)`: active, not counted yet.
+    static LEAST_BUSY_MEMO: std::cell::RefCell<Option<Option<HashMap<String, usize>>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Keeps `@least_busy` counts in memory until dropped. Assignments made
+/// while it lives update the counts, so a run spreads work the same way
+/// one-at-a-time resolutions would.
+struct LeastBusyMemo;
+
+impl LeastBusyMemo {
+    fn new() -> Self {
+        LEAST_BUSY_MEMO.with(|memo| *memo.borrow_mut() = Some(None));
+        Self
+    }
+}
+
+impl Drop for LeastBusyMemo {
+    fn drop(&mut self) {
+        LEAST_BUSY_MEMO.with(|memo| *memo.borrow_mut() = None);
+    }
+}
+
+/// Active (not done) tasks per assignee. Reads stored tasks without building
+/// DTOs; each task is classified under its own project's completion policy
+/// (DEV-21), with one config resolution per (root, project).
+fn active_counts_by_assignee(storage: &Storage) -> HashMap<String, usize> {
+    let mut done_sets: HashMap<(std::path::PathBuf, String), HashSet<String>> = HashMap::new();
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for (id, task, root) in storage.search_located(&crate::storage::TaskFilter::default()) {
+        if task.moved_to.is_some() {
+            continue;
+        }
+        let Some(assignee) = task.assignee.as_deref().filter(|a| !a.trim().is_empty()) else {
+            continue;
+        };
+        let prefix = crate::storage::TaskId::parse(&id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
+        let done = done_sets
+            .entry((root.clone(), prefix.clone()))
+            .or_insert_with(|| {
+                crate::config::resolution::config_for_project(root.as_path(), Some(&prefix))
+                    .map(|config| crate::services::completion::effective_done_statuses(&config))
+                    .unwrap_or_default()
+            });
+        if !done.contains(&task.status.as_str().to_ascii_lowercase()) {
+            *counts.entry(assignee.to_string()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn resolve_least_busy(
+    config: &ResolvedConfig,
+    storage: &Storage,
+    task: &TaskDTO,
+) -> Option<String> {
     let members = real_members(config);
     if members.is_empty() {
         return None;
     }
-    // Count active (non-done) tasks per member. DEV-21: each task's
-    // activity classifies under its own project completion policy via the
-    // server-computed task state, so cross-project workloads compare
-    // fairly.
-    let all_tasks = TaskService::list(storage, &crate::api_types::TaskListFilter::default());
+    let memoized = LEAST_BUSY_MEMO.with(|memo| memo.borrow().is_some());
+    let counts = if memoized {
+        LEAST_BUSY_MEMO.with(|memo| {
+            let mut memo = memo.borrow_mut();
+            memo.as_mut()
+                .expect("memo is active")
+                .get_or_insert_with(|| active_counts_by_assignee(storage))
+                .clone()
+        })
+    } else {
+        active_counts_by_assignee(storage)
+    };
 
-    let mut counts: HashMap<String, usize> = members.iter().map(|m| (m.clone(), 0)).collect();
-    for (_id, task) in &all_tasks {
-        if let Some(assignee) = task.assignee.as_deref() {
-            let is_active = !task.task_state.as_ref().is_some_and(|state| state.is_done);
-            if is_active && let Some(count) = counts.get_mut(assignee) {
-                *count += 1;
-            }
-        }
-    }
-
-    members
+    let chosen = members
         .into_iter()
-        .min_by_key(|m| counts.get(m).copied().unwrap_or(0))
+        .min_by_key(|m| counts.get(m).copied().unwrap_or(0))?;
+    if memoized {
+        let task_active = !task.task_state.as_ref().is_some_and(|state| state.is_done);
+        LEAST_BUSY_MEMO.with(|memo| {
+            if let Some(Some(counts)) = memo.borrow_mut().as_mut()
+                && task_active
+                && task.assignee.as_deref() != Some(chosen.as_str())
+            {
+                if let Some(previous) = task.assignee.as_deref()
+                    && let Some(count) = counts.get_mut(previous)
+                {
+                    *count = count.saturating_sub(1);
+                }
+                *counts.entry(chosen.clone()).or_insert(0) += 1;
+            }
+        });
+    }
+    Some(chosen)
 }
 
 fn resolve_reporter_value(value: &str, task: &TaskDTO, tasks_dir: &Path) -> Option<String> {

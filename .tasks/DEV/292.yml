@@ -1,13 +1,22 @@
 title: 'Performance: activity feed spawns git per commit and file, exclusion filters and @least_busy rerun full queries'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:39.143386+00:00
-modified: 2026-10-31T22:06:39.208899+00:00
+modified: 2026-11-04T03:59:20.252643+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T03:59:20.212453+00:00
+  text: |-
+    Fixed all three findings.
+    1. Activity feed: build_tracked_activity_feed reads every blob (sha and sha^) through one long-lived `git cat-file --batch` process (AuditService BlobBatch), falling back to git show if it can't start. 300-file bulk commit: 0.24s in a debug build (was ~2 spawns per file).
+    2. @least_busy: counts active tasks from StorageSearch results (no DTOs), done-ness from one config per (root, project). Manual automation runs memoize the counts (LeastBusyMemo) and adjust them as assignments land.
+    3. Exclusions: task_list::remove_matching evaluates each exclusion on the main query's candidates in memory (storage filter fields, assignee, field filters, smart filters) instead of a full workspace query; relationships.rs uses the same helper.
+    Tests: tests/dev292_performance_test.rs (bulk feed incl. root commit, least_busy spread, exclusion combinations); existing exclusion/least_busy/feed tests pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -42,3 +51,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T03:22:46.999780+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T03:59:20.212453+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T03:59:20.252643+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

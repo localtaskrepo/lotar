@@ -1234,17 +1234,7 @@ pub fn graph(
     crate::services::task_service::TaskService::filter_assignees(&mut matching, &filter);
     crate::services::task_query::apply(&mut matching, &options, now);
     // Excluded filters (`-key:value`, DEV-5) leave tasks out of the matches.
-    if !exclude.is_empty() {
-        let excluded: std::collections::HashSet<String> = exclude
-            .iter()
-            .flat_map(|exclusion| {
-                crate::services::task_list::run(storage, exclusion, now)
-                    .into_iter()
-                    .map(|(id, _)| id)
-            })
-            .collect();
-        matching.retain(|(id, _)| !excluded.contains(id));
-    }
+    crate::services::task_list::remove_matching(storage, &exclude, &mut matching, now);
     matching.sort_by_key(|(id, _)| exact.as_ref() != Some(id));
     let matches: BTreeSet<_> = matching.iter().map(|(id, _)| id.clone()).collect();
     let exact = exact.filter(|id| matches.contains(id));

@@ -8,6 +8,77 @@ use std::path::{Path, PathBuf};
 use crate::storage::task::Task;
 use crate::types::{TaskChange, TaskChangeLogEntry};
 
+/// A long-lived `git cat-file --batch` process: each read is one request
+/// line and one response, so reading many blobs costs one spawn.
+pub struct BlobBatch {
+    child: std::process::Child,
+    stdin: std::process::ChildStdin,
+    stdout: std::io::BufReader<std::process::ChildStdout>,
+}
+
+impl BlobBatch {
+    pub fn spawn(repo_root: &Path) -> std::io::Result<Self> {
+        use std::process::Stdio;
+        let mut child = crate::utils::git::git_command(repo_root)
+            .args(["cat-file", "--batch"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| std::io::Error::other("no stdin"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| std::io::Error::other("no stdout"))?;
+        Ok(Self {
+            child,
+            stdin,
+            stdout: std::io::BufReader::new(stdout),
+        })
+    }
+
+    /// The blob at `rev:path`, `Ok(None)` when it does not exist there (a
+    /// root commit's parent, a file added or deleted by the commit). An `Err`
+    /// means the process is unusable.
+    pub fn read(&mut self, rev: &str, path: &str) -> std::io::Result<Option<String>> {
+        use std::io::{BufRead, Read, Write};
+        if AuditService::ensure_safe_git_rev(rev).is_err() || path.contains('\n') {
+            return Ok(None);
+        }
+        writeln!(self.stdin, "{}:{}", rev, path)?;
+        self.stdin.flush()?;
+        let mut header = String::new();
+        if self.stdout.read_line(&mut header)? == 0 {
+            return Err(std::io::Error::other("git cat-file exited"));
+        }
+        let header = header.trim_end();
+        // "<oid> <type> <size>", or "<spec> missing" / "<spec> ambiguous".
+        let mut parts = header.rsplitn(3, ' ');
+        let size = parts.next().unwrap_or_default();
+        let kind = parts.next().unwrap_or_default();
+        let Ok(size) = size.parse::<usize>() else {
+            return Ok(None);
+        };
+        let mut body = vec![0u8; size + 1];
+        self.stdout.read_exact(&mut body)?;
+        body.truncate(size);
+        if kind != "blob" {
+            return Ok(None);
+        }
+        Ok(Some(String::from_utf8_lossy(&body).into_owned()))
+    }
+}
+
+impl Drop for BlobBatch {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct FileCommitEvent {
     pub commit: String,
@@ -571,6 +642,9 @@ impl AuditService {
         project_filter: Option<&str>,
     ) -> Result<Vec<ActivityFeedItem>, String> {
         let mut feed: Vec<ActivityFeedItem> = Vec::new();
+        // One `git cat-file --batch` process serves every blob in the window
+        // instead of two `git show` spawns per (commit, file) (DEV-292).
+        let mut blobs = BlobBatch::spawn(repo_root).ok();
 
         for commit in commits.into_iter() {
             if commit.files.is_empty() {
@@ -594,9 +668,14 @@ impl AuditService {
                     continue;
                 }
 
-                let current_task = Self::load_task_version(repo_root, &commit.sha, file_rel);
-                let previous_task =
-                    Self::load_task_version(repo_root, &format!("{}^", commit.sha), file_rel);
+                let current_task =
+                    Self::load_task_version_batched(&mut blobs, repo_root, &commit.sha, file_rel);
+                let previous_task = Self::load_task_version_batched(
+                    &mut blobs,
+                    repo_root,
+                    &format!("{}^", commit.sha),
+                    file_rel,
+                );
 
                 let current_history = current_task
                     .as_ref()
@@ -895,6 +974,23 @@ impl AuditService {
 
     fn parse_task_yaml(content: &str) -> Option<Task> {
         serde_yaml_ng::from_str::<Task>(content).ok()
+    }
+
+    /// Reads through the shared batch process when it is running, and falls
+    /// back to `git show` when it could not start or has failed.
+    fn load_task_version_batched(
+        blobs: &mut Option<BlobBatch>,
+        repo_root: &Path,
+        commit: &str,
+        file_rel: &Path,
+    ) -> Option<Task> {
+        if let Some(batch) = blobs.as_mut() {
+            match batch.read(commit, &Self::git_path_str(file_rel)) {
+                Ok(content) => return content.and_then(|text| Self::parse_task_yaml(&text)),
+                Err(_) => *blobs = None,
+            }
+        }
+        Self::load_task_version(repo_root, commit, file_rel)
     }
 
     fn load_task_version(repo_root: &Path, commit: &str, file_rel: &Path) -> Option<Task> {

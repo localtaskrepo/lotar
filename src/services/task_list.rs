@@ -514,15 +514,109 @@ pub fn remove_excluded(
     tasks: &mut Vec<(String, TaskDTO)>,
     now: chrono::DateTime<chrono::Utc>,
 ) {
-    if query.exclude.is_empty() {
+    remove_matching(storage, &query.exclude, tasks, now);
+}
+
+/// Leave out tasks matching any of `exclusions`. Each exclusion is checked
+/// against the given tasks in memory, with the same filters [`run`] applies,
+/// rather than as its own workspace query (DEV-292).
+pub fn remove_matching(
+    storage: &Storage,
+    exclusions: &[TaskQuery],
+    tasks: &mut Vec<(String, TaskDTO)>,
+    now: chrono::DateTime<chrono::Utc>,
+) {
+    if exclusions.is_empty() || tasks.is_empty() {
         return;
     }
-    let excluded: std::collections::HashSet<String> = query
-        .exclude
-        .iter()
-        .flat_map(|exclusion| run(storage, exclusion, now).into_iter().map(|(id, _)| id))
-        .collect();
+    let mut excluded: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for exclusion in exclusions {
+        let mut matching: Vec<(String, TaskDTO)> = tasks
+            .iter()
+            .filter(|(id, task)| {
+                !excluded.contains(id)
+                    && dto_matches_list_filter(storage, id, task, &exclusion.filter)
+            })
+            .cloned()
+            .collect();
+        crate::services::task_service::TaskService::filter_assignees(
+            &mut matching,
+            &exclusion.filter,
+        );
+        apply_field_filters(&mut matching, &exclusion.field_filters, &exclusion.config);
+        task_query::apply_smart_filters(&mut matching, &exclusion.options, now);
+        remove_matching(storage, &exclusion.exclude, &mut matching, now);
+        excluded.extend(matching.into_iter().map(|(id, _)| id));
+    }
     tasks.retain(|(id, _)| !excluded.contains(id));
+}
+
+/// The storage-level part of a list filter, evaluated on a task object
+/// (mirrors `TaskService::list` and `StorageSearch::task_matches_filter`).
+fn dto_matches_list_filter(
+    storage: &Storage,
+    id: &str,
+    task: &TaskDTO,
+    filter: &TaskListFilter,
+) -> bool {
+    use crate::storage::layout::ArchiveFilter;
+    match filter.deletion {
+        DeletionFilter::Active if task.deleted_at.is_some() => return false,
+        DeletionFilter::Deleted if task.deleted_at.is_none() => return false,
+        _ => {}
+    }
+    match filter.archived {
+        ArchiveFilter::Exclude if task.archived => return false,
+        ArchiveFilter::Only if !task.archived => return false,
+        _ => {}
+    }
+    if let Some(project) = filter.project.as_deref() {
+        let wanted = crate::utils::project::resolve_project_input(project, &storage.root_path);
+        let prefix = crate::storage::TaskId::parse(id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
+        if !prefix.eq_ignore_ascii_case(&wanted) {
+            return false;
+        }
+    }
+    if !filter.status.is_empty() && !filter.status.contains(&task.status) {
+        return false;
+    }
+    if !filter.priority.is_empty() && !filter.priority.contains(&task.priority) {
+        return false;
+    }
+    if !filter.task_type.is_empty() && !filter.task_type.contains(&task.task_type) {
+        return false;
+    }
+    if let Some(text) = filter.text_query.as_deref() {
+        use crate::utils::text_search::{SearchQuery, Searchable};
+        if !SearchQuery::parse(text).matches(&task.search_document(id)) {
+            return false;
+        }
+    }
+    if !filter.tags.is_empty()
+        && !filter.tags.iter().any(|wanted| {
+            task.tags
+                .iter()
+                .any(|tag| crate::utils::fuzzy_match::fuzzy_contains(tag, wanted))
+        })
+    {
+        return false;
+    }
+    for (name, allowed) in &filter.custom_fields {
+        let Some(values) =
+            crate::utils::custom_fields::extract_value_strings(&task.custom_fields, name)
+        else {
+            return false;
+        };
+        if values.is_empty() || !crate::utils::fuzzy_match::fuzzy_set_match(&values, allowed) {
+            return false;
+        }
+    }
+    if !filter.sprints.is_empty() && !task.sprints.iter().any(|s| filter.sprints.contains(s)) {
+        return false;
+    }
+    true
 }
 
 /// IDs of the tasks a search in the web syntax selects, for commands that
