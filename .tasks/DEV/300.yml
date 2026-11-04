@@ -1,0 +1,26 @@
+title: CLI and sync follow-ups from the DEV-253 fixes
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+created: 2026-11-04T05:03:03.155331+00:00
+modified: 2026-11-04T05:03:03.240789+00:00
+relationships:
+  related:
+  - DEV-289
+  - DEV-293
+  - DEV-294
+description: |-
+  Small issues noticed while fixing DEV-289, DEV-293 and DEV-294; not fixed there.
+  - `lotar config show` text output omits review.reviewers (the JSON output has it). (DEV-293)
+  - `lotar ls --help` and `lotar tasks --help` print 'No help available'. (DEV-293)
+  - `lotar changelog` reports 'No task changes' when git fails, instead of the git error (src/main.rs). (DEV-289)
+  - Sync: when the token_env variable is unset, its name is sent as the token, so the remote answers 401 rather than LoTaR saying the variable is missing. (DEV-294)
+  - Sync: a run with failures still exits 0 and reports status ok. (DEV-294)
+history:
+- at: 2026-11-04T05:03:03.240789+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-289","DEV-293","DEV-294"]}'

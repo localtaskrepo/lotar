@@ -77,8 +77,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-and-release:
-    name: Build and Release
+  build:
+    name: Build
+    # Runs npm, vite, cargo build scripts and cross with a read-only token and
+    # no signing identity; the build-and-release job below signs and uploads
+    # (DEV-291).
     needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
@@ -116,11 +119,12 @@ jobs:
             artifact: windows-x64
             bin: lotar.exe
     permissions:
-      contents: write
-      id-token: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
@@ -166,8 +170,10 @@ jobs:
 
       - name: Install Rust target
         shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
-          rustup target add "${{ matrix.rust_target }}"
+          rustup target add "$RUST_TARGET"
 
       - name: Install cross (aarch64 musl)
         if: matrix.rust_target == 'aarch64-unknown-linux-musl'
@@ -175,7 +181,8 @@ jobs:
         run: |
           set -euo pipefail
           if ! command -v cross >/dev/null 2>&1; then
-            cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5 --locked
+            # v0.2.5, pinned by commit; its image is pinned by digest in Cross.toml.
+            cargo install cross --git https://github.com/cross-rs/cross --rev 88f49ff79e777bef6d3564531636ee4d3cc2f8d2 --locked
           fi
 
       - name: Build Web UI
@@ -189,12 +196,16 @@ jobs:
       - name: Build (release via cross)
         if: matrix.rust_target == 'aarch64-unknown-linux-musl'
         shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
-          cross build --release --locked --all-features --target "${{ matrix.rust_target }}"
+          cross build --release --locked --all-features --target "$RUST_TARGET"
 
       - name: Build (release)
         if: matrix.rust_target != 'aarch64-unknown-linux-musl'
         shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           set -euo pipefail
           # Keep the runner's home and checkout paths out of the binary and
@@ -212,15 +223,18 @@ jobs:
           done
           flags="$flags --remap-path-prefix=$(native "${GITHUB_WORKSPACE:-$PWD}")=/lotar"
           export RUSTFLAGS="${RUSTFLAGS:-} $flags"
-          cargo build --release --locked --all-features --target "${{ matrix.rust_target }}"
+          cargo build --release --locked --all-features --target "$RUST_TARGET"
 
       - name: Strip binary (Unix)
         if: runner.os != 'Windows'
         shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
+          BIN: ${{ matrix.bin }}
         run: |
           set -euo pipefail
-          BIN_PATH="target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
-          if [[ "${{ matrix.rust_target }}" == aarch64-* ]]; then
+          BIN_PATH="target/$RUST_TARGET/release/$BIN"
+          if [[ "$RUST_TARGET" == aarch64-* ]]; then
             echo "Skipping strip for cross-compiled target"
             exit 0
           fi
@@ -231,13 +245,19 @@ jobs:
       - name: Package artifact (non-Windows)
         if: matrix.os != 'windows-latest'
         shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          ARTIFACT: ${{ matrix.artifact }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+          BIN: ${{ matrix.bin }}
         run: |
           set -euo pipefail
-          mkdir -p dist
-          NAME="lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
-          BIN_PATH="target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
-          cp "$BIN_PATH" "dist/${{ matrix.bin }}"
-          tar -czf "$NAME.tar.gz" -C dist "${{ matrix.bin }}"
+          mkdir -p dist out
+          NAME="lotar-$TAG-$ARTIFACT"
+          BIN_PATH="target/$RUST_TARGET/release/$BIN"
+          cp "$BIN_PATH" "dist/$BIN"
+          tar -czf "out/$NAME.tar.gz" -C dist "$BIN"
+          cd out
           if command -v shasum >/dev/null 2>&1; then
             shasum -a 256 "$NAME.tar.gz" > "$NAME.sha256"
           elif command -v sha256sum >/dev/null 2>&1; then
@@ -250,15 +270,45 @@ jobs:
       - name: Package artifact (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+          ARTIFACT: ${{ matrix.artifact }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+          BIN: ${{ matrix.bin }}
         run: |
           $ErrorActionPreference = 'Stop'
-          New-Item -Path dist -ItemType Directory -Force | Out-Null
-          $name = "lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
-          $binPath = "target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
-          Copy-Item $binPath "dist/${{ matrix.bin }}"
-          Compress-Archive -Path "dist/${{ matrix.bin }}" -DestinationPath "$name.zip"
-          $hash = (Get-FileHash -Path "$name.zip" -Algorithm SHA256).Hash
-          "$hash  $name.zip" | Out-File -FilePath "$name.sha256" -Encoding ascii
+          New-Item -Path dist, out -ItemType Directory -Force | Out-Null
+          $name = "lotar-$($env:TAG)-$($env:ARTIFACT)"
+          $binPath = "target/$($env:RUST_TARGET)/release/$($env:BIN)"
+          Copy-Item $binPath "dist/$($env:BIN)"
+          Compress-Archive -Path "dist/$($env:BIN)" -DestinationPath "out/$name.zip"
+          $hash = (Get-FileHash -Path "out/$name.zip" -Algorithm SHA256).Hash
+          "$hash  $name.zip" | Out-File -FilePath "out/$name.sha256" -Encoding ascii
+
+      - name: Upload build output
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.artifact }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 3
+
+  build-and-release:
+    name: Sign and upload release assets
+    # Holds the write token and the signing identity, and runs no build code:
+    # it only signs what the build job produced and attaches it (DEV-291).
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Download build output
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: assets
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
@@ -268,53 +318,28 @@ jobs:
         with:
           cosign-release: "v2.6.5"
 
-      - name: Sign artifact (non-Windows)
-        if: matrix.os != 'windows-latest'
+      - name: Sign artifacts
         shell: bash
         env:
           COSIGN_EXPERIMENTAL: 1
         run: |
           set -euo pipefail
-          NAME="lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
-          cosign sign-blob --yes \
-            --output-signature "$NAME.tar.gz.sig" \
-            --output-certificate "$NAME.tar.gz.pem" \
-            "$NAME.tar.gz"
+          cd assets
+          for archive in *.tar.gz *.zip; do
+            [ -e "$archive" ] || continue
+            cosign sign-blob --yes \
+              --output-signature "$archive.sig" \
+              --output-certificate "$archive.pem" \
+              "$archive"
+          done
+          ls -l
 
-      - name: Sign artifact (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        env:
-          COSIGN_EXPERIMENTAL: 1
-        run: |
-          $name = "lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
-          cosign sign-blob --yes --output-signature "$name.zip.sig" --output-certificate "$name.zip.pem" "$name.zip"
-
-      - name: Create GitHub Release (append assets, tar.gz)
-        if: matrix.os != 'windows-latest'
+      - name: Create GitHub Release (append assets)
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
-          files: |
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz.pem
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz.sig
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub Release (append assets, zip)
-        if: matrix.os == 'windows-latest'
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          tag_name: ${{ github.ref_name }}
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          files: |
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip.pem
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip.sig
-            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.sha256
+          files: assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -789,12 +814,14 @@ jobs:
           PY
 
       - name: Commit and push tap update
+        env:
+          VERSION: ${{ steps.release_meta.outputs.version }}
         run: |
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/lotar.rb
-          git commit -m "Update lotar formula to v${{ steps.release_meta.outputs.version }}" || echo "No changes"
+          git commit -m "Update lotar formula to v$VERSION" || echo "No changes"
           git push
 
   update-scoop-bucket:

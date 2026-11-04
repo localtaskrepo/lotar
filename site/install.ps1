@@ -74,11 +74,28 @@ function Install-Lotar {
         Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
     }
 
-    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $entries = @($userPath -split ';' | Where-Object { $_ })
-    if ($entries -notcontains $InstallDir) {
-        [Environment]::SetEnvironmentVariable('Path', (($entries + $InstallDir) -join ';'), 'User')
-        Write-Host "Added $InstallDir to your user PATH; open a new terminal to use it there."
+    # Read and write the raw registry value: [Environment]::Get/SetEnvironmentVariable
+    # would expand %VAR% entries and store the user Path as plain text, freezing
+    # entries such as %JAVA_HOME%\bin (DEV-291).
+    $pathChanged = $false
+    $envKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
+    try {
+        $userPath = [string]$envKey.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        $entries = @($userPath -split ';' | Where-Object { $_ })
+        $expanded = @($entries | ForEach-Object { [Environment]::ExpandEnvironmentVariables($_).TrimEnd('\') })
+        if ($expanded -notcontains $InstallDir.TrimEnd('\')) {
+            $envKey.SetValue('Path', (($entries + $InstallDir) -join ';'), [Microsoft.Win32.RegistryValueKind]::ExpandString)
+            $pathChanged = $true
+            Write-Host "Added $InstallDir to your user PATH; open a new terminal to use it there."
+        }
+    } finally {
+        $envKey.Close()
+    }
+    if ($pathChanged) {
+        # Setting and clearing a variable through .NET broadcasts WM_SETTINGCHANGE,
+        # so Explorer and new terminals pick up the new Path.
+        [Environment]::SetEnvironmentVariable('LOTAR_INSTALL_REFRESH', '1', 'User')
+        [Environment]::SetEnvironmentVariable('LOTAR_INSTALL_REFRESH', $null, 'User')
     }
     if (($env:Path -split ';') -notcontains $InstallDir) { $env:Path = "$env:Path;$InstallDir" }
 

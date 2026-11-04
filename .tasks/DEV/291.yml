@@ -1,13 +1,21 @@
 title: 'Release and install hardening: token scope, workflow expressions, install.ps1 PATH handling'
-status: Todo
+status: Done
 priority: Low
 type: Chore
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:38.994897+00:00
-modified: 2026-10-31T22:06:39.058049+00:00
+modified: 2026-11-04T05:24:35.224889+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T05:24:35.151325+00:00
+  text: |-
+    1. release.yml split: the matrix job 'build' runs npm, vite, cargo and cross with contents: read, no id-token, and checkout persist-credentials: false. It uploads archives and checksums as workflow artifacts. 'build-and-release' (kept as the name, so downstream needs: don't change) has contents/id-token write, runs no build code (no checkout, npm or cargo), and signs every archive with cosign v2 before attaching it. cross is installed by commit 88f49ff7 (tag v0.2.5), and Cross.toml pins its aarch64-musl image by digest (sha256:702154f5…, the 0.2.5 tag as of 2026-11-03).
+    2. ci.yml, homebrew-verify.yml and scoop-verify.yml get top-level permissions: contents: read. Every ${{ }} inside run scripts (release matrix/ref_name, the performance baseline label, the tap commit version) now goes through env:. tests/dev291_workflow_hardening_test.rs enforces the job split, the pins, the read-only workflows and no ${{ in any run script. release-page.test.mjs updated to the single upload step; docs/release-guide.md describes both jobs.
+    3. install.ps1 reads the raw user Path from HKCU\Environment with DoNotExpandEnvironmentNames, compares expanded entries, writes it back as ExpandString, and broadcasts the change. install-verify.yml (Windows, pwsh and powershell) now seeds a %USERPROFILE% entry and fails if it gets expanded or the value kind changes.
+    Verification limits: the workflows and install.ps1 were not run here (no Windows, no release run). They are covered by YAML contract tests and will be exercised by the next install-verify and release runs.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -42,3 +50,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T05:24:35.103408+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T05:24:35.151325+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T05:24:35.224889+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

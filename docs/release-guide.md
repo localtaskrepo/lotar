@@ -126,7 +126,11 @@ publisher matching this repository and `release.yml`, or its configuration expir
    git push origin vX.Y.Z
    ```
 2. Monitor the **Release** workflow in GitHub Actions. The important jobs are:
-   - `build-and-release`: compiles, signs, and uploads release assets.
+   - `build`: compiles and packages each platform with a read-only token and no
+     signing identity, and hands the archives to the next job as workflow artifacts.
+   - `build-and-release`: signs the archives with cosign and uploads them to the release.
+     It holds the write token and the signing identity and runs no build code. The
+     aarch64 cross build is pinned by commit (cross) and digest (`Cross.toml` image).
    - `package-linux`: builds `.deb`/`.rpm` packages from the uploaded musl archives,
      signs them, and uploads them. Homebrew, Scoop, and Docker do not wait for it.
    - `publish-npm`: publishes the platform packages, then `@localtaskrepo/lotar`, with npm provenance.

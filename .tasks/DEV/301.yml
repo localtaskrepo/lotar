@@ -1,0 +1,22 @@
+title: 'Task panel: server-side stale-write check and field-safe saves'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+created: 2026-11-04T05:03:03.355433+00:00
+modified: 2026-11-04T05:03:03.426905+00:00
+relationships:
+  related:
+  - DEV-263
+description: |-
+  Follow-ups from DEV-263, not done there.
+  - A save already in flight can still overwrite a simultaneous outside change. Needs a server-side precondition on modified (or a revision) for task updates, with a clear conflict response.
+  - Save responses re-apply every form field, which can wipe text typed in another field meanwhile.
+  - Archive and attachment responses update the snapshot but not the form.
+history:
+- at: 2026-11-04T05:03:03.426905+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-263"]}'

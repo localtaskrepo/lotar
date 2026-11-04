@@ -18,6 +18,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Read-only token: these jobs only check out and test (DEV-291).
+permissions:
+  contents: read
+
 jobs:
   scoop-install-test:
     runs-on: windows-latest

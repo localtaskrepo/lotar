@@ -1,0 +1,4 @@
+[target.aarch64-unknown-linux-musl]
+# The image cross v0.2.5 uses by default (tag 0.2.5), pinned by digest so a
+# moved tag cannot change what builds the release binary (DEV-291).
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl@sha256:702154f52b2d8091671aa2c84d5582d849f949977228c735ff8462f93cc0e1e4"

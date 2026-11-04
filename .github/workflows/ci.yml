@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+# Read-only token: these jobs only check out and test (DEV-291).
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1

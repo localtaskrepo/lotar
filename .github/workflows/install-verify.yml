@@ -90,7 +90,18 @@ jobs:
       - name: Install with install.ps1 (piped, as documented)
         run: |
           $ErrorActionPreference = 'Stop'
+          # A %VAR% entry must stay unexpanded after the installer edits Path (DEV-291).
+          $envKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
+          $before = [string]$envKey.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $envKey.SetValue('Path', ((@($before -split ';' | Where-Object { $_ }) + '%USERPROFILE%\lotar-path-probe') -join ';'), [Microsoft.Win32.RegistryValueKind]::ExpandString)
+          $envKey.Close()
           Get-Content -Raw site/install.ps1 | Invoke-Expression
+          $envKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment')
+          $raw = [string]$envKey.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $kind = $envKey.GetValueKind('Path')
+          $envKey.Close()
+          if ($raw -notmatch '%USERPROFILE%\\lotar-path-probe') { throw "The installer expanded %VAR% entries in the user Path: $raw" }
+          if ($kind -ne [Microsoft.Win32.RegistryValueKind]::ExpandString) { throw "The user Path became $kind instead of ExpandString" }
           $exe = Join-Path $env:LOCALAPPDATA 'Programs\lotar\lotar.exe'
           $output = & $exe --version
           Write-Host $output

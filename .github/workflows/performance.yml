@@ -99,7 +99,9 @@ jobs:
         run: test -f target/web/index.html
 
       - name: Record baseline label
-        run: 'echo "Performance baseline label: ${{ inputs.baseline_label }} (measurements are baseline wall-clock values on a GitHub-hosted runner)"'
+        env:
+          BASELINE_LABEL: ${{ inputs.baseline_label }}
+        run: 'echo "Performance baseline label: $BASELINE_LABEL (measurements are baseline wall-clock values on a GitHub-hosted runner)"'
 
       - name: Run performance budgets
         run: npm run test:rust:perf

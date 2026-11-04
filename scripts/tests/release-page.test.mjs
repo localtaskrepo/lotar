@@ -338,7 +338,7 @@ test('prerelease tags are GitHub prereleases that never become the latest releas
     assert.equal(create.with.prerelease, isPrerelease);
     assert.equal(create.with.make_latest, "${{ !contains(github.ref_name, '-') }}");
     const uploads = workflow.jobs['build-and-release'].steps.filter((step) => step.uses?.startsWith('softprops/'));
-    assert.equal(uploads.length, 2);
+    assert.equal(uploads.length, 1);
     for (const upload of uploads) {
         assert.equal(upload.with.prerelease, isPrerelease, upload.name);
         assert.equal(upload.with.make_latest, undefined, upload.name);
