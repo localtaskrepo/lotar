@@ -59,7 +59,7 @@ base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 ureq = { version = "3.4.2", features = ["json"] }
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 libc = "0.2.191"
-sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 fs2 = "0.4.3"
 
 # Production release profile optimized for minimal binary size
