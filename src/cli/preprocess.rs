@@ -1,5 +1,32 @@
 use std::borrow::Cow;
 
+/// Index of the command word: the first token after the global options
+/// (`-p X`, `--format json`, `--config K=V`, `-v`, ...). `help` and
+/// `version` are only requests in this position, never as values such as
+/// `lotar add version` or `comment -m help` (DEV-281).
+pub fn command_index(raw_args: &[String]) -> Option<usize> {
+    let mut idx = 1;
+    while idx < raw_args.len() {
+        let token = raw_args[idx].as_str();
+        match token {
+            "-p" | "--project" | "-f" | "--format" | "-l" | "--log-level" | "--tasks-dir"
+            | "--config" => idx += 2,
+            "-v" | "--verbose" | "--force-archived" => idx += 1,
+            "--" => return None,
+            _ if token.starts_with("--") && token.contains('=') => idx += 1,
+            _ if (token.starts_with("-f")
+                || token.starts_with("-l")
+                || token.starts_with("-p"))
+                && token.len() > 2 =>
+            {
+                idx += 1
+            }
+            _ => return Some(idx),
+        }
+    }
+    None
+}
+
 /// Rewrite CLI arguments to support additional convenience forms.
 ///
 /// Steps:
@@ -154,7 +181,12 @@ fn try_hoist_global_flag(
     if is_excluded_filter(token) {
         return Ok(None);
     }
-    if token.starts_with("-f") && token.len() > 2 {
+    // `-fjson` is the format flag; `-fix: flaky test` (a title, comment or
+    // option value) is not, so only real formats are hoisted (DEV-281).
+    if token.starts_with("-f")
+        && token.len() > 2
+        && crate::output::parse_output_format(&token[2..]).is_ok()
+    {
         return Ok(Some((1, vec![format!("--format={}", &token[2..])])));
     }
 
@@ -166,7 +198,7 @@ fn try_hoist_global_flag(
         return Ok(Some((2, vec!["--log-level".to_string(), value])));
     }
 
-    if token.starts_with("-l") && token.len() > 2 {
+    if token.starts_with("-l") && token.len() > 2 && is_log_level(&token[2..]) {
         return Ok(Some((1, vec![format!("--log-level={}", &token[2..])])));
     }
 
@@ -178,6 +210,11 @@ fn try_hoist_global_flag(
     // `serve -p <port>` which `normalize_serve_args` handles separately.
 
     Ok(None)
+}
+
+fn is_log_level(value: &str) -> bool {
+    use clap::ValueEnum;
+    crate::output::LogLevel::from_str(value, true).is_ok()
 }
 
 fn normalize_serve_args(raw_args: &[String]) -> Result<Vec<String>, String> {
@@ -353,6 +390,12 @@ fn find_serve_index(raw_args: &[String]) -> Option<usize> {
                 idx += 1;
                 continue;
             }
+            // `--config KEY=VALUE` before `serve` (DEV-281).
+            "--config" => {
+                pending_global = Some("--config");
+                idx += 1;
+                continue;
+            }
             _ => {}
         }
 
@@ -361,6 +404,7 @@ fn find_serve_index(raw_args: &[String]) -> Option<usize> {
             || token.starts_with("--tasks-dir=")
             || token.starts_with("--log-level=")
             || token.starts_with("--project=")
+            || token.starts_with("--config=")
             || (token.starts_with("-f") && token.len() > 2)
             || (token.starts_with("-l") && token.len() > 2)
             || (token.starts_with("-p") && token.len() > 2 && token != "-p")

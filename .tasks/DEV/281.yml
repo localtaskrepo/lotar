@@ -1,13 +1,24 @@
 title: 'CLI argument preprocessing: help/version words and -f/-l values hijack commands'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:37.467469+00:00
-modified: 2026-10-31T22:06:37.529498+00:00
+modified: 2026-11-04T02:16:07.856027+00:00
 relationships:
   related:
   - DEV-253
+  - DEV-294
+comments:
+- date: 2026-11-04T02:16:07.632336+00:00
+  text: |-
+    Outcome: findings 1-5 fixed, with one narrow case declined.
+    1./2. main.rs only treats help/version as requests in command position (cli::preprocess::command_index skips global options such as -p X, --format json, --config K=V, -v), and --help/-h only before '--'. 'lotar add version', '--tag version', 'comment -m help', 'edit --description help' and 'list help' are data again; 'lotar -p ALPH list --help' shows list help.
+    3. The hoister only hoists -f<x>/-l<x> clusters whose rest is a real format or log level, and text options (-m/--message, -D/--description, -T/--title) accept values starting with '-'. Declined: a bare positional starting with -f (e.g. 'lotar comment 1 "-fix..."'): clap itself reads -f as the format flag; use -m, the = form or '--'.
+    4. HELP_ALIASES gained ls->list and tasks->task (pull/push/sync came with DEV-294), and bare stats/agent/automation/sync show their overview page with exit 0. Not done: per-subcommand usage for 'stats churn --help' (clap's help features are off; the command page is shown).
+    5. find_serve_index knows --config/--config=, so 'lotar --config K=V serve <PORT>' takes the port.
+    Evidence: tests/dev281_cli_preprocessing_test.rs; manual repro of every case; full Rust suite 1924/1924; smoke cli.* specs pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -58,3 +69,27 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T00:11:56.742326+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T02:16:07.632336+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T02:16:07.761992+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-253"]}'
+    new: '{"related":["DEV-253","DEV-294"]}'
+- at: 2026-11-04T02:16:07.856027+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -151,7 +151,7 @@ pub enum Commands {
         /// Comment text (optional if using -m or -F)
         text: Option<String>,
         /// Comment message (useful for shell-safe multi-word input)
-        #[arg(short = 'm', long = "message")]
+        #[arg(short = 'm', long = "message", allow_hyphen_values = true)]
         message: Option<String>,
         /// Read comment text from file
         #[arg(short = 'F', long = "file")]

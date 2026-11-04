@@ -170,7 +170,7 @@ pub struct AddArgs {
     pub due: Option<String>,
 
     /// Task description
-    #[arg(long, short = 'D', alias = "desc")]
+    #[arg(long, short = 'D', alias = "desc", allow_hyphen_values = true)]
     pub description: Option<String>,
 
     /// Tags (can be used multiple times)
@@ -298,7 +298,7 @@ pub enum TaskAction {
         /// Comment text (optional if using -m or -F)
         text: Option<String>,
         /// Comment message (useful for shell-safe multi-word input)
-        #[arg(short = 'm', long = "message")]
+        #[arg(short = 'm', long = "message", allow_hyphen_values = true)]
         message: Option<String>,
         /// Read comment text from file
         #[arg(short = 'F', long = "file")]
@@ -509,7 +509,7 @@ pub struct TaskAddArgs {
     pub due: Option<String>,
 
     /// Task description
-    #[arg(long, short = 'D', alias = "desc")]
+    #[arg(long, short = 'D', alias = "desc", allow_hyphen_values = true)]
     pub description: Option<String>,
 
     /// Tags (can be used multiple times)
@@ -535,7 +535,7 @@ pub struct TaskEditArgs {
     pub id: String,
 
     /// New title
-    #[arg(long, short = 'T')]
+    #[arg(long, short = 'T', allow_hyphen_values = true)]
     pub title: Option<String>,
 
     /// New type
@@ -565,7 +565,7 @@ pub struct TaskEditArgs {
     pub due: Option<String>,
 
     /// New description
-    #[arg(long, short = 'D')]
+    #[arg(long, short = 'D', allow_hyphen_values = true)]
     pub description: Option<String>,
 
     /// Add tags (can be used multiple times)

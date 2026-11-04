@@ -37,6 +37,8 @@ static HELP_ALIASES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::n
         ("update", "task"),
         ("pull", "sync"),
         ("push", "sync"),
+        ("ls", "list"),
+        ("tasks", "task"),
     ])
 });
 
