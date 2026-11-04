@@ -32,7 +32,7 @@ modified-only, strip attributes, and re-anchor), but lets you pick individual fi
 | --- | --- | --- |
 | Turn TODO comments into LoTaR tasks | `lotar scan src` | Writes tasks, inserts IDs beside the comments, and adds code references to the task file. |
 | Clean up anchors after refactors | `lotar scan --reanchor` | Also removes dead anchors whose file is gone or no longer mentions the ID; preview with `--dry-run`. |
-| Limit noise to active work | `lotar scan --modified-only` | Uses `git status` to choose files; automatically falls back to full scan outside a repo. |
+| Limit noise to active work | `lotar scan --modified-only` | Scans only files `git status` reports as changed or new (new folders included), still applying `--include`/`--exclude` and ignore files; falls back to a full scan outside a repo or when git fails. |
 | Feed results into tooling | `lotar --format json scan --include rs` | JSON is `{"status": "ok", "dry_run": ..., "count": N, "findings": [...]}`; each finding has `file`, `line`, `title`, `key` (the ticket key already on the line, or `null`) and `annotation`. |
 | Work in another workspace | `lotar scan --tasks-dir /path/to/.tasks ...` | Shares precedence with other commands plus `LOTAR_TASKS_DIR`. |
 
@@ -82,7 +82,7 @@ tests/integration.rs:56
 
 ## Signal words & supported files
 
-Default (case-insensitive) triggers: **TODO**, **FIXME**, **HACK**, **BUG**, **NOTE**. Shapes that match:
+Default (case-insensitive) triggers: **TODO**, **FIXME**, **HACK**, **BUG**, **NOTE**. NOTE needs a colon or a key (`NOTE: ...`, `NOTE(ABC-1): ...`), so prose such as `// Note that ...` is left alone. Shapes that match:
 
 - `WORD: message`
 - `WORD (ABC-123): message` – captures an existing ID so only the anchor is updated.
@@ -134,7 +134,7 @@ scan:
 
 | Symptom | Fix |
 | --- | --- |
-| Comments are ignored | Confirm the extension is supported or add it via `--include`. When in doubt, add the comment token to the line (`// TODO`). |
+| Comments are ignored | Confirm the file type is supported: `--include` only narrows the scan to supported types, it can't add new ones. Module variants (`.mjs`, `.cjs`, `.mts`, `.cts`), `.zsh`, `.fish`, `.mk`, Makefile, Dockerfile and Justfile are supported. |
 | Nothing shows up in JSON output | Ensure you passed `lotar --format json scan …` (format flag comes before the subcommand). |
 | Anchors stay stale after refactors | Run `lotar scan --reanchor` from the repo root so LoTaR can locate renamed files and drop anchors that no longer point at a mention. |
 | Inline attributes remain in code | Set `--strip-attributes=true` or enable `scan.strip_attributes` in config. |

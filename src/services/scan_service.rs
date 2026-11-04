@@ -664,7 +664,12 @@ fn update_task_code_reference(
     Ok(outcome.changed)
 }
 
-fn coerce_entry_title(title: &str, annotation: &str, rel_path: &str, line: usize) -> String {
+pub(crate) fn coerce_entry_title(
+    title: &str,
+    annotation: &str,
+    rel_path: &str,
+    line: usize,
+) -> String {
     if !title.trim().is_empty() {
         return title.trim().to_string();
     }

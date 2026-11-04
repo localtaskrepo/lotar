@@ -261,8 +261,15 @@ impl CommandHandler for ScanHandler {
                             let inline_attrs = parse_inline_attributes(&orig_line[range]);
                             // Create task title from entry.title
                             // Reuse AddHandler with smart defaults
+                            // Same fallback title as the REST scan, never
+                            // an empty one (DEV-285).
                             let cli_add_args = crate::cli::AddArgs {
-                                title: entry.title.clone(),
+                                title: crate::services::scan_service::coerce_entry_title(
+                                    &entry.title,
+                                    "",
+                                    &crate::utils::paths::repo_relative_display(&entry.file_path),
+                                    entry.line_number,
+                                ),
                                 task_type: inline_attrs.task_type,
                                 priority: inline_attrs.priority,
                                 status: None,

@@ -252,8 +252,34 @@ fn apply_plan(references: &mut Vec<ReferenceEntry>, plan: &[(String, AnchorChang
         }
         kept.push(reference);
     }
+    // A move onto an anchor the task already has (after a rename, the
+    // per-entry refresh records the new path first) would leave the same
+    // code reference twice; keep one (DEV-285).
+    if dedupe_code_references(&mut kept) {
+        changed = true;
+    }
     *references = kept;
     changed
+}
+
+/// Drop plain code references (nothing but `code`) that repeat an earlier
+/// plain one. Entries that carry more data are never touched, nor is a
+/// plain anchor that shares its line with such an entry. Returns whether
+/// anything was removed.
+pub(crate) fn dedupe_code_references(references: &mut Vec<ReferenceEntry>) -> bool {
+    let bare = |r: &ReferenceEntry| {
+        ReferenceEntry {
+            code: None,
+            ..r.clone()
+        } == ReferenceEntry::default()
+    };
+    let mut seen = std::collections::HashSet::new();
+    let before = references.len();
+    references.retain(|r| match r.code.as_deref() {
+        Some(code) if bare(r) => seen.insert(code.to_string()),
+        _ => true,
+    });
+    references.len() != before
 }
 
 /// Whether a code reference was attached by a person rather than by scan.
@@ -304,9 +330,10 @@ pub(crate) fn parse_code_ref(code: &str) -> (String, Option<usize>) {
 
 /// Best-effort map of renamed paths from `git status`.
 fn git_rename_map(repo_root: &Path) -> HashMap<String, String> {
+    // NUL-separated, so paths with spaces or non-ASCII names match (DEV-285).
     let mut map = HashMap::new();
     let Ok(output) = crate::utils::git::git_command(repo_root)
-        .args(["status", "--porcelain"])
+        .args(["status", "--porcelain", "-z"])
         .output()
     else {
         return map;
@@ -314,17 +341,20 @@ fn git_rename_map(repo_root: &Path) -> HashMap<String, String> {
     if !output.status.success() {
         return map;
     }
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        if line.len() < 4 {
+    let text = String::from_utf8_lossy(&output.stdout).to_string();
+    let mut entries = text.split('\0').filter(|e| !e.is_empty());
+    while let Some(entry) = entries.next() {
+        if entry.len() < 4 {
             continue;
         }
-        if line[..2].contains('R')
-            && let Some(pos) = line.find(" -> ")
-        {
-            map.insert(
-                line[3..pos].trim().to_string(),
-                line[pos + 4..].trim().to_string(),
-            );
+        let status = &entry[..2];
+        if status.contains('R') || status.contains('C') {
+            let new = entry[3..].to_string();
+            if let Some(old) = entries.next()
+                && status.contains('R')
+            {
+                map.insert(old.to_string(), new);
+            }
         }
     }
     map

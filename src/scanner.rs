@@ -61,6 +61,35 @@ const FILE_TYPES: &[(&str, &str)] = &[
 ];
 
 use ignore::WalkBuilder;
+
+/// The language a file is scanned as: its lowercase extension, with module
+/// variants mapped to their base language (`.mjs` is JavaScript) and
+/// well-known extensionless files (Makefile, Dockerfile) included
+/// (DEV-285). `None` when the file has no scannable type.
+pub(crate) fn scan_language(path: &Path) -> Option<String> {
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        let ext = ext.to_ascii_lowercase();
+        let mapped = match ext.as_str() {
+            "mjs" | "cjs" => "js",
+            "mts" | "cts" => "ts",
+            "zsh" | "fish" | "mk" | "dockerfile" | "containerfile" => "sh",
+            other => other,
+        };
+        return Some(mapped.to_string());
+    }
+    let name = path.file_name()?.to_str()?;
+    matches!(
+        name,
+        "Makefile"
+            | "makefile"
+            | "GNUmakefile"
+            | "Dockerfile"
+            | "Containerfile"
+            | "Justfile"
+            | "justfile"
+    )
+    .then(|| "sh".to_string())
+}
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use regex::Regex;
@@ -489,25 +518,25 @@ impl Scanner {
     fn collect_candidate_files(&self, dir_path: &Path) -> Vec<PathBuf> {
         let mut files = Vec::new();
 
-        // If modified_only is enabled and we are inside a git repo, restrict to modified/renamed files
-        if self.modified_only
-            && let Some(repo_root) = crate::utils::git::find_repo_root(dir_path)
-        {
-            let modified = Self::git_modified_files(&repo_root);
-            for p in modified {
-                // Keep only files under dir_path and supported extensions
-                let abs = repo_root.join(&p);
-                if abs.starts_with(dir_path)
-                    && let Some(ext) = abs.extension().and_then(|e| e.to_str())
-                {
-                    let ext_lc = ext.to_ascii_lowercase();
-                    if Self::is_supported_ext(&ext_lc) {
-                        files.push(abs);
-                    }
-                }
-            }
-            return files;
-        }
+        // --modified-only keeps the walker's filters (supported types,
+        // --include/--exclude, .lotarignore/.gitignore) and only narrows the
+        // result to files git reports as changed or new; when git can't
+        // answer, it scans everything (DEV-285).
+        let modified: Option<std::collections::HashSet<PathBuf>> = if self.modified_only {
+            crate::utils::git::find_repo_root(dir_path).and_then(|repo_root| {
+                Self::git_modified_files(&repo_root).map(|paths| {
+                    paths
+                        .into_iter()
+                        .map(|p| {
+                            let abs = repo_root.join(p);
+                            abs.canonicalize().unwrap_or(abs)
+                        })
+                        .collect()
+                })
+            })
+        } else {
+            None
+        };
 
         // Build walker that honors .lotarignore (root and nested) with fallback to .gitignore
         // when no root .lotarignore exists. If a root .lotarignore is present, gitignore fallback
@@ -544,66 +573,62 @@ impl Scanner {
         for entry in walker.flatten() {
             if entry.file_type().is_some_and(|t| t.is_file()) {
                 let path = entry.path().to_path_buf();
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    let ext_lc = ext.to_ascii_lowercase();
-                    if !Self::is_supported_ext(&ext_lc) {
-                        continue;
-                    }
-                    if let Some(ref excludes) = self.exclude_ext
-                        && excludes.iter().any(|e| e == &ext_lc)
-                    {
-                        continue;
-                    }
-                    if let Some(ref includes) = self.include_ext
-                        && !includes.iter().any(|e| e == &ext_lc)
-                    {
-                        continue;
-                    }
-                    files.push(path);
+                let Some(language) = scan_language(&path) else {
+                    continue;
+                };
+                if !Self::is_supported_ext(&language) {
+                    continue;
                 }
+                // Filters match the file's own extension or its language.
+                let own = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(str::to_ascii_lowercase)
+                    .unwrap_or_else(|| language.clone());
+                let named = |list: &Vec<String>| list.iter().any(|e| *e == own || *e == language);
+                if self.exclude_ext.as_ref().is_some_and(named) {
+                    continue;
+                }
+                if self.include_ext.as_ref().is_some_and(|list| !named(list)) {
+                    continue;
+                }
+                if let Some(modified) = modified.as_ref() {
+                    let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
+                    if !modified.contains(&canonical) {
+                        continue;
+                    }
+                }
+                files.push(path);
             }
         }
 
         files
     }
 
-    /// Return paths from `git status --porcelain` that are modified/renamed/added/deleted
-    fn git_modified_files(repo_root: &Path) -> Vec<PathBuf> {
-        // Prefer parsing porcelain output via invoking git; avoid adding a dependency.
-        // If git not available or fails, return empty to fall back to full scan.
-        use std::process::Command;
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(repo_root)
-            .arg("status")
-            .arg("--porcelain")
-            .output();
-        let output = match out {
-            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
-            _ => return Vec::new(),
-        };
+    /// Paths git reports as changed, added, renamed or untracked (each new
+    /// file, not just its folder), relative to the repository root; `None`
+    /// when git fails. NUL-separated output keeps unusual names intact.
+    fn git_modified_files(repo_root: &Path) -> Option<Vec<PathBuf>> {
+        let output = crate::utils::git::git_command(repo_root)
+            .args(["status", "--porcelain", "-z", "--untracked-files=all"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())?;
+        let text = String::from_utf8_lossy(&output.stdout).to_string();
+        let mut entries = text.split('\0').filter(|e| !e.is_empty());
         let mut files = Vec::new();
-        for line in output.lines() {
-            if line.len() < 4 {
+        while let Some(entry) = entries.next() {
+            if entry.len() < 4 {
                 continue;
             }
-            // Format: XY <path> or R <old> -> <new>
-            let status = &line[..2];
-            // Handle renames with "R" in either position
-            if status.contains('R') {
-                if let Some(pos) = line.find(" -> ") {
-                    let new_path = &line[pos + 4..];
-                    files.push(PathBuf::from(new_path.trim()));
-                }
-                continue;
-            }
-            // Else take path after 3rd char
-            let path = line[3..].trim();
-            if !path.is_empty() {
-                files.push(PathBuf::from(path));
+            let status = &entry[..2];
+            files.push(PathBuf::from(&entry[3..]));
+            // Renames and copies are followed by their original path.
+            if status.contains('R') || status.contains('C') {
+                entries.next();
             }
         }
-        files
+        Some(files)
     }
 
     fn get_comment_token(extension: &str) -> Option<&'static str> {
@@ -620,11 +645,8 @@ impl Scanner {
         mentions: &mut Vec<Reference>,
     ) {
         if let Ok(file_contents) = fs::read_to_string(file_path)
-            && let Some(extension) = file_path.extension()
-            && let Some(ext_str) = extension.to_str()
+            && let Some(ext_str) = scan_language(file_path)
         {
-            let ext_str = ext_str.to_ascii_lowercase();
-
             let mut lexer = CommentLexer::default();
             for (line_number, raw_line) in file_contents.lines().enumerate() {
                 for range in lexer.ranges(raw_line, &ext_str) {
@@ -652,10 +674,15 @@ impl Scanner {
         // still carry a bare ticket key: when mention tracking is enabled they are
         // reported separately so the scan consumer can anchor the existing task.
         let body = comment_body(line);
-        let starts_with_signal = self
-            .signal_regex
-            .find(body)
-            .is_some_and(|matched| matched.start() == 0);
+        let starts_with_signal = self.signal_regex.find(body).is_some_and(|matched| {
+            matched.start() == 0
+                // "Note that ..." is prose; NOTE needs `NOTE:` or
+                // `NOTE(KEY)` to be a finding (DEV-285).
+                && (!matched.as_str().eq_ignore_ascii_case("note")
+                    || body[matched.end()..]
+                        .trim_start()
+                        .starts_with([':', '(']))
+        });
         if !starts_with_signal {
             if self.track_mentions {
                 let trimmed = body;
@@ -753,11 +780,7 @@ impl Scanner {
         contents: &str,
         line_number: usize,
     ) -> Option<std::ops::Range<usize>> {
-        let extension = path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
+        let extension = scan_language(path).unwrap_or_default();
         let mut lexer = CommentLexer::default();
         for (index, line) in contents.lines().enumerate() {
             let ranges = lexer.ranges(line, &extension);
@@ -896,11 +919,7 @@ impl Scanner {
     /// quote-aware lexer as discovery. Covers both signal-word and bare mentions;
     /// keys in quoted strings or executable source are never reported.
     pub fn key_mention_lines(&self, path: &Path, contents: &str, key: &str) -> Vec<usize> {
-        let extension = path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
+        let extension = scan_language(path).unwrap_or_default();
         let mut lexer = CommentLexer::default();
         let mut lines = Vec::new();
         for (index, line) in contents.lines().enumerate() {

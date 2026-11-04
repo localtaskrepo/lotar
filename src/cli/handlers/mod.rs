@@ -112,6 +112,10 @@ impl CommandHandler for AddHandler {
         renderer: &OutputRenderer,
     ) -> Self::Result {
         renderer.log_info("add: begin validation and project resolution");
+        // Like REST and MCP: no task without a title (DEV-285).
+        if args.title.trim().is_empty() {
+            return Err("Title cannot be empty.".to_string());
+        }
         // Create project resolver and validator
         let mut project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;

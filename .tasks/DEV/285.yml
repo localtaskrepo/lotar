@@ -1,13 +1,24 @@
 title: 'Scanner polish: renamed files, --modified-only, empty titles, NOTE default, --include docs'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:38.070211+00:00
-modified: 2026-10-31T22:06:38.136920+00:00
+modified: 2026-11-04T03:01:23.463089+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T03:01:23.425145+00:00
+  text: |-
+    Outcome: all five findings fixed.
+    1. --modified-only now runs 'git status --porcelain -z --untracked-files=all' through git_command (env scrubbed), parses NUL entries incl. rename pairs, and narrows the normal walk instead of replacing it, so --include/--exclude, supported types and .lotarignore/.gitignore still apply; new untracked folders and quoted names are found; a git failure falls back to a full scan.
+    2. Code references: plain duplicates (code only) are collapsed after the anchor plan and after the per-entry refresh, so a rename no longer leaves two src/n.rs#2 entries; a plain anchor sharing a line with a richer entry is kept (existing behavior). git_rename_map parses -z output, so names with spaces or non-ASCII match.
+    3. CLI scan uses the REST fallback title ('TODO in a.rs:1') instead of an empty one, and 'lotar add' refuses a blank title.
+    4. NOTE needs a colon or a key (NOTE: / NOTE(KEY)); 'Note that ...' prose is no longer a finding.
+    5. scan_language maps .mjs/.cjs to JS, .mts/.cts to TS, .zsh/.fish/.mk/.dockerfile to shell-style comments and handles Makefile, Dockerfile, Containerfile and Justfile; scan.md's troubleshooting now says --include only narrows supported types and lists the new ones.
+    Evidence: tests/scanner_features_test.rs dev285_scanner_covers_new_types_and_modified_only_filters; tests/dev285_scan_rename_test.rs (git mv + scan + reanchor leaves one reference; blank add refused); manual repros; full Rust suite 1935 pass; smoke scan specs pass; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -59,3 +70,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T02:48:12.054279+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T03:01:23.425145+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T03:01:23.463089+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

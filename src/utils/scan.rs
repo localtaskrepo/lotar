@@ -285,6 +285,9 @@ pub fn refresh_code_reference(
         });
         changed = true;
     }
+    if crate::services::scan_anchor_service::dedupe_code_references(references) {
+        changed = true;
+    }
     changed
 }
 

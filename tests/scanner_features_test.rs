@@ -592,3 +592,62 @@ mod more_languages {
             .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 }
+
+/// DEV-285: module and extensionless file types are scanned, prose
+/// "Note that ..." is not a finding, and --modified-only keeps the
+/// --include filter while seeing new untracked folders.
+#[test]
+fn dev285_scanner_covers_new_types_and_modified_only_filters() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    let git = |args: &[&str]| {
+        std::process::Command::new("git")
+            .current_dir(root)
+            .args(args)
+            .output()
+            .unwrap()
+    };
+    git(&["init", "-q"]);
+    std::fs::write(root.join("tracked.rs"), "fn a() {}\n").unwrap();
+    git(&["add", "tracked.rs"]);
+    git(&[
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@e",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-q",
+        "-m",
+        "init",
+    ]);
+    std::fs::write(root.join("m.mjs"), "// TODO: module item\n").unwrap();
+    std::fs::write(root.join("Makefile"), "# TODO: make item\n").unwrap();
+    std::fs::write(
+        root.join("prose.rs"),
+        "// Note that this is prose\n// NOTE: real\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(root.join("feature")).unwrap();
+    std::fs::write(root.join("feature/new.rs"), "// TODO: new module\n").unwrap();
+    std::fs::write(root.join("b.py"), "# TODO: python\n").unwrap();
+
+    let titles = |scanner: &mut lotar::scanner::Scanner| {
+        let mut t: Vec<String> = scanner.scan().into_iter().map(|r| r.title).collect();
+        t.sort();
+        t
+    };
+    let mut all = lotar::scanner::Scanner::new(root.to_path_buf());
+    let found = titles(&mut all);
+    for expected in ["make item", "module item", "new module", "python", "real"] {
+        assert!(found.iter().any(|t| t == expected), "{expected}: {found:?}");
+    }
+    assert!(!found.iter().any(|t| t.contains("prose")), "{found:?}");
+
+    let mut modified = lotar::scanner::Scanner::new(root.to_path_buf())
+        .with_modified_only(true)
+        .with_include_ext(&["rs".to_string()]);
+    let found = titles(&mut modified);
+    assert_eq!(found, ["new module", "real"], "{found:?}");
+}
