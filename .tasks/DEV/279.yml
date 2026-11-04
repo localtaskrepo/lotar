@@ -1,13 +1,26 @@
 title: 'Agent jobs across processes: detection, cancel/status, orphaned MCP jobs, queue drops, Windows cancel'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:37.172805+00:00
-modified: 2026-10-31T22:06:37.238522+00:00
+modified: 2026-11-04T00:11:49.755672+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T00:11:49.722141+00:00
+  text: |-
+    Outcome: all eight findings handled.
+    1./6. New src/services/agent_active_jobs.rs: every running job writes a record (job id, ticket, runner, agent, owner pid, child pid) next to the agent queue, removed when the job's slot drops; records of dead owners are ignored and cleaned up. list-running, agent status, agent queue counts, the status/assignee guards and worktree list/cleanup use these records, so they work in packaged installs without lotar-agent-wrapper. The wrapper scan stays as an extra source and now refreshes process command lines (ProcessRefreshKind with_cmd), so its job/ticket ids parse. Not done: shipping the wrapper in release archives (no longer needed for these features).
+    2. MCP sessions call AgentJobService::shutdown_jobs on stdin EOF and before an autoreload exit: their jobs are cancelled and finalized (cancelled status, job_cancelled automation) within 10 s.
+    3. lotar agent cancel on a job in another process writes a cancel request the owner checks while it waits for the runner; the owner cancels through its normal path. The CLI waits up to 15 s and reports cancelled/cancelling.
+    4. A queued entry whose ticket is busy (now also when the job runs in another process) is put back without counting a retry, so hand-offs are no longer dropped after ~1 s; a worker that exits re-checks the queue after releasing its lock and starts a new worker if entries arrived.
+    5. Windows: terminate_child also runs taskkill /PID <wrapper> /T /F so the agent CLI below the wrapper ends too (not run on Windows).
+    7. max_iterations counts only jobs finished in the last 24 hours, and the in-memory registry drops finished jobs after 24 h (max 500 kept). Still per process; documented.
+    8. The logs folder only gets a '*' .gitignore when it holds nothing but job logs, only job-*.jsonl files are pruned, and a logs_dir that is the workspace root uses a lotar-agent-logs subfolder.
+    Evidence: tests/dev279_cross_process_jobs_test.rs (a --wait job in one process is listed with id/ticket by another, its status change is refused, agent cancel from another process stops it before the agent finishes); agent_active_jobs unit test (register/find/cancel request/stale owner); full Rust suite 1921/1921 (an agent chain test caught and fixed a self-blocking check: own-process records are ignored); smoke ui.agent-jobs, mcp.contracts, mcp.safe-dispatch pass; agent.md/automation.md updated; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -75,3 +88,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-03T23:54:47.309589+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T00:11:49.722141+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T00:11:49.755672+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

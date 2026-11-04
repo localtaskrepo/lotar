@@ -344,7 +344,10 @@ impl AgentJobService {
                 .lock()
                 .map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
 
-            if registry.active_by_ticket.contains_key(&ticket_id) {
+            if registry.active_by_ticket.contains_key(&ticket_id)
+                || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, &ticket_id)
+                    .is_some()
+            {
                 return Err(LoTaRError::ValidationError(format!(
                     "Ticket '{}' already has an active job",
                     ticket_id
@@ -371,6 +374,7 @@ impl AgentJobService {
             registry
                 .active_by_ticket
                 .insert(ticket_id.clone(), job_id.clone());
+            prune_finished_jobs(&mut registry);
             registry.jobs.insert(
                 job_id.clone(),
                 AgentJobState {
@@ -503,6 +507,14 @@ impl AgentJobService {
         false
     }
 
+    /// [`Self::has_active_job`], plus jobs other processes run for this
+    /// tasks directory (DEV-279).
+    pub fn has_active_job_in(tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
+        Self::has_active_job(ticket_id)
+            || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id)
+                .is_some()
+    }
+
     pub fn get_job(id: &str) -> Option<AgentJob> {
         get_job_dto(id)
     }
@@ -578,6 +590,24 @@ impl AgentJobService {
 
         Ok(cancelled)
     }
+    /// Cancel every job of this process and wait (up to `timeout`) until
+    /// they are finalized: cancelled status, job_cancelled automation,
+    /// worktree handling. For processes that are about to exit.
+    pub fn shutdown_jobs(timeout: Duration) {
+        let had_jobs = Self::cancel_all_jobs().is_ok_and(|jobs| !jobs.is_empty());
+        if !had_jobs {
+            return;
+        }
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            let stats = Self::queue_stats();
+            if stats.running == 0 && stats.queued == 0 {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+
     pub fn events_for(id: &str) -> Vec<AgentJobEvent> {
         if let Ok(registry) = JOB_REGISTRY.lock()
             && let Some(state) = registry.jobs.get(id)
@@ -814,6 +844,17 @@ fn terminate_child(child: &mut Child) {
                 let _ = libc::kill(pid, libc::SIGTERM);
             }
         }
+    }
+    // Windows has no process groups here: end the wrapper's whole process
+    // tree, or the agent CLI it started keeps running (DEV-279).
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/PID", &child.id().to_string(), "/T", "/F"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
     }
     let _ = child.kill();
 }
@@ -1654,6 +1695,7 @@ fn run_job(
     let _slot = RunningJobSlot {
         job_id: &job_id,
         ticket_id: &ticket_id,
+        tasks_dir: &tasks_dir,
     };
     if should_stop_job(&job_id) {
         return;
@@ -1884,13 +1926,27 @@ fn run_job(
     let stdin = child.lock().ok().and_then(|mut c| c.stdin.take());
     let stdin = stdin.map(|handle| Arc::new(Mutex::new(handle)));
 
+    let mut active_record = None;
     if let Some(state) = registry.jobs.get_mut(&job_id) {
         state.runtime = Some(AgentJobRuntime {
             child: Arc::clone(&child),
             stdin: stdin.clone(),
         });
+        active_record = Some(crate::services::agent_active_jobs::ActiveJob {
+            job_id: job_id.clone(),
+            ticket_id: ticket_id.clone(),
+            runner: state.record.runner.clone(),
+            agent: state.record.agent_profile.clone(),
+            owner_pid: std::process::id(),
+            child_pid: child.lock().map(|c| c.id()).unwrap_or_default(),
+            started_at: Utc::now().to_rfc3339(),
+        });
     }
     drop(registry);
+    // Other processes see the job, and can ask to cancel it (DEV-279).
+    if let Some(record) = active_record.as_ref() {
+        crate::services::agent_active_jobs::register(&tasks_dir, record);
+    }
 
     // DEV-199: Claude reads its first prompt from stdin. Only the runtime
     // keeps the pipe afterwards, so closing it there ends the session.
@@ -1966,6 +2022,10 @@ fn run_job(
     });
 
     let status = loop {
+        // A cancel asked for by another process (`lotar agent cancel`).
+        if crate::services::agent_active_jobs::cancel_requested(&tasks_dir, &job_id) {
+            let _ = AgentJobService::cancel_job(&job_id);
+        }
         if should_stop_job(&job_id)
             && let Ok(mut c) = child.lock()
         {
@@ -2154,6 +2214,7 @@ fn read_job_output(
 struct RunningJobSlot<'a> {
     job_id: &'a str,
     ticket_id: &'a str,
+    tasks_dir: &'a std::path::Path,
 }
 
 impl Drop for RunningJobSlot<'_> {
@@ -2161,6 +2222,7 @@ impl Drop for RunningJobSlot<'_> {
         // All process/output teardown and context writes precede ownership transfer.
         // Keep this slot counted while cancellation automation schedules a successor.
         finalize_cancelled_job(self.job_id);
+        crate::services::agent_active_jobs::unregister(self.tasks_dir, self.job_id);
         if let Ok(mut registry) = JOB_REGISTRY.lock() {
             if registry
                 .active_by_ticket
@@ -2808,6 +2870,41 @@ fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
 
 /// Record-then-stream pair for SSE-visible job events. Log-only kinds
 /// (agent_job_raw/init/result) stay on bare `push_event`.
+/// Finished jobs stay in memory for a day (status, events for the UI) and
+/// at most `MAX_FINISHED_JOBS` of them, so a long-running server doesn't
+/// grow without bound (DEV-279). Their logs stay on disk.
+const MAX_FINISHED_JOBS: usize = 500;
+
+fn prune_finished_jobs(registry: &mut JobRegistry) {
+    let cutoff = Utc::now() - chrono::Duration::hours(24);
+    let finished_at = |state: &AgentJobState| {
+        state
+            .record
+            .finished_at
+            .as_deref()
+            .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+            .map(|at| at.with_timezone(&Utc))
+    };
+    let mut finished: Vec<(chrono::DateTime<Utc>, String)> = registry
+        .jobs
+        .iter()
+        .filter(|(_, state)| {
+            matches!(
+                state.record.status,
+                AgentJobStatus::Completed | AgentJobStatus::Failed | AgentJobStatus::Cancelled
+            ) && state.runtime.is_none()
+        })
+        .filter_map(|(id, state)| finished_at(state).map(|at| (at, id.clone())))
+        .collect();
+    finished.sort();
+    let over = finished.len().saturating_sub(MAX_FINISHED_JOBS);
+    for (index, (at, id)) in finished.into_iter().enumerate() {
+        if index < over || at < cutoff {
+            registry.jobs.remove(&id);
+        }
+    }
+}
+
 fn record_and_emit(
     state: &mut AgentJobState,
     kind: &str,

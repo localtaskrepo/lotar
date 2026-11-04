@@ -230,10 +230,19 @@ impl AgentQueueService {
                 if capacity > 0 {
                     let entries = dequeue_entries(tasks_dir, capacity)?;
                     for entry in entries {
-                        if let Err(err) = start_entry(tasks_dir, entry.clone())
-                            && !requeue_entry(tasks_dir, entry)?
-                        {
-                            exhausted_error = Some(err);
+                        match start_entry(tasks_dir, entry.clone()) {
+                            Ok(()) => {}
+                            // The ticket's previous job is still running
+                            // (maybe in another process): wait for it rather
+                            // than spend retries (DEV-279).
+                            Err(err) if is_ticket_busy(&err) => {
+                                requeue_entry_unchanged(tasks_dir, &entry)?;
+                            }
+                            Err(err) => {
+                                if !requeue_entry(tasks_dir, entry)? {
+                                    exhausted_error = Some(err);
+                                }
+                            }
                         }
                     }
                 }
@@ -256,6 +265,13 @@ impl AgentQueueService {
             }
             thread::sleep(Duration::from_millis(WORKER_POLL_MS));
         }
+        // An entry queued while this worker was exiting saw the lock held and
+        // spawned no worker; start the next one now (DEV-279).
+        let _ = lock_file.unlock();
+        drop(lock_file);
+        if pending_count(tasks_dir).unwrap_or(0) > 0 {
+            let _ = Self::ensure_worker(tasks_dir);
+        }
         result
     }
 }
@@ -272,6 +288,23 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
     let _ =
         AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;
     Ok(())
+}
+
+fn is_ticket_busy(err: &LoTaRError) -> bool {
+    err.to_string().contains("already has an active job")
+}
+
+/// Put an entry back without counting an attempt.
+fn requeue_entry_unchanged(tasks_dir: &Path, entry: &AgentQueueEntry) -> LoTaRResult<()> {
+    with_locked_queue(tasks_dir, |state| {
+        if !state.pending.iter().any(|item| {
+            item.ticket_id == entry.ticket_id
+                && item.agent == entry.agent
+                && item.runner == entry.runner
+        }) {
+            state.pending.push(entry.clone());
+        }
+    })
 }
 
 fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<bool> {
@@ -429,11 +462,11 @@ fn worker_lock_path(tasks_dir: &Path) -> Option<PathBuf> {
     Some(queue_dir().join(format!("worker-{hash}.lock")))
 }
 
-fn queue_dir() -> PathBuf {
+pub(crate) fn queue_dir() -> PathBuf {
     queue_base_dir().join("agent-queue")
 }
 
-fn queue_hash(tasks_dir: &Path) -> String {
+pub(crate) fn queue_hash(tasks_dir: &Path) -> String {
     let raw = tasks_dir.to_string_lossy();
     let hash = blake3::hash(raw.as_bytes());
     hash.to_hex().to_string()

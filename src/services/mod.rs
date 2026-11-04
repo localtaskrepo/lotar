@@ -1,3 +1,4 @@
+pub mod agent_active_jobs;
 pub mod agent_context_service;
 pub mod agent_job_service;
 pub mod agent_log_service;

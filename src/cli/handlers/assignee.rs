@@ -164,7 +164,7 @@ fn handle_set_assignee(
 
     // If an agent job is already running for this ticket, changing assignee would
     // disrupt the automation lifecycle. Require the user to cancel the job first.
-    if let Some(job) = running_job_for_ticket(full_id)
+    if let Some(job) = running_job_for_ticket(&ctx.tasks_dir.path, full_id)
         && !current_agent_job_matches_ticket(full_id)
     {
         if let Some(job_id) = job.job_id.as_deref() {

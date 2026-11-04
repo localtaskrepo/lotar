@@ -92,16 +92,25 @@ pub fn effective_logs_dir(tasks_dir: &Path, configured: Option<&str>) -> Option<
 
 /// Keep logs out of version control and drop the oldest beyond the limit.
 fn prepare_logs_dir(dir: &Path) {
+    // The `*` .gitignore only goes into a folder that holds nothing but job
+    // logs, so pointing agent_logs_dir at an existing folder can't hide its
+    // other files from git (DEV-279).
     let ignore = dir.join(".gitignore");
-    if !ignore.exists() {
+    let only_logs = fs::read_dir(dir).is_ok_and(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .all(|entry| is_job_log(&entry.path()))
+    });
+    if !ignore.exists() && only_logs {
         let _ = fs::write(&ignore, "# Agent job logs written by LoTaR\n*\n");
     }
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
+    // Only LoTaR's own job logs are pruned.
     let mut logs: Vec<(std::time::SystemTime, PathBuf)> = entries
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "jsonl"))
+        .filter(|entry| is_job_log(&entry.path()))
         .filter_map(|entry| {
             let modified = entry.metadata().ok()?.modified().ok()?;
             Some((modified, entry.path()))
@@ -339,11 +348,33 @@ impl AgentLogService {
 /// Resolve the logs directory path. Supports both relative and absolute paths.
 fn resolve_logs_dir(workspace_root: &Path, logs_dir: &str) -> PathBuf {
     let logs_path = Path::new(logs_dir);
-    if logs_path.is_absolute() {
+    let resolved = if logs_path.is_absolute() {
         logs_path.to_path_buf()
     } else {
         workspace_root.join(logs_dir)
+    };
+    // Never the workspace root itself: LoTaR writes a `*` .gitignore into
+    // its logs folder (DEV-279). `agent_logs_dir: .` gets a subfolder.
+    let same = |a: &Path, b: &Path| {
+        a.canonicalize()
+            .ok()
+            .zip(b.canonicalize().ok())
+            .is_some_and(|(a, b)| a == b)
+    };
+    if same(&resolved, workspace_root) {
+        resolved.join("lotar-agent-logs")
+    } else {
+        resolved
     }
+}
+
+/// A job log LoTaR wrote: `job-<id>.jsonl`.
+fn is_job_log(path: &Path) -> bool {
+    path.extension().is_some_and(|ext| ext == "jsonl")
+        && path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("job-"))
 }
 
 fn resolve_log_path(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<PathBuf> {

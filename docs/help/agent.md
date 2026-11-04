@@ -171,11 +171,17 @@ agents:
 
 The server only offers the tools a job needs: `task_get`, `task_list`, `task_update`, `task_comment_add`, `task_reference_add`, `relationship_graph`, `config_show` and `whoami` (set through `LOTAR_MCP_TOOLS`, which `lotar mcp` honours in general). An agent can't start other agents (including by assigning a ticket to an agent profile), delete tasks or sync through it. This limits the MCP tools only: the agent still has a shell and `lotar` on its PATH, so it is not a security boundary. Because the server is named `lotar`, it takes the place of a LoTaR server with that name in the CLI's own settings for the job, which would point at a different tasks directory or build. Other runners don't support the switch; their jobs log a note and use the CLI.
 
-## list-running requirements
+## Jobs in other processes
 
-`lotar agent list-running` discovers running jobs by scanning for the wrapper process name. This requires the wrapper binary to be available in the same directory as `lotar` or on `PATH` (or set `LOTAR_AGENT_WRAPPER` to an absolute path).
+A job runs inside the process that started it: `lotar serve`, the background queue worker, an MCP session, or `lotar agent run --wait`. Each running job also leaves a small record next to the agent queue (in `LOTAR_AGENT_QUEUE_DIR`, `$XDG_RUNTIME_DIR/lotar` or your cache directory), so any other `lotar` process for the same tasks directory can:
 
-If the wrapper is not available, jobs can still run, but `list-running` will show no results.
+- list it with `lotar agent list-running` and show it with `lotar agent status <JOB_ID>`
+- cancel it with `lotar agent cancel <JOB_ID>`; the owning process stops the agent and finishes the job as cancelled, so `job_cancelled` automation runs
+- refuse `lotar status` and `lotar assignee` changes on its ticket, and skip its worktree in `lotar agent worktree cleanup`
+
+Records of a process that died are ignored and cleaned up. When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
+
+`list-running` also lists `lotar-agent-wrapper` processes if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`).
 
 ## Environment variables
 
@@ -319,7 +325,7 @@ Worktrees with active jobs are never removed, even with `--all`. Cleanup refuses
 
 Default CLI cleanup and all automatic cleanup require a readable, valid ticket in a configured done state. Missing, malformed, unreadable, or unknown-status tickets are preserved, even with `--all`. Failure/cancellation cleanup settings only enable cleanup when that same done-state and Git safety check succeeds.
 
-The queue worker drains pending entries and waits for dispatched jobs, including finalization, before exiting. It also waits for dispatched jobs if queue/config processing fails. There is no single-poll `--once` mode. Start failures retain the existing bounded retry policy (three retries), with exhausted retries reported as an error after draining; failed runner jobs are terminal rather than automatically rerun.
+The queue worker drains pending entries and waits for dispatched jobs, including finalization, before exiting. It also waits for dispatched jobs if queue/config processing fails. There is no single-poll `--once` mode. Start failures retain the existing bounded retry policy (three retries), with exhausted retries reported as an error after draining; failed runner jobs are terminal rather than automatically rerun. A ticket whose previous job is still running (in any process) is not a failure: the entry waits in the queue until that job ends.
 
 Cancelling a dispatched job requests termination immediately, but cancellation automation and reassignment wait until process/output teardown and context persistence finish. The job retains its capacity slot through finalization, so a replacement is queued safely and cancellation automation runs once. Cancelling an undispatched queued job finalizes immediately.
 
@@ -333,7 +339,7 @@ Agent lifecycle automation lives in the automation rules file. Without a rule, a
 
 - Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running. Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.
 - Context history is persisted to `<project>/<ticket><extension>` files next to each ticket.
-- Job events are persisted to `<tasks dir>/@agent-logs/<JOB_ID>.jsonl` by default (`agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR` picks another folder; `off` turns it off). LoTaR writes a `.gitignore` into the folder so logs, which contain prompts and agent output, aren't committed, and keeps the newest 500 job logs.
+- Job events are persisted to `<tasks dir>/@agent-logs/<JOB_ID>.jsonl` by default (`agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR` picks another folder; `off` turns it off). LoTaR writes a `.gitignore` into the folder so logs, which contain prompts and agent output, aren't committed, and keeps the newest 500 job logs. The `.gitignore` is only written when the folder holds nothing but job logs, only `job-*.jsonl` files are ever pruned, and a setting that names the workspace root itself (`agent.logs_dir: .`) uses a `lotar-agent-logs` subfolder.
 - `lotar agent status`, `lotar agent logs` and `lotar agent list-jobs` read these files when the job isn't in the current process.
 - Assigning a ticket to an agent profile (e.g., `@claude-review`) automatically queues a job for that ticket.
 - Review-stage tickets can only be advanced by their reporter when the change would alter assignee or status.

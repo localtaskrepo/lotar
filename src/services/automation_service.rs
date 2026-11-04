@@ -2580,12 +2580,20 @@ fn maybe_queue_agent_on_assignment(
 }
 
 /// Count how many jobs have reached a terminal state (completed/failed) for the given ticket.
+/// Terminal jobs on this ticket that finished in the last day. A window
+/// keeps the loop guard from blocking a ticket forever in a long-running
+/// server (DEV-279); loops run within minutes.
 fn count_terminal_jobs_for_ticket(ticket_id: &str) -> usize {
+    let since = chrono::Utc::now() - chrono::Duration::hours(24);
     AgentJobService::list_jobs()
         .iter()
         .filter(|j| {
             crate::storage::identity::aliases_match(&j.ticket_id, ticket_id)
                 && (j.status == "completed" || j.status == "failed")
+                && j.finished_at
+                    .as_deref()
+                    .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+                    .is_none_or(|at| at.with_timezone(&chrono::Utc) >= since)
         })
         .count()
 }

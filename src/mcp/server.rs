@@ -656,6 +656,9 @@ pub fn run_stdio_server() {
                 if let Ok(Ok(m)) = std::fs::metadata(&exe_path).map(|m| m.modified())
                     && m > initial
                 {
+                    crate::services::agent_job_service::AgentJobService::shutdown_jobs(
+                        Duration::from_secs(10),
+                    );
                     std::process::exit(0);
                 }
             }
@@ -704,6 +707,9 @@ pub fn run_stdio_server() {
         let outcome = process_wire_text(&session, trimmed);
         write_wire_outcome(&stdout, &session, outcome);
     }
+    // Jobs started here live in this process; cancel and finalize them
+    // instead of leaving the agents running unsupervised (DEV-279).
+    crate::services::agent_job_service::AgentJobService::shutdown_jobs(Duration::from_secs(10));
 }
 
 fn process_wire_text(session: &McpSession, raw: &str) -> WireOutcome {

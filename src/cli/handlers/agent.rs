@@ -52,9 +52,9 @@ impl AgentHandler {
             AgentAction::Run(args) => Self::run(args, resolver, renderer),
             AgentAction::Status { id } => Self::status(&id, resolver, renderer),
             AgentAction::Logs { id } => Self::logs(&id, resolver, renderer),
-            AgentAction::Cancel { id } => Self::cancel(&id, renderer),
+            AgentAction::Cancel { id } => Self::cancel(&id, resolver, renderer),
             AgentAction::Check(args) => Self::check(&args, project, resolver, renderer),
-            AgentAction::ListRunning => Self::list_running(renderer),
+            AgentAction::ListRunning => Self::list_running(resolver, renderer),
             AgentAction::ListJobs(args) => Self::list_jobs(&args, resolver, renderer),
             AgentAction::Queue(args) => Self::queue(args, resolver, renderer),
             AgentAction::Worktree(args) => match args.action {
@@ -179,6 +179,28 @@ impl AgentHandler {
             return Ok(());
         }
 
+        // Running in another process (server, queue worker, MCP session).
+        if let Some(active) = crate::services::agent_active_jobs::find(&resolver.path, id) {
+            if matches!(renderer.format, OutputFormat::Json) {
+                renderer.emit_json(&serde_json::json!({ "job": {
+                    "id": active.job_id,
+                    "ticket_id": active.ticket_id,
+                    "runner": active.runner,
+                    "agent": active.agent,
+                    "status": "running",
+                    "started_at": active.started_at,
+                    "owner_pid": active.owner_pid,
+                }}));
+            } else {
+                renderer.emit_success(format!(
+                    "Job {}: running (in process {})",
+                    active.job_id, active.owner_pid
+                ));
+                renderer.emit_info(format!("Ticket: {}", active.ticket_id));
+            }
+            return Ok(());
+        }
+
         // Fall back to persisted log file (if logging is enabled)
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
@@ -287,8 +309,37 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn cancel(id: &str, renderer: &OutputRenderer) -> Result<(), String> {
-        let job = AgentJobService::cancel_job(id).map_err(|e| e.to_string())?;
+    fn cancel(
+        id: &str,
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+    ) -> Result<(), String> {
+        let mut job = AgentJobService::cancel_job(id).map_err(|e| e.to_string())?;
+        // Jobs run by another process (server, queue worker, MCP session):
+        // ask that process to cancel and wait for it to finish (DEV-279).
+        if job.is_none() && crate::services::agent_active_jobs::request_cancel(&resolver.path, id) {
+            let deadline = Instant::now() + Duration::from_secs(15);
+            while crate::services::agent_active_jobs::find(&resolver.path, id).is_some()
+                && Instant::now() < deadline
+            {
+                thread::sleep(Duration::from_millis(200));
+            }
+            let still_running =
+                crate::services::agent_active_jobs::find(&resolver.path, id).is_some();
+            if matches!(renderer.format, OutputFormat::Json) {
+                renderer.emit_json(&serde_json::json!({
+                    "job": { "id": id, "status": if still_running { "cancelling" } else { "cancelled" } }
+                }));
+            } else if still_running {
+                renderer.emit_warning(format!(
+                    "Asked the process running job {id} to cancel it; it has not stopped yet"
+                ));
+            } else {
+                renderer.emit_success(format!("Job {id}: cancelled"));
+            }
+            return Ok(());
+        }
+        let _ = &mut job;
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({ "job": job }));
             return Ok(());
@@ -301,8 +352,11 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn list_running(renderer: &OutputRenderer) -> Result<(), String> {
-        let jobs = list_running_jobs();
+    fn list_running(
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+    ) -> Result<(), String> {
+        let jobs = list_running_jobs(Some(&resolver.path));
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({ "jobs": jobs }));
             return Ok(());
@@ -433,7 +487,11 @@ impl AgentHandler {
                 let pending =
                     AgentQueueService::list_pending(tasks_dir).map_err(|e| e.to_string())?;
                 let worker_running = AgentQueueService::is_worker_running(tasks_dir);
-                let stats = AgentJobService::queue_stats();
+                let mut stats = AgentJobService::queue_stats();
+                // Count jobs other processes run too (DEV-279).
+                stats.running = stats
+                    .running
+                    .max(crate::services::agent_active_jobs::list(tasks_dir).len());
 
                 if matches!(renderer.format, OutputFormat::Json) {
                     let entries: Vec<_> = pending
@@ -702,7 +760,7 @@ impl AgentHandler {
             if done_state.is_none()
                 || (!args.all && done_state != Some(true))
                 || AgentJobService::has_active_job(&wt.ticket_id)
-                || running_job_for_ticket(&wt.ticket_id).is_some()
+                || running_job_for_ticket(&resolver.path, &wt.ticket_id).is_some()
             {
                 errors.push(format!(
                     "{}: ticket state changed or a job is active",
@@ -855,7 +913,7 @@ fn list_agent_worktrees(
         let done_state =
             crate::services::agent_job_service::ticket_done_state(&resolver.path, &ticket_id);
         let has_active_job = AgentJobService::has_active_job(&ticket_id)
-            || running_job_for_ticket(&ticket_id).is_some();
+            || running_job_for_ticket(&resolver.path, &ticket_id).is_some();
 
         results.push(WorktreeInfo {
             path,
@@ -930,21 +988,55 @@ pub(crate) fn running_job_matches(job_ticket: &str, needle: &str) -> bool {
     crate::storage::identity::aliases_match(job_ticket, needle)
 }
 
-pub(crate) fn running_job_for_ticket(ticket_id: &str) -> Option<RunningAgentJob> {
+pub(crate) fn running_job_for_ticket(
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+) -> Option<RunningAgentJob> {
     let needle = ticket_id.trim();
     if needle.is_empty() {
         return None;
     }
-    list_running_jobs().into_iter().find(|job| {
+    list_running_jobs(Some(tasks_dir)).into_iter().find(|job| {
         job.ticket_id
             .as_deref()
             .is_some_and(|value| running_job_matches(value, needle))
     })
 }
 
-fn list_running_jobs() -> Vec<RunningAgentJob> {
+/// Running jobs: the shared records of this tasks directory (any process,
+/// no wrapper needed; DEV-279) plus any `lotar-agent-wrapper` processes.
+fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob> {
+    let mut jobs: Vec<RunningAgentJob> = tasks_dir
+        .map(crate::services::agent_active_jobs::list)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|job| RunningAgentJob {
+            pid: job.child_pid,
+            job_id: Some(job.job_id),
+            ticket_id: Some(job.ticket_id),
+            runner: Some(job.runner),
+        })
+        .collect();
+    for wrapper in list_wrapper_processes() {
+        let known = wrapper.job_id.is_some() && jobs.iter().any(|job| job.job_id == wrapper.job_id);
+        if !known {
+            jobs.push(wrapper);
+        }
+    }
+    jobs
+}
+
+fn list_wrapper_processes() -> Vec<RunningAgentJob> {
     let mut system = System::new();
-    system.refresh_processes(ProcessesToUpdate::All, true);
+    // The command line is not refreshed by default; the wrapper's job and
+    // ticket ids are read from it (DEV-279).
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        sysinfo::ProcessRefreshKind::nothing()
+            .with_cmd(sysinfo::UpdateKind::Always)
+            .with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+    );
 
     system
         .processes()
