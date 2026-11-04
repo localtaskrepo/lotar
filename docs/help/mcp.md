@@ -54,8 +54,7 @@ Sessions follow the MCP initialize → initialized handshake:
   "result": {
     "protocolVersion": "2025-06-18",
     "capabilities": {
-      "tools": { "listChanged": true },
-      "logging": {}
+      "tools": { "listChanged": true }
     },
     "serverInfo": { "name": "lotar-mcp", "version": "0.8.0" },
     "instructions": "Lotar MCP server exposes task, project, config, and agent tools."
@@ -72,12 +71,16 @@ Notes:
 
 ## Tool Surface
 
-The registry binds all 38 advertised tools to their handlers; `tools/list` returns exactly this set (see [MCP Tools Reference](./mcp-tools.md) for full schemas):
+The registry binds every advertised tool to its handler; `tools/list` returns exactly this set (see [MCP Tools Reference](./mcp-tools.md) for full schemas):
 
 | Tool | Purpose |
 |------|---------|
 | `whoami` | Resolve the identity used for `@me` (with optional explain output). |
 | `task_create` | Create a task with optional type/priority/status overrides and custom fields. |
+| `relationship_graph` | Bounded relationship graph snapshot (nodes, edges, issues) for a project or task. |
+| `relationship_check` | Report invalid targets, one-sided links, conflicting parents and cycles. |
+| `relationship_mutate` | Add, remove or change the kind of one relationship, updating both sides together. |
+| `relationship_repair` | Preview, then apply, conservative relationship repairs. |
 | `task_get` | Fetch a task by id (project inferred or provided). |
 | `task_update` | Patch mutable fields, relationships, and custom fields. |
 | `task_comment_add` | Append a comment to a task. |
@@ -104,6 +107,7 @@ The registry binds all 38 advertised tools to their handlers; `tools/list` retur
 | `sprint_remove` | Remove tasks from a sprint (optionally scoped). |
 | `sprint_delete` | Delete a sprint by id and optionally clean dangling references. |
 | `sprint_backlog` | Return ranked backlog tasks with pagination and hints. |
+| `sprint_reorder` | Move a task before or after another within a sprint or the backlog. |
 | `project_list` | Enumerate known projects. |
 | `project_stats` | Aggregate stats for a single project. |
 | `config_show` | Render merged config (global or per project). |
@@ -124,7 +128,7 @@ Handshake/control methods include:
 - tools/list -> { tools: [{ name, description, inputSchema }] }
 - schema/discover(params?: { tool?: string }) -> same payload as tools/list but filtered
 - tools/call (params: { name, arguments }) -> result of the named tool; unknown names — including control-plane methods — return `-32602` `Unknown tool: <name>`
-- logging/setLevel(params: { level }) -> acknowledgement after recording the requested level
+- logging/setLevel(params: { level }) -> `{}` for an MCP log level (`debug`, `info`, `notice`, `warning`, `error`, `critical`, `alert`, `emergency`), `-32602` otherwise. The server sends no log messages and does not advertise the `logging` capability; the method is accepted for hosts that call it anyway.
 
 Notifications:
 - `notifications/tools/list_changed` is emitted whenever `.tasks/` metadata or config changes alter enum hints (`hintCategories` identifies which values changed). The notification method is `notifications/tools/list_changed`; the capability key advertised in the `initialize` response remains `tools.listChanged`. Hosts should call `tools/list` again when they receive this event.
@@ -168,7 +172,7 @@ Protocol errors are JSON-RPC error responses (`error.code`, `error.message`, opt
 |------|---------|
 | `-32700` | Parse error — text that is not valid JSON, bad framing, or an oversized frame. Answered with `id: null`. |
 | `-32600` | Invalid Request — valid JSON that is not a valid JSON-RPC request envelope: a top-level array or string, wrong `jsonrpc`/`method`, an invalid `id` (null, bool, object, array, or fractional number), or non-object `params`. The `id` is echoed when it is valid. |
-| `-32602` | Invalid params. Covers malformed `initialize` params (`error.data.tool: "initialize"`), tool arguments that fail the tool's advertised schema — missing required arguments, unknown fields, type/enum violations — reported with `error.data.tool` and `error.data.issues`, and unknown tool names under `tools/call` (`Unknown tool: <name>`). Control-plane methods such as `initialize` and `tools/list` are not callable as tools. |
+| `-32602` | Invalid params. Covers malformed `initialize` params (`error.data.tool: "initialize"`), tool arguments that fail the tool's advertised schema — missing required arguments, unknown fields, type/enum violations — reported with `error.data.tool` and `error.data.issues` — status, priority and type values the task's project does not allow (with `error.data.field` and `error.data.suggestions`, as documented per tool in the [MCP Tools Reference](./mcp-tools.md)), and unknown tool names under `tools/call` (`Unknown tool: <name>`). Control-plane methods such as `initialize` and `tools/list` are not callable as tools. |
 | `-32601` | Method not found — unknown direct method. |
 | `-32002` | Server not initialized — an operational request arrived before `notifications/initialized`; it is rejected before any dispatch or side effects. |
 
@@ -220,4 +224,4 @@ lotar mcp
 - Operational requests rejected with `-32002` mean the handshake has not completed: send `initialize`, wait for the result, then send `notifications/initialized` before calling tools.
 - The server exits (code 0) when the `lotar` binary changes so a supervising host can relaunch it. Set `LOTAR_MCP_AUTORELOAD=0` if your host already manages restarts.
 - If you see "Method not found", verify the `method` matches one of the tools (names accept either `task/list` or `task_list`).
-- For payload validation issues, inspect `error.data.details` for enum hints or schema messages.
+- For arguments that fail a tool's schema, `error.data.issues` lists what failed. Enum values a project does not allow come back as `-32602` with `error.data.suggestions` (the valid values). `error.data.details` is only set for JSON parse errors (`-32700`).

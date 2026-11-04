@@ -225,7 +225,7 @@ fn mcp_logging_set_level_acknowledged() {
         "jsonrpc": "2.0",
         "id": 2,
         "method": "logging/setLevel",
-        "params": {"level": "warn"}
+        "params": {"level": "warning"}
     });
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
@@ -234,6 +234,19 @@ fn mcp_logging_set_level_acknowledged() {
         resp.get("error").is_none(),
         "logging/setLevel should be accepted: {resp}"
     );
+
+    // Levels outside the MCP set are invalid params (DEV-280).
+    for level in ["warn", "trace", "off"] {
+        let req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "logging/setLevel",
+            "params": {"level": level}
+        });
+        let resp_line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&req).unwrap());
+        let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
+        assert_eq!(resp["error"]["code"], -32602, "{level}: {resp}");
+    }
 }
 
 #[test]

@@ -1653,7 +1653,7 @@ fn make_agent_cancel_tool() -> Value {
 fn make_agent_send_message_tool() -> Value {
     json!({
         "name": "agent_send_message",
-        "description": "Send a follow-up message to a running agent job via stdin. Only supported for runners that accept stdin input (Claude, Copilot). Returns updated job details.",
+        "description": "Send a follow-up message to a running agent job via stdin. Only supported for runners that accept stdin input (currently Claude). Returns updated job details.",
         "inputSchema": {
             "type": "object",
             "properties": {

@@ -1,6 +1,6 @@
 //! Authoritative MCP tool registry (DEV-63).
 //!
-//! One table binds every advertised tool definition (the 38 entries emitted by
+//! One table binds every advertised tool definition (every entry emitted by
 //! `tools::build_tool_definitions`) to its handler and both documented direct
 //! wire aliases: the canonical snake_case tool name (`task_create`) and the
 //! slash method (`task/create`).

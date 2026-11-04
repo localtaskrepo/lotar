@@ -1,13 +1,21 @@
 title: 'MCP protocol details and docs: error codes, logging capability, stale tool counts'
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:37.322793+00:00
-modified: 2026-10-31T22:06:37.385467+00:00
+modified: 2026-11-04T05:24:24.625716+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T05:24:24.588163+00:00
+  text: |-
+    1+4. docs/help/mcp.md: the tool table now lists all advertised tools (added relationship_graph/check/mutate/repair and sprint_reorder) and drops the stale count. registry.rs no longer names a number. Troubleshooting says error.data.issues holds schema failures, error.data.suggestions holds project enum failures, and error.data.details only appears for -32700 parse errors. agent_send_message's description says Claude only. agent.md lists all 11 runners instead of four. New tests/dev280_mcp_docs_test.rs fails when the table and tools/list drift.
+    2. Declined, with a reason: -32602 for project-enum failures is the documented per-tool contract (mcp-tools.md for task_create/update/list/backlog: '-32602 with error.data.suggestions'), and hosts and tests depend on it. The valid values are in the message and data. mcp.md's error table now names this case explicitly, so it no longer reads as a domain error.
+    3. initialize no longer advertises the logging capability, since the server never sends notifications/message. The unused LOG_LEVEL was removed. logging/setLevel accepts only the MCP levels (debug..emergency) and returns -32602 otherwise. mcp_server_unit_test covers this, and dev280 checks the capability is gone.
+    Tests: 43 MCP tests pass (unit, wire lifecycle, dev280); clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -48,3 +56,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T04:31:09.050120+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T05:24:24.588163+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T05:24:24.625716+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

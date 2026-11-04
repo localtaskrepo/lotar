@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, RwLock, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
 /// Unwrap a `Result<T, JsonRpcResponse>`, returning the error response.
@@ -154,21 +154,19 @@ fn normalize_method(name: &str) -> String {
     }
 }
 
-static LOG_LEVEL: OnceLock<RwLock<String>> = OnceLock::new();
 static USE_FRAMED_OUTPUT: AtomicBool = AtomicBool::new(false);
 
-fn set_log_level(level: &str) {
-    let lvl = level.to_ascii_lowercase();
-    let valid = matches!(
-        lvl.as_str(),
-        "trace" | "debug" | "info" | "warn" | "error" | "off"
-    );
-    let final_level = if valid { lvl } else { "info".to_string() };
-    let cell = LOG_LEVEL.get_or_init(|| RwLock::new("info".to_string()));
-    if let Ok(mut guard) = cell.write() {
-        *guard = final_level;
-    }
-}
+/// The log levels MCP defines (RFC 5424 severities).
+const MCP_LOG_LEVELS: [&str; 8] = [
+    "debug",
+    "info",
+    "notice",
+    "warning",
+    "error",
+    "critical",
+    "alert",
+    "emergency",
+];
 
 /// Classify a domain-service error for MCP tool responses: expected domain
 /// failures (validation, not-found, invalid references) use the custom
@@ -442,15 +440,22 @@ fn route_request(
         // tools/call -> resolve the tool in the registry, validate arguments
         // against the advertised schema, then invoke its handler.
         "tools/call" => handle_tools_call(id, &params),
-        // logging/setLevel -> accept the requested level and ack
-        "logging/setLevel" => {
-            let level = params
-                .get("level")
-                .and_then(|v| v.as_str())
-                .unwrap_or("info");
-            set_log_level(level);
-            ok(Some(id), json!({}))
-        }
+        // logging/setLevel: the server sends no log messages and does not
+        // advertise the logging capability (DEV-280). Older hosts still call
+        // it, so a valid MCP level is acknowledged; anything else is invalid.
+        "logging/setLevel" => match params.get("level").and_then(|v| v.as_str()) {
+            Some(level) if MCP_LOG_LEVELS.contains(&level) => ok(Some(id), json!({})),
+            other => err(
+                Some(id),
+                -32602,
+                &format!(
+                    "Invalid log level {}; use one of: {}",
+                    other.map_or_else(|| "(missing)".to_string(), |l| format!("'{l}'")),
+                    MCP_LOG_LEVELS.join(", ")
+                ),
+                Some(json!({ "issues": ["params.level must be an MCP log level"] })),
+            ),
+        },
         "schema/discover" => handle_schema_discover(id, &params),
         _ => match registry::find_tool_by_method(&method_key) {
             // Direct method calls obey LOTAR_MCP_TOOLS like tools/call does
@@ -512,9 +517,7 @@ fn initialize_response(id: Value) -> JsonRpcResponse {
             "capabilities": {
                 // Tools with listChanged notifications when config/project
                 // metadata updates.
-                "tools": { "listChanged": true },
-                // Logging support so hosts can subscribe if desired.
-                "logging": {}
+                "tools": { "listChanged": true }
             },
             "serverInfo": {
                 "name": "lotar-mcp",
