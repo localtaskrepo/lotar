@@ -166,6 +166,7 @@ A pulled status, priority or type must exist in the project. If it does not, tha
 
 **Jira**
 
+- Pulls never turn task IDs mentioned in remote text into `related` links: `ENG-2` in a Jira description is a Jira key, not your local task `ENG-2`.
 - Descriptions become Markdown-style text on pull: blank lines between paragraphs, `- ` and `1. ` lists, `#` headings, fenced code, `> ` quotes and `[text](url)` links. Mentions, emoji, dates and status labels become plain text. A push turns the text back into Jira's format. Bold, colors and mention links are lost when you edit a description locally and push it.
 - A push changes the Jira status through a workflow transition. The mapped status value must match the name of a transition that is available for the issue.
 - New issues get the `Task` issue type unless you map `type`. If the mapped type does not exist in the Jira project, LoTaR uses `Task` and warns.

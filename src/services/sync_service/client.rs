@@ -197,10 +197,41 @@ pub(super) fn send_json_request(
 
     let code = resp.status().as_u16();
     if code >= 400 {
+        let header = |name: &str| {
+            resp.headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string)
+        };
+        let retry_after = header("retry-after");
+        let remaining = header("x-ratelimit-remaining");
+        let reset = header("x-ratelimit-reset");
         let payload = resp
             .body_mut()
             .read_to_string()
             .unwrap_or_else(|_| String::new());
+        // Rate limits say when to try again instead of a bare HTTP error
+        // (DEV-286).
+        let limited = code == 429
+            || (code == 403
+                && (remaining.as_deref() == Some("0")
+                    || retry_after.is_some()
+                    || payload.to_ascii_lowercase().contains("rate limit")));
+        if limited {
+            let when = retry_after
+                .and_then(|s| s.trim().parse::<u64>().ok())
+                .map(|secs| format!("retry in {secs} s"))
+                .or_else(|| {
+                    reset
+                        .and_then(|s| s.trim().parse::<i64>().ok())
+                        .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0))
+                        .map(|at| format!("the limit resets at {}", at.to_rfc3339()))
+                })
+                .unwrap_or_else(|| "retry later".to_string());
+            return Err(LoTaRError::ValidationError(format!(
+                "Remote API rate limit reached (HTTP {code}); {when}. Nothing after this point was synced."
+            )));
+        }
         let message = payload.trim();
         let detail = if message.is_empty() {
             format!("Remote API error (HTTP {})", code)

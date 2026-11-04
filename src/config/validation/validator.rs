@@ -950,6 +950,29 @@ impl ConfigValidator {
                             "GitHub repo should look like owner/repo".to_string(),
                         ));
                     }
+                    // Mappings to fields GitHub pushes can't write were
+                    // silently ignored (DEV-286).
+                    for (local, mapping) in &remote.mapping {
+                        let target = match mapping {
+                            crate::config::types::SyncFieldMapping::Simple(field) => field.clone(),
+                            crate::config::types::SyncFieldMapping::Detailed(detail) => {
+                                detail.field.clone().unwrap_or_else(|| local.clone())
+                            }
+                        };
+                        let target = target.trim().to_ascii_lowercase();
+                        if !target.is_empty()
+                            && !crate::services::sync_service::GITHUB_PUSH_FIELDS
+                                .contains(&target.as_str())
+                        {
+                            result.add_error(ValidationError::warning(
+                                Some(format!("remotes.{trimmed}.mapping.{local}")),
+                                format!(
+                                    "GitHub field '{target}' is pulled but never pushed; pushable fields: {}",
+                                    crate::services::sync_service::GITHUB_PUSH_FIELDS.join(", ")
+                                ),
+                            ));
+                        }
+                    }
                 }
             }
         }

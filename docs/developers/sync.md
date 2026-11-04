@@ -186,7 +186,8 @@ How to get Jira values:
 ### GitHub
 
 - Use a PAT or GitHub App token.
-- Issue `state` is `open|closed`, and `state_reason` can be set when closing.
+- Issue `state` is `open|closed`, and a mapping to `state_reason` (`completed`, `not_planned`, `reopened`) is sent along with a state change. Pushes can write `title`, `body`, `state`, `state_reason`, `labels` and `assignees`; `config validate` / `sync check` warn about mappings to other GitHub fields, which are pulled but never pushed.
+- Pulls page through the search API and use the search results directly (no per-issue refetch). A rate limit (HTTP 429, or 403 with `X-RateLimit-Remaining: 0`) stops the run with the time to retry.
 
 How to get GitHub values:
 - `token_env`: create a Personal Access Token in GitHub → Settings → Developer settings → Personal access tokens. Store the token directly or set an env var name.

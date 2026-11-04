@@ -19,6 +19,9 @@ pub(super) fn perform_pull(
         warnings,
         journal,
     } = sinks;
+    // Remote text mentions remote keys; never link them to local tasks that
+    // happen to share the ID (DEV-286).
+    let _no_mention_links = crate::services::task_service::MentionLinkingPaused::new();
     if remote.provider == SyncProvider::Github
         && remote.repo.as_deref().unwrap_or("").trim().is_empty()
     {

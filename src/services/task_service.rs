@@ -23,6 +23,36 @@ use crate::utils::tags::normalize_tags;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
+thread_local! {
+    static MENTION_LINKING_PAUSED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// While alive, task writes on this thread don't turn mentioned IDs into
+/// `related` links. Sync pulls hold one (DEV-286): a Jira key such as
+/// ENG-2 in a remote description is not the local task ENG-2.
+pub struct MentionLinkingPaused {
+    previous: bool,
+}
+
+impl MentionLinkingPaused {
+    pub fn new() -> Self {
+        let previous = MENTION_LINKING_PAUSED.with(|paused| paused.replace(true));
+        Self { previous }
+    }
+}
+
+impl Default for MentionLinkingPaused {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for MentionLinkingPaused {
+    fn drop(&mut self) {
+        MENTION_LINKING_PAUSED.with(|paused| paused.set(self.previous));
+    }
+}
+
 pub struct TaskService;
 
 #[derive(Debug, Clone, Copy)]
@@ -944,7 +974,7 @@ impl TaskService {
         previous: Option<&str>,
     ) -> bool {
         let text = text.unwrap_or_default();
-        if text.is_empty() {
+        if text.is_empty() || MENTION_LINKING_PAUSED.with(|paused| paused.get()) {
             return false;
         }
         match crate::services::relationships::link_mentions(

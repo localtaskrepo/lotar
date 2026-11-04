@@ -57,6 +57,8 @@ use references::*;
 use remote_fields::*;
 use report::*;
 
+pub(crate) use payloads::GITHUB_PUSH_FIELDS;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncDirection {
     Push,

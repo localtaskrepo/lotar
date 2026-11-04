@@ -144,26 +144,10 @@ pub(super) fn github_search_issues(
         }
         page += 1;
     }
-    let mut detailed = Vec::new();
-    for issue in issues {
-        let number = issue.get("number").and_then(|v| v.as_u64());
-        if let Some(number) = number {
-            match github_fetch_issue(client, repo, number) {
-                Ok(full) => detailed.push(full),
-                Err(err) => {
-                    warnings.push(format!(
-                        "GitHub issue {} fetch failed; using search payload: {}",
-                        number, err
-                    ));
-                    detailed.push(issue);
-                }
-            }
-        } else {
-            detailed.push(issue);
-        }
-    }
-
-    Ok(detailed)
+    // Search results are full issue objects (title, body, state, labels,
+    // assignees, state_reason, ...), so no per-issue refetch: that cost up to
+    // 1000 extra requests per pull (DEV-286).
+    Ok(issues)
 }
 
 pub(super) fn github_create_issue(

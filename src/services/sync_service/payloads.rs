@@ -7,6 +7,8 @@ pub(super) struct GithubIssuePayload {
     pub(super) title: Option<String>,
     pub(super) body: Option<String>,
     pub(super) state: Option<String>,
+    /// `completed`, `not_planned` or `reopened`; sent with a state change.
+    pub(super) state_reason: Option<String>,
     pub(super) labels: Vec<String>,
     pub(super) assignees: Vec<String>,
     pub(super) labels_explicit: bool,
@@ -34,6 +36,12 @@ impl GithubIssuePayload {
         }
         if include_state && let Some(state) = self.state.as_ref() {
             map.insert("state".to_string(), JsonValue::String(state.clone()));
+            if let Some(reason) = self.state_reason.as_ref() {
+                map.insert(
+                    "state_reason".to_string(),
+                    JsonValue::String(reason.clone()),
+                );
+            }
         }
         if self.labels_explicit || !self.labels.is_empty() {
             map.insert(
@@ -252,6 +260,7 @@ pub(super) fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, 
         "title" => payload.title = value.to_string_value(),
         "body" | "description" => payload.body = value.to_string_value(),
         "state" | "status" => payload.state = value.to_string_value(),
+        "state_reason" => payload.state_reason = value.to_string_value(),
         "labels" => {
             payload.labels_explicit = true;
             payload.labels.extend(value.to_list_value());
@@ -263,6 +272,18 @@ pub(super) fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, 
         _ => {}
     }
 }
+
+/// Issue fields a GitHub mapping can write; others are not sent.
+pub(crate) const GITHUB_PUSH_FIELDS: &[&str] = &[
+    "title",
+    "body",
+    "description",
+    "state",
+    "status",
+    "state_reason",
+    "labels",
+    "assignees",
+];
 
 pub(super) fn jira_payload_field_names(payload: &JiraIssuePayload) -> Vec<String> {
     let mut names = payload.fields.keys().cloned().collect::<Vec<_>>();

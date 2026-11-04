@@ -1,13 +1,22 @@
 title: 'Sync robustness: Jira keys auto-linked as local tasks, no rate-limit handling, dropped GitHub fields'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: claude
 created: 2026-10-31T22:06:38.223672+00:00
-modified: 2026-10-31T22:06:38.286282+00:00
+modified: 2026-11-04T03:10:31.316193+00:00
 relationships:
   related:
   - DEV-253
+comments:
+- date: 2026-11-04T03:10:31.250090+00:00
+  text: |-
+    Outcome: all three findings handled.
+    1. New TaskService MentionLinkingPaused guard (thread-local); perform_pull holds it, so task create/update during a pull never turn IDs in remote text into related links (Jira ENG-2 is not local ENG-2). sync.md says so.
+    2. GitHub pulls no longer refetch every search result (search items are full issues): up to 1000 fewer requests per pull. Rate limits (429, or 403 with X-RateLimit-Remaining: 0 / Retry-After / 'rate limit' body) now fail with 'Remote API rate limit reached (HTTP N); retry in N s / the limit resets at <time>'. Declined for now: automatic retry with backoff (ureq 3 request builders can't be cloned, so retrying would mean rebuilding all 18 request sites; the clear error lets the user rerun at the right time).
+    3. GitHub pushes support state_reason (sent with a state change); config validation (and so sync check) warns about GitHub mappings to fields pushes can't write. developers/sync.md updated.
+    Evidence: tests/dev286_sync_mentions_test.rs (paused vs normal linking); provider_tests github_search_pages_skip_pull_requests_without_refetching_issues (2 requests total) and rate_limits_say_when_to_retry; full Rust suite 1937/1937; clippy clean.
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -42,3 +51,21 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-253"]}'
+- at: 2026-11-04T03:01:28.997931+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-04T03:10:31.250090+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-04T03:10:31.316193+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

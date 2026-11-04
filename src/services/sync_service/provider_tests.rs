@@ -162,7 +162,9 @@ mod http {
     }
 
     #[test]
-    fn github_search_pages_skips_pull_requests_and_falls_back_on_fetch_errors() {
+    fn github_search_pages_skip_pull_requests_without_refetching_issues() {
+        // DEV-286: search items are full issues; refetching each one cost up
+        // to 1000 extra requests per pull.
         let api = MockApi::start(|request| {
             if request.path.starts_with("/search/issues") {
                 let page = query_param(request, "page").unwrap_or("1");
@@ -182,10 +184,7 @@ mod http {
                     json!({"items": [{"number": 101, "title": "search"}]})
                 });
             }
-            if request.path == "/repos/org/repo/issues/5" {
-                return (500, json!({"message": "boom"}));
-            }
-            ok(json!({"title": "detailed"}))
+            (404, json!({"message": "unexpected"}))
         });
         let client = api.client(SyncProvider::Github);
         let mut warnings = Vec::new();
@@ -197,24 +196,22 @@ mod http {
             100,
             "99 issues from page 1 plus 1 from page 2"
         );
-        assert_eq!(
-            issues.iter().filter(|i| i["title"] == "search").count(),
-            1,
-            "only the failed fetch keeps the search payload"
-        );
-        assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].contains("GitHub issue 5 fetch failed"));
-        let searches: Vec<_> = api
-            .requests()
-            .into_iter()
-            .filter(|r| r.path.starts_with("/search/issues"))
-            .collect();
-        assert_eq!(searches.len(), 2);
+        assert!(issues.iter().all(|i| i["title"] == "search"));
+        assert!(warnings.is_empty(), "{warnings:?}");
+        let requests = api.requests();
+        assert_eq!(requests.len(), 2, "only the two search pages");
         assert!(
-            query_param(&searches[0], "q")
+            query_param(&requests[0], "q")
                 .unwrap()
                 .contains("repo%3Aorg%2Frepo")
         );
+    }
+
+    #[test]
+    fn rate_limits_say_when_to_retry() {
+        let api = MockApi::start(|_| (429, json!({"message": "slow down"})));
+        let err = github_fetch_issue(&api.client(SyncProvider::Github), "org/repo", 1).unwrap_err();
+        assert!(err.to_string().contains("rate limit"), "{err}");
     }
 
     #[test]
