@@ -1,0 +1,5 @@
+# Written by LoTaR: runtime files that are not task data.
+# Edit this file rather than deleting it; LoTaR recreates it when missing.
+.*.lock
+.txn-pending.json
+.*.tmp-*
