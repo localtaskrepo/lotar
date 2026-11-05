@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-04T05:03:03.355433+00:00
-modified: 2026-11-05T23:03:42.026358+00:00
+modified: 2026-11-05T23:19:27.052197+00:00
 relationships:
   related:
   - DEV-263
@@ -18,6 +18,8 @@ comments:
     2. Panel saves: every autosave sends the snapshot's modified. On a 409 the panel fetches the task and merges it through the DEV-263 outside-change logic. Fields changed on both sides become the existing reload/keep-mine conflict, and the other saved fields are resent once with the new modified. Save responses no longer wipe text typed in other fields (preserveUnsaved).
     3. Archive, attachment and reference responses go through the same merge (mergeServerTask) instead of only replacing the snapshot, so outside changes in them reach the form and older form values are not later saved as edits.
     Tests: tests/dev301_stale_write_test.rs (409, success with the current value, no precondition, bad timestamp); view/__tests__/TaskPanel.staleSave.spec.ts (4, including resend, conflict hold, keeping typed text and archive merge; the typed-text test fails without the fix); escape/externalSync specs updated for the new payload field. 134 panel UI tests pass; clippy, eslint and prettier are clean.
+- date: 2026-11-05T23:19:27.052197+00:00
+  text: 'Follow-up from the full smoke run: 3 UI smoke specs failed because their seeded tasks have no ''modified:'' line. Task responses then show ''created'' as modified, while the precondition compared against the empty stored field, so every panel save got a 409. The check now compares the value responses show (shown_modified: created when modified is missing), as instants when both are RFC 3339 and as text otherwise (hand-written formats like a plain date). The route no longer requires RFC 3339, only a string. dev301_stale_write_test covers the missing-modified and plain-date cases. TaskUpdateContext is no longer Copy, since it holds the string.'
 description: |-
   Follow-ups from DEV-263, not done there.
   - A save already in flight can still overwrite a simultaneous outside change. Needs a server-side precondition on modified (or a revision) for task updates, with a clear conflict response.
@@ -54,3 +56,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-05T23:19:27.052197+00:00
+  actor: claude
+  changes:
+  - field: comment_added

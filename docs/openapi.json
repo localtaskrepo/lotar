@@ -4579,9 +4579,8 @@
           },
           "expected_modified": {
             "type": "string",
-            "format": "date-time",
             "nullable": true,
-            "description": "Optional precondition: the task's `modified` value the caller loaded. If the task changed since, the update is refused with 409 CONFLICT and nothing is written."
+            "description": "Optional precondition: the task's `modified` value the caller loaded, exactly as task responses show it. If the task changed since, the update is refused with 409 CONFLICT and nothing is written."
           }
         },
         "required": [

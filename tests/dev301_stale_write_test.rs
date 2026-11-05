@@ -83,7 +83,39 @@ fn stale_expected_modified_is_a_conflict() {
 
     let (status, body) = post(
         &server,
-        serde_json::json!({"id": created.id, "title": "x", "expected_modified": "yesterday"}),
+        serde_json::json!({"id": created.id, "title": "x", "expected_modified": 5}),
     );
     assert_eq!(status, 400, "{body}");
+
+    // A hand-written task without `modified` shows `created` instead, and
+    // that value is what the precondition compares (smoke caught this).
+    std::fs::write(
+        root.join("ST").join("7.yml"),
+        "title: Hand written\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
+    )
+    .unwrap();
+    let shown = TaskService::get(&storage, "ST-7", None).unwrap();
+    assert_eq!(shown.modified, "2026-01-01T00:00:00Z");
+    let (status, body) = post(
+        &server,
+        serde_json::json!({"id": "ST-7", "title": "Edited", "expected_modified": shown.modified}),
+    );
+    assert_eq!(status, 200, "{body}");
+
+    // Other formats are compared as written.
+    std::fs::write(
+        root.join("ST").join("8.yml"),
+        "title: Dated\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01\nmodified: 2026-02-01\n",
+    )
+    .unwrap();
+    let (status, body) = post(
+        &server,
+        serde_json::json!({"id": "ST-8", "title": "Edited", "expected_modified": "2026-02-01"}),
+    );
+    assert_eq!(status, 200, "{body}");
+    let (status, _) = post(
+        &server,
+        serde_json::json!({"id": "ST-8", "title": "Again", "expected_modified": "2026-02-01"}),
+    );
+    assert_eq!(status, 409);
 }

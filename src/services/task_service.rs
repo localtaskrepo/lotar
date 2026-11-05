@@ -55,11 +55,12 @@ impl Drop for MentionLinkingPaused {
 
 pub struct TaskService;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct TaskUpdateContext {
-    /// Refuse the update with [`LoTaRError::Conflict`] unless the stored
-    /// task's `modified` equals this (an optimistic precondition, DEV-301).
-    pub expected_modified: Option<chrono::DateTime<chrono::Utc>>,
+    /// Refuse the update with [`LoTaRError::Conflict`] unless the task's
+    /// `modified`, as task responses show it, equals this (an optimistic
+    /// precondition, DEV-301).
+    pub expected_modified: Option<String>,
     pub allow_agent_automation: bool,
     /// Internal bypass used by automation/job lifecycle handlers so they can
     /// mutate assignee/status while a job is active.
@@ -173,6 +174,17 @@ pub struct PreparedTaskCreate<'a> {
     /// Members the task introduces that are missing from the project
     /// config, computed with the CLI member rules.
     pub pending_members: &'a [String],
+}
+
+/// Whether two `modified` values name the same moment: compared as
+/// instants when both are RFC 3339, else as text (hand-written files may
+/// hold other formats, which task responses echo unchanged).
+fn same_modified(stored: &str, expected: &str) -> bool {
+    let parse = |raw: &str| chrono::DateTime::parse_from_rfc3339(raw.trim()).ok();
+    match (parse(stored), parse(expected)) {
+        (Some(a), Some(b)) => a == b,
+        _ => stored.trim() == expected.trim(),
+    }
 }
 
 impl TaskService {
@@ -1002,6 +1014,15 @@ impl TaskService {
         Self::update_with_context(storage, id, patch, TaskUpdateContext::default())
     }
 
+    /// `modified` as task responses show it: `created` when the file has none.
+    fn shown_modified(task: &Task) -> String {
+        if task.modified.is_empty() {
+            task.created.clone()
+        } else {
+            task.modified.clone()
+        }
+    }
+
     pub fn update_with_context(
         storage: &mut Storage,
         id: &str,
@@ -1051,6 +1072,7 @@ impl TaskService {
         context: TaskUpdateContext,
         relationship_delta: Option<F>,
     ) -> LoTaRResult<TaskUpdateReceipt> {
+        let expected_modified = context.expected_modified;
         let (id, _) = Self::follow_moves(storage, id, None)?;
         let id = id.as_str();
         // Derive the project prefix from the canonical ID parse (final numeric
@@ -1102,16 +1124,14 @@ impl TaskService {
         Self::ensure_not_deleted(&existing, id)?;
         // Optimistic precondition (DEV-301), checked under the transaction's
         // locks so no write can slip in between the check and this update.
-        if let Some(expected) = context.expected_modified {
-            let stored = chrono::DateTime::parse_from_rfc3339(existing.modified.trim())
-                .ok()
-                .map(|at| at.with_timezone(&chrono::Utc));
-            if stored != Some(expected) {
-                return Err(LoTaRError::Conflict(format!(
-                    "Task '{}' changed since it was loaded (modified {}); reload it and apply the change again",
-                    canonical, existing.modified
-                )));
-            }
+        if let Some(expected) = expected_modified.as_deref()
+            && !same_modified(&Self::shown_modified(&existing), expected)
+        {
+            return Err(LoTaRError::Conflict(format!(
+                "Task '{}' changed since it was loaded (modified {}); reload it and apply the change again",
+                canonical,
+                Self::shown_modified(&existing)
+            )));
         }
         if let Some(delta) = relationship_delta {
             let mut relationships = patch
@@ -2481,11 +2501,7 @@ impl TaskService {
         config: &ResolvedConfig,
         now: chrono::DateTime<chrono::Utc>,
     ) -> TaskDTO {
-        let modified = if task.modified.is_empty() {
-            task.created.clone()
-        } else {
-            task.modified.clone()
-        };
+        let modified = Self::shown_modified(&task);
         let sprint_order = sprint_lookup
             .and_then(|lookup| lookup.get(id))
             .cloned()
