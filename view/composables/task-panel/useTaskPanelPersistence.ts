@@ -71,6 +71,16 @@ interface UseTaskPanelPersistenceOptions {
      * so a blur never silently overwrites the newer value.
      */
     isFieldHeld?: (field: string) => boolean
+    /**
+     * DEV-301: remember unsaved form values (other than `saving`) before a
+     * save response is applied; the returned function puts them back.
+     */
+    preserveUnsaved?: (saving: string[]) => () => void
+    /**
+     * DEV-301: merge a server version that raced a refused save: unchanged
+     * fields update, fields changed on both sides become conflicts.
+     */
+    mergeServerTask?: (server: TaskDTO) => void
 }
 
 export interface TaskPanelPersistenceApi {
@@ -198,6 +208,9 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         if (!state || state.running) return
         state.running = true
         activeSaves.value += 1
+        // A refused stale save is retried with the fields that did not
+        // clash; a second refusal in a row is reported instead (DEV-301).
+        let conflictRetries = 0
         try {
             while (state.pending) {
                 const snapshot = state.pending
@@ -213,20 +226,46 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 // the read-only state.
                 const deletedBeforeSave = isDeletedTask(options.task)
                 let outcome: SaveOutcome
+                let settled = snapshotRevisions
+                // DEV-301: the server refuses the save (409) if the task
+                // changed since the panel's snapshot was taken.
+                const request: Record<string, unknown> = { ...snapshot }
+                if (options.task.id === id && options.task.modified) {
+                    request.expected_modified = options.task.modified
+                }
                 try {
-                    const updated = await options.apiClient.updateTask(id, snapshot)
+                    const updated = await options.apiClient.updateTask(id, request)
                     const lifecycleFlipped = deletedBeforeSave !== isDeletedTask(options.task)
                     if (stillCurrent() && !lifecycleFlipped) {
-                        applyServerTask(updated)
+                        applyServerTask(updated, Object.keys(snapshot))
                         options.emit('updated', updated)
                     }
                     outcome = { ok: true, stale: !stillCurrent() || lifecycleFlipped }
+                    conflictRetries = 0
                 } catch (error: unknown) {
                     const stale = !stillCurrent()
-                    if (!stale) await reconcileFailedSave(id, snapshot, state, error, stillCurrent)
-                    outcome = { ok: false, stale, error }
+                    const refusedAsStale = (error as { status?: number } | null)?.status === 409
+                    if (!stale && refusedAsStale && conflictRetries < 1) {
+                        conflictRetries += 1
+                        const retry = await reconcileStaleSave(id, snapshot, stillCurrent)
+                        if (retry && Object.keys(retry).length) {
+                            // Resend what did not clash, ahead of newer edits;
+                            // its waiters settle with the retried request.
+                            state.pending = { ...retry, ...(state.pending ?? {}) }
+                            const retried: Record<string, number> = {}
+                            for (const field of Object.keys(retry)) retried[field] = snapshotRevisions[field] ?? 0
+                            state.pendingRevisions = { ...retried, ...(state.pendingRevisions ?? {}) }
+                            settled = Object.fromEntries(
+                                Object.entries(snapshotRevisions).filter(([field]) => !(field in retry)),
+                            )
+                        }
+                        outcome = { ok: false, stale: false, error }
+                    } else {
+                        if (!stale) await reconcileFailedSave(id, snapshot, state, error, stillCurrent)
+                        outcome = { ok: false, stale, error }
+                    }
                 }
-                resolveWaiters(state, snapshotRevisions, outcome)
+                resolveWaiters(state, settled, outcome)
             }
         } finally {
             state.running = false
@@ -235,13 +274,54 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         }
     }
 
-    function applyServerTask(updated: TaskDTO) {
+    /**
+     * Apply a save response. Fields typed meanwhile in other inputs keep the
+     * user's text (DEV-301): the response holds only the saved fields' new
+     * values, since the save's precondition rules out outside changes.
+     */
+    function applyServerTask(updated: TaskDTO, saved: string[] = []) {
+        const restoreUnsaved = options.preserveUnsaved?.(saved)
         applyTaskSnapshot(options.task, updated)
         options.suppressWatch.value = true
         options.applyTask(updated)
+        restoreUnsaved?.()
         nextTick(() => {
             options.suppressWatch.value = false
         })
+    }
+
+    /**
+     * DEV-301: a save refused because the task changed elsewhere. Merge the
+     * current server task (conflicting fields are held for the user to
+     * decide) and return the saved fields to send again.
+     */
+    async function reconcileStaleSave(
+        id: string,
+        snapshot: Record<string, unknown>,
+        stillCurrent: () => boolean,
+    ): Promise<Record<string, unknown> | null> {
+        let server: TaskDTO
+        try {
+            server = await options.apiClient.getTask(id, { includeDeleted: true })
+        } catch {
+            options.showToast('This task changed elsewhere; reload it before editing')
+            return null
+        }
+        if (!stillCurrent()) return null
+        if (options.mergeServerTask) {
+            options.mergeServerTask(server)
+        } else {
+            applyServerTask(server)
+        }
+        options.emit('updated', server)
+        if (isDeletedTask(server)) return null
+        const retry: Record<string, unknown> = {}
+        for (const field of Object.keys(snapshot)) {
+            if (isHeld(field)) continue
+            const intent = currentIntentFor(field)
+            retry[field] = intent === undefined ? snapshot[field] : intent
+        }
+        return retry
     }
 
     /**

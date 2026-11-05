@@ -8,7 +8,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
   `{ "data": { "total": 0, "limit": 50, "offset": 0 } }`, populated page:
   `{ "data": { "total": 1, "limit": 50, "offset": 0, "tasks": [ { "id": "QA-1", "title": "Wire contract tests", "status": "Todo", "priority": "Medium", "task_type": "Feature", "created": "2026-09-15T10:00:00+00:00", "modified": "2026-09-15T11:30:00+00:00" } ] } }`
 - GET  /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true] -> { data: TaskDTO }; deleted tasks are hidden unless explicitly included
-- POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }
+- POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }; optional `expected_modified` -> 409 CONFLICT if the task changed since
 - POST /api/tasks/delete ({ id, hard?: bool }[?project=PREFIX]) -> { data: { deleted: bool, hard: bool, warnings: string[] } }; defaults to soft delete; hard deletion retains attachment blobs and warns about their references and incoming task relationships
 - POST /api/tasks/restore ({ id }[?project=PREFIX]) -> { data: TaskDTO }; restores a soft-deleted task without changing `modified`
 - POST /api/tasks/archive and /api/tasks/unarchive ({ id }[?project=PREFIX]) -> { data: TaskDTO }; moves the task into its project's `@archive` folder (read-only) or back, without changing `modified`

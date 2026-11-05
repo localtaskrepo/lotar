@@ -109,7 +109,10 @@ describe('TaskPanel Escape (DEV-263)', () => {
         pressEscape(input.element)
         await flushPromises()
 
-        expect(api.updateTask).toHaveBeenCalledWith('A-3', { title: 'Third task (edited title)' })
+        expect(api.updateTask).toHaveBeenCalledWith('A-3', {
+            title: 'Third task (edited title)',
+            expected_modified: '2026-10-01T10:00:00Z',
+        })
         expect(wrapper.emitted('close')).toHaveLength(1)
     })
 
@@ -125,7 +128,10 @@ describe('TaskPanel Escape (DEV-263)', () => {
         await flushPromises()
 
         expect(api.updateTask).toHaveBeenCalledTimes(1)
-        expect(api.updateTask).toHaveBeenCalledWith('A-3', { description: 'Typed then Escape' })
+        expect(api.updateTask).toHaveBeenCalledWith('A-3', {
+            description: 'Typed then Escape',
+            expected_modified: '2026-10-01T10:00:00Z',
+        })
         expect(wrapper.emitted('close')).toHaveLength(1)
     })
 
@@ -140,7 +146,10 @@ describe('TaskPanel Escape (DEV-263)', () => {
         await wrapper.find('button[aria-label="Close panel"]').trigger('click')
         await flushPromises()
 
-        expect(api.updateTask).toHaveBeenCalledWith('A-3', { description: 'Typed then closed' })
+        expect(api.updateTask).toHaveBeenCalledWith('A-3', {
+            description: 'Typed then closed',
+            expected_modified: '2026-10-01T10:00:00Z',
+        })
         expect(wrapper.emitted('close')).toHaveLength(1)
     })
 

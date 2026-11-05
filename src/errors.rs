@@ -12,6 +12,9 @@ pub enum LoTaRError {
     ProjectNotFound(String),
     ValidationError(String),
     IndexError(String),
+    /// The task changed since the caller read it (`expected_modified` no
+    /// longer matches, DEV-301). Nothing was written.
+    Conflict(String),
 }
 
 impl fmt::Display for LoTaRError {
@@ -25,6 +28,7 @@ impl fmt::Display for LoTaRError {
             LoTaRError::ProjectNotFound(name) => write!(f, "Project not found: {}", name),
             LoTaRError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
             LoTaRError::IndexError(msg) => write!(f, "Index error: {}", msg),
+            LoTaRError::Conflict(msg) => write!(f, "Conflict: {}", msg),
         }
     }
 }

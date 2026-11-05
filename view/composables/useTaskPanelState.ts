@@ -28,6 +28,7 @@ import { useTaskPanelOwnership } from './useTaskPanelOwnership'
 import { useTaskPanelController } from './useTaskPanelController'
 import { useTaskRelationships } from './useTaskRelationships'
 import { useTaskStore } from './useTaskStore'
+import { applyTaskSnapshot } from '../utils/text'
 import { relationshipMutation } from '../utils/relationships'
 
 export interface TaskPanelProps {
@@ -568,6 +569,13 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     }
 
     let isFieldHeldImpl: (field: string) => boolean = () => false
+    // Bound once external sync exists (DEV-301).
+    let preserveUnsavedImpl: (saving: string[]) => () => void = () => () => {}
+    let mergeServerTaskImpl: ((server: TaskDTO) => void) | null = null
+    const mergeServerTask = (server: TaskDTO) => {
+        if (mergeServerTaskImpl) mergeServerTaskImpl(server)
+        else applyTaskSnapshot(task, server)
+    }
 
     const {
         handleSubmit: handleSubmitFromPersistence,
@@ -612,6 +620,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         emit,
         afterCreate: (created) => (afterCreateHook ? afterCreateHook(created) : Promise.resolve(created)),
         isFieldHeld: (field) => isFieldHeldImpl(field),
+        preserveUnsaved: (saving) => preserveUnsavedImpl(saving),
+        mergeServerTask: (server) => mergeServerTask(server),
         announceCreated: (created) =>
             showToast(created.title || 'Untitled task', `Created ${created.id}`, 6000, {
                 label: 'Open',
@@ -666,6 +676,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         },
     })
     isFieldHeldImpl = externalSync.isFieldHeld
+    preserveUnsavedImpl = externalSync.preserveUnsaved
+    mergeServerTaskImpl = externalSync.mergeServerTask
     resetExternalSync = externalSync.resetExternalSync
 
     useTaskPanelHotkeys({
@@ -775,6 +787,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         requestClose,
         setBeforeClose,
         externalConflicts: externalSync.externalConflicts,
+        mergeServerTask,
         reloadConflicts: externalSync.reloadConflicts,
         keepMineConflicts: externalSync.keepMineConflicts,
         handleSubmit,

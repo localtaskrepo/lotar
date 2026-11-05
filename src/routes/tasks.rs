@@ -740,11 +740,30 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(msg) => return bad_request(msg),
         };
+        // Optional precondition (DEV-301): the `modified` value the caller
+        // loaded. A task changed since then answers 409 and writes nothing.
+        let expected_modified = match body.get("expected_modified") {
+            None | Some(serde_json::Value::Null) => None,
+            Some(serde_json::Value::String(raw)) => {
+                match chrono::DateTime::parse_from_rfc3339(raw.trim()) {
+                    Ok(at) => Some(at.with_timezone(&chrono::Utc)),
+                    Err(_) => {
+                        return bad_request(format!(
+                            "expected_modified must be an RFC 3339 timestamp, got '{raw}'"
+                        ));
+                    }
+                }
+            }
+            Some(_) => {
+                return bad_request("expected_modified must be a string timestamp".into());
+            }
+        };
         match TaskService::update_with_context(
             &mut storage,
             &id,
             patch,
             crate::services::task_service::TaskUpdateContext {
+                expected_modified,
                 emit_api_event: true,
                 ..Default::default()
             },
@@ -1274,6 +1293,7 @@ const TASK_UPDATE_KEYS: &[&str] = &[
     "custom_fields",
     "fields",
     "sprints",
+    "expected_modified",
 ];
 
 fn parse_task_update_body(

@@ -57,6 +57,9 @@ pub struct TaskService;
 
 #[derive(Debug, Clone, Copy)]
 pub struct TaskUpdateContext {
+    /// Refuse the update with [`LoTaRError::Conflict`] unless the stored
+    /// task's `modified` equals this (an optimistic precondition, DEV-301).
+    pub expected_modified: Option<chrono::DateTime<chrono::Utc>>,
     pub allow_agent_automation: bool,
     /// Internal bypass used by automation/job lifecycle handlers so they can
     /// mutate assignee/status while a job is active.
@@ -70,6 +73,7 @@ pub struct TaskUpdateContext {
 impl TaskUpdateContext {
     pub fn automation_disabled() -> Self {
         Self {
+            expected_modified: None,
             allow_agent_automation: false,
             bypass_active_job_lock: true,
             enforce_review_owner: false,
@@ -81,6 +85,7 @@ impl TaskUpdateContext {
 impl Default for TaskUpdateContext {
     fn default() -> Self {
         Self {
+            expected_modified: None,
             allow_agent_automation: true,
             bypass_active_job_lock: false,
             enforce_review_owner: true,
@@ -1095,6 +1100,19 @@ impl TaskService {
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
         // Lifecycle guard (DEV-92): a tombstone is read-only until restored.
         Self::ensure_not_deleted(&existing, id)?;
+        // Optimistic precondition (DEV-301), checked under the transaction's
+        // locks so no write can slip in between the check and this update.
+        if let Some(expected) = context.expected_modified {
+            let stored = chrono::DateTime::parse_from_rfc3339(existing.modified.trim())
+                .ok()
+                .map(|at| at.with_timezone(&chrono::Utc));
+            if stored != Some(expected) {
+                return Err(LoTaRError::Conflict(format!(
+                    "Task '{}' changed since it was loaded (modified {}); reload it and apply the change again",
+                    canonical, existing.modified
+                )));
+            }
+        }
         if let Some(delta) = relationship_delta {
             let mut relationships = patch
                 .relationships

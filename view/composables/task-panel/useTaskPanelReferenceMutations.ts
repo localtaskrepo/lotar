@@ -11,6 +11,11 @@ interface UseTaskPanelReferenceMutationsOptions {
     /** Returns true (and explains why) when the task is soft-deleted. */
     rejectDeletedMutation: (label: string) => boolean
     emitUpdated: (task: TaskDTO) => void
+    /**
+     * DEV-301: take a response task into the panel (merging outside changes
+     * into the form). Defaults to replacing the snapshot.
+     */
+    mergeTask?: (task: TaskDTO) => void
 }
 
 export type LinkAddOutcome = 'added' | 'skipped' | 'failed'
@@ -78,7 +83,8 @@ export function useTaskPanelReferenceMutations(
     }
 
     function applyResponseTask(updated: TaskDTO) {
-        Object.assign(task, updated)
+        if (options.mergeTask) options.mergeTask(updated)
+        else Object.assign(task, updated)
         applyReferencesFromTaskResponse(updated)
         options.emitUpdated(updated)
     }

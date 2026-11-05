@@ -178,6 +178,11 @@ pub(super) fn load_merged_config(
         .map_err(|e| internal_error(format!("Failed to load config: {e}")))
 }
 
+/// 409: the resource changed since the caller read it (DEV-301).
+pub(super) fn conflict(msg: &str) -> HttpResponse {
+    ok_json(409, json!({"error": {"code": "CONFLICT", "message": msg}}))
+}
+
 #[expect(
     clippy::needless_pass_by_value,
     reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
@@ -208,6 +213,7 @@ pub(super) fn map_lotar_error(err: LoTaRError) -> HttpResponse {
         err @ (LoTaRError::SerializationError(_) | LoTaRError::IndexError(_)) => {
             internal_error(err.to_string())
         }
+        LoTaRError::Conflict(msg) => conflict(&msg),
         LoTaRError::IoError(io_err) => {
             let coordination_refusal = io_err.kind() == std::io::ErrorKind::WouldBlock
                 || io_err.get_ref().is_some_and(|inner| {

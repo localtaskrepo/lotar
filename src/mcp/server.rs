@@ -185,7 +185,8 @@ fn domain_service_error(
         | LoTaRError::SprintNotFound(_)
         | LoTaRError::InvalidTaskId(_)
         | LoTaRError::ProjectNotFound(_)
-        | LoTaRError::IndexError(_) => err(
+        | LoTaRError::IndexError(_)
+        | LoTaRError::Conflict(_) => err(
             id,
             -32000,
             envelope,

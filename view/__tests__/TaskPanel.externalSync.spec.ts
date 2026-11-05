@@ -122,6 +122,7 @@ describe('TaskPanel outside edits (DEV-263)', () => {
         expect(api.updateTask).toHaveBeenCalledTimes(1)
         expect(api.updateTask.mock.calls[0]![1]).toEqual({
             description: 'Original text. Acceptance criteria added by agent. User note.',
+            expected_modified: '2026-10-01T10:05:00Z',
         })
     })
 
@@ -163,7 +164,11 @@ describe('TaskPanel outside edits (DEV-263)', () => {
         await wrapper.find('[data-testid="task-panel-conflict-keep"]').trigger('click')
         await flushPromises()
         expect(api.updateTask).toHaveBeenCalledTimes(1)
-        expect(api.updateTask.mock.calls[0]![1]).toEqual({ description: 'Mine' })
+        // DEV-301: the save carries the newer snapshot's modified as a precondition.
+        expect(api.updateTask.mock.calls[0]![1]).toEqual({
+            description: 'Mine',
+            expected_modified: '2026-10-01T10:05:00Z',
+        })
         expect(wrapper.find('[data-testid="task-panel-conflict"]').exists()).toBe(false)
     })
 

@@ -493,6 +493,11 @@ export interface TaskUpdate {
     custom_fields?: Record<string, unknown> | null
     /** Replaces sprint memberships; null or [] clears them. */
     sprints?: number[] | null
+    /**
+     * DEV-301: the `modified` value the caller loaded. If the task changed
+     * since, the server answers 409 and writes nothing.
+     */
+    expected_modified?: string | null
 }
 
 /**

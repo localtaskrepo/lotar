@@ -1106,6 +1106,7 @@ const {
   requestClose,
   setBeforeClose,
   externalConflicts,
+  mergeServerTask,
   reloadConflicts,
   keepMineConflicts,
   handleSubmit,
@@ -1206,7 +1207,8 @@ async function setTaskArchived(archive: boolean) {
   try {
     const updated = await taskStore.setArchived(id, archive, projectPrefixOfTaskId(id) || undefined)
     if (!props.open || task.id !== id || props.taskId !== id) return
-    applyTaskSnapshot(task, updated)
+    // DEV-301: merge, so outside changes in the response reach the form.
+    mergeServerTask(updated)
     emit('updated', updated)
     showToast(archive ? 'Task archived' : 'Task unarchived')
   } catch (error) {
@@ -1387,6 +1389,7 @@ const referenceMutations = useTaskPanelReferenceMutations({
   task,
   mode,
   rejectDeletedMutation,
+  mergeTask: mergeServerTask,
   emitUpdated: (updated) => emit('updated', updated),
 })
 const {
@@ -1449,7 +1452,7 @@ const {
 })
 
 function onReferencesUpdated(updated: TaskDTO) {
-  applyTaskSnapshot(task, updated)
+  mergeServerTask(updated)
   applyReferencesFromTaskResponse(updated)
   emit('updated', updated)
 }

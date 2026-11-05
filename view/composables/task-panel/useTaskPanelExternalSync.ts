@@ -104,8 +104,9 @@ function valuesEqual(a: unknown, b: unknown): boolean {
  * conflict: the user's text stays, autosave holds it back, and the panel asks
  * whether to reload the other value or keep (and save) theirs.
  *
- * Without a server-side precondition this narrows, but cannot close, the
- * window in which a save overwrites an outside change it has not seen.
+ * Saves carry the snapshot's `modified` as a precondition (DEV-301): a save
+ * that raced an outside change is refused by the server and merged here
+ * instead of overwriting it.
  */
 export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOptions) {
     const conflicts = reactive(new Set<ExternalSyncField>())
@@ -204,14 +205,13 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
         }
     }
 
-    function sync() {
-        if (!options.active()) return
-        const entity = options.entity()
-        if (!entity || entity.id !== options.task.id) return
-        // Delete/restore has its own authoritative reload (DEV-92).
-        if (isDeletedTask(entity) !== isDeletedTask(options.task)) return
-        if (compareModified(entity.modified, options.task.modified) <= 0) return
-        const next = JSON.parse(JSON.stringify(entity)) as TaskDTO
+    /**
+     * Take a server version of the task into the panel: fields the user has
+     * not changed take the server value, changed ones that also differ there
+     * become conflicts, and the snapshot moves to the server version.
+     */
+    function merge(source: TaskDTO) {
+        const next = JSON.parse(JSON.stringify(source)) as TaskDTO
         const apply: ExternalSyncField[] = []
         for (const field of FIELDS) {
             if (valuesEqual(serverValue(field, next), serverValue(field, options.task))) continue
@@ -228,6 +228,56 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
             applyTaskSnapshot(options.task, next)
             options.afterApply(next)
         })
+    }
+
+    function sync() {
+        if (!options.active()) return
+        const entity = options.entity()
+        if (!entity || entity.id !== options.task.id) return
+        // Delete/restore has its own authoritative reload (DEV-92).
+        if (isDeletedTask(entity) !== isDeletedTask(options.task)) return
+        if (compareModified(entity.modified, options.task.modified) <= 0) return
+        merge(entity)
+    }
+
+    /**
+     * DEV-301: a response from another endpoint (archive, attachments,
+     * references) is the current server state. Merge it like an outside
+     * change instead of replacing the snapshot, which would make the form's
+     * older values look like the user's own edits.
+     */
+    function mergeServerTask(source: TaskDTO) {
+        if (!source || source.id !== options.task.id) return
+        if (isDeletedTask(source) !== isDeletedTask(options.task)) {
+            applyTaskSnapshot(options.task, source)
+            return
+        }
+        merge(source)
+    }
+
+    /** Fields the user has changed and not saved, except those in `except`. */
+    function unsavedFields(except: Iterable<string>): ExternalSyncField[] {
+        const skip = new Set(except)
+        return FIELDS.filter((field) => field !== 'custom_fields' && !skip.has(field) && isDirty(field))
+    }
+
+    /**
+     * DEV-301: remember the form values of unsaved fields (other than the
+     * ones being saved) so a save response can be applied without wiping
+     * text typed elsewhere meanwhile. Call before the snapshot changes.
+     */
+    function preserveUnsaved(saving: Iterable<string>): () => void {
+        const kept = unsavedFields(saving).map(
+            (field) => [field, JSON.parse(JSON.stringify(options.form[field as keyof TaskPanelFormState]))] as const,
+        )
+        return () => {
+            if (!kept.length) return
+            withSuppressedWatch(() => {
+                for (const [field, value] of kept) {
+                    ;(options.form as unknown as Record<string, unknown>)[field] = value
+                }
+            })
+        }
     }
 
     watch(
@@ -281,5 +331,8 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
         keepMineConflicts,
         resetExternalSync: () => conflicts.clear(),
         syncFromStore: sync,
+        mergeServerTask,
+        preserveUnsaved,
+        unsavedFields,
     }
 }

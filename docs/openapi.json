@@ -861,6 +861,9 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
           "500": {
             "$ref": "#/components/responses/InternalError"
           }
@@ -4573,6 +4576,12 @@
             },
             "nullable": true,
             "description": "Replaces sprint memberships; null or [] clears them."
+          },
+          "expected_modified": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Optional precondition: the task's `modified` value the caller loaded. If the task changed since, the update is refused with 409 CONFLICT and nothing is written."
           }
         },
         "required": [
@@ -7777,7 +7786,8 @@
         "type": "object",
         "properties": {
           "status": {
-            "type": "string"
+            "type": "string",
+            "description": "`ok`, or `partial` when some items failed (see summary.failed and warnings)."
           },
           "direction": {
             "type": "string"
@@ -7786,8 +7796,7 @@
             "type": "string"
           },
           "remote": {
-            "type": "string",
-            "description": "`ok`, or `partial` when some items failed (see summary.failed and warnings)."
+            "type": "string"
           },
           "project": {
             "type": "string",
@@ -8837,6 +8846,16 @@
     "responses": {
       "BadRequest": {
         "description": "Bad Request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict: the resource changed since the caller loaded it",
         "content": {
           "application/json": {
             "schema": {

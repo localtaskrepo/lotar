@@ -1,13 +1,23 @@
 title: 'Task panel: server-side stale-write check and field-safe saves'
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: claude
+assignee: claude
 created: 2026-11-04T05:03:03.355433+00:00
-modified: 2026-11-04T05:03:03.426905+00:00
+modified: 2026-11-05T23:03:42.026358+00:00
 relationships:
   related:
   - DEV-263
+  - DEV-300
+comments:
+- date: 2026-11-05T23:03:41.958274+00:00
+  text: |-
+    Fixed all three items.
+    1. Server precondition: POST /api/tasks/update accepts an optional expected_modified (RFC 3339). TaskService checks it under the update transaction's locks and refuses a changed task with the new LoTaRError::Conflict, which REST maps to 409 CONFLICT (MCP: isError). Nothing is written. openapi (TaskUpdateRequest.expected_modified, 409 Conflict response), types.ts, serve.md and api-quick-reference.md are updated. Callers without the field behave as before.
+    2. Panel saves: every autosave sends the snapshot's modified. On a 409 the panel fetches the task and merges it through the DEV-263 outside-change logic. Fields changed on both sides become the existing reload/keep-mine conflict, and the other saved fields are resent once with the new modified. Save responses no longer wipe text typed in other fields (preserveUnsaved).
+    3. Archive, attachment and reference responses go through the same merge (mergeServerTask) instead of only replacing the snapshot, so outside changes in them reach the form and older form values are not later saved as edits.
+    Tests: tests/dev301_stale_write_test.rs (409, success with the current value, no precondition, bad timestamp); view/__tests__/TaskPanel.staleSave.spec.ts (4, including resend, conflict hold, keeping typed text and archive merge; the typed-text test fails without the fix); escape/externalSync specs updated for the new payload field. 134 panel UI tests pass; clippy, eslint and prettier are clean.
 description: |-
   Follow-ups from DEV-263, not done there.
   - A save already in flight can still overwrite a simultaneous outside change. Needs a server-side precondition on modified (or a revision) for task updates, with a clear conflict response.
@@ -20,3 +30,27 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-263"]}'
+- at: 2026-11-05T23:03:29.840776+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-263"]}'
+    new: '{"related":["DEV-263","DEV-300"]}'
+- at: 2026-11-05T23:03:41.919069+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-05T23:03:41.958274+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-05T23:03:42.026358+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
