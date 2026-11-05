@@ -1,10 +1,10 @@
+use crate::common;
+use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use serde_json::Value;
 use std::collections::HashMap;
-mod common;
-use common::env_mutex::EnvVarGuard;
 
 fn fixture() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();

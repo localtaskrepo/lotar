@@ -1,8 +1,7 @@
 //! DEV-282: CLI commands refuse unsafe or invalid input instead of acting
 //! on everything or reporting success.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn run(fixtures: &TestFixtures, args: &[&str], stdin: &str) -> std::process::Output {

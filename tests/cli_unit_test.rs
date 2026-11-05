@@ -3,8 +3,6 @@
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::StatusArgs;
 
-mod common;
-
 #[test]
 fn priority_args_get_only() {
     let args = PriorityArgs::new("TEST-1".to_string(), None, Some("test-project".to_string()));

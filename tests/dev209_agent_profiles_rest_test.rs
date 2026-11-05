@@ -1,11 +1,11 @@
 //! DEV-209: `/api/agents/profiles` reports each profile's run settings so the
 //! Agents page can show them and prefill the run dialog.
 
+use crate::common;
+use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use serde_json::Value;
 use std::collections::HashMap;
-mod common;
-use common::env_mutex::EnvVarGuard;
 
 #[test]
 fn profiles_include_model_effort_and_permissions_sorted_by_name() {

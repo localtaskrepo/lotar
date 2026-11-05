@@ -19,8 +19,7 @@ use lotar::utils::paths;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-mod common;
-
+use crate::common;
 fn workspace(extra_config: &str) -> (tempfile::TempDir, PathBuf) {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");

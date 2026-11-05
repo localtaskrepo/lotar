@@ -1,8 +1,7 @@
 //! DEV-283: CLI outputs use canonical IDs and honest no-ops, history takes
 //! numeric IDs, and fields can be cleared from the CLI.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn run(fixtures: &TestFixtures, args: &[&str]) -> std::process::Output {

@@ -1,7 +1,7 @@
 // Scanner consolidation suite: block_comments, custom_patterns, inline_effort, insertion_suggestion,
 // signal_words, ticket_extraction, words_toggle
 
-mod common;
+use crate::common;
 use common::{TestFixtures, cargo_bin_in};
 
 mod block_comments {

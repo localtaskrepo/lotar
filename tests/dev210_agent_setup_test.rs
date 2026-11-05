@@ -1,11 +1,11 @@
 //! DEV-210: agent profiles can be added from the UI (POST /api/agents/profiles)
 //! and set like other config fields (`config set agents`).
 
+use crate::common;
+use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use serde_json::{Value, json};
 use std::collections::HashMap;
-mod common;
-use common::env_mutex::EnvVarGuard;
 
 fn call(method: &str, body: Value) -> (u16, Value) {
     let mut api = ApiServer::new();

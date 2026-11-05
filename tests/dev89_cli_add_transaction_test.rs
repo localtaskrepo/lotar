@@ -4,8 +4,7 @@
 //! failures leave the configuration and task files untouched. All cases run
 //! against the real `lotar` binary at the public CLI boundary.
 
-mod common;
-
+use crate::common;
 use common::lotar_cmd;
 use std::path::{Path, PathBuf};
 use std::process::Output;

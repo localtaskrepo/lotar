@@ -1,5 +1,3 @@
-mod common;
-
 use lotar::help::HelpSystem;
 use lotar::output::OutputFormat;
 use lotar::workspace::TasksDirectoryResolver;

@@ -2,11 +2,11 @@
 //! match, quoted phrases, `-word` exclusions, accents and typo tolerance, plus
 //! the opt-in `relevance` sort (best match first).
 
+use crate::common;
+use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use serde_json::Value;
 use std::collections::HashMap;
-mod common;
-use common::env_mutex::EnvVarGuard;
 
 const TASKS: [(u32, &str); 6] = [
     (

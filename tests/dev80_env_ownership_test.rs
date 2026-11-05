@@ -14,8 +14,6 @@
 //!   child-scoped by `common::lotar_cmd`/`run_command` instead of through
 //!   process-global mutation.
 
-mod common;
-
 use crate::common::TestFixtures;
 use crate::common::env_mutex::EnvVarGuard;
 use std::time::Duration;

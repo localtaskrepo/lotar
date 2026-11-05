@@ -10,8 +10,7 @@
 //! pending transaction journal) with no sleeps, retries, or weakened
 //! bounds.
 
-mod common;
-
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest, HttpResponse};
 use lotar::routes;

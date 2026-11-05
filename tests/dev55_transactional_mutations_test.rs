@@ -4,6 +4,7 @@
 //! unchanged; retries must not create duplicates; concurrent participating
 //! writers must not lose updates.
 
+use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_types::{TaskCreate, TaskUpdate};
 use lotar::services::sprint_assignment;
 use lotar::services::sprint_service::SprintService;
@@ -12,8 +13,6 @@ use lotar::storage::manager::Storage;
 use lotar::storage::sprint::Sprint;
 use lotar::utils::paths;
 use std::path::{Path, PathBuf};
-mod common;
-use crate::common::env_mutex::EnvVarGuard;
 
 fn write_global_config(tasks_dir: &Path, extra: &str) {
     let content = format!(

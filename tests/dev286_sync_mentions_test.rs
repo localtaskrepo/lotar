@@ -1,8 +1,7 @@
 //! DEV-286: writes made while mention linking is paused (sync pulls) don't
 //! turn IDs in the text into relationships.
 
-mod common;
-
+use crate::common;
 use lotar::api_types::TaskCreate;
 use lotar::services::task_service::{MentionLinkingPaused, TaskService};
 

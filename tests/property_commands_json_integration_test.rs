@@ -3,7 +3,7 @@
 use predicates::prelude::*;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 #[test]

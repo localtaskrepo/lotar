@@ -1,7 +1,7 @@
 use predicates::prelude::*;
 use std::fs;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 fn assert_yaml_contains(anchor_list: &str, needle: &str) {

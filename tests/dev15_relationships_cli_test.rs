@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
-mod common;
-
+use crate::common;
 fn run(root: &Path, args: &[&str]) -> Output {
     common::lotar_cmd()
         .unwrap()

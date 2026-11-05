@@ -1,7 +1,6 @@
 use predicates::prelude::*;
 
-mod common;
-
+use crate::common;
 #[test]
 fn task_command_without_subcommand_lists_options() {
     let fixtures = common::TestFixtures::new();

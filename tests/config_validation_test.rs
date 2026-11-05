@@ -1,5 +1,3 @@
-mod common;
-
 use lotar::config::types::{
     ConfigurableField, GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField,
 };

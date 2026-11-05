@@ -1,8 +1,7 @@
 //! DEV-18: `lotar show <id>` prints one task, and `update` / `edit` work as
 //! top-level commands, because that is what people and agents type first.
 
-mod common;
-
+use crate::common;
 fn run(dir: &std::path::Path, args: &[&str]) -> (bool, String) {
     let mut cmd = common::cargo_bin_silent();
     cmd.env("LOTAR_IGNORE_HOME_CONFIG", "1");

@@ -1,8 +1,7 @@
 //! DEV-275: export honours `format`, unknown parameters are 400s, and CSV
 //! cells are quoted correctly and guarded against formulas.
 
-mod common;
-
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use std::collections::HashMap;

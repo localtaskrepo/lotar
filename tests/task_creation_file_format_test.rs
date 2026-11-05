@@ -2,8 +2,7 @@ use lotar::api_types::TaskCreate;
 use lotar::services::task_service::TaskService;
 use serde_yaml_ng::Value as YamlValue;
 
-mod common;
-
+use crate::common;
 #[test]
 fn new_task_file_omits_modified_and_history() {
     let fixtures = common::TestFixtures::new();

@@ -1,7 +1,6 @@
+use crate::common;
 use predicates::prelude::*;
 use tempfile::TempDir;
-mod common;
-
 /// Focused test suite for smart defaults functionality
 /// Smart Defaults Test: Phase 3.1.1 completion validation
 /// Tests the core smart default behavior that was implemented

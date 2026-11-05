@@ -12,8 +12,6 @@
 //!   dry runs, and force;
 //! - the computed `config show` / `config inspect` fields.
 
-mod common;
-
 use std::collections::BTreeMap;
 
 use lotar::services::config_service::ConfigService;

@@ -1,7 +1,5 @@
 use predicates::prelude::*;
 use std::fs;
-mod common;
-
 // Helper to run lotar with args in a given cwd
 fn run_lotar(cwd: &std::path::Path, args: &[&str]) -> assert_cmd::assert::Assert {
     let mut cmd = crate::common::lotar_cmd().unwrap();

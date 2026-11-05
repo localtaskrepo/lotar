@@ -6,8 +6,7 @@
 //! automation side effects (synchronous `run` actions appending to a log
 //! file); no agents or Git are involved.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use std::path::PathBuf;
 

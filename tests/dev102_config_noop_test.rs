@@ -10,8 +10,6 @@
 //! equal to an inherited default — and an explicit server-port pin the raw
 //! file does not carry yet — are genuine changes, never no-ops.
 
-mod common;
-
 use crate::common::cargo_bin_silent;
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_events;

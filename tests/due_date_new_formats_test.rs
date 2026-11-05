@@ -1,7 +1,7 @@
 use chrono::Local;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 fn ymd_string(days_from_today: i64) -> String {

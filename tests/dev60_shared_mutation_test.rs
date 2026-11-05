@@ -19,6 +19,7 @@
 //! No git tooling: repo-anchored fixtures live under CARGO_TARGET_TMPDIR
 //! (ancestry-only `.git` discovery); the Gitless fixture lives under the
 //! plain temp dir outside the checkout. No Git gating.
+use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_events::{self, ApiEvent};
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
@@ -32,8 +33,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
-mod common;
-use crate::common::env_mutex::EnvVarGuard;
 
 // ---------------------------------------------------------------------------
 // Fixtures

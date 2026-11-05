@@ -3,8 +3,7 @@
 //! assignees, and hooks install doesn't silence existing hooks.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn git(root: &std::path::Path, args: &[&str]) -> std::process::Output {

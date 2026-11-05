@@ -3,8 +3,7 @@ use std::process::Output;
 
 use tempfile::TempDir;
 
-mod common;
-
+use crate::common;
 fn run(args: &[&str], dir: &Path) -> Output {
     let mut cmd = common::lotar_cmd().expect("lotar cmd");
     cmd.current_dir(dir)

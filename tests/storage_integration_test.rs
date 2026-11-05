@@ -8,7 +8,7 @@
 
 use predicates::prelude::*;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 // =============================================================================

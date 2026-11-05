@@ -1,8 +1,6 @@
 use assert_cmd::Command;
 use tempfile::TempDir;
 
-mod common;
-
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.current_dir(temp_dir.path())
         .args(["--format", "json"]) // stable json output

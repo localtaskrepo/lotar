@@ -3,8 +3,6 @@ use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
 
-mod common;
-
 fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = ProcCommand::new("git");
     cmd.current_dir(repo).args(args);

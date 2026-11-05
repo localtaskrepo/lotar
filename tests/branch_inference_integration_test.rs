@@ -1,7 +1,5 @@
 use tempfile::TempDir;
 
-mod common;
-
 fn write_global(tasks_dir: &std::path::Path) {
     // Allow Feature/Bug/Chore so inference can map
     let content = r#"default.project: TEST

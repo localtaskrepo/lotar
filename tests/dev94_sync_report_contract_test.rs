@@ -1,8 +1,8 @@
+use crate::common;
+use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::api_types::SyncReportListResponse;
 use std::collections::HashMap;
-mod common;
-use common::env_mutex::EnvVarGuard;
 
 #[test]
 fn empty_report_list_serializes_required_array() {

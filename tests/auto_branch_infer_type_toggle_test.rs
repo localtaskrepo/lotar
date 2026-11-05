@@ -1,5 +1,3 @@
-mod common;
-
 use tempfile::TempDir;
 
 fn write_global(tasks_dir: &std::path::Path, enable: bool) {

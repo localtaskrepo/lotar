@@ -1,7 +1,7 @@
 use predicates::prelude::*;
 use std::fs;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 fn request(path: &std::path::Path) -> lotar::api_types::ScanRequest {

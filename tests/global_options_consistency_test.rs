@@ -1,7 +1,6 @@
 use std::env;
 use std::fs;
 
-mod common;
 use crate::common::TestFixtures;
 use crate::common::env_mutex::{EnvVarGuard, lock_var};
 

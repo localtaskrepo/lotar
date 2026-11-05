@@ -2,8 +2,7 @@ use std::path::Path;
 
 use tempfile::TempDir;
 
-mod common;
-
+use crate::common;
 #[test]
 fn lotar_init_alias_matches_config_init() {
     common::reset_lotar_test_environment();

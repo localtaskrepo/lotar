@@ -3,8 +3,6 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-mod common;
-
 fn write_task(dir: &Path, proj: &str, id: &str, title: &str) {
     let tasks = dir.join(".tasks").join(proj);
     fs::create_dir_all(&tasks).unwrap();

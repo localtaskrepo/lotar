@@ -3,8 +3,7 @@
 //! main query's results in memory.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use lotar::services::audit_service::AuditService;
 

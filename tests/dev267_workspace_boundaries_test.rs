@@ -1,8 +1,7 @@
 //! DEV-267: read-only commands do not create workspaces, and workspace
 //! discovery stays inside the git repository and below a home `.tasks`.
 
-mod common;
-
+use crate::common;
 fn lotar(dir: &std::path::Path, home: &std::path::Path, args: &[&str]) -> String {
     let output = common::lotar_cmd()
         .unwrap()

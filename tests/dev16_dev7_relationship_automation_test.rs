@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::Path;
 
-mod common;
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 
 fn run(dir: &Path, args: &[&str]) -> (bool, String) {

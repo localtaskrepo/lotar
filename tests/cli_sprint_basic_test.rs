@@ -10,8 +10,7 @@ use lotar::{Task, TaskStatus};
 use predicates::prelude::*;
 use serde_json::Value;
 
-mod common;
-
+use crate::common;
 fn append_sprint_tasks(storage: &mut Storage, sprint_id: u32, task_ids: &[String]) {
     let mut record = SprintService::get(storage, sprint_id).expect("sprint exists");
     let mut tasks = record.sprint.tasks;

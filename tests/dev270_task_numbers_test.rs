@@ -3,8 +3,7 @@
 //! number stored twice can be renumbered.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn lotar_in(dir: &std::path::Path, args: &[&str]) -> std::process::Output {

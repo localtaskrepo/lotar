@@ -7,8 +7,7 @@
 //! is always reaped with a bounded wait and a kill fallback. No test touches
 //! processes it did not spawn.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};

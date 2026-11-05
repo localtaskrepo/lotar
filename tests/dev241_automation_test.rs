@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-mod common;
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 
 struct Workspace {

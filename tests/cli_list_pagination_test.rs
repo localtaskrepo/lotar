@@ -2,8 +2,6 @@
 
 use tempfile::TempDir;
 
-mod common;
-
 fn seed(dir: &std::path::Path, count: usize) {
     for i in 1..=count {
         let mut cmd = crate::common::lotar_cmd().unwrap();

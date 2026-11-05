@@ -1,0 +1,35 @@
+title: Merge integration tests into one test binary
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-05T23:13:53.110525+00:00
+modified: 2026-11-05T23:24:08.813229+00:00
+comments:
+- date: 2026-11-05T23:24:08.782354+00:00
+  text: |-
+    Done. Cargo.toml sets autotests = false. tests/integration.rs declares common once and every tests/*.rs as a module (182 files); nextest_guard_test and performance_test stay separate. In the files, 'mod common;' became 'use crate::common;', or was dropped where the file only used crate::common:: paths. .config/nextest.toml selects the serialized agent suites with test(/^agent_automation_integration_test::/) + test(/^agent_safety_test::/). The gitless profile's ::git_required:: filter still matches. testing-strategy SKILL.md explains file selection and registering new files.
+    Result: npm run test:rust:agent ran 1961 tests across 6 binaries (was about 190), the same count as before. 93 s total (31 s build, 60 s tests) against about 30 minutes for the previous full run, which was dominated by macOS first-launch scans of each new binary. Clippy and fmt are clean.
+description: |-
+  Each of the 184 files in tests/ builds its own test binary (~19 MB each, ~3.8 GB per full rebuild). Every library change relinks all of them, and on macOS each new binary is security-scanned on its first launch: one listing took 61 s of wall time with zero CPU while syspolicyd/XprotectService were busy, so a full test run spent ~30 minutes before running a test.
+  Plan: autotests = false; one [[test]] target tests/integration.rs declaring every file as a module (common declared once); keep nextest_guard_test and performance_test as their own small binaries. Test names gain the file as a module prefix, so binary(...) filters in .config/nextest.toml become test(/^file::/). nextest still runs each test in its own process, so env/cwd isolation is unchanged.
+history:
+- at: 2026-11-05T23:13:57.303740+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-05T23:24:08.782354+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-05T23:24:08.813229+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

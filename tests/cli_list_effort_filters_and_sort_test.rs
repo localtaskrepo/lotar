@@ -2,8 +2,6 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
-mod common;
-
 fn run(cmd: &mut Command, temp: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

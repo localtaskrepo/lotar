@@ -11,8 +11,7 @@
 //! tests/dev102_config_noop_test.rs); the shared service boundary itself is
 //! covered by tests/task_noop_update_test.rs.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use std::path::{Path, PathBuf};
 use std::process::Output;

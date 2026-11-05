@@ -1,7 +1,6 @@
 use predicates::prelude::*;
 use tempfile::TempDir;
 
-mod common;
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::utils::paths;
 

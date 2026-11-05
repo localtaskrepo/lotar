@@ -10,8 +10,6 @@
 //! rules, reordering, `max_iterations`, or a missing file) still write and
 //! emit. Invalid incoming files and unreadable current files still reject.
 
-mod common;
-
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_events;
 use lotar::services::automation_service::AutomationService;

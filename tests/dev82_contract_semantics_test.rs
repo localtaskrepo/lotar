@@ -14,8 +14,7 @@
 //! Fixtures are isolated temporary workspaces (`LOTAR_TASKS_DIR`); no git
 //! tooling is involved, and no `.tasks/DEV` data is read or written.
 
-mod common;
-
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 use common::openapi_semantics::SpecValidator;
 use lotar::api_server::{ApiServer, HttpRequest, HttpResponse};

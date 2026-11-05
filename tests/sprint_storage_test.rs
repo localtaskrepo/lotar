@@ -1,5 +1,3 @@
-mod common;
-
 use lotar::Storage;
 use lotar::services::sprint_service::SprintService;
 use lotar::storage::sprint::{

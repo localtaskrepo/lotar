@@ -7,8 +7,6 @@
 //! deferred tools-list notifications. The stateless `handle_json_line`
 //! helper is never used as a readiness shortcut.
 
-mod common;
-
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};

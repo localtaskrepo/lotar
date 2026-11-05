@@ -14,8 +14,6 @@
 //! Load-time: hand-edited invalid explicit policies fail closed on read;
 //! repair through the candidate pipeline keeps working.
 
-mod common;
-
 use chrono::{Duration, NaiveDate, TimeZone, Utc};
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;

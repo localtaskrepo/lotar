@@ -1,5 +1,3 @@
-mod common;
-
 use lotar::cli::project::ProjectResolver;
 use lotar::cli::project::test_support::resolver_from_config;
 use lotar::config::StringConfigField;

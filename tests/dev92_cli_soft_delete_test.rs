@@ -3,7 +3,7 @@
 //! `--include-deleted` list views, `task restore` (incl. dry-run), and the
 //! confirmation-only semantics of `--yes`.
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 use predicates::prelude::*;

@@ -1,4 +1,3 @@
-mod common;
 use crate::common::env_mutex::EnvVarGuard;
 use std::path::{Path, PathBuf};
 

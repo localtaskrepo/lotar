@@ -2,8 +2,6 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
-mod common;
-
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.current_dir(temp_dir.path())
         .env("LOTAR_TEST_SILENT", "1")

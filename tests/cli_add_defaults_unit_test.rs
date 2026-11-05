@@ -1,6 +1,6 @@
-use lotar::cli::handlers::test_support as add_test_support;
-mod common;
+use crate::common;
 use common::env_mutex::EnvVarGuard;
+use lotar::cli::handlers::test_support as add_test_support;
 use lotar::config::types::{ConfigurableField, ResolvedConfig, StringConfigField};
 use lotar::types::{Priority, TaskStatus, TaskType};
 

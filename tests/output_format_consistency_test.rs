@@ -1,5 +1,4 @@
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use predicates::prelude::*;
 use std::process::Output;

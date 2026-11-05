@@ -2,8 +2,7 @@
 //! DEV-231: field equalities are written in the web search syntax
 //! (`key=value`, `field:name=value`) instead of the removed `--where` flag.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use serde_json::Value;
 

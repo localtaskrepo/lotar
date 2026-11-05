@@ -1,8 +1,7 @@
 use predicates::prelude::*;
 use std::fs;
 
-mod common;
-
+use crate::common;
 #[test]
 fn completions_generate_can_write_file_and_print() {
     let fixtures = common::TestFixtures::new();

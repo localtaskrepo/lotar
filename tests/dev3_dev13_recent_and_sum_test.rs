@@ -5,8 +5,7 @@
 use chrono::{Duration, Utc};
 use serde_json::Value;
 
-mod common;
-
+use crate::common;
 struct Workspace {
     _tmp: tempfile::TempDir,
     tasks_dir: std::path::PathBuf,

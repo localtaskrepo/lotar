@@ -2,7 +2,7 @@ use lotar::Storage;
 use serde_json::Value as JsonValue;
 use std::path::Path;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 fn create_task(work_dir: &Path, title: &str) -> String {

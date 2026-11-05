@@ -13,8 +13,6 @@
 //! - create project-only enum validation with project-scoped suggestions,
 //! - soft/hard delete semantics on the task tools.
 
-mod common;
-
 use crate::common::env_mutex::EnvVarGuard;
 use serde_json::{Value, json};
 use std::path::Path;

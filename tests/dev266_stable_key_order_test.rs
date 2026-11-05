@@ -1,8 +1,7 @@
 //! DEV-266: maps in task and config files are written in a stable, sorted
 //! order, so unrelated edits do not reorder them.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn lotar(fixtures: &TestFixtures, args: &[&str]) {

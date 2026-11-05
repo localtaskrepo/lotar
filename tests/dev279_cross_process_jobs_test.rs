@@ -2,8 +2,7 @@
 //! cancellable from another, without the lotar-agent-wrapper binary.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use std::time::{Duration, Instant};
 

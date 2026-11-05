@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::TestFixtures;
 use common::env_mutex::EnvVarGuard;
 

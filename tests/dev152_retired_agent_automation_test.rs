@@ -6,8 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-mod common;
-
+use crate::common;
 const GLOBAL: &str = "default:\n  project: AB\nagent:\n  automation:\n    on_start:\n      set_status: InProgress\n    on_success:\n      set_status: NeedsReview\n      reassign_to: assignee_or_reporter\n";
 const PROJECT: &str =
     "project:\n  name: AB\nagent:\n  automation:\n    on_failure:\n      set_status: Blocked\n";

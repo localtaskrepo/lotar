@@ -1,6 +1,6 @@
 use std::fs;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 fn project_and_task_paths(root: &std::path::Path) -> (String, std::path::PathBuf) {

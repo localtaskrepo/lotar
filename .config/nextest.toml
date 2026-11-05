@@ -20,8 +20,9 @@ profile.default.slow-timeout = "90s"
 # The agent automation and safety suites spawn real worker processes (mock
 # agents polling the filesystem or running shell loops) on wall-clock
 # schedules. Under full num-cpus parallelism those windows blow and the tests
-# flake (passing standalone, failing under load). Serialize both binaries in
-# this group (agent safety joined via DEV-78).
+# flake (passing standalone, failing under load). Serialize both suites in
+# this group (agent safety joined via DEV-78). Since DEV-302 all integration
+# tests share one binary, so the suites are selected by their module prefix.
 [test-groups.agent-processes]
 max-threads = 1
 
@@ -30,7 +31,7 @@ max-threads = 1
 # relies on them. Assertions are unchanged and deterministic failures still
 # fail all retries.
 [[profile.default.overrides]]
-filter = 'binary(agent_automation_integration_test) + binary(agent_safety_test)'
+filter = 'test(/^agent_automation_integration_test::/) + test(/^agent_safety_test::/)'
 test-group = 'agent-processes'
 retries = 2
 

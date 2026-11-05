@@ -8,8 +8,7 @@
 //! stamp, while a genuine change rewrites the file canonically without
 //! losing concurrent membership updates.
 
-mod common;
-
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 use lotar::api_types::TaskCreate;
 use lotar::services::sprint_assignment;

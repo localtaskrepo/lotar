@@ -7,8 +7,6 @@
 //! dry runs run the full pipeline minus the write, force escapes only task
 //! conflicts, and field-precise project clears preserve sibling settings.
 
-mod common;
-
 use crate::common::cargo_bin_silent;
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::services::config_service::ConfigService;

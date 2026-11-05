@@ -16,6 +16,7 @@
 //! - attachment reachability and sprint analytics treat tombstones per the
 //!   DEV-92 contract
 
+use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
 use lotar::services::attachment_service::AttachmentService;
@@ -24,8 +25,6 @@ use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use serde_json::{Value, json};
 use std::collections::HashMap;
-mod common;
-use crate::common::env_mutex::EnvVarGuard;
 
 fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> HttpRequest {
     let mut q = HashMap::new();

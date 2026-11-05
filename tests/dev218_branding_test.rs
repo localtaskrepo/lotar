@@ -1,13 +1,12 @@
 //! DEV-218: repository branding for the web UI — `ui.*` settings, the
 //! /api/branding endpoints, and uploads.
+use crate::common::env_mutex::EnvVarGuard;
 use base64::Engine;
 use lotar::api_server::{ApiServer, HttpRequest, HttpResponse};
 use lotar::routes;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::PathBuf;
-mod common;
-use crate::common::env_mutex::EnvVarGuard;
 
 struct Fixture {
     _tmp: tempfile::TempDir,

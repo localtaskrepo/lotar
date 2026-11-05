@@ -1,5 +1,3 @@
-mod common;
-
 use lotar::workspace::TasksDirectoryResolver;
 use tempfile::TempDir;
 

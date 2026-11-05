@@ -3,8 +3,7 @@
 //! quotes, or inside a nested `sh -c '...'`.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 #[test]

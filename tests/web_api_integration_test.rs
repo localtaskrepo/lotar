@@ -1,3 +1,4 @@
+use crate::common::env_mutex::{EnvVarGuard, lock_var};
 use chrono::Utc;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
@@ -7,8 +8,6 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::{Duration, Instant};
-mod common;
-use crate::common::env_mutex::{EnvVarGuard, lock_var};
 
 // Test-time acceleration helpers
 fn fast_net() -> bool {

@@ -1,14 +1,13 @@
 //! DEV-216: attachment handling behind the web UI — metadata stripping and
 //! not-an-image warnings on upload, thumbnails (`?w=`), the info endpoint,
 //! reordering, the `has` list filter, and download names.
+use crate::common::env_mutex::EnvVarGuard;
 use base64::Engine;
 use lotar::api_server::{ApiServer, HttpRequest, HttpResponse};
 use lotar::routes;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::PathBuf;
-mod common;
-use crate::common::env_mutex::EnvVarGuard;
 
 struct Fixture {
     _tmp: tempfile::TempDir,

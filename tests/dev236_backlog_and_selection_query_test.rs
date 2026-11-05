@@ -5,7 +5,7 @@ use lotar::api_server::{ApiServer, HttpRequest};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
-mod common;
+use crate::common;
 use crate::common::env_mutex::EnvVarGuard;
 
 struct Workspace {

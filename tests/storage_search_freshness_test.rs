@@ -5,8 +5,6 @@
 //! Tests control timestamps explicitly, including unchanged mtime/length cases,
 //! without wall-clock sleeps or filesystem clock-granularity assumptions.
 
-mod common;
-
 use lotar::storage::manager::Storage;
 use lotar::storage::task::Task;
 use lotar::types::Priority;

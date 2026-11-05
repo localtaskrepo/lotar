@@ -5,8 +5,7 @@
 //! scripts and with cross-platform outcomes (missing binary, cached verdict,
 //! fail-closed contract) everywhere else.
 
-mod common;
-
+use crate::common;
 #[test]
 fn probe_reports_missing_git_binary() {
     let dir = tempfile::tempdir().unwrap();

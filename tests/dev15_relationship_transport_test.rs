@@ -1,5 +1,4 @@
-mod common;
-
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 use common::openapi_semantics::SpecValidator;
 use lotar::api_server::{ApiServer, HttpRequest};

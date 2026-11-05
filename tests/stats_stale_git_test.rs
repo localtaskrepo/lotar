@@ -1,5 +1,3 @@
-mod common;
-
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;

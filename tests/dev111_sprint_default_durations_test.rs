@@ -9,8 +9,6 @@
 //! Values already saved in a config file stay readable: `config validate`
 //! reports them as warnings and status reads never panic on them.
 
-mod common;
-
 use crate::common::cargo_bin_silent;
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::services::config_service::ConfigService;

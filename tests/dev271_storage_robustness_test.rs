@@ -3,8 +3,7 @@
 //! `created` are readable, and removed statuses can still be filtered.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use lotar::services::attachment_service::AttachmentService;
 

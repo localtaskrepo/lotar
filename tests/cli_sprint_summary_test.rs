@@ -7,8 +7,7 @@ use lotar::utils::paths;
 use predicates::prelude::*;
 use serde_json::Value;
 
-mod common;
-
+use crate::common;
 #[test]
 fn sprint_summary_surfaces_blocked_tasks_and_capacity() {
     let fixtures = common::TestFixtures::new();

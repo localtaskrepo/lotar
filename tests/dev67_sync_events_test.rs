@@ -1,5 +1,3 @@
-mod common;
-
 use lotar::api_events::{self, ApiEvent};
 use lotar::workspace::{TasksDirectoryResolver, TasksDirectorySource};
 use std::sync::mpsc::Receiver;

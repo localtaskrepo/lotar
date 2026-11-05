@@ -25,6 +25,7 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
 
 - Full (CI-like profile): `npm run test:rust` (runtime Git probe: default profile when Git works, else the `gitless` profile with reported `git_required` exclusions — see [tests README](../../../tests/README.md))
 - Filter by substring: `npm run test:rust -- <substring>`
+- Integration tests build into one binary (`tests/integration.rs`, DEV-302); each `tests/<file>.rs` is a module, so test names start with the file name. Select one file with `-E 'test(/^<file>::/)'`, and list new test files in `tests/integration.rs`.
 - List exact test names: `cargo nextest list --cargo-profile ci`
 - Pass-through test-binary args (e.g. `--nocapture`): `cargo nextest run --cargo-profile ci <filter> -- --nocapture`
 - Raw nextest (no npm runner) still selects `git_required` tests; they fail closed via `require_git()` when Git is unavailable — never a silent pass.

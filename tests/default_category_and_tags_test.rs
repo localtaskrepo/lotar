@@ -1,7 +1,7 @@
 use predicates::prelude::*;
 use tempfile::TempDir;
 
-mod common;
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 
 fn write_global_with_defaults(tasks_dir: &std::path::Path) {

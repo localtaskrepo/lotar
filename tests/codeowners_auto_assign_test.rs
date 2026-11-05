@@ -1,6 +1,6 @@
 use tempfile::TempDir;
 
-mod common;
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 
 use lotar::api_types::TaskCreate;

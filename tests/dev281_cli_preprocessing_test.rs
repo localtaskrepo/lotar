@@ -1,8 +1,7 @@
 //! DEV-281: help/version words and dash-leading values are data, not
 //! commands or global flags.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn run(fixtures: &TestFixtures, args: &[&str]) -> std::process::Output {

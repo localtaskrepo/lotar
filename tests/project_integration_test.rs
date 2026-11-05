@@ -9,7 +9,7 @@
 use predicates::prelude::*;
 use std::fs;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 // =============================================================================

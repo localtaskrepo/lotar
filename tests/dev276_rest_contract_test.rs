@@ -1,8 +1,7 @@
 //! DEV-276: REST bodies, status codes and response shapes follow the
 //! documented contract.
 
-mod common;
-
+use crate::common;
 use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use serde_json::{Value, json};

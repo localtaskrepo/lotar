@@ -12,7 +12,7 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
-mod common;
+use crate::common;
 use common::{TestFixtures, extract_task_id_from_output};
 
 // =============================================================================

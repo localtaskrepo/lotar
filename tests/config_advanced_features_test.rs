@@ -1,5 +1,4 @@
-mod common;
-
+use crate::common;
 use crate::common::cargo_bin_silent;
 use common::TestFixtures;
 use std::fs;

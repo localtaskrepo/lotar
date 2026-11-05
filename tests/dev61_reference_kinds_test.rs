@@ -19,13 +19,12 @@
 //! stay compiled (and executing) in every environment, including
 //! Git-denied sandboxes (only source-local `git_required` modules are ever
 //! excluded, and never by compilation).
+use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-mod common;
-use crate::common::env_mutex::EnvVarGuard;
 
 /// Fixture workspace placed under CARGO_TARGET_TMPDIR (inside the real
 /// checkout's target directory) so `find_repo_root` resolves by ANCESTRY

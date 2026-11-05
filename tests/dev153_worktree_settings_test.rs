@@ -2,8 +2,7 @@
 //! with `config set`, globally and per project, like the other worktree
 //! settings.
 
-mod common;
-
+use crate::common;
 fn run(dir: &std::path::Path, args: &[&str]) -> (bool, String) {
     let mut cmd = common::cargo_bin_silent();
     cmd.env("LOTAR_IGNORE_HOME_CONFIG", "1");

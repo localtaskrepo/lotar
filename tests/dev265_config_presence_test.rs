@@ -1,8 +1,7 @@
 //! DEV-265: a higher config layer that sets a value back to its built-in
 //! default must still win over a lower layer's non-default value.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use predicates::prelude::*;
 

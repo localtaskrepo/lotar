@@ -1,5 +1,3 @@
-mod common;
-
 use tempfile::TempDir;
 
 fn write_global_with_aliases(tasks_dir: &std::path::Path, body: &str) {

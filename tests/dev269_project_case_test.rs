@@ -2,8 +2,7 @@
 //! case refers to the existing folder, and generated prefixes don't merge
 //! two differently named projects.
 
-mod common;
-
+use crate::common;
 use lotar::utils::project::resolve_project_input;
 
 fn workspace_with(projects: &[(&str, Option<&str>)]) -> tempfile::TempDir {

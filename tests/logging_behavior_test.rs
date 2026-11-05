@@ -1,7 +1,7 @@
 use crate::common::{cargo_bin_silent, extract_task_id_from_output};
 use predicates::prelude::*;
 
-mod common;
+use crate::common;
 use common::TestFixtures;
 
 #[test]

@@ -2,8 +2,7 @@
 //! profiles in repo config) only run after the workspace is trusted.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use common::env_mutex::EnvVarGuard;
 use predicates::prelude::*;

@@ -1,7 +1,6 @@
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use lotar::api_types::{AgentJobCreateRequest, TaskCreate, TaskUpdate};
 use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};

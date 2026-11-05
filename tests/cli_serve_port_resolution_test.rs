@@ -7,8 +7,7 @@
 //! and is reaped before assertions end; all ports used are either held by
 //! the test itself or OS-assigned. No foreign process is ever touched.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use std::io::{BufRead, BufReader, Read};
 use std::net::TcpListener;

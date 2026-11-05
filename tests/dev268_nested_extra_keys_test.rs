@@ -1,7 +1,6 @@
 //! DEV-268: unknown keys nested in task and sprint files survive edits.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn lotar(fixtures: &TestFixtures, args: &[&str]) {

@@ -7,8 +7,7 @@ use lotar::utils::paths;
 use predicates::prelude::*;
 use serde_json::Value;
 
-mod common;
-
+use crate::common;
 fn create_task(
     storage: &mut Storage,
     title: &str,

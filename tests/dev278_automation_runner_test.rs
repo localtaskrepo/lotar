@@ -3,8 +3,7 @@
 //! the rules after it.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 fn with_rules(rules: &str) -> TestFixtures {

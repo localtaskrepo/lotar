@@ -10,7 +10,7 @@ use lotar::routes;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
-mod common;
+use crate::common;
 use crate::common::env_mutex::EnvVarGuard;
 
 struct Fixture {

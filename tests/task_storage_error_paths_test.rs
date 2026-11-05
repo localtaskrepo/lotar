@@ -2,7 +2,7 @@
 
 use predicates::prelude::*;
 
-mod common;
+use crate::common;
 use common::{TestFixtures, extract_task_id_from_bytes};
 
 #[test]

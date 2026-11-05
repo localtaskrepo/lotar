@@ -1,5 +1,3 @@
-mod common;
-
 use predicates::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};

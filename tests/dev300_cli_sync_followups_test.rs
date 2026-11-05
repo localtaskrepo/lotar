@@ -3,8 +3,7 @@
 //! exits non-zero with status `partial`.
 #![cfg(unix)]
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use std::io::{BufRead, BufReader, Read, Write};
 

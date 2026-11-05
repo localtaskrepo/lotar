@@ -1,8 +1,7 @@
 //! DEV-285: renaming a scanned file leaves one code reference, and blank
 //! titles are refused.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 
 #[test]

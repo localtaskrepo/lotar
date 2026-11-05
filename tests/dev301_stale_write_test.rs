@@ -1,12 +1,12 @@
 //! DEV-301: `/api/tasks/update` takes an optional `expected_modified`
 //! precondition; a task changed since then answers 409 and writes nothing.
 
+use crate::common;
+use common::env_mutex::EnvVarGuard;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::api_types::{TaskCreate, TaskUpdate};
 use lotar::services::task_service::TaskService;
 use std::collections::HashMap;
-mod common;
-use common::env_mutex::EnvVarGuard;
 
 fn post(server: &ApiServer, body: serde_json::Value) -> (u16, serde_json::Value) {
     let response = server.handle_request(&HttpRequest {

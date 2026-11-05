@@ -6,8 +6,7 @@
 //! truthfully. All work happens in isolated child workspaces; no ports are
 //! bound.
 
-mod common;
-
+use crate::common;
 use common::TestFixtures;
 use std::process::Command;
 
