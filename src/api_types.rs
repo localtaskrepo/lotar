@@ -1765,6 +1765,7 @@ pub struct SyncReportListResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SyncResponse {
+    /// `ok`, or `partial` when some items failed (DEV-300).
     pub status: String,
     pub direction: String,
     pub provider: String,

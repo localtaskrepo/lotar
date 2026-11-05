@@ -261,17 +261,20 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
         .source("attachments.max_upload_mb"),
     field("sync_reports_dir")
         .both()
-        .aliases(&["sync.reports_dir"]),
+        .aliases(&["sync.reports_dir"])
+        .source("sync.reports_dir"),
     field("sync_write_reports")
         .both()
-        .aliases(&["sync.write_reports"]),
+        .aliases(&["sync.write_reports"])
+        .source("sync.write_reports"),
     field("agent_context_enabled")
         .both()
         .aliases(&["agent.context_enabled"])
         .source("agent.context-enabled"),
     field("agent_context_extension")
         .both()
-        .aliases(&["agent.context_extension"]),
+        .aliases(&["agent.context_extension"])
+        .source("agent.context-extension"),
     field("agent_logs_dir").both().aliases(&["agent.logs_dir"]),
     field("agent_instructions")
         .both()
@@ -698,6 +701,12 @@ mod tests {
             "attachments_max_upload_mb",
             "attachments_max_upload_mb",
         ),
+        ("sync.reports_dir", "sync_reports_dir", "sync_reports_dir"),
+        (
+            "sync.write_reports",
+            "sync_write_reports",
+            "sync_write_reports",
+        ),
         (
             "sprints.defaults.capacity_points",
             "sprints_defaults_capacity_points",
@@ -727,6 +736,11 @@ mod tests {
             "agent.context-enabled",
             "agent_context_enabled",
             "agent_context_enabled",
+        ),
+        (
+            "agent.context-extension",
+            "agent_context_extension",
+            "agent_context_extension",
         ),
         (
             "agent.instructions",

@@ -312,6 +312,9 @@ fn source_label_for_global(
         "attachments_dir" => scope_field!(attachments_dir),
         "attachments_max_upload_mb" => scope_field!(attachments_max_upload_mb),
         "agent_context_enabled" => scope_field!(agent_context_enabled),
+        "agent_context_extension" => scope_field!(agent_context_extension),
+        "sync_reports_dir" => scope_field!(sync_reports_dir),
+        "sync_write_reports" => scope_field!(sync_write_reports),
         "agent_instructions" => scope_field!(agent_instructions),
         "agent_worktree_enabled" => scope_field!(agent_worktree),
         "agent_worktree_dir" => scope_field!(agent_worktree),
@@ -406,6 +409,9 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
         "attachments_dir" => env_equal!(attachments_dir),
         "attachments_max_upload_mb" => env_equal!(attachments_max_upload_mb),
         "agent_context_enabled" => env_equal!(agent_context_enabled),
+        "agent_context_extension" => env_equal!(agent_context_extension),
+        "sync_reports_dir" => env_equal!(sync_reports_dir),
+        "sync_write_reports" => env_equal!(sync_write_reports),
         "agent_instructions" => env_equal!(agent_instructions),
         "agent_worktree_enabled" => env_equal!(agent_worktree),
         "agent_worktree_dir" => env_equal!(agent_worktree),
@@ -684,6 +690,26 @@ fn source_label_for_project(
                 .is_some();
             let diff = resolved_project.agent_context_enabled != base_config.agent_context_enabled;
             project_scope!("agent_context_enabled", has_override, diff)
+        }
+        "agent_context_extension" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.agent_context_extension.as_ref())
+                .is_some();
+            let diff =
+                resolved_project.agent_context_extension != base_config.agent_context_extension;
+            project_scope!("agent_context_extension", has_override, diff)
+        }
+        "sync_reports_dir" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.sync_reports_dir.as_ref())
+                .is_some();
+            let diff = resolved_project.sync_reports_dir != base_config.sync_reports_dir;
+            project_scope!("sync_reports_dir", has_override, diff)
+        }
+        "sync_write_reports" => {
+            let has_override = project_cfg.and_then(|pc| pc.sync_write_reports).is_some();
+            let diff = resolved_project.sync_write_reports != base_config.sync_write_reports;
+            project_scope!("sync_write_reports", has_override, diff)
         }
         "agent_instructions" => {
             let has_override = project_cfg

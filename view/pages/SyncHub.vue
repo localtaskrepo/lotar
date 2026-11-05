@@ -1054,6 +1054,7 @@ function reportStatusLabel(status?: string | null): string {
   const normalized = status.toLowerCase()
   if (normalized === 'success' || normalized === 'ok') return 'Success'
   if (normalized === 'failed') return 'Failed'
+  if (normalized === 'partial') return 'Some failed'
   if (normalized === 'running') return 'Running'
   return normalized.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase())
 }
@@ -1085,7 +1086,7 @@ function reportStatusClass(status?: string | null): string {
   if (normalized === 'success' || normalized === 'ok') return 'pill--success'
   if (normalized === 'failed') return 'pill--danger'
   if (normalized === 'running') return 'pill--info'
-  if (normalized === 'unknown') return 'pill--warn'
+  if (normalized === 'unknown' || normalized === 'partial') return 'pill--warn'
   return 'pill--muted'
 }
 

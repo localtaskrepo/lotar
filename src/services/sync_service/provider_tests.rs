@@ -114,20 +114,32 @@ mod auth {
     }
 
     #[test]
-    fn unset_env_style_names_fall_back_to_the_literal_with_a_warning() {
-        let (auth, warnings) = build(
+    fn unset_env_style_names_are_an_error_not_a_token() {
+        // DEV-300: the name used to be sent as the token, earning a 401.
+        let message = error(
             SyncProvider::Github,
             &SyncAuthProfile {
                 token_env: Some("LOTAR_TEST_UNSET_TOKEN_9F2C".into()),
                 ..Default::default()
             },
         );
+        assert!(
+            message.contains("Environment variable 'LOTAR_TEST_UNSET_TOKEN_9F2C' is not set"),
+            "{message}"
+        );
+        // Other values are still used as the token itself.
+        let (auth, warnings) = build(
+            SyncProvider::Github,
+            &SyncAuthProfile {
+                token_env: Some("ghp_literalToken123".into()),
+                ..Default::default()
+            },
+        );
         assert_eq!(
             auth.unwrap().auth_header.as_deref(),
-            Some("Bearer LOTAR_TEST_UNSET_TOKEN_9F2C")
+            Some("Bearer ghp_literalToken123")
         );
-        assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].contains("env var is not set"));
+        assert!(warnings.is_empty());
     }
 
     #[test]

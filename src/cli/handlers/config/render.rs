@@ -452,6 +452,66 @@ fn render_resolved_config_yaml(
         sections.push(format!("attachments:\n{}", attachments_body));
     }
 
+    // Project-only reviewers (shown when any are set), sync reports and agent
+    // context files: present in the JSON output, missing here before DEV-300.
+    if !resolved.review_reviewers.is_empty() {
+        let mut review_body = String::new();
+        if write_sequence(
+            &mut review_body,
+            2,
+            "reviewers",
+            &resolved.review_reviewers,
+            sources.get("review.reviewers"),
+            options,
+        ) {
+            sections.push(format!("review:\n{}", review_body));
+        }
+    }
+
+    let mut sync_body = String::new();
+    let mut sync_written = false;
+    sync_written |= write_scalar_line(
+        &mut sync_body,
+        2,
+        "reports_dir",
+        &yaml_scalar(&resolved.sync_reports_dir),
+        sources.get("sync.reports_dir"),
+        options,
+    );
+    sync_written |= write_scalar_line(
+        &mut sync_body,
+        2,
+        "write_reports",
+        &yaml_scalar(&resolved.sync_write_reports),
+        sources.get("sync.write_reports"),
+        options,
+    );
+    if sync_written {
+        sections.push(format!("sync:\n{}", sync_body));
+    }
+
+    let mut agent_body = String::new();
+    let mut agent_written = false;
+    agent_written |= write_scalar_line(
+        &mut agent_body,
+        2,
+        "context_enabled",
+        &yaml_scalar(&resolved.agent_context_enabled),
+        sources.get("agent.context-enabled"),
+        options,
+    );
+    agent_written |= write_scalar_line(
+        &mut agent_body,
+        2,
+        "context_extension",
+        &yaml_scalar(&resolved.agent_context_extension),
+        sources.get("agent.context-extension"),
+        options,
+    );
+    if agent_written {
+        sections.push(format!("agent:\n{}", agent_body));
+    }
+
     let mut sprint_body = String::new();
     let mut sprint_written = false;
     if resolved.sprint_defaults.capacity_points.is_some()

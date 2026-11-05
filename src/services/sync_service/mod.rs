@@ -493,7 +493,12 @@ impl SyncService {
             info.push("Dry run: no changes applied".into());
         }
 
-        let report_status = "ok";
+        // Some items failed: the run finished, but not cleanly (DEV-300).
+        let report_status = if recorder.summary.failed > 0 {
+            "partial"
+        } else {
+            "ok"
+        };
         let report = recorder.report(report_status, warnings.clone(), info.clone());
         let write_enabled = !dry_run && write_report.unwrap_or(resolved.sync_write_reports);
         let stored_path = match SyncReportService::write_report(
@@ -527,7 +532,7 @@ impl SyncService {
         };
 
         Ok(SyncResponse {
-            status: "ok".to_string(),
+            status: report_status.to_string(),
             direction: direction.as_str().to_string(),
             provider: provider_label(&remote_config.provider).to_string(),
             remote: trimmed_remote.to_string(),

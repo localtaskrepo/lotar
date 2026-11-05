@@ -86,8 +86,8 @@ pub(super) fn build_auth_context(
                     profile_name
                 ))
             })?;
-            let email = resolve_auth_value(email_env, profile_name, "email", warnings)?;
-            let token = resolve_auth_value(token_env, profile_name, "token", warnings)?;
+            let email = resolve_auth_value(email_env, profile_name, "email")?;
+            let token = resolve_auth_value(token_env, profile_name, "token")?;
             let raw = format!("{}:{}", email, token);
             Some(format!("Basic {}", BASE64_STANDARD.encode(raw.as_bytes())))
         }
@@ -98,7 +98,7 @@ pub(super) fn build_auth_context(
                     profile_name
                 ))
             })?;
-            let token = resolve_auth_value(token_env, profile_name, "token", warnings)?;
+            let token = resolve_auth_value(token_env, profile_name, "token")?;
             Some(format!("Bearer {}", token))
         }
         other => {
@@ -121,7 +121,6 @@ pub(super) fn resolve_auth_value(
     name_or_value: &str,
     profile_name: &str,
     label: &str,
-    warnings: &mut Vec<String>,
 ) -> LoTaRResult<String> {
     let trimmed = name_or_value.trim();
     if trimmed.is_empty() {
@@ -143,15 +142,13 @@ pub(super) fn resolve_auth_value(
                 Ok(resolved.to_string())
             }
         }
-        Err(_) => {
-            if looks_like_env_var(trimmed) {
-                warnings.push(format!(
-                    "Auth profile '{}' {} env var is not set; using the literal value from home config",
-                    profile_name, label
-                ));
-            }
-            Ok(trimmed.to_string())
-        }
+        // A value shaped like a variable name (`LOTAR_GITHUB_TOKEN`) is never
+        // a real token or email: sending it would only earn a 401 (DEV-300).
+        Err(_) if looks_like_env_var(trimmed) => Err(LoTaRError::ValidationError(format!(
+            "Environment variable '{}' is not set (auth profile '{}' {}); export it, or put the {} itself in the profile",
+            trimmed, profile_name, label, label
+        ))),
+        Err(_) => Ok(trimmed.to_string()),
     }
 }
 

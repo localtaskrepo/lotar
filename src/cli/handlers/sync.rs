@@ -45,10 +45,30 @@ impl SyncHandler {
             ..SyncOptions::default()
         };
         let result = SyncService::run(resolver, direction, options).map_err(|e| e.to_string())?;
+        // Failed items do not stop the run, but they fail the command so
+        // scripts and cron notice (DEV-300).
+        let outcome = if result.summary.failed > 0 {
+            Err(format!(
+                "Sync {} finished with {} failed item(s); see the warnings{}",
+                result.direction,
+                result.summary.failed,
+                if result
+                    .report
+                    .as_ref()
+                    .is_some_and(|r| r.stored_path.is_some())
+                {
+                    " and the sync report"
+                } else {
+                    ""
+                }
+            ))
+        } else {
+            Ok(())
+        };
 
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&result);
-            return Ok(());
+            return outcome;
         }
 
         renderer.emit_success(format!(
@@ -73,7 +93,7 @@ impl SyncHandler {
             renderer.emit_notice(note);
         }
 
-        Ok(())
+        outcome
     }
 
     pub fn check(

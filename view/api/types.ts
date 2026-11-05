@@ -1348,7 +1348,8 @@ export interface SyncReportListResponse {
 }
 
 export interface SyncResponse {
-    status: string
+    /** `ok`, or `partial` when some items failed. */
+    status: 'ok' | 'partial' | string
     direction: 'push' | 'pull'
     provider: SyncProvider
     remote: string

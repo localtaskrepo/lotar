@@ -124,7 +124,7 @@ export LOTAR_GITHUB_TOKEN=...     # your GitHub token
 | `api_url` | Use another API address, such as GitHub Enterprise. GitHub defaults to `https://api.github.com`. |
 | `provider` | Optional. `jira` or `github`; LoTaR warns if it does not match the remote. |
 
-If no environment variable with the given name is set, LoTaR uses the text itself as the value and prints a warning. Environment variables are the safer choice.
+A value written like a variable name (capital letters, digits and `_`, such as `LOTAR_GITHUB_TOKEN`) must name a set environment variable; if it is not set, sync stops with an error instead of sending the name as the token. Any other value is used as the token or email itself. Environment variables are the safer choice.
 
 Where to get a token:
 
@@ -179,7 +179,7 @@ A pulled status, priority or type must exist in the project. If it does not, tha
 
 ## Results and reports
 
-Each run prints how many tasks or issues it created, updated, skipped and failed, followed by any warnings. A failed task or issue does not stop the run and does not change the exit code, so read the counts and warnings. `--format json` prints the same summary.
+Each run prints how many tasks or issues it created, updated, skipped and failed, followed by any warnings. A failed task or issue does not stop the run, but the command then exits with status 1 and the result's `status` is `partial` instead of `ok` (also over REST and MCP, and in the report), so scripts and cron jobs notice. The warnings say what failed. `--format json` prints the same summary.
 
 Every run except a dry run writes a report to `.tasks/@reports/`. The Sync page in the web UI lists the reports and every task in them. Change the folder with `sync.reports_dir`, or turn reports off with `sync.write_reports: false`.
 
