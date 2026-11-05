@@ -162,11 +162,14 @@ describe('UI task panel persistence contract', () => {
                         // Releasing the first response flushes one coalesced patch.
                         releaseFirst();
                         await expect.poll(() => updateCount, { timeout: 10_000 }).toBe(2);
+                        // DEV-301: each save carries the panel's `modified` as a
+                        // precondition; the coalesced patch is sent once, not retried.
                         expect(updates[1]).toEqual({
                             id: seeded.id,
                             due_date: null,
                             effort: null,
                             custom_fields: { product: 'Edited' },
+                            expected_modified: expect.any(String),
                         });
 
                         // Durable: YAML reflects every change once the queue drains.
