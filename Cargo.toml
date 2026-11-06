@@ -54,14 +54,14 @@ clap_complete = "4.6.11"
 rayon = { version = "1.12.0", default-features = false, optional = true }
 ignore = { version = "0.4.33" }
 notify = "8.2.0"
-pulldown-cmark = { version = "0.13.4", default-features = false }
+pulldown-cmark = { version = "0.13.6", default-features = false }
 blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "ico", "tiff"] }
 base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 ureq = { version = "3.4.2", features = ["json"] }
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 libc = "0.2.191"
-sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 fs2 = "0.4.3"
 
 # Production release profile optimized for minimal binary size

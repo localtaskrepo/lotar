@@ -55,7 +55,11 @@ pub fn process_alive(pid: u32) -> bool {
     }
     #[cfg(not(unix))]
     {
-        let mut system = sysinfo::System::new();
+        // If the process list cannot be read, assume the job still runs:
+        // a live job is never treated as gone and started twice.
+        let Ok(mut system) = sysinfo::System::new() else {
+            return true;
+        };
         let pid = sysinfo::Pid::from_u32(pid);
         system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
         system.process(pid).is_some()

@@ -1027,7 +1027,11 @@ fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob
 }
 
 fn list_wrapper_processes() -> Vec<RunningAgentJob> {
-    let mut system = System::new();
+    // sysinfo 0.40 reports when the process list cannot be read; that is
+    // treated as no wrapper processes, as on unsupported platforms before.
+    let Ok(mut system) = System::new() else {
+        return Vec::new();
+    };
     // The command line is not refreshed by default; the wrapper's job and
     // ticket ids are read from it (DEV-279).
     system.refresh_processes_specifics(

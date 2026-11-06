@@ -862,7 +862,10 @@ fn terminate_child(child: &mut Child) {
 /// All processes below `root`, found through their parent links.
 #[cfg(unix)]
 fn descendant_pids(root: u32) -> Vec<u32> {
-    let mut system = sysinfo::System::new();
+    // Without a process list only the root itself is stopped.
+    let Ok(mut system) = sysinfo::System::new() else {
+        return Vec::new();
+    };
     system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for (pid, process) in system.processes() {

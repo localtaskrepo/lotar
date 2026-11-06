@@ -1,0 +1,53 @@
+title: 'Release prep: fix RUSTSEC-2026-0433 and bring dependencies up to date'
+status: Done
+priority: High
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-06T00:28:17.111558+00:00
+modified: 2026-11-06T00:37:59.413862+00:00
+relationships:
+  related:
+  - DEV-253
+  - DEV-288
+  - DEV-301
+comments:
+- date: 2026-11-06T00:37:59.155026+00:00
+  text: |-
+    Rust: cargo update (32 compatible updates), including pulldown-cmark 0.13.5 to 0.13.6 for RUSTSEC-2026-0433; Cargo.toml now requires >=0.13.6. lotar parses Markdown with Options::empty(), so it was not exposed to the wikilink issue. sysinfo 0.39 to 0.40, the only direct dependency a major version behind: System::new() can now fail. A failed process list is treated as no processes, as on unsupported platforms before, except the Windows liveness check in agent_active_jobs, which assumes the job is still alive so it is never started twice. That Windows-only branch could not be compiled locally (ring needs a Windows C compiler), so the CI Windows job is its check.
+    npm: npm update (minor/patch for playwright, vitest, vite, vue, eslint and others). overrides pin minimatch ^11.0.5 and glob ^14.0.3, which clears the 15 moderate audit findings, all in dev tooling (eslint, typescript-eslint, @vue/test-utils) and none shipped. Dependabot's security update could not do this because those tools still allow minimatch 10. npm audit: 0 vulnerabilities.
+    Kept: TypeScript 7 (typescript-eslint supports typescript <6.1) and jsdom 31 (its CSS parser drops min() with three arguments, failing a DependencyGraph style assertion; test environment only).
+    CI investigation on main (run 42128691522): cargo-deny was this advisory; the 3 smoke failures were already fixed locally in DEV-301 follow-up commits; the UI test failure was the DEV-288 time zone test (fixed in 5bf57d9). CodeQL (rust) failed while uploading results, without an error, and passed on all earlier runs; I take it as transient and the next push reruns it.
+    Verified: cargo deny check ok; clippy, fmt, eslint, prettier and vue-tsc clean; 1961 Rust tests and 1431 UI tests pass.
+description: 'CI on main fails cargo-deny: RUSTSEC-2026-0433 (quadratic parsing of nested image wikilinks with ENABLE_WIKILINKS) in pulldown-cmark 0.13.5; fixed in 0.13.6. Before the next release, which contains the DEV-253 batch of bug fixes, bring Rust and npm dependencies up to date, including the pending Dependabot groups (npm minor/patch, minimatch, GitHub Actions), and get CI green.'
+history:
+- at: 2026-11-06T00:28:17.259002+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-253"]}'
+- at: 2026-11-06T00:28:21.928011+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-06T00:37:59.155026+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T00:37:59.295361+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-253"]}'
+    new: '{"related":["DEV-253","DEV-288","DEV-301"]}'
+- at: 2026-11-06T00:37:59.413862+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
