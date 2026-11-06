@@ -54,6 +54,11 @@ fn release_build_job_has_no_write_token_or_signing_identity() {
         cross.contains("aarch64-unknown-linux-musl@sha256:"),
         "{cross}"
     );
+    // DEV-309: the armv7 image is pinned the same way.
+    assert!(
+        cross.contains("armv7-unknown-linux-musleabihf@sha256:"),
+        "{cross}"
+    );
 }
 
 #[test]
