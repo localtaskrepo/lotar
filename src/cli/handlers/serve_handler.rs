@@ -391,16 +391,8 @@ impl CommandHandler for ServeHandler {
 
         // DEV-305: let launchd/systemd start the upgraded binary.
         if exit_on_upgrade {
-            let watching = crate::utils::binary_watch::spawn_watcher(|| {
-                eprintln!(
-                    "The lotar binary changed; stopping so the service manager starts the new version"
-                );
-                crate::services::agent_job_service::AgentJobService::shutdown_jobs(
-                    std::time::Duration::from_secs(10),
-                );
-                std::process::exit(0);
-            });
-            if !watching {
+            // Same watcher and exit as lotar mcp's default autoreload.
+            if !crate::utils::binary_watch::exit_when_replaced() {
                 renderer
                     .emit_warning("Cannot watch the lotar binary; --exit-on-upgrade has no effect");
             }

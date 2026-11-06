@@ -93,6 +93,19 @@ pub fn spawn_watcher(on_change: impl FnOnce() + Send + 'static) -> bool {
     spawn_watcher_for(path, interval(), on_change)
 }
 
+/// The one upgrade reaction for long-running commands (`lotar mcp`, `lotar
+/// serve --exit-on-upgrade`): once the binary is replaced, stop running
+/// agent jobs and exit with status 0, so whatever started this process runs
+/// the new version. The note goes to stderr; stdout may carry a protocol.
+/// Returns false when there is nothing to watch.
+pub fn exit_when_replaced() -> bool {
+    spawn_watcher(|| {
+        eprintln!("The lotar binary changed; exiting so the new version can start");
+        crate::services::agent_job_service::AgentJobService::shutdown_jobs(Duration::from_secs(10));
+        std::process::exit(0);
+    })
+}
+
 /// [`spawn_watcher`] for a given path and interval.
 pub fn spawn_watcher_for(
     path: PathBuf,
