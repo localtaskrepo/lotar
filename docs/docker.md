@@ -9,7 +9,7 @@ checksum, and works in your repository mounted at `/workspace`.
 - `linux/arm64` (Apple Silicon / Graviton)
 
 ## Tags
-- `mallox/lotar:<version>` (for example `mallox/lotar:0.11.2`): one release.
+- `mallox/lotar:<version>` (for example `mallox/lotar:0.12.0`): one release.
 - `mallox/lotar:latest`: the newest stable release.
 - `mallox/lotar:next`: the newest prerelease (for example `1.0.0-rc.1`). Prereleases never
   move `latest`, and a stable release does not move `next`, so after a stable release `next`

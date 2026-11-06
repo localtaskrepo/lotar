@@ -150,7 +150,7 @@ Once started, the server provides:
 
 To keep a server running for a repository, for example so a reverse proxy can always reach it, let the system start it: launchd on macOS, systemd on Linux. LoTaR does not install services itself; copy one of the files below and adjust the paths, port and names. Three things are easy to get wrong:
 
-- **The `lotar` path.** Use the stable path you run from a terminal (`/opt/homebrew/bin/lotar`, `/usr/local/bin/lotar`, `~/.cargo/bin/lotar`), not a versioned one such as `/opt/homebrew/Cellar/lotar/0.11.2/bin/lotar`, so upgrades take effect.
+- **The `lotar` path.** Use the stable path you run from a terminal (`/opt/homebrew/bin/lotar`, `/usr/local/bin/lotar`, `~/.cargo/bin/lotar`), not a versioned one such as `/opt/homebrew/Cellar/lotar/0.12.0/bin/lotar`, so upgrades take effect.
 - **`PATH`.** Services start with a very short `PATH`. Agent jobs need the agent CLIs (`claude`, `codex`, ...) and `git`, so set `PATH` to what `echo $PATH` prints in your terminal. Tokens for sync or agents are not inherited either. Put them in the service only if you accept them being stored in that file.
 - **Upgrades.** Add `--exit-on-upgrade` so the server stops when `lotar` is upgraded and the service manager starts the new version. It watches the path the service runs, so a Homebrew upgrade (a new version behind the same symlink) counts.
 
