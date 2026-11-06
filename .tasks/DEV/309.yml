@@ -1,11 +1,11 @@
 title: Release native Windows arm64 and Linux armv7 builds
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-06T02:36:49.920691+00:00
-modified: 2026-11-06T03:29:52.068142+00:00
+modified: 2026-11-06T03:33:33.481437+00:00
 relationships:
   related:
   - DEV-310
@@ -32,6 +32,8 @@ comments:
     - install-verify (run 42156206945) passes for install.ps1 on windows-11-arm (pwsh and Windows PowerShell, PE machine check), npm on Windows arm64, the armv7 deb under QEMU and install.sh in Alpine armv7 under QEMU.
     - Fixed in the verify workflow: the armv7 npm step used node:24, which has no arm/v7 image (now node:22). The rpm checks used rpm -i, which RPM 6 / Fedora 45 refuses for unsigned packages; they now use the documented 'dnf install' (follow-up DEV-310 to GPG-sign rpms).
     - npm on Linux arm64 failed only because the registry hadn't caught up with the new versions yet; it is visible now. Next: push the fix and rerun install-verify for v0.12.1.
+- date: 2026-11-06T03:33:33.445757+00:00
+  text: 'Second install-verify run for v0.12.1 (42157009609): all 21 jobs green, including Windows ARM64 (install.ps1 x2 with the PE check, npm), Linux armv7 under QEMU (install.sh, npm with node:22, deb armhf), and rpm via dnf on Fedora 45. Done.'
 description: 'Add two platforms to every release channel: Windows arm64 (aarch64-pc-windows-msvc; today Windows on ARM runs the x64 build under emulation) and Linux armv7 (armv7-unknown-linux-musleabihf, static, for 32-bit Raspberry Pi OS and older Pis). Covers the release build matrix, checksums/signing/upload, the release page, npm platform packages (@localtaskrepo/lotar-win32-arm64, @localtaskrepo/lotar-linux-arm) and the launcher, install.ps1/install.sh architecture selection, the Scoop arm64 entry, .deb/.rpm for armhf, install verification, docs and tests. The first version of each new npm package must be published by hand before trusted publishing works (docs/release-guide.md).'
 history:
 - at: 2026-11-06T02:38:14.826930+00:00
@@ -60,3 +62,13 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-310"]}'
+- at: 2026-11-06T03:33:33.445757+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T03:33:33.481437+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
