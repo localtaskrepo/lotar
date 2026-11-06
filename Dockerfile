@@ -12,6 +12,7 @@ RUN set -euxo pipefail \
     && case "$TARGETARCH" in \
         amd64) ARCH_SUFFIX="x64" ;; \
         arm64) ARCH_SUFFIX="arm64" ;; \
+        arm) ARCH_SUFFIX="armv7" ;; \
         *) echo "Unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
     esac \
     && download_base="https://github.com/localtaskrepo/lotar/releases/download/v${LOTAR_VERSION}" \

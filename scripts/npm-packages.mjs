@@ -27,8 +27,8 @@ const MAIN_DIR = 'lotar';
 export const SCOPE = '@localtaskrepo';
 
 // npm platform -> release archive. Linux uses the static musl builds, which run
-// on glibc and musl distributions alike. Windows on ARM runs the x64 build
-// under emulation, so its package allows arm64 too (the launcher maps it).
+// on glibc and musl distributions alike. Windows on ARM and 32-bit ARM Linux
+// have native builds since DEV-309.
 export const PLATFORMS = [
     {
         id: 'darwin-arm64',
@@ -55,6 +55,14 @@ export const PLATFORMS = [
         label: 'Linux on arm64',
     },
     {
+        id: 'linux-arm',
+        os: 'linux',
+        cpu: ['arm'],
+        archive: 'linux-musl-armv7.tar.gz',
+        binary: 'lotar',
+        label: 'Linux on 32-bit ARM (armv7)',
+    },
+    {
         id: 'linux-x64',
         os: 'linux',
         cpu: ['x64'],
@@ -63,12 +71,20 @@ export const PLATFORMS = [
         label: 'Linux on x64',
     },
     {
+        id: 'win32-arm64',
+        os: 'win32',
+        cpu: ['arm64'],
+        archive: 'windows-arm64.zip',
+        binary: 'lotar.exe',
+        label: 'Windows on ARM64',
+    },
+    {
         id: 'win32-x64',
         os: 'win32',
-        cpu: ['x64', 'arm64'],
+        cpu: ['x64'],
         archive: 'windows-x64.zip',
         binary: 'lotar.exe',
-        label: 'Windows on x64 and ARM64',
+        label: 'Windows on x64',
     },
 ];
 

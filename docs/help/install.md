@@ -28,8 +28,9 @@ curl -fsSL https://localtaskrepo.github.io/lotar/install.sh | sh
 
 The script downloads the latest release for your system from GitHub, checks it against the release's
 SHA-256 file, and installs `lotar` to `~/.local/bin` without `sudo`. Linux gets the static musl build,
-which runs on any distribution. It needs `curl` or `wget`, `tar`, and a SHA-256 tool, and works with
-BusyBox. Options:
+which runs on any distribution, on x64, arm64, and (in releases after v0.12.0) 32-bit ARM (armv7,
+such as 32-bit Raspberry Pi OS; armv6 boards like the Pi Zero are not supported). It needs `curl` or
+`wget`, `tar`, and a SHA-256 tool, and works with BusyBox. Options:
 
 ```bash
 # A specific release and another directory (the directory must be writable)
@@ -53,8 +54,10 @@ sudo apt install ./lotar-$VERSION-linux-x64.deb      # Fedora/RHEL: sudo dnf ins
 lotar --version
 ```
 
-Use `linux-arm64` for 64-bit ARM. The packages install `/usr/bin/lotar`; there is no package repository
-yet, so upgrade by installing the newer package.
+Use `linux-arm64` for 64-bit ARM. Releases after v0.12.0 also have a `linux-armv7` `.deb` (armhf) for
+32-bit ARM such as Raspberry Pi OS; there is no 32-bit ARM `.rpm`, since Fedora and RHEL no longer support
+it. The packages install `/usr/bin/lotar`; there is no package repository yet, so upgrade by installing
+the newer package.
 
 ## Any OS with Node.js: npm
 
@@ -64,7 +67,7 @@ lotar --version
 ```
 
 The `@localtaskrepo/lotar` package installs the `lotar` command, using the release binary for your platform (macOS, Linux, or Windows on x64 or
-arm64; Windows on ARM runs the x64 build under emulation). npm picks the matching
+arm64, and Linux on 32-bit ARM; up to v0.12.0, Windows on ARM ran the x64 build under emulation). npm picks the matching
 `@localtaskrepo/lotar-<platform>` package from its optional dependencies; there is no install script,
 so `--ignore-scripts` works. Node.js only starts the binary. Upgrade with `npm update --global @localtaskrepo/lotar`.
 
@@ -98,16 +101,18 @@ The bucket is updated during every release. Upgrade with `scoop update lotar`.
 irm https://localtaskrepo.github.io/lotar/install.ps1 | iex
 ```
 
-The script downloads the latest x64 release, checks it against the release's SHA-256 file, installs
+The script downloads the latest release for your CPU (x64 or ARM64), checks it against the release's SHA-256 file, installs
 `lotar.exe` to `%LOCALAPPDATA%\Programs\lotar`, and adds that folder to your user `PATH` (open a new
 terminal afterwards). Set `$env:LOTAR_VERSION` (for example `v0.11.0`) or `$env:LOTAR_INSTALL_DIR` before
-running it to pick a release or folder. On ARM64 Windows it installs the x64 build, which Windows 11 runs
-under emulation. Run it again to upgrade.
+running it to pick a release or folder. On ARM64 Windows it installs the native ARM64 build; for releases
+up to v0.12.0, which have none, it installs the x64 build, which Windows 11 runs under emulation. Run it
+again to upgrade.
 
 ## Linux, macOS, Windows: release archives
 
 Each [GitHub release](https://github.com/localtaskrepo/lotar/releases/latest) has archives for
-`linux-x64`, `linux-musl-x64`, `linux-musl-arm64`, `macos-arm64`, `macos-x64`, and `windows-x64`,
+`linux-x64`, `linux-musl-x64`, `linux-musl-arm64`, `linux-musl-armv7`, `macos-arm64`, `macos-x64`,
+`windows-x64`, and `windows-arm64` (`linux-musl-armv7` and `windows-arm64` in releases after v0.12.0),
 each with a SHA-256 checksum file and a keyless Sigstore signature (`.sig`) and certificate (`.pem`).
 
 ```bash
@@ -128,7 +133,7 @@ Release archives contain the `lotar` binary only. Agent jobs run without the opt
 ## Any OS: Docker
 
 The [`mallox/lotar`](https://hub.docker.com/r/mallox/lotar) image contains the static musl build
-and `git` on Alpine Linux, for `linux/amd64` and `linux/arm64`. Its entrypoint is `lotar`, so
+and `git` on Alpine Linux, for `linux/amd64`, `linux/arm64`, and (after v0.12.0) `linux/arm/v7`. Its entrypoint is `lotar`, so
 pass subcommands directly. Mount your repository at `/workspace`, the working directory, and on
 Linux run as your own user so LoTaR can write to it:
 

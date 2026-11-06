@@ -10,7 +10,7 @@ automation and the manual checks to run after every tag.
   `v` lands on `main` (for example `v0.6.3`).
 - **Artifacts produced**:
   - Signed tarballs/zips for every supported target, attached to the GitHub Release page.
-  - Signed `.deb` and `.rpm` packages for x64 and arm64, built with nfpm from the static
+  - Signed `.deb` and `.rpm` packages for x64 and arm64, plus a `.deb` for armv7 (armhf), built with nfpm from the static
     musl binaries (`packaging/nfpm.yaml`), attached to the same release.
   - npm packages: `@localtaskrepo/lotar` (a small Node launcher that installs the `lotar` command) and one `@localtaskrepo/lotar-<platform>`
     package per binary, assembled by `scripts/npm-packages.mjs` from the release archives.
@@ -80,14 +80,15 @@ So the first version of each package is published by hand from a maintainer's ma
    ```bash
    TAG=v0.11.1
    mkdir -p npm-bootstrap/downloads && cd npm-bootstrap
-   for p in macos-arm64 macos-x64 linux-musl-arm64 linux-musl-x64 windows-x64; do
-     ext=tar.gz; [ "$p" = windows-x64 ] && ext=zip
+   for p in macos-arm64 macos-x64 linux-musl-arm64 linux-musl-armv7 linux-musl-x64 windows-x64 windows-arm64; do
+     ext=tar.gz; case "$p" in windows-*) ext=zip ;; esac
      gh release download "$TAG" --repo localtaskrepo/lotar --dir downloads \
        --pattern "lotar-$TAG-$p.$ext" --pattern "lotar-$TAG-$p.sha256"
    done
    node ../scripts/npm-packages.mjs --tag "$TAG" --archives downloads --out dist
    npm login
-   for d in lotar-darwin-arm64 lotar-darwin-x64 lotar-linux-arm64 lotar-linux-x64 lotar-win32-x64 lotar; do
+   for d in lotar-darwin-arm64 lotar-darwin-x64 lotar-linux-arm lotar-linux-arm64 lotar-linux-x64 \
+            lotar-win32-arm64 lotar-win32-x64 lotar; do
      (cd "dist/$d" && npm publish --access public) || break
    done
    ```
@@ -101,8 +102,8 @@ So the first version of each package is published by hand from a maintainer's ma
 
    ```bash
    for p in @localtaskrepo/lotar-darwin-arm64 @localtaskrepo/lotar-darwin-x64 \
-            @localtaskrepo/lotar-linux-arm64 @localtaskrepo/lotar-linux-x64 \
-            @localtaskrepo/lotar-win32-x64 @localtaskrepo/lotar; do
+            @localtaskrepo/lotar-linux-arm @localtaskrepo/lotar-linux-arm64 @localtaskrepo/lotar-linux-x64 \
+            @localtaskrepo/lotar-win32-arm64 @localtaskrepo/lotar-win32-x64 @localtaskrepo/lotar; do
      npm trust github "$p" --repo localtaskrepo/lotar --file release.yml --allow-publish --yes
      sleep 2
    done
@@ -112,6 +113,40 @@ So the first version of each package is published by hand from a maintainer's ma
    are under **Settings → Trusted publishing** for each package on npmjs.com.
 4. Optionally select **Require two-factor authentication and disallow tokens** for each
    package once its first workflow publish succeeds.
+
+### Adding a platform package
+
+A new platform (for example `@localtaskrepo/lotar-win32-arm64` and `@localtaskrepo/lotar-linux-arm`,
+added in DEV-309) needs the same one-time setup before the first release that contains it, but
+there is no release to build it from yet. Publish an empty placeholder version to create the
+package, then connect it:
+
+```bash
+npm login
+for p in lotar-win32-arm64 lotar-linux-arm; do
+  dir=$(mktemp -d)
+  cat > "$dir/package.json" <<JSON
+{
+  "name": "@localtaskrepo/$p",
+  "version": "0.0.0",
+  "description": "Placeholder; install @localtaskrepo/lotar instead.",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/localtaskrepo/lotar.git" }
+}
+JSON
+  (cd "$dir" && npm publish --access public) || break
+done
+for p in @localtaskrepo/lotar-win32-arm64 @localtaskrepo/lotar-linux-arm; do
+  npm trust github "$p" --repo localtaskrepo/lotar --file release.yml --allow-publish --yes
+  sleep 2
+done
+```
+
+Until the next release publishes the real version, `0.0.0` (which contains no binary) is the only
+version, and nothing depends on it: the main package only lists the new packages from the release
+that contains them. Do the `npm trust` step shortly before tagging (the 48-hour expiry above
+applies). Afterwards, `npm deprecate @localtaskrepo/<package>@0.0.0 "placeholder"` makes installs of
+that version warn.
 
 The job needs npm 11.5.1 or newer for trusted publishing and installs it if the runner's
 Node.js bundles an older npm. If a publish fails with `E404`, the package has no trusted
@@ -221,12 +256,15 @@ What it does:
    and `wget`), and macOS (Apple Silicon, Intel), checks the version and binary
    architecture, and reinstalls over the existing binary.
 2. Runs `site/install.ps1` piped into `Invoke-Expression`, as documented, under PowerShell
-   7 and Windows PowerShell 5.1, and checks the version and the user `PATH` entry.
-3. Downloads the `.deb` and `.rpm` packages for x64 and arm64, checks their SHA-256 files,
-   and installs, runs, and removes them in Debian and Fedora containers.
+   7 and Windows PowerShell 5.1 on Windows x64 and ARM64, and checks the version and the
+   user `PATH` entry; manual runs also check that the binary matches the CPU.
+3. Downloads the `.deb` and `.rpm` packages for x64 and arm64 and the armv7 `.deb`, checks
+   their SHA-256 files, and installs, runs, and removes them in Debian and Fedora containers
+   (armv7 under QEMU).
 4. Installs the `lotar` npm package globally on Linux (x64, arm64), macOS (Apple Silicon,
-   Intel), and Windows, checks the version and that only the matching platform package was
-   installed, and runs it once with `npx`.
+   Intel), and Windows (x64, ARM64), checks the version and that only the matching platform
+   package was installed, and runs it once with `npx`.
+5. Runs `install.sh` (Alpine) and the npm package (Debian) on 32-bit ARM under QEMU.
 
 Pull requests that change the install scripts run steps 1 and 2 against the latest release.
 

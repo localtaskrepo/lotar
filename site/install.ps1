@@ -25,9 +25,9 @@ function Install-Lotar {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
     $cpu = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
-    switch ($cpu) {
-        'AMD64' { }
-        'ARM64' { Write-Host 'No native ARM64 build yet; installing the x64 build, which Windows 11 runs under emulation.' }
+    $platform = switch ($cpu) {
+        'AMD64' { 'windows-x64' }
+        'ARM64' { 'windows-arm64' }
         default { throw "Unsupported CPU '$cpu'. See $Releases for the available builds." }
     }
 
@@ -45,14 +45,25 @@ function Install-Lotar {
     }
     if (-not $Version.StartsWith('v')) { $Version = "v$Version" }
 
-    $asset = "lotar-$Version-windows-x64"
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ("lotar-install-" + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
-        Write-Host "Downloading LoTaR $Version (windows-x64)"
+        $asset = "lotar-$Version-$platform"
         $zip = Join-Path $tmp "$asset.zip"
+        Write-Host "Downloading LoTaR $Version ($platform)"
+        try {
+            Invoke-WebRequest -Uri "$Releases/download/$Version/$asset.zip" -OutFile $zip -UseBasicParsing
+        } catch {
+            # Releases before the native ARM64 build (DEV-309) only have x64,
+            # which Windows 11 runs under emulation.
+            if ($platform -ne 'windows-arm64') { throw }
+            $platform = 'windows-x64'
+            $asset = "lotar-$Version-$platform"
+            $zip = Join-Path $tmp "$asset.zip"
+            Write-Host "$Version has no ARM64 build; installing the x64 build, which Windows 11 runs under emulation."
+            Invoke-WebRequest -Uri "$Releases/download/$Version/$asset.zip" -OutFile $zip -UseBasicParsing
+        }
         $sumFile = Join-Path $tmp "$asset.sha256"
-        Invoke-WebRequest -Uri "$Releases/download/$Version/$asset.zip" -OutFile $zip -UseBasicParsing
         Invoke-WebRequest -Uri "$Releases/download/$Version/$asset.sha256" -OutFile $sumFile -UseBasicParsing
 
         $expected = ((Get-Content -Raw $sumFile).Trim() -split '\s+')[0]

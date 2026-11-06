@@ -1,0 +1,32 @@
+title: Release native Windows arm64 and Linux armv7 builds
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-06T02:36:49.920691+00:00
+modified: 2026-11-06T02:46:33.737770+00:00
+comments:
+- date: 2026-11-06T02:46:33.737770+00:00
+  text: |-
+    Implemented; it ships with the next release once the two new npm packages are bootstrapped (placeholder publish plus npm trust; steps in docs/release-guide.md 'Adding a platform package').
+    - release.yml: new build entries windows-arm64 (native windows-11-arm, aarch64-pc-windows-msvc, with a step that finds clang for ring) and linux-musl-armv7 (cross with armv7-unknown-linux-musleabihf, image pinned by digest in Cross.toml). The build entries use a cross flag instead of hard-coded aarch64 conditions, and packaging keys on target == windows rather than windows-latest. Also: the npm archive list, release page links, a deb-only armv7 package (nfpm arm7 -> armhf; no rpm, since Fedora/RHEL dropped 32-bit ARM), a Scoop arm64 entry, and Docker linux/arm/v7 (the Dockerfile maps TARGETARCH arm to armv7).
+    - npm: new packages @localtaskrepo/lotar-win32-arm64 and @localtaskrepo/lotar-linux-arm; win32-x64 is x64-only now; the launcher maps win32-arm64 and linux-arm.
+    - install.ps1 picks windows-arm64 on ARM64 and falls back to x64 for releases without it; install.sh maps armv7l/armv7* on Linux.
+    - CI: a new QA job release_targets builds both targets on every push (Windows arm64 also runs --version natively), so a broken ARM build blocks the release. install-verify adds Windows ARM runs for install.ps1 (with a PE machine check) and npm, plus an armv7 deb and an install.sh/npm job under QEMU.
+    - Docs: install.md, docker.md, release-guide.md.
+    Verification limits: armv7 could not be built locally (rustc segfaults under Docker's amd64 emulation on Apple Silicon), and Windows arm64 can't be built on macOS. Both are first exercised by the new QA job on the next push. npm package, release-page and workflow contract tests pass.
+description: 'Add two platforms to every release channel: Windows arm64 (aarch64-pc-windows-msvc; today Windows on ARM runs the x64 build under emulation) and Linux armv7 (armv7-unknown-linux-musleabihf, static, for 32-bit Raspberry Pi OS and older Pis). Covers the release build matrix, checksums/signing/upload, the release page, npm platform packages (@localtaskrepo/lotar-win32-arm64, @localtaskrepo/lotar-linux-arm) and the launcher, install.ps1/install.sh architecture selection, the Scoop arm64 entry, .deb/.rpm for armhf, install verification, docs and tests. The first version of each new npm package must be published by hand before trusted publishing works (docs/release-guide.md).'
+history:
+- at: 2026-11-06T02:38:14.826930+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-06T02:46:33.737770+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -46,8 +46,19 @@ test('platform packages declare the os and cpu npm installs them for', () => {
     );
     assert.equal(windows.name, '@localtaskrepo/lotar-win32-x64');
     assert.deepEqual(windows.os, ['win32']);
-    assert.deepEqual(windows.cpu, ['x64', 'arm64']);
+    assert.deepEqual(windows.cpu, ['x64']);
     assert.deepEqual(windows.files, ['bin/lotar.exe']);
+    // DEV-309: native builds for Windows on ARM and 32-bit ARM Linux.
+    const windowsArm = platformManifest(
+        PLATFORMS.find((platform) => platform.id === 'win32-arm64'),
+        '0.12.0',
+    );
+    assert.deepEqual([windowsArm.name, windowsArm.cpu], ['@localtaskrepo/lotar-win32-arm64', ['arm64']]);
+    const armv7 = platformManifest(
+        PLATFORMS.find((platform) => platform.id === 'linux-arm'),
+        '0.12.0',
+    );
+    assert.deepEqual([armv7.name, armv7.os, armv7.cpu], ['@localtaskrepo/lotar-linux-arm', ['linux'], ['arm']]);
     const linux = platformManifest(
         PLATFORMS.find((platform) => platform.id === 'linux-arm64'),
         '0.12.0',
@@ -76,7 +87,11 @@ test('the launcher resolves the binary or explains why it cannot', () => {
     };
     assert.equal(
         launcher.binaryPath('win32', 'arm64', resolve),
-        '/node_modules/@localtaskrepo/lotar-win32-x64/bin/lotar.exe',
+        '/node_modules/@localtaskrepo/lotar-win32-arm64/bin/lotar.exe',
+    );
+    assert.equal(
+        launcher.binaryPath('linux', 'arm', resolve),
+        '/node_modules/@localtaskrepo/lotar-linux-arm/bin/lotar',
     );
     assert.equal(
         launcher.binaryPath('linux', 'x64', resolve),

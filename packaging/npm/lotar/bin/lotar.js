@@ -7,14 +7,14 @@ const { spawn } = require('node:child_process');
 
 const INSTALL_DOCS = 'https://github.com/localtaskrepo/lotar/blob/main/docs/help/install.md';
 
-// `${process.platform}-${process.arch}` -> platform package. Windows on ARM runs
-// the x64 build under emulation, so that package also allows arm64.
+// `${process.platform}-${process.arch}` -> platform package.
 const PACKAGES = {
     'darwin-arm64': '@localtaskrepo/lotar-darwin-arm64',
     'darwin-x64': '@localtaskrepo/lotar-darwin-x64',
+    'linux-arm': '@localtaskrepo/lotar-linux-arm',
     'linux-arm64': '@localtaskrepo/lotar-linux-arm64',
     'linux-x64': '@localtaskrepo/lotar-linux-x64',
-    'win32-arm64': '@localtaskrepo/lotar-win32-x64',
+    'win32-arm64': '@localtaskrepo/lotar-win32-arm64',
     'win32-x64': '@localtaskrepo/lotar-win32-x64',
 };
 

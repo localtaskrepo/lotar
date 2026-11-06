@@ -85,8 +85,13 @@ detect_platform() {
     case "$(uname -m)" in
     x86_64 | amd64) arch=x64 ;;
     aarch64 | arm64) arch=arm64 ;;
+    # 32-bit ARM (Raspberry Pi OS 32-bit); armv6 boards such as the Pi Zero are not built.
+    armv7l | armv7*) arch=armv7 ;;
     *) err "unsupported CPU $(uname -m); see $RELEASES for the available builds" ;;
     esac
+    if [ "$arch" = armv7 ] && [ "$os" != linux-musl ]; then
+        err "unsupported CPU $(uname -m) on $(uname -s); see $RELEASES for the available builds"
+    fi
     # A shell running under Rosetta reports x86_64 on Apple Silicon.
     if [ "$os" = macos ] && [ "$arch" = x64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || true)" = 1 ]; then
         arch=arm64

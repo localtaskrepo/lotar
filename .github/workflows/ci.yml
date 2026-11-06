@@ -579,6 +579,103 @@ jobs:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
 
+  # DEV-309: build the release targets that have no native runner elsewhere in
+  # QA, so a broken ARM build stops before a release is tagged. Windows arm64
+  # builds and runs natively; armv7 uses the same pinned cross as the release.
+  release_targets:
+    name: Release target build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux armv7
+            rust_target: armv7-unknown-linux-musleabihf
+            cross: true
+          - os: windows-11-arm
+            label: Windows arm64
+            rust_target: aarch64-pc-windows-msvc
+            cross: false
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      with:
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
+        targets: ${{ matrix.rust_target }}
+
+    - name: Rust cache
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      with:
+        cache-on-failure: true
+        shared-key: ci-${{ github.job }}-${{ matrix.rust_target }}
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+
+    - name: Determine Node version
+      id: node_version
+      shell: bash
+      run: |
+        version=$(node -p "require('./package.json').engines.node")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ steps.node_version.outputs.version }}
+        cache: npm
+
+    - name: Build web assets
+      shell: bash
+      run: |
+        npm ci --prefer-offline
+        npm run build:web
+
+    - name: Install cross
+      if: matrix.cross
+      shell: bash
+      run: |
+        set -euo pipefail
+        # v0.2.5, pinned by commit; its image is pinned by digest in Cross.toml.
+        cargo install cross --git https://github.com/cross-rs/cross --rev 88f49ff79e777bef6d3564531636ee4d3cc2f8d2 --locked
+
+    - name: Build (cross)
+      if: matrix.cross
+      shell: bash
+      env:
+        RUST_TARGET: ${{ matrix.rust_target }}
+      run: cross build --locked --all-features --profile ci --target "$RUST_TARGET"
+
+    # ring compiles its assembly with clang on Windows on ARM.
+    - name: Find clang
+      if: ${{ !matrix.cross }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v clang >/dev/null 2>&1; then
+          llvm="/c/Program Files/LLVM/bin"
+          if [ -x "$llvm/clang.exe" ]; then
+            cygpath -w "$llvm" >> "$GITHUB_PATH"
+          else
+            echo "::error::clang not found; ring needs it to build for aarch64-pc-windows-msvc"
+            exit 1
+          fi
+        fi
+
+    - name: Build and run (native)
+      if: ${{ !matrix.cross }}
+      shell: bash
+      env:
+        RUST_TARGET: ${{ matrix.rust_target }}
+      run: |
+        set -euo pipefail
+        cargo build --locked --all-features --profile ci --target "$RUST_TARGET"
+        "target/$RUST_TARGET/ci/lotar.exe" --version
+
   # Supply-chain checks with cargo-deny (runs in parallel)
   security:
     name: Security Audit

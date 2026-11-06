@@ -7,6 +7,7 @@ checksum, and works in your repository mounted at `/workspace`.
 ## Supported Architectures
 - `linux/amd64` (x86_64)
 - `linux/arm64` (Apple Silicon / Graviton)
+- `linux/arm/v7` (32-bit ARM, such as 32-bit Raspberry Pi OS; releases after v0.12.0)
 
 ## Tags
 - `mallox/lotar:<version>` (for example `mallox/lotar:0.12.0`): one release.

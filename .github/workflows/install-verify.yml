@@ -70,11 +70,14 @@ jobs:
           [[ "$output" == *"${EXPECTED_ARCH}"* ]]
 
   install-script-windows:
-    name: install.ps1 (${{ matrix.shell }})
-    runs-on: windows-latest
+    name: install.ps1 (${{ matrix.runner }}, ${{ matrix.shell }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
+        # windows-11-arm gets the native ARM64 build (DEV-309), or the x64 build
+        # for releases that have none.
+        runner: [windows-latest, windows-11-arm]
         # pwsh is PowerShell 7; powershell is the Windows PowerShell 5.1 that ships with Windows.
         shell: [pwsh, powershell]
     defaults:
@@ -113,6 +116,61 @@ jobs:
           # Reinstalling over an existing binary must work too.
           Get-Content -Raw site/install.ps1 | Invoke-Expression
 
+      - name: Check binary architecture
+        # Releases from DEV-309 on have a native ARM64 build; pull requests
+        # test against the latest release, which may predate it.
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\lotar\lotar.exe'
+          $bytes = [IO.File]::ReadAllBytes($exe)
+          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $pe + 4)
+          $expected = if ($env:RUNNER_ARCH -eq 'ARM64') { 0xAA64 } else { 0x8664 }
+          Write-Host ("PE machine 0x{0:X4}, expected 0x{1:X4}" -f $machine, $expected)
+          if ($machine -ne $expected) { throw 'The installed lotar.exe is not built for this CPU' }
+
+  armv7-emulated:
+    name: Linux armv7 (QEMU) install.sh and npm
+    # There is no 32-bit ARM runner, so the release's armv7 build runs under
+    # QEMU (DEV-309). It needs a release with that build, so pull requests skip it.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+      - name: install.sh in Alpine armv7
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The single-quoted script expands $LOTAR_VERSION inside the container.
+          # shellcheck disable=SC2016
+          docker run --rm --platform linux/arm/v7 -e LOTAR_VERSION -v "$PWD:/src:ro" alpine:3 sh -c '
+            set -eu
+            sh /src/site/install.sh --to /tmp/lotar-bin
+            /tmp/lotar-bin/lotar --version
+            if [ -n "${LOTAR_VERSION:-}" ]; then /tmp/lotar-bin/lotar --version | grep -q "${LOTAR_VERSION#v}"; fi
+          '
+
+      - name: npm in Debian armv7
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016
+          docker run --rm --platform linux/arm/v7 -e LOTAR_VERSION node:24-bookworm-slim bash -c '
+            set -euo pipefail
+            version="${LOTAR_VERSION:-latest}"
+            npm install --global "@localtaskrepo/lotar@${version#v}"
+            lotar --version
+            ls "$(npm root --global)/@localtaskrepo/lotar/node_modules/@localtaskrepo"
+          '
+
   linux-packages:
     name: ${{ matrix.format }} package (${{ matrix.arch }})
     # Packages exist only for releases newer than v0.11.0, so pull requests skip this.
@@ -124,6 +182,8 @@ jobs:
         include:
           - { runner: ubuntu-latest, arch: x64, format: deb, image: 'debian:stable-slim' }
           - { runner: ubuntu-24.04-arm, arch: arm64, format: deb, image: 'debian:stable-slim' }
+          # 32-bit ARM runs under QEMU; there is no armv7 rpm (DEV-309).
+          - { runner: ubuntu-latest, arch: armv7, format: deb, image: 'debian:stable-slim', platform: 'linux/arm/v7' }
           - { runner: ubuntu-latest, arch: x64, format: rpm, image: 'fedora:latest' }
           - { runner: ubuntu-24.04-arm, arch: arm64, format: rpm, image: 'fedora:latest' }
     steps:
@@ -142,11 +202,16 @@ jobs:
           echo "PACKAGE=$file" >> "$GITHUB_ENV"
           echo "TAG=$tag" >> "$GITHUB_ENV"
 
+      - name: Set up QEMU
+        if: matrix.platform != ''
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
       - name: Install, run, and remove in ${{ matrix.image }}
         shell: bash
         env:
           IMAGE: ${{ matrix.image }}
           FORMAT: ${{ matrix.format }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
           # The single-quoted scripts expand $PACKAGE and $TAG inside the container.
@@ -156,7 +221,7 @@ jobs:
           else
             script='rpm -i "/pkg/$PACKAGE" && lotar --version | grep -q "${TAG#v}" && rpm -e lotar && ! test -e /usr/bin/lotar'
           fi
-          docker run --rm -e PACKAGE -e TAG -v "$PWD:/pkg:ro" "$IMAGE" bash -c "$script"
+          docker run --rm ${PLATFORM:+--platform "$PLATFORM"} -e PACKAGE -e TAG -v "$PWD:/pkg:ro" "$IMAGE" bash -c "$script"
 
   npm-package:
     name: npm package (${{ matrix.label }})
@@ -172,6 +237,7 @@ jobs:
           - { runner: macos-15, label: macOS arm64 }
           - { runner: macos-15-intel, label: macOS x64 }
           - { runner: windows-latest, label: Windows x64 }
+          - { runner: windows-11-arm, label: Windows arm64 }
     steps:
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

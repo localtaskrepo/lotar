@@ -113,10 +113,24 @@ jobs:
             rust_target: aarch64-unknown-linux-musl
             artifact: linux-musl-arm64
             bin: lotar
+            cross: true
+          # 32-bit ARM (Raspberry Pi OS 32-bit, older Pis), static (DEV-309).
+          - os: ubuntu-latest
+            target: linux-musl
+            rust_target: armv7-unknown-linux-musleabihf
+            artifact: linux-musl-armv7
+            bin: lotar
+            cross: true
           - os: windows-latest
             target: windows
             rust_target: x86_64-pc-windows-msvc
             artifact: windows-x64
+            bin: lotar.exe
+          # Native build on GitHub's Windows ARM runner (DEV-309).
+          - os: windows-11-arm
+            target: windows
+            rust_target: aarch64-pc-windows-msvc
+            artifact: windows-arm64
             bin: lotar.exe
     permissions:
       contents: read
@@ -175,8 +189,8 @@ jobs:
         run: |
           rustup target add "$RUST_TARGET"
 
-      - name: Install cross (aarch64 musl)
-        if: matrix.rust_target == 'aarch64-unknown-linux-musl'
+      - name: Install cross (ARM Linux)
+        if: matrix.cross
         shell: bash
         run: |
           set -euo pipefail
@@ -194,15 +208,31 @@ jobs:
           fi
 
       - name: Build (release via cross)
-        if: matrix.rust_target == 'aarch64-unknown-linux-musl'
+        if: matrix.cross
         shell: bash
         env:
           RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           cross build --release --locked --all-features --target "$RUST_TARGET"
 
+      # ring compiles its assembly with clang on Windows on ARM.
+      - name: Find clang (Windows arm64)
+        if: matrix.rust_target == 'aarch64-pc-windows-msvc'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v clang >/dev/null 2>&1; then
+            llvm="/c/Program Files/LLVM/bin"
+            if [ -x "$llvm/clang.exe" ]; then
+              cygpath -w "$llvm" >> "$GITHUB_PATH"
+            else
+              echo "::error::clang not found; ring needs it to build for aarch64-pc-windows-msvc"
+              exit 1
+            fi
+          fi
+
       - name: Build (release)
-        if: matrix.rust_target != 'aarch64-unknown-linux-musl'
+        if: ${{ !matrix.cross }}
         shell: bash
         env:
           RUST_TARGET: ${{ matrix.rust_target }}
@@ -231,10 +261,11 @@ jobs:
         env:
           RUST_TARGET: ${{ matrix.rust_target }}
           BIN: ${{ matrix.bin }}
+          CROSS: ${{ matrix.cross }}
         run: |
           set -euo pipefail
           BIN_PATH="target/$RUST_TARGET/release/$BIN"
-          if [[ "$RUST_TARGET" == aarch64-* ]]; then
+          if [[ "$CROSS" == true || "$RUST_TARGET" == aarch64-* ]]; then
             echo "Skipping strip for cross-compiled target"
             exit 0
           fi
@@ -243,7 +274,7 @@ jobs:
           fi
 
       - name: Package artifact (non-Windows)
-        if: matrix.os != 'windows-latest'
+        if: matrix.target != 'windows'
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
@@ -268,7 +299,7 @@ jobs:
           fi
 
       - name: Package artifact (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.target == 'windows'
         shell: pwsh
         env:
           TAG: ${{ github.ref_name }}
@@ -381,7 +412,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p downloads
-          for arch in x64 arm64; do
+          for arch in x64 arm64 armv7; do
             gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir downloads \
               --pattern "lotar-${TAG}-linux-musl-${arch}.tar.gz" \
               --pattern "lotar-${TAG}-linux-musl-${arch}.sha256"
@@ -396,15 +427,19 @@ jobs:
           set -euo pipefail
           export VERSION="${TAG#v}"
           mkdir -p packages
-          for arch in x64 arm64; do
+          for arch in x64 arm64 armv7; do
+            formats="deb rpm"
             case "$arch" in
               x64) export ARCH=amd64 ;;
               arm64) export ARCH=arm64 ;;
+              # nfpm writes armhf for arm7. No rpm: Fedora and RHEL dropped
+              # 32-bit ARM, while Raspberry Pi OS and Debian still ship armhf.
+              armv7) export ARCH=arm7; formats="deb" ;;
             esac
             # packaging/nfpm.yaml always packages ./build/lotar.
             rm -rf build && mkdir build
             tar -xzf "downloads/lotar-${TAG}-linux-musl-${arch}.tar.gz" -C build
-            for format in deb rpm; do
+            for format in $formats; do
               file="packages/lotar-${TAG}-linux-${arch}.${format}"
               nfpm package --config packaging/nfpm.yaml --packager "$format" --target "$file"
               (cd packages && sha256sum "$(basename "$file")" > "$(basename "$file").sha256")
@@ -479,9 +514,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p downloads
-          for platform in macos-arm64 macos-x64 linux-musl-arm64 linux-musl-x64 windows-x64; do
+          for platform in macos-arm64 macos-x64 linux-musl-arm64 linux-musl-armv7 linux-musl-x64 windows-x64 windows-arm64; do
             ext=tar.gz
-            [ "$platform" = windows-x64 ] && ext=zip
+            case "$platform" in windows-*) ext=zip ;; esac
             gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir downloads \
               --pattern "lotar-${TAG}-${platform}.${ext}" \
               --pattern "lotar-${TAG}-${platform}.sha256"
@@ -579,9 +614,12 @@ jobs:
               { label: 'Linux (glibc x64)', file: `lotar-${tag}-linux-x64.tar.gz` },
               { label: 'Linux (musl x64)', file: `lotar-${tag}-linux-musl-x64.tar.gz` },
               { label: 'Linux (musl arm64)', file: `lotar-${tag}-linux-musl-arm64.tar.gz` },
+              { label: 'Linux (musl armv7, 32-bit)', file: `lotar-${tag}-linux-musl-armv7.tar.gz` },
               { label: 'Windows (x64)', file: `lotar-${tag}-windows-x64.zip` },
+              { label: 'Windows (ARM64)', file: `lotar-${tag}-windows-arm64.zip` },
               { label: 'Debian/Ubuntu package (x64)', file: `lotar-${tag}-linux-x64.deb` },
               { label: 'Debian/Ubuntu package (arm64)', file: `lotar-${tag}-linux-arm64.deb` },
+              { label: 'Debian/Ubuntu package (armv7)', file: `lotar-${tag}-linux-armv7.deb` },
               { label: 'Fedora/RHEL package (x64)', file: `lotar-${tag}-linux-x64.rpm` },
               { label: 'Fedora/RHEL package (arm64)', file: `lotar-${tag}-linux-arm64.rpm` },
             ];
@@ -697,7 +735,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           build-args: |
             LOTAR_VERSION=${{ steps.release_meta.outputs.version }}
           tags: |
@@ -851,13 +889,14 @@ jobs:
             echo "asset_base=${asset_base}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Download Windows checksum
+      - name: Download Windows checksums
         env:
           ASSET_BASE: ${{ steps.scoop_meta.outputs.asset_base }}
           TAG: ${{ steps.scoop_meta.outputs.tag }}
         run: |
           cd scoop-bucket
           curl -sSfL "${ASSET_BASE}/lotar-${TAG}-windows-x64.sha256" -o windows.sha
+          curl -sSfL "${ASSET_BASE}/lotar-${TAG}-windows-arm64.sha256" -o windows-arm64.sha
 
       - name: Update manifest
         env:
@@ -869,6 +908,9 @@ jobs:
           mkdir -p bucket
           hash=$(cut -d ' ' -f1 windows.sha)
           export HASH="$hash"
+          # Windows checksum files end lines with CRLF.
+          arm64_hash=$(cut -d ' ' -f1 windows-arm64.sha | tr -d '\r')
+          export ARM64_HASH="$arm64_hash"
           python3 - <<'PY'
           import json
           import os
@@ -878,6 +920,7 @@ jobs:
           base = os.environ['BASE_URL']
           tag = os.environ['TAG']
           hash_value = os.environ['HASH']
+          arm64_hash = os.environ['ARM64_HASH']
 
           manifest = {
               "version": version,
@@ -888,7 +931,11 @@ jobs:
                   "64bit": {
                       "url": f"{base}/lotar-{tag}-windows-x64.zip",
                       "hash": hash_value,
-                  }
+                  },
+                  "arm64": {
+                      "url": f"{base}/lotar-{tag}-windows-arm64.zip",
+                      "hash": arm64_hash,
+                  },
               },
               "bin": "lotar.exe",
               "checkver": "github",
@@ -896,7 +943,10 @@ jobs:
                   "architecture": {
                       "64bit": {
                           "url": "https://github.com/localtaskrepo/lotar/releases/download/v$version/lotar-v$version-windows-x64.zip",
-                      }
+                      },
+                      "arm64": {
+                          "url": "https://github.com/localtaskrepo/lotar/releases/download/v$version/lotar-v$version-windows-arm64.zip",
+                      },
                   }
               }
           }
