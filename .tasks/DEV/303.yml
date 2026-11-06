@@ -1,0 +1,53 @@
+title: 'Web UI login for network access: pair devices with a link or QR code'
+status: Done
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-05T23:31:13.979506+00:00
+modified: 2026-11-06T00:02:55.573999+00:00
+relationships:
+  related:
+  - DEV-295
+comments:
+- date: 2026-11-06T00:02:55.464784+00:00
+  text: 'Won''t do (owner decision, 2026-11-05). lotar gets no built-in login. Whoever exposes the server is responsible for protecting it: the owner uses Caddy on the home network/WireGuard. Requests from other websites are already rejected (the Origin must match the Host, plus the Host allowlist), so an unauthenticated server can''t be driven from another site in the browser. If needed later, add a docs note to serve.md: anything that can reach the port can run programs as you (agent profiles, automation run: commands, sync tokens), so put it behind auth (for example Caddy basic_auth or forward_auth) or a VPN before exposing it beyond a trusted network.'
+description: |-
+  Goal: reach the full web UI from the phone over the home network (the phone joins via WireGuard, like T3 Code on :3773) without letting every LAN device read tasks or start agent jobs (POST /api/jobs, automations run programs on the Mac).
+  Decisions (2026-11-05 with the owner): pairing link / QR code; full web UI; home network only; HTTPS later (traffic is already encrypted by WireGuard / Wi-Fi).
+  Design:
+  - Requests from loopback stay open (CLI, scripts, smoke, local browser): no change.
+  - Other requests need a device session: /api/* answers 401 JSON, the UI shows a 'pair this device' page.
+  - lotar serve on a non-loopback host prints a one-time pairing URL plus a terminal QR code (valid ~10 minutes, single use). Opening it sets an HttpOnly, SameSite=Strict session cookie (long-lived) and stores only a hash of the device token, in the user's config/state dir, never the repo.
+  - New links on demand (e.g. lotar serve pair / a Config page button when local); list and revoke devices (CLI and Config page).
+  - Changes from paired devices also check the Origin header against the allowed hosts (on top of SameSite).
+  - SSE (/api/events) works with the cookie; MCP (stdio) is unaffected.
+  - Update the 0.0.0.0 warning, docs/help/serve.md (security section), openapi (401), smoke test for the pairing flow.
+  Prerequisite for DEV-295 (hub server).
+tags:
+- won't do
+history:
+- at: 2026-11-05T23:31:14.122+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-295"]}'
+- at: 2026-11-06T00:02:55.464784+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T00:02:55.528025+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: won't do
+- at: 2026-11-06T00:02:55.573999+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

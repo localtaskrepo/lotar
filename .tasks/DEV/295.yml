@@ -1,9 +1,28 @@
 title: Add a repository/server switcher to the web UI
-status: Todo
+status: Done
 priority: Low
 type: Feature
 reporter: codex
+assignee: claude
 created: 2026-11-02T22:02:36.865665+00:00
+modified: 2026-11-06T00:02:55.427241+00:00
+relationships:
+  related:
+  - DEV-303
+comments:
+- date: 2026-11-05T23:31:22.231706+00:00
+  text: |-
+    Decisions (2026-11-05 with the owner): build this as ONE hub server rather than separate servers per repository. The phone reaches the Mac over the home network/WireGuard, needs the full web UI, and logs in with the pairing link / QR from DEV-303 (prerequisite), so one URL means one pairing.
+    Design sketch:
+    - Registry of repositories in the home config (~/.lotar), e.g. repositories: {name: path-to-.tasks}; CLI to add, remove and list them, plus the current repo when serve starts inside one.
+    - A hub serve mode serves all registered repositories on one port. The server currently picks its tasks dir once at startup (resolve_tasks_dir per request reads env/cwd), so every route must resolve the repository per request (a repo segment or parameter on /api, SSE per repo), including agent jobs, automations, attachments and branding.
+    - Web UI: a repository switcher that is clearly separate from the project filter, touch-friendly on narrow screens, remembers the last repository, and shows clearly when a repository is missing or unreadable.
+    - Keep plain single-repo lotar serve working as today.
+- date: 2026-11-06T00:02:55.233057+00:00
+  text: |-
+    Won't do (owner decision, 2026-11-05). Phone access will use one Caddy domain per repository instead: the owner's Caddy proxy (set up in the owner's own config repo) points each domain at a lotar serve running for that repository on the Mac, reached over the home network/WireGuard. That needs no lotar changes; lotar already supports it with --host plus --allow-host <domain>, Caddy keeps the Host header so the Origin check passes, and SSE streams through.
+    Why not a multi-repository server: one process for all repositories means the repository has to travel with every request and URL. The server pins its tasks dir at startup, and SSE, the file watcher, echo suppression, agent job tracking and automation cooldowns key by task ID, which repeats across repositories. A browser-stored repository list is per device and per origin (Safari may clear it), and accepting arbitrary paths from clients needs a server-side root restriction. Estimated at 5 to 8 working days, with compromises the owner didn't want.
+    Also considered and rejected: a Docker redirect service on the NAS (it duplicates Caddy, and discovery or starting servers would still need something on the Mac); running the server on the NAS against a network share of the repositories (file locks are unreliable over SMB/NFS, the NAS sees no change events, git is slow there, and agent jobs would run on the NAS instead of the Mac).
 description: |-
   Use case: several repositories each run their own LoTaR server. Make switching between them convenient from a phone without remembering URLs or ports. The immediate access solution is a private HTTPS domain and a project launcher page; this ticket tracks a future built-in switcher.
 
@@ -15,3 +34,34 @@ description: |-
   - Work with separate HTTPS hostnames behind a reverse proxy without requiring cross-origin API access for simple navigation.
 
   Start with navigation between independent servers. A combined task view and automatic server discovery are optional future work, not required for this ticket.
+tags:
+- won't do
+history:
+- at: 2026-11-05T23:31:14.121603+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-303"]}'
+- at: 2026-11-05T23:31:22.231706+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T00:02:55.233057+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T00:02:55.379784+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: won't do
+- at: 2026-11-06T00:02:55.427241+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude

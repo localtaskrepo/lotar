@@ -201,7 +201,8 @@ After frontend changes, `npm run build` rebuilds the UI and release binary. Rest
 - Server runs until interrupted (Ctrl+C)
 - Web interface works with all modern browsers
 - API handlers expect JSON bodies and respond with JSON envelopes that mirror the CLI output (`{status,message,data}`).
-- `--host=0.0.0.0` accepts connections from other machines. Only do this on a trusted network or behind your own authentication: anyone who can reach the port can change tasks, config and automation rules, and automation rules run shell commands.
+- `--host=0.0.0.0` accepts connections from other machines. Only do this on a trusted network or behind your own authentication: anyone who can reach the port can change tasks, config and automation rules, and automation rules run shell commands. LoTaR has no login of its own. Anyone who can reach the port can also start agent jobs, which run your configured agent CLIs with your accounts and keys, and sync runs, which use your tokens. Before making the server reachable from the internet, put it behind authentication, such as a reverse proxy with `basic_auth` or `forward_auth`, or keep it inside a VPN.
+- Behind a reverse proxy (for example Caddy on another machine, one domain per repository), start each server with `--host` set to an address the proxy can reach and `--allow-host <its domain>`. Keep the original `Host` header (Caddy's `reverse_proxy` does by default): changes are refused when the browser's `Origin` does not match the `Host` the server sees. Serve each instance at the root of its domain; the web UI does not support a sub-path such as `/lotar/`.
 
 ### Host checks
 
