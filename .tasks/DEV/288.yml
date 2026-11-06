@@ -5,7 +5,7 @@ type: Bug
 reporter: mallox
 assignee: claude
 created: 2026-10-31T22:06:38.530232+00:00
-modified: 2026-11-03T22:28:00.641175+00:00
+modified: 2026-11-06T00:28:09.194207+00:00
 relationships:
   related:
   - DEV-253
@@ -21,6 +21,8 @@ comments:
     5. Calendar 'N more' has role=button, tabindex=0 and Enter/Space handlers.
     6. Preferences reset also clears lotar.tasks.sort and lotar.dependencyHoverFields and shows a toast.
     Evidence: vitest SprintTaskCell.spec.ts, AutomationView.spec.ts, Preferences.reset.spec.ts (new) plus Board/Calendar/ActivityDrawer/frontendScopeSafety specs; full UI suite 1427 pass; new smoke spec ui.keyboard-access (LA timezone due date, Enter on board add, Activity modal, calendar overflow) passes on a rebuilt binary; existing ui.automation smoke test updated to confirm the new discard prompt. Full smoke: 371/372 before that update, all pass after.
+- date: 2026-11-06T00:28:09.194207+00:00
+  text: 'CI follow-up: SprintTaskCell.spec''s ''west of UTC'' test failed on the UTC CI runner (expected 5 to be 4). It set process.env.TZ in beforeAll, but vitest runs tests in worker threads, and assigning TZ in a worker does not change its zone. The test passed locally only because the Mac is on Pacific time. view/vitest.config.ts now sets TZ=America/Los_Angeles in the main process before workers start, so every UI test runs in one zone everywhere, and the test no longer switches zones. Verified: the full UI suite (1431 tests) passes with TZ=UTC, and SprintTaskCell passes with TZ=UTC and TZ=Asia/Tokyo.'
 description: |-
   Found by the DEV-253 product review and confirmed by an independent check that re-read the code and reproduced it where feasible.
 
@@ -96,3 +98,7 @@ history:
     new: Done
   - field: assignee
     new: claude
+- at: 2026-11-06T00:28:09.194207+00:00
+  actor: claude
+  changes:
+  - field: comment_added

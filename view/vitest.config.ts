@@ -25,6 +25,13 @@ function createLocalStorageFile(prefix: string) {
 }
 
 const localStorageFile = createLocalStorageFile('lotar-vitest-')
+// One time zone for every UI test on every machine, west of UTC so date-only
+// values that are wrongly parsed as UTC midnight show the day before. It must
+// be set here, in the main process before workers start: assigning TZ inside a
+// worker thread does not change that worker's zone (DEV-288 test passed on
+// Pacific-time machines and failed on UTC CI runners).
+process.env.TZ = 'America/Los_Angeles'
+
 const poolPreference = process.env.VITEST_POOL ?? (process.platform === 'win32' ? 'forks' : 'threads')
 
 if (localStorageFile) {
