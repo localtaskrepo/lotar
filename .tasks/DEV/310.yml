@@ -1,0 +1,18 @@
+title: Sign .rpm packages with a GPG key
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+created: 2026-11-06T03:29:40.884109+00:00
+modified: 2026-11-06T03:29:52.068380+00:00
+relationships:
+  related:
+  - DEV-309
+description: 'Found while verifying v0.12.1: RPM 6 (Fedora 45+) refuses ''rpm -i'' for packages without a GPG signature (''does not verify: no signature''). ''dnf install ./file.rpm'', as docs/help/install.md documents, still works with a warning, and ''rpm -i --nosignature'' works. Our .rpm files only carry detached Sigstore signatures. Proper fix: nfpm rpm signing with a GPG key stored as a GitHub secret (the owner creates the key and secret), plus publishing the public key so users can rpm --import it. Then install-verify could go back to rpm -i.'
+history:
+- at: 2026-11-06T03:29:52.068380+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-309"]}'

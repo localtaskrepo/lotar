@@ -57,7 +57,8 @@ lotar --version
 Use `linux-arm64` for 64-bit ARM. Releases after v0.12.0 also have a `linux-armv7` `.deb` (armhf) for
 32-bit ARM such as Raspberry Pi OS; there is no 32-bit ARM `.rpm`, since Fedora and RHEL no longer support
 it. The packages install `/usr/bin/lotar`; there is no package repository yet, so upgrade by installing
-the newer package.
+the newer package. The `.rpm` files have no GPG signature (their Sigstore signature is a separate file),
+so on RPM 6 (Fedora 45 and newer) install them with `dnf` as shown; plain `rpm -i` needs `--nosignature`.
 
 ## Any OS with Node.js: npm
 

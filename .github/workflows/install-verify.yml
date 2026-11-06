@@ -163,7 +163,8 @@ jobs:
         run: |
           set -euo pipefail
           # shellcheck disable=SC2016
-          docker run --rm --platform linux/arm/v7 -e LOTAR_VERSION node:24-bookworm-slim bash -c '
+          # node:24 has no 32-bit ARM image; node:22 still has one.
+          docker run --rm --platform linux/arm/v7 -e LOTAR_VERSION node:22-bookworm-slim bash -c '
             set -euo pipefail
             version="${LOTAR_VERSION:-latest}"
             npm install --global "@localtaskrepo/lotar@${version#v}"
@@ -219,7 +220,9 @@ jobs:
           if [ "$FORMAT" = deb ]; then
             script='apt-get install -y -qq "/pkg/$PACKAGE" && lotar --version | grep -q "${TAG#v}" && apt-get remove -y -qq lotar && ! test -e /usr/bin/lotar'
           else
-            script='rpm -i "/pkg/$PACKAGE" && lotar --version | grep -q "${TAG#v}" && rpm -e lotar && ! test -e /usr/bin/lotar'
+            # As documented: dnf installs the local package. RPM 6 (Fedora 45+)
+            # refuses `rpm -i` of a package without a GPG signature.
+            script='dnf install -y -q "/pkg/$PACKAGE" && lotar --version | grep -q "${TAG#v}" && dnf remove -y -q lotar && ! test -e /usr/bin/lotar'
           fi
           docker run --rm ${PLATFORM:+--platform "$PLATFORM"} -e PACKAGE -e TAG -v "$PWD:/pkg:ro" "$IMAGE" bash -c "$script"
 
