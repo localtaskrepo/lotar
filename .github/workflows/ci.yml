@@ -123,7 +123,7 @@ jobs:
         save-if: true
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
       with:
         tool: nextest
 
@@ -373,7 +373,7 @@ jobs:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
 
     - name: Install sccache
-      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
       with:
         tool: sccache
 
@@ -458,7 +458,7 @@ jobs:
         Pop-Location
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
       with:
         tool: nextest
 
@@ -593,7 +593,7 @@ jobs:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
       
     - name: Install cargo-deny
-      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+      uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
       with:
         tool: cargo-deny
 
