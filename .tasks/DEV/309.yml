@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-06T02:36:49.920691+00:00
-modified: 2026-11-06T02:46:33.737770+00:00
+modified: 2026-11-06T02:57:14.336412+00:00
 comments:
 - date: 2026-11-06T02:46:33.737770+00:00
   text: |-
@@ -16,6 +16,8 @@ comments:
     - CI: a new QA job release_targets builds both targets on every push (Windows arm64 also runs --version natively), so a broken ARM build blocks the release. install-verify adds Windows ARM runs for install.ps1 (with a PE machine check) and npm, plus an armv7 deb and an install.sh/npm job under QEMU.
     - Docs: install.md, docker.md, release-guide.md.
     Verification limits: armv7 could not be built locally (rustc segfaults under Docker's amd64 emulation on Apple Silicon), and Windows arm64 can't be built on macOS. Both are first exercised by the new QA job on the next push. npm package, release-page and workflow contract tests pass.
+- date: 2026-11-06T02:57:14.336412+00:00
+  text: 'npm bootstrap: published @localtaskrepo/lotar-win32-arm64@0.0.0 and @localtaskrepo/lotar-linux-arm@0.0.0 (placeholders, no binary) as mallocator, through opgate with the new 7-day token in ''NPM Token (LoTaR)''. The previous token in that item had been removed (401). Still open for the owner: connect trusted publishing for both packages shortly before tagging the next release (npm drops it after 48 h without a publish). npm trust rejects granular tokens with bypass-2FA, so it needs npm login in a terminal or Settings -> Trusted publishing on npmjs.com (GitHub Actions, localtaskrepo/lotar, release.yml). Then tag; publish-npm publishes the real versions.'
 description: 'Add two platforms to every release channel: Windows arm64 (aarch64-pc-windows-msvc; today Windows on ARM runs the x64 build under emulation) and Linux armv7 (armv7-unknown-linux-musleabihf, static, for 32-bit Raspberry Pi OS and older Pis). Covers the release build matrix, checksums/signing/upload, the release page, npm platform packages (@localtaskrepo/lotar-win32-arm64, @localtaskrepo/lotar-linux-arm) and the launcher, install.ps1/install.sh architecture selection, the Scoop arm64 entry, .deb/.rpm for armhf, install verification, docs and tests. The first version of each new npm package must be published by hand before trusted publishing works (docs/release-guide.md).'
 history:
 - at: 2026-11-06T02:38:14.826930+00:00
@@ -27,6 +29,10 @@ history:
   - field: assignee
     new: claude
 - at: 2026-11-06T02:46:33.737770+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T02:57:14.336412+00:00
   actor: claude
   changes:
   - field: comment_added
