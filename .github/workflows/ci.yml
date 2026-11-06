@@ -30,8 +30,6 @@ jobs:
       # Designated git-capable runner: build.rs refuses to compile git
       # behavior out (panics if creating .git is denied).
       LOTAR_REQUIRE_GIT: '1'
-      RUSTC_WRAPPER: sccache
-      SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,21 +45,6 @@ jobs:
         cache-on-failure: true
         shared-key: ci-${{ github.job }}-${{ runner.os }}
         save-if: true
-
-    - name: Install sccache
-      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
-      with:
-        tool: sccache
-
-    - name: Cache sccache
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: .sccache
-        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
-        restore-keys: |
-          sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
-          sccache-${{ runner.os }}-${{ github.job }}-
-          sccache-${{ runner.os }}-
 
     - name: Determine Node version
       id: node_version
@@ -122,8 +105,6 @@ jobs:
       # than setting no_git_tests, runtime require_git() probes fail closed,
       # and the manifest gate below asserts every selected test executed.
       LOTAR_REQUIRE_GIT: '1'
-      RUSTC_WRAPPER: sccache
-      SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -140,21 +121,6 @@ jobs:
         cache-on-failure: true
         shared-key: ci-${{ github.job }}-${{ runner.os }}
         save-if: true
-
-    - name: Install sccache
-      uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
-      with:
-        tool: sccache
-
-    - name: Cache sccache
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: .sccache
-        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
-        restore-keys: |
-          sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
-          sccache-${{ runner.os }}-${{ github.job }}-
-          sccache-${{ runner.os }}-
 
     - name: Install cargo-nextest
       uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
@@ -391,7 +357,11 @@ jobs:
       USER: mallox
       USERNAME: mallox
       LOTAR_REQUIRE_GIT: '1'
+      # sccache only here (DEV-107's Windows speedup). Capped, and saved only
+      # from pushes to main: every save is a new cache entry (keys are
+      # immutable), and uncapped saves overflowed the 10 GB cache limit.
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 1G
       RUSTC_WRAPPER: sccache
     steps:
     - name: Checkout code
@@ -407,15 +377,14 @@ jobs:
       with:
         tool: sccache
 
-    - name: Cache sccache
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    - name: Restore sccache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
         restore-keys: |
           sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
           sccache-${{ runner.os }}-${{ github.job }}-
-          sccache-${{ runner.os }}-
 
     - name: Rust Cache
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
@@ -595,6 +564,20 @@ jobs:
 
     - name: Verify release ticket links and page rendering
       run: npm run test:release
+
+    # Hit rate for later tuning; the cache itself is capped by SCCACHE_CACHE_SIZE.
+    - name: sccache stats
+      if: ${{ !cancelled() }}
+      shell: bash
+      run: sccache --show-stats
+
+    # Pull requests and failed-to-start runs restore but never save.
+    - name: Save sccache
+      if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .sccache
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
 
   # Supply-chain checks with cargo-deny (runs in parallel)
   security:

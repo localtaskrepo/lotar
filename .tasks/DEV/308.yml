@@ -1,0 +1,40 @@
+title: 'CI: keep the Actions cache under the 10 GB limit'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-06T01:19:43.459622+00:00
+modified: 2026-11-06T01:19:54.172624+00:00
+relationships:
+  related:
+  - DEV-107
+comments:
+- date: 2026-11-06T01:19:54.090897+00:00
+  text: 'Owner chose ''Windows-only, capped''. ci.yml: sccache removed from build_artifacts and rust_checks (env, install, cache); they keep Swatinem rust-cache, which restores compiled dependencies and falls back to an older entry when Cargo.lock changes. windows_checks keeps sccache for the DEV-107 speedup, with SCCACHE_CACHE_SIZE=1G. Restore and save are now separate steps: the run_id key still lets each save write fresh objects, but only on pushes to main (never PRs), and a new ''sccache stats'' step prints the hit rate for later tuning. performance.yml: sccache removed (rust-cache only). The contract test in ci_windows_reporting_contract_test checks that only windows_checks uses sccache, the 1G cap, and the push-to-main save condition. Expected steady state: about 1 GB of sccache per main push plus about 1.5 GB of rust-cache, Playwright, CodeQL and npm, so old sccache entries age out by LRU without crowding the others. The existing 2.3 GB+ entries will be evicted by LRU, or can be deleted now with gh cache delete. Verification limit: not run on GitHub yet; the next push to main shows the cache sizes and Windows timing. Workflow contract tests 9/9, clippy clean; actionlint is not installed locally.'
+description: 'GitHub reported 12.1 GB of 10 GB cache storage used, so least recently used caches were being evicted. Of 12.4 GB, 10.3 GB were sccache entries: ci.yml keyed sccache by github.run_id (cache keys are immutable, so that was how each run saved updated objects, from DEV-107) on three jobs. Each push saved about 4.6 GB (Windows 2.3, Linux checks 1.2, Linux build 1.2), the sccache folder had no size cap, and the evictions also hit rust-cache, Playwright, CodeQL and npm caches. The Linux jobs and the perf workflow also cached the same dependencies twice (Swatinem rust-cache plus sccache).'
+history:
+- at: 2026-11-06T01:19:43.540581+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-107"]}'
+- at: 2026-11-06T01:19:54.044295+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-06T01:19:54.090897+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T01:19:54.172624+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
