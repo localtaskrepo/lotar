@@ -1,0 +1,7 @@
+title: Board view columns overflow not handled well
+status: Todo
+priority: Low
+type: Bug
+reporter: mallox
+created: 2026-11-06T01:19:00.724523+00:00
+description: 'When you try to configure the board view and have a lot of columns, there is no easy way to scroll to the right with a normal mouse to manage the states at the right of the board. '
