@@ -1,0 +1,31 @@
+title: 'Mobile header: Preferences and Activity as icons'
+status: Done
+priority: Low
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-06T01:13:26.283784+00:00
+modified: 2026-11-06T01:14:27.111843+00:00
+comments:
+- date: 2026-11-06T01:14:27.086512+00:00
+  text: 'Done. App.vue: at the existing 900px breakpoint, Preferences (a nav link) and Activity (now a plain button styled like the tabs instead of a ghost UiButton) show only an icon. The text stays as aria-label/title, the touch target is at least 2.25rem, and the active highlight still applies. IconGlyph gains ''settings'' (gear) and ''activity'' (pulse), after Feather (MIT). Desktop keeps text everywhere. Verified with Playwright screenshots at 390px (end of the tab row, Preferences active) and 1400px. vue-tsc, eslint and prettier are clean; 1431 UI tests and 372 smoke tests pass (the keyboard-access smoke still finds the Activity button by role and name).'
+description: On narrow screens (<=900px) the Preferences tab and the Activity button sit at the end of the horizontally scrolling tab row, and Activity was styled as a ghost button unlike the tabs. Show both as icon-only items there (gear, pulse), with the text kept as accessible name and tooltip; all other tabs keep their text. On wide screens both stay text, and Activity looks like the tabs.
+history:
+- at: 2026-11-06T01:14:27.027155+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-06T01:14:27.086512+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T01:14:27.111843+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

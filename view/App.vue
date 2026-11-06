@@ -59,13 +59,25 @@
           v-for="item in visibleNavItems"
           :key="item.path"
           class="nav__link"
-          :class="{ active: isActive(item) }"
+          :class="{ active: isActive(item), 'nav__item--icon': item.icon }"
           :href="item.path"
+          :aria-label="item.icon ? item.label : undefined"
+          :title="item.icon ? item.label : undefined"
           @click.prevent="go(item.path)"
         >
-          {{ item.label }}
+          <IconGlyph v-if="item.icon" :name="item.icon" class="nav__icon" />
+          <span class="nav__label">{{ item.label }}</span>
         </a>
-        <UiButton variant="ghost" type="button" @click="activityOpen = true">Activity</UiButton>
+        <button
+          type="button"
+          class="nav__activity nav__item--icon"
+          aria-label="Activity"
+          title="Activity"
+          @click="activityOpen = true"
+        >
+          <IconGlyph name="activity" class="nav__icon" />
+          <span class="nav__label">Activity</span>
+        </button>
       </nav>
     </div>
   </header>
@@ -177,7 +189,11 @@ function openGlobalNewTask() {
 }
 
 const { visibleTabs } = useNavTabs()
-const visibleNavItems = computed(() => [...visibleTabs.value, { label: 'Preferences', path: '/preferences' }])
+// Preferences is shown as a gear icon on narrow screens (see `.nav__item--icon`).
+const visibleNavItems = computed<{ label: string; path: string; icon?: 'settings' }[]>(() => [
+  ...visibleTabs.value,
+  { label: 'Preferences', path: '/preferences', icon: 'settings' },
+])
 
 function isActive(item: { path: string }) {
   const currentPath = route.path
@@ -594,6 +610,56 @@ watch(
   .palette-trigger__keys {
     display: none;
   }
+
+  /* Preferences and Activity become icons on narrow screens; the other
+     tabs keep their text. */
+  .nav__item--icon .nav__label {
+    display: none;
+  }
+
+  .nav__item--icon .nav__icon {
+    display: block;
+  }
+
+  .nav__item--icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+  }
+}
+
+.nav__icon {
+  display: none;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* Activity opens a drawer rather than a page, but looks like the tabs
+   (`.nav__link` in styles.css). */
+.nav__activity {
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  color: var(--topbar-fg);
+  opacity: 0.85;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.nav__activity:hover {
+  opacity: 1;
+}
+
+.nav__activity:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* The two top-bar buttons sit closer together than the group gap: their own
