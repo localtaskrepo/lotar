@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-06T00:28:17.111558+00:00
-modified: 2026-11-06T00:37:59.413862+00:00
+modified: 2026-11-06T01:08:30.656588+00:00
 relationships:
   related:
   - DEV-253
@@ -19,6 +19,8 @@ comments:
     Kept: TypeScript 7 (typescript-eslint supports typescript <6.1) and jsdom 31 (its CSS parser drops min() with three arguments, failing a DependencyGraph style assertion; test environment only).
     CI investigation on main (run 42128691522): cargo-deny was this advisory; the 3 smoke failures were already fixed locally in DEV-301 follow-up commits; the UI test failure was the DEV-288 time zone test (fixed in 5bf57d9). CodeQL (rust) failed while uploading results, without an error, and passed on all earlier runs; I take it as transient and the next push reruns it.
     Verified: cargo deny check ok; clippy, fmt, eslint, prettier and vue-tsc clean; 1961 Rust tests and 1431 UI tests pass.
+- date: 2026-11-06T01:08:30.656588+00:00
+  text: 'CI follow-up (QA run 42140216460 on e948bd2): Smoke failed 1/372, ui.regressions ''displays normalised assignee on the sprints page''. Not a product bug and not a dependency regression; the test was racy. It clicks Sprints from the Tasks page and waited for text=Sprint assignee test, which the Tasks page being left also shows. It then read document.body once and caught the sprints page still showing its first-load ''Loading…'' (initialized never returns to false, so the page doesn''t reload by itself). The test now waits for the title inside .sprints-page and reads that section''s text; it passed 3/3 locally. The other sprints-navigation smoke tests already wait for sprints-only selectors ([data-sprint-id] rows).'
 description: 'CI on main fails cargo-deny: RUSTSEC-2026-0433 (quadratic parsing of nested image wikilinks with ENABLE_WIKILINKS) in pulldown-cmark 0.13.5; fixed in 0.13.6. Before the next release, which contains the DEV-253 batch of bug fixes, bring Rust and npm dependencies up to date, including the pending Dependabot groups (npm minor/patch, minimatch, GitHub Actions), and get CI green.'
 history:
 - at: 2026-11-06T00:28:17.259002+00:00
@@ -51,3 +53,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-06T01:08:30.656588+00:00
+  actor: claude
+  changes:
+  - field: comment_added

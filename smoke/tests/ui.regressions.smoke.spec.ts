@@ -47,12 +47,16 @@ describe.concurrent('UI regression: assignee display and sprints project filter'
             try {
                 await withPage(server.url, async (page) => {
                     await page.click('a[href="/sprints"]');
-                    await page.waitForSelector('text=Sprint assignee test', { timeout: 15_000 });
+                    // Wait for the task inside the sprints page: the Tasks page
+                    // being left also shows this title, and the sprints page
+                    // shows "Loading…" until its first load completes.
+                    const sprints = page.locator('.sprints-page');
+                    await sprints.getByText('Sprint assignee test').first().waitFor({ timeout: 15_000 });
 
-                    const bodyText = await page.evaluate(() => document.body.innerText);
+                    const pageText = await sprints.innerText();
                     // @bob normalises to 'bob' (@ prefix reserved for directives)
-                    expect(bodyText).toContain('bob');
-                    expect(bodyText).not.toContain('@@bob');
+                    expect(pageText).toContain('bob');
+                    expect(pageText).not.toContain('@@bob');
                 });
             } finally {
                 await server.stop();
