@@ -1,0 +1,31 @@
+title: 'lotar serve: restart on the new binary after an upgrade'
+status: Done
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-06T00:38:34.784415+00:00
+modified: 2026-11-06T00:45:22.856405+00:00
+comments:
+- date: 2026-11-06T00:45:22.833547+00:00
+  text: 'Done. New src/utils/binary_watch.rs watches the path lotar was started from: argv[0], resolved through PATH when it is a bare name, used only when it leads to the running binary, else current_exe(). It fires when that path leads to another file or a changed size or mtime, and only after the new binary is stable for one more interval. A missing path (mid-upgrade or uninstalled) is not a change. The interval is 2 s, overridable with LOTAR_BINARY_WATCH_INTERVAL_MS. lotar mcp now uses it, which fixes Homebrew upgrades: its old check compared current_exe()''s mtime, and that Cellar path never changes and is usually deleted. lotar serve --exit-on-upgrade (env LOTAR_SERVE_EXIT_ON_UPGRADE=1) stops agent jobs and exits 0 so launchd/systemd start the new version; it is off by default for servers started by hand. Docs: a new ''Run as a service'' section in serve.md with a launchd plist (checked with plutil -lint) and a systemd unit (Restart=always), covering the stable binary path, PATH for agent CLIs and git, and tokens; environment.md has the new variables. No lotar service command, by owner decision: the OS tools already do that. Tests: 3 unit tests (file replaced, symlink retargeted, missing path) and tests/dev305_serve_exit_on_upgrade_test.rs (a Homebrew-style upgrade with the flag exits 0, without the flag it keeps running). Full Rust suite 1966/1966; clippy and fmt clean.'
+description: 'A lotar serve started by launchd or systemd keeps running the old binary after brew upgrade (or any reinstall) until someone restarts it. lotar mcp already exits when its binary changes so its host relaunches it. Add an opt-in for serve (--exit-on-upgrade / LOTAR_SERVE_EXIT_ON_UPGRADE=1): when the binary at the path lotar was started from changes, stop agent jobs cleanly and exit 0 so the service manager starts the new version. Watch the launch path (e.g. the /opt/homebrew/bin/lotar symlink), not current_exe(): Homebrew installs each version under its own Cellar path and usually deletes the old one, which the MCP watcher (mtime of current_exe) misses. Share the check with MCP. Document a launchd plist and systemd unit (Restart=always) in serve.md, with the PATH, stable-binary and proxy pitfalls.'
+history:
+- at: 2026-11-06T00:45:22.757235+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-06T00:45:22.833547+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-06T00:45:22.856405+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -277,6 +277,7 @@ impl CommandHandler for ServeHandler {
             web_ui_path,
             web_ui_embedded,
             allow_host,
+            exit_on_upgrade,
             ..
         } = args;
 
@@ -387,6 +388,23 @@ impl CommandHandler for ServeHandler {
         renderer.emit_warning("Press Ctrl+C to stop the server");
 
         pin_process_tasks_dir(resolver)?;
+
+        // DEV-305: let launchd/systemd start the upgraded binary.
+        if exit_on_upgrade {
+            let watching = crate::utils::binary_watch::spawn_watcher(|| {
+                eprintln!(
+                    "The lotar binary changed; stopping so the service manager starts the new version"
+                );
+                crate::services::agent_job_service::AgentJobService::shutdown_jobs(
+                    std::time::Duration::from_secs(10),
+                );
+                std::process::exit(0);
+            });
+            if !watching {
+                renderer
+                    .emit_warning("Cannot watch the lotar binary; --exit-on-upgrade has no effect");
+            }
+        }
 
         let mut api_server = api_server::ApiServer::new();
         routes::initialize(&mut api_server);

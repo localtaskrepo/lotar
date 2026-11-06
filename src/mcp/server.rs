@@ -648,24 +648,14 @@ pub fn run_stdio_server() {
         .ok()
         .map(|v| v != "0")
         .unwrap_or(true);
-    if autoreload_enabled
-        && let Ok(exe_path) = std::env::current_exe()
-        && let Ok(meta) = std::fs::metadata(&exe_path)
-        && let Ok(modified) = meta.modified()
-    {
-        let initial = modified;
-        std::thread::spawn(move || {
-            loop {
-                std::thread::sleep(Duration::from_secs(2));
-                if let Ok(Ok(m)) = std::fs::metadata(&exe_path).map(|m| m.modified())
-                    && m > initial
-                {
-                    crate::services::agent_job_service::AgentJobService::shutdown_jobs(
-                        Duration::from_secs(10),
-                    );
-                    std::process::exit(0);
-                }
-            }
+    if autoreload_enabled {
+        // Watches the path lotar was started from, so Homebrew upgrades
+        // (a new Cellar path behind the same symlink) are noticed (DEV-305).
+        crate::utils::binary_watch::spawn_watcher(|| {
+            crate::services::agent_job_service::AgentJobService::shutdown_jobs(
+                Duration::from_secs(10),
+            );
+            std::process::exit(0);
         });
     }
 

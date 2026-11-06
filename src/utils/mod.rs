@@ -1,3 +1,4 @@
+pub mod binary_watch;
 pub mod codeowners;
 pub mod config;
 pub mod custom_fields;

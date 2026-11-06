@@ -121,6 +121,7 @@ All rows below are defined inside the same override table and map directly to th
 | _(CLI only)_ | `LOTAR_WEB_UI_EMBEDDED` | `1` | Forces serving only embedded UI assets, ignoring any `web_ui_path`. Useful for CI testing. |
 | _(CLI only)_ | `LOTAR_ENABLE_POLL_WATCH` | `1` (any value except `0`) | Also checks the tasks folder for changes on a timer. Turn it on when live updates in the browser miss file changes, for example in Docker or on a network drive. |
 | _(CLI only)_ | `LOTAR_POLL_WATCH_INTERVAL_MS` | Integer milliseconds (minimum 50, default 200) | How often the timer check runs when `LOTAR_ENABLE_POLL_WATCH` is on. |
+| _(CLI only)_ | `LOTAR_SERVE_EXIT_ON_UPGRADE` | `1` | Same as `lotar serve --exit-on-upgrade`: stop when the `lotar` binary is replaced, so a service manager starts the new version. |
 | _(CLI only)_ | `LOTAR_ALLOWED_HOSTS` | Comma-separated host names, or `*` | Extra names accepted in the `Host` header (same as `lotar serve --allow-host`). Loopback names and IP addresses are always accepted. |
 
 ## Runtime Toggles & Services
@@ -130,7 +131,8 @@ All rows below are defined inside the same override table and map directly to th
 | `LOTAR_SSE_DEBOUNCE_MS` | Integer milliseconds | Default debounce for `/api/events` when clients omit `?debounce_ms=`. |
 | `LOTAR_SSE_READY` | `1` | Allows clients to request an immediate `ready` SSE event; primarily used by integration tests. |
 | `LOTAR_STATS_EFFORT_CAP` | Integer | Caps the rolling window size used by `lotar stats effort`. |
-| `LOTAR_MCP_AUTORELOAD` | `0`/`1` (default `1`) | Controls whether the MCP stdio server restarts when the binary changes. |
+| `LOTAR_MCP_AUTORELOAD` | `0`/`1` (default `1`) | Controls whether the MCP stdio server restarts when the binary changes. It watches the path `lotar` was started from, so an upgrade behind the same symlink (Homebrew) counts. |
+| `LOTAR_BINARY_WATCH_INTERVAL_MS` | Integer milliseconds (default 2000) | How often `lotar mcp` and `lotar serve --exit-on-upgrade` check whether the `lotar` binary was replaced. |
 | `LOTAR_MCP_TOOLS` | comma-separated tool names | Limits which tools the MCP server lists and runs; unset means all. Agent jobs with `mcp.lotar` use it. |
 | `LOTAR_DOCS_BASE_URL` | URL | Overrides the base used when rendering hyperlinks inside `lotar help`. |
 | `LOTAR_HELP_STYLE` | `ansi`/`plain` | Forces colored (`ansi`) or plain-text help output regardless of TTY detection. |

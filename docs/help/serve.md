@@ -50,6 +50,7 @@ lotar serve --web-ui-embedded
 - `--open` - Automatically open browser after starting server
 - `--web-ui-path <PATH>` - Path to a directory containing custom web UI assets. When set and the directory exists, files are served from here first, falling back to the bundled UI if not found.
 - `--web-ui-embedded` - Force serving only the embedded/bundled UI assets, ignoring any custom web UI path. Useful for CI testing to ensure the bundled UI works correctly.
+- `--exit-on-upgrade` - Stop (exit status 0) when the `lotar` binary is replaced, for example by `brew upgrade`, so a service manager starts the new version. Running agent jobs are stopped first. Use it only when something restarts the server; see [Run as a service](#run-as-a-service).
 - `--format <FORMAT>` - Output format: text or json
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Override tasks directory resolution
@@ -71,6 +72,7 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 - `LOTAR_TASKS_DIR` - Default tasks directory location
 - `LOTAR_WEB_UI_PATH` - Path to custom web UI assets directory (same as `--web-ui-path`)
 - `LOTAR_WEB_UI_EMBEDDED` - When set to `1`, force embedded UI only (same as `--web-ui-embedded`)
+- `LOTAR_SERVE_EXIT_ON_UPGRADE` - When set to `1`, same as `--exit-on-upgrade`
 - `LOTAR_SSE_DEBOUNCE_MS` - Default debounce window for `/api/events` and `/api/tasks/stream` (overridden by the `debounce_ms` query parameter).
 - `LOTAR_SSE_READY` / `LOTAR_TEST_FAST_IO` - Testing hooks that control synthetic readiness events and heartbeat cadence.
 - `LOTAR_ENABLE_POLL_WATCH=1` - Also check the tasks folder for changes on a timer (every 200 ms; change it with `LOTAR_POLL_WATCH_INTERVAL_MS`). Use it when the browser misses changes made outside the server, for example in Docker or on a network drive.
@@ -143,6 +145,62 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 Once started, the server provides:
 - **Web Interface**: `http://<host>:<port>`
 - **API Base**: `http://<host>:<port>/api`
+
+## Run as a service
+
+To keep a server running for a repository, for example so a reverse proxy can always reach it, let the system start it: launchd on macOS, systemd on Linux. LoTaR does not install services itself; copy one of the files below and adjust the paths, port and names. Three things are easy to get wrong:
+
+- **The `lotar` path.** Use the stable path you run from a terminal (`/opt/homebrew/bin/lotar`, `/usr/local/bin/lotar`, `~/.cargo/bin/lotar`), not a versioned one such as `/opt/homebrew/Cellar/lotar/0.11.2/bin/lotar`, so upgrades take effect.
+- **`PATH`.** Services start with a very short `PATH`. Agent jobs need the agent CLIs (`claude`, `codex`, ...) and `git`, so set `PATH` to what `echo $PATH` prints in your terminal. Tokens for sync or agents are not inherited either. Put them in the service only if you accept them being stored in that file.
+- **Upgrades.** Add `--exit-on-upgrade` so the server stops when `lotar` is upgraded and the service manager starts the new version. It watches the path the service runs, so a Homebrew upgrade (a new version behind the same symlink) counts.
+
+macOS: save as `~/Library/LaunchAgents/com.example.lotar.myrepo.plist`, then run `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.example.lotar.myrepo.plist`. Stop it with `launchctl bootout gui/$(id -u)/com.example.lotar.myrepo`.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.example.lotar.myrepo</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/lotar</string>
+    <string>serve</string>
+    <string>--port</string><string>8101</string>
+    <string>--host</string><string>0.0.0.0</string>
+    <string>--allow-host</string><string>tasks-myrepo.example.home</string>
+    <string>--exit-on-upgrade</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/you/Development/myrepo</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/you/Library/Logs/lotar-myrepo.log</string>
+  <key>StandardErrorPath</key><string>/Users/you/Library/Logs/lotar-myrepo.log</string>
+</dict>
+</plist>
+```
+
+Linux: save as `~/.config/systemd/user/lotar-myrepo.service`, then run `systemctl --user daemon-reload && systemctl --user enable --now lotar-myrepo`. Run `loginctl enable-linger` if it should also run while you are logged out. `Restart=always` matters: with `--exit-on-upgrade` the server exits with status 0, which `Restart=on-failure` would not restart.
+
+```ini
+[Unit]
+Description=LoTaR web server for myrepo
+
+[Service]
+WorkingDirectory=%h/Development/myrepo
+ExecStart=%h/.cargo/bin/lotar serve --port 8101 --host 0.0.0.0 --allow-host tasks-myrepo.example.home --exit-on-upgrade
+Environment=PATH=%h/.cargo/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Restart=always
+
+[Install]
+WantedBy=default.target
+```
+
+Read [exposing the server](#notes) before using `--host` with anything but `localhost`.
 
 ## File Watching
 

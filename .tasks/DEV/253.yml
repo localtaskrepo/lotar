@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-31T02:20:03.605242+00:00
-modified: 2026-10-31T22:08:33.346293+00:00
+modified: 2026-11-06T00:28:17.258072+00:00
 relationships:
   related:
   - DEV-254
@@ -50,6 +50,7 @@ relationships:
   - DEV-293
   - DEV-294
   - DEV-1
+  - DEV-304
 comments:
 - date: 2026-10-31T02:20:11.122870+00:00
   text: 'Plan: multi-agent review (user opted in). 9 read-only reviewers in parallel: (1) storage/core/config/YAML compat, (2) REST+SSE+web server + contract parity (src/api_types.rs, view/api/types.ts, docs/openapi.json), (3) MCP + agent jobs + automation, (4) CLI + help, (5) sync/scanner/git/identity, (6) frontend, (7) docs accuracy/readability, (8) performance with large seeded workspaces, (9) security + release/install tooling. Each area''s findings go to an adversarial verifier that re-reads code and reproduces where feasible; only confirmed findings are reported. Reviewers make no file, ticket or git changes; repros use temp workspaces, never port 8080 or the DEV backlog. Then: dedupe, rank, report, one DEV ticket per confirmed actionable issue.'
@@ -349,3 +350,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-06T00:28:17.258072+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292","DEV-293","DEV-294","DEV-1"]}'
+    new: '{"related":["DEV-254","DEV-255","DEV-256","DEV-257","DEV-258","DEV-259","DEV-260","DEV-261","DEV-262","DEV-263","DEV-264","DEV-265","DEV-266","DEV-267","DEV-268","DEV-269","DEV-270","DEV-271","DEV-272","DEV-273","DEV-274","DEV-275","DEV-276","DEV-277","DEV-278","DEV-279","DEV-280","DEV-281","DEV-282","DEV-283","DEV-284","DEV-285","DEV-286","DEV-287","DEV-288","DEV-289","DEV-290","DEV-291","DEV-292","DEV-293","DEV-294","DEV-1","DEV-304"]}'

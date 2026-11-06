@@ -59,4 +59,16 @@ pub struct ServeArgs {
         default_value_t = false
     )]
     pub web_ui_embedded: bool,
+
+    /// Exit (status 0) when the lotar binary is replaced, for example by
+    /// `brew upgrade`, so a service manager (launchd, systemd) starts the new
+    /// version. Running agent jobs are stopped first. Only useful when
+    /// something restarts the server.
+    #[arg(
+        long,
+        env = "LOTAR_SERVE_EXIT_ON_UPGRADE",
+        value_parser = clap::builder::BoolishValueParser::new(),
+        default_value_t = false
+    )]
+    pub exit_on_upgrade: bool,
 }
