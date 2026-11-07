@@ -46,6 +46,22 @@ impl ConfigManager {
         })
     }
 
+    /// The configured default project, else the first existing project, else
+    /// a prefix from the detected project name. Writes nothing; used for
+    /// previews such as `add --dry-run`.
+    pub fn default_project_or_detected(&self, tasks_dir: &Path) -> String {
+        if !self.resolved_config.default_project.is_empty() {
+            return self.resolved_config.default_project.clone();
+        }
+        if let Some(detected) = crate::config::persistence::auto_detect_prefix(tasks_dir) {
+            return detected;
+        }
+        // No existing projects, generate from current directory
+        crate::project::get_project_name()
+            .map(|name| generate_project_prefix(&name))
+            .unwrap_or_else(|| "DEFAULT".to_string())
+    }
+
     /// Ensure default_project is set in global config, auto-detecting if necessary
     pub fn ensure_default_project(&mut self, tasks_dir: &Path) -> Result<String, ConfigError> {
         // Check if default_project is already set
@@ -54,17 +70,7 @@ impl ConfigManager {
         }
 
         // Default prefix is empty, need to auto-detect and update
-        let detected_prefix =
-            if let Some(detected) = crate::config::persistence::auto_detect_prefix(tasks_dir) {
-                detected
-            } else {
-                // No existing projects, generate from current directory
-                if let Some(project_name) = crate::project::get_project_name() {
-                    generate_project_prefix(&project_name)
-                } else {
-                    "DEFAULT".to_string()
-                }
-            };
+        let detected_prefix = self.default_project_or_detected(tasks_dir);
 
         // Update the global config with the detected prefix
         let config_path = crate::utils::paths::global_config_path(tasks_dir);

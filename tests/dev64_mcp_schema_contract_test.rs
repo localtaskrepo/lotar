@@ -766,11 +766,7 @@ fn create_hints_and_validation_use_the_service_repository_project() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join("Fallback Repo/.tasks");
     std::fs::create_dir_all(tasks_dir.join("FR")).unwrap();
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "default.project: MCP\nissue.states: [Todo, Done]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "issue.states: [Todo, Done]\n").unwrap();
     std::fs::write(
         tasks_dir.join("FR/config.yml"),
         "issue.states: [Ready, Closed]\n",

@@ -55,7 +55,7 @@ Types and priorities are whatever your configuration defines, so there are no sh
 
 ### Planning and diagnostics
 - `--dry-run` - Preview the task that would be created without writing
-- `--explain` - Show how defaults (status/priority/reporter) were chosen
+- `--explain` - Show where the project came from and how defaults (status/priority/reporter) were chosen
 	- Includes project detection source, whether a path-derived tag was added, and any branch-based inference (type/status/priority) with alias hits
 
 ### Custom Fields
@@ -126,15 +126,18 @@ Tasks are created in the appropriate project:
 
 1. **Explicit project**: `--project=myproject` or `-p myproject`
 2. **Task ID prefix**: If title starts with "PROJ-", uses PROJ project  
-3. **Default project**: From global config `default_project`
-4. **Auto-detection**:
-	 - `LOTAR_PROJECT` environment variable (if set)
+3. **Default project**: `default.project` in the configuration, or the `LOTAR_PROJECT` / `LOTAR_DEFAULT_PROJECT` environment variable. A manifest name never overrides it.
+4. **No default project set**: the existing project (the first one alphabetically), else a name detected from the checkout:
 	 - Nearest project manifest walking up to the repo root:
 		 - `package.json` name (scope stripped, e.g. `@scope/api` -> `api`)
 		 - `Cargo.toml` `[package].name`
 		 - `go.mod` module last path segment
 	 - Git repo name (folder name at repo root)
 	 - Current directory name
+
+	 A project picked by detection that doesn't exist yet prints a warning with the prefix it creates (also on `--dry-run`), and the first real `add` saves that prefix as `default.project`.
+
+`--explain` names where the project came from, for example `project G from default.project in the configuration`; JSON dry runs also return it as `project_source`.
 
 Auto-detection walks upward but stops at the repository root (supports `.git` directory or file for worktrees/submodules).
 

@@ -25,61 +25,65 @@ pub fn get_project_name() -> Option<String> {
     detect_project_name()
 }
 
-pub fn detect_project_context_name() -> Option<String> {
-    if let Ok(project) = std::env::var("LOTAR_PROJECT")
-        && !project.is_empty()
-    {
-        return Some(project);
-    }
-
-    detect_from_project_files()
+pub fn detect_project_name() -> Option<String> {
+    detect_project_name_with_source().map(|(name, _)| name)
 }
 
-pub fn detect_project_name() -> Option<String> {
+/// [`detect_project_name`] plus where the name came from, for messages such
+/// as `add --explain` ("package.json at /repo/site/package.json").
+pub fn detect_project_name_with_source() -> Option<(String, String)> {
     // 1. Check environment variable first
     if let Ok(project) = std::env::var("LOTAR_PROJECT")
         && !project.is_empty()
     {
-        return Some(project);
+        return Some((
+            project,
+            "the LOTAR_PROJECT environment variable".to_string(),
+        ));
     }
 
     // 2. Try to detect from project files (nearest manifest upwards)
-    if let Some(name) = detect_from_project_files() {
-        return Some(name);
+    if let Some((name, path)) = detect_from_project_files_with_path() {
+        return Some((name, format!("the name in {}", path.display())));
     }
 
     // 3. Use git repo name when available
     if let Some(repo_root) = crate::utils::git::find_repo_root(&std::env::current_dir().ok()?)
         && let Some(repo_name) = repo_root.file_name().and_then(|s| s.to_str())
     {
-        return Some(repo_name.to_string());
+        return Some((
+            repo_name.to_string(),
+            "the git repository folder name".to_string(),
+        ));
     }
 
     // 4. Use current folder name
     if let Some(name) = get_current_folder_name() {
-        return Some(name);
+        return Some((name, "the current folder name".to_string()));
     }
 
     // Final fallback
-    Some("default".to_string())
+    Some(("default".to_string(), "the built-in fallback".to_string()))
 }
 
-fn detect_from_project_files() -> Option<String> {
+/// The name in the nearest `package.json`, `Cargo.toml` or `go.mod`, walking
+/// up to the repository root, with that file's path.
+fn detect_from_project_files_with_path() -> Option<(String, PathBuf)> {
     let mut dir = std::env::current_dir().ok()?;
     // Walk up to repo root (if known) or filesystem root
     let repo_root = crate::utils::git::find_repo_root(&dir);
     loop {
         // Prefer package.json name
         if let Some(name) = read_package_json_name(&dir) {
-            return Some(name);
+            return Some((name, dir.join("package.json")));
         }
         // Then Cargo.toml package name
         if let Some(name) = read_cargo_toml_name(&dir) {
-            return Some(name);
+            return Some((name, dir.join("Cargo.toml")));
         }
         // Then go.mod module name (last path segment)
         if let Some(name) = read_go_mod_name(&dir) {
-            return Some(name);
+            return Some((name, dir.join("go.mod")));
         }
 
         // Stop at repo root if found

@@ -27,8 +27,11 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
             await workspace.addTask(frontendTitle, {
                 cwd: path.join(workspace.root, frontendDir),
             });
+            // The first task's detected project becomes the default, so the
+            // second project is chosen explicitly (DEV-311).
             const apiTask = await workspace.addTask(apiTitle, {
                 cwd: path.join(workspace.root, apiDir),
+                args: ['--project=api-service'],
             });
 
             const server = await startLotarServer(workspace);

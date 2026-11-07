@@ -125,14 +125,14 @@ impl CommandHandler for AddHandler {
             .trim()
             .is_empty();
 
-        let detected_name = if project.is_none() {
-            crate::project::detect_project_context_name()
-        } else {
-            None
-        };
-
         // Resolve project first (needed for project-specific config)
-        let effective_project = match project_resolver.resolve_project("", project) {
+        // A dry run must not save a detected default project.
+        let resolved = if args.dry_run && project.is_none() {
+            Ok(project_resolver.preview_default_project())
+        } else {
+            project_resolver.resolve_project("", project)
+        };
+        let effective_project = match resolved {
             Ok(project) => {
                 if project.is_empty() {
                     // No default project set, use global config
@@ -261,23 +261,27 @@ impl CommandHandler for AddHandler {
             validated_tags.push(validated_tag);
         }
 
-        let (project_for_storage, original_project_name) = if let Some(explicit_project) = project {
-            let prefix = resolve_project_input(explicit_project, resolver.path.as_path());
-            (prefix, Some(explicit_project.to_string()))
-        } else if let Some(ref detected) = detected_name {
-            let prefix = generate_project_prefix(detected);
-            (prefix, Some(detected.clone()))
-        } else if let Some(project_name) = effective_project.as_deref() {
-            let descriptive_name = if had_configured_default_project {
-                None
+        let choice = Self::choose_project(
+            project,
+            effective_project.as_deref(),
+            had_configured_default_project,
+            resolver.path.as_path(),
+        );
+        let project_for_storage = choice.prefix.clone();
+        let original_project_name = choice.name.clone();
+        let project_explanation = format!("project {} from {}", choice.prefix, choice.source);
+        if choice.detected && !project_folder_exists(resolver.path.as_path(), &choice.prefix) {
+            let verb = if args.dry_run {
+                "would create"
             } else {
-                crate::project::detect_project_name()
+                "creates"
             };
-            (project_name.to_string(), descriptive_name)
-        } else {
-            let prefix = crate::project::get_effective_project_name(resolver);
-            (prefix, None)
-        };
+            renderer.emit_warning(format_args!(
+                "No default project is set, so this {verb} a new project {} (from {}). \
+                 Pass --project, or set default.project, to use another.",
+                choice.prefix, choice.source
+            ));
+        }
 
         // Create the task
         let mut task = Task::new(resolver.path.clone(), args.title, validated_priority);
@@ -444,21 +448,6 @@ impl CommandHandler for AddHandler {
         // Save the task
         // Git-like behavior: if a parent tasks root is adopted, write to that parent (no child .tasks creation)
 
-        let global_context = original_project_name
-            .as_deref()
-            .or(effective_project.as_deref())
-            .map(|name| name.trim())
-            .filter(|name| !name.is_empty());
-
-        let mut storage = if let Some(context) = global_context {
-            // Prefer the human-readable project name for smart default prefix generation
-            Storage::new_with_context(&write_root, Some(context))
-        } else {
-            // Fall back to environment/project detection heuristics when no context is available
-            let context = crate::project::detect_project_name();
-            Storage::new_with_context(&write_root, context.as_deref())
-        };
-
         // Use resolved project prefix, not the raw project name
         if args.dry_run {
             // Preview without saving
@@ -501,7 +490,10 @@ impl CommandHandler for AddHandler {
                             .unwrap_or(serde_json::Value::Null);
                     }
                     if args.explain {
-                        obj["explain"] = serde_json::Value::String("default status and priority via smart defaults; reporter/assignee per config/defaults".to_string());
+                        obj["explain"] = serde_json::Value::String(format!(
+                            "{project_explanation}; default status and priority via smart defaults; reporter/assignee per config/defaults"
+                        ));
+                        obj["project_source"] = serde_json::Value::String(choice.source.clone());
                     }
                     renderer.emit_json(&obj);
                 }
@@ -511,12 +503,29 @@ impl CommandHandler for AddHandler {
                         project_for_storage, task.title, task.priority
                     ));
                     if args.explain {
-                        renderer.emit_info("Explanation: default status and priority chosen via smart defaults; reporter/assignee per config/defaults.");
+                        renderer.emit_info(format_args!("Explanation: {project_explanation}; default status and priority chosen via smart defaults; reporter/assignee per config/defaults."));
                     }
                 }
             }
             return Ok(format!("{}-PREVIEW", project_for_storage));
         }
+
+        // Created only now: opening storage bootstraps the workspace config,
+        // which a dry run must not do.
+        let global_context = original_project_name
+            .as_deref()
+            .or(effective_project.as_deref())
+            .map(|name| name.trim())
+            .filter(|name| !name.is_empty());
+
+        let mut storage = if let Some(context) = global_context {
+            // Prefer the human-readable project name for smart default prefix generation
+            Storage::new_with_context(&write_root, Some(context))
+        } else {
+            // Fall back to environment/project detection heuristics when no context is available
+            let context = crate::project::detect_project_name();
+            Storage::new_with_context(&write_root, context.as_deref())
+        };
 
         renderer.log_info(format_args!(
             "add: writing task to storage project={} original={:?}",
@@ -541,6 +550,9 @@ impl CommandHandler for AddHandler {
         )
         .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
         renderer.log_info(format_args!("add: created id={}", task_id));
+        if args.explain {
+            renderer.emit_info(format_args!("Explanation: {project_explanation}."));
+        }
 
         // Fire automation rules for the `created` event.
         // Skipped under RUST_TEST_THREADS to avoid interference with integration
@@ -570,7 +582,86 @@ impl CommandHandler for AddHandler {
     }
 }
 
+/// The project `add` writes to, and why (DEV-311).
+struct ProjectChoice {
+    prefix: String,
+    /// The human-readable name, used when the project is new.
+    name: Option<String>,
+    source: String,
+    /// Picked from the checkout (manifest, repository or folder name).
+    detected: bool,
+}
+
+fn project_folder_exists(tasks_dir: &std::path::Path, prefix: &str) -> bool {
+    crate::utils::filesystem::list_visible_subdirs(tasks_dir)
+        .iter()
+        .any(|(name, _)| name.eq_ignore_ascii_case(prefix))
+}
+
 impl AddHandler {
+    /// `--project` first, then the configured default (`default.project`,
+    /// or `LOTAR_PROJECT`), then an existing project, and only then a name
+    /// detected from the checkout. A manifest name never overrides a
+    /// configured default (DEV-311).
+    fn choose_project(
+        explicit: Option<&str>,
+        resolved: Option<&str>,
+        configured_default: bool,
+        tasks_dir: &std::path::Path,
+    ) -> ProjectChoice {
+        if let Some(explicit) = explicit {
+            return ProjectChoice {
+                prefix: resolve_project_input(explicit, tasks_dir),
+                name: Some(explicit.to_string()),
+                source: "--project".to_string(),
+                detected: false,
+            };
+        }
+        if configured_default && let Some(value) = resolved {
+            let env_var = ["LOTAR_PROJECT", "LOTAR_DEFAULT_PROJECT"]
+                .into_iter()
+                .find(|var| std::env::var(var).is_ok_and(|v| !v.trim().is_empty()));
+            // The environment may hold a project name; the configured
+            // default is a prefix, kept as written unless it names an
+            // existing project (`default.project: HOMEWS` stays HOMEWS).
+            let mapped = resolve_project_input(value, tasks_dir);
+            let prefix = if env_var.is_some() || project_folder_exists(tasks_dir, &mapped) {
+                mapped
+            } else {
+                value.to_string()
+            };
+            let source = env_var
+                .map(|var| format!("the {var} environment variable"))
+                .unwrap_or_else(|| "default.project in the configuration".to_string());
+            return ProjectChoice {
+                name: (prefix != value).then(|| value.to_string()),
+                prefix,
+                source,
+                detected: false,
+            };
+        }
+        if let Some(value) = resolved
+            && project_folder_exists(tasks_dir, value)
+        {
+            return ProjectChoice {
+                prefix: value.to_string(),
+                name: None,
+                source: "the existing project (no default.project is set)".to_string(),
+                detected: false,
+            };
+        }
+        let (name, from) = crate::project::detect_project_name_with_source()
+            .unwrap_or_else(|| ("default".to_string(), "the built-in fallback".to_string()));
+        ProjectChoice {
+            prefix: resolved
+                .map(str::to_string)
+                .unwrap_or_else(|| generate_project_prefix(&name)),
+            name: Some(name),
+            source: from,
+            detected: true,
+        }
+    }
+
     // Internal helper: create a warn logger that auto-silences during tests or when LOTAR_TEST_SILENT=1
     fn warn_logger() -> OutputRenderer {
         let test_silent = cfg!(test)

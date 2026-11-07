@@ -1,0 +1,54 @@
+title: add and MCP/REST create ignore default.project and silently create a project from package.json
+status: Done
+priority: High
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-07T01:56:05.192537+00:00
+modified: 2026-11-07T02:19:49.362806+00:00
+comments:
+- date: 2026-11-07T02:14:34.291218+00:00
+  text: |-
+    Fix in working tree:
+    - add: --project, then default.project / LOTAR_PROJECT, then the existing project, then detection (manifest, repo, folder). A configured default is used as written unless it names an existing project.
+    - A detected project that doesn't exist yet prints a warning naming the prefix and source (also on --dry-run).
+    - --explain names the project source; JSON dry runs add project_source.
+    - add --dry-run no longer writes .tasks/config.yml (it used to save the detected prefix as default.project, and bootstrap the workspace).
+    - REST/MCP creates without a project use the configured default before the repo folder name.
+    - Tests: tests/dev311_default_project_precedence_test.rs; dev64 test no longer sets a default it expected to be ignored. Docs: add.md, precedence.md, mcp-tools.md.
+    Local note: web_api_integration_test watcher_reports_config_edits/sprint_changes_announce fail only with this checkout's target/ (no SSE events); the same sources pass with a fresh CARGO_TARGET_DIR, and clean main passes too. Stale build state, not this change.
+- date: 2026-11-07T02:19:49.325877+00:00
+  text: |-
+    Behavior change: in a monorepo without a default, the first add's detected project is saved as default.project (as before), and now later adds from other package folders use it instead of their own manifest. Other packages' projects need --project. Smoke tests cli.multi-project, ui.multi-project and ui.sort-export updated for that.
+    Verified: npm run lint:agent, npm run test:agent (1969 Rust + 1431 UI tests), npm run test:smoke:agent (only the three tests above failed; they pass after the update). Gairola repro: root and site/ both preview project G; MCP task_create without a project lands in G.
+description: |-
+  Reported by the Gairola session (~/Development/gairola) at Ravi's request, lotar 0.12.1.
+
+  Repro: .tasks/config.yml has default.project G; root package.json name gairola, site/package.json name gairola-site. `lotar add "Plain" --dry-run` says GAIR (GS inside site/); a real add created .tasks/GAIR/config.yml and GAIR-1 without a warning. MCP task_create without a project also creates GAIR (from the repo folder name). -p G and LOTAR_PROJECT=G work.
+
+  Cause: AddHandler uses the nearest manifest name before the resolved default project; TaskService::resolve_create_project (REST, MCP) never reads default.project. docs/help/add.md already documents default before auto-detection.
+
+  Asks: 1) configured default before manifest/name detection, with tests; 2) no silent project creation from detection: warn and name the prefix; 3) --explain shows where the project came from.
+history:
+- at: 2026-11-07T01:56:23.705325+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-07T02:14:34.291218+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-07T02:19:49.325877+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-07T02:19:49.362806+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

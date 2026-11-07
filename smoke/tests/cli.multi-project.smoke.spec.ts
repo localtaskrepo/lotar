@@ -12,7 +12,7 @@ function apiManifest(): string {
 }
 
 describe.concurrent.skipIf(!gitAvailable())('CLI multi-project smoke scenarios', () => {
-    it('auto-detects project prefixes across monorepo directories', async () => {
+    it('detects the first project and keeps it as the default across monorepo directories', async () => {
         const workspace = await SmokeWorkspace.create();
 
         try {
@@ -26,8 +26,17 @@ describe.concurrent.skipIf(!gitAvailable())('CLI multi-project smoke scenarios',
                 cwd: path.join(workspace.root, 'apps', 'frontend'),
             });
 
-            const apiTask = await workspace.addTask('API default-detected task', {
+            // The detected project became default.project, and a configured
+            // default wins over the nearest manifest (DEV-311).
+            const defaultTask = await workspace.addTask('Second task from the API folder', {
                 cwd: path.join(workspace.root, 'services', 'api'),
+            });
+            expect(defaultTask.project).toBe(frontendTask.project);
+
+            // Another package's project is chosen explicitly.
+            const apiTask = await workspace.addTask('API explicit task', {
+                cwd: path.join(workspace.root, 'services', 'api'),
+                args: ['--project=api-service'],
             });
 
             expect(frontendTask.project).not.toBe(apiTask.project);

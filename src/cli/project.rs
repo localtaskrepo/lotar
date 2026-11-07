@@ -77,6 +77,13 @@ impl ProjectResolver {
         }
     }
 
+    /// The project a command without `--project` would use, without saving
+    /// a detected default to the configuration (for dry runs).
+    pub fn preview_default_project(&self) -> String {
+        self.config_manager
+            .default_project_or_detected(&self.tasks_dir)
+    }
+
     /// Resolve a project name (which could be a full name) to its prefix
     pub fn resolve_project_name_to_prefix(&self, project_name: &str) -> String {
         // Use the existing utility function that handles project name -> prefix mapping

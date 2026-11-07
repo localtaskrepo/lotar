@@ -132,6 +132,7 @@ describe('UI sort and export smoke scenarios (DEV-57)', () => {
             try {
                 const unrelated = await workspace.addTask('API unrelated task', {
                     cwd: path.join(workspace.root, apiDir),
+                    args: ['--project=api-service'],
                 });
                 await expectBackendSupportsSortBy(server.url, [
                     frontendHigh.id,

@@ -122,6 +122,7 @@ mod dev292_performance_test;
 mod dev300_cli_sync_followups_test;
 mod dev301_stale_write_test;
 mod dev305_serve_exit_on_upgrade_test;
+mod dev311_default_project_precedence_test;
 mod dev3_dev13_recent_and_sum_test;
 mod dev4_archive_test;
 mod dev54_mutation_contract_test;

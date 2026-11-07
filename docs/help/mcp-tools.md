@@ -29,7 +29,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Params:** `title` (required), optional `description`, `project`, `priority`, `type` (alias `task_type`), `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `acceptance_criteria[]`, `relationships`, `custom_fields` map, and `sprints[]` (positive integers).
 - **Behavior:** validates `status`/`priority`/`type` against the target project's configuration (project-only enum values are accepted; failures carry `error.data.suggestions` from that project); an explicit `status` is persisted atomically with creation; auto-fills missing defaults (priority/type/status/reporter/assignee/tags) per project config; `@me` supported for people fields.
 - **Response:** JSON blob containing the saved `task` plus `metadata.appliedDefaults` (fields the server filled) and `metadata.enumHints` when available.
-- **Project:** An explicit `project` selects that project. When omitted, MCP uses the shared task service's repository-derived project prefix for both enum validation and creation; it does not pre-validate against unrelated global values.
+- **Project:** An explicit `project` selects that project. When omitted, MCP uses the configured default project (`default.project` or `LOTAR_PROJECT`), else a prefix from the repository folder name, for both enum validation and creation; it does not pre-validate against unrelated global values.
 - **Type Alias:** A non-null `type` takes precedence over `task_type`; `type: null` permits the alias. This precedence is consistent in create, patch, and list filters.
 
 ### `task_get`

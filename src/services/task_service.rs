@@ -188,8 +188,18 @@ fn same_modified(stored: &str, expected: &str) -> bool {
 }
 
 impl TaskService {
+    /// The project for a create without one: the configured default
+    /// project (`default.project`, `LOTAR_PROJECT`) when set, else a prefix
+    /// from the repository folder name (DEV-311).
     pub(crate) fn resolve_create_project(tasks_root: &Path, project: Option<String>) -> String {
         project.unwrap_or_else(|| {
+            if let Ok(config) = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
+            {
+                let default = config.default_project.trim();
+                if !default.is_empty() {
+                    return crate::utils::project::resolve_project_input(default, tasks_root);
+                }
+            }
             let repo_name = tasks_root
                 .parent()
                 .and_then(|p| p.file_name())
@@ -226,7 +236,7 @@ impl TaskService {
         }
         let normalized_sprints = Self::normalize_sprint_ids(&sprints);
 
-        // Prefer explicit project if provided; otherwise, derive from repo folder name
+        // Explicit project, else the configured default, else the repo folder name
         let project = Self::resolve_create_project(&storage.root_path, project);
 
         let config = Self::resolve_config_for_mutation(storage.root_path.as_path(), &project)?;
