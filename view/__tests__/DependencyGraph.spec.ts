@@ -416,9 +416,9 @@ describe('Bounded dependency view', () => {
         expect(wrapper.get('.dependency-diagram').element).toBe(diagram)
         expect(wrapper.get('.dependency-render').attributes('inert')).toBeUndefined()
         expect(wrapper.get('.dependency-count').text()).toContain('1 focal task')
-        expect(wrapper.get('.dependency-diagram').attributes('style')).toContain(
-            'min-height: min(600px, 82dvh, 1000px)',
-        )
+        // jsdom folds the 1000px cap into 600px when serializing (CSS Values 4 min() simplification);
+        // the cap itself is checked against the source below.
+        expect(wrapper.get('.dependency-diagram').attributes('style')).toContain('min-height: min(600px, 82dvh)')
         expect(wrapper.get('.dependency-canvas').attributes('style')).not.toContain('min-height')
         expect(wrapper.get('.dependency-canvas').attributes('style')).not.toContain('min-width')
         wrapper.unmount()
@@ -471,6 +471,7 @@ describe('Bounded dependency view', () => {
     })
     it('bounds responsive card grids, wraps compact metadata, and allows a tall viewport', () => {
         expect(graphSource).toMatch(/max-height:\s*min\(82dvh, 1000px\)/)
+        expect(graphSource).toContain('minHeight: `min(${retainedHeight}px, 82dvh, 1000px)`')
         expect(graphSource).not.toContain('max-height: 500px')
         expect(graphSource).toContain('grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr))')
         expect(graphSource).toMatch(
