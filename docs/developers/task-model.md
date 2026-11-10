@@ -163,7 +163,7 @@ task lock cannot prove that such a file is abandoned or was created by LoTaR.
 The current production call sites are in [storage operations](../../src/storage/operations.rs),
 [sprint service](../../src/services/sprint_service.rs), [config operations](../../src/config/operations.rs),
 [init scaffolds](../../src/cli/handlers/config/init/scaffolds.rs),
-[sync service](../../src/services/sync_service.rs), and [source preparation](../../src/utils/scan.rs).
+[sync service](../../src/services/sync_service/mod.rs), and [source preparation](../../src/utils/scan.rs).
 These atomic helpers do not establish ownership of home artifacts, agent logs,
 queue data, reports, attachments, worktrees, or arbitrary operating-system temp
 directories. Those remain outside this operation and keep their existing owners.

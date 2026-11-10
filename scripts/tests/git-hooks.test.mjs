@@ -16,6 +16,7 @@ const CONFIGS = [
     '.prettierignore',
     'eslint.config.mjs',
     'eslint-suppressions.json',
+    '.gitleaks.toml',
 ];
 
 function git(cwd, ...args) {
@@ -76,6 +77,17 @@ test('pre-commit passes clean staged files without touching the repository', (t)
     const result = runHook(dir, 'pre-commit');
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.deepEqual(snapshot(dir), before);
+});
+
+test('pre-commit blocks a staged secret when gitleaks is installed', (t) => {
+    if (spawnSync('gitleaks', ['version']).status !== 0) return t.skip('gitleaks not installed');
+    const dir = fixtureRepo();
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    writeFileSync(path.join(dir, 'view/config.ts'), `export const secret = 'GOCSPX-${'a1B2c3D4e5'.repeat(3)}'\n`);
+    git(dir, 'add', '-A');
+    const result = runHook(dir, 'pre-commit');
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout + result.stderr, /google-oauth-client-secret/);
 });
 
 test('pre-commit rejects unformatted Rust and TypeScript without fixing them', (t) => {

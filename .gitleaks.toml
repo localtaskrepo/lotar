@@ -1,0 +1,22 @@
+# Copy of the owner's shared gitleaks rules (standards repo, configs/gitleaks/base.toml), copied because
+# this repo is public and must work from a clone alone. Update it from there.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "anthropic-oauth-token"
+description = "Claude Code OAuth token"
+regex = '''sk-ant-oat\d{2}-[A-Za-z0-9_\-]{40,}'''
+keywords = ["sk-ant-oat"]
+
+[[rules]]
+id = "google-oauth-refresh-token"
+description = "Google OAuth refresh token"
+regex = '''\b1//0[A-Za-z0-9_\-]{30,}'''
+keywords = ["1//0"]
+
+[[rules]]
+id = "google-oauth-client-secret"
+description = "Google OAuth client secret"
+regex = '''\bGOCSPX-[A-Za-z0-9_\-]{20,}'''
+keywords = ["gocspx-"]
