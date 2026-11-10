@@ -44,7 +44,7 @@ describe('ColumnsMenu', () => {
         const titleCheck = wrapper
             .findAll('label.column-option')
             .find((l) => l.text().trim() === 'Title')!
-            .find('input[type="checkbox"]')!
+            .find('input[type="checkbox"]')
         await titleCheck.setValue(true)
         expect(setVisibleCalls).toContainEqual(['title', true])
     })

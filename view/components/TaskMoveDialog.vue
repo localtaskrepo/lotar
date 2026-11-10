@@ -156,9 +156,11 @@ async function loadTarget() {
   try {
     const [config, first] = await Promise.all([api.showConfig(target.value), api.moveTask(request(true))])
     if (run !== generation) return
-    statuses.value = config.issue_states ?? []
-    types.value = config.issue_types ?? []
-    priorities.value = config.issue_priorities ?? []
+    // The target's configured lists; a project that does not set one has none here.
+    const names = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : [])
+    statuses.value = names(config.issue_states)
+    types.value = names(config.issue_types)
+    priorities.value = names(config.issue_priorities)
     // Start from what the move would do on its own; the user can change it.
     status.value = String(first.task.status ?? '')
     taskType.value = String(first.task.task_type ?? '')

@@ -7,14 +7,13 @@ import {
     buildSprintSchedule,
 } from '../utils/sprintCalendar'
 
-const baseSprint = (overrides: Partial<SprintListItem>): SprintListItem =>
-    ({
-        id: 1,
-        display_name: 'Sprint 1',
-        state: 'active',
-        warnings: [],
-        ...overrides,
-    }) as SprintListItem
+const baseSprint = (overrides: Partial<SprintListItem>): SprintListItem => ({
+    id: 1,
+    display_name: 'Sprint 1',
+    state: 'active',
+    warnings: [],
+    ...overrides,
+})
 
 describe('sprint calendar helpers', () => {
     it('normalizes start/end with fallbacks', () => {

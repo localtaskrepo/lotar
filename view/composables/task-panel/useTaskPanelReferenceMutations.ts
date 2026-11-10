@@ -78,7 +78,7 @@ export function useTaskPanelReferenceMutations(
 
     function applyReferencesFromTaskResponse(updated: Partial<TaskDTO> | null | undefined) {
         task.references = Array.isArray(updated?.references)
-            ? updated!.references!.map((reference) => ({ ...reference }))
+            ? updated.references.map((reference) => ({ ...reference }))
             : []
     }
 
@@ -113,7 +113,7 @@ export function useTaskPanelReferenceMutations(
             } else {
                 showToast(`Removed ${name} (file may already be gone)`)
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.warn('Failed to remove attachment', { path, error })
             showToast('Failed to remove attachment')
         } finally {
@@ -137,7 +137,7 @@ export function useTaskPanelReferenceMutations(
             const response = await api.addTaskLinkReference({ id: task.id, url: normalized })
             applyResponseTask(response.task)
             return response.added ? 'added' : 'skipped'
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.warn('Failed to add link reference', { url: normalized, error })
             return 'failed'
         }
@@ -161,7 +161,7 @@ export function useTaskPanelReferenceMutations(
             const response = await api.removeTaskLinkReference({ id: task.id, url: normalized })
             applyResponseTask(response.task)
             showToast(response.removed ? 'Link removed' : 'Link already removed')
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.warn('Failed to remove link reference', { url: normalized, error })
             showToast('Failed to remove link')
         } finally {
@@ -213,7 +213,7 @@ export function useTaskPanelReferenceMutations(
                     progress.fraction = 1
 
                     applyResponseTask(response.task)
-                } catch (error: any) {
+                } catch (error: unknown) {
                     failed += 1
                     progress.state = 'failed'
                     console.warn('Failed to upload attachment', { file: file.name, error })

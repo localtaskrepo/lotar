@@ -25,7 +25,7 @@ describe('task attachment helpers (DEV-116)', () => {
 
     it('strips content hashes from display names', () => {
         expect(attachmentDisplayName(`a/b/report-${HASH}.pdf`)).toBe('report.pdf')
-        expect(attachmentDisplayName(`${'-'}${HASH}.png`)).toBe('attachment.png')
+        expect(attachmentDisplayName(`-${HASH}.png`)).toBe('attachment.png')
         expect(attachmentDisplayName('plain.txt')).toBe('plain.txt')
         expect(attachmentDisplayName('')).toBe('attachment')
     })

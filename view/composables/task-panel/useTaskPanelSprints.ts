@@ -30,7 +30,7 @@ function directoryMissingSet(values: readonly number[] | undefined) {
     const set = new Set<number>()
     if (!values) return set
     values.forEach((value) => {
-        const id = Number(value)
+        const id = value
         if (Number.isFinite(id)) {
             set.add(id)
         }
@@ -47,7 +47,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
             const baseLabel = sprint.label || sprint.display_name || `Sprint ${sprint.id}`
             lookup[sprint.id] = {
                 label: `#${sprint.id} ${baseLabel}`.trim(),
-                state: sprint.state || 'unknown',
+                state: sprint.state,
             }
         }
         return lookup
@@ -60,7 +60,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
         const membership: number[] = []
         const membershipSet = new Set<number>()
         for (const raw of rawMembership) {
-            const id = Number(raw)
+            const id = raw
             if (!Number.isFinite(id) || id <= 0 || membershipSet.has(id)) continue
             membershipSet.add(id)
             membership.push(id)
@@ -69,10 +69,10 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
         const missing = directoryMissingSet(options.missingSprints.value)
 
         const orderedEntries: Array<{ id: number; order: number }> = []
-        const orderSource = taskSprintOrder.value || {}
+        const orderSource = taskSprintOrder.value
         Object.entries(orderSource).forEach(([rawId, rawOrder]) => {
             const id = Number(rawId)
-            const order = Number(rawOrder)
+            const order = rawOrder
             if (!Number.isFinite(id) || id <= 0) return
             orderedEntries.push({ id, order: Number.isFinite(order) ? order : Number.MAX_SAFE_INTEGER })
         })
@@ -123,7 +123,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
 
     const sprintOptions = computed(() => {
         const optionsList: Array<{ value: string; label: string }> = []
-        const activeList = options.activeSprints.value ?? []
+        const activeList = options.activeSprints.value
         const activeLabel = (() => {
             if (!activeList.length) return 'Auto (requires an active sprint)'
             if (activeList.length === 1) {
@@ -137,7 +137,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
         optionsList.push({ value: 'next', label: 'Next sprint' })
         optionsList.push({ value: 'previous', label: 'Previous sprint' })
 
-        const sorted = [...(options.sprintList.value ?? [])].sort((a, b) => a.id - b.id)
+        const sorted = [...options.sprintList.value].sort((a, b) => a.id - b.id)
         sorted.forEach((item) => {
             const name = item.label || item.display_name || `Sprint ${item.id}`
             const state = titleCase(item.state)
@@ -146,7 +146,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
         return optionsList
     })
 
-    const hasSprints = computed(() => (options.sprintList.value?.length ?? 0) > 0)
+    const hasSprints = computed(() => options.sprintList.value.length > 0)
 
     const resetSprintsState = () => {
         taskSprintOrder.value = {}
@@ -156,12 +156,12 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
     const applyTaskSprints = (data: TaskDTO) => {
         const normalizedSprints: number[] = []
         const orderPairs: Array<[number, number]> = []
-        const orderSource = data.sprint_order as Record<string, number> | undefined
+        const orderSource = data.sprint_order
         if (orderSource && typeof orderSource === 'object') {
             Object.entries(orderSource).forEach(([rawId, rawOrder]) => {
                 const id = Number(rawId)
                 if (!Number.isFinite(id) || id <= 0) return
-                const orderValue = Number(rawOrder)
+                const orderValue = rawOrder
                 const order = Number.isFinite(orderValue) ? orderValue : Number.MAX_SAFE_INTEGER
                 orderPairs.push([id, order])
             })
@@ -180,7 +180,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
 
         if (!normalizedSprints.length && Array.isArray(data.sprints)) {
             for (const value of data.sprints) {
-                const id = Number(value)
+                const id = value
                 if (!Number.isFinite(id) || id <= 0) continue
                 if (!normalizedSprints.includes(id)) {
                     normalizedSprints.push(id)

@@ -114,8 +114,8 @@ describe('UI task panel persistence contract', () => {
                     const routeJobs = new Set<Promise<void>>();
                     const runRouteJob = (job: Promise<void>) => {
                         routeJobs.add(job);
-                        job.catch(() => {});
-                        job.finally(() => routeJobs.delete(job));
+                        // finally() on the job itself would re-raise its rejection unhandled.
+                        void job.catch(() => {}).finally(() => routeJobs.delete(job));
                     };
                     await page.route('**/api/tasks/update', async (route) => {
                         runRouteJob(

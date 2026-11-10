@@ -36,6 +36,7 @@ import type {
     CodeReferenceRemoveRequest,
     CodeReferenceRemoveResponse,
     ConfigInspectResult,
+    ConfigShowResponse,
     ConfigSetResponse,
     FileReferenceAddRequest,
     FileReferenceAddResponse,
@@ -93,7 +94,7 @@ import type {
 
 const BASE = '' // same origin; server serves /api
 
-function qs(params: Record<string, any> = {}): string {
+function qs(params: object = {}): string {
     const usp = new URLSearchParams()
 
     const append = (key: string, value: unknown) => {
@@ -102,10 +103,13 @@ function qs(params: Record<string, any> = {}): string {
             if (value.length) usp.set(key, value.join(','))
             return
         }
+        if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+            throw new TypeError(`Query parameter ${key} must be a string, number, boolean or list`)
+        }
         usp.set(key, String(value))
     }
 
-    Object.entries(params).forEach(([k, v]) => {
+    Object.entries(params as Record<string, unknown>).forEach(([k, v]) => {
         if (k === 'custom_fields' && v && typeof v === 'object' && !Array.isArray(v)) {
             Object.entries(v as Record<string, unknown>).forEach(([name, value]) => {
                 if (value === undefined || value === null) return
@@ -123,7 +127,8 @@ function qs(params: Record<string, any> = {}): string {
 
 async function parseEnvelope<T>(method: 'GET' | 'POST', path: string, res: Response): Promise<T> {
     const raw = await res.text()
-    let payload: ApiEnvelope<T> | { error?: { message?: string }; data?: T } | null = null
+    // Server JSON: an envelope ({ data } or { error }), or a bare value from older endpoints.
+    let payload: unknown = null
     if (raw) {
         try {
             payload = JSON.parse(raw)
@@ -131,9 +136,11 @@ async function parseEnvelope<T>(method: 'GET' | 'POST', path: string, res: Respo
             payload = null
         }
     }
+    const body =
+        payload && typeof payload === 'object' ? (payload as { error?: { message?: string }; message?: string }) : null
 
     if (!res.ok) {
-        const message = (payload as any)?.error?.message || (payload as any)?.message || raw?.trim() || `${res.status}`
+        const message = body?.error?.message || body?.message || raw.trim() || `${res.status}`
         // Carry the HTTP status so callers can distinguish not-found from
         // transient failures without parsing messages.
         const error = new Error(`${method} ${path} failed: ${message}`) as Error & { status?: number }
@@ -145,23 +152,23 @@ async function parseEnvelope<T>(method: 'GET' | 'POST', path: string, res: Respo
         throw new Error(`${method} ${path} failed: Empty response`)
     }
 
-    if ((payload as any).error) {
-        throw new Error((payload as any).error.message || `${method} ${path} failed`)
+    if (body?.error) {
+        throw new Error(body.error.message || `${method} ${path} failed`)
     }
 
-    if (!('data' in (payload as ApiEnvelope<T>))) {
-        return payload as any as T
+    if (!body || !('data' in body)) {
+        return payload as T
     }
 
-    return (payload as ApiEnvelope<T>).data
+    return (body as ApiEnvelope<T>).data
 }
 
-async function get<T>(path: string, params?: Record<string, any>): Promise<T> {
+async function get<T>(path: string, params?: object): Promise<T> {
     const res = await fetch(`${BASE}${path}${qs(params)}`, { headers: { Accept: 'application/json' } })
     return parseEnvelope('GET', path, res)
 }
 
-async function post<T>(path: string, body: any): Promise<T> {
+async function post<T>(path: string, body: unknown): Promise<T> {
     const res = await fetch(`${BASE}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -190,7 +197,7 @@ export const api = {
     },
     // Tasks
     listTasks(filter: TaskListFilter = {}): Promise<TaskListResponse> {
-        return get('/api/tasks/list', filter as any)
+        return get('/api/tasks/list', filter)
     },
     getTask(id: string, project?: string, opts?: { includeDeleted?: boolean }): Promise<TaskDTO> {
         return get('/api/tasks/get', {
@@ -333,7 +340,7 @@ export const api = {
 
     // Projects
     listProjects(params: { limit?: number; offset?: number } = {}): Promise<ProjectListResponse> {
-        return get('/api/projects/list', params as any)
+        return get('/api/projects/list', params)
     },
     createProject(payload: ProjectCreateRequest): Promise<ProjectDTO> {
         return post('/api/projects/create', payload)
@@ -343,7 +350,7 @@ export const api = {
     },
 
     // Config
-    showConfig(project?: string): Promise<any> {
+    showConfig(project?: string): Promise<ConfigShowResponse> {
         return get('/api/config/show', { project })
     },
     inspectConfig(project?: string): Promise<ConfigInspectResult> {
@@ -373,7 +380,7 @@ export const api = {
     syncReportsList(
         params: { project?: string; limit?: number; offset?: number } = {},
     ): Promise<SyncReportListResponse> {
-        return get('/api/sync/reports/list', params as any)
+        return get('/api/sync/reports/list', params)
     },
     syncReportGet(path: string, project?: string): Promise<SyncReport> {
         return get('/api/sync/reports/get', { path, project })
@@ -386,7 +393,7 @@ export const api = {
 
     // Agent jobs
     listAgentJobs(params: { status?: string; ticket_id?: string } = {}): Promise<AgentJobListResponse> {
-        return get('/api/jobs', params as any)
+        return get('/api/jobs', params)
     },
     getAgentJob(id: string): Promise<AgentJobStatusResponse> {
         return get('/api/jobs/get', { id })
@@ -452,8 +459,8 @@ export const api = {
      * unknown extra keys, due/recent/needs smart filters, order, sort_by) so the
      * export matches what the list view displays.
      */
-    exportTasks(filter: TaskListFilter & { q?: string } = {} as any): Promise<Response> {
-        const source = filter as Record<string, any>
+    exportTasks(filter: TaskListFilter = {}): Promise<Response> {
+        const source: Record<string, unknown> = { ...filter }
         const params: Record<string, unknown> = { ...source }
         if (params.type === undefined && source.task_type !== undefined) params.type = source.task_type
         if (params.q === undefined && source.text_query !== undefined) params.q = source.text_query
@@ -461,7 +468,7 @@ export const api = {
         delete params.text_query
         // DTO-only flag; the REST grammar spells it assignee=__none__.
         delete params.assignee_none
-        return fetch(`/api/tasks/export${qs(params as Record<string, any>)}`, { headers: { Accept: 'text/csv' } })
+        return fetch(`/api/tasks/export${qs(params)}`, { headers: { Accept: 'text/csv' } })
     },
 
     // Sprints

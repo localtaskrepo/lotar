@@ -1,16 +1,16 @@
-import { execa, type Options as ExecaOptions, type Result, type ResultPromise } from 'execa';
+import { execa, type Result } from 'execa';
 import process from 'node:process';
 import { ensureBinaryExists } from './binary.js';
 
 export interface CliRunOptions {
     readonly env?: NodeJS.ProcessEnv;
     readonly cwd?: string;
-    readonly stdio?: ExecaOptions['stdio'];
     readonly timeout?: number;
     readonly acceptExitCodes?: readonly number[];
 }
 
-export type CliRunResult = Result;
+// Output is always piped and decoded, so stdout and stderr are strings.
+export type CliRunResult = Result<{ reject: false }>;
 
 export async function runLotar(args: readonly string[], options: CliRunOptions): Promise<CliRunResult> {
     const binary = await ensureBinaryExists();
@@ -23,7 +23,7 @@ export async function runLotar(args: readonly string[], options: CliRunOptions):
             ...process.env,
             ...options.env,
         },
-        stdio: options.stdio ?? 'pipe',
+        stdio: 'pipe',
         timeout: options.timeout ?? 60_000,
         reject: false,
     });
@@ -39,20 +39,4 @@ export async function runLotar(args: readonly string[], options: CliRunOptions):
     }
 
     return result;
-}
-
-export async function spawnLotar(args: readonly string[], options: CliRunOptions): Promise<ResultPromise> {
-    const binary = await ensureBinaryExists();
-
-    return execa(binary, args as string[], {
-        cwd: options.cwd,
-        env: {
-            LOTAR_TEST_SILENT: '1',
-            RUST_TEST_THREADS: undefined,
-            ...process.env,
-            ...options.env,
-        },
-        stdio: options.stdio ?? 'pipe',
-        timeout: options.timeout ?? 0,
-    });
 }

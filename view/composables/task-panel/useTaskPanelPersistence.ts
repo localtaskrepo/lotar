@@ -1,6 +1,7 @@
+import { errorMessage } from '../../utils/errors'
 import type { ComputedRef, Ref } from 'vue'
 import { nextTick, ref, watch } from 'vue'
-import type { TaskDTO } from '../../api/types'
+import type { TaskCreate, TaskDTO, TaskRelationships } from '../../api/types'
 import { completionStatusKey } from '../useCompletionPolicy'
 import { fromDateInputValue, toDateInputValue } from '../../utils/date'
 import { applyTaskSnapshot, isDeletedTask, projectOf } from '../../utils/text'
@@ -22,7 +23,7 @@ export interface TaskPanelFormState {
 }
 
 interface TaskPanelApiClient {
-    addTask: (payload: any) => Promise<TaskDTO>
+    addTask: (payload: TaskCreate) => Promise<TaskDTO>
     updateTask: (id: string, patch: Record<string, unknown>) => Promise<TaskDTO>
     getTask: (id: string, opts?: { includeDeleted?: boolean }) => Promise<TaskDTO>
 }
@@ -47,7 +48,7 @@ interface UseTaskPanelPersistenceOptions {
     showToast: (message: string) => void
     /** DEV-183: the server answered for a moved task under its new ID. */
     onRedirect?: (id: string) => void
-    buildRelationships: () => unknown
+    buildRelationships: () => TaskRelationships
     buildCustomFields: () => Record<string, unknown>
     applyTask: (data: TaskDTO) => void
     applyTaskCustomFields: (values: Record<string, unknown>) => void
@@ -167,8 +168,8 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
     function enqueuePatch(id: string, patch: Record<string, unknown>): Promise<SaveOutcome> {
         const state = saveQueueFor(id)
         const revision = ++state.revision
-        state.pending = { ...(state.pending ?? {}), ...patch }
-        state.pendingRevisions = { ...(state.pendingRevisions ?? {}) }
+        state.pending = { ...state.pending, ...patch }
+        state.pendingRevisions = { ...state.pendingRevisions }
         const fields = Object.keys(patch)
         for (const field of fields) {
             state.pendingRevisions[field] = revision
@@ -251,10 +252,13 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                         if (retry && Object.keys(retry).length) {
                             // Resend what did not clash, ahead of newer edits;
                             // its waiters settle with the retried request.
-                            state.pending = { ...retry, ...(state.pending ?? {}) }
+                            // Read the queue again: edits queued during the awaits above
+                            // are not visible to the narrowing after `state.pending = null`.
+                            const queued = saveQueueFor(id)
+                            state.pending = { ...retry, ...queued.pending }
                             const retried: Record<string, number> = {}
                             for (const field of Object.keys(retry)) retried[field] = snapshotRevisions[field] ?? 0
-                            state.pendingRevisions = { ...retried, ...(state.pendingRevisions ?? {}) }
+                            state.pendingRevisions = { ...retried, ...queued.pendingRevisions }
                             settled = Object.fromEntries(
                                 Object.entries(snapshotRevisions).filter(([field]) => !(field in retry)),
                             )
@@ -285,7 +289,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         options.suppressWatch.value = true
         options.applyTask(updated)
         restoreUnsaved?.()
-        nextTick(() => {
+        void nextTick(() => {
             options.suppressWatch.value = false
         })
     }
@@ -358,7 +362,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 applyServerFieldToForm(field, server)
             }
         } finally {
-            nextTick(() => {
+            void nextTick(() => {
                 options.suppressWatch.value = false
             })
         }
@@ -377,9 +381,9 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             case 'task_type':
                 return options.form.task_type
             case 'reporter':
-                return (options.form.reporter ?? '').trim() || null
+                return options.form.reporter.trim() || null
             case 'assignee':
-                return (options.form.assignee ?? '').trim() || null
+                return options.form.assignee.trim() || null
             case 'due_date':
                 return fromDateInputValue(options.form.due_date)
             case 'effort':
@@ -387,7 +391,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             case 'description':
                 return options.form.description || null
             case 'tags': {
-                const tags = (options.form.tags || []).map((tag) => (tag || '').trim()).filter((tag) => tag.length > 0)
+                const tags = options.form.tags.map((tag) => (tag || '').trim()).filter((tag) => tag.length > 0)
                 return tags
             }
             case 'sprints':
@@ -413,8 +417,8 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             return a.length === b.length && a.every((value, index) => valuesEqual(value, b[index]))
         }
         if (a && b && typeof a === 'object' && typeof b === 'object') {
-            const aKeys = Object.keys(a as Record<string, unknown>)
-            const bKeys = Object.keys(b as Record<string, unknown>)
+            const aKeys = Object.keys(a)
+            const bKeys = Object.keys(b)
             return (
                 aKeys.length === bKeys.length &&
                 aKeys.every(
@@ -429,9 +433,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
 
     function normalizeSprints(values: number[] | undefined | null): number[] {
         if (!Array.isArray(values)) return [] as number[]
-        const unique = Array.from(
-            new Set(values.map((value) => Number(value)).filter((value) => Number.isFinite(value))),
-        )
+        const unique = Array.from(new Set(values.filter((value) => Number.isFinite(value))))
         unique.sort((a, b) => a - b)
         return unique
     }
@@ -466,13 +468,13 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 options.form.description = server.description || ''
                 break
             case 'tags':
-                options.form.tags = [...(server.tags || [])]
+                options.form.tags = [...server.tags]
                 break
             case 'sprints':
-                options.form.sprints = [...(server.sprints || [])]
+                options.form.sprints = [...server.sprints]
                 break
             case 'custom_fields':
-                options.applyTaskCustomFields((server.custom_fields || {}) as Record<string, unknown>)
+                options.applyTaskCustomFields(server.custom_fields)
                 break
             case 'relationships':
                 options.applyRelationshipsFromTask(server)
@@ -514,12 +516,12 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 patch.priority = options.form.priority
                 break
             case 'reporter':
-                if ((options.form.reporter ?? '').trim() === (options.task.reporter || '')) return
-                patch.reporter = (options.form.reporter ?? '').trim() || null
+                if (options.form.reporter.trim() === (options.task.reporter || '')) return
+                patch.reporter = options.form.reporter.trim() || null
                 break
             case 'assignee':
-                if ((options.form.assignee ?? '').trim() === (options.task.assignee || '')) return
-                patch.assignee = (options.form.assignee ?? '').trim() || null
+                if (options.form.assignee.trim() === (options.task.assignee || '')) return
+                patch.assignee = options.form.assignee.trim() || null
                 break
             case 'due_date': {
                 const due = fromDateInputValue(options.form.due_date)
@@ -532,17 +534,17 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 patch.effort = options.form.effort || null
                 break
             case 'description':
-                if (!(options.form.description ?? '').trim() && !(options.task.description ?? '').trim()) {
+                if (!options.form.description.trim() && !(options.task.description ?? '').trim()) {
                     return
                 }
-                if ((options.form.description ?? '') === (options.task.description ?? '')) {
+                if (options.form.description === (options.task.description ?? '')) {
                     return
                 }
                 patch.description = options.form.description || null
                 break
             case 'sprints': {
-                const current = normalizeSprints(options.task.sprints as any)
-                const next = normalizeSprints(options.form.sprints as any)
+                const current = normalizeSprints(options.task.sprints)
+                const next = normalizeSprints(options.form.sprints)
                 if (current.length === next.length && current.every((value, index) => value === next[index])) {
                     return
                 }
@@ -617,9 +619,9 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             else options.showToast(`Created ${created.id}`)
             options.emit('created', created)
             if (current()) options.closePanel()
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (!current()) return
-            options.showToast(error?.message || 'Failed to create task')
+            options.showToast(errorMessage(error) || 'Failed to create task')
         } finally {
             if (scope === options.panelGeneration.value) options.submitting.value = false
         }
@@ -651,9 +653,9 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             if (!current()) return undefined
             options.ready.value = true
             return data
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (!current()) return undefined
-            options.showToast(error?.message || 'Failed to load task')
+            options.showToast(errorMessage(error) || 'Failed to load task')
             return undefined
         } finally {
             if (current()) options.loading.value = false

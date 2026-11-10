@@ -22,7 +22,7 @@ function waitForInsightsData(page: ResponseWaitTarget): Promise<unknown> {
     return page.waitForResponse(createOkResponsePredicate(insightsRequiredEndpoint), { timeout: 15_000 });
 }
 
-describe.concurrent.skipIf(!gitAvailable())('UI advanced smoke scenarios', () => {
+describe.skipIf(!gitAvailable())('UI advanced smoke scenarios', () => {
     it('keeps multiple browser sessions in sync when tasks are added', async () => {
         const workspace = await SmokeWorkspace.create();
 
@@ -178,7 +178,7 @@ describe.concurrent.skipIf(!gitAvailable())('UI advanced smoke scenarios', () =>
                 expect(exportResponse.ok).toBe(true);
                 const csv = await exportResponse.text();
                 const lines = csv.trim().split('\n').slice(1); // drop header
-                const csvIds = lines.map((line) => line.split(',')[0].replace(/"/g, ''));
+                const csvIds = lines.map((line) => line.split(',')[0]!.replace(/"/g, ''));
                 const listIds = listPayload.data.tasks.map((entry) => entry.id);
                 listIds.forEach((id) => {
                     expect(csvIds).toContain(id);

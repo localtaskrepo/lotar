@@ -6,7 +6,7 @@ import type { TaskDTO } from '../api/types'
  * value and therefore deleted — never use truthiness for this check.
  */
 export function isDeletedTask(task: Pick<TaskDTO, 'deleted_at'> | null | undefined): boolean {
-    return task?.deleted_at !== undefined && task?.deleted_at !== null
+    return task?.deleted_at !== undefined && task.deleted_at !== null
 }
 
 /**
@@ -15,7 +15,7 @@ export function isDeletedTask(task: Pick<TaskDTO, 'deleted_at'> | null | undefin
  * CLEAR a previous tombstone — plain Object.assign would keep the stale key.
  */
 export function applyTaskSnapshot(target: TaskDTO, source: Partial<TaskDTO> | null | undefined): void {
-    if (!target || !source) return
+    if (!source) return
     Object.assign(target, source)
     if (!isDeletedTask(source)) target.deleted_at = undefined
     // `archived` is omitted when false, so clear a stale flag the same way.
@@ -98,4 +98,24 @@ export function numericOf(id: string | null | undefined): string {
 /** Exact-case project prefix for config/sync/attachment requests, or null when the ID is malformed. */
 export function projectPrefixOfTaskId(id: string | null | undefined): string | null {
     return parseTaskId(id)?.project ?? null
+}
+
+/**
+ * Display text for a value from untyped data (rule YAML, custom fields): what `String()` writes, except that lists
+ * are joined item by item and plain objects become JSON instead of "[object Object]".
+ */
+export function displayText(value: unknown): string {
+    if (Array.isArray(value)) return value.map(displayText).join(',')
+    if (value !== null && typeof value === 'object' && value.toString === Object.prototype.toString) {
+        return JSON.stringify(value)
+    }
+    return String(value)
+}
+
+/**
+ * Removes `key` from a record that is used as a dictionary, such as reactive per-id state that templates index.
+ * Vue tracks the deletion; a Map would not be indexable from templates.
+ */
+export function removeKey(record: object, key: PropertyKey): void {
+    Reflect.deleteProperty(record, key)
 }

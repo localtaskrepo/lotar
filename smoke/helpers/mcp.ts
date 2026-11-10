@@ -111,7 +111,7 @@ async function waitForExit(child: McpChildProcess, timeoutMs: number): Promise<b
         () => true,
     );
     const timer = delay(timeoutMs).then(() => false);
-    return await Promise.race([exited, timer]);
+    return Promise.race([exited, timer]);
 }
 
 export async function disposeMcpChild(
@@ -251,7 +251,7 @@ export class NdjsonMcpClient implements McpClientLike {
     }
 
     async awaitResponse(id: unknown, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpMessage> {
-        return await this.queue.wait(
+        return this.queue.wait(
             (message) => mcpIdsMatch(message?.id, id),
             timeoutMs,
             `Timed out waiting for MCP response with id ${JSON.stringify(id)}`,
@@ -259,7 +259,7 @@ export class NdjsonMcpClient implements McpClientLike {
     }
 
     async readUntil(predicate: (message: any) => boolean, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpMessage> {
-        return await this.queue.wait(predicate, timeoutMs, 'Timed out waiting for expected MCP message');
+        return this.queue.wait(predicate, timeoutMs, 'Timed out waiting for expected MCP message');
     }
 
     async dispose(): Promise<void> {
@@ -409,11 +409,11 @@ export class FramedMcpClient implements McpClientLike {
     }
 
     async readFrame(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpFrame> {
-        return await this.queue.wait(() => true, timeoutMs, 'Timed out waiting for MCP frame');
+        return this.queue.wait(() => true, timeoutMs, 'Timed out waiting for MCP frame');
     }
 
     async readUntil(predicate: (frame: McpFrame) => boolean, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpFrame> {
-        return await this.queue.wait(predicate, timeoutMs, 'Timed out waiting for expected MCP frame');
+        return this.queue.wait(predicate, timeoutMs, 'Timed out waiting for expected MCP frame');
     }
 
     async awaitResponse(id: unknown, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<any> {

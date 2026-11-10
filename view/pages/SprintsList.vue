@@ -779,12 +779,14 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../utils/errors'
 import PageHeader from '../components/PageHeader.vue'
 import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type {
+  SprintAssignmentRequest,
   SprintBurndownResponse,
   SprintListItem,
   SprintSummaryReportResponse,
@@ -831,7 +833,7 @@ import {
   sprintMembershipMatches,
   toTrimmedString,
 } from '../utils/sprintPlanning'
-import { projectOf } from '../utils/text'
+import { projectOf, removeKey } from '../utils/text'
 import { colKeyToSortBy, compareTaskIds, sortTasks as sortTasksByContract } from '../utils/taskSort'
 import {
   storageGet,
@@ -1038,7 +1040,7 @@ function setLifecycleBusy(id: number, busy: boolean) {
   if (busy) {
     lifecycleBusy[id] = true
   } else {
-    delete lifecycleBusy[id]
+    removeKey(lifecycleBusy, id)
   }
 }
 
@@ -1090,8 +1092,8 @@ async function runSprintLifecycle(
       response.warnings.forEach((warning) => showToast(`Warning: ${warning}`))
     }
     await refreshAll(true)
-  } catch (error: any) {
-    showToast(error?.message || errorFallback)
+  } catch (error: unknown) {
+    showToast(errorMessage(error) || errorFallback)
   } finally {
     setLifecycleBusy(sprint.id, false)
   }
@@ -1216,7 +1218,7 @@ function toggleSprintManual(id: number) {
   manualSprints.value = isSprintManual(id)
     ? manualSprints.value.filter((value) => value !== id)
     : [...manualSprints.value, id]
-  delete sprintTaskOffsets[id]
+  removeKey(sprintTaskOffsets, id)
 }
 watch(manualSprints, (value) => storageSetJson('lotar.sprints.manualOrder', value))
 watch([backlogManualOrder, manualSprints], hideReorderHint)
@@ -1564,7 +1566,7 @@ function getPagedTasksForSprint(id: number): TaskDTO[] {
 function resetAllPagingOffsets() {
   backlogOffset.value = 0
   Object.keys(sprintTaskOffsets).forEach((key) => {
-    delete sprintTaskOffsets[Number(key)]
+    removeKey(sprintTaskOffsets, Number(key))
   })
 }
 
@@ -1575,7 +1577,7 @@ function clampSprintOffsets() {
     const id = Number(key)
     const total = getSortedTasksForSprint(id).length
     if (total <= 0) {
-      delete sprintTaskOffsets[id]
+      removeKey(sprintTaskOffsets, id)
       return
     }
     const clamped = clampPageOffset(offset, total, tasksPageSize.value)
@@ -1656,7 +1658,7 @@ watch(visibleSprints, (list) => {
   Object.keys(expanded)
     .filter((key) => key.startsWith('sprint-') && !keep.has(key))
     .forEach((key) => {
-      delete expanded[key]
+      removeKey(expanded, key)
     })
   list.forEach((sprint) => {
     if (!(sectionKey(sprint.id) in expanded)) {
@@ -1669,7 +1671,7 @@ watch(visibleSprints, (list) => {
     .map(Number)
     .filter((id) => !visibleIds.has(id))
     .forEach((id) => {
-      delete sprintTaskOffsets[id]
+      removeKey(sprintTaskOffsets, id)
     })
 })
 
@@ -1910,9 +1912,9 @@ async function refreshTasks() {
 
     while (pages < 10_000) {
       pages += 1
-      const response = await api.listTasks({ ...payload, limit: 200, offset: currentOffset } as any)
-      const batch: TaskDTO[] = Array.isArray((response as any)?.tasks) ? (response as any).tasks : []
-      expectedTotal = (response as any)?.total ?? expectedTotal
+      const response = await api.listTasks({ ...payload, limit: 200, offset: currentOffset })
+      const batch: TaskDTO[] = Array.isArray(response.tasks) ? response.tasks : []
+      expectedTotal = response.total
       if (batch.length === 0) break
       collected.push(...batch)
       currentOffset += batch.length
@@ -1925,9 +1927,9 @@ async function refreshTasks() {
     await ensureCompletionPolicies(normalized)
     const filtered = applySprintSmartFilters(normalized, qnorm)
     if (generation === taskGeneration) tasks.value = filtered
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (generation === taskGeneration) {
-      showToast(error?.message || 'Failed to load sprint tasks')
+      showToast(errorMessage(error) || 'Failed to load sprint tasks')
       tasks.value = []
     }
   } finally {
@@ -1941,8 +1943,8 @@ async function refreshTasks() {
 async function refreshAll(force = false) {
   try {
     await refreshSprints(force)
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to load sprints')
+  } catch (error: unknown) {
+    showToast(errorMessage(error) || 'Failed to load sprints')
   }
   await Promise.all([refreshTasks(), refreshBacklogOrder()])
 }
@@ -1953,9 +1955,9 @@ async function refreshBacklogOrder() {
   try {
     const response = await api.getBacklogOrder()
     if (!disposed && generation === orderGenerations.get(null)) backlogOrder.value = response.tasks
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (!disposed && generation === orderGenerations.get(null))
-      showToast(error?.message || 'Failed to load backlog order')
+      showToast(errorMessage(error) || 'Failed to load backlog order')
   } finally {
     if (!disposed && generation === orderGenerations.get(null)) backlogOrderLoading.value = false
   }
@@ -2050,9 +2052,9 @@ async function onRowDrop(event: DragEvent, anchor: string, sprint: number | null
     })
     if (disposed) return
     if (generation === orderGenerations.get(sprint)) applyTaskOrder(sprint, response.tasks)
-  } catch (error: any) {
+  } catch (error: unknown) {
     showToast(
-      `${moved ? 'Task moved, but placement failed: ' : 'Could not reorder tasks: '}${error?.message || 'Refresh and try again.'}`,
+      `${moved ? 'Task moved, but placement failed: ' : 'Could not reorder tasks: '}${errorMessage(error) || 'Refresh and try again.'}`,
     )
   } finally {
     reordering.value = false
@@ -2099,7 +2101,7 @@ async function assignTasksToSprint(
   }
 
   const forceSingle = options.forceSingle ?? !copyModifierActive.value
-  const payload: Record<string, unknown> = {
+  const payload: SprintAssignmentRequest = {
     tasks: [...taskIds],
     cleanup_missing: true,
     sprint: sprintId,
@@ -2110,7 +2112,7 @@ async function assignTasksToSprint(
   if (allowClosed.value) payload.allow_closed = true
 
   try {
-    const response = await api.sprintAdd(payload as any)
+    const response = await api.sprintAdd(payload)
     const changed = response.modified.length
     const replaced = Array.isArray(response.replaced) && response.replaced.length > 0
     const responseName = response.sprint_label || (response.sprint_id ? `Sprint #${response.sprint_id}` : 'sprint')
@@ -2126,9 +2128,9 @@ async function assignTasksToSprint(
       if (messages.length) {
         messages.forEach((message: string) => showToast(message))
       } else if (replaced && Array.isArray(response.replaced)) {
-        response.replaced.forEach((entry: any) => {
-          if (!entry?.previous?.length) return
-          const prior = entry.previous.map((id: number | string) => `#${id}`).join(', ')
+        response.replaced.forEach((entry) => {
+          if (!entry.previous.length) return
+          const prior = entry.previous.map((id) => `#${id}`).join(', ')
           showToast(`${entry.task_id} moved from ${prior}`)
         })
       }
@@ -2138,8 +2140,8 @@ async function assignTasksToSprint(
       notifyIntegrity(response.integrity)
     }
     return changed > 0 || replaced
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to assign to sprint')
+  } catch (error: unknown) {
+    showToast(errorMessage(error) || 'Failed to assign to sprint')
     throw error
   }
 }
@@ -2161,14 +2163,14 @@ async function removeTasksFromSprint(
     return false
   }
 
-  const payload: Record<string, unknown> = {
+  const payload: SprintAssignmentRequest = {
     tasks: [...taskIds],
     cleanup_missing: true,
     sprint: sprintId,
   }
 
   try {
-    const response = await api.sprintRemove(payload as any)
+    const response = await api.sprintRemove(payload)
     const changed = response.modified.length
     const responseName = response.sprint_label || (response.sprint_id ? `Sprint #${response.sprint_id}` : 'sprint')
     if (changed > 0 && !options.silent) {
@@ -2182,8 +2184,8 @@ async function removeTasksFromSprint(
       notifyIntegrity(response.integrity)
     }
     return changed > 0
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to remove from sprint')
+  } catch (error: unknown) {
+    showToast(errorMessage(error) || 'Failed to remove from sprint')
     throw error
   }
 }
@@ -2465,7 +2467,7 @@ function countExclusiveSprintTasks(list: TaskDTO[] | undefined | null, sprintId:
   if (!Array.isArray(list) || !list.length) return 0
   let total = 0
   for (const task of list) {
-    const memberships = normalizeSprintMembership((task as any).sprints)
+    const memberships = normalizeSprintMembership(task.sprints)
     if (memberships.length === 1 && memberships[0] === sprintId) {
       total += 1
     }
@@ -2577,8 +2579,8 @@ async function confirmDeleteSprint() {
     notifyIntegrity(response.integrity ?? null)
     closeDeleteDialog(true)
     await refreshAll(true)
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to delete sprint')
+  } catch (error: unknown) {
+    showToast(errorMessage(error) || 'Failed to delete sprint')
   } finally {
     deleteDialogSubmitting.value = false
     if (!deleteDialog.open) {
@@ -2648,8 +2650,8 @@ async function submitModal() {
     }
     closeModal()
     await refreshAll(true)
-  } catch (error: any) {
-    showToast(error?.message || (modal.mode === 'create' ? 'Failed to create sprint' : 'Failed to update sprint'))
+  } catch (error: unknown) {
+    showToast(errorMessage(error) || (modal.mode === 'create' ? 'Failed to create sprint' : 'Failed to update sprint'))
   } finally {
     submitting.value = false
   }
@@ -2694,8 +2696,8 @@ async function ensureSprintAnalytics(force = false) {
   if (!sprintId) return
   try {
     await sprintAnalytics.fetchSprintAnalytics(sprintId, { force })
-  } catch (error: any) {
-    const message = error?.message || 'Failed to load sprint analytics'
+  } catch (error: unknown) {
+    const message = errorMessage(error) || 'Failed to load sprint analytics'
     if (force) {
       showToast(message)
     } else {
@@ -2707,8 +2709,8 @@ async function ensureSprintAnalytics(force = false) {
 async function ensureVelocity(force = false) {
   try {
     await sprintAnalytics.loadVelocity(velocityParams.value, { force })
-  } catch (error: any) {
-    const message = error?.message || 'Failed to load sprint velocity'
+  } catch (error: unknown) {
+    const message = errorMessage(error) || 'Failed to load sprint velocity'
     if (force) {
       showToast(message)
     } else {
@@ -2780,7 +2782,7 @@ onMounted(() => {
 watch(
   () => route.query,
   async (q) => {
-    const nextProject = (q as any).project ? String((q as any).project) : ''
+    const nextProject = q.project ? String(q.project) : ''
     if (nextProject !== project.value) {
       project.value = nextProject
       await refreshAll(true)

@@ -2,7 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { nextTick, watch } from 'vue'
 import type { TaskDTO } from '../../api/types'
 import { toDateInputValue } from '../../utils/date'
-import { parseTaskId } from '../../utils/text'
+import { parseTaskId, removeKey } from '../../utils/text'
 import type { TaskPanelFormState } from './useTaskPanelPersistence'
 
 type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'references'
@@ -49,7 +49,7 @@ interface UseTaskPanelFormLifecycleOptions {
     applyDefaultsFromConfig: (defaults: Record<string, unknown>) => void
     syncOwnershipControls: () => void
     resetOwnership: () => void
-    preloadPeople: (project: string) => void
+    preloadPeople: (project: string) => Promise<void>
     resetReferencePreviews: () => void
     resetRelationships: () => void
     applyRelationshipsFromTask: (task: TaskDTO | null | undefined) => void
@@ -81,14 +81,14 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
 
     const resetErrors = () => {
         Object.keys(options.errors).forEach((key) => {
-            delete options.errors[key]
+            removeKey(options.errors, key)
         })
     }
 
     const resetForm = () => {
         projectGeneration += 1
         options.suppressWatch.value = true
-        for (const key of Object.keys(options.task)) delete (options.task as any)[key]
+        for (const key of Object.keys(options.task)) removeKey(options.task, key)
         options.form.id = ''
         options.form.title = ''
         options.form.project = options.getInitialProject() || ''
@@ -108,11 +108,11 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.resetRelationships()
         options.resetReferencePreviews()
         options.resetComments()
-        nextTick(() => (options.suppressWatch.value = false))
+        void nextTick(() => (options.suppressWatch.value = false))
     }
 
     const applyDefaults = (project: string) => {
-        const defaults = options.defaults.value || {}
+        const defaults = options.defaults.value
         const priorityOptions = options.priorities.value || []
         const statusOptions = options.statuses.value || []
         const typeOptions = options.types.value || []
@@ -133,8 +133,8 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.ensureConfiguredCustomFields()
         options.applyDefaultsFromConfig(defaults.customFields || {})
         options.syncOwnershipControls()
-        options.preloadPeople(options.form.project)
-        nextTick(() => (options.suppressWatch.value = false))
+        void options.preloadPeople(options.form.project)
+        void nextTick(() => (options.suppressWatch.value = false))
     }
 
     const cleanup = () => {
@@ -185,7 +185,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.form.due_date = toDateInputValue(data.due_date)
         options.form.effort = data.effort || ''
         options.form.description = data.description || ''
-        options.form.tags = [...(data.tags || [])]
+        options.form.tags = [...data.tags]
         options.mergeKnownTags(options.form.tags)
         options.applyTaskSprints(data)
         options.resetReferencePreviews()
@@ -203,12 +203,12 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
 
         options.syncFromTaskHistory(data)
         options.syncOwnershipControls()
-        options.preloadPeople(options.form.project)
-        options.applyTaskCustomFields((data.custom_fields || {}) as Record<string, unknown>)
+        void options.preloadPeople(options.form.project)
+        options.applyTaskCustomFields(data.custom_fields)
         options.applyRelationshipsFromTask(data)
         options.cancelEditComment()
 
-        nextTick(() => (options.suppressWatch.value = false))
+        void nextTick(() => (options.suppressWatch.value = false))
     }
 
     const ensureProjectsLoaded = async () => {
@@ -256,7 +256,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
             projectGeneration += 1
             if (options.mode.value === 'create') options.ready.value = false
             if (options.suppressWatch.value) return
-            options.preloadPeople(project)
+            void options.preloadPeople(project)
         },
         { flush: 'sync' },
     )
@@ -268,7 +268,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         validate,
         applyDefaults,
         applyTask,
-        projectFromList: () => projectFromList() ?? '',
+        projectFromList,
         ensureProjectsLoaded,
         onProjectChange,
     }

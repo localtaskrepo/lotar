@@ -191,7 +191,7 @@ describe.concurrent('MCP no-op mutations (DEV-102)', () => {
                 const mixedPayload = extractToolPayload(mixed) as Record<string, any>;
                 expect(mixedPayload.updated).toHaveLength(1);
                 expect(mixedPayload.failed).toHaveLength(1);
-                expect((mixedPayload.failed[0] as any).id).toBe('MNP-404');
+                expect(mixedPayload.failed[0].id).toBe('MNP-404');
             });
 
             expect(await fileState(fileOne)).toEqual(beforeOne);

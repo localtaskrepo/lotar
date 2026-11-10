@@ -1,3 +1,4 @@
+import { errorMessage } from '../utils/errors'
 import { computed, onMounted, ref, type Ref } from 'vue'
 import { api } from '../api/client'
 import type { SprintIntegrityDiagnostics, SprintListItem } from '../api/types'
@@ -28,8 +29,8 @@ async function load(force = false): Promise<void> {
             sprints.value = normalized
             missingSprints.value = Array.isArray(response.missing_sprints) ? response.missing_sprints : []
             integrity.value = response.integrity ?? null
-        } catch (err: any) {
-            error.value = err?.message || 'Failed to load sprints'
+        } catch (err: unknown) {
+            error.value = errorMessage(err) || 'Failed to load sprints'
             if (force) {
                 throw err
             }

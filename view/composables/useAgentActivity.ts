@@ -32,7 +32,7 @@ let stream: ReturnType<typeof useSse> | null = null
 let unsubscribers: Array<() => void> = []
 
 function fromJob(job: AgentJob): AgentActivity | null {
-    if (!job?.id || !job.ticket_id || !ACTIVE.has(job.status)) return null
+    if (!job.id || !job.ticket_id || !ACTIVE.has(job.status)) return null
     return {
         jobId: job.id,
         taskId: job.ticket_id,
@@ -47,7 +47,7 @@ async function reload() {
     try {
         const response = await api.listAgentJobs()
         const next = new Map<string, AgentActivity>()
-        for (const job of response.jobs ?? []) {
+        for (const job of response.jobs) {
             const activity = fromJob(job)
             if (activity) next.set(activity.jobId, activity)
         }
@@ -105,24 +105,24 @@ function connect() {
     for (const kind of EVENTS) {
         const handler = (event: MessageEvent) => {
             try {
-                applyAgentJobEvent(kind, JSON.parse(event.data || '{}'))
+                applyAgentJobEvent(kind, JSON.parse(String(event.data || '{}')) as AgentJobEventPayload | null)
             } catch {
                 // Ignore malformed payloads.
             }
         }
         stream.on(kind, handler)
-        unsubscribers.push(() => stream?.off?.(kind, handler))
+        unsubscribers.push(() => stream?.off(kind, handler))
     }
     // Events missed while disconnected: reconcile from the job list.
     const onOpen = () => void reload()
     stream.on('open', onOpen)
-    unsubscribers.push(() => stream?.off?.('open', onOpen))
+    unsubscribers.push(() => stream?.off('open', onOpen))
 }
 
 function disconnect() {
     unsubscribers.forEach((off) => off())
     unsubscribers = []
-    stream?.close?.()
+    stream?.close()
     stream = null
 }
 

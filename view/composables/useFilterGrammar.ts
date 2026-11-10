@@ -76,7 +76,7 @@ export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
 ]
 
 const ALIAS_INDEX: Record<string, GrammarKeyMeta> = (() => {
-    const index: Record<string, GrammarKeyMeta> = Object.create(null)
+    const index: Record<string, GrammarKeyMeta> = Object.create(null) as Record<string, GrammarKeyMeta>
     for (const meta of GRAMMAR_KEYS) {
         for (const alias of meta.aliases) index[alias] = meta
     }
@@ -88,7 +88,7 @@ const ALIAS_INDEX: Record<string, GrammarKeyMeta> = (() => {
 // order/sort, sort_by/sortby) plus the deletion routing key and every grammar
 // alias, so `field:STATE=x` and `field:task_type=x` reach the builtin controls.
 const RESERVED_FIELD_ALIASES: Record<string, string> = (() => {
-    const map: Record<string, string> = Object.assign(Object.create(null), {
+    const map: Record<string, string> = Object.assign(Object.create(null) as Record<string, string>, {
         q: 'q',
         query: 'q',
         text: 'q',
@@ -204,7 +204,7 @@ function splitTopLevel(raw: string, isSep: (ch: string) => boolean): string[] {
             if (ch === '\\') {
                 const next = raw[i + 1]
                 if (next === quote || next === '\\') {
-                    current += ch + (next ?? '')
+                    current += ch + next
                     i++
                     continue
                 }
@@ -402,10 +402,10 @@ function parseToken(
     // `-field:area=billing`. Negations of one key add up. A minus on
     // anything else (`-oauth`, `-title:draft`) stays search text.
     if (raw.length > 1 && raw.startsWith('-') && !raw.startsWith('--')) {
-        const inner: Record<string, string> = Object.create(null)
+        const inner: Record<string, string> = Object.create(null) as Record<string, string>
         const innerWords: string[] = []
         const innerErrors: string[] = []
-        parseToken(raw.slice(1), inner, innerWords, innerErrors, Object.create(null))
+        parseToken(raw.slice(1), inner, innerWords, innerErrors, Object.create(null) as Record<string, boolean>)
         const keys = Object.keys(inner)
         if (innerErrors.length) {
             errors.push(...innerErrors)
@@ -437,10 +437,10 @@ function parseToken(
 }
 
 export function parseFilterQuery(input: string): ParsedFilterQuery {
-    const filters: Record<string, string> = Object.create(null)
+    const filters: Record<string, string> = Object.create(null) as Record<string, string>
     const words: string[] = []
     const errors: string[] = []
-    const assignmentKeys: Record<string, boolean> = Object.create(null)
+    const assignmentKeys: Record<string, boolean> = Object.create(null) as Record<string, boolean>
     for (const rawToken of tokenize(input)) {
         for (const token of splitCommaExpressions(rawToken)) {
             parseToken(token, filters, words, errors, assignmentKeys)
@@ -576,7 +576,8 @@ function optionsFor(meta: GrammarKeyMeta, source: FilterValueSource): string[] {
             return (source.projects ?? []).map((p) => p.prefix)
         case 'tags':
             return source.tags ?? []
-        default:
+        case 'customFields':
+        case undefined:
             return []
     }
 }
@@ -678,7 +679,12 @@ function optionCandidates(meta: GrammarKeyMeta, source: FilterValueSource): Arra
             return (source.sprints ?? []).map((s) => ({ value: String(s.id), label: s.label }))
         case 'projects':
             return (source.projects ?? []).map((p) => ({ value: p.prefix, label: p.prefix }))
-        default:
+        case 'statuses':
+        case 'priorities':
+        case 'types':
+        case 'tags':
+        case 'customFields':
+        case undefined:
             return optionsFor(meta, source).map((value) => ({ value, label: value }))
     }
 }

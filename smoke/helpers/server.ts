@@ -221,7 +221,7 @@ export async function launchAndWaitReady(
             ? {
                   kind: 'exit',
                   code: node.exitCode,
-                  signal: node.signalCode as NodeJS.Signals | null,
+                  signal: node.signalCode,
               }
             : await Promise.race([waitForReady(), waitForExit()]);
 

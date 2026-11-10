@@ -1,5 +1,6 @@
 import type { TaskDTO } from '../api/types'
 import { fromDateTimeInputValue, safeTimestamp, toDateTimeInputValue } from './date'
+import { displayText } from './text'
 
 // -- Form values -------------------------------------------------------------------
 
@@ -8,7 +9,7 @@ export function toStringValue(value: unknown): string {
     if (typeof value === 'string') return value
     if (value === null || value === undefined) return ''
     try {
-        return String(value)
+        return displayText(value)
     } catch {
         return ''
     }

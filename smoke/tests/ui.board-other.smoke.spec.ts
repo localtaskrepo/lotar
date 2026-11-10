@@ -171,7 +171,7 @@ describe.concurrent('Board Other across supported rendering modes', () => {
                         .locator('.column[data-column-kind="status"][data-status="__other__"]')
                         .dispatchEvent('drop');
                     await expect.poll(() => writes.length).toBe(1);
-                    expect(JSON.parse(writes[0]).status).toBe('__other__');
+                    expect(JSON.parse(writes[0]!).status).toBe('__other__');
                     await expect
                         .poll(async () => {
                             const response = await fetch(`${server.url}/api/tasks/get?id=BRD-101`);

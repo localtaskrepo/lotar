@@ -25,7 +25,6 @@ describe('DEV-4 archive (actual backend/browser)', () => {
     }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'archive-ui-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const task = await workspace.addTask('Finished work to file away', {

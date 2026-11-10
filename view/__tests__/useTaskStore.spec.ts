@@ -49,13 +49,13 @@ function makeTask(id: string, overrides: Partial<TaskDTO> = {}): TaskDTO {
     return {
         id,
         title: `Task ${id}`,
-        status: 'Todo' as any,
-        priority: 'Medium' as any,
-        task_type: 'Task' as any,
+        status: 'Todo',
+        priority: 'Medium',
+        task_type: 'Task',
         created: '2025-01-01T00:00:00Z',
         modified: '2025-01-01T00:00:00Z',
         tags: [],
-        relationships: {} as any,
+        relationships: {},
         comments: [],
         references: [],
         sprints: [],
@@ -250,7 +250,7 @@ describe('TaskStore', () => {
                 tasks: [makeTask('A-1'), makeTask('A-2')],
             })
 
-            const result = await store.hydratePage({ limit: 20, offset: 0 } as any)
+            const result = await store.hydratePage({ limit: 20, offset: 0 })
 
             expect(result.total).toBe(50)
             expect(store.count.value).toBe(2)
@@ -346,7 +346,7 @@ describe('TaskStore', () => {
             const task = makeTask('NEW-1')
             mockClient.addTask.mockResolvedValue(task)
 
-            const result = await store.add({ title: 'New' } as any)
+            const result = await store.add({ title: 'New' })
 
             expect(result).toEqual(task)
             expect(store._map.value.has('NEW-1')).toBe(true)
@@ -357,7 +357,7 @@ describe('TaskStore', () => {
             const updated = makeTask('P-1', { title: 'Updated' })
             mockClient.updateTask.mockResolvedValue(updated)
 
-            const result = await store.update('P-1', { title: 'Updated' } as any)
+            const result = await store.update('P-1', { title: 'Updated' })
 
             expect(result.title).toBe('Updated')
             expect(store._map.value.get('P-1')?.title).toBe('Updated')
@@ -657,7 +657,7 @@ describe('TaskStore', () => {
             expect(spy).not.toHaveBeenCalled()
 
             // Missing id field
-            fireEvent('task_error', { message: 'oops' } as any)
+            fireEvent('task_error', { message: 'oops' })
             expect(spy).not.toHaveBeenCalled()
         })
     })
@@ -726,7 +726,7 @@ describe('TaskStore', () => {
             await store.fetchOne('Z-9')
             store.upsert(makeTask('PANEL-1'))
             mockClient.addTask.mockResolvedValueOnce(makeTask('ADDED-1'))
-            await store.add({ title: 'x' } as any)
+            await store.add({ title: 'x' })
 
             expect(store._map.value.has('Z-9')).toBe(true)
             expect(store._map.value.has('PANEL-1')).toBe(true)
@@ -883,7 +883,7 @@ describe('TaskStore', () => {
         })
 
         it('retained queries converge membership via authoritative refresh after SSE moves, preserving server order', async () => {
-            const query = store.getQuery({ status: ['Todo'] } as TaskListFilter)
+            const query = store.getQuery({ status: ['Todo'] })
             query.retain()
             mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('T-2'), makeTask('T-1')]))
             await query.refresh()
@@ -894,7 +894,7 @@ describe('TaskStore', () => {
             ])
 
             // An existing task moves out of the filter; a new matching task appears.
-            fireEvent('task_updated', makeTask('T-1', { status: 'Done' as any }))
+            fireEvent('task_updated', makeTask('T-1', { status: 'Done' }))
             fireEvent('task_created', makeTask('T-3'))
 
             mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('T-3'), makeTask('T-2')]))
@@ -939,7 +939,7 @@ describe('TaskStore', () => {
             await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(2))
 
             mockClient.addTask.mockResolvedValueOnce(makeTask('P-2'))
-            await store.add({ title: 'x' } as any)
+            await store.add({ title: 'x' })
             await vi.advanceTimersByTimeAsync(300)
             await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(3))
 
@@ -1277,7 +1277,7 @@ describe('TaskStore', () => {
             store.upsert(makeTask('P-1', { title: 'Old', modified: '2026-01-01T00:00:00Z' }))
             const response = deferred<TaskDTO>()
             mockClient.updateTask.mockImplementationOnce(() => response.promise)
-            const pending = store.update('P-1', { title: 'Edit' } as any)
+            const pending = store.update('P-1', { title: 'Edit' })
 
             // Soft delete lands while the update is in flight (modified unchanged).
             store.upsert(

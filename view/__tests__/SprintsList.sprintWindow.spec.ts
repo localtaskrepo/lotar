@@ -16,7 +16,7 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('../composables/useSse', () => ({
-    useSse: () => ({ on: vi.fn(), close: vi.fn() }),
+    useSse: () => ({ on: vi.fn(), off: vi.fn(), close: vi.fn() }),
 }))
 
 vi.mock('../api/client', () => ({

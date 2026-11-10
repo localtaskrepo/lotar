@@ -63,7 +63,7 @@ describe('useColumnDragReorder', () => {
         const { columnOrder, dnd } = setup()
         const original = columnOrder.value
         dnd.moveColumn('status', 'status', 'after')
-        dnd.moveColumn('title', 'custom:Missing' as ColKey, 'before')
+        dnd.moveColumn('title', 'custom:Missing', 'before')
         expect(columnOrder.value).toBe(original)
     })
 

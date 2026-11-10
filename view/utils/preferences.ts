@@ -47,12 +47,12 @@ function emitPreferencesChanged(key: string) {
 export function onPreferencesChanged(handler: (key: string) => void): () => void {
     if (typeof window === 'undefined') return () => {}
     const listener = (event: Event) => {
-        const detail = (event as CustomEvent<any>)?.detail
+        const detail = (event as CustomEvent<{ key?: unknown } | null>).detail
         const key = typeof detail?.key === 'string' ? detail.key : ''
         handler(key)
     }
-    window.addEventListener(PREFERENCES_EVENT, listener as any)
-    return () => window.removeEventListener(PREFERENCES_EVENT, listener as any)
+    window.addEventListener(PREFERENCES_EVENT, listener)
+    return () => window.removeEventListener(PREFERENCES_EVENT, listener)
 }
 
 const DEFAULT_FIXED_DESTINATION: FixedStartupDestination = 'tasks'
@@ -219,8 +219,7 @@ export function resolveStartupPath(destination: StartupDestination, lastVisited:
         }
         return DESTINATION_PATHS[DEFAULT_FIXED_DESTINATION]
     }
-    const fixedDestination = destination as FixedStartupDestination
-    return DESTINATION_PATHS[fixedDestination] ?? DESTINATION_PATHS[DEFAULT_FIXED_DESTINATION]
+    return DESTINATION_PATHS[destination]
 }
 
 export function getStartupRedirectPath(currentPath: string): string | null {

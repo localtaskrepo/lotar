@@ -437,6 +437,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../utils/errors'
 import { useProjectNames } from '../composables/useProjectNames'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
@@ -523,10 +524,10 @@ async function loadScopeConfig(scopeKey: SyncScope = scope.value) {
     if (!alive || gen !== inspectGen) return
     scopedInspect.value = fresh
     inspectStamp.value = scopeKey
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!alive || gen !== inspectGen) return
     // Keep the previous stamp: a failed load never validates a scope's rows.
-    scopeLoadError.value = err?.message || `Failed to load ${scopeLabelFor(scopeKey)} config`
+    scopeLoadError.value = errorMessage(err) || `Failed to load ${scopeLabelFor(scopeKey)} config`
   } finally {
     if (gen === inspectGen) {
       scopeLoading.value = false
@@ -816,10 +817,10 @@ async function submitRemoteDialog() {
       }
     }
 
-    const merged: Record<string, SyncRemoteConfig> = { ...freshRemotes }
-    if (remoteDialogMode.value === 'edit' && originalName && originalName !== name) {
-      delete merged[originalName]
-    }
+    const renamed = remoteDialogMode.value === 'edit' && originalName && originalName !== name
+    const merged: Record<string, SyncRemoteConfig> = Object.fromEntries(
+      Object.entries(freshRemotes).filter(([remote]) => !renamed || remote !== originalName),
+    )
     merged[name] = config
 
     const remotesPayload = Object.keys(merged).length ? stringifyYaml(merged).trim() : ''
@@ -837,9 +838,9 @@ async function submitRemoteDialog() {
     remoteDialogGen += 1
     await loadScopeConfig()
     showToast(response.warnings?.length ? 'Remote saved with warnings' : 'Remote saved')
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (alive && gen === remoteDialogGen && remoteDialogOpen.value) {
-      remoteFormError.value = err?.message || 'Failed to save remote'
+      remoteFormError.value = errorMessage(err) || 'Failed to save remote'
     }
   } finally {
     // Reset for the current session, or when the dialog already closed so a
@@ -879,8 +880,9 @@ async function deleteRemoteDialog() {
       return
     }
 
-    const merged: Record<string, SyncRemoteConfig> = { ...freshRemotes }
-    delete merged[originalName]
+    const merged: Record<string, SyncRemoteConfig> = Object.fromEntries(
+      Object.entries(freshRemotes).filter(([remote]) => remote !== originalName),
+    )
     const remotesPayload = Object.keys(merged).length ? stringifyYaml(merged).trim() : ''
     const response = await api.setConfig(
       target
@@ -896,9 +898,9 @@ async function deleteRemoteDialog() {
     remoteDialogGen += 1
     await loadScopeConfig()
     showToast('Remote removed')
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (alive && gen === remoteDialogGen && remoteDialogOpen.value) {
-      remoteFormError.value = err?.message || 'Failed to remove remote'
+      remoteFormError.value = errorMessage(err) || 'Failed to remove remote'
     }
   } finally {
     // Reset for the current session, or when the dialog already closed so a
@@ -938,9 +940,9 @@ async function validateRemoteDialog() {
     remoteDialogValidationMessage.value = warningCount
       ? `Validated with ${warningCount} warning${warningCount === 1 ? '' : 's'}`
       : 'Validated'
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (alive && gen === remoteDialogGen && remoteDialogOpen.value) {
-      remoteFormError.value = err?.message || 'Validation failed'
+      remoteFormError.value = errorMessage(err) || 'Validation failed'
       remoteDialogValidationStatus.value = 'idle'
       remoteDialogValidationMessage.value = null
     }
@@ -1338,11 +1340,11 @@ async function loadReports() {
     }))
     reportsError.value = null
     reconcileFromList(scopeNow, payload.reports)
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!alive || gen !== reportsGen) return
     // A failed same-scope refresh keeps the previous valid list (no false
     // empty state); stale cross-scope responses are dropped by the guard above.
-    reportsError.value = err?.message || 'Failed to load reports'
+    reportsError.value = errorMessage(err) || 'Failed to load reports'
   } finally {
     if (gen === reportsGen) {
       reportsLoading.value = false
@@ -1578,10 +1580,10 @@ async function verifyDefaultProjectRemote(
       `${actionLabelNow} runs through default project ${projectName(defaultProject)}; its effective config applies.`,
     )
     return true
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (alive && scope.value === originScope) {
       showToast(
-        `Cannot verify remote '${remoteName}' against default project ${projectName(defaultProject)}: ${err?.message || 'inspection failed'}. ${actionLabelNow} was blocked.`,
+        `Cannot verify remote '${remoteName}' against default project ${projectName(defaultProject)}: ${errorMessage(err) || 'inspection failed'}. ${actionLabelNow} was blocked.`,
       )
     }
     return false
@@ -1682,9 +1684,9 @@ async function runSync(action: SyncAction, entry: { name: string; remote: SyncRe
     if (result.info?.length) {
       result.info.forEach((note) => showToast(note))
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!alive) return
-    const message = err?.message || `Failed to ${action} ${remoteName}`
+    const message = errorMessage(err) || `Failed to ${action} ${remoteName}`
     failRun(run.id, `Request failed: ${message}`, true)
     showToast(`Request failed: ${message}`)
   }

@@ -49,7 +49,7 @@ function createBoardHandle(
 }
 
 function boardKeyOf(filter: Record<string, unknown> = {}): string {
-    const source: Record<string, unknown> = { order: 'desc', ...(filter ?? {}) }
+    const source: Record<string, unknown> = { order: 'desc', ...filter }
     return JSON.stringify(
         Object.entries(source)
             .filter(([k, v]) => !['limit', 'offset', 'page'].includes(k) && v !== undefined && v !== null && v !== '')
@@ -274,7 +274,7 @@ function baseTask(overrides: Partial<TaskDTO>): TaskDTO {
         effort: null,
         due_date: '2026-01-10',
         ...overrides,
-    } as any
+    }
 }
 
 describe('Board field visibility', () => {
@@ -294,7 +294,7 @@ describe('Board field visibility', () => {
         configStore.refresh.mockClear()
         routerPushMock.mockClear()
         openTaskPanelMock.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -565,7 +565,7 @@ describe('Board group-by swimlanes', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -633,7 +633,7 @@ describe('Board member badges', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -665,7 +665,7 @@ describe('Board progressive disclosure', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -762,7 +762,7 @@ describe('Board group-by type', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -804,7 +804,7 @@ describe('Board collapsible groups', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -861,7 +861,7 @@ describe('Board ticket highlight', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -908,7 +908,7 @@ describe('Board aligned swimlanes', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -956,7 +956,7 @@ describe('Board grouping persistence', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -1037,7 +1037,7 @@ describe('Board overdue suppression for done tasks', () => {
         showConfigMock.mockReset()
         showConfigMock.mockImplementation(async () => policyConfig())
         invalidateCompletionPolicies()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -1263,7 +1263,7 @@ describe('Board unknown-status Other column (DEV-68)', () => {
         showConfigMock.mockImplementation(async () => ({}))
         setStatusMock.mockClear()
         invalidateCompletionPolicies()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+        if (typeof localStorage !== 'undefined') {
             localStorage.clear()
         }
     })
@@ -1816,7 +1816,7 @@ describe('Board columns dialog: order, stacking, hiding, WIP and card rules (DEV
         setStatusMock.mockClear()
         openTaskPanelMock.mockClear()
         invalidateCompletionPolicies()
-        if (typeof localStorage !== 'undefined' && localStorage.clear) localStorage.clear()
+        if (typeof localStorage !== 'undefined') localStorage.clear()
         const tasks = [
             baseTask({ id: 'ACME-1', status: 'Todo', priority: 'High' }),
             baseTask({ id: 'ACME-2', status: 'Review', priority: 'High' }),

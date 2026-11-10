@@ -113,7 +113,7 @@ export async function callTool(
         },
     });
 
-    return await client.awaitResponse(id);
+    return client.awaitResponse(id);
 }
 
 export async function withMcpClient<T>(

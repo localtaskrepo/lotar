@@ -421,7 +421,7 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
         // The exact same string is valid as both a managed blob name and a
         // repository-root file path; rows must key by typed kind, not raw value.
         const sameName = 'notes.0123456789abcdef0123456789abcdef.txt'
-        apiFixtures.state.task.references = [{ attachment: sameName }, { file: sameName }] as any
+        apiFixtures.state.task.references = [{ attachment: sameName }, { file: sameName }]
 
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         let wrapper: ReturnType<typeof mount> | null = null

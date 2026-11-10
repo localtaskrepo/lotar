@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
-import type {
-    ConfigInspectResult,
-    GlobalConfigRaw,
-    ProjectConfigRaw,
-    ProjectDTO,
-    ResolvedConfigDTO,
-} from '../api/types'
+import type { ConfigInspectResult, GlobalConfigRaw, ProjectConfigRaw, ResolvedConfigDTO } from '../api/types'
 import { useConfigForm } from '../composables/useConfigForm'
 
 // DEV-146: every settable config field has a bespoke control, and list
@@ -85,7 +79,7 @@ function inspectFor(
 function load(project: string, inspect: ConfigInspectResult) {
     const form = useConfigForm({
         project: ref(project),
-        projects: ref([{ prefix: 'TEST', name: 'Test' } as ProjectDTO]),
+        projects: ref([{ prefix: 'TEST', name: 'Test' }]),
         inspectData: ref(inspect),
     })
     form.populateForm(inspect)

@@ -16,7 +16,7 @@ export interface TaskPanelDefaultsShape {
 }
 
 interface UseTaskPanelOwnershipOptions {
-    form: TaskPanelFormShape & Record<string, any>
+    form: TaskPanelFormShape & Record<string, unknown>
     mode: ComputedRef<'create' | 'edit'>
     ready: Ref<boolean>
     suppressWatch: Ref<boolean>
@@ -48,13 +48,13 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     })
 
     const sanitizedConfiguredMembers = () => {
-        return (options.members.value || [])
+        return options.members.value
             .map((value) => (value || '').trim().replace(/^@/, ''))
             .filter((value) => value.length > 0)
     }
 
     const defaultOwnershipCandidates = () => {
-        const defaults = options.defaults.value || {}
+        const defaults = options.defaults.value
         return [defaults.reporter, defaults.assignee]
             .map((value) => (value || '').trim().replace(/^@/, ''))
             .filter((value) => value.length > 0)
@@ -213,7 +213,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         const baseline = seedKnownUsers()
         try {
             const response = await api.listTasks(
-                scope ? ({ project: scope, limit: 200, offset: 0 } as any) : ({ limit: 200, offset: 0 } as any),
+                scope ? { project: scope, limit: 200, offset: 0 } : { limit: 200, offset: 0 },
             )
             const list = Array.isArray(response.tasks) ? response.tasks : []
             const seen = new Set<string>()
@@ -223,13 +223,12 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
                     const normalized = item.assignee.startsWith('@') ? item.assignee.slice(1) : item.assignee
                     if (normalized) seen.add(normalized)
                 }
-                const reporter = (item as any).reporter
+                const reporter = item.reporter
                 if (reporter) {
-                    const raw = String(reporter)
-                    const normalized = raw.startsWith('@') ? raw.slice(1) : raw
+                    const normalized = reporter.startsWith('@') ? reporter.slice(1) : reporter
                     if (normalized) seen.add(normalized)
                 }
-                ;(item.tags || []).forEach((tag) => {
+                item.tags.forEach((tag) => {
                     if (!tag) return
                     const trimmed = tag.trim()
                     if (trimmed) tags.add(trimmed)
@@ -262,7 +261,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             if (resolved !== options.form[field]) {
                 options.form[field] = resolved
                 if (options.mode.value === 'edit' && options.ready.value && !options.suppressWatch.value) {
-                    nextTick(() => options.updateField(field))
+                    void nextTick(() => options.updateField(field))
                 }
             }
             return true
@@ -277,7 +276,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             const current = (next ?? '').trim()
             const previous = (prev ?? '').trim()
             if (current === previous) return
-            nextTick(() => options.updateField('reporter'))
+            void nextTick(() => options.updateField('reporter'))
         },
     )
 
@@ -288,7 +287,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             const current = (next ?? '').trim()
             const previous = (prev ?? '').trim()
             if (current === previous) return
-            nextTick(() => options.updateField('assignee'))
+            void nextTick(() => options.updateField('assignee'))
         },
     )
 

@@ -58,8 +58,8 @@ describe('useSavedViews', () => {
             sort: { key: 'modified', dir: 'desc' as const },
         }
         updateExisting(created.id, updatePayload)
-        updatePayload.filter!.status = 'Done'
-        updatePayload.columns!.push('tags')
+        updatePayload.filter.status = 'Done'
+        updatePayload.columns.push('tags')
 
         const afterUpdate = getById(created.id)
         expect(afterUpdate?.filter.status).toBe('Doing')

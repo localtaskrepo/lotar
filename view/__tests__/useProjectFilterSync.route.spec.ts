@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive, ref } from 'vue'
 
-const route = reactive({ path: '/insights', query: {} as Record<string, string> })
+const route = reactive({ path: '/insights', query: {} })
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push }) }))
 

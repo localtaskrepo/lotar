@@ -76,7 +76,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { countBy, DAY_MS, effortTotals, parseDue, unitsIn } from '../../../utils/insightsMetrics'
-import BarList, { type BarRow } from '../BarList.vue'
+import BarList from '../BarList.vue'
+import type { BarRow } from '../insightsTypes'
 import ChartCard from '../ChartCard.vue'
 import { effortText, fmt, formatDue, rows, useInsights } from '../insightsContext'
 import StatTile from '../StatTile.vue'

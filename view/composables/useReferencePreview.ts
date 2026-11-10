@@ -1,6 +1,8 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { ReferenceSnippet } from '../api/types'
+import { errorMessage } from '../utils/errors'
+import { removeKey } from '../utils/text'
 
 interface ReferencePreviewEntry {
     loading: boolean
@@ -211,7 +213,7 @@ export function useReferencePreview() {
             hoveredReferenceAnchorRect.value = null
             return
         }
-        nextTick(() => {
+        void nextTick(() => {
             updateReferenceAnchorRect(true)
             scheduleReferencePreviewMeasure(true)
         })
@@ -302,12 +304,12 @@ export function useReferencePreview() {
                 entry.snippet = snippet
                 entry.error = null
             })
-            .catch((error: any) => {
-                entry.error = error?.message || 'Failed to load snippet'
+            .catch((error: unknown) => {
+                entry.error = errorMessage(error) || 'Failed to load snippet'
             })
             .finally(() => {
                 entry.loading = false
-                nextTick(() => scheduleReferencePreviewMeasure(true))
+                void nextTick(() => scheduleReferencePreviewMeasure(true))
             })
     }
 
@@ -354,8 +356,8 @@ export function useReferencePreview() {
             ensureReferencePreview(code)
             return
         }
-        const currentBefore = entry.requestedBefore ?? REFERENCE_SNIPPET_DEFAULT_CONTEXT
-        const currentAfter = entry.requestedAfter ?? REFERENCE_SNIPPET_DEFAULT_CONTEXT
+        const currentBefore = entry.requestedBefore
+        const currentAfter = entry.requestedAfter
         let targetBefore = currentBefore
         let targetAfter = currentAfter
         if (direction === 'before') {
@@ -400,7 +402,7 @@ export function useReferencePreview() {
         hoveredReferenceCode.value = null
         setReferenceAnchor(null)
         clearReferenceDismissTimer()
-        Object.keys(referencePreviewState).forEach((key) => delete referencePreviewState[key])
+        Object.keys(referencePreviewState).forEach((key) => removeKey(referencePreviewState, key))
         attachReferencePreviewResizeObserver(null)
     }
 

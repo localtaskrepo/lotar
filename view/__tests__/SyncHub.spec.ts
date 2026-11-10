@@ -175,7 +175,7 @@ function baseGlobalRaw(remotes: Record<string, SyncRemoteConfig> = {}, defaultPr
         branch_status_aliases: {},
         branch_priority_aliases: {},
         remotes,
-    } as GlobalConfigRaw
+    }
 }
 
 const configState: {
@@ -317,7 +317,7 @@ async function mountSyncHub(route = '/sync', options: { attachTo?: HTMLElement }
         history: createMemoryHistory(),
         routes: [{ path: '/sync', component: SyncHub }],
     })
-    router.push(route)
+    await router.push(route)
     await router.isReady()
 
     const wrapper = mount(SyncHub, {

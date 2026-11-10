@@ -98,7 +98,8 @@ import {
   orderByConfigured,
   percentile,
 } from '../../../utils/insightsMetrics'
-import BarList, { type BarRow } from '../BarList.vue'
+import BarList from '../BarList.vue'
+import type { BarRow } from '../insightsTypes'
 import ChartCard from '../ChartCard.vue'
 import ColumnChart from '../ColumnChart.vue'
 import { fmt, pct, rows, useInsights, valuesOf } from '../insightsContext'

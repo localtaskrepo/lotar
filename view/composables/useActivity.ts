@@ -3,6 +3,7 @@ import { reactive, readonly, shallowRef } from 'vue'
 import { api } from '../api/client'
 import type { ActivityFeedItem } from '../api/types'
 import { MS_PER_DAY, startOfLocalDay } from '../utils/date'
+import { removeKey } from '../utils/text'
 
 export type ActivityItem = {
     id: string
@@ -68,7 +69,7 @@ function ensure() {
     if (!state) {
         state = reactive<ActivityState>({ items: [], touches: {} })
     }
-    return state!
+    return state
 }
 
 function genId() {
@@ -197,7 +198,7 @@ export function useActivity() {
         const it: ActivityItem = {
             id: genId(),
             time: item.time || new Date().toISOString(),
-            kind: item.kind as any,
+            kind: item.kind,
             message: item.message,
         }
         // prepend newest
@@ -220,7 +221,7 @@ export function useActivity() {
                 () => {
                     const current = s.touches[entry.id]
                     if (current && current.time === entry.time) {
-                        delete s.touches[entry.id]
+                        removeKey(s.touches, entry.id)
                     }
                 },
                 5 * 60 * 1000,
@@ -229,11 +230,11 @@ export function useActivity() {
     }
     function removeTaskTouch(id: string) {
         if (id in s.touches) {
-            delete s.touches[id]
+            removeKey(s.touches, id)
         }
     }
     function clearTouches() {
-        Object.keys(s.touches).forEach((key) => delete s.touches[key])
+        Object.keys(s.touches).forEach((key) => removeKey(s.touches, key))
     }
     /**
      * Get (or create) the keyed feed handle for `query`. Each call owns one
@@ -247,7 +248,7 @@ export function useActivity() {
         return makeFeedHandle(ensureFeedEntry(query))
     }
     const items = readonly(s.items) as DeepReadonly<ActivityItem[]>
-    const touches = readonly(s.touches) as DeepReadonly<Record<string, TaskTouch>>
+    const touches = readonly(s.touches)
 
     return {
         items,

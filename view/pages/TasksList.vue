@@ -410,11 +410,12 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../utils/errors'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
-import type { TaskDTO } from '../api/types'
+import type { SprintAssignmentRequest, TaskDTO } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -818,7 +819,7 @@ async function applyFilter(raw: Record<string, string>, nav: NavMode = 'push', p
     }
   }
 
-  const serverFilter: any = builtFilter
+  const serverFilter = builtFilter
 
   if (disposed || request !== filterGeneration) return
   await refreshConfig(serverFilter.project)
@@ -895,8 +896,8 @@ async function exportCsv() {
     // The browser consumes the blob asynchronously once the click resolves;
     // revoking immediately can cancel the in-flight download.
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  } catch (e: any) {
-    showToast(e?.message || 'Export failed')
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || 'Export failed')
   } finally {
     exportBusy.value = false
   }
@@ -918,8 +919,8 @@ async function onUpdateTitle(payload: { id: string; title: string }) {
     const updated = await api.updateTask(id, { title })
     store.upsert(updated)
     showToast('Title updated')
-  } catch (e: any) {
-    showToast(e.message || 'Failed to update title')
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || 'Failed to update title')
   }
 }
 
@@ -930,8 +931,8 @@ async function onUpdateTags(payload: { id: string; tags: string[] }) {
     const updated = await api.updateTask(id, { tags })
     store.upsert(updated)
     showToast('Tags updated')
-  } catch (e: any) {
-    showToast(e.message || 'Failed to update tags')
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || 'Failed to update tags')
   }
 }
 
@@ -942,8 +943,8 @@ async function onQuickStatus(payload: { id: string; status: string }) {
     const updated = await api.setStatus(id, status)
     store.upsert(updated)
     showToast('Status updated')
-  } catch (e: any) {
-    showToast(e.message || 'Failed to update status')
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || 'Failed to update status')
   }
 }
 
@@ -1140,7 +1141,7 @@ async function unassignTasks(ids: string[]) {
       continue
     }
     try {
-      const updated = await api.updateTask(id, { assignee: '' as any })
+      const updated = await api.updateTask(id, { assignee: '' })
       if (scope === filterGeneration) store.upsert(updated)
       success += 1
     } catch (error) {
@@ -1187,7 +1188,7 @@ async function performSprintAction(
     showToast('Select at least one task first')
     return
   }
-  const payload: any = { tasks: taskIds }
+  const payload: SprintAssignmentRequest = { tasks: taskIds }
   const token = options.sprint ?? sprintSelection.value
   const sprintRef = parseSprintToken(token)
   if (sprintRef !== undefined) payload.sprint = sprintRef
@@ -1235,8 +1236,8 @@ async function performSprintAction(
       await refreshSprints(true)
       await applyFilter(filter.value, 'none')
     }
-  } catch (e: any) {
-    showToast(e.message || (mode === 'add' ? 'Failed to assign to sprint' : 'Failed to remove from sprint'))
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || (mode === 'add' ? 'Failed to assign to sprint' : 'Failed to remove from sprint'))
   }
 }
 
@@ -1437,8 +1438,8 @@ async function restoreTask(id: string) {
   try {
     const restored = await store.restore(id, deletionProject(id))
     showToast(`Restored ${restored.id}`)
-  } catch (e: any) {
-    showToast(e?.message || 'Failed to restore task')
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || 'Failed to restore task')
   }
 }
 
@@ -1464,10 +1465,16 @@ let suppressFilterWatch = false
 // (this page retains its handle in adoptQuery), so membership moves converge
 // without re-running the filter/URL pipeline on every event.
 
-function formatActivityMessage(kind: 'task_created' | 'task_updated' | 'task_deleted', payload: any) {
-  const id = payload?.id as string | undefined
-  const actor = payload?.triggered_by as string | undefined
-  const title = payload?.title as string | undefined
+/** A task_* SSE payload: the task's fields (when the API wrote it) plus who triggered it. */
+type TaskEventPayload = { id?: string; title?: string; modified?: string; triggered_by?: string }
+
+function formatActivityMessage(
+  kind: 'task_created' | 'task_updated' | 'task_deleted',
+  payload: TaskEventPayload | null,
+) {
+  const id = payload?.id
+  const actor = payload?.triggered_by
+  const title = payload?.title
   const label = id ? id : title ? title : 'Task'
   const actorSuffix = actor ? ` by ${actor}` : ''
   switch (kind) {
@@ -1482,16 +1489,16 @@ function formatActivityMessage(kind: 'task_created' | 'task_updated' | 'task_del
   }
 }
 
-function handleTaskEvent(kind: 'task_created' | 'task_updated' | 'task_deleted', payload: any) {
-  const id = payload?.id as string | undefined
-  const actor = payload?.triggered_by as string | undefined
-  const title = payload?.title as string | undefined
+function handleTaskEvent(kind: 'task_created' | 'task_updated' | 'task_deleted', payload: TaskEventPayload | null) {
+  const id = payload?.id
+  const actor = payload?.triggered_by
+  const title = payload?.title
   if (id) {
     if (kind === 'task_deleted') {
       removeTaskTouch(id)
     } else {
       const touchKind = kind === 'task_created' ? 'created' : 'updated'
-      markTaskTouch({ id, kind: touchKind, actor, title, time: payload?.modified as string | undefined })
+      markTaskTouch({ id, kind: touchKind, actor, title, time: payload?.modified })
     }
   }
   const message = formatActivityMessage(kind, payload)
@@ -1511,9 +1518,9 @@ function registerSseHandlers() {
   kinds.forEach((kind) => {
     const handler = (ev: MessageEvent) => {
       if (!ev.data) return
-      let payload: any
+      let payload: TaskEventPayload | null
       try {
-        payload = JSON.parse(ev.data)
+        payload = JSON.parse(String(ev.data)) as TaskEventPayload | null
       } catch (err) {
         console.warn('Failed to parse SSE payload', err)
         return
@@ -1618,7 +1625,7 @@ watch(
     if (debounceTimer) clearTimeout(debounceTimer)
 
     const query = route.query
-    const nextOffset = clampOffset(queryInt((query as any).offset, 0))
+    const nextOffset = clampOffset(queryInt(query.offset, 0))
     const nextFilter = Object.fromEntries(
       Object.entries(query)
         .filter(([key]) => key !== 'offset' && key !== 'taskPanel')
@@ -1656,7 +1663,7 @@ onMounted(() => {
 })
 
 // Debounced fetch on any filter change; also sync URL and config
-let debounceTimer: any = null
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 // Content signature of the filter the current page was loaded under. FilterBar
 // re-emits replace the filter object even when nothing changed; without this
 // guard the echo re-applies the query with resetOffset and yanks the user back

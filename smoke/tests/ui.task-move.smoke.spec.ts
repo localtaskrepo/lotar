@@ -9,7 +9,6 @@ describe('DEV-183 move a task to another project (actual backend/browser)', () =
     it('moves from the task panel and opens old IDs under the new one', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'task-move-ui-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             await workspace.addTask('Existing web task', { args: ['--project=WEB', '--reporter=Smoke'] });

@@ -4,22 +4,7 @@
       "count": 1
     }
   },
-  "view/api/client.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 16
-    }
-  },
-  "view/api/types.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
   "view/components/BarChart.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "view/components/SmartListChips.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
     }
@@ -41,30 +26,10 @@
   },
   "view/components/task-panel/TaskPanelReferencesTab.vue": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 10
-    }
-  },
-  "view/components/task-panel/TaskPanelSummarySection.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "view/composables/task-panel/useTaskPanelFormLifecycle.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "view/composables/task-panel/useTaskPanelPersistence.ts": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 5
     }
   },
-  "view/composables/task-panel/useTaskPanelReferenceMutations.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "view/composables/useActivity.ts": {
+  "view/components/task-panel/TaskPanelSummarySection.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
@@ -74,52 +39,7 @@
       "count": 2
     }
   },
-  "view/composables/useConfig.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    }
-  },
-  "view/composables/useConfigForm.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
-  "view/composables/useReferencePreview.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "view/composables/useResource.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
-  "view/composables/useSprintAnalytics.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
   "view/composables/useSprints.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "view/composables/useSyncRuns.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    }
-  },
-  "view/composables/useTaskComments.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "view/composables/useTaskPanelOwnership.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "view/composables/useTaskStore.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
@@ -131,7 +51,7 @@
   },
   "view/pages/Board.vue": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 2
+      "count": 1
     }
   },
   "view/pages/Calendar.vue": {
@@ -141,37 +61,17 @@
   },
   "view/pages/ConfigView.vue": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "view/pages/ScanView.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "view/pages/SprintsList.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 21
+      "count": 1
     }
   },
   "view/pages/SyncHub.vue": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    }
-  },
-  "view/pages/TasksList.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 14
+      "count": 1
     }
   },
   "view/utils/date.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    }
-  },
-  "view/utils/preferences.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
     }
   }
 }

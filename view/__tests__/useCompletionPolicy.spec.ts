@@ -54,7 +54,7 @@ function taskFixture(overrides: Partial<TaskDTO> = {}): TaskDTO {
         history: [],
         custom_fields: {},
         ...overrides,
-    } as TaskDTO
+    }
 }
 
 describe('useCompletionPolicy', () => {

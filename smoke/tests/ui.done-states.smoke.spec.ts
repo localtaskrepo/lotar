@@ -41,11 +41,22 @@ async function api<T>(url: string, path: string, body?: Record<string, unknown>)
     return (JSON.parse(text) as { data: T }).data;
 }
 
+const FIXTURE_TASKS = [
+    ['closed', 'ALPHA', 'Closed', 'Alpha closed finished'],
+    ['shipped', 'ALPHA', 'Shipped', 'Alpha shipped finished'],
+    ['done', 'ALPHA', 'Done', 'Alpha Done still open'],
+    ['open', 'ALPHA', 'Todo', 'Alpha open overdue'],
+    ['today', 'ALPHA', 'Todo', 'Alpha due today'],
+    ['betaDone', 'BETA', 'Done', 'Beta Done finished'],
+    ['betaClosed', 'BETA', 'Closed', 'Beta Closed still open'],
+] as const;
+type FixtureTask = (typeof FIXTURE_TASKS)[number][0];
+
 async function withDoneStatesFixture(
     callback: (fixture: {
         workspace: SmokeWorkspace;
         url: string;
-        tasks: Record<string, CreatedTask>;
+        tasks: Record<FixtureTask, CreatedTask>;
         policy: PolicySnapshot;
     }) => Promise<void>,
 ) {
@@ -67,23 +78,17 @@ async function withDoneStatesFixture(
         },
     });
     try {
-        const tasks: Record<string, CreatedTask> = {};
-        for (const [key, project, status, title] of [
-            ['closed', 'ALPHA', 'Closed', 'Alpha closed finished'],
-            ['shipped', 'ALPHA', 'Shipped', 'Alpha shipped finished'],
-            ['done', 'ALPHA', 'Done', 'Alpha Done still open'],
-            ['open', 'ALPHA', 'Todo', 'Alpha open overdue'],
-            ['today', 'ALPHA', 'Todo', 'Alpha due today'],
-            ['betaDone', 'BETA', 'Done', 'Beta Done finished'],
-            ['betaClosed', 'BETA', 'Closed', 'Beta Closed still open'],
-        ] as const) {
+        const created: Array<[FixtureTask, CreatedTask]> = [];
+        for (const [key, project, status, title] of FIXTURE_TASKS) {
             const task = await workspace.addTask(title, { args: [`--project=${project}`] });
             const data = parse(await fs.readFile(task.filePath, 'utf8')) as Record<string, unknown>;
             data.status = status;
             data.due_date = '2000-01-01';
             await fs.writeFile(task.filePath, stringify(data));
-            tasks[key] = task;
+            created.push([key, task]);
         }
+        // Every fixture key was created above.
+        const tasks = Object.fromEntries(created) as Record<FixtureTask, CreatedTask>;
         const server = await startLotarServer(workspace);
         try {
             const policy = await api<PolicySnapshot>(server.url, '/api/config/show?project=ALPHA');
@@ -128,7 +133,7 @@ describe.concurrent('DEV-21 done-state policy (actual backend)', () => {
             const overdue = await api<TaskPage>(url, '/api/tasks/list?due=overdue&limit=1&sort_by=id&order=asc');
             expect(overdue.total).toBe(3);
             expect(overdue.tasks).toHaveLength(1);
-            expect(overdue.tasks?.[0].id).toBe(tasks.done.id);
+            expect(overdue.tasks?.[0]?.id).toBe(tasks.done.id);
             const alpha = await api<{ open_count: number; done_count: number }>(
                 url,
                 '/api/projects/stats?project=ALPHA',

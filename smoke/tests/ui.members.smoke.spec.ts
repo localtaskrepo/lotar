@@ -224,8 +224,9 @@ describe('UI strict member smoke scenarios', () => {
             while (Date.now() < taskDetectionDeadline) {
                 const currentFiles = await workspace.listTaskFiles();
                 const newFiles = currentFiles.filter((file) => !baselineTaskFiles.includes(file));
-                if (newFiles.length > 0) {
-                    detectedTaskPath = newFiles[0];
+                const [newFile] = newFiles;
+                if (newFile !== undefined) {
+                    detectedTaskPath = newFile;
                     break;
                 }
                 await new Promise((resolve) => setTimeout(resolve, 200));

@@ -5,7 +5,7 @@ describe('api.exportTasks', () => {
     it('calls /api/tasks/export with query params and returns Response', async () => {
         const mockRes = new Response('id,title\n', { headers: { 'Content-Type': 'text/csv' } })
         const spy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue(mockRes as any)
-        const res = await api.exportTasks({ project: 'ABC', status: ['TODO', 'DONE'], tags: ['ui', 'backend'] } as any)
+        const res = await api.exportTasks({ project: 'ABC', status: ['TODO', 'DONE'], tags: ['ui', 'backend'] })
         expect(spy).toHaveBeenCalled()
         const url = spy.mock.calls[0]![0] as string
         expect(url).toContain('/api/tasks/export')
@@ -31,7 +31,7 @@ describe('api.exportTasks', () => {
             order: 'asc',
             sort_by: 'custom:Risk',
             component: 'ui',
-        } as any)
+        })
         const url = spy.mock.calls[0]![0] as string
         expect(url).toContain('sprints=3%2C7')
         expect(url).toContain('assignee=__none__')
@@ -49,7 +49,7 @@ describe('api.exportTasks', () => {
     it('maps task_type and text_query spellings onto the wire keys', async () => {
         const mockRes = new Response('id,title\n', { headers: { 'Content-Type': 'text/csv' } })
         const spy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue(mockRes as any)
-        await api.exportTasks({ task_type: ['bug'], text_query: 'x' } as any)
+        await api.exportTasks({ task_type: ['bug'], text_query: 'x' })
         const url = spy.mock.calls[0]![0] as string
         expect(url).toContain('type=bug')
         expect(url).toContain('q=x')

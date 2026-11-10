@@ -32,8 +32,7 @@ import {
     type Range,
     type TaskTimeline,
 } from '../../utils/insightsMetrics'
-import type { BarRow } from './BarList.vue'
-import type { StatDelta } from './StatTile.vue'
+import type { BarRow, StatDelta } from './insightsTypes'
 
 // -- Formatting (pure) ----------------------------------------------------------
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
@@ -248,7 +247,7 @@ export function provideInsights(input: InsightsInput): InsightsContext {
     )
     const openByTag = computed(() =>
         rows(
-            countBy(open.value, (task) => (task.tags?.length ? task.tags : null), 'No tag'),
+            countBy(open.value, (task) => (task.tags.length ? task.tags : null), 'No tag'),
             'No tag',
         ),
     )

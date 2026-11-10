@@ -29,7 +29,7 @@ const KNOWN_FLAGS = ['--gate-dir', '--label', '--mode', '--hold-ms', '--exit', '
 function parseFixtureArgs(argv: readonly string[]): Record<string, string> {
     const parsed: Record<string, string> = {};
     for (let i = 0; i < argv.length; i += 1) {
-        const arg = argv[i];
+        const arg = argv[i]!;
         if (KNOWN_FLAGS.includes(arg)) {
             const value = argv[i + 1];
             if (value !== undefined) {
@@ -401,7 +401,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             const gateDirIndex = boot.argv.indexOf('--gate-dir');
             expect(gateDirIndex).toBeGreaterThan(-1);
             expect(boot.argv[gateDirIndex + 1]).toBe(gate.dir);
-            expect(path.resolve(boot.argv[1])).toBe(path.resolve(path.join(shimDir, targetRel)));
+            expect(path.resolve(boot.argv[1]!)).toBe(path.resolve(path.join(shimDir, targetRel)));
 
             await gate.release();
             const outcome = await exit;
@@ -458,7 +458,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
 
             const boot = await readBootSentinel(gate.dir, 'fwd');
             expect(boot.argv).toContain(HOSTILE_PROMPT);
-            expect(path.resolve(boot.argv[1])).toBe(path.resolve(GATE_AGENT_SCRIPT));
+            expect(path.resolve(boot.argv[1]!)).toBe(path.resolve(GATE_AGENT_SCRIPT));
             const gateDirValues = boot.argv
                 .map((arg, index) => (arg === '--gate-dir' ? boot.argv[index + 1] : undefined))
                 .filter((value): value is string => value !== undefined);
@@ -532,7 +532,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
 
             const boot = await readBootSentinel(gate.dir, 'conflict');
             const argv = boot.argv;
-            expect(path.resolve(argv[1])).toBe(path.resolve(GATE_AGENT_SCRIPT));
+            expect(path.resolve(argv[1]!)).toBe(path.resolve(GATE_AGENT_SCRIPT));
             expect(argv).toContain(HOSTILE_PROMPT);
 
             const valuesFor = (flag: string): string[] =>

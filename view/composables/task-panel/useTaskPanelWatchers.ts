@@ -9,7 +9,7 @@ interface UseTaskPanelWatchersOptions {
     ready: Ref<boolean>
     suppressWatch: Ref<boolean>
     form: TaskPanelFormState
-    preloadPeople: (project: string) => void
+    preloadPeople: (project: string) => Promise<void>
     ensureProjectsLoaded: () => Promise<void>
     initialize: () => Promise<void>
     onClose: () => void

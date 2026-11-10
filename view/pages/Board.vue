@@ -503,6 +503,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../utils/errors'
 import { useProjectNames } from '../composables/useProjectNames'
 import { formatProjectLabel } from '../utils/projectLabels'
 import PageHeader from '../components/PageHeader.vue'
@@ -1166,8 +1167,8 @@ async function onDrop(target: BoardColumnDescriptor) {
     await api.setStatus(id, targetStatus)
     showToast(`Moved ${id} → ${targetStatus}`)
     await refreshBoardTasks()
-  } catch (e: any) {
-    showToast(e.message || 'Failed to move task')
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || 'Failed to move task')
     // revert by refetching
     await refreshBoardTasks()
   }

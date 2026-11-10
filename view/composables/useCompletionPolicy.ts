@@ -482,7 +482,7 @@ export function resolveDueBucket(
 
     const staleSnapshot = !!(state?.calendar_day && policy?.calendarDay && state.calendar_day !== policy.calendarDay)
     if (staleSnapshot) {
-        const derived = calendarStringDueBucket(task?.due_date, policy!.calendarDay)
+        const derived = calendarStringDueBucket(task?.due_date, policy.calendarDay)
         if (derived !== null) {
             return doneNow && derived === 'overdue' ? null : derived
         }
@@ -497,7 +497,7 @@ export function resolveDueBucket(
         const bucket = state ? (state.due_bucket ?? null) : localDueBucketOf(task)
         return bucket === 'overdue' ? null : bucket
     }
-    if (state && state.is_done === false) {
+    if (state && !state.is_done) {
         return state.due_bucket ?? null
     }
     // Optimistic reopen: a date-only due can be reclassified against the

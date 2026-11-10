@@ -28,7 +28,7 @@ async function taskSnapshot(serverUrl: string, id: string): Promise<TaskSnapshot
     const payload = (await response.json()) as { data?: { modified?: string | null; history?: unknown[] } };
     return {
         modified: payload.data?.modified ?? null,
-        historyLength: Array.isArray(payload.data?.history) ? payload.data!.history!.length : 0,
+        historyLength: Array.isArray(payload.data?.history) ? payload.data.history.length : 0,
     };
 }
 

@@ -261,8 +261,8 @@ describe('UI reference kinds (DEV-61)', () => {
                     expect(typedReferences(detached)).toHaveLength(0);
                     const removals = historyChanges(detached).filter((change) => change.field === 'reference_removed');
                     expect(removals).toHaveLength(1);
-                    expect(removals[0].old).toBe(`attachment:${storedPath}`);
-                    expect(removals[0].new ?? null).toBe(null);
+                    expect(removals[0]!.old).toBe(`attachment:${storedPath}`);
+                    expect(removals[0]!.new ?? null).toBe(null);
 
                     const removeCall = apiCalls.find((call) => call.path === '/api/tasks/attachments/remove');
                     expect(removeCall?.body).toMatchObject({
@@ -359,7 +359,7 @@ describe('UI reference kinds (DEV-61)', () => {
                     expect(typedReferences(detached)).toHaveLength(0);
                     const removals = historyChanges(detached).filter((change) => change.field === 'reference_removed');
                     expect(removals).toHaveLength(1);
-                    expect(removals[0].old).toBe(`file:${repoFile}`);
+                    expect(removals[0]!.old).toBe(`file:${repoFile}`);
                     const preserved = await workspace.read(SCRATCH_FILE);
                     expect(preserved).toContain(ANCHOR_LINE_TEXT);
                     expect(preserved.split('\n').length).toBeGreaterThanOrEqual(REPO_FILE_LINES);

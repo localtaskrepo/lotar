@@ -35,9 +35,8 @@ export function listFromCsv(value: string): string[] {
 
 export function normalizeFilter(raw: Record<string, string>) {
     const normalized: Record<string, string> = {}
-    const extras: Record<string, string> = Object.create(null)
-    const source = raw || {}
-    for (const [key, value] of Object.entries(source)) {
+    const extras: Record<string, string> = Object.create(null) as Record<string, string>
+    for (const [key, value] of Object.entries(raw)) {
         if (!value || key === 'order') continue
         if (key === 'sort_by') {
             // Round-trip the raw value: valid keys normalize on the wire, invalid
@@ -52,7 +51,7 @@ export function normalizeFilter(raw: Record<string, string>) {
             extras[key] = value
         }
     }
-    normalized.order = source.order && source.order.trim() ? source.order : 'desc'
+    normalized.order = raw.order && raw.order.trim() ? raw.order : 'desc'
     return { normalized, extras }
 }
 
@@ -106,10 +105,10 @@ export function buildServerFilter(
     if (sortByRaw) serverFilter.sort_by = normalizeSortBy(sortByRaw) ?? sortByRaw
     // Forwarded verbatim — including invalid values — so explicit errors
     // surface server-side instead of silently defaulting.
-    serverFilter.order = normalized.order as TaskListFilter['order']
+    serverFilter.order = normalized.order
     // Exclusions (`-status:done`, DEV-5) reach the server in the search
     // syntax via `query`; every other extra is a field filter.
-    const fieldExtras: Record<string, string> = Object.create(null)
+    const fieldExtras: Record<string, string> = Object.create(null) as Record<string, string>
     const exclusions: string[] = []
     for (const [key, value] of Object.entries(extras)) {
         if (key.startsWith('-')) exclusions.push(`-${serializeFilterToken(key.slice(1), value)}`)
@@ -147,25 +146,26 @@ export function useProjectFilterSync(
             if (typeof value === 'string') query[key] = value
         }
         if (desired) query.project = desired
-        router.push({ path: options?.routePath ?? route.path, query })
+        void router.push({ path: options?.routePath ?? route.path, query })
     }
 
     function resolveProjectSelection(requested: string | undefined) {
         return (requested || '').trim()
     }
 
-    function sanitizeFilterInput(payload: Record<string, string>) {
-        const next: Record<string, string> = Object.create(null)
-        const hasProjectKey = payload && Object.prototype.hasOwnProperty.call(payload, 'project')
+    function sanitizeFilterInput(payload: Record<string, string | undefined>) {
+        const next: Record<string, string> = Object.create(null) as Record<string, string>
+        const hasProjectKey = Object.prototype.hasOwnProperty.call(payload, 'project')
         if (hasProjectKey) {
             const nextProject = resolveProjectSelection(payload.project)
             if (nextProject !== projectRef.value) {
                 projectRef.value = nextProject
             }
         }
-        Object.entries(payload || {}).forEach(([key, value]) => {
+        Object.entries(payload).forEach(([key, value]) => {
             if (key === 'project') return
-            if (value === undefined || value === null) return
+            // Chip toggles can hand over cleared keys as undefined.
+            if (value === undefined) return
             next[key] = value
         })
         const prev = filterRef.value
@@ -178,7 +178,7 @@ export function useProjectFilterSync(
     }
 
     function onFilterUpdate(v: Record<string, string>) {
-        const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
+        const hasProjectKey = Object.prototype.hasOwnProperty.call(v, 'project')
         if (hasProjectKey) {
             const nextProject = (v.project || '').trim()
             if (options?.onProjectChange) {

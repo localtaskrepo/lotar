@@ -25,14 +25,7 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 import IconGlyph from '../IconGlyph.vue'
-
-export interface StatDelta {
-  /** e.g. "12% vs previous 30 days" */
-  text: string
-  direction: 'up' | 'down' | 'flat'
-  /** Whether the change is good news, bad news or neither. */
-  tone: 'good' | 'bad' | 'neutral'
-}
+import type { StatDelta } from './insightsTypes'
 
 withDefaults(
   defineProps<{

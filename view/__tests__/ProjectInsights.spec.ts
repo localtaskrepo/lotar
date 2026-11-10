@@ -31,7 +31,7 @@ vi.mock('../composables/useTaskPanelController', () => ({
     useTaskPanelController: () => ({ openTaskPanel }),
 }))
 
-const routeState = reactive({ path: '/insights', query: {} as Record<string, string> })
+const routeState = reactive({ path: '/insights', query: {} })
 const routerPush = vi.hoisted(() => vi.fn())
 const routerReplace = vi.hoisted(() => vi.fn(async () => {}))
 vi.mock('vue-router', () => ({
@@ -64,7 +64,7 @@ function task(id: string, overrides: Partial<TaskDTO> = {}): TaskDTO {
         history: [],
         custom_fields: {},
         ...overrides,
-    } as TaskDTO
+    }
 }
 
 function deferred<T>() {

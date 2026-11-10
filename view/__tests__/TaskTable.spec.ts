@@ -76,7 +76,7 @@ describe('TaskTable', () => {
         const columnsButton = wrapper.findAll('button.btn').find((b) => b.text().includes('Columns'))!
         await columnsButton.trigger('click')
         const labels = wrapper.findAll('label.column-option')
-        const tagsCheckbox = labels.find((l) => l.text().trim() === 'Tags')!.find('input[type="checkbox"]')!
+        const tagsCheckbox = labels.find((l) => l.text().trim() === 'Tags')!.find('input[type="checkbox"]')
         await tagsCheckbox.setValue(false)
         // close
         const closeButton = wrapper.findAll('button.btn').find((b) => b.text().trim() === 'Close')!
@@ -143,7 +143,7 @@ describe('TaskTable', () => {
         const popoverLabels = wrapper.findAll('label.column-option')
         const priorityCheckbox = popoverLabels
             .find((l) => l.text().trim() === 'Priority')!
-            .find('input[type="checkbox"]')!
+            .find('input[type="checkbox"]')
 
         await priorityCheckbox.setValue(false)
         await priorityCheckbox.setValue(true)

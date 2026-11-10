@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { computed, nextTick, ref, type ComputedRef, type Ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -23,7 +23,7 @@ interface MockHandle {
     ids: ComputedRef<string[]>
     tasks: ComputedRef<any[]>
     lastSyncAt: Ref<number>
-    refresh: ReturnType<typeof vi.fn>
+    refresh: Mock<() => Promise<void>>
     retain: ReturnType<typeof vi.fn>
     release: ReturnType<typeof vi.fn>
 }
@@ -63,7 +63,7 @@ function handleKeyOf(filter: Record<string, unknown> = {}): string {
     // buildServerFilter always materializes `order` (default 'desc'); mirror
     // that and canonicalize key order so test-side handleFor({}) matches the
     // page's serverFilter regardless of property insertion order.
-    const source: Record<string, unknown> = { order: 'desc', ...(filter ?? {}) }
+    const source: Record<string, unknown> = { order: 'desc', ...filter }
     const entries = Object.entries(source)
         .filter(([k, v]) => !['limit', 'offset', 'page'].includes(k) && v !== undefined && v !== null && v !== '')
         .sort(([a], [b]) => a.localeCompare(b))

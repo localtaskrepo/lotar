@@ -1,5 +1,12 @@
 import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
-import type { AgentInstructionsValue, ConfigInspectResult, ConfigSource, ProjectDTO, TagProperties } from '../api/types'
+import type {
+    AgentInstructionsValue,
+    ConfigInspectResult,
+    ConfigSource,
+    ProjectConfigRaw,
+    ProjectDTO,
+    TagProperties,
+} from '../api/types'
 import { resolveTagColor } from '../utils/tagColors'
 import { parseThemeValue } from '../utils/themes'
 import { provenanceClass as getProvenanceClass, provenanceLabel as getProvenanceLabel } from '../utils/provenance'
@@ -23,6 +30,11 @@ export interface BranchAliasEntry {
 }
 
 /** One tag colour row on the Config page (DEV-20). */
+/** The form fields that hold text (plain strings and toggle values). */
+type FormTextField = {
+    [K in keyof ConfigFormState]: ConfigFormState[K] extends string ? K : never
+}[keyof ConfigFormState]
+
 export interface TagColorEntry {
     tag: string
     color: string
@@ -365,8 +377,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function normalizedAlias(entries: BranchAliasEntry[]): Record<string, string> {
         const normalized: Record<string, string> = {}
         for (const entry of entries) {
-            const key = entry.key?.trim()
-            const value = entry.value?.trim()
+            const key = entry.key.trim()
+            const value = entry.value.trim()
             if (!key || !value) continue
             normalized[key.toLowerCase()] = value
         }
@@ -382,7 +394,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function tagColorEntries(map: Record<string, TagProperties> | null | undefined): TagColorEntry[] {
         if (!map) return []
         return Object.entries(map)
-            .filter(([, props]) => typeof props?.color === 'string' && props.color.trim())
+            .filter(([, props]) => typeof props.color === 'string' && props.color.trim())
             .map(([tag, props]) => ({ tag, color: String(props.color).trim() }))
             .sort((a, b) => a.tag.localeCompare(b.tag))
     }
@@ -391,14 +403,14 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function tagPropertiesFromEntries(entries: TagColorEntry[]): Record<string, TagProperties> {
         const next: Record<string, TagProperties> = {}
         for (const [tag, props] of Object.entries(loadedTagProperties)) {
-            const { color: _color, ...rest } = props ?? {}
+            const { color: _color, ...rest } = props
             if (Object.keys(rest).length) next[tag] = { ...rest }
         }
         for (const entry of entries) {
             const tag = entry.tag.trim()
             const color = entry.color.trim()
             if (!tag || !color) continue
-            next[tag] = { ...(next[tag] ?? {}), color }
+            next[tag] = { ...next[tag], color }
         }
         return Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)))
     }
@@ -449,8 +461,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function validateAliasEntries(entries: BranchAliasEntry[], label: string): string | null {
         const seen = new Set<string>()
         for (const entry of entries) {
-            const key = entry.key?.trim() ?? ''
-            const value = entry.value?.trim() ?? ''
+            const key = entry.key.trim()
+            const value = entry.value.trim()
             if (!key && !value) {
                 continue
             }
@@ -509,14 +521,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     // Effective values come from the server-resolved config; the form edits
     // the raw override only.
     const effectiveDoneLabels = computed(() => {
-        const labels = inspectData.value?.effective?.effective_done_states
-        return Array.isArray(labels)
-            ? labels.map((value) => String(value)).filter((value) => value.trim().length > 0)
-            : []
+        const labels = inspectData.value?.effective.effective_done_states
+        return Array.isArray(labels) ? labels.filter((value) => value.trim().length > 0) : []
     })
 
     const doneStatesMode = computed(() => {
-        const mode = inspectData.value?.effective?.done_states_mode
+        const mode = inspectData.value?.effective.done_states_mode
         return mode === 'explicit' || mode === 'inferred' ? mode : null
     })
 
@@ -594,14 +604,16 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     )
 
     function sourceFor(field: string): ConfigSource | undefined {
-        return inspectData.value?.sources?.[field]
+        return inspectData.value?.sources[field]
     }
 
     function cloneState(state: ConfigFormState): ConfigFormState {
         const copy = { ...state } as Record<string, unknown>
         for (const [key, value] of Object.entries(copy)) {
             if (Array.isArray(value)) {
-                copy[key] = value.map((entry) => (entry && typeof entry === 'object' ? { ...entry } : entry))
+                copy[key] = (value as unknown[]).map((entry) =>
+                    entry && typeof entry === 'object' ? { ...entry } : entry,
+                )
             }
         }
         return copy as unknown as ConfigFormState
@@ -908,14 +920,14 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             case 'sync_reports_dir':
             case 'agent_context_extension':
             case 'agent_worktree_branch_prefix': {
-                const labels: Record<string, [string, string]> = {
+                const labels: Record<string, [FormTextField, string]> = {
                     sync_reports_dir: ['syncReportsDir', 'Reports folder'],
                     agent_context_extension: ['agentContextExtension', 'Context file extension'],
                     agent_worktree_branch_prefix: ['agentWorktreeBranchPrefix', 'Branch prefix'],
                 }
                 const [key, label] = labels[field]!
-                const value = String(form[key as keyof ConfigFormState] ?? '').trim()
-                const loaded = String(baseline.value?.[key as keyof ConfigFormState] ?? '').trim()
+                const value = form[key].trim()
+                const loaded = (baseline.value?.[key] ?? '').trim()
                 if (!value) {
                     // Global values cannot be blank; only flag a value the user cleared.
                     errors[field] = isGlobal.value && loaded ? `${label} is required.` : null
@@ -1085,7 +1097,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             }
             case 'issue_done_states': {
                 const values = form.issueDoneStates
-                if (values === null || values === undefined) {
+                if (values === null) {
                     errors.issue_done_states = null
                     return
                 }
@@ -1213,15 +1225,14 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     function populateForm(data: ConfigInspectResult) {
         const effective = data.effective
-        form.serverPort = effective.server_port?.toString() ?? ''
-        const effectiveDefaultProject = effective.default_project ?? ''
-        form.defaultProject = effectiveDefaultProject
-        form.attachmentsDir = effective.attachments_dir ?? ''
-        form.attachmentsMaxUploadMb = effective.attachments_max_upload_mb?.toString() ?? ''
+        form.serverPort = effective.server_port.toString()
+        form.defaultProject = effective.default_project
+        form.attachmentsDir = effective.attachments_dir
+        form.attachmentsMaxUploadMb = effective.attachments_max_upload_mb.toString()
         form.defaultReporter = effective.default_reporter ?? ''
         form.defaultAssignee = effective.default_assignee ?? ''
         form.defaultTags = [...effective.default_tags]
-        form.defaultPriority = effective.default_priority ?? ''
+        form.defaultPriority = effective.default_priority
         form.defaultStatus = effective.default_status ?? ''
         form.issueStates = [...effective.issue_states]
         form.issueTypes = [...effective.issue_types]
@@ -1233,8 +1244,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.strictMembers = toToggle(!!effective.strict_members)
         form.autoPopulateMembers = toToggle(effective.auto_populate_members !== false)
         form.reviewReviewers = []
-        form.syncReportsDir = effective.sync_reports_dir ?? ''
-        form.syncWriteReports = toToggle(effective.sync_write_reports !== false)
+        form.syncReportsDir = effective.sync_reports_dir
+        form.syncWriteReports = toToggle(effective.sync_write_reports)
         form.agentContextEnabled = toToggle(effective.agent_context_enabled !== false)
         form.agentContextExtension = effective.agent_context_extension ?? ''
         form.agentLogsDir = effective.agent_logs_dir ?? ''
@@ -1253,32 +1264,32 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.sprintCapacityPoints = effective.sprint_defaults?.capacity_points?.toString() ?? ''
         form.sprintCapacityHours = effective.sprint_defaults?.capacity_hours?.toString() ?? ''
         form.sprintNotificationsEnabled = toToggle(effective.sprint_notifications?.enabled !== false)
-        form.webUiPath = data.global_raw?.web_ui_path ?? ''
-        form.uiTheme = data.global_raw?.ui_theme ?? ''
-        form.uiName = data.global_raw?.ui_name ?? ''
-        form.uiLogo = data.global_raw?.ui_logo ?? ''
-        form.uiLogoDark = data.global_raw?.ui_logo_dark ?? ''
-        form.uiIcon = data.global_raw?.ui_icon ?? ''
-        form.uiThemeFile = data.global_raw?.ui_theme_file ?? ''
-        form.autoCodeownersAssign = toToggle(!!effective.auto_codeowners_assign)
-        form.autoTagsFromPath = toToggle(!!effective.auto_tags_from_path)
-        form.autoBranchInferType = toToggle(!!effective.auto_branch_infer_type)
-        form.autoBranchInferStatus = toToggle(!!effective.auto_branch_infer_status)
-        form.autoBranchInferPriority = toToggle(!!effective.auto_branch_infer_priority)
-        form.autoIdentity = toToggle(!!effective.auto_identity)
-        form.autoIdentityGit = toToggle(!!effective.auto_identity_git)
-        form.scanSignalWords = [...(effective.scan_signal_words ?? [])]
+        form.webUiPath = data.global_raw.web_ui_path ?? ''
+        form.uiTheme = data.global_raw.ui_theme ?? ''
+        form.uiName = data.global_raw.ui_name ?? ''
+        form.uiLogo = data.global_raw.ui_logo ?? ''
+        form.uiLogoDark = data.global_raw.ui_logo_dark ?? ''
+        form.uiIcon = data.global_raw.ui_icon ?? ''
+        form.uiThemeFile = data.global_raw.ui_theme_file ?? ''
+        form.autoCodeownersAssign = toToggle(effective.auto_codeowners_assign)
+        form.autoTagsFromPath = toToggle(effective.auto_tags_from_path)
+        form.autoBranchInferType = toToggle(effective.auto_branch_infer_type)
+        form.autoBranchInferStatus = toToggle(effective.auto_branch_infer_status)
+        form.autoBranchInferPriority = toToggle(effective.auto_branch_infer_priority)
+        form.autoIdentity = toToggle(effective.auto_identity)
+        form.autoIdentityGit = toToggle(effective.auto_identity_git)
+        form.scanSignalWords = [...effective.scan_signal_words]
         form.scanTicketPatterns = [...(effective.scan_ticket_patterns ?? [])]
-        form.scanEnableTicketWords = toToggle(!!effective.scan_enable_ticket_words)
-        form.scanEnableMentions = toToggle(!!effective.scan_enable_mentions)
-        form.scanStripAttributes = toToggle(!!effective.scan_strip_attributes)
+        form.scanEnableTicketWords = toToggle(effective.scan_enable_ticket_words)
+        form.scanEnableMentions = toToggle(effective.scan_enable_mentions)
+        form.scanStripAttributes = toToggle(effective.scan_strip_attributes)
         form.branchTypeAliases = mapToAliasEntries(effective.branch_type_aliases)
         form.branchStatusAliases = mapToAliasEntries(effective.branch_status_aliases)
         form.branchPriorityAliases = mapToAliasEntries(effective.branch_priority_aliases)
-        loadedTagProperties = { ...(effective.tag_properties ?? {}) }
+        loadedTagProperties = { ...effective.tag_properties }
         form.tagColors = tagColorEntries(loadedTagProperties)
         if (!isGlobal.value) {
-            const raw = ((data.project_raw as any) || {}) as Record<string, any>
+            const raw: ProjectConfigRaw = data.project_raw ?? {}
             form.projectName = raw.project_name || currentProject.value?.name || ''
             // Project defaults show overrides only; blank means inherit.
             form.defaultPriority = typeof raw.default_priority === 'string' ? raw.default_priority : ''
@@ -1290,8 +1301,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 form.attachmentsDir = typeof raw.attachments_dir === 'string' ? raw.attachments_dir : ''
             }
             if (raw.attachments_max_upload_mb !== undefined) {
-                form.attachmentsMaxUploadMb =
-                    raw.attachments_max_upload_mb === null ? '' : String(raw.attachments_max_upload_mb)
+                form.attachmentsMaxUploadMb = String(raw.attachments_max_upload_mb)
             }
             form.autoSetReporter = toTriToggle(raw.auto_set_reporter)
             form.autoReciprocalRelationships = toTriToggle(raw.auto_reciprocal_relationships)
@@ -1356,18 +1366,18 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 form.branchPriorityAliases = mapToAliasEntries(raw.branch_priority_aliases)
             }
             // A project edits its own tag colours; the rest are inherited.
-            loadedTagProperties = { ...((raw.tag_properties as Record<string, TagProperties> | null) ?? {}) }
+            loadedTagProperties = { ...raw.tag_properties }
             form.tagColors = tagColorEntries(loadedTagProperties)
         } else {
             form.projectName = ''
-            form.issueDoneStates = normalizeDoneStatesRaw((data.global_raw as any)?.issue_done_states)
-            form.autoSetReporter = toToggle(!!effective.auto_set_reporter)
+            form.issueDoneStates = normalizeDoneStatesRaw(data.global_raw.issue_done_states)
+            form.autoSetReporter = toToggle(effective.auto_set_reporter)
             form.autoReciprocalRelationships = toToggle(effective.auto_reciprocal_relationships !== false)
             form.autoLinkMentions = toToggle(effective.auto_link_mentions !== false)
-            form.autoAssignOnStatus = toToggle(!!effective.auto_assign_on_status)
-            form.scanEnableTicketWords = toToggle(!!effective.scan_enable_ticket_words)
-            form.scanEnableMentions = toToggle(!!effective.scan_enable_mentions)
-            form.scanStripAttributes = toToggle(!!effective.scan_strip_attributes)
+            form.autoAssignOnStatus = toToggle(effective.auto_assign_on_status)
+            form.scanEnableTicketWords = toToggle(effective.scan_enable_ticket_words)
+            form.scanEnableMentions = toToggle(effective.scan_enable_mentions)
+            form.scanStripAttributes = toToggle(effective.scan_strip_attributes)
         }
     }
 
@@ -1384,12 +1394,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         const payload: Record<string, string> = {}
 
         const addValue = (
-            field: keyof ConfigFormState,
+            field: FormTextField,
             key: string,
             { trim = true, allowEmpty = true }: { trim?: boolean; allowEmpty?: boolean } = {},
         ) => {
-            const currentValue = (current[field] as unknown as string) ?? ''
-            const baseValue = (base[field] as unknown as string) ?? ''
+            const currentValue = current[field]
+            const baseValue = base[field]
             const normalize = (val: string) => (trim ? val.trim() : val)
             if (normalize(currentValue) === normalize(baseValue)) return
             if (!allowEmpty && normalize(currentValue) === '') return
@@ -1408,8 +1418,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             key: string,
             { allowInherit = false }: { allowInherit?: boolean } = {},
         ) => {
-            const currentValue = current[field] as ToggleValue
-            const baseValue = base[field] as ToggleValue
+            const currentValue = current[field]
+            const baseValue = base[field]
             if (currentValue === baseValue) return
             if (currentValue === 'inherit') {
                 if (!isGlobal.value && allowInherit) {
@@ -1424,7 +1434,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             field: 'branchTypeAliases' | 'branchStatusAliases' | 'branchPriorityAliases',
             key: string,
         ) => {
-            const currentEntries = current[field] as unknown as BranchAliasEntry[]
+            const currentEntries = current[field]
             const baseEntries = base[field] as unknown as BranchAliasEntry[]
             if (aliasEntriesEqual(currentEntries, baseEntries)) return
             const normalized = normalizedAlias(currentEntries)
@@ -1481,7 +1491,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                     return '*'
                 case 'none':
                     return '[]'
-                default:
+                case 'list':
                     return normalizeCsv(values)
             }
         }
@@ -1535,7 +1545,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                         return ['agent_instructions', state.agentInstructions.trim()]
                     case 'file':
                         return ['agent_instructions_file', state.agentInstructionsFile.trim()]
-                    default:
+                    case 'builtin':
+                    case 'inherit':
                         return ['agent_instructions', '']
                 }
             }

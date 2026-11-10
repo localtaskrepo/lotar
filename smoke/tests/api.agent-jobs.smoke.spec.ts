@@ -320,7 +320,7 @@ describe.concurrent('Agent job smoke tests', () => {
                 // Verify message event contains expected text
                 const messageEvents = entries.filter((e) => e.type === 'event' && e.kind === 'agent_job_message');
                 expect(messageEvents.length).toBe(1);
-                expect(messageEvents[0].message).toContain('phase one / phase two done');
+                expect(messageEvents[0]!.message).toContain('phase one / phase two done');
 
                 // Verify header contains job metadata
                 const header = entries.find((e) => e.type === 'header');

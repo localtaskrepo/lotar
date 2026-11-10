@@ -33,7 +33,7 @@ interface TimeInStatusResponse {
     }>;
 }
 
-describe.concurrent.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
+describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
     it('supports operations in a detached HEAD worktree', async () => {
         const workspace = await SmokeWorkspace.create();
 

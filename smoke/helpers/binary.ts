@@ -10,10 +10,8 @@ const BIN_NAME = process.platform === 'win32' ? 'lotar.exe' : 'lotar';
 // Prefer the fast-to-build `smoke` profile binary when present, falling back to
 // the full `release` build. This lets `npm run build:smoke` produce the binary
 // smoke tests use without paying for the size-optimized release build.
-const DEFAULT_BINARY_CANDIDATES: readonly (readonly string[])[] = [
-    ['..', 'target', 'smoke', BIN_NAME],
-    ['..', 'target', 'release', BIN_NAME],
-];
+const PREFERRED_BINARY = ['..', 'target', 'smoke', BIN_NAME] as const;
+const DEFAULT_BINARY_CANDIDATES = [PREFERRED_BINARY, ['..', 'target', 'release', BIN_NAME]] as const;
 
 export function resolveRepositoryRoot(): string {
     return path.resolve(__dirname, '..');
@@ -34,7 +32,7 @@ export function resolveBinaryPath(): string {
     }
 
     // Nothing built yet; point at the preferred candidate for a helpful error.
-    return path.resolve(root, ...DEFAULT_BINARY_CANDIDATES[0]);
+    return path.resolve(root, ...PREFERRED_BINARY);
 }
 
 export async function ensureBinaryExists(): Promise<string> {

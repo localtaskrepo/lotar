@@ -123,15 +123,15 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
             case 'reporter':
             case 'assignee':
             case 'effort':
-                return (task[field] as string | null | undefined) || ''
+                return task[field] || ''
             case 'due_date':
                 return toDateInputValue(task.due_date)
             case 'tags':
-                return [...(task.tags || [])]
+                return [...task.tags]
             case 'sprints':
                 return normalizeSprints(task.sprints)
             case 'custom_fields':
-                return task.custom_fields || {}
+                return task.custom_fields
         }
     }
 
@@ -144,14 +144,18 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
                 return form.description || ''
             case 'reporter':
             case 'assignee':
-                return options.pendingOwner(field) ?? (form[field] ?? '').trim()
+                return options.pendingOwner(field) ?? form[field].trim()
             case 'tags':
-                return (form.tags || []).map((tag) => (tag || '').trim()).filter((tag) => tag.length > 0)
+                return form.tags.map((tag) => (tag || '').trim()).filter((tag) => tag.length > 0)
             case 'sprints':
                 return normalizeSprints(form.sprints)
             case 'custom_fields':
                 return undefined
-            default:
+            case 'status':
+            case 'priority':
+            case 'task_type':
+            case 'due_date':
+            case 'effort':
                 return form[field] || ''
         }
     }
@@ -177,19 +181,19 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
             case 'reporter':
             case 'assignee':
             case 'effort':
-                form[field] = (source[field] as string | null | undefined) || ''
+                form[field] = source[field] || ''
                 break
             case 'due_date':
                 form.due_date = toDateInputValue(source.due_date)
                 break
             case 'tags':
-                form.tags = [...(source.tags || [])]
+                form.tags = [...source.tags]
                 break
             case 'sprints':
                 options.applySprints(source)
                 break
             case 'custom_fields':
-                options.applyCustomFields(JSON.parse(JSON.stringify(source.custom_fields || {})))
+                options.applyCustomFields(JSON.parse(JSON.stringify(source.custom_fields)) as Record<string, unknown>)
                 break
         }
     }
@@ -199,7 +203,7 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
         try {
             run()
         } finally {
-            nextTick(() => {
+            void nextTick(() => {
                 options.suppressWatch.value = false
             })
         }
@@ -247,7 +251,7 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
      * older values look like the user's own edits.
      */
     function mergeServerTask(source: TaskDTO) {
-        if (!source || source.id !== options.task.id) return
+        if (source.id !== options.task.id) return
         if (isDeletedTask(source) !== isDeletedTask(options.task)) {
             applyTaskSnapshot(options.task, source)
             return

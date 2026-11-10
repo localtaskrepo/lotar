@@ -103,9 +103,9 @@ const extraMocks = vi.hoisted(() => ({
         deleted: true,
         still_referenced: false,
     })),
+    // The server answers with the whole task.
     reorderTaskAttachments: vi.fn(async (payload: { id: string; attachments: string[] }) => ({
-        id: payload.id,
-        title: `Task ${payload.id}`,
+        ...apiFixtures.makeTask(payload.id),
         references: payload.attachments.map((attachment) => ({ attachment })),
     })),
     attachmentInfo: vi.fn(async () => ({

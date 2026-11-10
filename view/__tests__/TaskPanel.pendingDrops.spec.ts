@@ -43,8 +43,8 @@ const apiFixtures = vi.hoisted(() => {
     const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 
     const state = {
-        taskGate: Promise.resolve() as Promise<void>,
-        configGate: Promise.resolve() as Promise<void>,
+        taskGate: Promise.resolve(),
+        configGate: Promise.resolve(),
         tasks: { 'TP-1': makeTask('TP-1'), 'TP-2': makeTask('TP-2') } as Record<string, any>,
     }
 

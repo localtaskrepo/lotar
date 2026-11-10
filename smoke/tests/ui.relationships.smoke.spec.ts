@@ -221,7 +221,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                         );
                         await page.getByRole('dialog', { name: `Task ${target.id}`, exact: true }).waitFor();
                         expect(new URL(page.url()).searchParams.get('q')).toBe(target.id);
-                        expect(await searchElement!.evaluate((element) => element.isConnected)).toBe(true);
+                        expect(await searchElement.evaluate((element) => element.isConnected)).toBe(true);
                         await page.getByRole('tab', { name: 'Relationships', exact: true }).click();
                         await page
                             .getByRole('region', { name: 'Related', exact: true })
@@ -240,7 +240,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                                 url.searchParams.get('taskPanel') === target.id,
                         );
                         await page.getByRole('dialog', { name: `Task ${target.id}`, exact: true }).waitFor();
-                        expect(await searchElement!.evaluate((element) => element.isConnected)).toBe(true);
+                        expect(await searchElement.evaluate((element) => element.isConnected)).toBe(true);
                         await page.getByRole('button', { name: 'Close panel', exact: true }).click();
                         await page.waitForURL((url) => !url.searchParams.has('taskPanel'));
                         expect(new URL(page.url()).searchParams.get('root')).toBe(target.id);
@@ -517,7 +517,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                     await option.waitFor();
                     await expect.poll(() => new URL(page.url()).searchParams.get('q')).toBe('Fifth stage');
                     expect(
-                        await searchElement!.evaluate(
+                        await searchElement.evaluate(
                             (element) => element.isConnected && element === document.activeElement,
                         ),
                     ).toBe(true);
@@ -603,7 +603,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                     await page.waitForURL((url) => url.searchParams.get('taskPanel') === source.id);
                     await page.getByRole('dialog', { name: `Task ${source.id}`, exact: true }).waitFor();
                     expect(listReads.length).toBe(reads);
-                    expect(await row!.evaluate((element) => element.isConnected)).toBe(true);
+                    expect(await row.evaluate((element) => element.isConnected)).toBe(true);
                     expect(new URL(page.url()).searchParams.get('q')).toBe('Dependent');
                     expect(new URL(page.url()).searchParams.get('sort_by')).toBe('title');
                     await page.getByRole('button', { name: 'Close panel', exact: true }).click();
@@ -959,7 +959,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                         await search.press('Backspace');
                         await page.getByRole('option').filter({ hasText: 'Bug' }).waitFor();
                         expect(
-                            await element!.evaluate((input) => input.isConnected && input === document.activeElement),
+                            await element.evaluate((input) => input.isConnected && input === document.activeElement),
                         ).toBe(true);
                         await search.press('Enter');
                         await page.waitForURL(
@@ -967,7 +967,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                                 url.searchParams.get('type') === 'Bug' && url.searchParams.get('priority') === 'High',
                         );
                         expect(navigations).toEqual([]);
-                        expect(await element!.evaluate((input) => input.isConnected)).toBe(true);
+                        expect(await element.evaluate((input) => input.isConnected)).toBe(true);
                         expect(new URL(page.url()).searchParams.has('root')).toBe(false);
                     },
                 );

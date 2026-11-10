@@ -1,5 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import { reactive } from 'vue'
+import { displayText, removeKey } from '../../utils/text'
 
 interface UseTaskPanelCustomFieldsOptions {
     mode: ComputedRef<'create' | 'edit'>
@@ -55,7 +56,7 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
     // this map are skipped; null means "no baseline yet" (defer to server).
     let appliedTaskCustomFields: Record<string, unknown> | null = null
 
-    const displayValue = (value: unknown): string => (value === undefined || value === null ? '' : String(value))
+    const displayValue = (value: unknown): string => (value === undefined || value === null ? '' : displayText(value))
 
     /**
      * Structural deep equality for custom-field maps: preserves raw types
@@ -70,8 +71,8 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
             return a.length === b.length && a.every((value, index) => customFieldValuesEqual(value, b[index]))
         }
         if (a !== null && b !== null && typeof a === 'object' && typeof b === 'object') {
-            const aKeys = Object.keys(a as Record<string, unknown>)
-            const bKeys = Object.keys(b as Record<string, unknown>)
+            const aKeys = Object.keys(a)
+            const bKeys = Object.keys(b)
             return (
                 aKeys.length === bKeys.length &&
                 aKeys.every(
@@ -140,16 +141,16 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
     }
 
     const removeField = async (key: string) => {
-        delete customFields[key]
-        delete customFieldKeys[key]
-        delete rawCustomFieldValues[key]
+        removeKey(customFields, key)
+        removeKey(customFieldKeys, key)
+        removeKey(rawCustomFieldValues, key)
         await commitCustomFields()
     }
 
     const resetCustomFields = () => {
-        Object.keys(customFields).forEach((key) => delete customFields[key])
-        Object.keys(customFieldKeys).forEach((key) => delete customFieldKeys[key])
-        Object.keys(rawCustomFieldValues).forEach((key) => delete rawCustomFieldValues[key])
+        Object.keys(customFields).forEach((key) => removeKey(customFields, key))
+        Object.keys(customFieldKeys).forEach((key) => removeKey(customFieldKeys, key))
+        Object.keys(rawCustomFieldValues).forEach((key) => removeKey(rawCustomFieldValues, key))
         appliedTaskCustomFields = null
         newField.key = ''
         newField.value = ''
@@ -191,7 +192,7 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
             const trimmedKey = (key || '').trim()
             if (!trimmedKey) return
             if (customFields[trimmedKey] === undefined) {
-                customFields[trimmedKey] = value === undefined || value === null ? '' : String(value)
+                customFields[trimmedKey] = value === undefined || value === null ? '' : displayText(value)
             }
             if (!customFieldKeys[trimmedKey]) {
                 customFieldKeys[trimmedKey] = trimmedKey
@@ -203,7 +204,7 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
         resetCustomFields()
         // Baseline for the DEV-102 blur no-op guard: snapshot the persisted
         // raw values (deep copy) before the editor state is derived from them.
-        appliedTaskCustomFields = structuredClone(values ?? {})
+        appliedTaskCustomFields = structuredClone(values)
         Object.entries(values).forEach(([rawKey, value]) => {
             const targetKey = (rawKey || '').trim()
             if (!targetKey) return

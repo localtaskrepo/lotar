@@ -86,7 +86,7 @@ describe('AutomationView unsaved rule guards', () => {
         vi.clearAllMocks()
         vi.mocked(api.inspectAutomation).mockImplementation(async (scope?: string) => automation(scope ?? '') as any)
         vi.mocked(api.inspectConfig).mockResolvedValue(null as any)
-        vi.mocked(api.listAgentProfiles).mockResolvedValue({ profiles: [] } as any)
+        vi.mocked(api.listAgentProfiles).mockResolvedValue({ profiles: [] })
         vi.mocked(api.listProjects).mockResolvedValue({ projects: [{ prefix: 'APP', name: 'App' }] } as any)
     })
 

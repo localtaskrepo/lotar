@@ -723,6 +723,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../utils/errors'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
@@ -896,8 +897,8 @@ async function submitCreateProject() {
     await notifyProjectsChanged()
     project.value = created.prefix
     await reload(created.prefix)
-  } catch (err: any) {
-    createError.value = err?.message ?? String(err)
+  } catch (err: unknown) {
+    createError.value = errorMessage(err) || (typeof err === 'string' ? err : 'Unexpected error')
   } finally {
     creatingProject.value = false
   }
@@ -1084,8 +1085,8 @@ async function loadAutomation() {
     automationBaselineYaml.value = response.scope_yaml || ''
     automationSource.value = response.source
     automationScopeExists.value = response.scope_exists
-  } catch (err: any) {
-    automationError.value = err?.message ?? String(err)
+  } catch (err: unknown) {
+    automationError.value = errorMessage(err) || (typeof err === 'string' ? err : 'Unexpected error')
   } finally {
     automationLoading.value = false
   }
@@ -1271,8 +1272,8 @@ async function save() {
     await reload()
     await loadAutomation()
     saveError.value = null
-  } catch (err: any) {
-    saveError.value = err?.message ?? String(err)
+  } catch (err: unknown) {
+    saveError.value = errorMessage(err) || (typeof err === 'string' ? err : 'Unexpected error')
     saveWarnings.value = []
     saveInfoMessages.value = []
   } finally {

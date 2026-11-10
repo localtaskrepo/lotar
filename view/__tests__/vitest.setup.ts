@@ -40,7 +40,7 @@ beforeAll(() => {
     vi.stubGlobal(
         'fetch',
         vi.fn(async (input: RequestInfo | URL) => {
-            const url = typeof input === 'string' ? input : input.toString()
+            const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
 
             if (url.includes('/api/tasks/export')) {
                 return new Response('', {

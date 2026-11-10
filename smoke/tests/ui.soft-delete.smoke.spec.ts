@@ -52,7 +52,7 @@ async function withLiveTaskPage(
                         });
                         for (const kind of ['task_created', 'task_updated', 'task_deleted']) {
                             this.addEventListener(kind, (event) => {
-                                const id = JSON.parse((event as MessageEvent).data).id;
+                                const id = JSON.parse(event.data).id;
                                 state.taskEvents!.push(`${kind}:${id}`);
                             });
                         }
@@ -76,7 +76,6 @@ describe.concurrent('DEV-92 soft deletion (actual backend/browser)', () => {
     it('shares soft-delete and restore semantics between CLI and initialized MCP', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'cli-mcp-deletion-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const task = await workspace.addTask('Cross-surface recoverable task', { args: ['--project=LIFE'] });
@@ -90,8 +89,8 @@ describe.concurrent('DEV-92 soft deletion (actual backend/browser)', () => {
             const listed = await workspace.runLotar(['--format', 'json', 'list', '--project=LIFE', '--deleted']);
             const deletedRows = JSON.parse(String(listed.stdout)).tasks as TaskSnapshot[];
             expect(deletedRows.map((entry) => entry.id)).toEqual([task.id]);
-            expect(deletedRows[0].deleted_at).toBe(deleted.deleted_at);
-            expect(deletedRows[0].modified).toBe(before.modified);
+            expect(deletedRows[0]!.deleted_at).toBe(deleted.deleted_at);
+            expect(deletedRows[0]!.modified).toBe(before.modified);
             await withMcpClient(workspace, async (client) => {
                 const hidden = await callTool(client, 'hidden', 'task_get', { id: task.id });
                 expect(hidden.error).toBeUndefined();
@@ -126,7 +125,6 @@ describe.concurrent('DEV-92 soft deletion (actual backend/browser)', () => {
     }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'soft-delete-ui-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const task = await workspace.addTask('Recoverable task content', {
@@ -239,7 +237,6 @@ describe.concurrent('DEV-92 soft deletion (actual backend/browser)', () => {
     it('warns about retained attachments and incoming relationships on hard deletion', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'hard-delete-warnings-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const target = await workspace.addTask('Permanently removed target', { args: ['--project=KEEP'] });
@@ -290,7 +287,6 @@ describe.concurrent('DEV-92 soft deletion (actual backend/browser)', () => {
     it('keeps a shared blob reachable through a soft-deleted task', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'deleted-attachment-reachability-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const first = await workspace.addTask('Deleted attachment owner', { args: ['--project=BLOB'] });
@@ -339,7 +335,6 @@ describe.concurrent('DEV-92 soft deletion (actual backend/browser)', () => {
     }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'external-deletion-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const task = await workspace.addTask('Externally deleted task', {

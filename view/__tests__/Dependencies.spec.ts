@@ -63,7 +63,7 @@ vi.mock('vue-router', async (importOriginal) => ({
 vi.mock('../composables/useSse', () => ({
     useSse: (_path: string, _params: unknown, options: { onReconnect: () => void }) => {
         mocks.reconnect = options.onReconnect
-        return { on: mocks.on, close: mocks.close }
+        return { on: mocks.on, off: vi.fn(), close: mocks.close }
     },
 }))
 

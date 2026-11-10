@@ -1,5 +1,6 @@
 import { computed, inject, provide, ref, watch, type InjectionKey, type Ref } from 'vue'
 import { storageGetJson, storageSetJson } from '../utils/storage'
+import { displayText } from '../utils/text'
 
 export type BuiltinColKey =
     | 'id'
@@ -19,7 +20,7 @@ export type BuiltinColKey =
 
 export type ColKey = BuiltinColKey | `custom:${string}`
 
-export type FieldOption = { key: ColKey | string; label: string }
+export type FieldOption = { key: ColKey | (string & {}); label: string }
 
 export const BUILTIN_COLUMNS: BuiltinColKey[] = [
     'id',
@@ -70,7 +71,7 @@ const BUILTIN_LABELS: Record<BuiltinColKey, string> = {
 
 export interface UseColumnsOptions {
     storagePrefix?: string
-    defaultVisible?: (ColKey | string)[]
+    defaultVisible?: (ColKey | (string & {}))[]
     /** Builtin (non-custom) columns offered by this store; defaults to all builtins. */
     builtinColumns?: BuiltinColKey[]
     /** Whether shared custom fields appear as columns; defaults to true. */
@@ -85,9 +86,12 @@ function isCustomFieldName(name: string): boolean {
     return !!name && name !== '*'
 }
 
+/** The built-in labels for lookups by any column key (custom keys have none). */
+const BUILTIN_LABEL_LOOKUP: Partial<Record<string, string>> = BUILTIN_LABELS
+
 function headerLabelFor(key: string): string {
     if (isCustomKey(key)) return key.slice('custom:'.length)
-    return BUILTIN_LABELS[key as BuiltinColKey] ?? key
+    return BUILTIN_LABEL_LOOKUP[key] ?? key
 }
 
 /**
@@ -106,7 +110,7 @@ export function customFieldEntriesFromTask(
         if (!name || name === '*') continue
         const raw = custom[name]
         if (raw === undefined || raw === null || raw === '') continue
-        out.push({ key: name, label: name, value: String(raw) })
+        out.push({ key: name, label: name, value: displayText(raw) })
     }
     return out
 }
@@ -136,18 +140,18 @@ export interface ColumnStore {
     columnOrder: Ref<ColKey[]>
     fieldOptions: import('vue').ComputedRef<FieldOption[]>
     visibleColumns: import('vue').ComputedRef<ColKey[]>
-    toggleColumn: (col: ColKey | string, event: Event) => void
-    isVisible: (key: ColKey | string) => boolean
+    toggleColumn: (col: ColKey | (string & {}), event: Event) => void
+    isVisible: (key: ColKey | (string & {})) => boolean
     resetColumns: () => void
-    headerLabel: (key: ColKey | string) => string
-    customFieldKey: (col: ColKey | string) => string | null
+    headerLabel: (key: ColKey | (string & {})) => string
+    customFieldKey: (col: ColKey | (string & {})) => string | null
     setProjectKey: (key: string) => void
     setCustomFieldKeys: (keys: string[]) => void
 }
 
 export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
     const storagePrefix = options.storagePrefix ?? 'lotar.taskTable'
-    const defaultVisible: (ColKey | string)[] = options.defaultVisible ?? DEFAULT_VISIBLE
+    const defaultVisible: (ColKey | (string & {}))[] = options.defaultVisible ?? DEFAULT_VISIBLE
     const builtinColumns: BuiltinColKey[] = options.builtinColumns ?? BUILTIN_COLUMNS
     const includeCustomFields = options.includeCustomFields ?? true
     const customFieldKeys = includeCustomFields ? sharedCustomFieldKeys : ref<string[]>([])
@@ -186,7 +190,7 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
         let entries: unknown[] = []
         if (Array.isArray(value)) {
             entries = value
-        } else if (value && typeof value === 'object') {
+        } else if (typeof value === 'object') {
             // Legacy boolean-map format written by useFieldVisibility stored custom
             // fields under their bare names; map them onto the custom: prefix so
             // those selections survive the migration.
@@ -263,7 +267,7 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
         allColumnsFor().map((col) => ({ key: col, label: headerLabelFor(col) })),
     )
 
-    function toggleColumn(col: ColKey | string, event: Event) {
+    function toggleColumn(col: ColKey | (string & {}), event: Event) {
         const checked = Boolean((event.target as HTMLInputElement | null)?.checked)
         const next = new Set(columns.value)
         if (checked) next.add(col as ColKey)
@@ -271,7 +275,7 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
         columns.value = Array.from(next)
     }
 
-    function isVisible(key: ColKey | string): boolean {
+    function isVisible(key: ColKey | (string & {})): boolean {
         return columnsSet.value.has(key as ColKey)
     }
 
@@ -280,11 +284,11 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
         columnOrder.value = [...allColumnsFor()]
     }
 
-    function headerLabel(key: ColKey | string): string {
+    function headerLabel(key: ColKey | (string & {})): string {
         return headerLabelFor(key)
     }
 
-    function customFieldKey(col: ColKey | string): string | null {
+    function customFieldKey(col: ColKey | (string & {})): string | null {
         return isCustomKey(col) ? col.slice('custom:'.length) : null
     }
 

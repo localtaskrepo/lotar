@@ -44,6 +44,8 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         },
         { flush: 'sync' },
     )
+    /** The panel is mounted and `request` is still the latest; read live, since unmounts land during awaits. */
+    const current = (request: number) => alive && request === generation
     onBeforeUnmount(() => {
         alive = false
         generation += 1
@@ -54,7 +56,7 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         const request = generation
         try {
             const updated = await options.reconcile()
-            if (alive && request === generation && updated) applyRelationshipsFromTask(updated)
+            if (current(request) && updated) applyRelationshipsFromTask(updated)
         } catch {
             /* An operation or explicit reload reports actionable errors. */
         }
@@ -73,8 +75,8 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         for (const event of ['task_updated', 'task_deleted', 'task_restored'])
             stream.on(event, (message) => {
                 try {
-                    const payload = JSON.parse(message.data)
-                    if ((payload.id || payload.task?.id) === options.taskId()) void refreshRelationships()
+                    const payload = JSON.parse(String(message.data)) as { id?: string; task?: { id?: string } } | null
+                    if ((payload?.id || payload?.task?.id) === options.taskId()) void refreshRelationships()
                 } catch {
                     /* Ignore malformed events; reconnect reconciles current state. */
                 }
@@ -89,7 +91,7 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
                 const values = relationshipEntries(relationships, key)
                 return [key, singletonRelationship(key) ? values[0] : values]
             }),
-        ) as TaskRelationships
+        )
     }
     function applyRelationshipsFromTask(data?: TaskDTO | null) {
         resetRelationships()
@@ -136,10 +138,10 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         } catch (cause) {
             failure = cause
         }
-        if (!alive || request !== generation) return
+        if (!current(request)) return
         try {
             const updated = await options.reconcile()
-            if (alive && request === generation && updated) applyRelationshipsFromTask(updated)
+            if (current(request) && updated) applyRelationshipsFromTask(updated)
         } catch {
             if (!failure)
                 failure = new Error(
@@ -148,7 +150,9 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         } finally {
             if (request === generation) pending = false
         }
-        if (alive && request === generation && failure) throw failure
+        if (current(request) && failure !== undefined) {
+            throw failure instanceof Error ? failure : new Error('Relationship request failed')
+        }
     }
     return { relationships, resetRelationships, buildRelationships, applyRelationshipsFromTask, mutateRelationship }
 }

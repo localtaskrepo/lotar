@@ -153,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import { removeKey } from '../../utils/text'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, useId, watch } from 'vue'
 import { api } from '../../api/client'
 import { useTaskPanelController } from '../../composables/useTaskPanelController'
@@ -206,9 +207,9 @@ function clear() {
   graphExpanded.value = false
   timers.forEach(clearTimeout)
   timers.clear()
-  for (const key of Object.keys(queries)) delete queries[key]
-  for (const key of Object.keys(suggestions)) delete suggestions[key]
-  for (const key of Object.keys(requests)) delete requests[key]
+  for (const key of Object.keys(queries)) removeKey(queries, key)
+  for (const key of Object.keys(suggestions)) removeKey(suggestions, key)
+  for (const key of Object.keys(requests)) removeKey(requests, key)
 }
 watch(() => [props.taskId, props.mode, props.project, props.disabled], clear)
 onBeforeUnmount(clear)

@@ -17,7 +17,6 @@ describe('DEV-239 large task view (actual backend/browser)', () => {
     it('switches between the side panel and the large view, and opens in the preferred view', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'task-view-ui-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const task = await workspace.addTask('Offline edits are lost when reconnecting', {

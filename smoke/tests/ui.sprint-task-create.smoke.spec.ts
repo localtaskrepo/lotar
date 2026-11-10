@@ -159,8 +159,8 @@ describe.concurrent('Sprint and backlog task creation (DEV-104)', () => {
                         const backlogTask = (await response.json()).data;
                         await panel.waitFor({ state: 'detached' });
                         expect(writes).toHaveLength(2);
-                        expect(writes[1].body).toMatchObject({ project: 'WEB', title: backlogTitle });
-                        expect(writes[1].body.sprints).toBeUndefined();
+                        expect(writes[1]!.body).toMatchObject({ project: 'WEB', title: backlogTitle });
+                        expect(writes[1]!.body.sprints).toBeUndefined();
                         await expect
                             .poll(() =>
                                 page.locator(`[data-sprint-id="backlog"] tr[data-task-id="${backlogTask.id}"]`).count(),

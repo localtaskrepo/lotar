@@ -37,6 +37,7 @@ vi.mock('../composables/useSse', () => ({
         on: (kind: string, handler: (event: MessageEvent) => void) => {
             sseHandlers.set(kind, [...(sseHandlers.get(kind) ?? []), handler])
         },
+        off: vi.fn(),
         close: vi.fn(),
     }),
 }))

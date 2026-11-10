@@ -55,12 +55,10 @@ function getNeeds(): string[] {
 const isNoEstimate = computed(() => getNeeds().includes('effort'))
 
 function patch(next: Partial<Record<string, string>>) {
-  const base: Record<string, string> = { ...(props.value || {}) }
-  for (const [k, v] of Object.entries(next)) {
-    if (v === '') delete (base as any)[k]
-    else (base as any)[k] = v as string
-  }
-  emit('update:value', base)
+  // An empty value clears that filter.
+  const cleared = new Set(Object.keys(next).filter((key) => next[key] === ''))
+  const merged = { ...props.value, ...next } as Record<string, string>
+  emit('update:value', Object.fromEntries(Object.entries(merged).filter(([key]) => !cleared.has(key))))
 }
 
 function toggleMine() {

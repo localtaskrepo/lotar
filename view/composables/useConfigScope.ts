@@ -54,7 +54,7 @@ export function useConfigScope() {
             } else {
                 delete query.project
             }
-            router.replace({ query })
+            void router.replace({ query })
             await reload(value)
         },
         { flush: 'post' },

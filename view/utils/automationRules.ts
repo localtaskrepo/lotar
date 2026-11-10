@@ -1,5 +1,6 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { listFromCsv } from '../composables/useFilterBuilder'
+import { displayText } from './text'
 
 /** A plain YAML mapping from an automation document. Values are untrusted
  * user YAML, so they stay `unknown` until narrowed. */
@@ -313,12 +314,12 @@ export function parseAutomationYamlDocument(yaml: string): AutomationParsedDocum
     }
 
     try {
-        const parsed = parseYaml(yaml)
+        const parsed: unknown = parseYaml(yaml)
         if (Array.isArray(parsed)) {
             return { rules: sanitizeRuleList(parsed), maxIterations: '', parseError: null }
         }
 
-        const automation =
+        const automation: unknown =
             parsed && typeof parsed === 'object' && 'automation' in parsed
                 ? (parsed as AutomationRecord).automation
                 : parsed
@@ -333,7 +334,7 @@ export function parseAutomationYamlDocument(yaml: string): AutomationParsedDocum
         const maxIterations = automationRecord.max_iterations
         return {
             rules,
-            maxIterations: maxIterations == null ? '' : String(maxIterations),
+            maxIterations: maxIterations == null ? '' : displayText(maxIterations),
             parseError: null,
         }
     } catch (error) {
@@ -364,11 +365,11 @@ export function buildAutomationYamlDocument(rules: AutomationRecord[], maxIterat
 export function summarizeAutomationRule(rule: AutomationRecord): AutomationRuleSummary {
     const events = summarizeEvents(rule)
     const actions = summarizeActions(rule, events)
-    const conditions = summarizeConditions(rule?.when)
+    const conditions = summarizeConditions(rule.when)
 
     return {
-        name: typeof rule?.name === 'string' ? rule.name : undefined,
-        events: events.map((event) => EVENT_LABELS[event] ?? event),
+        name: typeof rule.name === 'string' ? rule.name : undefined,
+        events: events.map((event) => EVENT_LABELS[event]),
         conditions,
         actions,
     }
@@ -400,7 +401,7 @@ export function buildAutomationRuleFromDraft(draft: AutomationRuleDraft): Automa
     if (draft.name.trim()) {
         rule.name = draft.name.trim()
     }
-    if (draft.enabled === false) {
+    if (!draft.enabled) {
         rule.enabled = false
     }
     if (draft.cooldown.trim()) {
@@ -436,7 +437,7 @@ function sanitizeRuleList(value: unknown[]): AutomationRecord[] {
 }
 
 function summarizeEvents(rule: AutomationRecord): AutomationEventKey[] {
-    const on = rule?.on
+    const on = rule.on
     if (!on || typeof on !== 'object') return []
     return Object.keys(on)
         .map((key) => normalizeEventKey(key))
@@ -489,7 +490,7 @@ function summarizeConditions(when: unknown): string[] {
 }
 
 function summarizeActions(rule: AutomationRecord, events: AutomationEventKey[]): string[] {
-    const on = rule?.on
+    const on = rule.on
     if (!on || typeof on !== 'object' || !events.length) return ['No actions']
     return events.flatMap((event) => {
         const action = resolveActionForEvent(on as AutomationRecord, event)
@@ -536,7 +537,7 @@ function summarizeAction(action: unknown): string[] {
         const settings = (['model', 'effort'] as const)
             .filter((key) => typeof record.agent === 'object' && (record.agent as AutomationRecord)[key])
             .map((key) => `${key} ${formatValue((record.agent as AutomationRecord)[key])}`)
-        if ((record.agent as AutomationRecord).prompt) settings.push('custom prompt')
+        if (record.agent.prompt) settings.push('custom prompt')
         if (settings.length) summary.push(`agent run: ${settings.join(', ')}`)
     }
 
@@ -546,7 +547,7 @@ function summarizeAction(action: unknown): string[] {
         } else if (isRecord(record.run)) {
             const cmd = record.run.command || ''
             const args = Array.isArray(record.run.args) ? record.run.args.join(' ') : ''
-            const line = [cmd, args].filter(Boolean).join(' ')
+            const line = [displayText(cmd), args].filter(Boolean).join(' ')
             summary.push(line ? `run: ${line}` : 'run: command')
         }
     }
@@ -576,7 +577,7 @@ function summarizeFieldCondition(value: unknown): string {
 function formatValue(value: unknown): string {
     if (Array.isArray(value)) return value.join(', ')
     if (value && typeof value === 'object') return JSON.stringify(value)
-    return value == null ? '' : String(value)
+    return value == null ? '' : displayText(value)
 }
 
 function collectUnsupportedRuleReasons(rule: AutomationRecord): string[] {
@@ -898,7 +899,7 @@ function stringifyConditionValue(value: unknown): string {
     if (value == null) return ''
     if (Array.isArray(value)) return value.join(', ')
     if (typeof value === 'boolean') return value ? 'true' : 'false'
-    return String(value)
+    return displayText(value)
 }
 
 function extractEventActionDraft(event: AutomationEventKey, action: unknown): AutomationEventActionDraft {
@@ -920,7 +921,7 @@ function extractEventActionDraft(event: AutomationEventKey, action: unknown): Au
                         scope: 'custom_field',
                         field: 'custom_field',
                         customFieldKey: customKey,
-                        value: customValue == null ? '' : String(customValue),
+                        value: customValue == null ? '' : displayText(customValue),
                     })
                 }
                 continue
@@ -1090,7 +1091,12 @@ function buildFieldConditionFromDraft(condition: AutomationConditionDraft): stri
             return { [condition.operator]: listFromCsv(value) }
         case 'exists':
             return { exists: value !== 'false' }
-        default:
+        case 'contains':
+        case 'starts_with':
+        case 'matches':
+        case 'before':
+        case 'older_than':
+        case 'within':
             return { [condition.operator]: value }
     }
 }
@@ -1331,7 +1337,13 @@ function denormalizeEventKey(event: AutomationEventKey): string {
             return 'job_failed'
         case 'cancel':
             return 'job_cancelled'
-        default:
+        case 'created':
+        case 'updated':
+        case 'assigned':
+        case 'commented':
+        case 'sprint_changed':
+        case 'manual':
+        case 'start':
             return event
     }
 }

@@ -1,5 +1,6 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
+import type { ConfigShowResponse } from '../api/types'
 import { createResource } from './useResource'
 
 type ConfigDefaults = {
@@ -24,16 +25,16 @@ function sanitizeStringList(list: string[]): string[] {
     return list.map((item) => item.trim()).filter((item) => item.length > 0)
 }
 
-function pick(obj: any, path: string[]): any {
+function pick(obj: unknown, path: string[]): unknown {
     let cur = obj
     for (const p of path) {
         if (!cur || typeof cur !== 'object') return undefined
-        cur = cur[p]
+        cur = (cur as Record<string, unknown>)[p]
     }
     return cur
 }
 
-function pickArray(obj: any, path: string[], fallback: string[] = []): string[] {
+function pickArray(obj: unknown, path: string[], fallback: string[] = []): string[] {
     const value = pick(obj, path)
     if (Array.isArray(value)) {
         return value.map((item) => String(item))
@@ -68,7 +69,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
     const tags = ref<string[]>([])
     const members = ref<string[]>([])
 
-    const cfgResource = createResource<any, [string?]>(
+    const cfgResource = createResource<ConfigShowResponse, [string?]>(
         async (project?: string) => {
             const projParam = project && project.trim().length > 0 ? project : undefined
             return api.showConfig(projParam)
@@ -76,7 +77,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         { throwOnError: options.throwOnError },
     )
 
-    const cfg = computed<any>(() => cfgResource.data.value ?? null)
+    const cfg = computed<ConfigShowResponse | null>(() => cfgResource.data.value ?? null)
     const loading = cfgResource.loading
     const error = computed<string | null>(() => cfgResource.error.value?.message ?? null)
 
@@ -107,8 +108,8 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         sprintDefaults.capacity_hours = null
     }
 
-    function applyConfig(config: any) {
-        const extractLists = (c: any) => ({
+    function applyConfig(config: ConfigShowResponse) {
+        const extractLists = (c: ConfigShowResponse) => ({
             statuses: sanitizeStringList(pickArray(c, ['issue_states', 'values'], pickArray(c, ['issue_states']))),
             priorities: sanitizeStringList(
                 pickArray(c, ['issue_priorities', 'values'], pickArray(c, ['issue_priorities'])),
@@ -128,30 +129,29 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         customFieldKeys.value = base.customFields
         members.value = sanitizeStringList(pickArray(config, ['members'], pickArray(config, ['default', 'members'])))
 
-        const defaultStatus = config?.default_status
-        const defaultPriority = config?.default_priority
-        const defaultReporter = config?.default_reporter
-        const defaultAssignee = config?.default_assignee
-        const defaultTags = config?.default_tags
-        const defaultProject = config?.default_project || ''
+        // An empty, missing or non-scalar setting means "not set".
+        const text = (value: unknown) =>
+            (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') && value
+                ? String(value)
+                : ''
 
-        defaults.project = currentProject.value || String(defaultProject || '')
-        defaults.status = (defaultStatus && String(defaultStatus)) || statuses.value[0] || ''
-        defaults.priority = (defaultPriority && String(defaultPriority)) || priorities.value[0] || ''
+        defaults.project = currentProject.value || text(config.default_project)
+        defaults.status = text(config.default_status) || statuses.value[0] || ''
+        defaults.priority = text(config.default_priority) || priorities.value[0] || ''
         defaults.type = types.value[0] || ''
-        defaults.reporter = (defaultReporter && String(defaultReporter)) || ''
-        defaults.assignee = (defaultAssignee && String(defaultAssignee)) || ''
-        defaults.tags = Array.isArray(defaultTags) ? sanitizeStringList(defaultTags.map((t: any) => String(t))) : []
+        defaults.reporter = text(config.default_reporter)
+        defaults.assignee = text(config.default_assignee)
+        defaults.tags = sanitizeStringList(pickArray(config, ['default_tags']))
         defaults.customFields = {}
 
-        const sprintDefaultsConfig = config?.sprints?.defaults ?? {}
-        sprintDefaults.length = typeof sprintDefaultsConfig.length === 'string' ? sprintDefaultsConfig.length : ''
-        sprintDefaults.overdue_after =
-            typeof sprintDefaultsConfig.overdue_after === 'string' ? sprintDefaultsConfig.overdue_after : ''
-        sprintDefaults.capacity_points =
-            typeof sprintDefaultsConfig.capacity_points === 'number' ? sprintDefaultsConfig.capacity_points : null
-        sprintDefaults.capacity_hours =
-            typeof sprintDefaultsConfig.capacity_hours === 'number' ? sprintDefaultsConfig.capacity_hours : null
+        const length = pick(config, ['sprints', 'defaults', 'length'])
+        const overdueAfter = pick(config, ['sprints', 'defaults', 'overdue_after'])
+        const capacityPoints = pick(config, ['sprints', 'defaults', 'capacity_points'])
+        const capacityHours = pick(config, ['sprints', 'defaults', 'capacity_hours'])
+        sprintDefaults.length = typeof length === 'string' ? length : ''
+        sprintDefaults.overdue_after = typeof overdueAfter === 'string' ? overdueAfter : ''
+        sprintDefaults.capacity_points = typeof capacityPoints === 'number' ? capacityPoints : null
+        sprintDefaults.capacity_hours = typeof capacityHours === 'number' ? capacityHours : null
     }
 
     watch(
@@ -167,7 +167,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
     )
 
     async function refresh(project?: string) {
-        const trimmed = project ? String(project).trim() : ''
+        const trimmed = project ? project.trim() : ''
         currentProject.value = trimmed
         cfgResource.reset()
         resetState()

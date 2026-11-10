@@ -1,3 +1,4 @@
+import { errorMessage } from '../utils/errors'
 import { reactive } from 'vue'
 import { api } from '../api/client'
 import type { SprintBurndownResponse, SprintSummaryReportResponse, SprintVelocityResponse } from '../api/types'
@@ -76,8 +77,8 @@ export function useSprintAnalytics() {
                 const response = await api.sprintSummary(sprintId)
                 summaryCache[sprintId] = response
                 return response
-            } catch (error: any) {
-                const message = error?.message || 'Failed to load sprint summary'
+            } catch (error: unknown) {
+                const message = errorMessage(error) || 'Failed to load sprint summary'
                 summaryError[sprintId] = message
                 throw error
             } finally {
@@ -106,8 +107,8 @@ export function useSprintAnalytics() {
                 const response = await api.sprintBurndown(sprintId)
                 burndownCache[sprintId] = response
                 return response
-            } catch (error: any) {
-                const message = error?.message || 'Failed to load sprint burndown'
+            } catch (error: unknown) {
+                const message = errorMessage(error) || 'Failed to load sprint burndown'
                 burndownError[sprintId] = message
                 throw error
             } finally {
@@ -172,8 +173,8 @@ export function useSprintAnalytics() {
                 const response = await api.sprintVelocity(normalized)
                 velocityCache[key] = response
                 return response
-            } catch (error: any) {
-                const message = error?.message || 'Failed to load sprint velocity'
+            } catch (error: unknown) {
+                const message = errorMessage(error) || 'Failed to load sprint velocity'
                 velocityError[key] = message
                 throw error
             } finally {

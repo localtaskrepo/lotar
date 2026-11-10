@@ -51,7 +51,7 @@ function task(id: string, fields: Partial<TaskDTO> = {}): TaskDTO {
         history: [],
         custom_fields: {},
         ...fields,
-    } as TaskDTO
+    }
 }
 
 const completion: CompletionLookup = {

@@ -422,7 +422,7 @@ function cmpOptionalStr(a: string | null | undefined, b: string | null | undefin
     if (aMissing && bMissing) return 0
     if (aMissing) return -1
     if (bMissing) return 1
-    return cmpStr(a as string, b as string)
+    return cmpStr(a, b)
 }
 
 /** Explicit missing-last ordering used for due dates, as in the backend sort. */
@@ -432,7 +432,7 @@ function cmpOptionalStrMissingLast(a: string | null | undefined, b: string | nul
     if (aMissing && bMissing) return 0
     if (aMissing) return 1
     if (bMissing) return -1
-    return cmpDueValues(a as string, b as string)
+    return cmpDueValues(a, b)
 }
 
 /**
@@ -529,9 +529,9 @@ function cmpVec<T>(a: readonly T[], b: readonly T[], cmp: (x: T, y: T) => number
 export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number {
     switch (sortBy) {
         case 'priority':
-            return cmpStr(a.priority ?? '', b.priority ?? '')
+            return cmpStr(a.priority, b.priority)
         case 'status':
-            return cmpStr(a.status ?? '', b.status ?? '')
+            return cmpStr(a.status, b.status)
         case 'effort':
             return cmpEffort(a.effort, b.effort)
         case 'due':
@@ -545,17 +545,17 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number
         case 'reporter':
             return cmpOptionalStr(a.reporter, b.reporter)
         case 'type':
-            return cmpStr(a.task_type ?? '', b.task_type ?? '')
+            return cmpStr(a.task_type, b.task_type)
         case 'project':
             return cmpStr(projectOf(a.id), projectOf(b.id))
         case 'id':
             return compareTaskIds(a.id, b.id)
         case 'title':
-            return cmpStr(a.title ?? '', b.title ?? '')
+            return cmpStr(a.title, b.title)
         case 'tags':
-            return cmpVec(a.tags ?? [], b.tags ?? [], cmpStr)
+            return cmpVec(a.tags, b.tags, cmpStr)
         case 'sprints':
-            return cmpVec(a.sprints ?? [], b.sprints ?? [], (x, y) => x - y)
+            return cmpVec(a.sprints, b.sprints, (x, y) => x - y)
         case 'relevance':
             // Only the server can score a search; keep its order.
             return 0

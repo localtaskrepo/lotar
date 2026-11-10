@@ -1553,12 +1553,14 @@ function removeChip(chip: FilterChip) {
       deletion.value = 'active'
       break
     default: {
-      const next = { ...customFilters.value }
       // An exclusion (`-status:done`, DEV-5) removes one value at a time.
-      const remaining = chip.key.startsWith('-') ? removeCsvValue(next[chip.key] ?? '', chip.value) : ''
-      if (remaining) next[chip.key] = remaining
-      else delete next[chip.key]
-      customFilters.value = next
+      const current = customFilters.value
+      const remaining = chip.key.startsWith('-') ? removeCsvValue(current[chip.key] ?? '', chip.value) : ''
+      customFilters.value = Object.fromEntries(
+        Object.entries(current).flatMap(([key, value]): [string, string][] =>
+          key !== chip.key ? [[key, value]] : remaining ? [[key, remaining]] : [],
+        ),
+      )
     }
   }
 }

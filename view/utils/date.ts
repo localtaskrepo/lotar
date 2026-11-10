@@ -65,9 +65,9 @@ export function toDateInputValue(value?: string | null): string {
     return toDateKey(parsed)
 }
 
-export function fromDateInputValue(value: unknown): string | null {
+export function fromDateInputValue(value: string | null | undefined): string | null {
     if (value === null || value === undefined) return null
-    const trimmed = typeof value === 'string' ? value.trim() : String(value).trim()
+    const trimmed = value.trim()
     if (!trimmed) return null
     if (DATE_ONLY_REGEX.test(trimmed)) {
         return trimmed
@@ -91,9 +91,9 @@ export function toDateTimeInputValue(value?: string | null): string {
     return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
-export function fromDateTimeInputValue(value: unknown): string | null {
+export function fromDateTimeInputValue(value: string | null | undefined): string | null {
     if (value === null || value === undefined) return null
-    const trimmed = typeof value === 'string' ? value.trim() : String(value).trim()
+    const trimmed = value.trim()
     if (!trimmed) return null
     const parsed = Date.parse(trimmed)
     if (!Number.isFinite(parsed)) {

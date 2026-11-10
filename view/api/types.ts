@@ -154,7 +154,7 @@ export interface TaskDTO {
     description?: string | null
     tags: string[]
     relationships: TaskRelationships
-    comments: any[]
+    comments: TaskComment[]
     references: ReferenceEntry[]
     /** Acceptance criteria entries; omitted when empty. */
     acceptance_criteria?: string[]
@@ -553,7 +553,7 @@ export interface TaskListFilter {
     deletion?: 'active' | 'deleted' | 'all'
     /** DEV-4 archive visibility: `no` (default) leaves archived tasks out, `yes` only them, `all` both. */
     archived?: 'no' | 'yes' | 'all'
-    [key: string]: any
+    [key: string]: unknown
 }
 
 /** Response of POST /api/tasks/delete (soft by default, `hard` on request). */
@@ -945,9 +945,19 @@ export interface ProjectStatsDTO {
 
 // Task/sprint domain errors: invalid input/identity/safety = 400 INVALID_ARGUMENT,
 // missing resource = 404 NOT_FOUND, storage/serialization/index = 500 INTERNAL.
+/** A task comment; keys a newer server adds pass through unchanged. */
+export interface TaskComment {
+    date: string
+    text: string
+    [key: string]: unknown
+}
+
+/** `GET /api/config/show`: the scope's configuration as stored (its shape depends on the scope) plus computed completion fields. */
+export type ConfigShowResponse = Record<string, unknown>
+
 export interface ApiEnvelope<T> {
     data: T
-    meta?: any
+    meta?: unknown
     error?: { code: string; message: string }
 }
 
@@ -1253,8 +1263,8 @@ export interface ScanSummary {
 }
 
 export interface ScanEntry {
-    status: 'created' | 'updated' | 'skipped' | 'failed' | string
-    action: 'create' | 'refresh' | 'skip' | string
+    status: 'created' | 'updated' | 'skipped' | 'failed' | (string & {})
+    action: 'create' | 'refresh' | 'skip' | (string & {})
     file: string
     line: number
     title: string
@@ -1354,7 +1364,7 @@ export interface SyncReportListResponse {
 
 export interface SyncResponse {
     /** `ok`, or `partial` when some items failed. */
-    status: 'ok' | 'partial' | string
+    status: 'ok' | 'partial' | (string & {})
     direction: 'push' | 'pull'
     provider: SyncProvider
     remote: string

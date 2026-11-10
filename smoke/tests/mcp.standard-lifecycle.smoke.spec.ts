@@ -33,7 +33,7 @@ async function sendRequest(
 ): Promise<any> {
     const id = nextMcpRequestId('req');
     await client.send({ jsonrpc: '2.0', id, method, params });
-    return await client.awaitResponse(id);
+    return client.awaitResponse(id);
 }
 
 async function sendRawLine(client: Awaited<ReturnType<typeof spawnMcpClient>>, line: string): Promise<void> {

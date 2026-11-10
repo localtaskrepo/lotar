@@ -164,7 +164,7 @@ for (const line of stdout.split('\n')) {
     }
 }
 
-const fmtMs = (ms) => `${String(ms).padEnd(8)}`;
+const fmtMs = (ms) => String(ms).padEnd(8);
 console.log('\n== Performance budget summary ==');
 console.log(`${'status'.padEnd(7)} ${'label'.padEnd(28)} ${'elapsed'.padEnd(9)} budget`);
 const problems = [];

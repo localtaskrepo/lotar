@@ -32,7 +32,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../api/client', () => ({ api }))
 
 vi.mock('../composables/useSse', () => ({
-    useSse: () => ({ on: vi.fn(), close: vi.fn() }),
+    useSse: () => ({ on: vi.fn(), off: vi.fn(), close: vi.fn() }),
 }))
 
 vi.mock('../components/toast', () => ({

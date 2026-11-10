@@ -424,6 +424,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../../utils/errors'
 import { computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { api } from '../../api/client'
 import type { ConfigInspectResult, ReferenceSnippet, SyncAuthProfile, SyncRemoteConfig } from '../../api/types'
@@ -656,9 +657,9 @@ async function submitAddFile() {
     emit('updated', response.task)
     showToast(response.added ? 'Repository file reference added' : 'Repository file reference already attached')
     addReferenceDialogOpen.value = false
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.warn('Failed to add repository file reference', error)
-    showToast(error?.message || 'Failed to add repository file reference')
+    showToast(errorMessage(error) || 'Failed to add repository file reference')
   } finally {
     addFileSubmitting.value = false
   }
@@ -704,9 +705,9 @@ async function submitAddCode() {
     emit('updated', response.task)
     showToast(response.added ? 'Code reference added' : 'Code reference already attached')
     addReferenceDialogOpen.value = false
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.warn('Failed to add code reference', error)
-    showToast(error?.message || 'Failed to add code reference')
+    showToast(errorMessage(error) || 'Failed to add code reference')
   } finally {
     addCodeSubmitting.value = false
   }
@@ -791,9 +792,9 @@ async function fetchAddCodePreview() {
       }
       scrollAddCodePreviewToFocusedLine(focus)
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     addCodePreviewSnippet.value = null
-    addCodePreviewError.value = error?.message || 'Failed to load preview'
+    addCodePreviewError.value = errorMessage(error) || 'Failed to load preview'
   } finally {
     addCodePreviewLoading.value = false
   }
@@ -816,9 +817,9 @@ async function submitAddLink() {
     emit('updated', response.task)
     showToast(response.added ? 'Link added' : 'Link already attached')
     addReferenceDialogOpen.value = false
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.warn('Failed to add link reference', error)
-    showToast(error?.message || 'Failed to add link')
+    showToast(errorMessage(error) || 'Failed to add link')
   } finally {
     addLinkSubmitting.value = false
   }
@@ -1076,9 +1077,9 @@ async function removeReference(reference: ReferenceEntry) {
       showToast(response.removed ? 'Jira reference removed' : 'Jira reference already removed')
       return
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.warn('Failed to remove reference', { reference, error })
-    showToast(error?.message || 'Failed to remove reference')
+    showToast(errorMessage(error) || 'Failed to remove reference')
   } finally {
     removingReferenceKey.value = null
   }

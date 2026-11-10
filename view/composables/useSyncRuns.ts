@@ -83,6 +83,21 @@ function actionLabel(action: SyncAction): string {
     return action === 'check' ? 'CHECK' : action.toUpperCase()
 }
 
+/** A sync SSE payload (sync_started, sync_progress, sync_completed, sync_failed); the fields depend on the kind. */
+interface SyncEventPayload {
+    run_id?: string
+    direction?: string
+    remote?: string
+    project?: string | null
+    dry_run?: boolean
+    started_at?: string
+    finished_at?: string
+    summary?: SyncResponse['summary']
+    entry?: SyncReportEntry
+    report?: SyncReportMeta
+    error?: string
+}
+
 function projectOrNull(value: unknown): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
@@ -175,7 +190,7 @@ export function useSyncRuns(
             info: result.info,
             report: result.report ?? run.report ?? null,
             reportEntries: result.report_entries,
-            dryRun: result.dry_run ?? run.dryRun,
+            dryRun: result.dry_run,
             transportError: false,
         })
         return { finalized: 'now' }
@@ -214,13 +229,13 @@ export function useSyncRuns(
         return externalRuns.value.filter((run) => scope === '' || run.execProject === scope)
     }
 
-    function handleStarted(payload: any) {
-        const runId = String(payload?.run_id ?? '').trim()
+    function handleStarted(payload: SyncEventPayload | null) {
+        const runId = payload?.run_id?.trim() ?? ''
         if (!runId) return
-        const remote = String(payload?.remote ?? 'unknown')
-        const action = String(payload?.direction ?? 'pull') as SyncAction
+        const remote = payload?.remote ?? 'unknown'
+        const action = (payload?.direction ?? 'pull') as SyncAction
         const execProject = projectOrNull(payload?.project)
-        const startedAt = String(payload?.started_at ?? new Date().toISOString())
+        const startedAt = payload?.started_at ?? new Date().toISOString()
         const dryRun = typeof payload?.dry_run === 'boolean' ? payload.dry_run : undefined
         const known = findKnown(runId)
         if (known) {
@@ -246,18 +261,18 @@ export function useSyncRuns(
         })
     }
 
-    function handleProgress(payload: any) {
-        const runId = String(payload?.run_id ?? '').trim()
-        const entry = payload?.entry as SyncReportEntry | undefined
+    function handleProgress(payload: SyncEventPayload | null) {
+        const runId = payload?.run_id?.trim() ?? ''
+        const entry = payload?.entry
         if (!runId || !entry) return
-        const action = String(payload?.direction ?? 'pull') as SyncAction
+        const action = (payload.direction ?? 'pull') as SyncAction
         const known = findKnown(runId)
         if (known) {
             const updated = patchKnown(runId, {
                 action,
                 actionLabel: actionLabel(action),
-                summary: payload?.summary || known.summary,
-                dryRun: typeof payload?.dry_run === 'boolean' ? payload.dry_run : known.dryRun,
+                summary: payload.summary || known.summary,
+                dryRun: typeof payload.dry_run === 'boolean' ? payload.dry_run : known.dryRun,
                 reportEntries: [entry, ...(known.reportEntries ?? [])].slice(0, KNOWN_ENTRIES_CAP),
             })
             if (updated) options.onRunProgress?.(updated)
@@ -266,30 +281,30 @@ export function useSyncRuns(
         const external = findExternal(runId)
         const base: ExternalSyncRun = external ?? {
             id: runId,
-            remote: String(payload?.remote ?? 'unknown'),
+            remote: payload.remote ?? 'unknown',
             action,
             actionLabel: actionLabel(action),
             status: 'running',
             startedAt: new Date().toISOString(),
-            execProject: projectOrNull(payload?.project),
+            execProject: projectOrNull(payload.project),
             reportEntries: [],
         }
         const updated: ExternalSyncRun = {
             ...base,
             action,
             actionLabel: actionLabel(action),
-            execProject: projectOrNull(payload?.project) ?? base.execProject,
+            execProject: projectOrNull(payload.project) ?? base.execProject,
             reportEntries: [entry, ...(base.reportEntries ?? [])].slice(0, EXTERNAL_ENTRIES_CAP),
         }
         upsertExternal(updated)
         options.onExternalProgress?.(updated)
     }
 
-    function handleCompleted(payload: any) {
-        const runId = String(payload?.run_id ?? '').trim()
+    function handleCompleted(payload: SyncEventPayload | null) {
+        const runId = payload?.run_id?.trim() ?? ''
         if (!runId) return
-        const report = payload?.report as SyncReportMeta | undefined
-        const finishedAt = String(payload?.finished_at ?? new Date().toISOString())
+        const report = payload?.report
+        const finishedAt = payload?.finished_at ?? new Date().toISOString()
         const known = findKnown(runId)
         if (known) {
             if (known.status !== 'success') {
@@ -308,15 +323,15 @@ export function useSyncRuns(
             }
             return
         }
-        const action = String(report?.direction ?? 'pull') as SyncAction
+        const action: SyncAction = report?.direction ?? 'pull'
         const external = findExternal(runId)
         const updated: ExternalSyncRun = {
             id: runId,
-            remote: String(report?.remote ?? external?.remote ?? 'unknown'),
+            remote: report?.remote ?? external?.remote ?? 'unknown',
             action,
             actionLabel: actionLabel(action),
             status: 'success',
-            startedAt: external?.startedAt ?? String(report?.created_at ?? new Date().toISOString()),
+            startedAt: external?.startedAt ?? report?.created_at ?? new Date().toISOString(),
             finishedAt,
             execProject: projectOrNull(report?.project) ?? external?.execProject ?? null,
             report: report ?? null,
@@ -328,11 +343,11 @@ export function useSyncRuns(
         options.onExternalFinalized?.(updated)
     }
 
-    function handleFailed(payload: any) {
-        const runId = String(payload?.run_id ?? '').trim()
+    function handleFailed(payload: SyncEventPayload | null) {
+        const runId = payload?.run_id?.trim() ?? ''
         if (!runId) return
-        const message = String(payload?.error ?? 'Sync failed')
-        const finishedAt = String(payload?.finished_at ?? new Date().toISOString())
+        const message = payload?.error ?? 'Sync failed'
+        const finishedAt = payload?.finished_at ?? new Date().toISOString()
         const known = findKnown(runId)
         if (known) {
             const outcome = failRun(runId, message)
@@ -374,7 +389,7 @@ export function useSyncRuns(
             const updated = patchKnown(run.id, {
                 status: 'success',
                 finishedAt: meta.created_at,
-                summary: meta.summary ?? run.summary,
+                summary: meta.summary,
                 warnings: meta.warnings,
                 info: meta.info,
                 report: meta,
@@ -413,7 +428,7 @@ export function useSyncRuns(
                 const updated = patchKnown(run.id, {
                     status: 'success',
                     finishedAt: meta.created_at,
-                    summary: meta.summary ?? fresh.summary,
+                    summary: meta.summary,
                     warnings: meta.warnings,
                     info: meta.info,
                     report: meta,
@@ -457,7 +472,7 @@ export function useSyncRuns(
                 },
             },
         )
-        const bindings: Array<[string, (payload: any) => void]> = [
+        const bindings: Array<[string, (payload: SyncEventPayload | null) => void]> = [
             ['sync_started', handleStarted],
             ['sync_progress', handleProgress],
             ['sync_completed', handleCompleted],
@@ -467,7 +482,7 @@ export function useSyncRuns(
             const wrapped = (ev: MessageEvent) => {
                 if (!ev.data) return
                 try {
-                    handler(JSON.parse(ev.data))
+                    handler(JSON.parse(String(ev.data)) as SyncEventPayload | null)
                 } catch (err) {
                     console.warn('Failed to parse sync SSE payload', err)
                 }

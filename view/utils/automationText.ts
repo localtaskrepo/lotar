@@ -1,5 +1,6 @@
 import type { TaskDTO } from '../api/types'
 import type { AutomationEventKey, AutomationRecord } from './automationRules'
+import { displayText } from './text'
 
 /**
  * Plain-language summaries of automation rules and help with `${{...}}`
@@ -71,7 +72,7 @@ export function triggerText(event: AutomationEventKey): string {
 function asList(value: unknown): string[] {
     if (Array.isArray(value)) return value.map(String)
     if (value == null) return []
-    return [String(value)]
+    return [displayText(value)]
 }
 
 function quote(text: string, max = 60): string {
@@ -90,30 +91,32 @@ export function describeCondition(field: string, condition: unknown): string {
     const map = condition as AutomationRecord
     const pastField = field === 'created' || field === 'modified' || field === 'status_changed'
     const parts: string[] = []
-    if (map.equals != null) parts.push(`${name} is ${String(map.equals)}`)
+    if (map.equals != null) parts.push(`${name} is ${displayText(map.equals)}`)
     if (map.in != null) parts.push(`${name} is ${asList(map.in).join(' or ')}`)
-    if (map.contains != null) parts.push(`${name} contains ${String(map.contains)}`)
+    if (map.contains != null) parts.push(`${name} contains ${displayText(map.contains)}`)
     if (map.any != null) parts.push(`${name} include any of ${asList(map.any).join(', ')}`)
     if (map.all != null) parts.push(`${name} include all of ${asList(map.all).join(', ')}`)
     if (map.none != null) parts.push(`${name} include none of ${asList(map.none).join(', ')}`)
-    if (map.starts_with != null) parts.push(`${name} starts with ${String(map.starts_with)}`)
-    if (map.matches != null) parts.push(`${name} matches /${String(map.matches)}/`)
-    if (map.exists != null) parts.push(map.exists ? `${name} is set` : `${name} is empty`)
-    if (map.before != null) parts.push(`${name} is before ${String(map.before)}`)
+    if (map.starts_with != null) parts.push(`${name} starts with ${displayText(map.starts_with)}`)
+    if (map.matches != null) parts.push(`${name} matches /${displayText(map.matches)}/`)
+    // Before the null check: narrowed to `{}`, the linter would take false for always truthy.
+    const isSet = !!map.exists
+    if (map.exists != null) parts.push(isSet ? `${name} is set` : `${name} is empty`)
+    if (map.before != null) parts.push(`${name} is before ${displayText(map.before)}`)
     if (map.older_than != null) {
         parts.push(
             field === 'status_changed'
-                ? `in its current status for more than ${String(map.older_than)}`
-                : `${name} more than ${String(map.older_than)} ago`,
+                ? `in its current status for more than ${displayText(map.older_than)}`
+                : `${name} more than ${displayText(map.older_than)} ago`,
         )
     }
     if (map.within != null) {
         parts.push(
             pastField
                 ? field === 'status_changed'
-                    ? `entered its current status in the last ${String(map.within)}`
-                    : `${name} in the last ${String(map.within)}`
-                : `${name} within the next ${String(map.within)}`,
+                    ? `entered its current status in the last ${displayText(map.within)}`
+                    : `${name} in the last ${displayText(map.within)}`
+                : `${name} within the next ${displayText(map.within)}`,
         )
     }
     return parts.join(' and ') || `${name} (condition)`
@@ -180,8 +183,8 @@ export function describeActionSteps(action: unknown): string[] {
             const name = FIELD_NAMES[key] ?? key
             steps.push(
                 key === 'description' || key === 'title'
-                    ? `set ${name} to ${quote(String(value))}`
-                    : `set ${name} to ${String(value)}`,
+                    ? `set ${name} to ${quote(displayText(value))}`
+                    : `set ${name} to ${displayText(value)}`,
             )
         }
     }
@@ -205,15 +208,16 @@ export function describeActionSteps(action: unknown): string[] {
         if (typeof record.run === 'string') steps.push(`run ${quote(record.run, 40)}`)
         else if (typeof record.run === 'object') {
             const run = record.run as AutomationRecord
-            const line = [run.command, ...(Array.isArray(run.args) ? run.args : [])].filter(Boolean).join(' ')
+            const args: unknown[] = Array.isArray(run.args) ? run.args : []
+            const line = [run.command, ...args].filter(Boolean).join(' ')
             steps.push(line ? `run ${quote(line, 40)}` : 'run a command')
         }
     }
     if (record.agent && typeof record.agent === 'object') {
         const agent = record.agent as AutomationRecord
         const settings = [
-            agent.model ? `model ${String(agent.model)}` : '',
-            agent.effort ? `effort ${String(agent.effort)}` : '',
+            agent.model ? `model ${displayText(agent.model)}` : '',
+            agent.effort ? `effort ${displayText(agent.effort)}` : '',
             agent.prompt ? 'a custom prompt' : '',
         ].filter(Boolean)
         if (settings.length) steps.push(`run the agent with ${settings.join(', ')}`)
@@ -315,22 +319,21 @@ export function templateVariables(events: AutomationEventKey[], customFields: st
 function readTaskValue(task: TaskDTO, path: string): string | null {
     const field = path.startsWith('field:') ? null : path
     if (path.startsWith('field:')) {
-        const value = task.custom_fields?.[path.slice('field:'.length)]
-        return value == null ? '' : String(value)
+        const value = task.custom_fields[path.slice('field:'.length)]
+        return value == null ? '' : displayText(value)
     }
     const listMatch = /^(tags|comments|references)\[(\*|-?\d+)\](?:\.(\w+))?$/.exec(path)
     if (listMatch) {
         const [, list, selector, prop] = listMatch
-        const items: unknown[] =
-            list === 'tags' ? (task.tags ?? []) : list === 'comments' ? (task.comments ?? []) : (task.references ?? [])
+        const items: unknown[] = list === 'tags' ? task.tags : list === 'comments' ? task.comments : task.references
         const pick = (item: unknown) => {
             if (item == null) return ''
-            if (typeof item !== 'object') return String(item)
+            if (typeof item !== 'object') return displayText(item)
             const record = item as Record<string, unknown>
-            if (prop) return record[prop] == null ? '' : String(record[prop])
-            if (list === 'comments') return String(record.text ?? '')
+            if (prop) return record[prop] == null ? '' : displayText(record[prop])
+            if (list === 'comments') return displayText(record.text ?? '')
             const first = Object.values(record).find((value) => typeof value === 'string' && value)
-            return first ? String(first) : ''
+            return first ? displayText(first) : ''
         }
         if (selector === '*') return items.map(pick).filter(Boolean).join(', ')
         const index = Number(selector)
@@ -348,12 +351,13 @@ function readTaskValue(task: TaskDTO, path: string): string | null {
         case 'due_date':
         case 'effort': {
             const value = (task as unknown as Record<string, unknown>)[field]
-            return value == null ? '' : String(value)
+            return value == null ? '' : displayText(value)
         }
         case 'type':
-            return String(task.task_type ?? '')
+            return task.task_type
         case 'tags':
-            return (task.tags ?? []).join(', ')
+            return task.tags.join(', ')
+        case null:
         default:
             return null
     }

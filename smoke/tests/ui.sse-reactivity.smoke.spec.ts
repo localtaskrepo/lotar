@@ -6,7 +6,7 @@ import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
-describe.concurrent.skipIf(!gitAvailable())('UI SSE reactivity', () => {
+describe.skipIf(!gitAvailable())('UI SSE reactivity', () => {
     it('board view moves a card when task status changes on disk', async () => {
         const workspace = await SmokeWorkspace.create();
         try {
@@ -27,9 +27,9 @@ describe.concurrent.skipIf(!gitAvailable())('UI SSE reactivity', () => {
                     // Change the task status on disk
                     const taskFiles = await workspace.listTaskFiles();
                     expect(taskFiles.length).toBe(1);
-                    const yaml = parse(await fs.readFile(taskFiles[0], 'utf8')) as Record<string, unknown>;
+                    const yaml = parse(await fs.readFile(taskFiles[0]!, 'utf8')) as Record<string, unknown>;
                     yaml.status = 'InProgress';
-                    await fs.writeFile(taskFiles[0], stringify(yaml));
+                    await fs.writeFile(taskFiles[0]!, stringify(yaml));
 
                     // Wait for the card to appear in the InProgress column
                     await page.waitForSelector('[data-status="InProgress"] article', { timeout: 15_000 });
@@ -65,9 +65,9 @@ describe.concurrent.skipIf(!gitAvailable())('UI SSE reactivity', () => {
 
                     // Change the status on disk
                     const taskFiles = await workspace.listTaskFiles();
-                    const yaml = parse(await fs.readFile(taskFiles[0], 'utf8')) as Record<string, unknown>;
+                    const yaml = parse(await fs.readFile(taskFiles[0]!, 'utf8')) as Record<string, unknown>;
                     yaml.status = 'Done';
-                    await fs.writeFile(taskFiles[0], stringify(yaml));
+                    await fs.writeFile(taskFiles[0]!, stringify(yaml));
 
                     // Wait for the status cell to change to "Done"
                     await page.waitForSelector('td:has-text("Done")', { timeout: 15_000 });
@@ -97,7 +97,7 @@ describe.concurrent.skipIf(!gitAvailable())('UI SSE reactivity', () => {
 
                     // Corrupt the YAML file
                     const taskFiles = await workspace.listTaskFiles();
-                    await fs.writeFile(taskFiles[0], 'title: broken\n  bad indent: here\n: orphan\n');
+                    await fs.writeFile(taskFiles[0]!, 'title: broken\n  bad indent: here\n: orphan\n');
 
                     // Wait for the error toast to appear
                     await page.waitForSelector('.toast-card', { timeout: 15_000 });
@@ -145,9 +145,9 @@ describe.concurrent.skipIf(!gitAvailable())('UI SSE reactivity', () => {
 
                     // Change status on disk
                     const taskFiles = await workspace.listTaskFiles();
-                    const yaml = parse(await fs.readFile(taskFiles[0], 'utf8')) as Record<string, unknown>;
+                    const yaml = parse(await fs.readFile(taskFiles[0]!, 'utf8')) as Record<string, unknown>;
                     yaml.status = 'Done';
-                    await fs.writeFile(taskFiles[0], stringify(yaml));
+                    await fs.writeFile(taskFiles[0]!, stringify(yaml));
 
                     // Wait for the card to move to Done
                     await page.waitForSelector('[data-status="Done"] article', { timeout: 15_000 });

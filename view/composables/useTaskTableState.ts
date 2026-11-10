@@ -226,7 +226,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         return sortTasks(base, serverSortBy, sort.value.dir)
     })
 
-    const touchesMap = computed(() => props.touches ?? ({} as Record<string, TaskTouch>))
+    const touchesMap = computed(() => props.touches ?? {})
 
     const selected = ref<string[]>(props.selectedIds ? [...props.selectedIds] : [])
 

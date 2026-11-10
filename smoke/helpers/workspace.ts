@@ -20,7 +20,6 @@ export interface WorkspaceOptions {
 export interface LotarCommandOptions {
     readonly env?: NodeJS.ProcessEnv;
     readonly timeout?: number;
-    readonly stdio?: 'pipe' | 'inherit';
     readonly acceptExitCodes?: readonly number[];
     readonly cwd?: string;
 }
@@ -46,7 +45,7 @@ export class SmokeWorkspace {
             await fs.ensureDir(options.parentDir);
             const root = await mkdtemp(path.join(options.parentDir, options.name ?? 'lotar-smoke-'));
             const workspace = new SmokeWorkspace(
-                { path: root, cleanup: async () => removeWorkspaceDir(root) } as DirectoryResult,
+                { path: root, cleanup: async () => removeWorkspaceDir(root) },
                 options,
             );
             await workspace.bootstrap(options.seedFiles ?? {});
@@ -124,7 +123,6 @@ export class SmokeWorkspace {
                 ...this.env,
                 ...options.env,
             },
-            stdio: options.stdio,
             timeout: options.timeout,
             acceptExitCodes: options.acceptExitCodes,
         });

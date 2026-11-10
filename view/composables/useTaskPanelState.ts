@@ -60,7 +60,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     const hasRouter = hasInjectionContext() && inject(routerKey, null) !== null
     /** Open a task from a toast: through the URL when there is a router. */
     async function openCreatedTask(id: string) {
-        if (panelController.navigateTask && hasRouter) await panelController.navigateTask(id)
+        if (hasRouter) await panelController.navigateTask(id)
         else panelController.openTaskPanel({ taskId: id })
     }
     // DEV-244: set by the panel to upload files staged while creating.
@@ -106,9 +106,9 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         if (request === configGeneration) loadedConfigScope.value = project
     }
 
-    const statusOptions = computed(() => statuses.value ?? [])
-    const priorityOptions = computed(() => priorities.value ?? [])
-    const typeOptions = computed(() => types.value ?? [])
+    const statusOptions = computed(() => statuses.value)
+    const priorityOptions = computed(() => priorities.value)
+    const typeOptions = computed(() => types.value)
 
     const allowNewCustomFields = computed(() =>
         Array.isArray(configCustomFields.value)
@@ -218,16 +218,12 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         await updateStatusImpl(status)
     }
 
-    let reloadTaskImpl: () => Promise<TaskDTO | undefined> = async () => {
-        // Placeholder replaced once persistence initializes
-        return undefined
-    }
+    // Placeholder replaced once persistence initializes
+    let reloadTaskImpl: () => Promise<TaskDTO | undefined> = () => Promise.resolve(undefined)
     const reloadTask = async () => reloadTaskImpl()
 
-    let loadTaskImpl: (id: string) => Promise<TaskDTO | undefined> = async () => {
-        // Placeholder replaced once persistence initializes
-        return undefined
-    }
+    // Placeholder replaced once persistence initializes
+    let loadTaskImpl: (id: string) => Promise<TaskDTO | undefined> = () => Promise.resolve(undefined)
     const loadTask = async (id: string) => loadTaskImpl(id)
 
     let handleSubmitImpl: () => Promise<void> = async () => {
@@ -513,7 +509,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
                 await refreshConfig(scopeProject)
                 if (!current() || form.project !== scopeProject || loadedConfigScope.value !== scopeProject) return
                 applyDefaults(scopeProject)
-                if (props.initialStatus && (statuses.value || []).includes(props.initialStatus)) {
+                if (props.initialStatus && statuses.value.includes(props.initialStatus)) {
                     form.status = props.initialStatus
                 }
                 if (props.initialDueDate) {
@@ -550,7 +546,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     }
 
     function handleFieldBlur(field: string) {
-        onFieldBlur(field)
+        void onFieldBlur(field)
     }
 
     function projectLabel(project: { prefix: string; name?: string | null }) {
@@ -564,7 +560,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
 
     /** A user close (Escape, close button, backdrop); the panel may intervene. */
     function requestClose(source: TaskPanelCloseSource = 'dismiss') {
-        if (beforeCloseHook && beforeCloseHook(source) === false) return
+        if (beforeCloseHook && !beforeCloseHook(source)) return
         closePanel()
     }
 
@@ -598,8 +594,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         submitting,
         loading,
         apiClient: {
-            addTask: api.addTask,
-            updateTask: api.updateTask,
+            addTask: (payload) => api.addTask(payload),
+            updateTask: (id, patch) => api.updateTask(id, patch),
             // DEV-92: the panel can open trash rows — always request the
             // deleted task too; `include_deleted` is a strict widening flag
             // for active tasks, so this is safe for every load.
@@ -664,7 +660,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         applyCustomFields: applyTaskCustomFields,
         applySprints: applyTaskSprints,
         afterApply: (source) => {
-            mergeKnownTags(source.tags || [])
+            mergeKnownTags(source.tags)
             syncOwnershipControls()
             syncFromTaskHistory(source)
         },

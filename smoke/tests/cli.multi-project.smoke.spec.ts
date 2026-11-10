@@ -11,7 +11,7 @@ function apiManifest(): string {
     return ['[package]', 'name = "api-service"', 'version = "0.1.0"'].join('\n');
 }
 
-describe.concurrent.skipIf(!gitAvailable())('CLI multi-project smoke scenarios', () => {
+describe.skipIf(!gitAvailable())('CLI multi-project smoke scenarios', () => {
     it('detects the first project and keeps it as the default across monorepo directories', async () => {
         const workspace = await SmokeWorkspace.create();
 

@@ -304,6 +304,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../utils/errors'
 import { formatProjectLabel } from '../utils/projectLabels'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, onMounted, reactive, ref, useId, watch } from 'vue'
@@ -520,8 +521,8 @@ async function runScan(dryRun: boolean, targets?: ScanTarget[]) {
     const response = await api.scanRun(payload)
     scanResponse.value = normalizeResponse(response)
     appliedKeys.clear()
-  } catch (err: any) {
-    error.value = err?.message || 'Failed to run scan'
+  } catch (err: unknown) {
+    error.value = errorMessage(err) || 'Failed to run scan'
   } finally {
     loading.value = false
   }
@@ -543,7 +544,7 @@ async function applyEntry(entry: ScanEntry) {
     const result =
       response.entries.find((candidate) => entryKey(candidate) === key) ??
       (response.entries.length === 1 ? response.entries[0] : undefined)
-    const merged = { ...entry, ...(result ?? {}), file: entry.file, line: entry.line }
+    const merged = { ...entry, ...result, file: entry.file, line: entry.line }
     scanResponse.value = {
       ...preview,
       entries: preview.entries.map((candidate) => (entryKey(candidate) === key ? merged : candidate)),
@@ -584,8 +585,8 @@ async function toggleSnippet(entry: ScanEntry) {
   state.error = null
   try {
     state.snippet = await api.referenceSnippet(entry.code_reference, { before: 4, after: 4 })
-  } catch (err: any) {
-    state.error = err?.message || 'Failed to load preview'
+  } catch (err: unknown) {
+    state.error = errorMessage(err) || 'Failed to load preview'
   } finally {
     state.loading = false
   }
@@ -611,8 +612,8 @@ async function loadConfig() {
   try {
     configState.value = await api.inspectConfig(project.value || undefined)
     syncEditableFields()
-  } catch (err: any) {
-    configError.value = err?.message || 'Failed to load scan config'
+  } catch (err: unknown) {
+    configError.value = errorMessage(err) || 'Failed to load scan config'
   } finally {
     configLoading.value = false
   }
@@ -633,8 +634,8 @@ async function saveAllSettings() {
     settingsWarnings.value = warnings
     showToast(warnings.length ? 'Scanner settings saved with warnings' : 'Scanner settings saved')
     await loadConfig()
-  } catch (err: any) {
-    settingsError.value = err?.message || 'Failed to save settings'
+  } catch (err: unknown) {
+    settingsError.value = errorMessage(err) || 'Failed to save settings'
   } finally {
     configLoading.value = false
   }

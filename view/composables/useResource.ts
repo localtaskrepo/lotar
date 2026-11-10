@@ -2,14 +2,14 @@ import { computed, ref, type ComputedRef, type Ref } from 'vue'
 
 export type ResourceStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-export interface ResourceOptions<T, Args extends any[]> {
+export interface ResourceOptions<T, Args extends unknown[]> {
     initialValue?: T
     throwOnError?: boolean
     onError?: (error: Error, args: Args) => void
     transform?: (value: T) => T
 }
 
-export interface ResourceState<T, Args extends any[]> {
+export interface ResourceState<T, Args extends unknown[]> {
     data: Ref<T | undefined>
     status: Ref<ResourceStatus>
     error: Ref<Error | null>
@@ -27,12 +27,12 @@ function normalizeError(err: unknown): Error {
     return new Error(typeof err === 'string' ? err : JSON.stringify(err))
 }
 
-export function createResource<T, Args extends any[]>(
+export function createResource<T, Args extends unknown[]>(
     loader: (...args: Args) => Promise<T>,
     options: ResourceOptions<T, Args> = {},
 ): ResourceState<T, Args> {
-    const data = ref<T | undefined>(options.initialValue as T | undefined) as Ref<T | undefined>
-    const status = ref<ResourceStatus>('idle') as Ref<ResourceStatus>
+    const data = ref<T | undefined>(options.initialValue) as Ref<T | undefined>
+    const status = ref<ResourceStatus>('idle')
     const error = ref<Error | null>(null)
     const lastArgs = ref<Args | null>(null as Args | null) as Ref<Args | null>
     const loading = computed(() => status.value === 'loading')
@@ -73,7 +73,7 @@ export function createResource<T, Args extends any[]>(
 
     function reset() {
         generation += 1
-        data.value = options.initialValue as T | undefined
+        data.value = options.initialValue
         status.value = 'idle'
         error.value = null
         lastArgs.value = null

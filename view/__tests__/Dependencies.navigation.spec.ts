@@ -52,7 +52,7 @@ vi.mock('../composables/useProjects', async () => {
 vi.mock('../composables/useSse', () => ({
     useSse: (_path: string, _params: unknown, options: { onReconnect: () => void }) => {
         mocks.reconnect = options.onReconnect
-        return { on: (event: string, fn: () => void) => mocks.handlers.set(event, fn), close: vi.fn() }
+        return { on: (event: string, fn: () => void) => mocks.handlers.set(event, fn), off: vi.fn(), close: vi.fn() }
     },
 }))
 

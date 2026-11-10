@@ -21,10 +21,9 @@ export const STUB_AGENT_SCRIPT = path.join(HERE, 'stub-agent.mjs');
 export const DEMO_PROJECT = 'ATLS';
 
 export function demoEnvironment(dir, inherited = process.env) {
-    const env = { ...inherited };
-    for (const key of Object.keys(env)) {
-        if (key.startsWith('GIT_') || key.startsWith('LOTAR_')) delete env[key];
-    }
+    const env = Object.fromEntries(
+        Object.entries(inherited).filter(([key]) => !key.startsWith('GIT_') && !key.startsWith('LOTAR_')),
+    );
     return {
         ...env,
         LOTAR_IGNORE_HOME_CONFIG: '1',

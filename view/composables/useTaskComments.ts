@@ -1,3 +1,4 @@
+import { errorMessage } from '../utils/errors'
 import type { Ref } from 'vue'
 import { nextTick, ref } from 'vue'
 import { api } from '../api/client'
@@ -50,7 +51,7 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
         editingCommentIndex.value = index
         editingCommentText.value = list[index].text || ''
         editingCommentSubmitting.value = false
-        nextTick(() => {
+        void nextTick(() => {
             const el = editingCommentTextarea.value
             if (el) {
                 el.focus()
@@ -79,8 +80,8 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
             Object.assign(options.task, updated)
             options.applyTask(updated)
             options.emitUpdated(updated)
-        } catch (error: any) {
-            showToast(error?.message || 'Failed to add comment')
+        } catch (error: unknown) {
+            showToast(errorMessage(error) || 'Failed to add comment')
         } finally {
             options.submitting.value = false
         }
@@ -111,8 +112,8 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
             options.applyTask(updated)
             options.emitUpdated(updated)
             cancelEditComment()
-        } catch (error: any) {
-            showToast(error?.message || 'Failed to update comment')
+        } catch (error: unknown) {
+            showToast(errorMessage(error) || 'Failed to update comment')
         } finally {
             editingCommentSubmitting.value = false
         }

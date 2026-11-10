@@ -11,7 +11,7 @@ async function copyRepositoryHooks(targetDir: string): Promise<void> {
     await fs.copy(source, targetDir, { overwrite: true });
 }
 
-describe.concurrent.skipIf(!gitAvailable())('Git hooks smoke scenarios', () => {
+describe.skipIf(!gitAvailable())('Git hooks smoke scenarios', () => {
     it('installs bundled git hooks once and reports idempotency on repeat invocations', async () => {
         const workspace = await SmokeWorkspace.create({ name: 'git-hooks-smoke-' });
 

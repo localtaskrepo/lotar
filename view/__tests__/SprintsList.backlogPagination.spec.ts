@@ -8,6 +8,7 @@ const orderEvents = vi.hoisted(() => ({ handlers: new Map<string, (event: Messag
 vi.mock('../composables/useSse', () => ({
     useSse: () => ({
         on: (kind: string, handler: (event: MessageEvent) => void) => orderEvents.handlers.set(kind, handler),
+        off: vi.fn(),
         close: orderEvents.close,
     }),
 }))

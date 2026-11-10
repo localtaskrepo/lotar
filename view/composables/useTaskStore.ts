@@ -77,7 +77,7 @@ import type {
     TaskListResponse,
     TaskUpdate,
 } from '../api/types'
-import { isDeletedTask, projectOf } from '../utils/text'
+import { displayText, isDeletedTask, projectOf } from '../utils/text'
 import { registerTaskQueryInvalidator } from './useCompletionPolicy'
 import { useSse } from './useSse'
 
@@ -294,12 +294,12 @@ function canonicalQueryKey(filter: TaskListFilter = {}): string {
         const value = source[key]
         if (value === undefined || value === null || value === '') continue
         if (Array.isArray(value)) {
-            const items = [...value].map((item) => String(item)).sort()
+            const items = (value as unknown[]).map((item) => displayText(item)).sort()
             parts.push(`${key}=[${items.join(',')}]`)
         } else if (typeof value === 'object') {
             parts.push(`${key}=${JSON.stringify(value)}`)
         } else {
-            parts.push(`${key}=${String(value)}`)
+            parts.push(`${key}=${displayText(value)}`)
         }
     }
     return parts.length ? parts.join('&') : '*'
@@ -309,7 +309,7 @@ function canonicalQueryKey(filter: TaskListFilter = {}): string {
 export type DeletionMode = 'active' | 'deleted' | 'all'
 
 export function deletionModeOfFilter(filter?: TaskListFilter): DeletionMode {
-    const value = (filter as Record<string, unknown> | undefined)?.deletion
+    const value = filter?.deletion
     return value === 'deleted' || value === 'all' ? value : 'active'
 }
 
@@ -323,7 +323,7 @@ export function matchesDeletionMode(task: TaskDTO, mode: DeletionMode): boolean 
 export type ArchivedMode = 'no' | 'yes' | 'all'
 
 export function archivedModeOfFilter(filter?: TaskListFilter): ArchivedMode {
-    const value = (filter as Record<string, unknown> | undefined)?.archived
+    const value = filter?.archived
     return value === 'yes' || value === 'all' ? value : 'no'
 }
 
@@ -417,7 +417,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
     /** Live entity write (SSE DTO, panel upsert, API mutation response). */
     function writeEntity(task: TaskDTO): void {
-        if (!task?.id) return
+        if (!task.id) return
         const previous = _map.value.get(task.id)
         const deletionTransitioned = !!previous && previous.deleted_at !== task.deleted_at
         _map.value.set(task.id, task)
@@ -483,7 +483,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
      * - an older response snapshot than what we already hold is dropped.
      */
     function applyResponseEntity(task: TaskDTO, requestClock: number): boolean {
-        const id = task?.id
+        const id = task.id
         if (!id) return false
         // A tombstone stamped STRICTLY AFTER the request started makes the
         // response pre-delete evidence; an equal/older stamp means the request
@@ -535,7 +535,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
      * Content-only agreement still applies through the ordinary live write.
      */
     function applyMutationOutcome(task: TaskDTO, requestClock: number): boolean {
-        const id = task?.id
+        const id = task.id
         if (!id) return false
         const tomb = tombstones.get(id)
         if (tomb !== undefined && tomb > requestClock) return false
@@ -614,6 +614,11 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         }
     }
 
+    /** Read through a call: invalidations during a refresh's awaits set `dirty` again, which narrowing cannot see. */
+    function isDirty(entry: QueryEntry): boolean {
+        return entry.dirty
+    }
+
     /** True while the entry's current-generation refresh is still running. */
     function isRefreshRunning(entry: QueryEntry): boolean {
         return entry.runningGeneration !== null && entry.runningGeneration === entry.generation
@@ -681,12 +686,11 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         const ranks = new Map<string, number>()
 
         try {
-            const fetchPage = (offset: number) =>
-                client.listTasks({ ...entry.filter, limit: pageSize, offset } as TaskListFilter)
-            const applyBatch = (response: TaskListResponse | undefined) => {
-                const batch = Array.isArray(response?.tasks) ? response.tasks : []
+            const fetchPage = (offset: number) => client.listTasks({ ...entry.filter, limit: pageSize, offset })
+            const applyBatch = (response: TaskListResponse) => {
+                const batch = Array.isArray(response.tasks) ? response.tasks : []
                 for (const task of batch) {
-                    if (!task?.id) continue
+                    if (!task.id) continue
                     applyResponseEntity(task, requestClock)
                     ranks.set(task.id, ranks.size)
                     ids.add(task.id)
@@ -696,7 +700,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
             const first = await fetchPage(0)
             if (generation !== entry.generation) return
-            let expectedTotal = first?.total ?? 0
+            let expectedTotal = first.total
             let currentOffset = applyBatch(first)
             if (currentOffset > 0 && expectedTotal > currentOffset) {
                 // Remaining pages in parallel, applied in offset order so ranks
@@ -713,7 +717,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                     const responses = await Promise.all(offsets.slice(index, index + PAGE_CONCURRENCY).map(fetchPage))
                     if (generation !== entry.generation) return
                     for (const response of responses) {
-                        expectedTotal = response?.total ?? expectedTotal
+                        expectedTotal = response.total
                         currentOffset += applyBatch(response)
                     }
                 }
@@ -738,7 +742,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
             if (entry.runningGeneration === generation) entry.runningGeneration = null
             // Invalidations that arrived while this refresh ran get one
             // trailing refresh (debounced, so a burst still costs one run).
-            if (entry.dirty && !isRefreshRunning(entry)) {
+            if (isDirty(entry) && !isRefreshRunning(entry)) {
                 entry.dirty = false
                 if (entry.liveHandles > 0) scheduleEntryRefresh(entry)
             }
@@ -848,16 +852,16 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         try {
             const response = await client.listTasks(filter)
             if (generation !== entry.generation) return { total: entry.total.value }
-            const batch = Array.isArray(response?.tasks) ? response.tasks : []
+            const batch = Array.isArray(response.tasks) ? response.tasks : []
             const ids = new Set<string>(seed)
             for (const task of batch) {
-                if (!task?.id) continue
+                if (!task.id) continue
                 applyResponseEntity(task, requestClock)
                 ids.add(task.id)
             }
             entry.runs += 1
             entry.ids.value = Array.from(ids)
-            if (typeof response?.total === 'number') entry.total.value = response.total
+            if (typeof response.total === 'number') entry.total.value = response.total
             entry.lastSyncAt.value = Date.now()
             entry.status.value = 'ready'
             bump()
@@ -885,7 +889,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         const isNotFound = (status: unknown) => status === 404 || status === 410
         try {
             const task = await client.getTask(id, undefined, { includeDeleted: opts?.includeDeleted })
-            if (task && task.id) {
+            if (task.id) {
                 applyResponseEntity(task, requestClock)
                 forgetMovedId(id, task.id, requestClock)
                 return task
@@ -899,7 +903,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 // surfaces here as an id-only task_updated whose strict fetch 404s.
                 try {
                     const task = await client.getTask(id, undefined, { includeDeleted: true })
-                    if (task && task.id) {
+                    if (task.id) {
                         applyResponseEntity(task, requestClock)
                         forgetMovedId(id, task.id, requestClock)
                         return task
@@ -961,7 +965,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     async function remove(id: string, opts?: { project?: string; hard?: boolean }): Promise<TaskDeleteResponse> {
         const requestClock = writeClock
         const response = await client.deleteTask(id, opts)
-        if (opts?.hard || response?.hard) {
+        if (opts?.hard || response.hard) {
             applyHardDeleteOutcome(id, requestClock)
         } else {
             applySoftDeleteOutcome(id, requestClock)
@@ -989,7 +993,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     }
 
     function upsert(task: TaskDTO, opts?: { restore?: boolean }) {
-        if (!task?.id) return
+        if (!task.id) return
         const current = _map.value.get(task.id)
         // DEV-92 lifecycle guards for the mutation-response channel: an ordinary
         // late snapshot must never resurrect a hard-deleted ID or clear a live
@@ -1010,9 +1014,10 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
     // ---- SSE ----------------------------------------------------------------
 
-    function handleSseEvent(kind: string, payload: any) {
+    /** task_* SSE payload: a full TaskDTO (API writes) or just `{ id }` (file watcher, deletes). */
+    function handleSseEvent(kind: string, payload: Partial<TaskDTO> | null) {
         if (!payload) return
-        const id: string | undefined = payload.id
+        const id = payload.id
 
         switch (kind) {
             case 'task_created': {
@@ -1084,8 +1089,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
             const handler = (ev: MessageEvent) => {
                 if (!ev.data) return
                 try {
-                    const data = JSON.parse(ev.data)
-                    handleSseEvent(kind, data)
+                    handleSseEvent(kind, JSON.parse(String(ev.data)) as Partial<TaskDTO> | null)
                 } catch {
                     /* ignore malformed */
                 }
@@ -1098,9 +1102,10 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         const errorHandler = (ev: MessageEvent) => {
             if (!ev.data) return
             try {
-                const data = JSON.parse(ev.data)
-                if (data?.id && data?.message) {
-                    for (const cb of errorListeners) cb(data)
+                const data = JSON.parse(String(ev.data)) as { id?: string; message?: string } | null
+                if (data?.id && data.message) {
+                    const event = { ...data, id: data.id, message: data.message }
+                    for (const cb of errorListeners) cb(event)
                 }
             } catch {
                 /* ignore malformed */

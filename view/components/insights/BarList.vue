@@ -34,21 +34,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import IconGlyph from '../IconGlyph.vue'
-
-export interface BarRow {
-  key: string
-  label: string
-  value: number
-  /** Text shown instead of the raw value (e.g. "3.5d"). */
-  display?: string
-  hint?: string
-  /** Needs attention: shows a flag icon next to the label. */
-  alert?: boolean
-  /** De-emphasised (e.g. "unassigned", "none"). */
-  muted?: boolean
-  /** Set false for rows with no matching drill-down. */
-  clickable?: boolean
-}
+import type { BarRow } from './insightsTypes'
 
 const props = withDefaults(
   defineProps<{

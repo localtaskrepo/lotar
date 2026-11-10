@@ -100,7 +100,8 @@ import {
   timeInStatus,
   unitsIn,
 } from '../../../utils/insightsMetrics'
-import BarList, { type BarRow } from '../BarList.vue'
+import BarList from '../BarList.vue'
+import type { BarRow } from '../insightsTypes'
 import ChartCard from '../ChartCard.vue'
 import ColumnChart, { type ColumnSeries } from '../ColumnChart.vue'
 import { fmt, pct, useInsights, valuesOf } from '../insightsContext'

@@ -662,7 +662,7 @@ describe('FilterBar unified search and panel cleanup (DEV-98)', () => {
         )
         await flushPromises()
         const count = (wrapper.emitted('update:value') || []).length
-        ;(wrapper.vm as any).appendCustomFilter('field:Release Stage=')
+        wrapper.vm.appendCustomFilter('field:Release Stage=')
         await nextTick()
         const search = wrapper.find('[data-testid="filter-search"]')
         expect((search.element as HTMLInputElement).value).toBe('roadmap field:"Release Stage"=')
@@ -883,7 +883,7 @@ describe('FilterBar unified search and panel cleanup (DEV-98)', () => {
 
     it('queues a literal custom-field preset even when its name is a builtin alias', async () => {
         const wrapper = render({ customFieldOptions: ['sprint'] })
-        ;(wrapper.vm as any).appendCustomFilter('field:sprint=')
+        wrapper.vm.appendCustomFilter('field:sprint=')
         await nextTick()
         expect((wrapper.find('[data-testid="filter-search"]').element as HTMLInputElement).value).toBe(
             'field:"sprint"=',

@@ -27,9 +27,9 @@ function normalizeVelocityPayload(value: unknown): VelocityEntriesPayload {
     if (value && typeof value === 'object') {
         const envelope = value as { data?: unknown };
         if (envelope.data && typeof envelope.data === 'object') {
-            return envelope.data as VelocityEntriesPayload;
+            return envelope.data;
         }
-        return value as VelocityEntriesPayload;
+        return value;
     }
     return { entries: [] };
 }
@@ -138,7 +138,7 @@ describe.concurrent('UI sprint analytics smoke scenarios', () => {
                         if (payload && typeof payload === 'object' && 'data' in payload) {
                             const data = (payload as { data?: VelocityEntriesPayload }).data;
                             if (data && typeof data === 'object') {
-                                return data as VelocityEntriesPayload;
+                                return data;
                             }
                         }
                         return payload as VelocityEntriesPayload;

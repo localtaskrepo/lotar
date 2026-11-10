@@ -8,7 +8,6 @@ describe('DEV-6 task references in markdown (actual backend/browser)', () => {
     it('links a task ID in a description, shows its hover card, and opens it on click', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'task-refs-ui-',
-            env: { LOTAR_DEFAULT_REPORTER: 'Smoke' },
         });
         try {
             const target = await workspace.addTask('Paginate the notes API', {
