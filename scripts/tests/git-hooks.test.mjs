@@ -51,6 +51,10 @@ function fixtureRepo() {
     return dir;
 }
 
+function scanner() {
+    return spawnSync('betterleaks', ['version']).status === 0 ? 'betterleaks' : 'gitleaks';
+}
+
 function runHook(dir, hook, input = '') {
     return spawnSync('bash', [path.join(ROOT, '.githooks', hook)], {
         cwd: dir,
@@ -80,7 +84,7 @@ test('pre-commit passes clean staged files without touching the repository', (t)
 });
 
 test('pre-commit blocks a staged secret when gitleaks is installed', (t) => {
-    if (spawnSync('gitleaks', ['version']).status !== 0) return t.skip('gitleaks not installed');
+    if (spawnSync(scanner(), ['version']).status !== 0) return t.skip('betterleaks or gitleaks not installed');
     const dir = fixtureRepo();
     t.after(() => rmSync(dir, { recursive: true, force: true }));
     writeFileSync(path.join(dir, 'view/config.ts'), `export const secret = 'GOCSPX-${'a1B2c3D4e5'.repeat(3)}'\n`);

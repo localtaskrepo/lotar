@@ -14,10 +14,11 @@ export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-# Secret scan of the staged changes (.gitleaks.toml). Optional for contributors
-# without gitleaks; CI and GitHub push protection still apply.
-if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks git --pre-commit --staged --redact --no-banner --no-color -v --log-level warn . || exit 1
+# Secret scan of the staged changes (.gitleaks.toml): betterleaks, or gitleaks (its frozen predecessor). Optional
+# for contributors without either; CI and GitHub push protection still apply.
+scanner="$(command -v betterleaks || command -v gitleaks || true)"
+if [ -n "$scanner" ]; then
+  "$scanner" git --pre-commit --staged --config .gitleaks.toml --redact --no-banner --no-color -v --log-level warn . || exit 1
 fi
 
 # Same scopes as `cargo fmt`, `npm run fmt:js` (Prettier) and `eslint .`.
