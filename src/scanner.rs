@@ -96,6 +96,14 @@ use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Byte length of the first character; callers only pass the non-empty rest of a line.
+fn first_char_len(rest: &str) -> usize {
+    rest.chars()
+        .next()
+        .expect("the rest of the line is not empty")
+        .len_utf8()
+}
+
 #[derive(Default)]
 struct CommentLexer {
     block: Option<(&'static str, &'static str, usize)>,
@@ -129,7 +137,7 @@ impl CommentLexer {
                         depth += 1;
                         index += open.len();
                     } else {
-                        index += line[index..].chars().next().unwrap().len_utf8();
+                        index += first_char_len(&line[index..]);
                     }
                 }
                 ranges.push(start..index);
@@ -161,13 +169,13 @@ impl CommentLexer {
                 {
                     index += 1;
                     if index < line.len() {
-                        index += line[index..].chars().next().unwrap().len_utf8();
+                        index += first_char_len(&line[index..]);
                     }
                 } else if tail.starts_with(terminator) {
                     index += terminator.len();
                     self.quote = None;
                 } else {
-                    index += tail.chars().next().unwrap().len_utf8();
+                    index += first_char_len(tail);
                 }
                 continue;
             }
@@ -219,7 +227,9 @@ impl CommentLexer {
                 self.ambiguous = true;
                 break;
             }
-            let ch = tail.chars().next().unwrap();
+            let Some(ch) = tail.chars().next() else {
+                break;
+            };
             // Rust: `'` opens a char literal only when one closes right
             // after it ('x', '\n', '\u{1F600}'); otherwise it is a lifetime
             // (`<'a>`, `&'static`) and must not open a quote (DEV-261).
@@ -357,7 +367,7 @@ impl Scanner {
             Ok(r) => r,
             Err(_) => match Regex::new(r"(?i)\b(?:todo|fixme|hack|bug|note)\b") {
                 Ok(r) => r,
-                Err(_) => Regex::new(r"todo").unwrap(), // extremely unlikely; minimal fallback
+                Err(_) => Regex::new(r"todo").expect("regex compile fallback"),
             },
         };
         // With id in parens: WORD (<id>): <text>
@@ -451,11 +461,13 @@ impl Scanner {
         // prefixes (ABC-OPS-12) consistent with the canonical ID grammar.
         let ticket_attr_regex =
             Regex::new(r"(?i)\[\s*ticket\s*=\s*([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\s*\]")
-                .unwrap_or_else(|_| Regex::new(r"\[ticket=([A-Z]+-\d+)\]").unwrap());
+                .unwrap_or_else(|_| {
+                    Regex::new(r"\[ticket=([A-Z]+-\d+)\]").expect("regex compile fallback")
+                });
         // Generic key like DEMO-123; capture the FULL hyphenated key
         // (ABC-OPS-12, ABC-OPS-12-3) instead of the trailing slice (OPS-12).
         let ticket_key_regex = Regex::new(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\b")
-            .unwrap_or_else(|_| Regex::new(r"([A-Z]+-\d+)").unwrap());
+            .unwrap_or_else(|_| Regex::new(r"([A-Z]+-\d+)").expect("regex compile fallback"));
         (ticket_attr_regex, ticket_key_regex)
     }
 

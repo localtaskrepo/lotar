@@ -54,7 +54,7 @@ log_dir="$(mktemp -d)"
 trap 'rm -rf "$log_dir"' EXIT
 
 run_rust() {
-  cargo fmt --all --check && cargo clippy --lib --bins --all-features --quiet -- -D warnings
+  cargo fmt --all --check && cargo clippy --lib --bins --all-features --quiet --message-format=short -- -D warnings
 }
 
 run_web() {

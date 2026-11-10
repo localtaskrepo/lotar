@@ -31,6 +31,7 @@ path = "src/bin/lotar_agent_wrapper.rs"
 allow_attributes_without_reason = "warn"
 dbg_macro = "warn"
 todo = "warn"
+unwrap_used = "warn" # no unwrap outside tests (clippy.toml allows it there); use ? or expect("why it cannot fail")
 
 [build-dependencies]
 # build.rs compresses the embedded help docs and OpenAPI spec (DEV-221).

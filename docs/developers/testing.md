@@ -18,7 +18,7 @@ These commands keep CI and local development aligned. Treat them as the required
 
 | Area | Tooling | Where it runs |
 | --- | --- | --- |
-| Rust style and lints | `rustfmt` (edition 2024), Clippy with `-D warnings`; lint levels in `Cargo.toml` `[lints]`; suppress with `#[expect(lint, reason = "...")]` so stale suppressions are reported | `npm run lint`, pre-push hook, CI |
+| Rust style and lints | `rustfmt` (edition 2024), Clippy with `-D warnings`; lint levels in `Cargo.toml` `[lints]` (the owner's standard, including `unwrap_used`: outside tests use `?` with context or `expect("why it cannot fail")`; `clippy.toml` allows unwrap in tests and sets lotar's `large-error-threshold`); suppress with `#[expect(lint, reason = "...")]` so stale suppressions are reported | `npm run lint`, pre-push hook (short output), CI |
 | Frontend types, lints and style | `vue-tsc`, ESLint (`eslint.config.mjs`; existing app `any`s in `eslint-suppressions.json`), Prettier (`.prettierrc.json`) | `npm run lint`, pre-commit (staged files) and pre-push hooks, CI |
 | Tests | nextest (manifest vs JUnit check in CI), Vitest, Playwright smoke, hook and release-page Node tests | `npm test`, `npm run smoke`, CI |
 | Dependencies | `cargo deny check` (`deny.toml`), Dependabot alerts, a monthly dependency pass (cargo, npm, GitHub Actions), SHA-pinned workflow actions | `npm run check:deps`, CI Security Audit job |

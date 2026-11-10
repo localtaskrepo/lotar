@@ -369,7 +369,7 @@ fn push_text(nodes: &mut Vec<JsonValue>, text: &str, href: Option<&str>) {
 fn parse_links(line: &str, nodes: &mut Vec<JsonValue>) {
     let mut rest = line;
     let mut plain = String::new();
-    while !rest.is_empty() {
+    while let Some(ch) = rest.chars().next() {
         // [text](url)
         if rest.starts_with('[')
             && let Some(close) = rest.find("](")
@@ -396,7 +396,6 @@ fn parse_links(line: &str, nodes: &mut Vec<JsonValue>) {
                 continue;
             }
         }
-        let ch = rest.chars().next().unwrap();
         plain.push(ch);
         rest = &rest[ch.len_utf8()..];
     }

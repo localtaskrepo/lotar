@@ -413,10 +413,9 @@ impl Inventory {
     }
 
     fn key(&self, raw: &str) -> String {
-        if self.unique(raw).is_some() {
-            self.current(TaskId::parse(raw).unwrap().canonical())
-        } else {
-            raw.to_string()
+        match TaskId::parse(raw) {
+            Ok(parsed) if self.unique(raw).is_some() => self.current(parsed.canonical()),
+            _ => raw.to_string(),
         }
     }
 
@@ -441,18 +440,26 @@ impl Inventory {
                 .map_err(|e| invalid(format!("Invalid relationship task '{raw}': {e}")))?
                 .canonical(),
         );
-        if self.state(&id) != "active" {
-            return Err(invalid(format!(
-                "Relationship task '{raw}' is {}",
-                self.state(&id)
-            )));
-        }
-        if self.unique(&id).unwrap().root != canonical_root(root) {
+        let state = self.state(&id);
+        let record = match self.unique(&id) {
+            Some(record) if state == "active" => record,
+            _ => {
+                return Err(invalid(format!("Relationship task '{raw}' is {state}")));
+            }
+        };
+        if record.root != canonical_root(root) {
             return Err(invalid(format!(
                 "Cross-root relationship writes are not supported for '{raw}'; external context is read-only"
             )));
         }
         Ok(id)
+    }
+
+    /// A copy of an active task to edit; callers check it with `active_local` first.
+    fn active_task(&self, id: &str) -> LoTaRResult<Task> {
+        self.unique(id)
+            .and_then(|record| record.task.clone())
+            .ok_or_else(|| invalid(format!("Relationship task '{id}' is {}", self.state(id))))
     }
 
     fn assertions(&self) -> BTreeMap<Edge, Vec<RelationshipProvenance>> {
@@ -573,7 +580,8 @@ fn issue(code: &str, tasks: Vec<String>, repairable: bool, message: String) -> R
     let mut identity_tasks = tasks.clone();
     identity_tasks.sort();
     identity_tasks.dedup();
-    let identity = serde_json::to_vec(&(code, identity_tasks, &message)).unwrap();
+    let identity = serde_json::to_vec(&(code, identity_tasks, &message))
+        .expect("strings always serialize to JSON");
     RelationshipIssue {
         id: blake3::hash(&identity).to_hex().to_string(),
         code: code.into(),
@@ -1191,7 +1199,9 @@ pub fn graph(
             let Some(task) = &records[0].task else {
                 continue;
             };
-            let project = TaskId::parse(id).unwrap().project;
+            let project = TaskId::parse(id)
+                .map_err(|e| invalid(format!("Invalid relationship task '{id}': {e}")))?
+                .project;
             let cfg = &configs[&(root.clone(), project.clone())];
             let mut normalized = task.clone();
             crate::services::task_service::TaskService::ensure_task_defaults(
@@ -1618,9 +1628,7 @@ fn apply_edge(
             }
         }
         inventory.active_local(root, &owner)?;
-        let task = tasks
-            .entry(owner.clone())
-            .or_insert_with(|| inventory.unique(&owner).unwrap().task.clone().unwrap());
+        let task = edited_task(tasks, inventory, &owner)?;
         change_assertion(&mut task.relationships, field, &target, add, inventory);
     }
     Ok(())
@@ -1739,11 +1747,15 @@ fn stage_tasks(
         let record = inventory
             .unique(&id)
             .ok_or_else(|| invalid(format!("Ambiguous task '{id}'")))?;
-        let previous = record.task.as_ref().unwrap();
+        let previous = record
+            .task
+            .as_ref()
+            .ok_or_else(|| invalid(format!("Relationship task '{id}' is unreadable")))?;
         if previous.relationships == task.relationships {
             continue;
         }
-        let parsed = TaskId::parse(&id).unwrap();
+        let parsed = TaskId::parse(&id)
+            .map_err(|e| invalid(format!("Invalid relationship task '{id}': {e}")))?;
         txn.ensure_covers(std::slice::from_ref(&parsed.project))?;
         // Reciprocal links write both tasks; an archived one stays read-only.
         crate::storage::operations::ensure_writable(
@@ -1792,8 +1804,8 @@ pub(crate) fn emit_counterparts(storage: &Storage, ids: &[String]) {
     for id in ids {
         if let Some(record) = inventory.unique(id)
             && let Some(mut task) = record.task.clone()
+            && let Ok(TaskId { project, .. }) = TaskId::parse(id)
         {
-            let project = TaskId::parse(id).unwrap().project;
             let config = crate::services::task_service::TaskService::resolve_config_for_project(
                 &record.root,
                 &project,
@@ -1990,22 +2002,11 @@ fn repair_plan(
             {
                 continue;
             }
-            let task = tasks
-                .entry(owner.clone())
-                .or_insert_with(|| inventory.unique(&owner).unwrap().task.clone().unwrap());
+            let task = edited_task(&mut tasks, inventory, &owner)?;
             repair_assertion(&mut task.relationships, field, &target, inventory);
         }
     }
-    tasks.retain(|id, task| {
-        inventory
-            .unique(id)
-            .unwrap()
-            .task
-            .as_ref()
-            .unwrap()
-            .relationships
-            != task.relationships
-    });
+    retain_changed(&mut tasks, inventory);
     Ok(tasks)
 }
 
@@ -2040,22 +2041,36 @@ fn selected_repair_plan(
     for action in selected {
         let (owner, _, _) = action.assertion();
         inventory.active_local(&storage.root_path, owner)?;
-        let task = tasks
-            .entry(owner.to_string())
-            .or_insert_with(|| inventory.unique(owner).unwrap().task.clone().unwrap());
+        let task = edited_task(&mut tasks, inventory, owner)?;
         action.apply(&mut task.relationships, inventory);
     }
+    retain_changed(&mut tasks, inventory);
+    Ok(tasks)
+}
+
+/// The edited copy of `id` in `tasks`, taken from the inventory on first use.
+fn edited_task<'a>(
+    tasks: &'a mut BTreeMap<String, Task>,
+    inventory: &Inventory,
+    id: &str,
+) -> LoTaRResult<&'a mut Task> {
+    Ok(match tasks.entry(id.to_string()) {
+        std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+        std::collections::btree_map::Entry::Vacant(entry) => {
+            entry.insert(inventory.active_task(id)?)
+        }
+    })
+}
+
+/// Keeps only tasks whose relationships differ from the stored copy; a task the
+/// inventory no longer resolves stays, so staging reports it.
+fn retain_changed(tasks: &mut BTreeMap<String, Task>, inventory: &Inventory) {
     tasks.retain(|id, task| {
         inventory
             .unique(id)
-            .unwrap()
-            .task
-            .as_ref()
-            .unwrap()
-            .relationships
-            != task.relationships
+            .and_then(|record| record.task.as_ref())
+            .is_none_or(|previous| previous.relationships != task.relationships)
     });
-    Ok(tasks)
 }
 
 fn repair_issues(
@@ -2115,7 +2130,8 @@ pub fn repair(
 
 fn repair_revision(inventory: &Inventory, request: &RelationshipRepairRequest) -> String {
     let ids: BTreeSet<_> = request.issue_ids.iter().collect();
-    let scope = serde_json::to_string(&(&request.project, ids)).unwrap();
+    let scope =
+        serde_json::to_string(&(&request.project, ids)).expect("strings always serialize to JSON");
     blake3::hash(format!("{}:{scope}", inventory.revision).as_bytes())
         .to_hex()
         .to_string()
@@ -2146,11 +2162,9 @@ pub fn blocked_dependencies(
     }
     let mut blocked = Vec::new();
     for dep in dependencies {
-        let done = if inventory.state(&dep) == "active" {
-            let record = inventory.unique(&dep).unwrap();
-            task_is_done(record, &dep)?
-        } else {
-            false
+        let done = match inventory.unique(&dep) {
+            Some(record) if inventory.state(&dep) == "active" => task_is_done(record, &dep)?,
+            _ => false,
         };
         if !done {
             blocked.push(dep);
@@ -2169,7 +2183,10 @@ fn task_is_done(record: &Record, id: &str) -> LoTaRResult<bool> {
                 "Relationship completion policy unavailable for '{id}': {e}"
             ))
         })?;
-    let task = record.task.as_ref().unwrap();
+    let task = record
+        .task
+        .as_ref()
+        .ok_or_else(|| invalid(format!("Relationship task '{id}' is unreadable")))?;
     let status = if task.status.is_empty() {
         config.effective_default_status().unwrap_or_default()
     } else {

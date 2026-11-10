@@ -18,6 +18,8 @@
 //! carried over unchanged as the baseline; they must not be raised just to
 //! make a run pass.
 
+#![allow(clippy::unwrap_used, reason = "test helpers outside #[test] fns")]
+
 use predicates::prelude::*;
 use std::fs;
 use std::time::{Duration, Instant};

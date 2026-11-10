@@ -1738,7 +1738,6 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
         WorktreeSubfield::CleanupDeleteBranches => worktree.cleanup_delete_branches = None,
         WorktreeSubfield::CleanupIgnoredFiles => worktree.cleanup_ignored_files = None,
     }
-    let worktree = config.agent_worktree.as_ref().unwrap();
     let empty = worktree.enabled.is_none()
         && worktree.dir.is_none()
         && worktree.branch_prefix.is_none()

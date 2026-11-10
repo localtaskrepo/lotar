@@ -275,19 +275,19 @@ fn parse_task_update_patch(
             Some(Value::Array(items)) => {
                 let mut ids = Vec::new();
                 for item in items {
-                    let valid = item
+                    let Some(id) = item
                         .as_u64()
                         .and_then(|v| u32::try_from(v).ok())
-                        .is_some_and(|v| v > 0);
-                    if !valid {
+                        .filter(|v| *v > 0)
+                    else {
                         return Err(err(
                             req_id,
                             -32602,
                             "sprints must be an array of positive integers or null",
                             None,
                         ));
-                    }
-                    ids.push(item.as_u64().unwrap() as u32);
+                    };
+                    ids.push(id);
                 }
                 patch.sprints = Some(ids);
             }

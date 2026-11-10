@@ -1,0 +1,42 @@
+title: 'Adopt the shared lint standard: oxlint for TypeScript, clippy unwrap_used'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-10T21:58:17.873069+00:00
+modified: 2026-11-10T22:04:01.675768+00:00
+relationships:
+  related:
+  - DEV-123
+  - DEV-302
+comments:
+- date: 2026-11-10T22:04:01.503541+00:00
+  text: 'Step 1 (Rust): unwrap_used in [lints.clippy]; clippy.toml = standard (allow unwrap/expect/dbg in tests) + large-error-threshold 200 (the other 7 old settings were defaults or tuned lints that are off). The 27 src unwraps are fixed by restructuring (if-let guards, let-else, a checked active_task/edited_task helper in relationships.rs, ? with the existing ''Invalid relationship task'' error), expect only where impossible (JSON of strings, constant fallback regexes, non-empty line rest). Integration test crate roots (tests/integration.rs, tests/performance_test.rs) allow unwrap in helpers: 644 findings, one line each since DEV-302 made tests one binary. Pre-push clippy uses --message-format=short. Toolchain pin 1.98.1 kept (same 27 findings on 1.99). Gates: lint:agent, test:agent (1972 Rust, 1431 UI, release, hooks), test:smoke:agent 372, cargo deny pass; one agent_automation git_required test failed once under load and passed 3/3 alone and in the full rerun.'
+description: |-
+  Owner's lint standard (standards docs/decisions/2026-11-10-lint-standard.md, configs/typescript and configs/rust READMEs).
+  Scope: oxlintrc.standard.json copied unchanged, .oxlintrc.json extends it (ignores, vue plugin, smoke harness override, no-non-null-assertion off pending the owner's decision); oxlint + oxlint-tsgolint; ESLint reduced to eslint-plugin-vue template rules; eslint-suppressions.json removed; every finding fixed (no legacy overrides). Rust: [lints.clippy] unwrap_used, clippy.toml = standard plus large-error-threshold 200, test crate roots allow unwrap in helpers, the 27 unwraps in src fixed. Hooks (opt-in, light): oxlint added, clippy short output; CI full output. Formatting (Prettier, rustfmt) and the toolchain pin unchanged; TypeScript stays on 6 (DEV-123).
+  Acceptance: lint:agent, test:agent, test:smoke:agent, clippy --all-targets --all-features -D warnings, cargo deny check pass; docs (AGENTS.md, docs/developers/testing.md, .githooks/SETUP.md, skills) describe the new setup.
+history:
+- at: 2026-11-10T21:58:18.013995+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-123"]}'
+- at: 2026-11-10T21:58:18.126722+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-10T22:04:01.503541+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-10T22:04:01.675768+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-123"]}'
+    new: '{"related":["DEV-123","DEV-302"]}'

@@ -726,7 +726,7 @@ fn write_wire_outcome(stdout: &Arc<Mutex<io::Stdout>>, session: &McpSession, out
 fn parse_limit_value(value: Option<&Value>, default: usize) -> Result<usize, &'static str> {
     match value {
         None | Some(Value::Null) => Ok(default),
-        Some(Value::Number(num)) if num.is_u64() => Ok(num.as_u64().unwrap() as usize),
+        Some(Value::Number(num)) if let Some(n) = num.as_u64() => Ok(n as usize),
         Some(Value::String(text)) => text
             .trim()
             .parse::<usize>()
@@ -738,7 +738,7 @@ fn parse_limit_value(value: Option<&Value>, default: usize) -> Result<usize, &'s
 fn parse_cursor_value(value: Option<&Value>) -> Result<usize, &'static str> {
     match value {
         None | Some(Value::Null) => Ok(0),
-        Some(Value::Number(num)) if num.is_u64() => Ok(num.as_u64().unwrap() as usize),
+        Some(Value::Number(num)) if let Some(n) = num.as_u64() => Ok(n as usize),
         Some(Value::String(text)) => text
             .trim()
             .parse::<usize>()

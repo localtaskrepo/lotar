@@ -10,6 +10,8 @@
 //! `nextest_guard_test` and `performance_test` stay separate binaries.
 //! New test files must be added below (Cargo.toml sets `autotests = false`).
 
+#![allow(clippy::unwrap_used, reason = "test helpers outside #[test] fns")]
+
 mod common;
 
 mod agent_automation_integration_test;

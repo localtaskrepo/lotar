@@ -1,20 +1,7 @@
-# Complexity thresholds
-too-many-arguments-threshold = 7
-type-complexity-threshold = 250
-trivial-copy-size-limit = 128
-
-# Length limits
-max-suggested-slice-pattern-length = 3
-
-# Cognitive complexity
-cognitive-complexity-threshold = 30
-
-# Performance settings
+# Only what differs from clippy's defaults.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-dbg-in-tests = true
+# lotar's own setting (standards configs/rust/README.md: a per-repo line): its error enums are larger than
+# clippy's default of 128 bytes.
 large-error-threshold = 200
-vec-box-size-threshold = 4096
-
-# Naming conventions - allow certain patterns common in CLI tools
-enum-variant-name-threshold = 3
-
-# Allow certain patterns that are common in our codebase
-# (We'll handle these through targeted allows in code where needed)
