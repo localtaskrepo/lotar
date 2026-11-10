@@ -189,8 +189,9 @@ fn same_modified(stored: &str, expected: &str) -> bool {
 
 impl TaskService {
     /// The project for a create without one: the configured default
-    /// project (`default.project`, `LOTAR_PROJECT`) when set, else a prefix
-    /// from the repository folder name (DEV-311).
+    /// project (`default.project`, `LOTAR_PROJECT`) when set (DEV-311), else
+    /// an existing project (DEV-312), else a prefix from the repository
+    /// folder name.
     pub(crate) fn resolve_create_project(tasks_root: &Path, project: Option<String>) -> String {
         project.unwrap_or_else(|| {
             if let Ok(config) = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
@@ -199,6 +200,9 @@ impl TaskService {
                 if !default.is_empty() {
                     return crate::utils::project::resolve_project_input(default, tasks_root);
                 }
+            }
+            if let Some(existing) = crate::config::persistence::auto_detect_prefix(tasks_root) {
+                return existing;
             }
             let repo_name = tasks_root
                 .parent()

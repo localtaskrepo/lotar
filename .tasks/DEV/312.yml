@@ -1,0 +1,53 @@
+title: add and REST/MCP create a new project from the repo name while a project already exists
+status: Done
+priority: High
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-10T08:30:58.984955+00:00
+modified: 2026-11-10T08:38:26.730116+00:00
+relationships:
+  related:
+  - DEV-311
+comments:
+- date: 2026-11-10T08:38:26.586024+00:00
+  text: |-
+    Outcome: foundera (FOUN) and gairola (GAIR) are both DEV-311: 0.12.1 takes the nearest package.json name before default.project. Fixed on main since 2026-11-06 but not released; main picks FND/G in both repos from root, infra/ and site/ (dry runs). Fixed the remaining paths that still made a project from the repo name while one existed:
+    - auto_detect_prefix (src/config/persistence.rs) counts a project folder with task files, not only one with config.yml.
+    - Storage bootstrap (src/config/bootstrap.rs) writing a missing .tasks/config.yml chose default.project from the repo/manifest name before existing projects: a correct add to FND then saved default.project FOUN and the next add went to FOUN. Existing project now comes first.
+    - REST/MCP create without a default (TaskService::resolve_create_project) uses the existing project before the repo folder name.
+    Docs: add.md, precedence.md, mcp-tools.md.
+    Evidence: tests/dev312_existing_project_before_detection_test.rs (foundera layout with default FND; FND with only tickets and no/empty/no-default config; service create) failed before, pass now; the gairola layout stays covered by dev311. npm run lint:agent, test:agent (1972 Rust + 1431 UI), test:smoke:agent (372) pass.
+    Remaining: uncommitted. Users on 0.12.1 need a release to get DEV-311 + DEV-312; until then pass --project.
+    Guidance: no durable finding.
+description: |-
+  Reported by the pyxzl.net session (~/Development/local), lotar 0.12.1: in ~/Development/foundera (default.project FND, package.json name foundera, infra/package.json @foundera/infra) lotar add created FOUN; same earlier in ~/Development/gairola (G vs GAIR).
+
+  Findings: both are DEV-311 (manifest name before default.project), fixed on main after 0.12.1 and unreleased; main picks FND/G in both repos (dry runs from root, infra/, site/). Remaining gap: with no usable default.project, auto_detect_prefix only counts project folders that have config.yml, so a project folder holding only tickets is ignored and add creates a new project from the manifest name. REST/MCP creates without a default use the repo folder name even when a project exists.
+
+  Acceptance: an existing project (config.yml or task files) is used before any name detection, in add and REST/MCP; a new project is only made from detection when no project exists; regression tests for the foundera and gairola layouts.
+history:
+- at: 2026-11-10T08:30:59.126422+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-311"]}'
+- at: 2026-11-10T08:31:17.059123+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-10T08:38:26.586024+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-10T08:38:26.730116+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -127,7 +127,7 @@ Tasks are created in the appropriate project:
 1. **Explicit project**: `--project=myproject` or `-p myproject`
 2. **Task ID prefix**: If title starts with "PROJ-", uses PROJ project  
 3. **Default project**: `default.project` in the configuration, or the `LOTAR_PROJECT` / `LOTAR_DEFAULT_PROJECT` environment variable. A manifest name never overrides it.
-4. **No default project set**: the existing project (the first one alphabetically), else a name detected from the checkout:
+4. **No default project set**: the existing project (the first one alphabetically; a folder with a `config.yml` or task files), else a name detected from the checkout:
 	 - Nearest project manifest walking up to the repo root:
 		 - `package.json` name (scope stripped, e.g. `@scope/api` -> `api`)
 		 - `Cargo.toml` `[package].name`

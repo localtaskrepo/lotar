@@ -5,7 +5,10 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-07T01:56:05.192537+00:00
-modified: 2026-11-07T02:19:49.362806+00:00
+modified: 2026-11-10T08:30:59.125971+00:00
+relationships:
+  related:
+  - DEV-312
 comments:
 - date: 2026-11-07T02:14:34.291218+00:00
   text: |-
@@ -52,3 +55,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-10T08:30:59.125971+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-312"]}'

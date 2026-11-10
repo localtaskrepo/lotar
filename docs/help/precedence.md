@@ -55,7 +55,7 @@ Project context is determined in this order:
 - Explicit `--project` flag (highest). Accepts either a prefix or the full project name; both are normalized via `resolve_project_input`.
 - Task ID prefix (e.g., AUTH-123 → AUTH) when present.
 - Default project (`default.project`, or `LOTAR_PROJECT`) from merged configuration. Manifest names never override it.
-- Without a default: the existing project (first alphabetically), else a prefix from the nearest manifest, repo or folder name. `lotar add` warns before it creates a project this way; see [add](./add.md#project-resolution).
+- Without a default: the existing project (first alphabetically; a folder with a `config.yml` or task files), else a prefix from the nearest manifest, repo or folder name. `lotar add` warns before it creates a project this way; see [add](./add.md#project-resolution).
 
 ## Automation semantics
 

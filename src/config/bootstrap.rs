@@ -6,8 +6,9 @@ use std::path::Path;
 /// Ensure the global configuration exists for the provided tasks root.
 ///
 /// When no configuration is present we create one with a best-effort
-/// default project prefix derived from the explicit `project_context`,
-/// the surrounding repository name, or existing project folders.
+/// default project prefix: the explicit `project_context`, else an existing
+/// project, else the surrounding repository name. An existing project comes
+/// before the name, or the next add would start a second project (DEV-312).
 pub fn ensure_global_config(
     root_path: &Path,
     project_context: Option<&str>,
@@ -40,6 +41,10 @@ fn determine_smart_default_project(
         && let Ok(prefix) = generate_unique_project_prefix(project_name, root_path)
     {
         return Some(prefix);
+    }
+
+    if let Some(existing) = crate::config::persistence::auto_detect_prefix(root_path) {
+        return Some(existing);
     }
 
     if let Some(auto_detected) = crate::project::detect_project_name()

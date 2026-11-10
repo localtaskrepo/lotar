@@ -273,15 +273,13 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
     Ok(())
 }
 
-/// Auto-detect the default prefix from existing project directories
-/// This scans for existing project directories and their configurations
+/// The first existing project, alphabetically: a folder with a `config.yml`
+/// or task files (DEV-312: a project holding only tickets counts too).
 pub fn auto_detect_prefix(tasks_dir: &Path) -> Option<String> {
     let mut project_prefixes = Vec::new();
 
-    // Look for project directories that exist and have config files
     for (prefix, path) in crate::utils::filesystem::list_visible_subdirs(tasks_dir) {
-        let config_path = path.join("config.yml");
-        if config_path.exists() {
+        if path.join("config.yml").exists() || crate::storage::layout::max_number(&path) > 0 {
             project_prefixes.push(prefix);
         }
     }
