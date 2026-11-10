@@ -21,7 +21,7 @@ These commands keep CI and local development aligned. Treat them as the required
 | Rust style and lints | `rustfmt` (edition 2024), Clippy with `-D warnings`; lint levels in `Cargo.toml` `[lints]`; suppress with `#[expect(lint, reason = "...")]` so stale suppressions are reported | `npm run lint`, pre-push hook, CI |
 | Frontend types, lints and style | `vue-tsc`, ESLint (`eslint.config.mjs`; existing app `any`s in `eslint-suppressions.json`), Prettier (`.prettierrc.json`) | `npm run lint`, pre-commit (staged files) and pre-push hooks, CI |
 | Tests | nextest (manifest vs JUnit check in CI), Vitest, Playwright smoke, hook and release-page Node tests | `npm test`, `npm run smoke`, CI |
-| Dependencies | `cargo deny check` (`deny.toml`), Dependabot (cargo, npm, GitHub Actions), SHA-pinned workflow actions | `npm run check:deps`, CI Security Audit job |
+| Dependencies | `cargo deny check` (`deny.toml`), Dependabot alerts, a monthly dependency pass (cargo, npm, GitHub Actions), SHA-pinned workflow actions | `npm run check:deps`, CI Security Audit job |
 | Code scanning | CodeQL for Rust, TypeScript/Vue and workflows | CI on push, pull request and weekly |
 | Coverage (report only) | `npm run coverage:rust` (cargo-llvm-cov), `npm run coverage:ui` (Vitest v8); reports under `target/coverage/` | Locally, and the Coverage workflow after pushes to `main` |
 
