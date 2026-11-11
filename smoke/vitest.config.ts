@@ -1,37 +1,9 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const nodeMajorVersion = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10);
-
-function createLocalStorageFile(prefix: string) {
-    if (Number.isNaN(nodeMajorVersion) || nodeMajorVersion < 22) {
-        return undefined;
-    }
-
-    try {
-        const dir = mkdtempSync(path.join(tmpdir(), prefix));
-        const file = path.join(dir, 'localstorage.json');
-        writeFileSync(file, '', { flag: 'w' });
-        return file;
-    } catch {
-        return undefined;
-    }
-}
-
-const localStorageFile = createLocalStorageFile('lotar-vitest-smoke-');
-
-if (localStorageFile) {
-    const flag = `--localstorage-file=${localStorageFile}`;
-    if (!process.execArgv.includes(flag)) {
-        process.execArgv.push(flag);
-    }
-}
 
 export default defineConfig({
     test: {
@@ -49,6 +21,7 @@ export default defineConfig({
         // holds. Polls stay condition-based; they only get a realistic budget.
         // Explicit per-poll timeouts still override this.
         expect: { poll: { timeout: 15_000 } },
+        globalSetup: ['../scripts/vitest-temp-guard.mjs'],
         setupFiles: ['helpers/setup.ts'],
         env: {
             LOTAR_TEST_SILENT: '1',

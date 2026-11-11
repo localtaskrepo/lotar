@@ -541,6 +541,22 @@ async function runTests(runArgs, childEnv) {
     });
 }
 
+// Tests clean up after themselves (DEV-315): nextest runs with a fresh temp folder, and a passing run fails when
+// anything is left in it.
+async function runTestsInFreshTemp(runArgs, childEnv, stderr) {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'lotar-rust-temp-'));
+    const outcome = await runTests(runArgs, { ...childEnv, TMPDIR: root, TEMP: root, TMP: root });
+    const leftovers = await fs.readdir(root);
+    await fs.rm(root, { recursive: true, force: true });
+    if (leftovers.length === 0) {
+        return outcome;
+    }
+    stderr.write(
+        `rust-test-runner: error: tests left ${leftovers.length} entries in the temp folder; remove them where they are created: ${leftovers.join(', ')}\n`,
+    );
+    return { exitCode: outcome.exitCode === 0 ? 1 : outcome.exitCode };
+}
+
 export async function main({
     argv = process.argv.slice(2),
     env = process.env,
@@ -605,7 +621,7 @@ export async function main({
         }
     }
 
-    const outcome = await runTests(runArgs, childEnv);
+    const outcome = await runTestsInFreshTemp(runArgs, childEnv, stderr);
     if (plan.gitlessSelected) {
         stderr.write(
             `JUnit report for this run: ${GITLESS_JUNIT_PATH} (gitless profile dir; git_required tests excluded, not passed).\n`,

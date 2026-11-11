@@ -1,0 +1,47 @@
+title: Tests clean up their temp files; the test runners fail on leftovers
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-11T08:10:29.425313+00:00
+modified: 2026-11-11T08:25:21.088940+00:00
+comments:
+- date: 2026-11-11T08:10:38.711357+00:00
+  text: 'Plan: measure each suite with a fresh TMPDIR; fix leaks where created; vitest globalSetup guard (view + smoke) that points TMPDIR at a fresh folder and fails the run on leftovers; verify the guard fails against unfixed code; full npm test + smoke + hooks; one commit, no push.'
+- date: 2026-11-11T08:25:21.043651+00:00
+  text: |-
+    Outcome: leaks fixed where created; guards added. UI/smoke vitest: obsolete --localstorage-file hack removed from view/vitest.config.ts and smoke/vitest.config.ts (1 lotar-vitest-* / lotar-vitest-smoke-* per run; vitest 5 passes no such flag to workers, Node 24/26 have no default localStorage); smoke ui.agent-jobs reviewed-template test put its worktrees in the default root beside the workspace ($TMPDIR/.lotar-worktrees, 1 per run), now uses its own worktree dir and removes it. Rust: lotar-test-automation-state (tests/common/mod.rs) moved into the process scratch and removed by the dtor; the empty .lotar-test-scratch base is removed by the last process (lib tests got the missing dtor). Guards: scripts/vitest-temp-guard.mjs (globalSetup of both vitest configs) and scripts/rust-test-runner.mjs give each run a fresh temp folder and fail on leftovers.
+    Evidence: guards failed before the fix (smoke: .lotar-worktrees; Rust: .lotar-test-scratch, lotar-test-automation-state; UI: probe spec); after: npm run lint:agent, npm test (1972 Rust, 1436 UI, release 47, hooks 6), npm run smoke (372), coverage:ui, rust-test-runner unit tests all pass with an empty temp folder (only npm's own node-compile-cache from npm/npx startup).
+    Remaining: none; committed, not pushed (owner review).
+    Guidance: testing-strategy skill names the guards.
+description: 'Owner 2026-11-11: "Tests need to clean up after themselves properly". The per-user temp folder had hundreds of lotar test leftovers (lotar-vitest-*, lotar-vitest-smoke-*, likely Playwright profiles). Acceptance: every suite (Rust nextest, UI vitest, smoke, test:release, test:hooks) leaves its temp folder empty; leaks are fixed where they are created; the vitest runners fail the run when a test leaves anything in a fresh temp folder.'
+history:
+- at: 2026-11-11T08:10:38.522946+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-11-11T08:10:38.711357+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-11T08:10:48.470330+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude
+- at: 2026-11-11T08:25:21.043651+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-11T08:25:21.088940+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -58,9 +58,9 @@ mod test_environment {
     /// scratch named `<pid>-<nanos>` under a dot-prefixed (scanner-invisible)
     /// base so lib-test fixtures are never siblings of unrelated workspaces;
     /// nextest's process-per-test model isolates individual tests as well.
-    /// Cleanup mirrors `tests/common`: destructors on regular exit, plus
-    /// dead-owner sweeping because nextest kills finished test processes
-    /// before their destructors run.
+    /// Cleanup mirrors `tests/common`: the destructor removes the scratch
+    /// and the empty base on regular exit, plus dead-owner sweeping for
+    /// processes killed before their destructors ran.
     #[ctor::ctor(unsafe)]
     unsafe fn isolate_tmpdir_under_owned_scratch() {
         scrub_repository_routing_env();
@@ -77,7 +77,9 @@ mod test_environment {
                 .map(|d| d.as_nanos())
                 .unwrap_or(0),
         ));
-        if std::fs::create_dir_all(&scratch).is_err() {
+        // Retry: a finishing process removes the base once it is empty,
+        // which can happen between creating the base and the scratch.
+        if !(0..3).any(|_| std::fs::create_dir_all(&scratch).is_ok()) {
             return; // keep the shared temp dir behavior on unusable filesystems
         }
         // Manipulating process-wide env vars requires `unsafe`. Keep scope
@@ -86,6 +88,16 @@ mod test_environment {
             std::env::set_var("TMPDIR", &scratch);
         }
         let _ = OWNED_SCRATCH.set(scratch);
+    }
+
+    #[dtor::dtor(unsafe)]
+    unsafe fn cleanup_owned_scratch() {
+        if let Some(scratch) = OWNED_SCRATCH.get() {
+            let _ = std::fs::remove_dir(scratch);
+            if let Some(base) = scratch.parent() {
+                let _ = std::fs::remove_dir(base); // only succeeds once no other process uses it
+            }
+        }
     }
 
     /// Remove inherited Git repository-routing variables once per lib-test

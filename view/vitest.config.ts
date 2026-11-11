@@ -1,30 +1,10 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, mergeConfig } from 'vitest/config'
 import baseConfig from '../vite.config.mts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const nodeMajorVersion = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10)
-
-function createLocalStorageFile(prefix: string) {
-    if (Number.isNaN(nodeMajorVersion) || nodeMajorVersion < 22) {
-        return undefined
-    }
-
-    try {
-        const dir = mkdtempSync(join(tmpdir(), prefix))
-        const file = join(dir, 'localstorage.json')
-        writeFileSync(file, '', { flag: 'w' })
-        return file
-    } catch {
-        return undefined
-    }
-}
-
-const localStorageFile = createLocalStorageFile('lotar-vitest-')
 // One time zone for every UI test on every machine, west of UTC so date-only
 // values that are wrongly parsed as UTC midnight show the day before. It must
 // be set here, in the main process before workers start: assigning TZ inside a
@@ -33,13 +13,6 @@ const localStorageFile = createLocalStorageFile('lotar-vitest-')
 process.env.TZ = 'America/Los_Angeles'
 
 const poolPreference = process.env.VITEST_POOL ?? (process.platform === 'win32' ? 'forks' : 'threads')
-
-if (localStorageFile) {
-    const flag = `--localstorage-file=${localStorageFile}`
-    if (!process.execArgv.includes(flag)) {
-        process.execArgv.push(flag)
-    }
-}
 
 export default mergeConfig(
     baseConfig,
@@ -50,6 +23,7 @@ export default mergeConfig(
             pool: poolPreference,
             environment: 'jsdom',
             globals: true,
+            globalSetup: ['../scripts/vitest-temp-guard.mjs'],
             setupFiles: ['__tests__/vitest.setup.ts'],
             // Report-only coverage (DEV-164): `npm run coverage:ui`. No
             // thresholds; the numbers inform where tests are missing.

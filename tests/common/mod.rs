@@ -42,9 +42,9 @@ pub fn lotar_cmd() -> Result<Command, CargoError> {
 
 #[ctor(unsafe)]
 unsafe fn init_lotar_test_environment() {
-    reset_lotar_test_environment();
     scrub_repository_routing_env();
     isolate_tmpdir_under_owned_scratch();
+    reset_lotar_test_environment();
 }
 
 /// Remove inherited Git repository-routing variables once per test process.
@@ -96,11 +96,11 @@ const SCRATCH_BASE_NAME: &str = ".lotar-test-scratch";
 /// leftovers entirely; multiple fixtures inside one test remain siblings,
 /// exactly as before.
 ///
-/// Cleanup: the `#[dtor]` removes this process's (normally empty) scratch on
-/// a regular exit, and each new process sweeps base entries whose owning pid
-/// is gone, because nextest kills finished test processes before their
-/// destructors run. Leaked scratches are invisible to sibling scans either
-/// way.
+/// Cleanup: the `#[dtor]` removes this process's scratch (normally empty
+/// apart from its automation state) and the base once it is empty, on a
+/// regular exit; each new process also sweeps base entries whose owning pid
+/// is gone, in case a process was killed before its destructors ran. Leaked
+/// scratches are invisible to sibling scans either way.
 fn isolate_tmpdir_under_owned_scratch() {
     if OWNED_SCRATCH.get().is_some() {
         return;
@@ -115,7 +115,9 @@ fn isolate_tmpdir_under_owned_scratch() {
             .map(|d| d.as_nanos())
             .unwrap_or(0),
     ));
-    if std::fs::create_dir_all(&scratch).is_err() {
+    // Retry: a finishing process removes the base once it is empty, which can
+    // happen between creating the base and the scratch inside it.
+    if !(0..3).any(|_| std::fs::create_dir_all(&scratch).is_ok()) {
         return; // keep the shared temp dir behavior on unusable filesystems
     }
     // Manipulating process-wide env vars requires `unsafe`. Keep scope tiny;
@@ -168,9 +170,15 @@ unsafe fn cleanup_owned_scratch() {
     // own tree on drop. Failures leave only an invisible dot-nested dir that
     // a later process sweeps once this pid is gone.
     if let Some(scratch) = OWNED_SCRATCH.get() {
+        let _ = std::fs::remove_dir_all(scratch.join(AUTOMATION_STATE_NAME));
         let _ = std::fs::remove_dir(scratch);
+        if let Some(base) = scratch.parent() {
+            let _ = std::fs::remove_dir(base); // only succeeds once no other process uses it
+        }
     }
 }
+
+const AUTOMATION_STATE_NAME: &str = "automation-state";
 
 /// Remove shared LOTAR environment variables and ignore home config for deterministic tests.
 ///
@@ -210,14 +218,17 @@ pub fn reset_lotar_test_environment() {
         std::env::set_var("LOTAR_TRUST_ALL", "1");
     }
     // Automation cooldowns persist in a state file (DEV-278); keep the
-    // tests' out of the user's cache directory. Entries are keyed by tasks
-    // directory, so tests sharing the file don't see each other's.
+    // tests' out of the user's cache directory, in the process scratch that
+    // the destructor removes. Entries are keyed by tasks directory, so tests
+    // sharing the file don't see each other's.
+    let state_dir = OWNED_SCRATCH
+        .get()
+        .cloned()
+        .unwrap_or_else(std::env::temp_dir)
+        .join(AUTOMATION_STATE_NAME);
     let _guard = env_mutex::lock_var("LOTAR_AUTOMATION_STATE_DIR");
     unsafe {
-        std::env::set_var(
-            "LOTAR_AUTOMATION_STATE_DIR",
-            std::env::temp_dir().join("lotar-test-automation-state"),
-        );
+        std::env::set_var("LOTAR_AUTOMATION_STATE_DIR", state_dir);
     }
 }
 

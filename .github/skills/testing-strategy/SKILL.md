@@ -17,6 +17,9 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
   For test-first work, implement one failing behavior, make it pass, then proceed
   to the next slice. Ask about a testing boundary only when it changes the agreed
   design, not as a mandatory gate before every test.
+- Tests remove every temp file and folder they create. `npm run test:rust`,
+  `test:ui` and the smoke suite run with a fresh temp folder and fail when
+  anything is left in it (`scripts/rust-test-runner.mjs`, `scripts/vitest-temp-guard.mjs`).
 - Pure documentation needs link/example/consistency checks. Run executable
   examples in isolated temporary workspaces. Embedded prompts and behavioral
   configuration need relevant behavior checks even when their files are Markdown.

@@ -1,4 +1,6 @@
 import fs from 'fs-extra';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createFixtureAgents, createGateFixture } from '../helpers/agent-fixtures.js';
@@ -35,7 +37,11 @@ ${worktreeLines.join('\n')}
 ${agentsYaml}`;
 }
 
-async function writeReviewedTemplateWorkflow(workspace: SmokeWorkspace, mockLauncherCommand: string) {
+async function writeReviewedTemplateWorkflow(
+    workspace: SmokeWorkspace,
+    mockLauncherCommand: string,
+    worktreeDir: string,
+) {
     const template = parse(await fs.readFile(reviewedTemplatePath, 'utf8')) as {
         config: Record<string, unknown>;
         automation: Record<string, unknown>;
@@ -44,9 +50,15 @@ async function writeReviewedTemplateWorkflow(workspace: SmokeWorkspace, mockLaun
     const config = template.config as {
         project?: { name?: string };
         agents?: Record<string, Record<string, unknown>>;
+        agent?: { worktree?: Record<string, unknown> };
     };
     if (config.project) {
         config.project.name = 'UI Reviewed';
+    }
+    // The default worktree root is a sibling of the workspace, outside its
+    // cleanup; the test owns this one and removes it.
+    if (config.agent?.worktree) {
+        config.agent.worktree.dir = worktreeDir;
     }
     for (const agentName of ['implement', 'test', 'merge']) {
         const agent = config.agents?.[agentName];
@@ -541,13 +553,14 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
     it.skipIf(!gitAvailable())('advances the reviewed template workflow live without reloads', async () => {
         const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-reviewed-');
+        const worktreeDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-worktrees-'));
 
         try {
             const workspace = await SmokeWorkspace.create();
 
             try {
                 await workspace.initGit({ name: 'tester', email: 'tester@example.com' });
-                await writeReviewedTemplateWorkflow(workspace, agents.command('mock'));
+                await writeReviewedTemplateWorkflow(workspace, agents.command('mock'), worktreeDir);
 
                 const taskTitle = 'UI reviewed workflow';
                 const server = await startLotarServer(workspace);
@@ -576,6 +589,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
             }
         } finally {
             await agents.dispose();
+            await fs.remove(worktreeDir);
         }
     });
 
